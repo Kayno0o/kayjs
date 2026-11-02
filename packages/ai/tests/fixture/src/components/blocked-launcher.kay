@@ -1,0 +1,12 @@
+---
+// kay-island
+import { blocked } from '../routes/tools.kay'
+import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
+---
+ChatLauncher(action={blocked} label="Assistant")
+  @turn(turn)
+    div.card {turn.role}: {turn.content}
+  @empty(chat)
+    button.hello(type="button" onClick={() => chat.send('Hello there')}) Say hello
+  @footer
+    p.footer Footer text

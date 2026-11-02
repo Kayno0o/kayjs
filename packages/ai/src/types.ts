@@ -42,6 +42,16 @@ export interface Message {
 // A message a `Chat` shows to start with, through `initial`: an island prop carries no `Blob`, so it has no attachments.
 export type ChatTurn = Pick<Message, 'role' | 'content' | 'sources'>
 
+// A turn as `Chat`'s `@turn` and `@actions` blocks receive it: plain data, the turn being written included (`pending`).
+export interface ChatTurnView extends ChatTurn {
+  // The tools the reply called, when the action streams `reply.progress()`.
+  calls: readonly ToolCall[]
+  // A reply the visitor stopped, or one whose stream broke off.
+  stopped: boolean
+  // The reply still streaming in, whose `content` grows.
+  pending: boolean
+}
+
 export interface Usage {
   // The input read at full price: what the provider did not take from its cache, nor write to it.
   inputTokens: number

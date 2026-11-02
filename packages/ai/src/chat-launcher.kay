@@ -6,7 +6,7 @@ import Icon from '@kaynooo/kayjs-ui/icon.kay'
 
 type ChatProps = typeof Chat extends Component<infer Props> ? Props : never
 
-const { icon, closeIcon, sendIcon, stopIcon, attachIcon, newIcon, expandIcon, collapseIcon, note, openLabel, closeLabel, newLabel, expandLabel, collapseLabel, remember, class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember' | 'conversationIn' | 'newButton' | 'sendIcon' | 'stopIcon' | 'attachIcon'> & {
+const { icon, closeIcon, turn, actions, call, source, empty, footer, sendIcon, stopIcon, attachIcon, newIcon, expandIcon, collapseIcon, note, openLabel, closeLabel, newLabel, expandLabel, collapseLabel, remember, class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember' | 'conversationIn' | 'newButton' | 'sendIcon' | 'stopIcon' | 'attachIcon' | 'turn' | 'actions' | 'call' | 'source' | 'empty' | 'footer'> & {
   // The text of the button while the panel is closed and while it is open; `Open the chat` and `Close the chat` by default. The chat's `label` heads the panel.
   openLabel?: string | undefined
   closeLabel?: string | undefined
@@ -17,6 +17,13 @@ const { icon, closeIcon, sendIcon, stopIcon, attachIcon, newIcon, expandIcon, co
   closeIcon?: Snippet
   // The header's two other buttons, which clear the conversation and enlarge the panel: a new-chat plus, and a pair of arrows out and in.
   newIcon?: Snippet
+  // The chat's blocks, as `Chat` takes them: its turns, the buttons under a turn, a tool call, a cited source, the empty chat and a footer under the form.
+  turn?: ChatProps['turn']
+  actions?: ChatProps['actions']
+  call?: ChatProps['call']
+  source?: ChatProps['source']
+  empty?: ChatProps['empty']
+  footer?: ChatProps['footer']
   // The chat's round buttons, as `Chat` takes them.
   sendIcon?: Snippet
   stopIcon?: Snippet
@@ -32,6 +39,20 @@ const { icon, closeIcon, sendIcon, stopIcon, attachIcon, newIcon, expandIcon, co
   // On the button and panel's wrapper.
   class?: string | undefined
 }>()
+
+// The blocks the app gave, passed on to the chat. A function passed to the chat island makes this component render as an island when the app gives one, and only then.
+function forwarded() {
+  const given: Pick<ChatProps, 'turn' | 'actions' | 'call' | 'source' | 'empty' | 'footer'> = {}
+
+  if (turn) given.turn = turn
+  if (actions) given.actions = actions
+  if (call) given.call = call
+  if (source) given.source = source
+  if (empty) given.empty = empty
+  if (footer) given.footer = footer
+
+  return given
+}
 ---
 // The panel keeps its state across page swaps, and the chat inside hydrates, and so loads, when the panel is first shown. A conversation kept on the server is named by the browser, as the panel is on every page and the address of none.
 Panel(persist label={chat.label} openLabel={openLabel} closeLabel={closeLabel} newLabel={newLabel} expandLabel={expandLabel} collapseLabel={collapseLabel} class={className})
@@ -60,7 +81,7 @@ Panel(persist label={chat.label} openLabel={openLabel} closeLabel={closeLabel} n
       | {collapseIcon}
     else
       Icon(icon="collapse")
-  Chat(hydrate="visible" {...chat} remember={remember} links="here" conversationIn="browser")
+  Chat(hydrate="visible" {...chat} {...forwarded()} remember={remember} links="here" conversationIn="browser")
     @sendIcon
       if sendIcon
         | {sendIcon}

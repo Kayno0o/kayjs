@@ -119,6 +119,15 @@ interface ChatMessagesOptions
 [.] ChatTurn
 type ChatTurn = Pick<Message, 'role' | 'content' | 'sources'>
 
+[.] ChatTurnView
+interface ChatTurnView extends ChatTurn
+  calls: readonly ToolCall[]
+  content: string
+  pending: boolean
+  role: "user" | "assistant"
+  sources?: readonly Source[] | undefined
+  stopped: boolean
+
 [.] CodeBlock
 interface CodeBlock
   html: string
@@ -588,12 +597,13 @@ const default: { description: string; extension: { import: string; expression: s
 component default
   approvalLabel: string
   argumentsLabel: string
+  block?: ((call: ToolCall) => Element) | undefined
   calls: ToolCall[]
   class?: string | {
   root?: string | undefined;
-  summary?: string | undefined;
   list?: string | undefined;
   call?: string | undefined;
+  summary?: string | undefined;
   name?: string | undefined;
   status?: string | undefined;
   title?: string | undefined;
@@ -611,6 +621,7 @@ component default
 component default
   accept?: string | undefined
   action: Action<{ messages: ChatMessage[]; }, AsyncIterable<string | Progress> | Failure<unknown>, never>
+  actions?: ((turn: ChatTurnView) => Element) | undefined
   allowLabel?: string | undefined
   allowedLabel?: string | undefined
   approvalLabel?: string | undefined
@@ -621,6 +632,7 @@ component default
   attachLabel?: string | undefined
   attachRefusedLabel?: string | undefined
   attachTooBigLabel?: string | undefined
+  call?: ((call: ToolCall) => Element) | undefined
   cancelLabel?: string | undefined
   changeFailedLabel?: string | undefined
   class?: string | undefined
@@ -642,11 +654,13 @@ component default
   editIcon?: Element
   editLabel?: string | undefined
   editable?: boolean | undefined
+  empty?: ((chat: { send: (text: string) => void; }) => Element) | undefined
   errorMessage?: string | undefined
   expandIcon?: Element
   expandLabel?: string | undefined
   failedLabel?: string | undefined
   fill?: boolean | undefined
+  footer?: Element
   greeting?: string | undefined
   icon?: Element
   images?: string | string[] | undefined
@@ -681,6 +695,7 @@ component default
   sendLabel?: string | undefined
   signedOutLabel?: string | undefined
   size?: "sm" | "md" | "lg" | undefined
+  source?: ((source: Source, n: number) => Element) | undefined
   sourcesLabel?: string | undefined
   stopIcon?: Element
   stopLabel?: string | undefined
@@ -694,6 +709,7 @@ component default
   transcribe?: Action<{ audio: File; }, string | Failure<unknown> | { text: string; }, never> | undefined
   transcribeFailedLabel?: string | undefined
   transcribingLabel?: string | undefined
+  turn?: ((turn: ChatTurnView, index: number) => Element) | undefined
   unheardLabel?: string | undefined
   untitledLabel?: string | undefined
   variant?: "bubble" | "plain" | undefined
@@ -727,6 +743,7 @@ component default
 
 [./chat-sources.kay] default
 component default
+  block?: ((source: Source, n: number) => Element) | undefined
   class?: string | { root?: string | undefined; label?: string | undefined; list?: string | undefined; item?: string | undefined; link?: string | undefined; } | undefined
   here: boolean
   label: string
@@ -736,6 +753,7 @@ component default
 component default
   accept?: string | undefined
   action: Action<{ messages: ChatMessage[]; }, AsyncIterable<string | Progress> | Failure<unknown>, never>
+  actions?: ((turn: ChatTurnView) => Element) | undefined
   allowLabel?: string | undefined
   allowedLabel?: string | undefined
   approvalLabel?: string | undefined
@@ -746,6 +764,7 @@ component default
   attachLabel?: string | undefined
   attachRefusedLabel?: string | undefined
   attachTooBigLabel?: string | undefined
+  call?: ((call: ToolCall) => Element) | undefined
   cancelLabel?: string | undefined
   changeFailedLabel?: string | undefined
   class?: string | {
@@ -768,19 +787,19 @@ component default
   log?: string | undefined;
   turn?: string | undefined;
   editField?: any;
-  text?: string | undefined;
   files?: string | undefined;
   file?: string | undefined;
   actions?: string | undefined;
   save?: string | undefined;
-  edit?: any;
+  text?: string | undefined;
   reasoning?: string | undefined;
   reasoningText?: string | undefined;
+  note?: string | undefined;
   approval?: string | undefined;
   approvalText?: string | undefined;
   allow?: string | undefined;
   deny?: string | undefined;
-  note?: string | undefined;
+  edit?: any;
   regenerate?: any;
   thinking?: string | undefined;
   status?: string | undefined;
@@ -810,9 +829,11 @@ component default
   editIcon?: Element
   editLabel?: string | undefined
   editable?: boolean | undefined
+  empty?: ((chat: { send: (text: string) => void; }) => Element) | undefined
   errorMessage?: string | undefined
   failedLabel?: string | undefined
   fill?: boolean | undefined
+  footer?: Element
   greeting?: string | undefined
   images?: string | string[] | undefined
   initial?: ChatTurn[] | undefined
@@ -846,6 +867,7 @@ component default
   sendLabel?: string | undefined
   signedOutLabel?: string | undefined
   size?: "sm" | "md" | "lg" | undefined
+  source?: ((source: Source, n: number) => Element) | undefined
   sourcesLabel?: string | undefined
   stopIcon?: Element
   stopLabel?: string | undefined
@@ -859,6 +881,7 @@ component default
   transcribe?: Action<{ audio: File; }, string | Failure<unknown> | { text: string; }, never> | undefined
   transcribeFailedLabel?: string | undefined
   transcribingLabel?: string | undefined
+  turn?: ((turn: ChatTurnView, index: number) => Element) | undefined
   unheardLabel?: string | undefined
   untitledLabel?: string | undefined
   variant?: "bubble" | "plain" | undefined

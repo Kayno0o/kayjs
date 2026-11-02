@@ -1,0 +1,8 @@
+---
+// kay-island
+import { blocked } from '../routes/tools.kay'
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+Chat(action={blocked} label="Assistant" regenerate)
+  @turn(turn, index)
+    div.card(data-index={index} data-pending={turn.pending ? '' : undefined} data-calls={turn.calls.length} data-stopped={turn.stopped ? '' : undefined}) {turn.role}: {turn.content}

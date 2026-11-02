@@ -1,0 +1,12 @@
+---
+// kay-island
+import { blocked } from '../routes/tools.kay'
+import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
+---
+ChatLauncher(action={blocked} label="Assistant")
+  @call(call)
+    div.order {call.name} gave {call.result ?? 'nothing yet'}
+  @source(source, n)
+    span.pill {n}={source.title}
+  @actions(_turn)
+    button.like(type="button") Like

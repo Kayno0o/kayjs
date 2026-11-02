@@ -1,7 +1,7 @@
 ---
 import type { Action, Failure, SanitizeOptions, Snippet } from 'kay'
 import type { Turn } from './chat-session'
-import type { ChatMessage, ChatTurn, CodeBlock, Progress, Source, ToolCall } from './types'
+import type { ChatMessage, ChatTurn, ChatTurnView, CodeBlock, Progress, Source, ToolCall } from './types'
 import { durationMs, effect, followLog, onCleanup, onMount, persisted, queryParam, recipe, sanitizeHtml, signal, trustHtml, untrack, withQuery } from 'kay'
 import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
@@ -51,7 +51,7 @@ const SANITIZED_LINK = /<a href="([^"]*)" rel="nofollow ugc">/g
 // The images and documents a model reads.
 const ATTACHABLE = 'image/png,image/jpeg,image/gif,image/webp,application/pdf'
 
-const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), sourcesLabel = wording('ai.chat.sources', 'Sources'), reasoning = true, reasoningLabel = wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), newIcon, remember, links = 'apart', images, runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxFileSize = 5 * 1024 * 1024, attachLabel = wording('ai.chat.attach', 'Attach a file'), removeLabel = wording('ai.chat.remove', 'Remove'), attachRefusedLabel = wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = wording('ai.chat.attachFull', 'No more files can be attached.'), attachIcon, regenerate = false, editable = false, regenerateLabel = wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = wording('ai.chat.edit', 'Edit the message'), saveLabel = wording('ai.chat.save', 'Save and send'), cancelLabel = wording('ai.chat.cancel', 'Cancel'), editEmptyLabel = wording('ai.chat.editEmpty', 'Write a message to send.'), editBusyLabel = wording('ai.chat.editBusy', 'Wait for the reply to finish.'), regenerateIcon, editIcon, transcribe, recordLabel = wording('ai.chat.record', 'Speak a message'), transcribingLabel = wording('ai.chat.transcribing', 'Writing down what was said…'), unheardLabel = wording('ai.chat.unheard', 'Nothing was heard.'), transcribeFailedLabel = wording('ai.chat.transcribeFailed', 'What was said could not be written down.'), recordIcon, fill = false, variant = 'bubble', tone = 'accent', size = 'md', keepOnServer = false, conversations = false, conversationIn = 'address', conversationsLabel = wording('ai.chat.conversations', 'Conversations'), untitledLabel = wording('ai.chat.untitled', 'Untitled conversation'), renameLabel = wording('ai.chat.rename', 'Rename the conversation'), deleteLabel = wording('ai.chat.delete', 'Delete the conversation'), deleteConfirmLabel = wording('ai.chat.deleteConfirm', 'Delete for good?'), conflictLabel = wording('ai.chat.conflict', 'This conversation changed in another tab, so it was reloaded.'), loadFailedLabel = wording('ai.chat.loadFailed', 'The conversation could not be loaded.'), changeFailedLabel = wording('ai.chat.changeFailed', 'The change could not be saved.'), signedOutLabel = wording('ai.chat.signedOut', 'You are signed out, so this conversation is no longer saved.') } = props<{
+const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), sourcesLabel = wording('ai.chat.sources', 'Sources'), reasoning = true, reasoningLabel = wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), newIcon, remember, links = 'apart', images, runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxFileSize = 5 * 1024 * 1024, attachLabel = wording('ai.chat.attach', 'Attach a file'), removeLabel = wording('ai.chat.remove', 'Remove'), attachRefusedLabel = wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = wording('ai.chat.attachFull', 'No more files can be attached.'), attachIcon, regenerate = false, editable = false, regenerateLabel = wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = wording('ai.chat.edit', 'Edit the message'), saveLabel = wording('ai.chat.save', 'Save and send'), cancelLabel = wording('ai.chat.cancel', 'Cancel'), editEmptyLabel = wording('ai.chat.editEmpty', 'Write a message to send.'), editBusyLabel = wording('ai.chat.editBusy', 'Wait for the reply to finish.'), regenerateIcon, editIcon, transcribe, recordLabel = wording('ai.chat.record', 'Speak a message'), transcribingLabel = wording('ai.chat.transcribing', 'Writing down what was said…'), unheardLabel = wording('ai.chat.unheard', 'Nothing was heard.'), transcribeFailedLabel = wording('ai.chat.transcribeFailed', 'What was said could not be written down.'), recordIcon, fill = false, variant = 'bubble', tone = 'accent', size = 'md', keepOnServer = false, conversations = false, conversationIn = 'address', conversationsLabel = wording('ai.chat.conversations', 'Conversations'), untitledLabel = wording('ai.chat.untitled', 'Untitled conversation'), renameLabel = wording('ai.chat.rename', 'Rename the conversation'), deleteLabel = wording('ai.chat.delete', 'Delete the conversation'), deleteConfirmLabel = wording('ai.chat.deleteConfirm', 'Delete for good?'), conflictLabel = wording('ai.chat.conflict', 'This conversation changed in another tab, so it was reloaded.'), loadFailedLabel = wording('ai.chat.loadFailed', 'The conversation could not be loaded.'), changeFailedLabel = wording('ai.chat.changeFailed', 'The change could not be saved.'), signedOutLabel = wording('ai.chat.signedOut', 'You are signed out, so this conversation is no longer saved.'), turn: turnBlock, actions: actionsBlock, call: callBlock, source: sourceBlock, empty: emptyBlock, footer } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.fail`; the chat posts the latest messages to it and reads the reply as it streams.
   // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
   action: Action<{ messages: ChatMessage[] }, AsyncIterable<string | Progress> | Failure<unknown>>
@@ -173,6 +173,18 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   changeFailedLabel?: string | undefined
   // Said when the visitor's session lapsed while a conversation was kept on the server: the chat keeps what it shows and posts it whole from then on.
   signedOutLabel?: string | undefined
+  // Replaces what a turn shows with the app's own markup, given the turn as plain data and its place in the log; the turn being written is given too, its `content` growing. The log, the turn's element, the held tool calls' Allow and Deny buttons, the edit and regenerate buttons and the field that opens on an edit stay the chat's, so scrolling and screen-reader announcements work as for the default.
+  turn?: Snippet<[turn: ChatTurnView, index: number]> | undefined
+  // Adds markup to the row of buttons under a turn, after the regenerate and edit buttons, such as a copy button or thumbs; given a finished turn.
+  actions?: Snippet<[turn: ChatTurnView]> | undefined
+  // Replaces how one tool call is drawn, instead of the folded list of the turn's calls, such as a card showing an order a tool returned: given the name, input, status and result.
+  call?: Snippet<[call: ToolCall]> | undefined
+  // Replaces how one cited source is drawn in the list under a reply; given the source and its number, which the list keeps.
+  source?: Snippet<[source: Source, n: number]> | undefined
+  // Replaces the greeting and suggestions of the empty chat; `send` posts a message as a clicked suggestion does.
+  empty?: Snippet<[chat: { send: (text: string) => void }]> | undefined
+  // Markup under the form, such as a link to the help or a limit counter.
+  footer?: Snippet | undefined
 }>()
 
 const statuses = { running: runningLabel, done: doneLabel, failed: failedLabel }
@@ -482,6 +494,9 @@ function actionsKey(event: KeyboardEvent, id: number) {
   }
 }
 
+// The turn as a block gets it: plain data, not the session's own record.
+const viewOf = (turn: Turn): ChatTurnView => ({ role: turn.role, content: turn.content, sources: turn.sources, calls: turn.calls ?? [], stopped: turn.stopped === true, pending: false })
+
 const callKey = (call: ToolCall) => `${call.name}\n${JSON.stringify(call.input)}`
 
 // Only the calls of the last turn can still be allowed: a later message has moved on.
@@ -648,75 +663,85 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
                 Icon(icon="delete")
   if history().length === 0 && !busy() && !session.opening()
     div(part="empty")
-      p(part="greeting") {greeting}
-      if suggestions.length > 0
-        ul(part="suggestions")
-          for question of suggestions key={question}
-            li
-              button(part="suggestion" type="button" onClick={() => ask(question)}) {question}
+      slot empty({ send: ask })
+        p(part="greeting") {greeting}
+        if suggestions.length > 0
+          ul(part="suggestions")
+            for question of suggestions key={question}
+              li
+                button(part="suggestion" type="button" onClick={() => ask(question)}) {question}
   // The log is the turns so far; the reply streaming in is hidden from screen readers until it is whole, so the finished turn is announced once, not word by word. The status line says the thinking label, then each tool call as it starts and ends, and the log is busy while a conversation held on the server is read.
   div(part="log" role="log" aria-label={label} aria-busy={session.loading() ? 'true' : undefined} tabindex="0" ref={element => log = element})
-    for turn of history() key={turn.id}
+    for turn, index of history() key={turn.id}
       article(part="turn" data-role={turn.role} data-editing={editing() === turn.id ? '' : undefined})
-        if turn.role === 'user'
-          if editing() === turn.id
-            Textarea(part="editField" writeFocused ref={element => { queueMicrotask(() => element.focus()) }} value={editDraft()} onInput={value => { editDraft = value; editProblem = undefined }} rows="1" aria-label={editLabel} onKeyDown={event => editKey(event, turn.id)})
-          else if turn.content !== ''
-            p(part="text") {withoutApproval(turn.content)}
+        if editing() === turn.id
+          Textarea(part="editField" writeFocused ref={element => { queueMicrotask(() => element.focus()) }} value={editDraft()} onInput={value => { editDraft = value; editProblem = undefined }} rows="1" aria-label={editLabel} onKeyDown={event => editKey(event, turn.id)})
           if filesOf(turn).length > 0
             ul(part="files")
               for file of filesOf(turn) key={fileKey(file)}
                 li(part="file") {file.name}
-          if editing() === turn.id
-            if editProblem()
-              Notice(tone="danger") {editProblem()}
-            div(part="actions" onKeyDown={event => actionsKey(event, turn.id)})
-              button(part="save" type="button" data-variant="solid" data-size="sm" disabled={busy()} onClick={saveEdit}) {saveLabel}
-              button(part="cancel" type="button" data-variant="ghost" data-size="sm" onClick={() => cancelEdit(turn.id)}) {cancelLabel}
-          else if canEdit(turn)
-            div(part="actions")
-              BareIconButton(part="edit" variant="inline" size="xs" label={editName(turn)} ref={element => takeFocus(element, turn)} onClick={() => startEdit(turn)})
-                slot editIcon
-                  Icon(icon="edit")
+          if editProblem()
+            Notice(tone="danger") {editProblem()}
+          div(part="actions" onKeyDown={event => actionsKey(event, turn.id)})
+            button(part="save" type="button" data-variant="solid" data-size="sm" disabled={busy()} onClick={saveEdit}) {saveLabel}
+            button(part="cancel" type="button" data-variant="ghost" data-size="sm" onClick={() => cancelEdit(turn.id)}) {cancelLabel}
         else
-          if reasoning && turn.reasoning
-            details(part="reasoning" open={turn.reasoningOpen})
-              summary {reasoningLabel}
-              p(part="reasoningText" tabindex="0") {turn.reasoning}
-          if turn.calls && turn.calls.length > 0
-            Calls(calls={turn.calls} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel} approvalLabel={approvalLabel})
-          for call of waitingFor(turn) key={call.id}
-            div(part="approval" role="group" aria-label={`${call.name}: ${approvalLabel}`})
-              span(part="approvalText") {call.name} {JSON.stringify(call.input)} - {approvalLabel}
-              button(part="allow" type="button" data-variant="solid" data-size="sm" onClick={() => decide(call, true)}) {allowLabel}
-              button(part="deny" type="button" data-variant="ghost" data-size="sm" onClick={() => decide(call, false)}) {denyLabel}
-          if turn.content !== ''
-            const view = render(turn.content, turn.code, turn.sources)
-            div(part="text" innerHTML={view.html})
-            if view.cited.length > 0
-              Sources(sources={view.cited} label={sourcesLabel} here={links === 'here'})
-          if turn.stopped
-            small(part="note") {stoppedLabel}
-          if canRegenerate(turn)
+          slot turn(viewOf(turn), index)
+            if turn.role === 'user'
+              if turn.content !== ''
+                p(part="text") {withoutApproval(turn.content)}
+              if filesOf(turn).length > 0
+                ul(part="files")
+                  for file of filesOf(turn) key={fileKey(file)}
+                    li(part="file") {file.name}
+            else
+              if reasoning && turn.reasoning
+                details(part="reasoning" open={turn.reasoningOpen})
+                  summary {reasoningLabel}
+                  p(part="reasoningText" tabindex="0") {turn.reasoning}
+              if turn.calls && turn.calls.length > 0
+                Calls(calls={turn.calls} block={callBlock} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel} approvalLabel={approvalLabel})
+              if turn.content !== ''
+                const view = render(turn.content, turn.code, turn.sources)
+                div(part="text" innerHTML={view.html})
+                if view.cited.length > 0
+                  Sources(sources={view.cited} block={sourceBlock} label={sourcesLabel} here={links === 'here'})
+              if turn.stopped
+                small(part="note") {stoppedLabel}
+          if turn.role === 'assistant'
+            for call of waitingFor(turn) key={call.id}
+              div(part="approval" role="group" aria-label={`${call.name}: ${approvalLabel}`})
+                span(part="approvalText") {call.name} {JSON.stringify(call.input)} - {approvalLabel}
+                button(part="allow" type="button" data-variant="solid" data-size="sm" onClick={() => decide(call, true)}) {allowLabel}
+                button(part="deny" type="button" data-variant="ghost" data-size="sm" onClick={() => decide(call, false)}) {denyLabel}
+          if (turn.role === 'user' ? canEdit(turn) : canRegenerate(turn)) || actionsBlock
             div(part="actions")
-              BareIconButton(part="regenerate" variant="inline" size="xs" label={regenerateLabel} onClick={session.regenerate})
-                slot regenerateIcon
-                  Icon(icon="refresh")
+              if turn.role === 'user'
+                if canEdit(turn)
+                  BareIconButton(part="edit" variant="inline" size="xs" label={editName(turn)} ref={element => takeFocus(element, turn)} onClick={() => startEdit(turn)})
+                    slot editIcon
+                      Icon(icon="edit")
+              else if canRegenerate(turn)
+                BareIconButton(part="regenerate" variant="inline" size="xs" label={regenerateLabel} onClick={session.regenerate})
+                  slot regenerateIcon
+                    Icon(icon="refresh")
+              slot actions(viewOf(turn))
     if busy()
       article(part="turn" data-role="assistant" data-pending="" aria-hidden="true")
-        if reasoning && thought() !== ''
-          details(part="reasoning" open={thoughtOpen()} onToggle={event => { thoughtOpen = event.currentTarget.open }})
-            summary(tabindex="-1") {reasoningLabel}
-            p(part="reasoningText" tabindex="-1") {thought()}
-        if calls().length > 0
-          Calls(pending={true} calls={calls()} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel} approvalLabel={approvalLabel})
-        if partial() !== ''
-          const view = render(partial(), code(), found(), false)
-          div(part="text" innerHTML={view.html})
-          if view.cited.length > 0
-            Sources(sources={view.cited} label={sourcesLabel} here={links === 'here'})
-        else if calls().length === 0
-          p(part="thinking") {thinkingLabel}
+        slot turn({ role: 'assistant', content: partial(), sources: found(), calls: calls(), stopped: false, pending: true }, history().length)
+          if reasoning && thought() !== ''
+            details(part="reasoning" open={thoughtOpen()} onToggle={event => { thoughtOpen = event.currentTarget.open }})
+              summary(tabindex="-1") {reasoningLabel}
+              p(part="reasoningText" tabindex="-1") {thought()}
+          if calls().length > 0
+            Calls(pending={true} calls={calls()} block={callBlock} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel} approvalLabel={approvalLabel})
+          if partial() !== ''
+            const view = render(partial(), code(), found(), false)
+            div(part="text" innerHTML={view.html})
+            if view.cited.length > 0
+              Sources(sources={view.cited} block={sourceBlock} label={sourcesLabel} here={links === 'here'})
+          else if calls().length === 0
+            p(part="thinking") {thinkingLabel}
   div(part="status" role="status" aria-atomic="false")
     for line of spoken() key={line.id}
       p {line.text}
@@ -772,3 +797,5 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
       BareIconButton(part="send" variant="inline" type="submit" label={sendLabel})
         slot sendIcon
           Icon(icon="send")
+  if footer
+    | {footer}

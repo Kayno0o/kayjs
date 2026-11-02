@@ -1,11 +1,14 @@
 ---
+import type { Snippet } from 'kay'
 import type { ToolCall } from './types'
 import { recipe } from 'kay'
 
 const look = recipe({ parts: { root: 'kai-chat-calls', summary: 'kai-chat-calls-summary', list: 'kai-chat-calls-list', call: 'kai-chat-call', name: 'kai-chat-call-name', status: 'kai-chat-call-status', title: 'kai-chat-call-title', code: 'kai-chat-call-code' } })
 
-const { calls, pending = false, labels, details, runningLabel, doneLabel, failedLabel, argumentsLabel, resultLabel, approvalLabel } = props<{
+const { calls, block, pending = false, labels, details, runningLabel, doneLabel, failedLabel, argumentsLabel, resultLabel, approvalLabel } = props<{
   calls: ToolCall[]
+  // The app's own drawing of one call, which replaces the folded list.
+  block?: Snippet<[call: ToolCall]> | undefined
   // Set in the turn being written, which is hidden from assistive technology: nothing in it takes focus.
   pending?: boolean
   // The phrase for a tool by its name, in the folded line.
@@ -52,23 +55,30 @@ function summary() {
   return held ? `${line} (${approvalLabel})` : line
 }
 ---
-details(part="root")
-  summary(part="summary" tabindex={pending ? -1 : undefined}) {summary()}
-  ul(part="list")
-    for call of calls key={call.id}
-      li(part="call" data-status={call.status} data-held={call.approval === undefined ? undefined : ''})
-        if details
-          details
-            summary(tabindex={pending ? -1 : undefined})
-              span(part="name") {call.name}
-              |
-              span(part="status") {status(call)}
-            p(part="title") {argumentsLabel}
-            pre(part="code") {JSON.stringify(call.input, null, 2)}
-            if call.result !== undefined
-              p(part="title") {resultLabel}
-              pre(part="code") {call.result}
-        else
-          span(part="name") {call.name}
-          |
-          span(part="status") {status(call)}
+if block
+  div(part="root")
+    ul(part="list")
+      for call of calls key={call.id}
+        li(part="call" data-status={call.status} data-held={call.approval === undefined ? undefined : ''})
+          slot block(call)
+else
+  details(part="root")
+    summary(part="summary" tabindex={pending ? -1 : undefined}) {summary()}
+    ul(part="list")
+      for call of calls key={call.id}
+        li(part="call" data-status={call.status} data-held={call.approval === undefined ? undefined : ''})
+          if details
+            details
+              summary(tabindex={pending ? -1 : undefined})
+                span(part="name") {call.name}
+                |
+                span(part="status") {status(call)}
+              p(part="title") {argumentsLabel}
+              pre(part="code") {JSON.stringify(call.input, null, 2)}
+              if call.result !== undefined
+                p(part="title") {resultLabel}
+                pre(part="code") {call.result}
+          else
+            span(part="name") {call.name}
+            |
+            span(part="status") {status(call)}

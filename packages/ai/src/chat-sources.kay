@@ -1,12 +1,15 @@
 ---
+import type { Snippet } from 'kay'
 import type { Source } from './types'
 import { recipe, uid } from 'kay'
 import { opensApart, REL_APART, REL_HERE } from './chat-sources'
 
 const look = recipe({ parts: { root: 'kai-chat-sources', label: 'kai-chat-sources-label', list: 'kai-chat-sources-list', item: 'kai-chat-source', link: 'kai-chat-source-link' } })
 
-const { sources, label, here } = props<{
+const { sources, block, label, here } = props<{
   sources: Source[]
+  // The app's own drawing of one source, in place of its link.
+  block?: Snippet<[source: Source, n: number]> | undefined
   label: string
   // A source of this site opens in place instead of a new tab.
   here: boolean
@@ -20,4 +23,5 @@ div(part="root")
     for source of sources key={source.n}
       const apart = opensApart(source.href, here)
       li(part="item" value={source.n})
-        a(part="link" href={source.href} target={apart ? '_blank' : undefined} rel={apart ? REL_APART : REL_HERE} data-new-tab={apart ? '' : undefined}) {source.title}
+        slot block(source, source.n)
+          a(part="link" href={source.href} target={apart ? '_blank' : undefined} rel={apart ? REL_APART : REL_HERE} data-new-tab={apart ? '' : undefined}) {source.title}

@@ -137,6 +137,27 @@ Each send also posts at most 40,000 characters, dropping the oldest messages fir
 
 <ReadMore href="/llms/kayjs-ai-chat-sources">How citations are linked and listed, and what a source may be.</ReadMore>
 
+### Draw a turn, a tool call or the empty chat yourself
+
+Blocks replace what the chat draws, each falling back to its own markup when you give none. `@turn(turn, index)` draws a whole turn, `@actions(turn)` adds buttons beside the regenerate and edit ones, `@call(call)` draws a tool call and `@source(source, n)` a cited source, `@empty(chat)` the empty chat (`chat.send(text)` posts a message), and `@footer` adds markup under the form.
+
+Each gets plain data, not the chat's own state, and the chat keeps the log, the screen reader announcements and the Allow and Deny buttons of a held call. `ChatLauncher` passes them on.
+
+```kay
+---
+import { reply } from '../routes/chat.kay'
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+Chat(action={reply} label="Assistant")
+  @call(call)
+    if call.result !== undefined
+      article.order-card
+        h3 {call.name}
+        pre {call.result}
+```
+
+<ReadMore href="/llms/kayjs-ai-chat-blocks">Every block, what it is given and what the chat keeps.</ReadMore>
+
 ### A chat button on every page
 
 `ChatLauncher` is the same chat behind a round button at the bottom right of the page, which opens it in a panel. Put it once in the root layout, in a `server` fence that gives it the action, and every page has the chat:

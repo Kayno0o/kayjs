@@ -1,0 +1,11 @@
+---
+import { blocked } from '../routes/tools.kay'
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+
+const liked = signal<string[]>([])
+---
+Chat(action={blocked} label="Assistant" regenerate)
+  @actions(turn)
+    button.like(type="button" onClick={() => { liked = [...liked(), turn.content] }}) Like
+  @footer
+    p.footer Liked {liked().length}
