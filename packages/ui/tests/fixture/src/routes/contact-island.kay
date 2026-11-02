@@ -10,7 +10,6 @@ export const contact = action(s.Object({
 ---
 import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
 
-let sent = 0
 ---
 main
-  ContactForm(action={contact} onSent={() => { sent++ }})
+  ContactForm(action={contact} onSent={() => undefined})
