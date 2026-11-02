@@ -8,6 +8,12 @@ What each release before 1.84 added, and the end of a newest release that was cu
 - A dom test and the component it mounts share the modules the component imports from the project and from packages, a signal store included: `mock.module()` reaches its static and dynamic imports, and a value the test sets, or imports from one of the project's files, is the component's: [testing](testing.md).
 - `testSite()` boots an app with `offline` before `kay build` has written `.kay/client`, so `bun run test` runs on a fresh clone and in CI: `/sw.js` answers with a worker listing no build files: [testing](testing.md).
 
+- kayjs-ui's `Combobox` options take a `description`, a quieter second line read after the label, and the Combobox takes an `@option(option)` block to draw each row: [forms](../packages/ui/llms/forms.md).
+- The styles docs say where a theme variable read only through a built `var(--x-${n})` goes, `@theme static` or `:root`, as Tailwind drops it from the CSS otherwise: [styles and assets](styles-and-assets.md).
+- `kay build` warns of a theme variable read through a built `var(--x-${n})` name when the app declares it in `@theme` and the CSS holds none, as Tailwind drops it: declare it in `@theme static` or `:root`: [styles and assets](styles-and-assets.md).
+- `testSite({ styles: true })` builds the real stylesheets with no browser, and `await page.css()` reads the CSS a visit's page carries, so a test asserts on a theme variable or a rule an app ships: [testing](testing.md).
+- kayjs-ui `TreeView` rows can be links (`href` on a `TreeNode`, selected by the page's address when `selected` is left out), carry their own controls (`@trailing(node)`, shown on hover and focus) and a context menu (`menu` on a node, from the keyboard with Shift+F10 or the Menu key): [Page layout, command palette and trees](../packages/ui/llms/page-layout-palette-and-trees.md#treeview).
+
 ## 1.83.0
 
 - kayjs-ai: `ground(found, read)` turns the rows pg-orm 8's `nearest()` found into the `system` and `sources` of an `ask`, so a chat answers from the app's own documents and cites them, and the fake answers it all under `bun test`: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).

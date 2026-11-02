@@ -39,11 +39,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui's `SplitLayout` keeps the list's width under `listWidthKey` in a cookie the server reads, not in `localStorage`, so the saved width is drawn from the first paint; a width kept in `localStorage` moves to the cookie once: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
 - kayjs-ui's `SidePanel` takes `scrollKey`, whose change brings its body back to the top, so a panel kept in a `persist` island needs no ref into its parts: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
 - kayjs-ui's `SidePanel` takes `sizeKey`, which keeps a docked panel's width in a cookie of that name the server reads, so the saved width is drawn from the first paint with no `persisted`, signal or `onSizeChange` of the app's: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
-- kayjs-ui's `Combobox` options take a `description`, a quieter second line read after the label, and the Combobox takes an `@option(option)` block to draw each row: [forms](../packages/ui/llms/forms.md).
-- The styles docs say where a theme variable read only through a built `var(--x-${n})` goes, `@theme static` or `:root`, as Tailwind drops it from the CSS otherwise: [styles and assets](styles-and-assets.md).
-- `kay build` warns of a theme variable read through a built `var(--x-${n})` name when the app declares it in `@theme` and the CSS holds none, as Tailwind drops it: declare it in `@theme static` or `:root`: [styles and assets](styles-and-assets.md).
-- `testSite({ styles: true })` builds the real stylesheets with no browser, and `await page.css()` reads the CSS a visit's page carries, so a test asserts on a theme variable or a rule an app ships: [testing](testing.md).
-- kayjs-ui `TreeView` rows can be links (`href` on a `TreeNode`, selected by the page's address when `selected` is left out), carry their own controls (`@trailing(node)`, shown on hover and focus) and a context menu (`menu` on a node, from the keyboard with Shift+F10 or the Menu key): [Page layout, command palette and trees](../packages/ui/llms/page-layout-palette-and-trees.md#treeview).
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
 
