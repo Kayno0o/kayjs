@@ -145,3 +145,18 @@ test('a Menu link opens in a new tab for an absolute or protocol-relative addres
 
   expect(['/a', 'a/b', '?q=1', '#x', 'https://x.org', 'http://x.org', '//x.org/a'].map(opensOutside)).toEqual([false, false, false, false, true, true, true])
 })
+
+test('a Menu @trigger replaces the icon button with a labelled button or an avatar, keeping popovertarget, aria-haspopup and aria-expanded', async () => {
+  mounted = await mountComponent(Menus)
+
+  for (const [id, trigger] of [['labelled', '#labelled-trigger'], ['avatar', '#avatar-trigger']] as const) {
+    const button = mounted.root.querySelector<HTMLElement>(trigger)!
+    const menu = mounted.root.querySelector<HTMLElement>(`#${id}`)!
+
+    expect([button.getAttribute('popovertarget'), button.getAttribute('aria-haspopup'), button.getAttribute('aria-expanded')]).toEqual([id, 'menu', 'false'])
+    expect(mounted.root.querySelector(`[popovertarget="${id}"][data-variant]`)).toBeNull()
+    expect(menu.getAttribute('popover')).toBe('auto')
+  }
+
+  expect(mounted.root.querySelector('#avatar-trigger span')).not.toBeNull()
+})

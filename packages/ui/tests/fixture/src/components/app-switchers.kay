@@ -16,3 +16,6 @@ AppSwitcher(id="named" apps={apps} label="Our apps" icon="plus" newTab)
 AppSwitcher(id="custom" apps={apps.slice(0, 2)})
   @tile(app)
     em {app.label}!
+AppSwitcher(id="trigger" apps={apps.slice(0, 2)})
+  @trigger(attributes)
+    button#switch({...attributes}) Switch

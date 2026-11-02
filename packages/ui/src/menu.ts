@@ -1,5 +1,6 @@
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
+import type { PopoverTriggerProps } from './popover'
 
 export interface MenuAction {
   label: string
@@ -24,3 +25,11 @@ export function opensOutside(href: string): boolean {
 
 // An action, or a rule between groups of them.
 export type MenuEntry = MenuAction | 'separator'
+
+// What a `@trigger` snippet of a Menu is handed: the popover's trigger attributes with the role of what they open, to spread on any element.
+export type MenuTriggerProps = PopoverTriggerProps & { 'aria-haspopup': 'menu' | 'true' }
+
+// Adds `aria-haspopup` to the attributes while keeping `aria-expanded` a getter, so a spread of the result still follows the panel.
+export function withPopup(attributes: PopoverTriggerProps, popup: MenuTriggerProps['aria-haspopup']): MenuTriggerProps {
+  return Object.defineProperty(Object.defineProperties({}, Object.getOwnPropertyDescriptors(attributes)), 'aria-haspopup', { value: popup, enumerable: true }) as MenuTriggerProps
+}

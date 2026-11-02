@@ -2,6 +2,7 @@
 // kay-island
 import type { MenuEntry } from '@kaynooo/kayjs-ui'
 import { signal } from 'kay'
+import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Menu from '@kaynooo/kayjs-ui/menu.kay'
 
 // Entries and triggers by `tone`, and the `danger` flag an entry still takes.
@@ -23,3 +24,10 @@ Menu(id="at-point" items={[{ label: 'First', onSelect: () => picked = 'First' },
 button#ask(onClick={() => { at = { x: 40, y: 60 }; pointOpen = true }}) Ask
 Menu(id="links" items={[{ label: 'Same', href: '/here', onSelect: () => picked = 'Same' }, { label: 'Away', href: 'https://example.org/x' }, { label: 'Off', href: '/off', disabled: true }, { label: 'Plain', onSelect: () => undefined }]} label="Links" icon="plus")
 p#picked {picked()}
+Menu(id="labelled" items={items} label="Actions")
+  @trigger(attributes)
+    button#labelled-trigger.kui-btn({...attributes}) Actions
+Menu(id="avatar" items={items} label="Account")
+  @trigger(attributes)
+    button#avatar-trigger({...attributes})
+      Avatar(name="Ada" label="Ada")

@@ -23,3 +23,7 @@ A tile is a real link. It opens in the same tab, even when it leads to another o
 ## Keyboard
 
 Opening the panel focuses the current tile. The arrow keys move between tiles, three to a row, Home and End jump to the first and last, and Escape closes the panel and gives the focus back to the trigger.
+
+## Your own trigger
+
+`@trigger(attributes)` replaces the icon button, as in [Menu](/ui/menu#your-own-trigger): spread the attributes on any element, and `icon` then has nothing to draw.

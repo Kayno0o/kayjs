@@ -25,3 +25,13 @@ An entry with an `href` is drawn as a link, so a middle-click, Ctrl+click or "co
 ## Trigger and placement
 
 `size` is `xs` to `lg`, `md` by default, and `variant` is `solid`, `ghost` or `inline`, `ghost` by default, with a `tone` of `neutral`, `accent` or `danger` for the trigger. An entry is destructive with `tone: 'danger'`; an entry's `danger: true` is deprecated for it. `placement` is where the menu opens from the trigger, `bottom-end` by default. `id` is the menu's id, unique on the page, and kay draws one when you give none.
+
+## Your own trigger
+
+A menu opened by a labelled button or a user name with an avatar gives a `@trigger(attributes)` block in place of the icon button. Spread the attributes on any element: they carry `popovertarget`, `aria-expanded`, `aria-haspopup="menu"` and the style that anchors the menu, and `aria-expanded` follows the menu. `icon`, `size`, `variant` and `tone` then have nothing to style.
+
+```kay
+Menu(label="Actions" items={items})
+  @trigger(attributes)
+    Button({...attributes} label="Actions")
+```

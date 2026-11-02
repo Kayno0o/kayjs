@@ -100,3 +100,11 @@ test('follows the browser closing the panel', async () => {
 
   expect(view.trigger('plain').getAttribute('aria-expanded')).toBe('false')
 })
+
+test('an AppSwitcher @trigger replaces the icon button and keeps the popover attributes', async () => {
+  const view = await switchers()
+  const button = view.root.querySelector<HTMLElement>('#switch')!
+
+  expect([button.getAttribute('popovertarget'), button.getAttribute('aria-haspopup'), button.getAttribute('aria-expanded')]).toEqual(['trigger', 'true', 'false'])
+  expect(view.root.querySelector('#trigger [data-part=tile]')).not.toBeNull()
+})
