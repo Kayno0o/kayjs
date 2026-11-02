@@ -1,5 +1,8 @@
 use zed_extension_api::{self as zed, LanguageServerId, Result};
 
+// Where the project's own kay keeps its command line, from the worktree's root.
+const PROJECT_CLI: &str = "node_modules/kay/src/cli.ts";
+
 struct KayExtension;
 
 impl zed::Extension for KayExtension {
@@ -7,7 +10,7 @@ impl zed::Extension for KayExtension {
         KayExtension
     }
 
-    // The project's own kay answers when it is on the PATH, else bunx runs the one the project installed.
+    // A kay on the PATH answers first, else bun runs the one the project installed, else bunx fetches one.
     fn language_server_command(
         &mut self,
         _language_server_id: &LanguageServerId,
@@ -18,6 +21,18 @@ impl zed::Extension for KayExtension {
 
         if let Some(kay) = worktree.which("kay") {
             return Ok(zed::Command { command: kay, args: serve.to_vec(), env });
+        }
+
+        if worktree.read_text_file(PROJECT_CLI).is_ok() {
+            if let Some(bun) = worktree.which("bun") {
+                let cli = format!("{}/{}", worktree.root_path(), PROJECT_CLI);
+
+                return Ok(zed::Command {
+                    command: bun,
+                    args: [cli].into_iter().chain(serve).collect(),
+                    env,
+                });
+            }
         }
 
         let bunx = worktree

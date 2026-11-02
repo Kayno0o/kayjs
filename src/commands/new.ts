@@ -1,13 +1,16 @@
+import type { Editor, EditorSetup } from '../editors'
 import type { Feature, Host, Preset } from '../new'
 import type { Command, Parsed } from './command'
 import process from 'node:process'
+import { confirm } from '@kaynooo/cli-kit/prompt'
 import { colors } from '@kaynooo/utils/tools/colors'
+import { EDITORS, findEditors, installEditor } from '../editors'
 import { createProject, detectHost, FEATURE_NAMES, HOSTS, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from '../new'
 import { count, done, formatOption, printDocument, reportFailure, shellQuote } from './command'
 
 export const scaffold: Command = {
-  usage: 'new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [--forge forgejo|github] [--runner <label>] [-y] [--dry-run] [--format text|json] [--quiet]',
-  options: { 'kay': { type: 'string' }, 'template': { type: 'string' }, 'with': { type: 'string' }, 'forge': { type: 'string' }, 'runner': { type: 'string' }, 'without': { type: 'string' }, 'yes': { type: 'boolean', short: 'y' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
+  usage: 'new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [--editor helix,zed|none] [--forge forgejo|github] [--runner <label>] [-y] [--dry-run] [--format text|json] [--quiet]',
+  options: { 'kay': { type: 'string' }, 'template': { type: 'string' }, 'with': { type: 'string' }, 'forge': { type: 'string' }, 'editor': { type: 'string' }, 'runner': { type: 'string' }, 'without': { type: 'string' }, 'yes': { type: 'boolean', short: 'y' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [dir] }, refuse) => {
     const format = formatOption('new', values.format)
@@ -53,6 +56,15 @@ export const scaffold: Command = {
         return 1
       }
 
+      const wanted = listed(values.editor)
+      const unknownEditor = wanted.find(name => name !== 'none' && !EDITORS.includes(name as Editor))
+
+      if (unknownEditor !== undefined) {
+        reportFailure(`kay new: --editor is ${unknownEditor}, which is none of ${EDITORS.join(', ')}, none`, format)
+
+        return 1
+      }
+
       await refuseTarget(dir)
 
       // With no option saying what to scaffold, a terminal asks; anything else takes the preset, the server's by default, with what --with and --without change.
@@ -75,13 +87,22 @@ export const scaffold: Command = {
 
       const files = await createProject(dir, { kay: typeof values.kay === 'string' ? values.kay : undefined, features, host: forge === undefined ? await detectHost(dir) : forge as Host, runner: typeof values.runner === 'string' ? values.runner : undefined, dryRun })
 
+      const editors = dryRun ? [] : await setUpEditors(dir, wanted.filter(name => name !== 'none') as Editor[], values.editor === undefined && yes !== true && format === 'text' && process.stdin.isTTY && process.stderr.isTTY)
+
       if (format === 'json') {
-        printDocument({ dir, features, files, dryRun })
+        printDocument({ dir, features, files, dryRun, editors })
 
         return 0
       }
 
       done(dryRun ? 'would create' : 'created', `${dir}, ${features.length > 0 ? features.join(', ') : 'blank'}, ${count(files.length, 'file')}`)
+
+      for (const { summary, notes } of editors) {
+        console.log(summary)
+
+        for (const note of notes)
+          process.stderr.write(`  ${note}\n`)
+      }
 
       if (dryRun && values.quiet !== true) {
         for (const path of files)
@@ -104,4 +125,29 @@ export const scaffold: Command = {
       return 1
     }
   },
+}
+
+// The editors the project is set up for: the ones --editor names, else, in a terminal, those on the PATH once the user agrees; a failure is said and does not undo the scaffold.
+async function setUpEditors(dir: string, named: Editor[], mayAsk: boolean): Promise<EditorSetup[]> {
+  let editors = named
+
+  if (mayAsk) {
+    editors = findEditors()
+
+    if (editors.length === 0 || !await confirm(`Set up ${editors.join(' and ')} for .kay files and the language server?`, { default: true }))
+      return []
+  }
+
+  const setups: EditorSetup[] = []
+
+  for (const editor of editors) {
+    try {
+      setups.push(await installEditor(editor, { root: dir, installing: true }))
+    }
+    catch (error) {
+      console.error(`kay new: ${editor} was not set up: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  return setups
 }

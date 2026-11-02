@@ -14,7 +14,7 @@ export interface Entry {
 }
 
 // What the help says of the first word of several commands.
-const GROUP_SUMMARIES: Record<string, string> = { i18n: 'find and accept missing translations' }
+const GROUP_SUMMARIES: Record<string, string> = { editor: 'set up the editors that read .kay files', i18n: 'find and accept missing translations' }
 
 // Each loaded when it is the one run, so `kay <command>` reads only its own code; a name of two words is a subcommand.
 function own(name: string, summary: string, load: () => Promise<Command>): Entry {
@@ -45,6 +45,7 @@ export const COMMANDS: Entry[] = [
   own('test', 'run the tests with bun test', async () => (await import('./test')).test),
   own('i18n missing', 'list the translations a locale lacks', async () => (await import('./i18n')).i18nMissing),
   own('i18n accept', 'accept the translations of a locale as they are', async () => (await import('./i18n')).i18nAccept),
+  own('editor install', 'set up Helix and Zed for .kay files and the language server', async () => (await import('./editor')).editorInstall),
   own('migrate', 'migrate an Astro site or its content', async () => (await import('./migrate')).migrate),
   own('lsp', 'serve the language server over stdio', async () => (await import('./lsp')).lsp),
   own('mcp', 'serve the project to an agent as MCP tools', async () => (await import('./mcp')).mcp),

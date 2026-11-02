@@ -24,6 +24,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay build [dir]` | Check the project and bundle the browser code for production |
 | `kay start [dir]` | Serve the last build as production does |
 | `kay render <url> [dir]` | Print what the server answers for one URL, without starting it on a port |
+| `kay editor install [helix\|zed]` | Set up Helix and Zed to highlight `.kay` files and run the language server |
 | `kay screenshot <path> [dir]` | Shoot a page of the running `kay dev` in a headless Chrome |
 | `kay a11y [dir]` | Check every page of the site with axe-core and draft its accessibility statement |
 | `kay check [dir]` | Type-check the project, `.kay` files included |
@@ -56,6 +57,7 @@ kay new my-app --template app --without docker
 | `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests` |
 | `--without <features>` | Drops features from the preset |
 | `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow |
+| `--editor helix,zed` | Also set those editors up as [`kay editor install`](/guides/other-editors#kay-editor-install) does. In a terminal, `kay new` asks once for the editors it finds on the PATH when this is not given |
 | `--runner <label>` | The runner label the CI jobs run on: `debian` on Forgejo and `ubuntu-latest` on GitHub by default. The Forgejo workflow installs only the `git` and `unzip` the image lacks, and skips the Bun setup when the image already has bun, so an Alpine image with bun and git runs it as written |
 | `--kay <dependency>` | The `kay` dependency the project installs, such as a path to a packed copy. By default the minor of the kay running the command |
 | `-y` | Takes the `server` preset without asking |

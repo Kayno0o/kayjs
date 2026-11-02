@@ -1,6 +1,6 @@
 # Language server, screenshot and MCP commands
 
-`kay lsp` serves an editor, `kay screenshot` photographs a page of `kay dev`, `kay mcp` gives an agent kay's tools, and `kay docs` finds a topic in these files. The other commands are in [Check, inspect and tool commands](check-and-tools.md).
+`kay lsp` serves an editor, `kay editor install` sets up Helix and Zed, `kay screenshot` photographs a page of `kay dev`, `kay mcp` gives an agent kay's tools, and `kay docs` finds a topic in these files. The other commands are in [Check, inspect and tool commands](check-and-tools.md).
 
 ## Common tasks
 
@@ -13,6 +13,16 @@ kay lsp --stdio
 ```
 
 The extension starts one server per project, each folder holding a `kay.config.ts` (a monorepo's apps, a multi-root workspace's folders, a project nested in another, which owns its files) once kay is installed in it, and adds the commands Kay: Restart the language server, Run kay check, Open the dev server and Show the output, the settings `kay.bun.path`, `kay.server.path`, `kay.routes`, `kay.lsp.trace` and `kay.dev.url`, and the snippets `page`, `pageserver`, `component` and `island`. `kay new` writes `.vscode/extensions.json` recommending it, and format-on-save for `.kay` in `.vscode/settings.json`.
+
+### Set up Helix or Zed
+
+`kay editor install [helix|zed] [dir]` writes what the editor needs to read `.kay` files: highlighting from the grammar in `editors/tree-sitter-kay` and the language server. With no editor named it sets up each of Helix (`hx` or `helix`) and Zed (`zed`, `zeditor` or `zed-editor`) found on the PATH:
+
+```sh
+kay editor install
+```
+
+The server command is `kay lsp --stdio` when `kay` is on the PATH, else `bun node_modules/kay/src/cli.ts lsp --stdio` from the project, else `bunx kay lsp --stdio`. Setup for Neovim and by hand: [Other editors](https://kayjs.kaynooo.fr/guides/other-editors).
 
 ### Photograph a page of the dev server
 
@@ -48,6 +58,10 @@ bunx kay docs kayjs-ui/forms-and-steps.md#reference
   - An import it adds goes in the fence the name is used from, the server fence for server code and the component script otherwise, made if missing.
   - Renaming a server value renames its reads in the template, and renaming a destructured prop renames it in every parent passing it.
   - It runs the project's `kay.config.ts`, and the modules it imports, as soon as a `.kay` file is opened, as `bun` would: open only a project you trust, as with its `package.json` scripts.
+- `kay editor install [helix|zed] [dir] [--format text|json]`:
+  - Prints one line per editor, and what is left to do on stderr; `--format json` prints `{ editors }`, each with `editor`, `summary`, `notes` and `files`. Exits 1 when no editor is named and none is on the PATH. It writes only inside the editor's configuration (`$XDG_CONFIG_HOME`, else `~/.config`) and the project's `.zed/settings.json`.
+  - Helix: puts a section between `# kay:begin` and `# kay:end` in `helix/languages.toml` (the `kay` language with `roots = ["kay.config.ts"]`, the server and formatter commands, and the `kay` grammar at this release's tag), rewritten by the next run, and copies the `highlights`, `indents` and `injections` queries to `helix/runtime/queries/kay`, then runs `hx --grammar fetch` and `hx --grammar build` (git and a C compiler are needed; a failure is a note, the files stay). It refuses a `kay` language declared outside its section. Helix ignores LSP semantic tokens, so tree-sitter alone colours the file.
+  - Zed: Zed starts a language server only from an extension it compiles, so it copies `editors/zed` (`extension.toml`, `Cargo.toml`, `src/lib.rs`, `languages/kay`) to `zed/kay-extension` in the configuration folder, replacing an earlier copy, and adds `"languages": { "Kay": { "semantic_tokens": "combined" } }` to the project's `.zed/settings.json` (a file with comments is left alone and the line printed). The grammar must stay named `kay`, as Zed links `tree_sitter_<name>`. It cannot load the extension itself: run `zed: install dev extension` and pick the folder printed; Rust through rustup must be installed, and a note says so when it is not.
 - `kay screenshot <path> [dir] [--width <px>]... [--height <px>] [--scheme light|dark] [--full-page] [--cookie <name=value>]... [--format text|json]`:
   - Needs `kay dev` running in the project (it writes `.kay/dev/server-<pid>.json`, `{ url, pid }`, one per `kay dev`, and removes it on exit; a dead pid is ignored, the latest written wins) and Chrome or Chromium; it says so, naming `BUN_CHROME_PATH`, otherwise.
   - `path` is what a visitor types, a locale prefix and a query included; a site's `base` is added when the path is not under it, and the page is opened through a proxy of the command's own that takes it off, as a proxy in front of the site does. A path that does not start with one `/`, holds a `..` segment (also percent-encoded), a backslash or a control character, or names another host is refused before the browser starts.
