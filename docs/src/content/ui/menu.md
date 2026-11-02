@@ -16,7 +16,7 @@ A menu fits at the end of a row. `disabled` greys an entry out, and the arrows, 
 
 ## Links
 
-An entry with an `href` is drawn as a link, so a middle-click, Ctrl+click or "copy link" works on it, and `onSelect` is optional. The menu closes as the link is followed. An address of another origin opens in a new tab with `rel="noopener noreferrer"`. A `disabled` entry stays a disabled button.
+An entry with an `href` is drawn as a link, so a middle-click, Ctrl+click or "copy link" works on it, and `onSelect` is optional. The menu closes as the link is followed. An absolute address (`https://...`) opens in a new tab with `rel="noopener noreferrer"`. A `disabled` entry stays a disabled button.
 
 ## At a point
 

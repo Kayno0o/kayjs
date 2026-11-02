@@ -139,3 +139,9 @@ test('a Menu link takes Space as Enter, and arrows move across links and buttons
   expect(clicks).toBe(1)
   expect(document.activeElement).toBe(away!)
 })
+
+test('a Menu link opens in a new tab for an absolute or protocol-relative address alone', async () => {
+  const { opensOutside } = await import('../src/menu')
+
+  expect(['/a', 'a/b', '?q=1', '#x', 'https://x.org', 'http://x.org', '//x.org/a'].map(opensOutside)).toEqual([false, false, false, false, true, true, true])
+})
