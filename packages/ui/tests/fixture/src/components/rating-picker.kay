@@ -1,0 +1,9 @@
+--- client
+import Rating from '@kaynooo/kayjs-ui/rating.kay'
+
+const { heard, refuse = false } = props<{ heard: unknown[], refuse?: boolean }>()
+---
+form#form
+  Rating#picked(value={3} label="Your rating" name="stars" onChange={async value => { heard.push(value); return !refuse }} allowClear)
+  Rating#shown(value={4.6} label="Rated 4.6 out of 5")
+  Rating#hearts(value={0} label="Hearts" icon="success" name="hearts" max={3})

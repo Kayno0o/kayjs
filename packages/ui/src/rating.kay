@@ -1,33 +1,82 @@
 ---
 import type { JSX } from 'kay'
-import { recipe } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
+import { recipe, signal, untrack } from 'kay'
+import { controlledRadios } from './controlled-radios'
 import Icon from './icon.kay'
 
 const look = recipe({
   parts: {
-    root: 'kui-rating relative inline-flex text-input',
+    root: 'kui-rating group/rating relative inline-flex text-input',
     stars: 'flex w-max gap-0.5',
     fill: 'absolute inset-y-0 left-0 overflow-hidden text-warning',
+    // The stars of a rating that is picked: one real radio each, the glyph drawn by the label around it.
+    star: 'relative inline-flex cursor-pointer text-input data-[on]:text-warning has-[input:disabled]:opacity-50 group-aria-busy/rating:cursor-progress',
+    input: 'peer/star absolute size-0 opacity-0',
+    glyph: 'peer-focus-visible/star:outline-2 peer-focus-visible/star:outline-offset-2 peer-focus-visible/star:outline-accent',
   },
 })
 
-const { value, max = 5, label, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role'> & {
-  // Any number from 0 to `max`, so an average such as 4.6 fills part of its fifth star.
+const { value, max = 5, label, onChange, name, icon = 'star', allowClear = false, disabled = false, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role' | 'onChange'> & {
+  // Any number from 0 to `max`, so an average such as 4.6 fills part of its fifth star. A rating that is picked holds a whole number, 0 for none, and follows the parent when it passes another.
   value: number
   max?: number | undefined
-  // What screen readers read, such as `Rated 4 out of 5`; required as Meter's and Progress's are, since the stars alone name nothing.
+  // What screen readers read, such as `Rated 4 out of 5`; required as Meter's and Progress's are, since the stars alone name nothing. A rating that is picked names its group by it, such as `Your rating`.
   label: string
+  // Turns the stars into a picker over real radios: a click, the arrow keys and a form reset pick, and a hover previews. A promise holds the group busy until it settles and puts the previous rating back when it resolves to false, rejects or throws (logged), as Segmented's does.
+  // Hears `null` for a rating cleared, and for a reset to none.
+  onChange?: ((value: number | null) => unknown) | undefined
+  // Turns the stars into a picker as `onChange` does, and posts the rating under this name inside a form.
+  name?: string | undefined
+  // The glyph of a star, a slot of the app's icon set or an imported icon.
+  icon?: IconSlot | IconProps | undefined
+  // Picking the rating it already holds clears it. A picked rating only.
+  allowClear?: boolean | undefined
+  // Keeps a picked rating from being changed.
+  disabled?: boolean | undefined
 }>()
 
 // One place per star; a value that is no number fills none.
 const places = () => Array.from({ length: Math.max(Math.floor(max), 0) }, (_, place) => place)
 const filled = () => max > 0 && Number.isFinite(value) ? Math.min(Math.max(value / max, 0), 1) * 100 : 0
+const picker = onChange !== undefined || name !== undefined
+
+// The whole number of stars a picker holds, `null` for none.
+const whole = () => Number.isFinite(value) && value >= 1 ? Math.min(Math.round(value), Math.floor(max)) : null
+
+const hovered = signal<number | null>(null)
+
+const { group, picked, busy, ref, pick } = controlledRadios({
+  control: 'Rating',
+  input: '[data-part=input]',
+  options: () => places().map(place => ({ value: place + 1 })),
+  value: whole,
+  name: () => name,
+  onChange: () => onChange as ((value: string | number | null) => unknown) | undefined,
+  appRef: rest.ref,
+})
+
+const lit = (star: number) => star <= (hovered() ?? (picked() as number | null) ?? 0)
+
+// A click on the star already picked clears it, which a radio would not report as a change.
+function again(star: number) {
+  if (allowClear && picked() === star)
+    void pick(null)
+}
 ---
-span(part="root" {...rest} role="img" aria-label={label})
-  span(part="stars")
+if picker
+  span(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-busy={busy() ? 'true' : undefined} onPointerLeave={() => hovered = null})
     for place of places() key={place}
-      Icon(icon="star")
-  span(part="fill" style={`width: ${filled()}%`})
+      label(part="star" data-on={lit(place + 1) ? '' : undefined} onPointerEnter={event => hovered = event.pointerType === 'mouse' && !disabled ? place + 1 : null})
+        input(part="input" ref={element => element.defaultChecked = untrack(() => place + 1 === whole())} type="radio" name={group} value={place + 1} checked={picked() === place + 1} disabled={disabled} aria-label={String(place + 1)} onChange={() => pick(place + 1)} onClick={() => again(place + 1)})
+        Icon(icon={icon} part="glyph")
+else
+  span(part="root" {...rest} role="img" aria-label={label})
     span(part="stars")
       for place of places() key={place}
-        Icon(icon="star")
+        Icon(icon={icon})
+    span(part="fill" style={`width: ${filled()}%`})
+      span(part="stars")
+        for place of places() key={place}
+          Icon(icon={icon})
