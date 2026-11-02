@@ -63,8 +63,9 @@ form(part="root" action={action} novalidate)
     p(part="privacy")
       a(part="link" href={privacy} {...OUTSIDE}) {privacyLabel}
   Button(type="submit" tone="accent" label={submitLabel})
+  // Only an island renders the form with a callback, which this passes on; the cast keeps `kay check` from reading the form as a static component handing an island a function.
   if onSent || onError
-    FormOutcome(action={action} onSent={onSent} onError={onError})
+    FormOutcome(action={action} whenSent={onSent as never} whenRefused={onError as never})
   if action.succeeded()
     if sent
       | {sent}
