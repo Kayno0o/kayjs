@@ -116,6 +116,7 @@ export function recorder(options: RecorderOptions): Recorder {
   onCleanup(() => {
     gone = true
     finish()?.cancel()
+    report(false)
   })
 
   function finish() {
@@ -183,6 +184,8 @@ export function recorder(options: RecorderOptions): Recorder {
       if (typeof started !== 'string')
         started.cancel()
 
+      report(false)
+
       return
     }
 
@@ -235,7 +238,9 @@ export function recorder(options: RecorderOptions): Recorder {
   }
 
   async function begin() {
-    if (state() === 'idle')
+    if (state() === 'asking')
+      stopAsked = false
+    else if (state() === 'idle')
       await start()
   }
 

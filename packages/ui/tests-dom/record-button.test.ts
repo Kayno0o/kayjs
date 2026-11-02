@@ -388,7 +388,8 @@ test('a controlled recording starts as a press would, stops and hands over when 
 
 test('a recording set false while the microphone is still being asked for stops once it opens', async () => {
   const opened = later()
-  const { given } = await mount({ recording: false })
+  const changes: boolean[] = []
+  const { given } = await mount({ recording: false, onRecordingChange: (recording: boolean) => changes.push(recording) })
 
   microphone(async () => {
     await opened.promise
@@ -401,6 +402,49 @@ test('a recording set false while the microphone is still being asked for stops 
   await settle()
 
   expect(given.length).toBe(1)
+  expect(changes).toEqual([true, false])
+})
+
+test('a recording set false then true again while the microphone is asked for keeps recording', async () => {
+  const opened = later()
+  const { look } = await mount({ recording: false })
+
+  microphone(async () => {
+    await opened.promise
+
+    return stream()
+  })
+  await mounted!.setProps({ recording: true })
+  await mounted!.setProps({ recording: false })
+  await mounted!.setProps({ recording: true })
+  opened.settle()
+  await settle()
+
+  expect(look().pressed).toBe('true')
+})
+
+test('onRecordingChange says false when maxDuration ends a recording and when the button goes mid-recording', async () => {
+  const changes: boolean[] = []
+  const { button } = await mount({ maxDuration: '30ms', onRecordingChange: (recording: boolean) => changes.push(recording) })
+
+  click(button)
+  await settle()
+  await Bun.sleep(60)
+  await settle()
+
+  expect(changes).toEqual([true, false])
+
+  mounted!.unmount()
+
+  const gone: boolean[] = []
+  const second = await mount({ onRecordingChange: (recording: boolean) => gone.push(recording) })
+
+  click(second.button)
+  await settle()
+  mounted!.unmount()
+  mounted = undefined
+
+  expect(gone).toEqual([true, false])
 })
 
 function button(target: Mounted) {
