@@ -1,5 +1,5 @@
 --- <Item extends MediaItem = MediaItem>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { MediaItem } from './media'
 import type { InfiniteList } from './infinite-list'
 import { effect, onCleanup, recipe, signal, untrack } from 'kay'
@@ -32,14 +32,20 @@ const look = recipe({
   },
 })
 
-const { items: given, list, index = 0, onIndexChange, ratio = '16 / 9', emptyLabel, previousLabel = wording('ui.mediaGallery.previous', 'Previous'), nextLabel = wording('ui.mediaGallery.next', 'Next'), closeLabel = wording('ui.mediaGallery.close', 'Close'), openLabel = wording('ui.mediaGallery.open', 'Open full size'), itemLabel = wording('ui.mediaGallery.item', 'Media {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { items: given, list, caption, index = 0, onIndexChange, open = false, onOpenChange, ratio = '16 / 9', emptyLabel, previousLabel = wording('ui.mediaGallery.previous', 'Previous'), nextLabel = wording('ui.mediaGallery.next', 'Next'), closeLabel = wording('ui.mediaGallery.close', 'Close'), openLabel = wording('ui.mediaGallery.open', 'Open full size'), itemLabel = wording('ui.mediaGallery.item', 'Media {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   // The items to show. Left out when `list` holds them: one of the two is required.
   items?: Item[] | undefined
   // Items loaded page by page, from `infiniteList`: the next page loads when the reader reaches the last items, and a failed page shows LoadMore's alert with its retry under the strip.
   list?: InfiniteList<Item> | undefined
+  // Draws the caption over the stage and the lightbox in place of the item's `title`: `@caption(item, index)`, given the item and its place. The title still names the item for screen readers.
+  caption?: Snippet<[item: Item, index: number]> | undefined
   // The item on the stage to start with; a gallery whose parent passes another follows it, and `onIndexChange` reports each turn.
   index?: number | undefined
   onIndexChange?: ((index: number) => unknown) | undefined
+  // Shows the lightbox on the current item when the page sets it; a click on the picture, Escape and a click outside open and close it on their own.
+  open?: boolean | undefined
+  // Called with the lightbox's new state and the index of the item on it, whenever it opens or closes, however it did.
+  onOpenChange?: ((open: boolean, index: number) => unknown) | undefined
   // The stage's CSS `aspect-ratio`.
   ratio?: string | undefined
   // What the gallery reads with no items.
@@ -57,7 +63,7 @@ const all = () => list ? list.rows() : given ?? []
 
 const nothing = () => emptyLabel ?? wording('ui.mediaGallery.empty', 'No media.')
 const shown = signal(index)
-const zoomed = signal(false)
+const zoomed = signal(open)
 // Each video's player, stopped once its element leaves the page.
 const players = new Map<HTMLVideoElement, () => void>()
 let strip: HTMLElement | undefined
@@ -65,6 +71,8 @@ let lightbox: HTMLDialogElement | undefined
 let swipeFrom: { x: number, y: number } | null = null
 
 effect(() => shown = index)
+
+effect(() => zoomed = open)
 
 // The next page loads once the reader is on the last items.
 effect(() => {
@@ -81,6 +89,12 @@ function go(next: number) {
 
   shown = target
   onIndexChange?.(target)
+}
+
+// A change of the lightbox the visitor made, which the page hears of; one the page set through `open` it knows already.
+function zoom(next: boolean) {
+  zoomed = next
+  onOpenChange?.(next, active())
 }
 
 function step(delta: number) {
@@ -179,6 +193,12 @@ effect(() => {
   }
 })
 ---
+// The caption's content: the app's block, else the item's title.
+snippet captioned(item: MediaItem, position: number)
+  if caption
+    slot caption(item, position)
+  else
+    | {item.title}
 if !current()
   // The app's id and class stay on whichever element shows.
   p.kui-media-gallery-empty.text-xs.text-muted(part="root" id={rest.id}) {nothing()}
@@ -195,15 +215,16 @@ else
             if item.captions
               track(kind="captions" src={item.captions} default)
         else
-          button(part="zoom" type="button" aria-label={item.title ? `${openLabel}: ${item.title}` : openLabel} onClick={() => zoomed = true})
+          button(part="zoom" type="button" aria-label={item.title ? `${openLabel}: ${item.title}` : openLabel} onClick={() => zoom(true)})
             // kay-allow unsized-image
             img(part="frame" src={item.preview} alt={item.title ?? ''})
       if all().length > 1
         IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={() => step(-1)})
         IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={() => step(1)})
         span(part="counter") {active() + 1} / {all().length}
-      if current()!.title
-        span(part="caption") {current()!.title}
+      if caption || current()!.title
+        span(part="caption")
+          | {captioned(current()!, active())}
     if all().length > 1
       div(part="strip" ref={element => strip = element})
         for item, position of all() key={item.key}
@@ -214,7 +235,7 @@ else
               Icon(icon="play" part="play")
     if list && list.failed()
       LoadMore(list={list})
-    dialog(part="lightbox" ref={element => lightbox = element} closedby="any" aria-label={current()!.title ?? named(active())} onClose={() => zoomed = false} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
+    dialog(part="lightbox" ref={element => lightbox = element} closedby="any" aria-label={current()!.title ?? named(active())} onClose={() => zoomed() && zoom(false)} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
       if zoomed()
         for item of [current()!] key={item.key}
           if isPlayable(item)
@@ -227,6 +248,7 @@ else
         if all().length > 1
           IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={() => step(-1)})
           IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={() => step(1)})
-        if current()!.title
-          span(part="caption") {current()!.title}
-        IconButton(icon="close" label={closeLabel} variant="ghost" part="close" onClick={() => zoomed = false})
+        if caption || current()!.title
+          span(part="caption")
+            | {captioned(current()!, active())}
+        IconButton(icon="close" label={closeLabel} variant="ghost" part="close" onClick={() => zoom(false)})

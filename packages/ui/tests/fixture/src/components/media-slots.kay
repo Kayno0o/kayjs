@@ -1,0 +1,31 @@
+---
+import type { MediaItem } from '@kaynooo/kayjs-ui'
+import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
+import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
+
+// What the test reads back: the lightbox's changes, and a way to open it from the page.
+const { onOpenChange, onReady } = props<{ onOpenChange: (open: boolean, index: number) => void, onReady: (set: (open: boolean) => void) => void }>()
+
+const lightbox = signal(false)
+
+onReady(next => lightbox = next)
+
+const items: MediaItem[] = [
+  { key: 1, kind: 'image', thumb: '/a-thumb.png', preview: '/a.png', title: 'Mars' },
+  { key: 2, kind: 'image', thumb: '/b-thumb.png', preview: '/b.png', title: 'Venus' },
+]
+
+const slides = [
+  { src: '/a.png', alt: 'Plain' },
+  { src: '/b.png', alt: 'Linked', href: 'https://example.com/promo' },
+  { src: '/c.png', alt: 'Third' },
+]
+---
+Carousel#plain-carousel(slides={slides})
+Carousel#block-carousel(slides={slides})
+  @slide(slide, index)
+    p.caption {index}: {slide.alt}
+MediaGallery#plain-gallery(items={items})
+MediaGallery#captioned(items={items} open={lightbox()} onOpenChange={(open, index) => { lightbox = open; onOpenChange(open, index) }})
+  @caption(item, index)
+    em {index + 1}. {item.title}!

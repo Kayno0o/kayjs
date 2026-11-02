@@ -1,5 +1,5 @@
---- <Slide extends { src: string, alt: string }>
-import type { Duration, JSX } from 'kay'
+--- <Slide extends { src: string, alt: string, href?: string | undefined }>
+import type { Duration, JSX, Snippet } from 'kay'
 import { durationMs, effect, every, onCleanup, recipe, reducedMotion, signal, untrack } from 'kay'
 import IconButton from './icon-button.kay'
 import { startRef } from './form-reset'
@@ -14,6 +14,7 @@ const look = recipe({
     viewport: 'relative w-full overflow-hidden bg-surface',
     // Every slide sits over the viewport, moved a width aside per place it stands from the one shown.
     slide: 'absolute inset-0 transition-transform duration-700 ease-in-out motion-reduce:transition-none',
+    link: 'block size-full',
     image: 'size-full object-cover',
     controls: 'flex items-center justify-center gap-4',
     step: 'data-[side=next]:-rotate-90 data-[side=previous]:rotate-90',
@@ -24,9 +25,12 @@ const look = recipe({
   },
 })
 
-const { slides: given, list, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previous', 'Previous slide'), nextLabel = wording('ui.carousel.next', 'Next slide'), pauseLabel = wording('ui.carousel.pause', 'Pause'), playLabel = wording('ui.carousel.play', 'Play'), slideLabel = wording('ui.carousel.slide', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dot', 'Go to slide {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
+const { slides: given, slide, list, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previous', 'Previous slide'), nextLabel = wording('ui.carousel.next', 'Next slide'), pauseLabel = wording('ui.carousel.pause', 'Pause'), playLabel = wording('ui.carousel.play', 'Play'), slideLabel = wording('ui.carousel.slide', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dot', 'Go to slide {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
   // The slides to draw. Left out when `list` holds them: one of the two is required.
+  // A slide with an `href` makes the picture a link to that address, as a promo banner needs: middle-click and a new tab work, and an address off the site opens in one.
   slides?: readonly Slide[] | undefined
+  // Draws each slide's content in place of its picture and link: `@slide(slide, index)`, given the slide as written and its place. `src` and `alt` stay the default, and the slide keeps its group, its label and the sliding.
+  slide?: Snippet<[slide: Slide, index: number]> | undefined
   // Slides loaded page by page, from `infiniteList`: the next page loads when the reader reaches the last slides, and a failed page shows LoadMore's alert with its retry under the controls.
   list?: InfiniteList<Slide> | undefined
   // The slide shown first; a carousel whose parent passes another follows it.
@@ -108,14 +112,21 @@ function numbered(text: string, position: number) {
 ---
 section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-label={label} onPointerEnter={() => pointed = true} onPointerLeave={() => pointed = false} onFocusIn={() => focused = true} onFocusOut={() => focused = false})
   div(part="viewport" style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
-    for slide, position of all() key={slide.src}
+    for entry, position of all() key={entry.src}
       div(part="slide" role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={position === active() ? undefined : 'true'} inert={position !== active()} style={`transform: translateX(${(position - active()) * 100}%)`})
-        // kay-allow unsized-image
-        img(part="image" src={slide.src} alt={slide.alt} loading={position === 0 ? 'eager' : 'lazy'})
+        if slide
+          slot slide(entry, position)
+        else if entry.href !== undefined
+          a(part="link" href={entry.href})
+            // kay-allow unsized-image
+            img(part="image" src={entry.src} alt={entry.alt} loading={position === 0 ? 'eager' : 'lazy'})
+        else
+          // kay-allow unsized-image
+          img(part="image" src={entry.src} alt={entry.alt} loading={position === 0 ? 'eager' : 'lazy'})
   if all().length > 1
     div(part="controls")
       IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={() => step(-1)})
-      for slide, position of all() key={slide.src}
+      for entry, position of all() key={entry.src}
         button(part="dot" type="button" aria-label={numbered(dotLabel, position)} aria-current={position === active() ? 'true' : undefined} onClick={() => go(position)})
       IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={() => step(1)})
       if autoplay
