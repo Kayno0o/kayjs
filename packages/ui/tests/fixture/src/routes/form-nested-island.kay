@@ -1,7 +1,7 @@
 --- server
 import { s } from 'kay'
 
-export const nested = action(s.Object({ name: s.String({ minLength: 2 }) }), async () => undefined, { protect: { honeypot: 'website', minTime: '3s' } })
+export const nested = action(s.Object({ name: s.String({ minLength: 2, maxLength: 100 }) }), async () => undefined, { protect: { honeypot: 'website', minTime: '3s' } })
 --- script
 import { signal } from 'kay'
 
@@ -12,6 +12,6 @@ main
   section
     p Nested
     form(action={nested} novalidate)
-      input(field="name")
+      input(field="name" aria-label="Name")
       button#count(type="button" onClick={() => clicks = clicks() + 1}) Count {clicks()}
       button(type="submit") Send

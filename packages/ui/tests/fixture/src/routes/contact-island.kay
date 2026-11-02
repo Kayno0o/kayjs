@@ -2,9 +2,9 @@
 import { s } from 'kay'
 
 export const contact = action(s.Object({
-  name: s.String({ minLength: 2 }),
-  email: s.String({ format: 'email' }),
-  message: s.String({ minLength: 5 }),
+  name: s.String({ minLength: 2, maxLength: 100 }),
+  email: s.String({ format: 'email', maxLength: 254 }),
+  message: s.String({ minLength: 5, maxLength: 2000 }),
 }), async () => undefined, { protect: { honeypot: 'website', minTime: '3s' } })
 ---
 ---
