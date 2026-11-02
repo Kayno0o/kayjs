@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { LeafletApi, LeafletGroup, LeafletLayer, LeafletPath, LeafletView, MapMarker, MapPoint } from './map-view'
 import { effect, mediaQuery, onCleanup, onMount, recipe, reducedMotion, signal, untrack } from 'kay'
 import { drawnPoints, OSM_ATTRIBUTION, OSM_TILES, validPoint } from './map-view'
@@ -18,10 +18,10 @@ const look = recipe({
   },
 })
 
-const { lines = [], markers = [], highlight, tiles = OSM_TILES, attribution = OSM_ATTRIBUTION, darkTiles, darkAttribution, maxZoom = 19, center = [20, 0], zoom = 2, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { lines = [], markers = [], highlight, tiles = OSM_TILES, attribution = OSM_ATTRIBUTION, darkTiles, darkAttribution, maxZoom = 19, center = [20, 0], zoom = 2, label, onMarkerClick, onMove, popup, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   // Polylines, each an array of [latitude, longitude] points; a change redraws them, refitting only while the visitor has not moved the map.
   lines?: readonly (readonly MapPoint[])[] | undefined
-  // Round markers; a `label` shows on hover or focus and is read by screen readers, a `popup` opens on a click, Enter or Space and is read in the list too.
+  // Round markers; a `label` shows on hover or focus and is read by screen readers, a `popup` opens on a click, Enter or Space and is read in the list too. A marker is clickable, and a tab stop, when it has a label, a popup or the map has `onMarkerClick`.
   markers?: readonly MapMarker[] | undefined
   // A path drawn over the lines and brought into view, such as the entry picked in a timeline; one point draws a dot. Unset, the map fits what it draws again.
   highlight?: readonly MapPoint[] | undefined
@@ -33,9 +33,15 @@ const { lines = [], markers = [], highlight, tiles = OSM_TILES, attribution = OS
   darkTiles?: string | undefined
   darkAttribution?: string | undefined
   maxZoom?: number | undefined
-  // Where the map looks while there is nothing to fit, and how close.
+  // Where the map looks while there is nothing to fit, and how close. A new `center` or `zoom` from the parent moves the map there and counts as the visitor's own move, so later changes to the lines or markers no longer refit it; the view `onMove` reports passed back is the view it already has.
   center?: MapPoint | undefined
   zoom?: number | undefined
+  // Called with the marker and its place in `markers` as a click, Enter or Space presses it, besides opening its popup.
+  onMarkerClick?: ((marker: MapMarker, index: number) => unknown) | undefined
+  // Called with `{ center, zoom }` once the visitor has moved or zoomed the map, not for a fit the map makes itself nor for a `center` or `zoom` the parent set.
+  onMove?: ((view: { center: MapPoint, zoom: number }) => unknown) | undefined
+  // Draws the content of a marker's popup in place of its `popup` text, such as a link or a button; it is moved into the popup while open, and an empty block leaves that marker with none.
+  popup?: Snippet<[marker: MapMarker, index: number]> | undefined
   // Describes the map for screen readers.
   label: string
 }>()
@@ -43,7 +49,11 @@ const { lines = [], markers = [], highlight, tiles = OSM_TILES, attribution = OS
 let canvas: HTMLElement | undefined
 
 // What a screen reader reads of a marker: its label, and its popup's text, which a click opens for everyone else.
-const names = () => markers.flatMap(marker => marker.label || marker.popup ? [[marker.label, marker.popup].filter(Boolean).join(': ')] : [])
+// A marker the map cannot name still gets an entry when its popup is a block or the app listens to its clicks.
+const entries = () => markers.flatMap((marker, index) => marker.label || marker.popup || popup || onMarkerClick ? [{ marker, index, name: [marker.label, marker.popup].filter(Boolean).join(': ') }] : [])
+
+// The block of each marker's popup, once drawn: Leaflet takes the element out of the list while the popup is open.
+const bodies = new Map<number, HTMLElement>()
 
 // Leaflet writes a string into the page as HTML, so text goes in as an element holding it as text.
 const textNode = (leaflet: LeafletApi, text: string) => Object.assign(leaflet.DomUtil.create('div'), { textContent: text })
@@ -100,7 +110,15 @@ onMount(() => {
       // Any move but a fit is the visitor's, a popup's auto-pan included; a fit's own moves end with the first `moveend`, its zoom animation starting a frame later.
       view.on('movestart zoomstart', () => moved ||= !fitting)
       view.on('dragstart', () => moved = true)
-      view.on('moveend', () => fitting = false)
+      view.on('moveend', () => {
+        const mine = fitting || following
+
+        fitting = false
+        following = false
+
+        if (!mine)
+          onMove?.({ center: [view!.getCenter().lat, view!.getCenter().lng], zoom: view!.getZoom() })
+      })
 
       // A map mounted hidden has no size to fit into: it fits once the box gets one, and learns of later resizes.
       if (typeof ResizeObserver !== 'undefined') {
@@ -137,6 +155,8 @@ onMount(() => {
   // Whether the visitor panned or zoomed since the last fit, which a change to the lines or markers then leaves be.
   let moved = false
   let fitting = false
+  // Set while the map moves to a view the parent passed, which is not the visitor's to report.
+  let following = false
 
   const fit = (map: LeafletView) => {
     const leaflet = drawing()?.leaflet
@@ -155,6 +175,37 @@ onMount(() => {
     else
       map.setView(center, zoom, { animate })
   }
+
+  // A `center` or `zoom` the parent changes moves the map there, once it is drawn and unless it already looks there.
+  let looking: { center: MapPoint, zoom: number } | undefined
+
+  effect(() => {
+    const ready = drawing()
+    const next = { center: [center[0], center[1]] as MapPoint, zoom }
+
+    if (!ready)
+      return
+
+    if (looking === undefined) {
+      looking = next
+
+      return
+    }
+
+    if (looking.center[0] === next.center[0] && looking.center[1] === next.center[1] && looking.zoom === next.zoom)
+      return
+
+    looking = next
+
+    const now = ready.view.getCenter()
+
+    if (Math.abs(now.lat - next.center[0]) < 1e-6 && Math.abs(now.lng - next.center[1]) < 1e-6 && ready.view.getZoom() === next.zoom)
+      return
+
+    moved = true
+    following = true
+    ready.view.setView(next.center, next.zoom, { animate: !untrack(still) })
+  })
 
   // The tile layer is replaced with the props that make it, which its attribution follows.
   let tileLayer: LeafletLayer | undefined
@@ -175,14 +226,14 @@ onMount(() => {
   let stops: SVGElement[] = []
   let stop = 0
 
-  const focusable = (dot: LeafletPath, marker: MapMarker, at: number, map: LeafletView) => {
+  const focusable = (dot: LeafletPath, marker: MapMarker, index: number, at: number, map: LeafletView, opens: boolean) => {
     const element = dot.getElement()
 
     if (!element)
       return
 
     element.setAttribute('tabindex', at === stop ? '0' : '-1')
-    element.setAttribute('role', marker.popup ? 'button' : 'img')
+    element.setAttribute('role', opens || onMarkerClick ? 'button' : 'img')
     element.setAttribute('aria-label', marker.label || marker.popup || '')
     // Leaflet shows the label on focus, and the marker comes into view if the visitor moved away from it.
     element.addEventListener('focus', () => {
@@ -195,9 +246,13 @@ onMount(() => {
       if (event.altKey || event.ctrlKey || event.metaKey)
         return
 
-      if (marker.popup && (event.key === 'Enter' || event.key === ' ')) {
+      if ((opens || onMarkerClick) && (event.key === 'Enter' || event.key === ' ')) {
         event.preventDefault()
-        dot.togglePopup()
+
+        if (opens)
+          dot.togglePopup()
+
+        onMarkerClick?.(marker, index)
 
         return
       }
@@ -237,22 +292,35 @@ onMount(() => {
 
     base.clearLayers()
     stops = []
-    stop = Math.min(stop, Math.max(0, marks.filter(marker => marker.label || marker.popup).length - 1))
+    stop = Math.min(stop, Math.max(0, entries().length - 1))
 
     for (const path of paths)
       leaflet.polyline(path, { weight: 3, className: 'kui-map-view-line' }).addTo(base)
 
-    for (const marker of marks) {
-      const dot = leaflet.circleMarker(marker.at, { radius: 5, weight: 1, className: 'kui-map-view-marker', interactive: Boolean(marker.label || marker.popup) }).addTo(base)
+    const clicked = onMarkerClick
+
+    for (const [index, marker] of markers.entries()) {
+      if (!validPoint(marker.at))
+        continue
+
+      const block = popup ? bodies.get(index) : undefined
+      const opens = Boolean(marker.popup) || Boolean(block?.hasChildNodes())
+      const live = Boolean(marker.label) || opens || Boolean(onMarkerClick)
+      const dot = leaflet.circleMarker(marker.at, { radius: 5, weight: 1, className: 'kui-map-view-marker', interactive: live }).addTo(base)
 
       if (marker.label)
         dot.bindTooltip(textNode(leaflet, marker.label))
 
-      if (marker.popup)
+      if (block?.hasChildNodes())
+        dot.bindPopup(block)
+      else if (marker.popup)
         dot.bindPopup(textNode(leaflet, marker.popup))
 
-      if (marker.label || marker.popup)
-        focusable(dot, marker, stops.length, map)
+      if (clicked)
+        dot.on('click', () => clicked(marker, index))
+
+      if (live)
+        focusable(dot, marker, index, stops.length, map, opens)
     }
   })
 
@@ -290,7 +358,11 @@ onMount(() => {
 div(part="root" {...rest} role="region" aria-label={label})
   div(part="canvas" data-dark-tiles={dark() && darkTiles === undefined ? '' : undefined})
     div(part="surface" ref={el => canvas = el})
-  if names().length > 0
+  if entries().length > 0
     ul(part="list")
-      for name, at of names() key={at}
-        li(part="item") {name}
+      for entry of entries() key={entry.index}
+        li(part="item")
+          | {entry.name}
+          if popup
+            div(part="popup" ref={element => bodies.set(entry.index, element)})
+              | {popup(entry.marker, entry.index)}

@@ -1,0 +1,13 @@
+---
+import { signal } from 'kay'
+import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
+import type { Plate } from '@kaynooo/kayjs-ui'
+
+// A pane the page drives with buttons, and which tells the page where it was taken.
+const { heard } = props<{ heard: Plate[] }>()
+const plate = signal<Plate>({ scale: 1, x: 0, y: 0 })
+---
+button#close(type="button" onClick={() => plate = { scale: 2, x: -40, y: -30 }}) Close in
+button#fit(type="button" onClick={() => plate = { scale: 1, x: 0, y: 0 }}) Fit
+ZoomPane#pane(label="Plan" plate={plate()} onChange={next => { heard.push(next); plate = next }})
+  p Content

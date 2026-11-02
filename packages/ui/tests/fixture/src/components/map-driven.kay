@@ -1,0 +1,15 @@
+---
+import { signal } from 'kay'
+import MapView from '@kaynooo/kayjs-ui/map-view.kay'
+import type { MapMarker, MapPoint } from '@kaynooo/kayjs-ui'
+
+// A map the parent drives: markers with a popup block, a click and a move reported, and a view the test's button sets.
+const { clicks, moves } = props<{ clicks: string[], moves: { center: MapPoint, zoom: number }[] }>()
+const markers: MapMarker[] = [{ at: [48.85, 2.35], label: 'Louvre' }, { at: [48.87, 2.4] }]
+const view = signal<{ center: MapPoint, zoom: number }>({ center: [48.86, 2.37], zoom: 6 })
+---
+button#go(type="button" onClick={() => view = { center: [10, 10], zoom: 4 }}) Go
+MapView#map(label="Places" markers={markers} center={view().center} zoom={view().zoom} onMarkerClick={(marker, index) => clicks.push(`${index}:${marker.label ?? ''}`)} onMove={next => moves.push(next)})
+  @popup(marker, index)
+    if index === 0
+      a.go(href="#louvre") Open {marker.label}

@@ -22,6 +22,20 @@ When `lines` or `markers` change, the map fits them again, unless the visitor pa
 
 <Demo name="map-view/highlight" />
 
+## Clicks, moves and popup content
+
+`onMarkerClick(marker, index)` is called as a click, Enter or Space presses a marker, besides opening its popup; a marker with the callback is clickable and a tab stop even with no label or popup. `onMove({ center, zoom })` hears the visitor's own pans and zooms, not a fit the map makes nor a view the parent set.
+
+`center` and `zoom` are followed: a new value moves the map there, and counts as the visitor's own move, so later changes to the lines or markers no longer refit it. A parent that keeps the view in a signal writes `onMove={view => { center = view.center; zoom = view.zoom }}`; the view it passes back is the view the map already has.
+
+The `popup(marker, index)` block draws a marker's popup in place of its `popup` text, so it can hold a link or a button. Its content sits in the screen-reader list and moves into the popup while it is open; a block that draws nothing for a marker leaves that marker with no popup.
+
+```kay
+MapView(label="Route" markers={stops} onMarkerClick={(stop, index) => selected = index})
+  @popup(stop, index)
+    a(href={`/stops/${index}`}) Open {stop.label}
+```
+
 ## Tiles
 
 `tiles` is the tile layer's URL template and `attribution` the credit shown in the corner, OpenStreetMap's by default. Set the two together, and `maxZoom` to what the tiles reach. The map follows a change to any of them.

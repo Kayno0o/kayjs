@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent } from 'kay/test'
+import MapDriven from '../tests/fixture/src/components/map-driven.kay'
 import MapFixture from '../tests/fixture/src/components/map-view.kay'
 
 let mounted: Mounted | undefined
@@ -256,5 +257,62 @@ describe('MapView', () => {
     finally {
       globalThis.getComputedStyle = original
     }
+  })
+})
+
+describe('MapView driven by the app', () => {
+  async function driven(props: Record<string, unknown> = {}) {
+    const clicks: string[] = []
+    const moves: { center: [number, number], zoom: number }[] = []
+
+    mounted = await mountComponent(MapDriven, { clicks, moves, ...props })
+
+    for (let tries = 0; tries < 400 && mounted.root.querySelector('#map .leaflet-overlay-pane svg path') === null; tries++)
+      await Bun.sleep(5)
+
+    return { root: mounted.root, clicks, moves }
+  }
+
+  test('a click on a marker, or Enter on it, calls onMarkerClick with the marker and its place, and a block popup holds the link', async () => {
+    await laidOut(async () => {
+      const { root, clicks } = await driven()
+      const dots = [...root.querySelectorAll<SVGElement>('#map path.kui-map-view-marker')]
+
+      expect(dots).toHaveLength(2)
+      expect(dots.map(dot => dot.getAttribute('role'))).toEqual(['button', 'button'])
+
+      dots[1]!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      dots[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+      expect(clicks).toEqual(['1:', '0:Louvre'])
+      expect(root.querySelector('.leaflet-popup a.go')?.getAttribute('href')).toBe('#louvre')
+    })
+  })
+
+  test('a new center and zoom from the parent move the map there without reporting it as the visitor\'s', async () => {
+    await laidOut(async () => {
+      const { root, moves } = await driven()
+      const before = tilesOf(root, '#map')
+
+      ;(root.querySelector('#go') as HTMLElement).click()
+      await Bun.sleep(50)
+
+      expect(tilesOf(root, '#map')).not.toEqual(before)
+      expect(tilesOf(root, '#map').every(src => src.includes('/4/'))).toBe(true)
+      expect(moves).toEqual([])
+    })
+  })
+
+  test('a move by the visitor is reported with the centre and zoom', async () => {
+    await laidOut(async () => {
+      const { root, moves } = await driven()
+      const surface = root.querySelector('#map .leaflet-container')!
+
+      surface.dispatchEvent(new Event('focus'))
+      surface.dispatchEvent(Object.assign(new KeyboardEvent('keydown', { bubbles: true }), { keyCode: 187 }))
+      await Bun.sleep(100)
+
+      expect(moves.length).toBeGreaterThan(0)
+      expect(moves.at(-1)!.zoom).toBeGreaterThan(6)
+    })
   })
 })

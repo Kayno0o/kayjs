@@ -34,6 +34,7 @@ export interface LeafletPath extends LeafletLayer {
   bindTooltip: (content: HTMLElement) => this
   bindPopup: (content: HTMLElement) => this
   togglePopup: () => this
+  on: (event: string, handler: () => void) => this
   closePopup: () => this
   getElement: () => SVGElement | undefined
 }
@@ -49,6 +50,8 @@ export interface LeafletView {
   invalidateSize: (options: { animate: boolean }) => this
   panInside: (at: MapPoint, options: { padding: [number, number], animate: boolean }) => this
   getSize: () => { x: number, y: number }
+  getCenter: () => { lat: number, lng: number }
+  getZoom: () => number
   on: (events: string, handler: () => void) => this
   remove: () => this
 }

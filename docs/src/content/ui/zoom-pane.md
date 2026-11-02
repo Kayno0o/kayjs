@@ -24,6 +24,10 @@ The zoom is published as `--zoom-scale`, so a mark standing on the pane can undo
 
 <Demo name="zoom-pane/marks" />
 
+## Driven by the page
+
+`plate` is the view to show, `{ scale, x, y }` as `onChange` hears it: a zoom-to-marker button sets it, a restored view starts the pane on it, and `{ scale: 1, x: 0, y: 0 }` fits it. The pane follows each new value the parent passes, held against its edges as a gesture is, without calling `onChange` for it; its own gestures, keys and buttons keep working and report through `onChange`, so a parent that keeps `plate` in a signal writes `onChange={next => plate = next}`.
+
 ## Button labels
 
 `zoomInLabel`, `zoomOutLabel` and `fitLabel` name the three zoom buttons, `Zoom in`, `Zoom out` and `Fit` by default. Set them to translate the pane.

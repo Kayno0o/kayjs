@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import Feed from '../tests/fixture/src/components/feed.kay'
 import MediaComponent from '../tests/fixture/src/components/media.kay'
+import ZoomDriven from '../tests/fixture/src/components/zoom-driven.kay'
 import { click } from './dom'
 
 // Stand-ins for the observers happy-dom lacks or never fires: each one made is kept, to be fired by hand.
@@ -514,5 +515,29 @@ describe('WhenVisible loading from a source', () => {
     await settle()
 
     expect(loads).toHaveLength(1)
+  })
+})
+
+describe('ZoomPane driven by the app', () => {
+  test('follows the plate the parent passes, fitted again when it passes the fitted one, and reports gestures through onChange only', async () => {
+    const heard: { scale: number, x: number, y: number }[] = []
+
+    mounted = await mountComponent(ZoomDriven, { heard })
+
+    const plate = () => mounted!.root.querySelector<HTMLElement>('#pane .kui-zoom-plate')!.style.getPropertyValue('--zoom-scale')
+
+    expect(plate()).toBe('1')
+    click(mounted.root.querySelector('#close'))
+    await settle()
+    expect(plate()).toBe('2')
+    expect(heard).toEqual([])
+
+    click(mounted.root.querySelector('#fit'))
+    await settle()
+    expect(plate()).toBe('1')
+
+    mounted.root.querySelector('#pane')!.dispatchEvent(new KeyboardEvent('keydown', { key: '+', bubbles: true, cancelable: true }))
+    await settle()
+    expect([plate(), heard.length]).toEqual(['1.15', 1])
   })
 })
