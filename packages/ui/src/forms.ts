@@ -1,5 +1,6 @@
 import type { Action, Answer, FailureData, Signal, Success } from 'kay'
 import { ActionError, context, describeField, effect, focusInvalid, markInvalid, uid } from 'kay'
+import { answerMessage } from './internal/answer-message'
 import { toast } from './toast'
 
 // The messages a FormDialog's last call was refused with, by field name, which each FormField inside it reads for its own `name`.
@@ -125,7 +126,7 @@ export async function callAction<Output>(form: HTMLFormElement, action: Action<n
     return { result: await action(new FormData(form)) }
   }
   catch (error) {
-    const said = error instanceof ActionError && error.data !== undefined ? refused?.(error.data as FailureData<Output>) : undefined
+    const said = error instanceof ActionError && error.data !== undefined ? refused?.(error.data as FailureData<Output>) ?? answerMessage(error.data) : undefined
     const byField = { ...error instanceof ActionError ? error.errors : {}, ...messagesOf(said) }
     const messages = Object.entries(byField)
     const shown = (name: string) => [...form.querySelectorAll('[data-field]')].some(field => field.getAttribute('data-field') === name)

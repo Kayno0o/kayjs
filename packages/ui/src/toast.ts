@@ -1,5 +1,6 @@
 import type { Duration } from 'kay'
 import { ActionError, ApiError, durationMs, signal, untrack } from 'kay'
+import { answerMessage } from './internal/answer-message'
 
 // What a toast means, in the vocabulary of every tone: a failed call is a `danger`.
 export type ToastTone = 'danger' | 'success' | 'info'
@@ -187,7 +188,7 @@ function refusalOf<Data>(error: unknown, refused: ((data: Data) => string | unde
     // A schema refusal carries no handler data for `refused` to read.
     const said = error.data === undefined ? undefined : readRefused(refused, error.data as Data)
 
-    return [said, error.errors['']].find(message => message !== undefined && message !== '')
+    return [said, answerMessage(error.data), error.errors['']].find(message => message !== undefined && message !== '')
   }
 
   return error instanceof ApiError ? refusalOfApi(error, refused) : undefined
@@ -214,20 +215,4 @@ function readRefused<Data>(refused: ((data: Data) => string | undefined) | undef
 
     return undefined
   }
-}
-
-const MAX_WORDS = 200
-// A code is one word with an underscore, or digits: `NOT_FOUND`, `404`. A short all-caps message such as `ACCESS DENIED` or `FULL` is still a message.
-const CODE = /^[A-Z0-9]+(?:_[A-Z0-9]+)+$|^\d+$/
-
-// The words of a route's answer, as `refusal()` in kay's runtime reads them, kept only when they read as a message: not markup from a proxy, a status code, several lines or a page.
-function answerMessage(answer: unknown): string | undefined {
-  const text = typeof answer === 'object' && answer !== null && 'message' in answer ? answer.message : answer
-
-  if (typeof text !== 'string')
-    return undefined
-
-  const words = text.trim()
-
-  return words === '' || words.length > MAX_WORDS || words.startsWith('<') || words.includes('\n') || CODE.test(words) ? undefined : words
 }

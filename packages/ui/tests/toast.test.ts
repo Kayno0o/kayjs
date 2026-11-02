@@ -177,14 +177,20 @@ describe('attempt', () => {
     await attempt(reject(new ActionError(400, '', {}, { error: 'Still referenced' })), 'Could not delete', refused)
     await attempt(reject(new ActionError(400, '', {}, { error: '' })), 'Could not delete', refused)
     await attempt(reject(new ActionError(429, '', { '': 'Too many tries' })), 'Could not delete', refused)
-    await attempt(reject(new ActionError(400, '', {}, { error: 'Still referenced' })), 'Could not delete')
+    // Without `refused`, a string, or a string `error` or `message`, that reads as a message is toasted.
+    await attempt(reject(new ActionError(409, '', {}, { error: 'Name taken' })), 'Could not delete')
+    await attempt(reject(new ActionError(409, '', {}, { message: 'Branch is behind', error: 5 })), 'Could not delete')
+    await attempt(reject(new ActionError(409, '', {}, 'Locked by someone')), 'Could not delete')
+    await attempt(reject(new ActionError(409, '', {}, { error: 'NOT_FOUND' })), 'Code failure')
+    await attempt(reject(new ActionError(409, '', {}, { error: 'two\nlines' })), 'Lines failure')
+    await attempt(reject(new ActionError(409, '', {}, { output: 'nginx: bad' })), 'Other failure')
     // A schema refusal and a plain error carry no handler data, so `refused` is never asked.
     await attempt(reject(new ActionError(422, '', { name: 'Required' })), 'Could not delete', refused)
     await attempt(reject(new Error('offline')), 'Could not delete', refused)
     // An empty refusal says nothing, so `failure` goes in its place.
     await attempt(reject(new ActionError(400, '', { '': '' }, { error: '' })), 'Could not delete', refused)
 
-    expect(shown().map(({ message }) => message)).toEqual(['Still referenced', 'Could not delete', 'Too many tries'])
+    expect(shown().map(({ message }) => message)).toEqual(['Still referenced', 'Could not delete', 'Too many tries', 'Name taken', 'Branch is behind', 'Locked by someone', 'Code failure', 'Lines failure', 'Other failure'])
     // The same error open is shown once.
   })
 
