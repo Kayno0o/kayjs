@@ -120,3 +120,39 @@ it('forwards the call, source and actions blocks through the launcher', async ()
   expect(await page.count('.kai-launcher-body .kai-chat-turn .like')).toBe(2)
   expect(page.errors).toEqual([])
 }, 120_000)
+
+it('hands a turn block the pending turn as it grows, and keeps the Allow button and the edit button of the chat, the approval ticket never shown', async () => {
+  await using page = await site.open('/blocked-approval')
+
+  await page.initScript(() => {
+    const seen = new Set<string>()
+
+    Object.assign(window, { seen })
+    new MutationObserver(() => {
+      const pending = document.querySelector('.card[data-pending]')
+
+      if (pending)
+        seen.add(pending.getAttribute('data-index')!)
+    }).observe(document, { subtree: true, childList: true, attributes: true })
+  })
+  await page.reload()
+  fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+  fakeAi.reply('May I add it?')
+  await page.fill('.kai-chat-form textarea', 'Add milk')
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('.kai-chat-approval')
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  expect([...await page.evaluate(() => [...(window as unknown as { seen: Set<string> }).seen])]).toContain('1')
+  expect(await page.count('.kai-chat-approval button')).toBe(2)
+  expect(await page.count('.kai-chat-turn[data-role=user] button[aria-label^="Edit the message"]')).toBe(1)
+
+  fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+  fakeAi.reply('Added')
+  await page.click('.kai-chat-approval button:first-of-type')
+  await page.waitFor('.card', { text: 'assistant: Added' })
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  expect((await texts(page, '.card')).some(text => text?.includes('kai-approved'))).toBe(false)
+  expect(page.errors).toEqual([])
+}, 120_000)

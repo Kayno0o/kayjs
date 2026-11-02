@@ -1,0 +1,8 @@
+---
+// kay-island
+import { approving } from '../routes/tools.kay'
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+Chat(action={approving} label="Assistant" editable)
+  @turn(turn, index)
+    div.card(data-index={index} data-pending={turn.pending ? '' : undefined}) {turn.role}: {turn.content}

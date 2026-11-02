@@ -495,7 +495,7 @@ function actionsKey(event: KeyboardEvent, id: number) {
 }
 
 // The turn as a block gets it: plain data, not the session's own record.
-const viewOf = (turn: Turn): ChatTurnView => ({ role: turn.role, content: turn.content, sources: turn.sources, calls: turn.calls ?? [], stopped: turn.stopped === true, pending: false })
+const viewOf = (turn: Turn): ChatTurnView => ({ role: turn.role, content: withoutApproval(turn.content), sources: turn.sources, calls: turn.calls ?? [], stopped: turn.stopped === true, pending: false })
 
 const callKey = (call: ToolCall) => `${call.name}\n${JSON.stringify(call.input)}`
 
@@ -686,6 +686,12 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
             button(part="save" type="button" data-variant="solid" data-size="sm" disabled={busy()} onClick={saveEdit}) {saveLabel}
             button(part="cancel" type="button" data-variant="ghost" data-size="sm" onClick={() => cancelEdit(turn.id)}) {cancelLabel}
         else
+          snippet approvals(entry: Turn)
+            for call of waitingFor(entry) key={call.id}
+              div(part="approval" role="group" aria-label={`${call.name}: ${approvalLabel}`})
+                span(part="approvalText") {call.name} {JSON.stringify(call.input)} - {approvalLabel}
+                button(part="allow" type="button" data-variant="solid" data-size="sm" onClick={() => decide(call, true)}) {allowLabel}
+                button(part="deny" type="button" data-variant="ghost" data-size="sm" onClick={() => decide(call, false)}) {denyLabel}
           slot turn(viewOf(turn), index)
             if turn.role === 'user'
               if turn.content !== ''
@@ -701,6 +707,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
                   p(part="reasoningText" tabindex="0") {turn.reasoning}
               if turn.calls && turn.calls.length > 0
                 Calls(calls={turn.calls} block={callBlock} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel} approvalLabel={approvalLabel})
+              {approvals(turn)}
               if turn.content !== ''
                 const view = render(turn.content, turn.code, turn.sources)
                 div(part="text" innerHTML={view.html})
@@ -708,12 +715,8 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
                   Sources(sources={view.cited} block={sourceBlock} label={sourcesLabel} here={links === 'here'})
               if turn.stopped
                 small(part="note") {stoppedLabel}
-          if turn.role === 'assistant'
-            for call of waitingFor(turn) key={call.id}
-              div(part="approval" role="group" aria-label={`${call.name}: ${approvalLabel}`})
-                span(part="approvalText") {call.name} {JSON.stringify(call.input)} - {approvalLabel}
-                button(part="allow" type="button" data-variant="solid" data-size="sm" onClick={() => decide(call, true)}) {allowLabel}
-                button(part="deny" type="button" data-variant="ghost" data-size="sm" onClick={() => decide(call, false)}) {denyLabel}
+          if turn.role === 'assistant' && turnBlock
+            {approvals(turn)}
           if (turn.role === 'user' ? canEdit(turn) : canRegenerate(turn)) || actionsBlock
             div(part="actions")
               if turn.role === 'user'
