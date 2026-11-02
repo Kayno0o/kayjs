@@ -40,7 +40,7 @@ document.querySelector('.kai-chat')?.dispatchEvent(new CustomEvent('kai-chat-dra
 
 ### Suggestions per page or visitor
 
-`suggestions` also takes a function returning the list or a promise of it, called once when the chat is drawn: a list returned at once is drawn by the server, a promise fills in once the chat is hydrated, and one that rejects shows none (the error is logged).
+`suggestions` also takes a function returning the list or a promise of it, called once when the chat is drawn (on the server too, so a slow one costs each page view): a list returned at once is drawn by the server, a promise fills in once the chat is hydrated, and one that rejects shows none (the error is logged).
 
 ```kay
 Chat(action={reply} suggestions={async () => fetchSuggestions(page)})
@@ -63,4 +63,5 @@ A reply that ends because the chat left its conversation (a new conversation, an
 
 - `open` is read live: set it to `true` to open the panel and `false` to close it. A panel set open on the server is drawn open.
 - `onOpenChange(open)` is called when the visitor opens it (button) or closes it (button, close button, Escape), not when the app sets `open`, so the app's state needs no guard against an echo.
+- Keep `open` in sync through `onOpenChange`: the panel only follows `open` when it changes, so an app ignoring `onOpenChange` after the visitor closed it must set `false` then `true` to open it again. A throw in `onOpenChange` is logged.
 - The focus moves to the field on the visitor's opening, and back to the button on their closing. An app setting `open` leaves the focus where it is.

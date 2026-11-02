@@ -269,3 +269,38 @@ describe('the fake', () => {
     expect(heard).toEqual(['own'])
   })
 })
+
+describe('structured asks and failed calls', () => {
+  it('run the hooks once for a schema ask', async () => {
+    const heard: string[] = []
+    const json: Provider = { name: 'json', model: 'm', async* stream() {
+      yield { text: '{"a":1}' }
+    } }
+
+    ai({ onRequest: () => {
+      heard.push('request')
+    }, onFinish: () => heard.push('finish') })
+
+    expect(await ask('hi', { provider: json, schema: s.Object({ a: s.Number() }) })).toEqual({ a: 1 })
+    expect(heard).toEqual(['request', 'finish'])
+  })
+
+  it('tell onToolCall a call that failed', async () => {
+    const statuses: string[] = []
+    const broken = tool({ name: 'look', description: 'Looks', input: s.Object({}), run: () => {
+      throw new Error('no')
+    } })
+
+    const log = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      ai({ onToolCall: call => statuses.push(call.status) })
+      await ask('go', { provider: echo(undefined, 1), tools: [broken] })
+    }
+    finally {
+      log.mockRestore()
+    }
+
+    expect(statuses).toEqual(['running', 'failed'])
+  })
+})

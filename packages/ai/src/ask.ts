@@ -367,6 +367,9 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
     const change = await requested(onRequest!, { messages: messages.map(message => ({ ...message })), system: options.system, model: first.about.model, options })
     let used = first
 
+    if (signal.aborted)
+      return
+
     if (change !== undefined && (change.messages !== undefined || 'system' in change)) {
       used = plan(change.messages === undefined ? messages : messagesOf(change.messages, replayed), 'system' in change ? change.system : options.system)
 

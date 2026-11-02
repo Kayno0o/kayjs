@@ -108,7 +108,6 @@ export interface Fake extends Provider {
 }
 
 const FAKE = Symbol.for('kayjs-ai.fake')
-
 const WORDS = /\S+\s*|\s+/g
 const CHARS_PER_TOKEN = 4
 const DEV_PACE_MS = 20

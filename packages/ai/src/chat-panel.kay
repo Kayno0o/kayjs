@@ -43,6 +43,15 @@ function hide() {
   button?.focus()
 }
 
+async function logged(pending: Promise<unknown>) {
+  try {
+    await pending
+  }
+  catch (error) {
+    console.error(error)
+  }
+}
+
 // The visitor's own opening or closing, which the page hears of.
 function toggle(next: boolean) {
   if (next)
@@ -50,7 +59,15 @@ function toggle(next: boolean) {
   else
     hide()
 
-  onOpenChange?.(next)
+  try {
+    const result = onOpenChange?.(next)
+
+    if (result instanceof Promise)
+      void logged(result)
+  }
+  catch (error) {
+    console.error(error)
+  }
 }
 
 // The page sets `open`: the panel follows it, the focus where the visitor has it, since nobody pressed a button.
