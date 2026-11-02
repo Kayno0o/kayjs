@@ -6,6 +6,8 @@ A Bun web framework: `.kay` components (pug-like templates over TypeScript), com
 
 Every feature asks the least of the app: the fewest declarations, the easiest setup, no workaround on the app's side. Prefer a design harder to build inside kay over one the app has to wire around.
 
+A kay component or library API is customizable from its first version, so an app does whatever it wants without wrapping it, copying it or waiting for an issue. Before a component is done, each of these has an answer: its data comes from a list or from an async source (a function returning a promise), each visible part can be replaced or extended (a block, a part, a class), anything that navigates can be a link as well as a button, its state can be controlled by the app or left to the component, and a callback or event marks each transition (open, close, select, load, fail). A gap an app finds later is a miss against this rule: filed with the component's label, and fixed for every component of its kind, not only the one the app used.
+
 ## Workflow
 
 Each session works alone, with no coordinator:
