@@ -73,8 +73,8 @@ type AsLink = Omit<JSX.IntrinsicElements['a'], 'class'> & Look & { href: string 
 [./lib/button-props] buttonOf
 function buttonOf(attributes: TagAttributes): {
   disabled: undefined;
-  'aria-expanded': string | undefined;
-  'aria-pressed': string | undefined;
+  'aria-pressed'?: string;
+  'aria-expanded'?: string;
   command?: "close" | "show-modal" | "request-close" | "show-popover" | "hide-popover" | "toggle-popover" | `--${string}` | undefined;
   form?: Value;
   slot?: Value;
@@ -256,8 +256,8 @@ function buttonOf(attributes: TagAttributes): {
   href?: undefined;
   type: "button";
   'aria-disabled': "true"; ...#35e55001 (2 lines)
-  'aria-expanded': string | undefined;
-  'aria-pressed': string | undefined;
+  'aria-pressed'?: string;
+  'aria-expanded'?: string;
   type: "reset" | "submit" | "button";
   disabled: Value;
   command?: "close" | "show-modal" | "request-close" | "show-popover" | "hide-popover" | "toggle-popover" | `--${string}` | undefined;
