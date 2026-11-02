@@ -299,4 +299,5 @@ Topics of the kayjs-ui reference the sections above do not link:
 - [Page layout, command palette and trees](/llms/kayjs-ui-page-layout-palette-and-trees)
 - [Infinite lists, LoadMore and a Table over them](/llms/kayjs-ui-infinite-list)
 - [Open state, transitions and option sources](/llms/kayjs-ui-open-state-and-sources)
-- [Charts, drag and drop, galleries and image tools](/llms/kayjs-ui-charts-drag-and-media)
+- [Charts and MapView](/llms/kayjs-ui-charts)
+- [Drag and drop, galleries and image tools](/llms/kayjs-ui-charts-drag-and-media)
