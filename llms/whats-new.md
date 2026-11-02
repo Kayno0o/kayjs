@@ -39,8 +39,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `infiniteList` starts over when what it follows changes, as the props a `persist` island gets from the next page: the props an action source's function `input` reads, or first rows given as a function (`infiniteList(() => rows, ...)`): [kayjs-ui infinite lists](../packages/ui/llms/infinite-list.md).
 - kayjs-ui's `SplitLayout` keeps the list's width under `listWidthKey` in a cookie the server reads, not in `localStorage`, so the saved width is drawn from the first paint; a width kept in `localStorage` moves to the cookie once: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
 - kayjs-ui's `SidePanel` takes `scrollKey`, whose change brings its body back to the top, so a panel kept in a `persist` island needs no ref into its parts: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
-- kayjs-ui's `SidePanel` takes `sizeKey`, which keeps a docked panel's width in a cookie of that name the server reads, so the saved width is drawn from the first paint with no `persisted`, signal or `onSizeChange` of the app's: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
-- kayjs-ui's `Combobox` options take a `description`, a quieter second line read after the label, and the Combobox takes an `@option(option)` block to draw each row: [forms](../packages/ui/llms/forms.md).
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
 

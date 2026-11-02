@@ -14,6 +14,9 @@ What each release before 1.84 added, and the end of a newest release that was cu
 - `testSite({ styles: true })` builds the real stylesheets with no browser, and `await page.css()` reads the CSS a visit's page carries, so a test asserts on a theme variable or a rule an app ships: [testing](testing.md).
 - kayjs-ui `TreeView` rows can be links (`href` on a `TreeNode`, selected by the page's address when `selected` is left out), carry their own controls (`@trailing(node)`, shown on hover and focus) and a context menu (`menu` on a node, from the keyboard with Shift+F10 or the Menu key): [Page layout, command palette and trees](../packages/ui/llms/page-layout-palette-and-trees.md#treeview).
 
+- kayjs-ui's `SidePanel` takes `sizeKey`, which keeps a docked panel's width in a cookie of that name the server reads, so the saved width is drawn from the first paint with no `persisted`, signal or `onSizeChange` of the app's: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
+- kayjs-ui's `Combobox` options take a `description`, a quieter second line read after the label, and the Combobox takes an `@option(option)` block to draw each row: [forms](../packages/ui/llms/forms.md).
+
 ## 1.83.0
 
 - kayjs-ai: `ground(found, read)` turns the rows pg-orm 8's `nearest()` found into the `system` and `sources` of an `ask`, so a chat answers from the app's own documents and cites them, and the fake answers it all under `bun test`: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).
