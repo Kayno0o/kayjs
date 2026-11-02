@@ -40,3 +40,59 @@ export function describeScope(memory: ScopeMemory | undefined, before?: ScopeMem
 
   return `the scope's memory.peak is ${Math.round(memory.peak / MB)} MB and the kernel has killed ${memory.oomKills} of its processes for the limit${during}`
 }
+
+export interface ScopeSamples {
+  // The highest memory.current seen, in bytes.
+  peak: number
+  // Every sample as seconds since the sampler started and bytes.
+  samples: [number, number][]
+}
+
+// The cgroup folder of this process, none where it is not v2.
+function scopeFolder(): string | undefined {
+  const folder = CGROUP_LINE.exec(read('/proc/self/cgroup') ?? '')?.[1]
+
+  return folder === undefined ? undefined : `/sys/fs/cgroup${folder}`
+}
+
+// Samples the scope's memory.current every `intervalMs` until `stop()`, which returns what was seen: the peak of one step, where memory.peak counts the whole scope since it started. Undefined where memory.current is not readable, so nothing runs.
+// `folder` is the cgroup folder, this process's own by default.
+export function sampleScope(intervalMs = 1000, folder = scopeFolder()): { stop: () => ScopeSamples } | undefined {
+  const file = folder === undefined ? undefined : `${folder}/memory.current`
+
+  if (file === undefined || read(file) === undefined)
+    return undefined
+
+  const started = performance.now()
+  const samples: [number, number][] = []
+  let peak = 0
+
+  function take() {
+    const current = Number(read(file!))
+
+    if (Number.isNaN(current))
+      return
+
+    peak = Math.max(peak, current)
+    samples.push([Math.round((performance.now() - started) / 100) / 10, current])
+  }
+
+  take()
+  const timer = setInterval(take, intervalMs)
+
+  timer.unref()
+
+  return {
+    stop() {
+      clearInterval(timer)
+      take()
+
+      return { peak, samples }
+    },
+  }
+}
+
+// The samples as a log line: seconds then MB, in order.
+export function describeSamples({ samples }: ScopeSamples): string {
+  return `memory.current by second: ${samples.map(([at, bytes]) => `${at}s=${Math.round(bytes / MB)}`).join(' ')}`
+}

@@ -6,7 +6,7 @@ import { $, Glob } from 'bun'
 import { dependenciesOnly } from './dependency-change'
 import { librariesToTest, libraryDependencies } from './library-dependents'
 import { addedMarkers } from './merge-markers'
-import { describeScope, scopeMemory } from './scope-memory'
+import { describeSamples, describeScope, sampleScope, scopeMemory } from './scope-memory'
 import { readersOf, WHOLE_SUITE } from './source-readers'
 import { subprocessTests } from './subprocess-tests'
 import { crashedWorkers, failedTests } from './test-failures'
@@ -105,6 +105,7 @@ async function settledWithin(work: Promise<void>, ms: number) {
 async function step(label: string, argv: string[], cwd = '.') {
   const started = performance.now()
   const before = scopeMemory()
+  const sampler = sampleScope()
 
   process.stdout.write(`${label}: `)
   await appendFile(LOG, `$ ${label}\n`)
@@ -142,17 +143,20 @@ async function step(label: string, argv: string[], cwd = '.') {
   await settledWithin(drained, DRAIN_MS)
   // A process left holding the pipe would otherwise keep the landing alive once it is done.
   await reader.cancel()
-  await appendFile(LOG, `\n(${describeScope(scopeMemory(), before)})\n\n`)
+  const sampled = sampler?.stop()
+
+  await appendFile(LOG, `\n(${describeScope(scopeMemory(), before)})\n${sampled === undefined ? '' : `(${describeSamples(sampled)})\n`}\n`)
 
   const seconds = Math.round((performance.now() - started) / 1000)
+  const peak = sampled === undefined ? '' : `, peak ${Math.round(sampled.peak / 1024 / 1024)} MB`
 
   if (exitCode === 0 && !hung) {
-    console.log(`ok, ${seconds} s`)
+    console.log(`ok, ${seconds} s${peak}`)
 
     return
   }
 
-  console.log(hung ? `killed after ${seconds} s` : `exit ${exitCode}, ${seconds} s`)
+  console.log(hung ? `killed after ${seconds} s${peak}` : `exit ${exitCode}, ${seconds} s${peak}`)
   const lines = output.trimEnd().split('\n')
 
   const failures = failedTests(lines)
