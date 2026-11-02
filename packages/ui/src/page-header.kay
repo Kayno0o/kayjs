@@ -14,12 +14,12 @@ const look = recipe({
 })
 
 const { title, meta, description, actions, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'title'> & {
-  // The page's one `h1`.
-  title: string
+  // The page's one `h1`. A `@title` block draws markup inside it instead of the string.
+  title: string | Snippet
   // Beside the title: a badge, a count, a link back.
   meta?: Snippet
-  // Under the title's line: a sentence saying what the page holds.
-  description?: string | undefined
+  // Under the title's line: a sentence saying what the page holds. A `@description` block draws markup in its paragraph, such as a link.
+  description?: string | Snippet | undefined
   // After the title, past a divider: a `+` Button, a link, a row of controls.
   actions?: Snippet
 }>()

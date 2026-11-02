@@ -1,0 +1,33 @@
+---
+import Card from '@kaynooo/kayjs-ui/card.kay'
+import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
+import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Widget from '@kaynooo/kayjs-ui/widget.kay'
+---
+Card(id="card-string" title="Plain" level={4})
+  | body
+Card(id="card-block" level={4})
+  @title
+    a(href="https://example.com/x") Linked
+  | body
+PageHeader(id="header-block")
+  @title
+    a(href="https://example.com/page") Page
+  @description
+    a(href="https://example.com/more") More
+PageHeader(id="header-string" title="Title" description="Described")
+PageSection(id="section-block" level={3})
+  @title
+    a(href="https://example.com/s") Section
+Widget(id="widget-string" title="Tile" level={4})
+Widget(id="widget-default" title="Tile")
+Widget(id="widget-block")
+  @title
+    a(href="https://example.com/w") Widget
+EmptyState(id="empty-block" level={2})
+  @title
+    a(href="https://example.com/e") Empty
+  @description
+    a(href="https://example.com/add") Add one
+EmptyState(id="empty-string" title="None" description="Nothing here")

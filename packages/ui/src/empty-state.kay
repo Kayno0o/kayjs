@@ -12,10 +12,12 @@ const look = recipe({
 })
 
 const { title, level, description, actions, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title' | 'children'> & {
-  title: string
+  // A `@title` block draws markup inside the heading, or the paragraph, instead of the string.
+  title: string | Snippet
   // Makes the title a heading of that level, `1` for an empty state standing for the whole page, such as a 404; without it, a paragraph under the page's own heading.
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
-  description?: string | undefined
+  // A `@description` block draws markup in its paragraph, such as a link.
+  description?: string | Snippet | undefined
   // Below the description: a button or a link leading out of the empty list, such as the one that adds the first item.
   actions?: Snippet
 }>()

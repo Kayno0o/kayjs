@@ -13,7 +13,8 @@ const look = recipe({
 })
 
 const { title, level = 2, subtitle, sticky = false, actions, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
-  title: string
+  // A `@title` block draws markup inside the heading instead of the string.
+  title: string | Snippet
   // The title's heading level, `1` for a section holding a whole page.
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   // A muted line under the title, such as the collection an entry belongs to.

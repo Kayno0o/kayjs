@@ -13,8 +13,11 @@ const look = recipe({
   },
 })
 
-const { title, icon, actions, isEmpty = false, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title'> & {
-  title?: string | undefined
+const { title, level = 2, icon, actions, isEmpty = false, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title'> & {
+  // A `@title` block draws markup inside the heading instead of the string.
+  title?: string | Snippet | undefined
+  // The title's heading level, under the page's outline.
+  level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   icon?: IconSlot | IconProps | undefined
   // The end of the head line: a link, a button, a row of actions.
   actions?: Snippet
@@ -31,7 +34,18 @@ if empty !== undefined || !isEmpty
         if icon
           Icon(icon={icon})
         if title
-          h2.kui-heading-section(part="title") {title}
+          if level === 1
+            h1.kui-heading-section(part="title") {title}
+          else if level === 2
+            h2.kui-heading-section(part="title") {title}
+          else if level === 3
+            h3.kui-heading-section(part="title") {title}
+          else if level === 4
+            h4.kui-heading-section(part="title") {title}
+          else if level === 5
+            h5.kui-heading-section(part="title") {title}
+          else
+            h6.kui-heading-section(part="title") {title}
         | {actions}
     if isEmpty
       | {empty}
