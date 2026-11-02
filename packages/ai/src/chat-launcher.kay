@@ -6,10 +6,13 @@ import Icon from '@kaynooo/kayjs-ui/icon.kay'
 
 type ChatProps = typeof Chat extends Component<infer Props> ? Props : never
 
-const { icon, closeIcon, turn, actions, call, source, empty, footer, sendIcon, stopIcon, attachIcon, newIcon, expandIcon, collapseIcon, note, openLabel, closeLabel, newLabel, expandLabel, collapseLabel, remember, class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember' | 'conversationIn' | 'newButton' | 'sendIcon' | 'stopIcon' | 'attachIcon' | 'turn' | 'actions' | 'call' | 'source' | 'empty' | 'footer'> & {
+const { icon, closeIcon, turn, actions, call, source, empty, footer, sendIcon, stopIcon, attachIcon, newIcon, expandIcon, collapseIcon, note, openLabel, closeLabel, open, onOpenChange, onSend, onReply, onStop, onError, onToolCall, onRegenerate, onEdit, onSuggestion, suggestions, newLabel, expandLabel, collapseLabel, remember, class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember' | 'conversationIn' | 'newButton' | 'sendIcon' | 'stopIcon' | 'attachIcon' | 'onSend' | 'onReply' | 'onStop' | 'onError' | 'onToolCall' | 'onRegenerate' | 'onEdit' | 'onSuggestion' | 'suggestions' | 'turn' | 'actions' | 'call' | 'source' | 'empty' | 'footer'> & {
   // The text of the button while the panel is closed and while it is open; `Open the chat` and `Close the chat` by default. The chat's `label` heads the panel.
   openLabel?: string | undefined
   closeLabel?: string | undefined
+  // Opens and closes the panel when the app sets it, such as an "Ask the assistant" button elsewhere on the page, or to close it after a navigation; left out, the button and Escape work on their own. `onOpenChange(open)` is called when the visitor opens or closes it, so the app's state follows.
+  open?: boolean | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
   // The tab's session storage key the conversation is kept under, so a reload finds it; none by default, as the next visitor to use the tab would read it. A site with sign-in gives one per visitor.
   remember?: string | undefined
   // What the button and the panel's close button draw, in place of a chat bubble and a cross.
@@ -17,6 +20,16 @@ const { icon, closeIcon, turn, actions, call, source, empty, footer, sendIcon, s
   closeIcon?: Snippet
   // The header's two other buttons, which clear the conversation and enlarge the panel: a new-chat plus, and a pair of arrows out and in.
   newIcon?: Snippet
+  // What the chat hears and the questions it offers, as `Chat` takes them: the callbacks, and `suggestions` as a list or a function.
+  onSend?: ChatProps['onSend']
+  onReply?: ChatProps['onReply']
+  onStop?: ChatProps['onStop']
+  onError?: ChatProps['onError']
+  onToolCall?: ChatProps['onToolCall']
+  onRegenerate?: ChatProps['onRegenerate']
+  onEdit?: ChatProps['onEdit']
+  onSuggestion?: ChatProps['onSuggestion']
+  suggestions?: ChatProps['suggestions']
   // The chat's blocks, as `Chat` takes them: its turns, the buttons under a turn, a tool call, a cited source, the empty chat and a footer under the form.
   turn?: ChatProps['turn']
   actions?: ChatProps['actions']
@@ -42,7 +55,17 @@ const { icon, closeIcon, turn, actions, call, source, empty, footer, sendIcon, s
 
 // The blocks the app gave, passed on to the chat. A function passed to the chat island makes this component render as an island when the app gives one, and only then.
 function forwarded() {
-  const given: Pick<ChatProps, 'turn' | 'actions' | 'call' | 'source' | 'empty' | 'footer'> = {}
+  const given: Pick<ChatProps, 'turn' | 'actions' | 'call' | 'source' | 'empty' | 'footer' | 'onSend' | 'onReply' | 'onStop' | 'onError' | 'onToolCall' | 'onRegenerate' | 'onEdit' | 'onSuggestion' | 'suggestions'> = {}
+
+  if (onSend) given.onSend = onSend
+  if (onReply) given.onReply = onReply
+  if (onStop) given.onStop = onStop
+  if (onError) given.onError = onError
+  if (onToolCall) given.onToolCall = onToolCall
+  if (onRegenerate) given.onRegenerate = onRegenerate
+  if (onEdit) given.onEdit = onEdit
+  if (onSuggestion) given.onSuggestion = onSuggestion
+  if (suggestions) given.suggestions = suggestions
 
   if (turn) given.turn = turn
   if (actions) given.actions = actions
@@ -53,9 +76,17 @@ function forwarded() {
 
   return given
 }
+
+// What the app set of the panel's opening, as getters so a change of `open` reaches the panel; a function passed to the panel by name would make this component an island whatever the app gives.
+function opening() {
+  return {
+    get open() { return open },
+    get onOpenChange() { return onOpenChange },
+  }
+}
 ---
 // The panel keeps its state across page swaps, and the chat inside hydrates, and so loads, when the panel is first shown. A conversation kept on the server is named by the browser, as the panel is on every page and the address of none.
-Panel(persist label={chat.label} openLabel={openLabel} closeLabel={closeLabel} newLabel={newLabel} expandLabel={expandLabel} collapseLabel={collapseLabel} class={className})
+Panel(persist {...opening()} label={chat.label} openLabel={openLabel} closeLabel={closeLabel} newLabel={newLabel} expandLabel={expandLabel} collapseLabel={collapseLabel} class={className})
   @icon
     if icon
       | {icon}

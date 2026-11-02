@@ -1,0 +1,4 @@
+---
+import Opening from '../components/opening.kay'
+---
+Opening

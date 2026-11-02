@@ -52,6 +52,12 @@ export interface ChatTurnView extends ChatTurn {
   pending: boolean
 }
 
+// What `Chat`'s `onError` receives: the message the chat shows, and the refused call's HTTP status when the action answered one (a stream that broke off has none).
+export interface ChatFailure {
+  message: string
+  status: number | undefined
+}
+
 export interface Usage {
   // The input read at full price: what the provider did not take from its cache, nor write to it.
   inputTokens: number

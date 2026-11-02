@@ -1,0 +1,11 @@
+---
+import { reply } from '../routes/chat.kay'
+import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
+
+const open = signal(false)
+const changes = signal<boolean[]>([])
+---
+button.ask(type="button" onClick={() => { open = true }}) Ask the assistant
+button.dismiss(type="button" onClick={() => { open = false }}) Dismiss
+p.changes {changes().join(';')}
+ChatLauncher(action={reply} label="Assistant" open={open()} onOpenChange={value => { open = value; changes = [...changes(), value] }} suggestions={['What is it?']})

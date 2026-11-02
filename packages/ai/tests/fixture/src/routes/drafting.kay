@@ -1,0 +1,4 @@
+---
+import Drafting from '../components/drafting.kay'
+---
+Drafting

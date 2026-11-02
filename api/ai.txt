@@ -100,6 +100,11 @@ interface Calls
   reasoning?: string | string[] | undefined
   text?: string | string[] | undefined
 
+[.] ChatFailure
+interface ChatFailure
+  message: string
+  status: number | undefined
+
 [.] ChatMessage
 interface ChatMessage
   attachments?: File[]
@@ -675,6 +680,16 @@ component default
   newIcon?: Element
   newLabel?: string | undefined
   note?: Element
+  onEdit?: ((text: string) => unknown) | undefined
+  onError?: ((failure: ChatFailure) => unknown) | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onRegenerate?: (() => unknown) | undefined
+  onReply?: ((turn: ChatTurnView) => unknown) | undefined
+  onSend?: ((sent: { messages: ChatMessage[]; }) => unknown) | undefined
+  onStop?: (() => unknown) | undefined
+  onSuggestion?: ((text: string) => unknown) | undefined
+  onToolCall?: ((call: ToolCall) => unknown) | undefined
+  open?: boolean | undefined
   openLabel?: string | undefined
   placeholder?: string | undefined
   reasoning?: boolean | undefined
@@ -700,7 +715,7 @@ component default
   stopIcon?: Element
   stopLabel?: string | undefined
   stoppedLabel?: string | undefined
-  suggestions?: string[] | undefined
+  suggestions?: string[] | (() => string[] | Promise<string[]>) | undefined
   tableLabel?: string | undefined
   thinkingLabel?: string | undefined
   tone?: "accent" | "neutral" | undefined
@@ -739,6 +754,8 @@ component default
   label?: string | undefined
   newIcon: Element
   newLabel?: string | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
   openLabel?: string | undefined
 
 [./chat-sources.kay] default
@@ -848,6 +865,14 @@ component default
   newButton?: boolean | undefined
   newIcon?: Element
   newLabel?: string | undefined
+  onEdit?: ((text: string) => unknown) | undefined
+  onError?: ((failure: ChatFailure) => unknown) | undefined
+  onRegenerate?: (() => unknown) | undefined
+  onReply?: ((turn: ChatTurnView) => unknown) | undefined
+  onSend?: ((sent: { messages: ChatMessage[]; }) => unknown) | undefined
+  onStop?: (() => unknown) | undefined
+  onSuggestion?: ((text: string) => unknown) | undefined
+  onToolCall?: ((call: ToolCall) => unknown) | undefined
   placeholder?: string | undefined
   reasoning?: boolean | undefined
   reasoningLabel?: string | undefined
@@ -872,7 +897,7 @@ component default
   stopIcon?: Element
   stopLabel?: string | undefined
   stoppedLabel?: string | undefined
-  suggestions?: string[] | undefined
+  suggestions?: string[] | (() => string[] | Promise<string[]>) | undefined
   tableLabel?: string | undefined
   thinkingLabel?: string | undefined
   tone?: "accent" | "neutral" | undefined

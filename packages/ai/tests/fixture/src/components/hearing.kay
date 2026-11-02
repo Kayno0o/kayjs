@@ -1,0 +1,10 @@
+---
+import { reply } from '../routes/chat.kay'
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+
+const heard = signal<string[]>([])
+
+const hear = (what: string) => { heard = [...heard(), what] }
+---
+Chat(action={reply} label="Assistant" suggestions={async () => ['From a promise']} onSuggestion={text => hear(`suggestion:${text}`)} onSend={sent => hear(`send:${sent.messages.at(-1)?.content}`)} onReply={turn => hear(`reply:${turn.content}`)} onStop={() => hear('stop')} onError={failure => hear(`error:${failure.status}`)})
+p.heard {heard().join(';')}

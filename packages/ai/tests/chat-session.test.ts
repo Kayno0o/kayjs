@@ -494,3 +494,108 @@ test('a transcription finishing after the conversation started over sends nothin
   expect(await heard).toBeUndefined()
   expect([session.draft(), posts.length]).toEqual(['', 0])
 })
+
+test('the app hears a send, a tool call, then the finished reply, each once and in that order', async () => {
+  const heard: string[] = []
+  const reply = fakeStream()
+  const { session } = chat([answer(reply.stream)], {
+    onSend: ({ messages }) => heard.push(`send ${messages.map(message => message.content).join('|')}`),
+    onToolCall: call => heard.push(`call ${call.name} ${call.status}`),
+    onReply: turn => heard.push(`reply ${turn.content}`),
+    onStop: () => heard.push('stop'),
+    onError: () => heard.push('error'),
+  })
+
+  await session.send('hi')
+  reply.send({ text: 'He', calls: [{ id: 'c1', name: 'search', input: {}, status: 'running' }] })
+  // The same snapshot again is no transition.
+  reply.send({ text: 'Hel', calls: [{ id: 'c1', name: 'search', input: {}, status: 'running' }] })
+  reply.send({ text: 'Hello', calls: [{ id: 'c1', name: 'search', input: {}, status: 'done' }] })
+  reply.end('done')
+  flush()
+
+  expect(heard).toEqual(['send hi', 'call search running', 'call search done', 'reply Hello'])
+})
+
+test('the app hears a stop when the visitor presses it, and no reply', async () => {
+  const heard: string[] = []
+  const reply = fakeStream()
+  const { session } = chat([answer(reply.stream)], { onReply: () => heard.push('reply'), onStop: () => heard.push('stop'), onError: () => heard.push('error') })
+
+  session.stop()
+  await session.send('hi')
+  reply.send('Hel')
+  session.stop()
+  flush()
+
+  expect(heard).toEqual(['stop'])
+})
+
+test('the app hears a refused call with its status, and a stream that broke off without one', async () => {
+  const failures: unknown[] = []
+  const broken = fakeStream()
+  const { session } = chat([refuse(429, { '': 'Slow down' }), answer(broken.stream)], { onError: failure => failures.push(failure), onReply: () => failures.push('reply') })
+
+  await session.send('one')
+  await session.retry()
+  broken.send('Hel')
+  broken.end('failed')
+  flush()
+
+  expect(failures).toEqual([{ message: 'Slow down', status: 429 }, { message: 'The reply failed.', status: undefined }])
+})
+
+test('the app hears a regenerate and an edit before the request they send', async () => {
+  const heard: string[] = []
+  const first = fakeStream()
+  const second = fakeStream()
+  const third = fakeStream()
+  const { session } = chat([answer(first.stream), answer(second.stream), answer(third.stream)], {
+    onSend: ({ messages }) => heard.push(`send ${messages.at(-1)?.content}`),
+    onRegenerate: () => heard.push('regenerate'),
+    onEdit: text => heard.push(`edit ${text}`),
+  })
+
+  await session.send('hi')
+  first.send('Hello')
+  first.end('done')
+  flush()
+  session.regenerate()
+  await Bun.sleep(0)
+  second.send('Hey')
+  second.end('done')
+  flush()
+  session.edit(session.history()[0]!.id, ' hello ')
+  await Bun.sleep(0)
+
+  expect(heard).toEqual(['send hi', 'regenerate', 'send hi', 'edit hello', 'send hello'])
+})
+
+test('a callback that throws or rejects is logged and leaves the chat alone', async () => {
+  const reply = fakeStream()
+  const { session } = chat([answer(reply.stream)], {
+    onSend: () => {
+      throw new Error('boom')
+    },
+    onReply: async () => Promise.reject(new Error('later')),
+  })
+
+  await session.send('hi')
+  reply.send('Hello')
+  reply.end('done')
+  flush()
+  await Bun.sleep(0)
+
+  expect(turns(session)).toEqual(['user: hi', 'assistant: Hello'])
+  expect(console.error).toHaveBeenCalledTimes(2)
+})
+
+test('prefill puts text in front of what the visitor typed', () => {
+  const { session } = chat([])
+
+  session.prefill('Ask about this page')
+  expect(session.draft()).toBe('Ask about this page')
+  session.draft.set('mine')
+  session.prefill('Ask')
+  expect(session.draft()).toBe('Ask\nmine')
+})

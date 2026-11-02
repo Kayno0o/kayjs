@@ -1,7 +1,7 @@
 import type { Action, ActionStream, Failure, Signal } from 'kay'
 import type { Attachments } from './chat-attachments'
 import type { ConversationAnswer, ConversationSummary } from './conversation-title'
-import type { ChatMessage, ChatTurn, CodeBlock, Message, Progress, Source, ToolCall } from './types'
+import type { ChatFailure, ChatMessage, ChatTurn, CodeBlock, Message, Progress, Source, ToolCall } from './types'
 import { ActionError, effect, onMount, signal, untrack } from 'kay'
 import { markdownReady } from 'kay/markdown'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, restored, shrunk, stored } from './chat-history'
@@ -50,6 +50,14 @@ export interface ChatSessionOptions {
   readonly conflictMessage?: string | undefined
   readonly loadFailedMessage?: string | undefined
   readonly signedOutMessage?: string | undefined
+  // What the app hears, each called once per transition. A throw is logged and leaves the chat alone.
+  readonly onSend?: ((sent: { messages: ChatMessage[] }) => unknown) | undefined
+  readonly onReply?: ((turn: Turn) => unknown) | undefined
+  readonly onStop?: (() => unknown) | undefined
+  readonly onError?: ((failure: ChatFailure) => unknown) | undefined
+  readonly onToolCall?: ((call: ToolCall) => unknown) | undefined
+  readonly onRegenerate?: (() => unknown) | undefined
+  readonly onEdit?: ((text: string) => unknown) | undefined
 }
 
 // What a Chat's `transcribe` action answers: the text, or `{ text }`.
@@ -110,6 +118,31 @@ interface Replacement {
 }
 
 const MAX_RETRIES = 5
+
+async function logged(pending: Promise<unknown>): Promise<void> {
+  try {
+    await pending
+  }
+  catch (error) {
+    console.error(error)
+  }
+}
+
+// Tells the app, which a throw of its own, or a rejection of its promise, must not break the chat for.
+function notify<Args extends unknown[]>(listener: ((...args: Args) => unknown) | undefined, ...args: Args): void {
+  if (listener === undefined)
+    return
+
+  try {
+    const result = listener(...args)
+
+    if (result instanceof Promise)
+      void logged(result)
+  }
+  catch (error) {
+    console.error(error)
+  }
+}
 
 // The turns of a Chat and the reply under way, which is idle, waiting (the call is out, no word yet), streaming, then ended, when what arrived joins the history. Every transition is here, apart from the DOM: the component draws it and wires its events.
 export function createChatSession(options: ChatSessionOptions) {
@@ -329,6 +362,7 @@ export function createChatSession(options: ChatSessionOptions) {
         continue
 
       told.set(call.id, call.status)
+      notify(options.onToolCall, call)
       said.push({ id: nextId++, text: options.say(call) })
     }
 
@@ -426,9 +460,12 @@ export function createChatSession(options: ChatSessionOptions) {
         void load(shown, false)
     }
 
+    let added: Turn | undefined
+
     if (text !== '' || made.length > 0) {
       replacement = undefined
-      history.set([...history(), { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, reasoning: thinking, reasoningOpen: thinkingOpen, ...cites.length > 0 && { sources: cites }, stopped: state === 'closed' }])
+      added = { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, reasoning: thinking, reasoningOpen: thinkingOpen, ...cites.length > 0 && { sources: cites }, stopped: state === 'closed' }
+      history.set([...history(), added])
     }
 
     // The server stored the exchange as it does: a reply that ended, or one stopped or broken off once it had said or called something, a reply resumed after a reload included.
@@ -448,6 +485,11 @@ export function createChatSession(options: ChatSessionOptions) {
       failure.set(options.errorMessage)
     else if (state === 'closed' && text === '' && made.length === 0)
       takeBack()
+
+    if (state === 'failed')
+      notify(options.onError, { message: options.errorMessage, status: undefined })
+    else if (state === 'done' && added !== undefined)
+      notify(options.onReply, added)
   }
 
   // Posts the history; a 413 halves what is posted, at most 5 times a send since each counts against the action's rate limit, until the action takes it or only the last message is left.
@@ -518,6 +560,9 @@ export function createChatSession(options: ChatSessionOptions) {
     spoken.set([])
     waiting.set(true)
 
+    if (resuming === undefined)
+      notify(options.onSend, { messages: posted(history(), held ? 1 : options.keep, Math.min(options.maxChars, learned)) })
+
     try {
       // A turn that only called tools has no text to post, which a provider refuses.
       // A resume after a reload comes once the server has dropped the turns.
@@ -558,6 +603,7 @@ export function createChatSession(options: ChatSessionOptions) {
         const refusal = error instanceof ActionError && error.status < 500 ? error.errors[''] : undefined
 
         failure.set(refusal !== undefined && refusal !== '' ? refusal : options.errorMessage)
+        notify(options.onError, { message: failure() ?? options.errorMessage, status: error instanceof ActionError ? error.status : undefined })
       }
     }
     finally {
@@ -577,6 +623,14 @@ export function createChatSession(options: ChatSessionOptions) {
     catch (error) {
       console.warn('the reply could not be ended on the server', error)
     }
+  }
+
+  // The visitor's Stop, which the app hears of; the chat ends a reply the same way when it leaves the conversation.
+  function stopped() {
+    if (busy())
+      notify(options.onStop)
+
+    stop()
   }
 
   function stop() {
@@ -723,15 +777,18 @@ export function createChatSession(options: ChatSessionOptions) {
 
       return done
     },
+    // Puts text in front of the field's, for the visitor to read and send.
+    prefill: withDraft,
     send: async (question?: string) => post(false, question),
     // Try again: the same request, the history as it is.
     retry: async () => post(true),
-    stop,
+    stop: stopped,
     // Asks again for the last reply: it leaves the log and the history, and the post ends on the message before it, which replaces both turns on a server that keeps the conversation.
     regenerate() {
       if (busy())
         return
 
+      notify(options.onRegenerate)
       replacement = { header: 'regenerate:2', before: history() }
       history.set(history().slice(0, -1))
       void post(true)
@@ -756,6 +813,7 @@ export function createChatSession(options: ChatSessionOptions) {
 
       // The edit field is gone, and the edit button too while the reply is under way.
       options.focus()
+      notify(options.onEdit, content)
       replacement = { header: `edit:${turns.length - index}`, before: turns }
       history.set([...turns.slice(0, index), { id: nextId++, role: 'user', content, ...files.length > 0 && { attachments: files } }])
       void post(true)

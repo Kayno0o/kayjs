@@ -1,0 +1,4 @@
+---
+import Hearing from '../components/hearing.kay'
+---
+Hearing

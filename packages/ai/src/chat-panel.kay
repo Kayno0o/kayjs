@@ -1,11 +1,11 @@
 ---
 import type { Snippet } from 'kay'
-import { recipe, signal, uid } from 'kay'
+import { effect, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kai-launcher', panel: 'kai-launcher-panel', head: 'kai-launcher-head', title: 'kai-launcher-title', actions: 'kai-launcher-actions', action: 'kui-icon-btn', expand: 'kui-icon-btn kai-launcher-expand', body: 'kai-launcher-body', button: 'kui-icon-btn kai-launcher-button', glyph: 'kai-launcher-glyph' } })
 
-const { label = wording('ai.chat.label', 'Chat'), openLabel = wording('ai.chat.open', 'Open the chat'), closeLabel = wording('ai.chat.close', 'Close the chat'), icon, closeIcon, newIcon, expandIcon, collapseIcon, newLabel = wording('ai.chat.new', 'New conversation'), expandLabel = wording('ai.chat.expand', 'Enlarge the chat'), collapseLabel = wording('ai.chat.collapse', 'Shrink the chat') } = props<{
+const { label = wording('ai.chat.label', 'Chat'), openLabel = wording('ai.chat.open', 'Open the chat'), closeLabel = wording('ai.chat.close', 'Close the chat'), icon, closeIcon, newIcon, expandIcon, collapseIcon, newLabel = wording('ai.chat.new', 'New conversation'), expandLabel = wording('ai.chat.expand', 'Enlarge the chat'), collapseLabel = wording('ai.chat.collapse', 'Shrink the chat'), open: wanted, onOpenChange } = props<{
   // Names the panel for screen readers and heads it.
   label?: string | undefined
   // Name and tooltip of the button while the panel is closed, and while it is open.
@@ -21,9 +21,13 @@ const { label = wording('ai.chat.label', 'Chat'), openLabel = wording('ai.chat.o
   newLabel?: string | undefined
   expandLabel?: string | undefined
   collapseLabel?: string | undefined
+  // Opens and closes the panel when the page sets it; the button, the close button and Escape work on their own, so it can be left out.
+  open?: boolean | undefined
+  // Called with the new state when the visitor opens or closes the panel, not when the page sets `open`.
+  onOpenChange?: ((open: boolean) => unknown) | undefined
 }>()
 
-const open = signal(false)
+const open = signal(wanted === true)
 const large = signal(false)
 const panelId = uid()
 let button: HTMLButtonElement | undefined
@@ -39,6 +43,26 @@ function hide() {
   button?.focus()
 }
 
+// The visitor's own opening or closing, which the page hears of.
+function toggle(next: boolean) {
+  if (next)
+    show()
+  else
+    hide()
+
+  onOpenChange?.(next)
+}
+
+// The page sets `open`: the panel follows it, the focus where the visitor has it, since nobody pressed a button.
+effect(() => {
+  const next = wanted
+
+  untrack(() => {
+    if (next !== undefined && next !== open())
+      open = next
+  })
+})
+
 // The chat inside is told to start over; it hears the event once hydrated, which the first opening does.
 function startOver() {
   panel?.querySelector('.kai-chat')?.dispatchEvent(new CustomEvent('kai-chat-new'))
@@ -49,7 +73,7 @@ function keyDown(event: KeyboardEvent) {
   // A reply under way stops on Escape first, which the chat marks by preventing the event's default.
   if (event.key === 'Escape' && open() && !event.defaultPrevented && !event.isComposing) {
     event.preventDefault()
-    hide()
+    toggle(false)
   }
 }
 ---
@@ -62,11 +86,11 @@ div(part="root" onKeyDown={keyDown})
           | {newIcon}
         button(part="expand" type="button" aria-label={large() ? collapseLabel : expandLabel} data-tooltip={large() ? collapseLabel : expandLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={() => large = !large()})
           | {large() ? collapseIcon : expandIcon}
-        button(part="action" type="button" aria-label={closeLabel} data-tooltip={closeLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={hide})
+        button(part="action" type="button" aria-label={closeLabel} data-tooltip={closeLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={() => toggle(false)})
           | {closeIcon}
     div(part="body")
       slot
-  button(part="button" type="button" ref={element => { button = element }} aria-label={openLabel} aria-expanded={open()} aria-controls={panelId} data-tooltip={open() ? closeLabel : openLabel} data-tooltip-placement="left" data-size="lg" data-variant="solid" data-tone="accent" onClick={() => open() ? hide() : show()})
+  button(part="button" type="button" ref={element => { button = element }} aria-label={openLabel} aria-expanded={open()} aria-controls={panelId} data-tooltip={open() ? closeLabel : openLabel} data-tooltip-placement="left" data-size="lg" data-variant="solid" data-tone="accent" onClick={() => toggle(!open())})
     span(part="glyph" hidden={open()})
       | {icon}
     span(part="glyph" hidden={!open()})

@@ -158,6 +158,14 @@ Chat(action={reply} label="Assistant")
 
 <ReadMore href="/llms/kayjs-ai-chat-blocks">Every block, what it is given and what the chat keeps.</ReadMore>
 
+### Hear what the chat does and control it
+
+`Chat` calls `onSend({ messages })`, `onReply(turn)` with the finished turn, `onStop()`, `onError({ message, status })`, `onToolCall(call)`, `onRegenerate()`, `onEdit(text)` and `onSuggestion(text)` as each happens, once each, so analytics or a save of the turn needs no wrapper around the action. A callback that throws is logged and leaves the chat alone. `suggestions` also takes a function, returning the list or a promise of it, for questions that depend on the page or the visitor.
+
+To start a question from your own link, dispatch a `kai-chat-send` event on the `.kai-chat` element to send it, or `kai-chat-draft` to put it in the field for the visitor to read first, with the text as the event's `detail`.
+
+<ReadMore href="/llms/kayjs-ai-chat-events">The order the callbacks run in, and the events.</ReadMore>
+
 ### A chat button on every page
 
 `ChatLauncher` is the same chat behind a round button at the bottom right of the page, which opens it in a panel. Put it once in the root layout, in a `server` fence that gives it the action, and every page has the chat:
@@ -178,7 +186,7 @@ The button works from the keyboard: Enter or Space opens the panel and puts the 
 
 The panel has a fixed height, so it does not grow or shrink as the conversation fills or empties: the answers scroll inside it, the field stays at the bottom, and the greeting and suggestions sit above the field. On a short window it is as tall as the window leaves room for.
 
-Its header has a New conversation button, which clears the log and the kept history, and an Enlarge button for code-heavy answers (hidden on a phone). `openLabel` names the button and `closeLabel` its close button, `newLabel`, `expandLabel` and `collapseLabel` name the two others, `@icon`, `@closeIcon`, `@newIcon`, `@expandIcon` and `@collapseIcon` replace the icons, and `@note` adds a line under the chat. The button turns into a close icon while the panel is open.
+Its header has a New conversation button, which clears the log and the kept history, and an Enlarge button for code-heavy answers (hidden on a phone). `openLabel` names the button and `closeLabel` its close button, `newLabel`, `expandLabel` and `collapseLabel` name the two others, `@icon`, `@closeIcon`, `@newIcon`, `@expandIcon` and `@collapseIcon` replace the icons, and `@note` adds a line under the chat. The button turns into a close icon while the panel is open. `open` opens and closes the panel from your own button or after a navigation, and `onOpenChange(open)` tells you when the visitor does.
 
 <ReadMore href="/llms/kayjs-ai-chat-launcher">What the launcher takes of `Chat`, how its panel opens, closes and keeps the conversation, and its sizes.</ReadMore>
 

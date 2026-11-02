@@ -1,0 +1,4 @@
+---
+import Suggesting from '../components/suggesting.kay'
+---
+Suggesting
