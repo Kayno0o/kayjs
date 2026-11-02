@@ -434,8 +434,8 @@ describe('landing a change to a library', () => {
     const trace = (await Bun.file(join(dir, 'trace')).text()).split('\n').filter(line => line === 'lib' || line.startsWith('test '))
 
     expect(code).toBe(0)
-    expect(out).toMatch(/^tests the changes reach: ok, \d+ s$/m)
-    expect(out).toMatch(/^packages\/lib tests: ok, \d+ s$/m)
+    expect(out).toMatch(/^tests the changes reach: ok, \d+ s(, peak \d+ MB)?$/m)
+    expect(out).toMatch(/^packages\/lib tests: ok, \d+ s(, peak \d+ MB)?$/m)
     expect(trace.at(-1)).toBe('lib')
     expect(trace.length).toBeGreaterThan(1)
     expect(await tree()).toContain('packages')
