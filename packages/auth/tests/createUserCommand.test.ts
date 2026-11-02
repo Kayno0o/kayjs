@@ -361,7 +361,7 @@ describe('the kay command line', () => {
       return { code: await child.exited, out: await new Response(child.stdout).text(), err: await new Response(child.stderr).text() }
     }
 
-    expect((await spawn(['auth', '--help'])).out).toContain('auth create-user <email or username>')
+    expect((await spawn(['auth', '--help'])).out).toContain('create-user  <email or username>')
 
     const made = await spawn(['auth', 'create-user', 'piped@example.com', '--role', 'admin'], `${PASSWORD}\r\n`)
 
