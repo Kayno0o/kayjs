@@ -88,6 +88,7 @@ export default defineMessages({
     imageCropper: {
       crop: 'Zone de recadrage : les flèches la déplacent, Maj et les flèches la redimensionnent',
       cropText: '{w} sur {h} pixels en {x}, {y}',
+      error: 'L\'image n\'a pas pu être chargée.',
     },
     lineChart: { rangeHint: 'Maj avec les flèches choisit une plage, Entrée l\'applique, Échap l\'abandonne', total: 'Total' },
     loadMore: { failure: 'Impossible d\'en charger davantage.', loaded: { one: '{count} de plus chargé', other: '{count} de plus chargés' }, loading: 'Chargement…', more: 'Charger plus', retry: 'Réessayer' },

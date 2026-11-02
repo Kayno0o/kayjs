@@ -127,7 +127,12 @@ export async function callAction<Output>(form: HTMLFormElement, action: Action<n
   }
   catch (error) {
     // Told first, before the toast, what the call was refused or failed with.
-    onError?.(error)
+    try {
+      onError?.(error)
+    }
+    catch (thrown) {
+      console.error('kayjs-ui: an onError callback threw', thrown)
+    }
 
     const read = error instanceof ActionError && error.data !== undefined ? refused?.(error.data as FailureData<Output>) : undefined
     // As in `attempt`, a `refused` saying nothing leaves the words of the data itself.

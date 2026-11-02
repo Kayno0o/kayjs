@@ -372,6 +372,16 @@ describe('ImageCropper callbacks and crop', () => {
     expect(ends).toHaveLength(2)
   })
 
+  test('a parent echoing a rounded onCrop into crop settles', async () => {
+    let calls = 0
+    const { root } = await loadedCropper({ startCrop: { x: 10, y: 10, w: 101, h: 50 }, onCrop: () => calls++ })
+
+    await settle()
+
+    expect(root.querySelector('.kui-image-cropper [data-part="crop"]')).not.toBeNull()
+    expect(calls).toBeLessThan(3)
+  })
+
   test('onError runs when the image does not load, and the stage says so', async () => {
     let failures = 0
     const root = await media({ onCropError: () => failures++ })

@@ -146,6 +146,16 @@ const status = () => {
   return count() === 0 ? emptyLabel : wording('ui.combobox.results', count() === 1 ? '1 result' : '{count} results', { count: count() })
 }
 
+// An app's callback that throws is logged, not taken for a failed load.
+function notify(call: () => unknown) {
+  try {
+    call()
+  }
+  catch (error) {
+    console.error('kayjs-ui: a Combobox callback threw', error)
+  }
+}
+
 // Only the latest question lands: an answer arriving after a newer key press is dropped.
 async function load(query: string) {
   const mine = ++request
@@ -167,7 +177,7 @@ async function load(query: string) {
     answered = query
     failed = false
     active = -1
-    onLoad?.(answer, query)
+    notify(() => onLoad?.(answer, query))
   }
   catch (error) {
     if (mine === request) {
@@ -175,7 +185,7 @@ async function load(query: string) {
       found = []
       answered = query
       failed = true
-      onError?.(error, query)
+      notify(() => onError?.(error, query))
     }
   }
 }

@@ -5,7 +5,7 @@ import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
 import SubscribeForm from '@kaynooo/kayjs-ui/subscribe-form.kay'
 
 // A stand-in for an action: the page's outcome of the last post is what `settle` and `refuse` set.
-const { onSent, onError } = props<{ onSent: (data: unknown) => void, onError: (failure: FormFailure<never, unknown>) => void }>()
+const { onSent, onError, onSubscribed, onSubscribeError } = props<{ onSent: (data: unknown) => void, onError: (failure: FormFailure<never, unknown>) => void, onSubscribed?: (data: unknown) => void, onSubscribeError?: (failure: FormFailure<never, unknown>) => void }>()
 
 const done = signal<{ data: unknown } | undefined>(undefined)
 const failed = signal<FormFailure<never, unknown> | undefined>(undefined)
@@ -23,5 +23,7 @@ button#refused(onClick={() => { done = undefined; failed = { status: 422, values
 ContactForm(action={action} onSent={onSent} onError={onError})
   @sent
     p#custom-sent Custom
-SubscribeForm(action={action})
+SubscribeForm(action={action} onSent={onSubscribed} onError={onSubscribeError})
+  @sent
+    p#subscribed Subscribed
   input#extra(name="extra")

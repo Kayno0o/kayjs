@@ -25,9 +25,25 @@ describe('ContactForm and SubscribeForm', () => {
     expect(failures).toEqual([])
     expect(root.querySelector('.kui-contact-form #custom-sent')).not.toBeNull()
     expect(root.querySelector('.kui-contact-form [role="status"], .kui-contact-form .kui-notice')).toBeNull()
-    // SubscribeForm keeps its notice, and takes a field between the email and its notice.
-    expect(root.querySelector('.kui-subscribe-form .kui-notice')).not.toBeNull()
+    // SubscribeForm takes a field between the email and its notice.
     expect(root.querySelector('.kui-subscribe-form #extra')).not.toBeNull()
+  })
+
+  test('SubscribeForm reports the same, and its sent block replaces the notice', async () => {
+    const sent: unknown[] = []
+    const failures: unknown[] = []
+
+    mounted = await mountComponent(MailForms, { onSent: () => undefined, onError: () => undefined, onSubscribed: (data: unknown) => sent.push(data), onSubscribeError: (failure: unknown) => failures.push(failure) })
+    click(mounted.root.querySelector('#refused'))
+    await settle()
+
+    expect(failures).toHaveLength(1)
+
+    click(mounted.root.querySelector('#sent'))
+    await settle()
+
+    expect(sent).toEqual(['ok'])
+    expect(mounted.root.querySelector('.kui-subscribe-form #subscribed')).not.toBeNull()
   })
 
   test('onError runs with the failure of a refused post, and onSent is quiet', async () => {

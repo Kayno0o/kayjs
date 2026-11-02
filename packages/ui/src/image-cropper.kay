@@ -27,7 +27,7 @@ const look = recipe({
   },
 })
 
-const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wording('ui.imageCropper.crop', 'Crop area: arrows move it, Shift and the arrows resize it'), cropText = wording('ui.imageCropper.cropText', '{w} by {h} pixels at {x}, {y}'), errorLabel = wording('ui.imageCropper.error', 'The image could not be loaded.'), crop: given, onCrop, onCropEnd, onLoad, onError, fallback, footer, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wording('ui.imageCropper.crop', 'Crop area: arrows move it, Shift and the arrows resize it'), cropText = wording('ui.imageCropper.cropText', '{w} by {h} pixels at {x}, {y}'), errorLabel = wording('ui.imageCropper.error', 'The image could not be loaded.'), crop: given, onCrop, onCropEnd, onLoad, onError, fallback, footer, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onLoad' | 'onError'> & {
   src: string
   // Width over height the crop is locked to; a change centres the crop again.
   ratio?: number | undefined
@@ -95,6 +95,8 @@ function fitted(wanted: CropRect, known: ImageSize): CropRect {
   return { x: Math.min(Math.max(wanted.x, 0), known.width - w), y: Math.min(Math.max(wanted.y, 0), known.height - h), w, h }
 }
 
+const close = (a: CropRect, b: CropRect) => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1 && Math.abs(a.w - b.w) <= 1 && Math.abs(a.h - b.h) <= 1
+
 // A new image or ratio starts from a centred crop again, or from the one given; a changed `crop` moves it.
 effect(() => {
   const known = size()
@@ -108,10 +110,16 @@ effect(() => {
 
     const next = fitted(wanted, known)
 
-    crop = next
+    // A parent that stores the crop rounded gives back a value within a pixel of the clamped one: that one is kept as it is, so the echo settles.
+    if (close(next, wanted)) {
+      if (!close(next, crop()))
+        crop = wanted
 
-    if (next.x !== wanted.x || next.y !== wanted.y || next.w !== wanted.w || next.h !== wanted.h)
-      onCrop?.(next)
+      return
+    }
+
+    crop = next
+    onCrop?.(next)
   })
 })
 
@@ -133,14 +141,22 @@ function loaded() {
 }
 
 function failed() {
+  if (broken())
+    return
+
   broken = true
   onError?.()
 }
 
 // An image already decoded, from the cache, fires no load event of its own.
 onMount(() => {
-  if (image?.complete)
-    loaded()
+  if (image?.complete) {
+    // An image that failed before the island hydrated fires no error event of its own.
+    if (image.naturalWidth)
+      loaded()
+    else if (src)
+      failed()
+  }
 })
 
 function start(event: PointerEvent, mode: 'move' | CropHandle) {
@@ -227,7 +243,7 @@ div(part="root" {...rest})
         | {fallback}
       else
         p(part="error" role="alert") {errorLabel}
-    if crop().w > 0
+    if crop().w > 0 && !broken()
       div(part="crop" role="slider" tabindex="0" aria-label={cropLabel} aria-valuetext={described()} aria-valuemin={minSize} aria-valuemax={size()?.width ?? minSize} aria-valuenow={Math.round(crop().w)} style={area()} onPointerDown={event => start(event, 'move')} onKeyDown={keyDown})
         if grid
           span(part="gridCols")

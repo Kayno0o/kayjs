@@ -1278,7 +1278,7 @@ component default
   moreLabel?: string | undefined
   name?: string | undefined
   onChange?: ((name: string) => unknown) | undefined
-  onError?: (EventHandler<HTMLDivElement, ErrorEvent> & ((error: unknown) => unknown)) | undefined
+  onError?: ((error: unknown) => unknown) | undefined
   onSearch?: ((query: string) => unknown) | undefined
   placeholder?: string | undefined
   search: (query: string, limit: number, offset: number) => Promise<IconChoice[]>
@@ -1315,8 +1315,8 @@ component default
   minSize?: number | undefined
   onCrop?: ((crop: CropRect) => unknown) | undefined
   onCropEnd?: ((crop: CropRect) => unknown) | undefined
-  onError?: (EventHandler<HTMLDivElement, ErrorEvent> & (() => unknown)) | undefined
-  onLoad?: (EventHandler<HTMLDivElement, Event> & ((size: ImageSize) => unknown)) | undefined
+  onError?: (() => unknown) | undefined
+  onLoad?: ((size: ImageSize) => unknown) | undefined
   ratio?: number | undefined
   src: string
 
