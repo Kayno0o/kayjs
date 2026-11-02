@@ -11,3 +11,7 @@ description: A person's picture, or the initial of their name on a colour of its
 `size` is `xs`, `sm`, `md` (the default) or `lg`.
 
 <Demo name="avatar/sizes" />
+
+## Load, error and a fallback of your own
+
+`onLoad` and `onError` are called with the picture's event. `@fallback` draws the avatar in place of the name's initial when there is no picture or it fails to load.

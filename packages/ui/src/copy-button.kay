@@ -15,8 +15,9 @@ const look = recipe({
   variants: { tone: { neutral: '', accent: 'kui-btn-accent', success: 'kui-btn-success', danger: 'kui-btn-danger' } },
 })
 
-const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', copiedLabel = wording('ui.copyButton.copied', 'Copied!'), failure = wording('ui.copyButton.failure', 'Could not copy to the clipboard'), ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type'> & {
-  text: string
+const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', copiedLabel = wording('ui.copyButton.copied', 'Copied!'), failure = wording('ui.copyButton.failure', 'Could not copy to the clipboard'), onCopy, onFail, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type'> & {
+  // What is copied: the text, or a function returning it, or a promise of it, for a value that has to be fetched or built on the click (a signed link). Nothing is copied while it is empty.
+  text: string | (() => string | Promise<string>)
   label: string
   // A rendered version copied alongside `text`, which rich editors paste instead.
   html?: string | undefined
@@ -29,6 +30,10 @@ const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', cop
   copiedLabel?: string | undefined
   // Toasted when the browser refuses the copy.
   failure?: string | undefined
+  // Called with the text copied, once the copy went through.
+  onCopy?: ((text: string) => unknown) | undefined
+  // Called with the error when the text could not be built or the browser refused the copy, beside the `failure` toast.
+  onFail?: ((error: unknown) => unknown) | undefined
 }>()
 
 const copied = signal(false)
@@ -36,18 +41,59 @@ let timer: ReturnType<typeof setTimeout> | undefined
 
 onCleanup(() => clearTimeout(timer))
 
+// Writes the text and answers it, empty when there was nothing to copy. A text still on its way is handed to the clipboard as it is, since Safari only accepts a copy started inside the click.
+async function write(): Promise<string> {
+  const pending = typeof text === 'function' ? text() : text
+
+  if (typeof pending !== 'string' && html === undefined && typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+    let resolved = ''
+    const blob = (async () => {
+      resolved = await pending
+
+      return new Blob([resolved], { type: 'text/plain' })
+    })()
+
+    await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })])
+
+    return resolved
+  }
+
+  const resolved = await pending
+
+  if (resolved)
+    await copy(resolved, html === undefined ? {} : { html })
+
+  return resolved
+}
+
+let pressing = false
+
 async function press() {
-  if (!text)
+  if (pressing)
     return
 
-  const done = await attempt(async () => copy(text, html === undefined ? {} : { html }), failure)
+  pressing = true
 
-  if (!done)
+  let written = ''
+  const done = await attempt(async () => {
+    try {
+      written = await write()
+    }
+    catch (error) {
+      onFail?.(error)
+      throw error
+    }
+  }, failure)
+
+  pressing = false
+
+  if (!done || !written)
     return
 
   copied = true
   clearTimeout(timer)
   timer = setTimeout(() => copied = false, durationMs(copiedFor))
+  onCopy?.(written)
 }
 ---
 button.kui-btn(part="root" {...rest} type="button" data-variant={variant} data-size={size} onClick={press})

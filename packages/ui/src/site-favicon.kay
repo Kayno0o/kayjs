@@ -1,15 +1,21 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { stringToHexColor } from '@kaynooo/utils/colors'
 import { effect, recipe, signal } from 'kay'
 import Icon from './icon.kay'
 
 const look = recipe({ parts: { root: 'kui-site-favicon inline-flex size-5 shrink-0 items-center justify-center overflow-hidden', img: 'size-full object-contain', icon: 'size-full' } })
 
-const { src, name, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
+const { src, name, fallback, onLoad, onError, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'onLoad' | 'onError'> & {
   src?: string | null | undefined
   // Names the site: it colours the fallback icon, and goes unused once the image loads.
   name: string
+  // Draws the icon when there is no image or it fails to load, in place of the globe.
+  fallback?: Snippet | undefined
+  // Called when the image loads.
+  onLoad?: ((event: Event) => unknown) | undefined
+  // Called when the image fails to load, as the fallback takes its place.
+  onError?: ((event: Event) => unknown) | undefined
 }>()
 
 const failed = signal(false)
@@ -24,6 +30,8 @@ effect(() => {
 span(part="root" {...rest})
   if src && !failed()
     // kay-allow unsized-image
-    img(part="img" src={src} alt="" onError={() => failed = true})
+    img(part="img" src={src} alt="" onLoad={event => onLoad?.(event)} onError={event => { failed = true; onError?.(event) }})
+  else if fallback
+    | {fallback}
   else
     Icon(icon="globe" part="icon" style={`color: ${stringToHexColor(name)}`})

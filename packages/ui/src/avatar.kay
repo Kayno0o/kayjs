@@ -1,6 +1,6 @@
 ---
 import { recipe } from 'kay'
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { isDark, stringToHexColor } from '@kaynooo/utils/colors'
 import { effect, signal } from 'kay'
 
@@ -16,12 +16,18 @@ const look = recipe({
   defaults: { size: 'md' },
 })
 
-const { src, name, size = 'md', label, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role'> & {
+const { src, name, size = 'md', label, fallback, onLoad, onError, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role' | 'onLoad' | 'onError'> & {
   src?: string | null | undefined
   // Seeds the fallback's colour and gives its initial.
   name: string
   // Names the picture for screen readers; without it the avatar is decorative, the name being written beside it.
   label?: string | undefined
+  // Draws the avatar when there is no picture or it fails to load, in place of the name's initial.
+  fallback?: Snippet | undefined
+  // Called when the picture loads.
+  onLoad?: ((event: Event) => unknown) | undefined
+  // Called when the picture fails to load, as the fallback takes its place.
+  onError?: ((event: Event) => unknown) | undefined
 }>()
 
 const failed = signal(false)
@@ -38,6 +44,8 @@ const ground = () => stringToHexColor(name)
 span({...rest} data-size={size} role={label ? 'img' : undefined} aria-label={label})
   if src && !failed()
     // kay-allow unsized-image
-    img(part="image" src={src} alt="" onError={() => failed = true})
+    img(part="image" src={src} alt="" onLoad={event => onLoad?.(event)} onError={event => { failed = true; onError?.(event) }})
+  else if fallback
+    | {fallback}
   else
     span(part="initial" aria-hidden="true" style={`background-color: ${ground()}; color: ${isDark(ground()) ? '#fff' : '#000'}`}) {[...name.trim()][0]}

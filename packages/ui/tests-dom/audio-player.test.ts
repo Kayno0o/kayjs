@@ -71,8 +71,11 @@ afterEach(() => {
     Reflect.deleteProperty(navigator, 'mediaSession')
 })
 
+let events: string[] = []
+
 async function players() {
-  mounted = await mountComponent(AudioPlayers, { onPosition: (seconds: number) => positions.push(seconds), onChapter: (index: number) => chapters.push(index) })
+  events = []
+  mounted = await mountComponent(AudioPlayers, { onPosition: (seconds: number) => positions.push(seconds), onChapter: (index: number) => chapters.push(index), events })
 
   const root = mounted.root
   const player = root.querySelector<HTMLElement>('#player')!
@@ -107,6 +110,27 @@ test('plays a source from a bar with a play button, the time and a slider, and d
   click(part('play')[0]!)
   await settle()
   expect([part('play')[0]!.getAttribute('aria-label'), audio.paused, player.querySelector('input[type=range]')!.getAttribute('max')]).toEqual(['Play', true, String(LENGTH)])
+})
+
+test('tells onPlay, onPause, onEnded and onError as the audio moves through them', async () => {
+  const { audio, part } = await players()
+
+  click(part('play')[0]!)
+  await settle()
+  click(part('play')[0]!)
+  await settle()
+  audio.dispatchEvent(new Event('ended'))
+  audio.dispatchEvent(new Event('error'))
+  await settle()
+
+  expect(events).toEqual(['play', 'pause', 'ended', 'error media'])
+
+  Object.defineProperty(audio, 'play', { value: async () => {
+    throw new DOMException('blocked', 'NotAllowedError')
+  }, configurable: true })
+  click(part('play')[0]!)
+  await settle()
+  expect(events.at(-1)).toBe('error NotAllowedError')
 })
 
 test('the slider seeks, and speaks the time', async () => {
