@@ -339,7 +339,9 @@ export async function shipOrder(order: { id: string, userId: string }) {
 }
 ```
 
-The `Bell` of kayjs-ui shows them. Put it in a layout and it draws nothing for a visitor who is not signed in. For a signed-in one it shows how many notifications are unread, and a list that marks each one read when it is opened. Every open tab updates within a second of a new notification, a read or an erase. Notifications that live elsewhere, your own table or a third-party feed, go in `Bell(items={notes})`, or in `BellInbox` inside an island for a source loaded in the browser, with `onRead` to hear a read and an `@item` block to draw each row. Notifications that live elsewhere, your own table or a third-party feed, go in `Bell(items={notes})`, or in `BellInbox` inside an island for a source loaded in the browser, with `onRead` to hear a read and an `@item` block to draw each row.
+The `Bell` of kayjs-ui shows them. Put it in a layout and it draws nothing for a visitor who is not signed in. For a signed-in one it shows how many notifications are unread, and a list that marks each one read when it is opened. Every open tab updates within a second of a new notification, a read or an erase.
+
+Notifications that live elsewhere, your own table or a third-party feed, go in `Bell(items={notes})`. For a source loaded in the browser, use `BellInbox` inside an island, with `onRead` to hear a read and an `@item` block to draw each row.
 
 ```kay
 ---
