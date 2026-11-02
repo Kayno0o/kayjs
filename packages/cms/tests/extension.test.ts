@@ -129,6 +129,36 @@ describe('cms()', () => {
       }
     })
 
+    test('commits through GitLab when CMS_HOST names it, and stops the boot naming what it lacks', async () => {
+      Object.assign(process.env, variables, { CMS_HOST: 'gitlab' })
+
+      const posted: string[] = []
+      const lab = Bun.serve({ port: 0, fetch: (request) => {
+        posted.push(`${request.method} ${new URL(request.url).pathname}`)
+
+        return Response.json({ commit: { id: 'c0' } })
+      } })
+
+      try {
+        process.env.CMS_BASE_URL = `http://localhost:${lab.port}`
+        boot()
+
+        try {
+          await settings().files.save({ repoPath: 'a.md', absolute: '/nowhere/a.md', text: 'hi', message: 'add a' })
+        }
+        catch {}
+
+        expect(posted[0]).toBe('GET /api/v4/projects/team%2Fsite/repository/branches/content')
+
+        delete process.env.CMS_TOKEN
+        expect(boot).toThrow('GitLab the environment names, which lacks CMS_TOKEN')
+      }
+      finally {
+        await lab.stop()
+        delete process.env.CMS_HOST
+      }
+    })
+
     test('stops the boot naming what GitHub lacks', () => {
       process.env.CMS_HOST = 'github'
       process.env.CMS_REPO = 'team/site'

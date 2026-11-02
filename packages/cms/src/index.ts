@@ -12,6 +12,8 @@ export type { Commit, FileChange, FileMove, FileSaver, ForgejoOptions, Identity 
 export type { EntryForm, FormScope } from './form'
 export { github } from './github'
 export type { GithubOptions } from './github'
+export { gitlab } from './gitlab'
+export type { GitlabOptions } from './gitlab'
 export type { CollectionInfo, CollectionLayout, CustomFieldProps, DraftEntry, DraftResult, EntryRef, FormLayout, GivenLayout, Issue, JsonSchema, ListLayout, RowAction, ScreenCollection, StoredEntry } from './kay/contract'
 export type { EntryRow } from './listing'
 export { BODY, entryKey, fieldsAt, formatMarker, parseMarker } from './markers'

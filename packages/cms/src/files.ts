@@ -358,13 +358,16 @@ export function networkReason(error: unknown): string {
   return typeof code === 'string' ? code : error.message
 }
 
-// Forgejo explains a refusal in a JSON `message`; a proxy in front of it may answer anything, an HTML page say, which is cut short and logged whole.
+// Forgejo explains a refusal in a JSON `message` (GitLab in a `message` or an `error`, a text or an object); a proxy in front of it may answer anything, an HTML page say, which is cut short and logged whole.
 export async function errorMessage(response: Response, host = 'Forgejo'): Promise<string> {
   const text = await response.text()
   let message: string
 
   try {
-    message = (JSON.parse(text) as { message?: string }).message ?? response.statusText
+    const parsed = JSON.parse(text) as { message?: unknown, error?: unknown }
+    const given = parsed.message ?? parsed.error ?? response.statusText
+
+    message = typeof given === 'string' ? given : JSON.stringify(given)
   }
   catch {
     message = text || response.statusText
