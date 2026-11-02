@@ -1,4 +1,5 @@
 import type { Mounted } from 'kay/test'
+import type { PaletteEntry } from '../src/palette'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import Palette from '../tests/fixture/src/components/palette.kay'
@@ -24,7 +25,7 @@ afterEach(() => {
   seen.actions = []
 })
 
-async function palette(props: { recent?: string[], hotkey?: string | null, siteSearch?: boolean, hostile?: boolean, loose?: boolean } = {}) {
+async function palette(props: { recent?: string[], hotkey?: string | null, siteSearch?: boolean, hostile?: boolean, loose?: boolean, search?: (query: string) => Promise<PaletteEntry[]> } = {}) {
   mounted = await mountComponent(Palette, {
     onOpenChange: (open: boolean) => seen.open.push(open),
     onRecentChange: (recent: string[]) => seen.recent.push(recent),
@@ -338,5 +339,112 @@ describe('CommandPalette with siteSearch', () => {
     await settle()
 
     expect(asked).toEqual([])
+  })
+})
+
+describe('CommandPalette with search', () => {
+  async function until(ready: () => boolean) {
+    for (let tries = 0; tries < 100 && !ready(); tries++) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+      await settle()
+    }
+  }
+
+  test('lists the rows the search answers after the entries matched, under their own group, once typing pauses', async () => {
+    const asked: string[] = []
+
+    const { root, input, labels } = await palette({
+      search: async (query) => {
+        asked.push(query)
+
+        return [{ label: `Commit ${query}`, group: 'Commits', href: `/commit/${query}` }, { label: 'Revert', group: 'Commits', onSelect: () => seen.actions.push('revert') }]
+      },
+    })
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+    await search(input()!, 'c')
+    await search(input()!, 'co')
+    await search(input()!, 'con')
+    await until(() => labels().includes('# Found'))
+
+    expect(asked).toEqual(['con'])
+    expect(labels()).toEqual(['Content', '# Found', 'Commit con', 'Revert', 'New moon'])
+    expect(root.querySelector('[data-part=count]')?.textContent).toBe('4 results')
+  })
+
+  test('never lets a stale answer overwrite a newer query\'s rows', async () => {
+    const resolvers = new Map<string, (entries: PaletteEntry[]) => void>()
+
+    const { input, labels } = await palette({
+      search: async query => new Promise<PaletteEntry[]>((resolve) => {
+        resolvers.set(query, resolve)
+      }),
+    })
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+    await search(input()!, 'zz1')
+    await until(() => resolvers.has('zz1'))
+    await search(input()!, 'zz2')
+    await until(() => resolvers.has('zz2'))
+
+    resolvers.get('zz2')!([{ label: 'Two', group: 'Commits', href: '/two' }])
+    await until(() => labels().includes('Two'))
+    resolvers.get('zz1')!([{ label: 'One', group: 'Commits', href: '/one' }])
+    await settle()
+    await settle()
+
+    expect(labels()).toEqual(['# Found', 'Two'])
+  })
+
+  test('drops the answer of a query typed past while it was on its way', async () => {
+    let release: ((entries: PaletteEntry[]) => void) | undefined
+
+    const { input, labels } = await palette({
+      search: async () => new Promise<PaletteEntry[]>((resolve) => {
+        release = resolve
+      }),
+    })
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+    await search(input()!, 'one')
+    await until(() => release !== undefined)
+    await search(input()!, 'table')
+    release!([{ label: 'Late', group: 'Commits', href: '/late' }])
+    await settle()
+
+    expect(labels()).toEqual(['Table'])
+  })
+
+  test('says the search failed, still listing the entries', async () => {
+    const { root, input, labels } = await palette({
+      search: async () => {
+        throw new Error('down')
+      },
+    })
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+    await search(input()!, 'table')
+    await until(() => root.querySelector('[data-part=empty]') !== null)
+
+    expect(labels()).toEqual(['Table'])
+    expect(root.querySelector('[data-part=empty]')?.textContent).toBe('The search failed')
+  })
+
+  test('runs a found action on Enter and closes', async () => {
+    const { dialog, input } = await palette({ search: async () => [{ label: 'Revert', group: 'Commits', onSelect: () => seen.actions.push('revert') }] })
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+    await search(input()!, 'zzz')
+    await until(() => document.querySelector('[data-part=option]') !== null)
+    press(input()!, 'Enter')
+    await settle()
+
+    expect(seen.actions).toEqual(['revert'])
+    expect(dialog.open).toBe(false)
   })
 })

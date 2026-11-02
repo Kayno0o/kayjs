@@ -47,6 +47,8 @@ export default defineMessages({
       placeholder: 'Rechercher',
       recent: 'Récents',
       results: { one: '{count} résultat', other: '{count} résultats' },
+      search: 'Trouvés',
+      searchError: 'La recherche a échoué',
       siteSearchError: 'La recherche dans les pages a échoué',
       siteSearch: 'Dans les pages',
       siteSearchMore: { one: '{count} autre résultat', other: '{count} autres résultats' },

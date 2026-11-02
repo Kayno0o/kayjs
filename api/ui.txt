@@ -858,6 +858,9 @@ component default
   recent?: string[] | undefined
   recentLabel?: string | undefined
   resultsLabel?: ((count: number) => string) | undefined
+  search?: ((query: string) => PromiseLike<PaletteEntry[]>) | undefined
+  searchError?: string | undefined
+  searchLabel?: string | undefined
   siteSearch?: boolean | { limit?: number | undefined; } | undefined
   siteSearchError?: string | undefined
   siteSearchLabel?: string | undefined

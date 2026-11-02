@@ -1,12 +1,14 @@
 ---
 import type { SearchHit } from 'kay'
 import type { PaletteAction, PaletteEntry, PaletteLink } from './palette'
-import { effect, memo, recipe, searchResults, shortcut, signal, uid } from 'kay'
+import { effect, memo, onCleanup, recipe, searchResults, shortcut, signal, uid } from 'kay'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import { OUTSIDE } from './outside'
 import { isPaletteLink, paletteHits, paletteMatches, paletteSections, splitMatches, withRecent } from './palette'
 import { wording } from 'kay/words'
+
+const DEBOUNCE_MS = 200
 
 // 'kui-command-palette' stays as the component's name for an app's CSS and the always-hidden guard.
 const look = recipe({
@@ -31,7 +33,7 @@ const look = recipe({
   },
 })
 
-const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearch', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.empty', 'No results'), recentLabel = wording('ui.commandPalette.recent', 'Recent'), resultsLabel, siteSearchMore } = props<{
+const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearch', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.empty', 'No results'), recentLabel = wording('ui.commandPalette.recent', 'Recent'), resultsLabel, siteSearchMore, search, searchLabel = wording('ui.commandPalette.search', 'Found'), searchError = wording('ui.commandPalette.searchError', 'The search failed') } = props<{
   // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
@@ -57,6 +59,10 @@ const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentC
   resultsLabel?: ((count: number) => string) | undefined
   // How many more times a section found holds the words searched for, past the line shown.
   siteSearchMore?: ((count: number) => string) | undefined
+  // Rows for a query the app looks up itself, such as a server's: called once typing pauses, with the query as typed, and its rows are listed under `searchLabel` after the entries and the site's sections. An answer for an older query is dropped; a rejection shows `searchError`. An action works as is.
+  search?: ((query: string) => PromiseLike<PaletteEntry[]>) | undefined
+  searchLabel?: string | undefined
+  searchError?: string | undefined
 }>()
 
 // A row of the list, numbered the way the arrow keys walk it; a section the site search found carries the line of text it was found in, and its heading's words found marked.
@@ -66,6 +72,8 @@ interface Row {
   snippet?: SearchHit['snippet'] | undefined
   labelParts?: SearchHit['headingParts'] | undefined
   more?: number | undefined
+  // Found by `search`, so not kept as recent.
+  remote?: boolean | undefined
 }
 
 const id = uid()
@@ -78,9 +86,52 @@ const selected = signal(0)
 let dialog: HTMLDialogElement | undefined
 const searching = siteSearch
 const site = searching ? searchResults(query, searching === true ? {} : searching) : undefined
+// The rows `search` answered, with the query they answer.
+const answered = signal<{ query: string, entries: PaletteEntry[] } | undefined>(undefined)
+const looking = signal(false)
+const lookFailed = signal(false)
+let request = 0
 
 effect(() => shown = open)
 effect(() => followedRecently = recent)
+
+// Only the latest question lands: the answer to an older query is dropped.
+async function lookUp(text: string, mine: number) {
+  try {
+    const entries = await search!(text)
+
+    if (mine !== request)
+      return
+
+    answered = { query: text, entries }
+  }
+  catch (error) {
+    if (mine !== request)
+      return
+
+    console.error('kayjs-ui: a CommandPalette could not run its search', error)
+    lookFailed = true
+  }
+
+  looking = false
+}
+
+// The search waits for a pause in typing, and a new query drops the rows and the answer still on its way.
+effect(() => {
+  const text = query().trim()
+  const mine = ++request
+
+  answered = undefined
+  lookFailed = false
+  looking = Boolean(search) && text !== ''
+
+  if (!search || !text)
+    return
+
+  const timer = setTimeout(() => void lookUp(text, mine), DEBOUNCE_MS)
+
+  onCleanup(() => clearTimeout(timer))
+})
 
 // Headed groups while the query is empty, one flat ranked list once it is not, then the sections the site search found that no entry links already.
 const sections = memo(() => {
@@ -94,12 +145,19 @@ const sections = memo(() => {
   const split = splitMatches(matches, query())
   const found = numbered(split.strong)
   const hits = paletteHits(site?.hits() ?? [], matches).map(hit => ({ entry: hit.link, index: index++, snippet: hit.snippet, labelParts: hit.labelParts, more: hit.more }))
+  const answer = answered()
+  const remote = answer?.query === query().trim() ? numbered(answer.entries).map(row => ({ ...row, remote: true })) : []
   const loose = numbered(split.loose)
 
-  if (hits.length === 0)
+  if (hits.length === 0 && remote.length === 0)
     return [{ group: null, rows: [...found, ...loose] }]
 
-  return [{ group: null, rows: found }, { group: siteSearchLabel, rows: hits }, ...loose.length > 0 ? [{ group: null, rows: loose }] : []]
+  return [
+    { group: null, rows: found },
+    ...hits.length > 0 ? [{ group: siteSearchLabel, rows: hits }] : [],
+    ...remote.length > 0 ? [{ group: searchLabel, rows: remote }] : [],
+    ...loose.length > 0 ? [{ group: null, rows: loose }] : [],
+  ]
 })
 
 const rows = memo(() => sections().flatMap(section => section.rows))
@@ -194,7 +252,7 @@ function keyDown(event: KeyboardEvent) {
     if (option instanceof HTMLAnchorElement)
       window.open(option.href, '_blank', 'noopener,noreferrer')
 
-    followed(entry, row.snippet !== undefined)
+    followed(entry, row.snippet !== undefined || row.remote === true)
 
     return
   }
@@ -215,7 +273,7 @@ dialog(part="root" ref={element => dialog = element} closedby="any" aria-label={
             div.kui-heading-section(part="heading" id={`${id}-group-${sectionIndex}`}) {section.group}
           for row of section.rows key={row.index}
             if linkOf(row.entry) as link
-              a(part="option" data-snippet={row.snippet ? '' : undefined} href={link.href} {...link.external ? OUTSIDE : {}} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected = row.index} onClick={() => followed(link, row.snippet !== undefined)})
+              a(part="option" data-snippet={row.snippet ? '' : undefined} href={link.href} {...link.external ? OUTSIDE : {}} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected = row.index} onClick={() => followed(link, row.snippet !== undefined || row.remote === true)})
                 if link.icon as icon
                   Icon(icon={icon} part="icon")
                 if row.snippet as snippet
@@ -247,6 +305,8 @@ dialog(part="root" ref={element => dialog = element} closedby="any" aria-label={
                   span(part="group") {row.entry.group}
       if site?.error() && query().trim()
         p(part="empty") {siteSearchError}
-      else if rows().length === 0 && !site?.loading()
+      else if lookFailed() && query().trim()
+        p(part="empty") {searchError}
+      else if rows().length === 0 && !site?.loading() && !looking()
         p(part="empty") {emptyLabel}
-    p(part="count" role="status") {query().trim() && !site?.loading() ? counted(rows().length) : ''}
+    p(part="count" role="status") {query().trim() && !site?.loading() && !looking() ? counted(rows().length) : ''}

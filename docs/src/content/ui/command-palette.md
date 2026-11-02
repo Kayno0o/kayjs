@@ -24,6 +24,12 @@ An entry matching only by its characters in order is listed after those sections
 
 If the index fails to load, as under `kay dev`, which writes none, the palette says so with `siteSearchError`. This site's search, behind Ctrl K, is one.
 
+## Searching on the server
+
+`search` lists rows your app looks up itself for the query, such as commits a server finds. It is a function from the query to a promise of entries, links or actions, and an action works as is: `search={async query => (await findCommits(query)).map(commit => ({ label: commit.title, group: 'Commits', href: `/commits/${commit.sha}` }))}`.
+
+It is called once typing pauses, and its rows are listed under `searchLabel` (`Found`) after the entries and the pages found. An answer for an older query is dropped, and a rejection says so with `searchError` (`The search failed`) while the entries stay listed. A followed link is not kept in `recent`.
+
 ## Opening it
 
 Cmd on macOS and Ctrl elsewhere with `hotkey` (`k` by default) opens and closes the palette from anywhere. Pass `open` and `onOpenChange` to drive it from a button as above, or `hotkey={null}` to leave opening to your app.
