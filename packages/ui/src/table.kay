@@ -2,10 +2,11 @@
 import type { JSX, Snippet } from 'kay'
 import type { InfiniteList } from './infinite-list'
 import type { Column, FilterField, RowFilter, RowKey, RowKeyValue, SortState } from './table'
-import { effect, memo, onCleanup, onMount, persisted, recipe, signal, untrack } from 'kay'
+import { effect, memo, onCleanup, onMount, persisted, recipe, signal, uid, untrack } from 'kay'
 import Button from './button.kay'
 import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
+import IconButton from './icon-button.kay'
 import LoadMore from './load-more.kay'
 import Select from './select.kay'
 import { cellText, drawnByBlock, exportHref, nextSort, resolvedColumn, restoredSort, rowKeyOf, rowLabel, rowsMatching, sameFields, sortedRows, toCsv } from './table'
@@ -34,9 +35,16 @@ const look = recipe({
     headCell: 'border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-accent aria-[sort=descending]:text-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:bg-surface @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden',
     selectHead: 'border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-accent aria-[sort=descending]:text-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:bg-surface @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden w-0 @max-[30rem]/table:w-auto',
     selectText: 'sr-only',
+    toggleHead: 'border-b border-border px-3 py-2 text-left text-xs w-0 @max-[30rem]/table:hidden',
+    toggleCell: 'px-3 py-1.5 w-0 @max-[30rem]/table:w-auto @max-[30rem]/table:col-span-full @max-[30rem]/table:px-0 @max-[30rem]/table:py-1',
+    // The chevron turns over while the row is open.
+    toggle: 'aria-expanded:[&_svg]:rotate-180',
+    // The detail stands under its row across every column, and under its card in the narrow form.
+    detailRow: 'border-b border-border @max-[30rem]/table:block @max-[30rem]/table:border-b-0',
+    detailCell: 'px-3 py-3 text-foreground @max-[30rem]/table:block @max-[30rem]/table:px-3 @max-[30rem]/table:pt-0',
     sortButton: 'group/sort inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-inherit [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] @max-[30rem]/table:min-h-8 @max-[30rem]/table:border-solid @max-[30rem]/table:border-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-2 @max-[30rem]/table:py-0.5',
     sortIcon: 'size-3.5 group-data-[direction=asc]/sort:rotate-180',
-    row: 'border-b border-border @max-[30rem]/table:border-b-0 @max-[30rem]/table:[[data-part=row]+&]:border-t hover:bg-hover aria-selected:bg-hover @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-[fit-content(40%)_minmax(0,1fr)] @max-[30rem]/table:gap-x-4 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
+    row: 'border-b border-border @max-[30rem]/table:border-b-0 @max-[30rem]/table:[:is([data-part=row],[data-part=detailRow])+&]:border-t hover:bg-hover aria-selected:bg-hover @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-[fit-content(40%)_minmax(0,1fr)] @max-[30rem]/table:gap-x-4 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
     cell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left',
     // The box is 1rem, so its label grows to the 1.5rem a finger needs.
     selectCell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-0 @max-[30rem]/table:w-auto [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6 [&_.kui-checkbox]:justify-center',
@@ -49,7 +57,7 @@ const look = recipe({
   },
 })
 
-const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
+const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, expandable = false, expanded, onToggle, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle'> & {
   columns: Column<Row>[]
   // The rows to draw. Left out when `list` holds them: one of the two is required.
   rows?: Row[] | undefined
@@ -107,8 +115,22 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   exportName?: string | undefined
   // Draws only the rows in view, between room standing for the others, so a table of ten thousand rows and more stays as light as a short one. The table scrolls in a box of its own (`--table-height`, 70vh by default) with its headers kept on top. Decided once, when the table is made. The server draws the first screenful, so the rest shows once the page loads its script. Find-in-page sees the drawn rows alone, and a focused row that scrolls out of the window loses its focus. Name the scroll box with an `aria-label`.
   virtual?: boolean | undefined
+  // A toggle on each row opening the `@detail(row)` block in a full-width row under it, or under its card when stacked. Closed to start; it cannot be combined with `virtual`, whose rows all share one height.
+  expandable?: boolean | undefined
+  // The keys of the rows open to start from, as `rowKey` reads them; a table whose parent passes another list follows it.
+  expanded?: RowKeyValue<Row, Key>[] | undefined
+  // Called with a row's key and whether it is now open, each time a toggle is used.
+  onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined
+  // What an open row shows under it.
+  detail?: Snippet<[row: Row]> | undefined
+  // Names a row's toggle: `Details of <first column's text>`.
+  expandLabel?: ((row: Row) => string) | undefined
 } & ({ rows: Row[], list?: undefined } | { rows?: undefined, list: InfiniteList<Row> })>()
 
+if (expandable && virtual)
+  throw new Error('kayjs-ui: a Table cannot be both expandable and virtual, a detail row breaks the single row height a virtual table measures by')
+
+const tableId = uid()
 const rows = () => list ? list.rows() : passed ?? []
 const columns = memo(() => given.map(column => resolvedColumn(column, sortable)))
 const keptKey = sortParam === undefined ? undefined : persisted(sortParam, '', { storage: 'query' })
@@ -199,6 +221,14 @@ const chosenSet = memo(() => new Set(chosen()))
 const visible = memo(() => kept().map(row => rowKeyOf(row, rowKey)))
 const allChosen = memo(() => visible().length > 0 && visible().every(key => chosenSet().has(key)))
 const someChosen = memo(() => visible().some(key => chosenSet().has(key)))
+const noneOpen: RowKeyValue<Row, Key>[] = []
+const opened = signal(expanded ?? noneOpen)
+
+effect(() => opened = expanded ?? noneOpen)
+
+const openSet = memo(() => new Set(opened()))
+const detailId = (row: Row) => `${tableId}-detail-${rowKeyOf(row, rowKey)}`
+const span = () => given.length + (selectable ? 1 : 0) + (expandable ? 1 : 0)
 const countChosen = selectedLabel ?? ((count: number) => wording('ui.table.selected', '{count} selected', { count }))
 
 // A row that left `rows` leaves the selection for good, so it is not picked again if it comes back.
@@ -218,6 +248,13 @@ function commit(keys: RowKeyValue<Row, Key>[]) {
   const wanted = new Set(keys)
 
   onSelect(keys, rows().filter(row => wanted.has(rowKeyOf(row, rowKey))))
+}
+
+function toggleRow(key: RowKeyValue<Row, Key>) {
+  const open = !openSet().has(key)
+
+  opened = open ? [...opened(), key] : opened().filter(other => other !== key)
+  onToggle?.(key, open)
 }
 
 function pick(key: RowKeyValue<Row, Key>, on: boolean) {
@@ -308,6 +345,9 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
   table(part="table" aria-rowcount={virtual ? shown().length + 1 : undefined})
     thead(part="head")
       tr(part="headRow" aria-rowindex={virtual ? 1 : undefined})
+        if expandable
+          th(part="toggleHead" scope="col")
+            span(part="selectText") {wording('ui.table.details', 'Details')}
         if selectable
           th(part="selectHead" scope="col")
             span(part="selectText") {selectAllLabel}
@@ -323,9 +363,12 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
     tbody(part="body" ref={element => body = element})
       if windowed && windowed.before() > 0
         tr(part="spacer" aria-hidden="true" style={`height: ${windowed.before()}px`})
-          td(colspan={given.length + (selectable ? 1 : 0)} style="padding: 0; border: 0")
+          td(colspan={span()} style="padding: 0; border: 0")
       for row, position of drawn() key={rowKeyOf(row, rowKey)}
         tr(part="row" data-virtual-index={windowed ? windowed.start() + position : undefined} aria-rowindex={windowed ? windowed.start() + position + 2 : undefined} aria-selected={selectable ? (chosenSet().has(rowKeyOf(row, rowKey)) ? 'true' : 'false') : undefined})
+          if expandable
+            td(part="toggleCell")
+              IconButton(part="toggle" icon="chevron" variant="ghost" size="xs" label={(expandLabel ?? (item => wording('ui.table.expandRow', 'Details of {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} aria-expanded={openSet().has(rowKeyOf(row, rowKey)) ? 'true' : 'false'} aria-controls={detailId(row)} onClick={() => toggleRow(rowKeyOf(row, rowKey))})
           if selectable
             td(part="selectCell")
               div(part="cellBody")
@@ -339,17 +382,21 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                   | {cell(row, column)}
                 else
                   | {cellText(row, column)}
+        if expandable && detail && openSet().has(rowKeyOf(row, rowKey))
+          tr(part="detailRow" id={detailId(row)})
+            td(part="detailCell" colspan={span()})
+              | {detail(row)}
       else
         if (list ? filtering() : rows().length > 0) && noMatch
           tr
-            td(part="emptyCell" colspan={given.length + (selectable ? 1 : 0)})
+            td(part="emptyCell" colspan={span()})
               | {noMatch}
         else if empty
           tr
-            td(part="emptyCell" colspan={given.length + (selectable ? 1 : 0)})
+            td(part="emptyCell" colspan={span()})
               | {empty}
       if windowed && windowed.after() > 0
         tr(part="spacer" aria-hidden="true" style={`height: ${windowed.after()}px`})
-          td(colspan={given.length + (selectable ? 1 : 0)} style="padding: 0; border: 0")
+          td(colspan={span()} style="padding: 0; border: 0")
   if list
     LoadMore(list={list})

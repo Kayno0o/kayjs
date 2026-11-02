@@ -162,6 +162,8 @@ export default defineMessages({
       submit: 'S\'abonner',
     },
     table: {
+      details: 'Détails',
+      expandRow: 'Détails de {row}',
       export: 'Exporter en CSV',
       filter: 'Filtrer',
       rowCount: { one: '{count} ligne', other: '{count} lignes' },

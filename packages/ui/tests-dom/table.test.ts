@@ -2,6 +2,7 @@ import type { ListFilter, SortState } from '@kaynooo/kayjs-ui'
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import ExpandableTable from '../tests/fixture/src/components/expandable-table.kay'
 import FilteredTable from '../tests/fixture/src/components/filtered-table.kay'
 import ListedTable from '../tests/fixture/src/components/listed-table.kay'
 import SelectableFeed from '../tests/fixture/src/components/selectable-feed.kay'
@@ -631,5 +632,54 @@ describe('Table with a selection', () => {
 
     expect(toolbar(root)).toContain('3 selected')
     expect(seen.at(-1)).toEqual([1, 2, 3])
+  })
+})
+
+describe('Table expandable', () => {
+  const MOONS = [{ id: 1, name: 'Io' }, { id: 2, name: 'Europa' }, { id: 3, name: 'Amalthea' }]
+  const toggles = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>('[data-part="toggle"]')]
+  const details = (root: HTMLElement) => [...root.querySelectorAll('[data-part="detailRow"]')]
+
+  test('draws a closed toggle on each row and opens a full-width detail under its row, wired by aria-controls', async () => {
+    const seen: [unknown, boolean][] = []
+
+    mounted = await mountComponent(ExpandableTable, { rows: MOONS, onToggle: (key: unknown, open: boolean) => seen.push([key, open]) })
+
+    const { root } = mounted
+
+    expect(toggles(root).map(button => button.getAttribute('aria-expanded'))).toEqual(['false', 'false', 'false'])
+    expect(details(root)).toHaveLength(0)
+
+    click(toggles(root)[1]!)
+    await settle()
+
+    const [detail] = details(root)
+
+    expect(toggles(root)[1]!.getAttribute('aria-expanded')).toBe('true')
+    expect(toggles(root)[1]!.getAttribute('aria-controls')).toBe(detail!.id)
+    expect(detail!.previousElementSibling).toBe(toggles(root)[1]!.closest('tr'))
+    expect(detail!.textContent).toContain('Orbit of Europa')
+    expect(detail!.querySelector('td')!.getAttribute('colspan')).toBe('2')
+    expect(seen).toEqual([[2, true]])
+
+    click(toggles(root)[1]!)
+    await settle()
+
+    expect(details(root)).toHaveLength(0)
+    expect(seen.at(-1)).toEqual([2, false])
+  })
+
+  test('starts from `expanded` and follows a new list from the parent', async () => {
+    mounted = await mountComponent(ExpandableTable, { rows: MOONS, expanded: [1, 3] })
+
+    expect(details(mounted.root).map(row => row.textContent?.trim())).toEqual(['Orbit of Io', 'Orbit of Amalthea'])
+  })
+
+  test('opens the detail under a stacked card too', async () => {
+    mounted = await mountComponent(ExpandableTable, { rows: MOONS, narrow: 'stack' })
+    click(toggles(mounted.root)[0]!)
+    await settle()
+
+    expect(mounted.root.querySelector('[data-part="row"] + [data-part="detailRow"]')).not.toBeNull()
   })
 })

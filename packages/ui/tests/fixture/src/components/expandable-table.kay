@@ -1,0 +1,21 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+interface Moon {
+  id: number
+  name: string
+}
+
+const { rows, expanded, onToggle, narrow } = props<{
+  rows: Moon[]
+  expanded?: number[]
+  onToggle?: (key: number, open: boolean) => void
+  narrow?: 'stack' | 'scroll'
+}>()
+
+const columns: Column<Moon>[] = [{ key: 'name', header: 'Name' }]
+---
+Table(columns={columns} rows={rows} rowKey="id" expandable expanded={expanded} onToggle={onToggle} narrow={narrow})
+  @detail(moon)
+    p.more Orbit of {moon.name}

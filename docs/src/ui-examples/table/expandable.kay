@@ -1,0 +1,20 @@
+---
+import Table from '@kaynooo/kayjs-ui/table.kay'
+import type { Column } from '@kaynooo/kayjs-ui'
+
+interface Moon {
+  id: number
+  name: string
+  orbit: string
+}
+
+const moons: Moon[] = [
+  { id: 1, name: 'Io', orbit: '1.77 days around Jupiter' },
+  { id: 2, name: 'Europa', orbit: '3.55 days around Jupiter' },
+]
+
+const columns: Column<Moon>[] = [{ key: 'name', header: 'Name' }]
+---
+Table(columns={columns} rows={moons} rowKey="id" expandable)
+  @detail(moon)
+    p Orbit: {moon.orbit}

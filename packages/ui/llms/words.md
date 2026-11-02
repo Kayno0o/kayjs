@@ -66,6 +66,6 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.splitLayout.*`: `back` (`Back`), `resize` (`Resize list`)
 - `ui.steps.*`: `done` (`completed`)
 - `ui.subscribeForm.*`: `email` (`Email`), `notice` (`We use your address to send you the mails of this site, until you unsubscribe with the link in each one.`), `privacy` (`Privacy policy`), `sent` (`Almost done: open the mail we just sent you and confirm your address.`), `submit` (`Subscribe`)
-- `ui.table.*`: `export` (`Export CSV`), `filter` (`Filter`), `rowCount` (`{count} rows, `1 row` for one`), `selectAll` (`Select all`), `selectRow` (`Select {row}`), `selected` (`{count} selected`)
+- `ui.table.*`: `details` (`Details`), `expandRow` (`Details of {row}`), `export` (`Export CSV`), `filter` (`Filter`), `rowCount` (`{count} rows, `1 row` for one`), `selectAll` (`Select all`), `selectRow` (`Select {row}`), `selected` (`{count} selected`)
 - `ui.toaster.*`: `dismiss` (`Dismiss notification`)
 - `ui.zoomPane.*`: `fit` (`Fit`), `zoomIn` (`Zoom in`), `zoomOut` (`Zoom out`)
