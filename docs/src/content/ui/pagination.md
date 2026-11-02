@@ -29,3 +29,9 @@ Give `offset`, `limit`, `more` and `url` to page by row. Each link sets `?offset
 ## Labels
 
 `label` names the navigation for screen readers, `Pagination` by default. `previousLabel` and `nextLabel` word the two links, `Previous` and `Next` by default.
+
+## Your own Previous and Next
+
+`@step(direction)` draws the content of Previous and Next in place of their words, such as an icon, `direction` being `'previous'` or `'next'`. `previousLabel` and `nextLabel` still name the links for screen readers.
+
+`url` can be left out: each link then keeps the address the page has, with the page parameter set.

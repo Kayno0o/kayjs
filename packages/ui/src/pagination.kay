@@ -1,6 +1,6 @@
 ---
-import { recipe } from 'kay'
-import type { JSX } from 'kay'
+import { recipe, withQuery } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { PagedList } from './pagination'
 import { currentPage, openSteps, pageHref, pageItems } from './pagination'
 import { wording } from 'kay/words'
@@ -15,7 +15,7 @@ const look = recipe({
   },
 })
 
-const { of, page, pages, offset, limit, more, url, param, siblings = 1, label = wording('ui.pagination.label', 'Pagination'), previousLabel = wording('ui.pagination.previous', 'Previous'), nextLabel = wording('ui.pagination.next', 'Next'), ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & ({
+const { of, page, pages, offset, limit, more, url, param, siblings = 1, step, label = wording('ui.pagination.label', 'Pagination'), previousLabel = wording('ui.pagination.previous', 'Previous'), nextLabel = wording('ui.pagination.next', 'Next'), ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & ({
   // A page kay's `paginate()` gave, which links each page at its own path: `Pagination(of={list})`.
   of: PagedList
   page?: never
@@ -33,8 +33,8 @@ const { of, page, pages, offset, limit, more, url, param, siblings = 1, label = 
   offset?: never
   limit?: never
   more?: never
-  // The URL of the page on screen, `ctx.url`: each link keeps its path and query, `param` set to the page.
-  url: URL | string
+  // The URL of the page on screen, `ctx.url`: each link keeps its path and query, `param` set to the page. Left out, the links keep the address the page has.
+  url?: URL | string | undefined
 } | {
   // A list whose length is unknown, by page number: only Previous and Next, Next while `more` says there is a page after this one.
   of?: never
@@ -43,7 +43,7 @@ const { of, page, pages, offset, limit, more, url, param, siblings = 1, label = 
   offset?: never
   limit?: never
   more: boolean
-  url: URL | string
+  url?: URL | string | undefined
 } | {
   // The same by offset, `?offset=40`, a page holding `limit` rows.
   of?: never
@@ -52,7 +52,7 @@ const { of, page, pages, offset, limit, more, url, param, siblings = 1, label = 
   offset: number
   limit: number
   more: boolean
-  url: URL | string
+  url?: URL | string | undefined
 }) & {
   // The query parameter holding the page, `page` by default, or the offset, `offset` by default.
   param?: string | undefined
@@ -62,38 +62,63 @@ const { of, page, pages, offset, limit, more, url, param, siblings = 1, label = 
   label?: string | undefined
   previousLabel?: string | undefined
   nextLabel?: string | undefined
+
+  // Draws the content of Previous and Next in place of their words, such as an icon: `@step(direction)`, `direction` being `'previous'` or `'next'`. The labels still name the links.
+  step?: Snippet<[direction: 'previous' | 'next']> | undefined
 }>()
 
 const total = of?.pages ?? pages ?? 0
 // The page as one that exists, whatever the query held.
 const shown = () => currentPage(of?.page ?? page ?? 1, total)
-const href = (target: number) => of ? of.href(target) : pageHref(url ?? '', target, param)
-const steps = () => more === undefined ? undefined : openSteps(limit === undefined ? { page: page ?? 1 } : { offset: offset ?? 0, limit }, more, url ?? '', param)
+// The page on screen, for a pagination given no `url`: a page rendered once at build time does not have one.
+function address() {
+  try {
+    return withQuery({})
+  }
+  catch {
+    return ''
+  }
+}
+
+const base = () => url ?? address()
+const href = (target: number) => of ? of.href(target) : pageHref(base(), target, param)
+const position = () => limit === undefined ? { page: page ?? 1 } : { offset: offset ?? 0, limit }
+const steps = () => more === undefined ? undefined : openSteps(position(), more, base(), param)
+
 ---
 // Plain links, through the query or at the paths `paginate()` gives, so a page renders on the server, its pages crawlable, and needs no island.
+snippet words(direction: 'previous' | 'next')
+  if step
+    | {step(direction)}
+  else if direction === 'previous'
+    | {previousLabel}
+  else
+    | {nextLabel}
 if steps() as open
   if open.previous || open.next
     nav(part="root" {...rest} aria-label={label})
       if open.previous
-        a(part="step" href={open.previous} rel="prev") {previousLabel}
+        a(part="step" href={open.previous} rel="prev" aria-label={step ? previousLabel : undefined}) {words('previous')}
       else
-        span(part="step") {previousLabel}
+        span(part="step" aria-label={step ? previousLabel : undefined}) {words('previous')}
       if open.next
-        a(part="step" href={open.next} rel="next") {nextLabel}
+        a(part="step" href={open.next} rel="next" aria-label={step ? nextLabel : undefined}) {words('next')}
       else
-        span(part="step") {nextLabel}
+        span(part="step" aria-label={step ? nextLabel : undefined}) {words('next')}
+
 else if total > 1
   nav(part="root" {...rest} aria-label={label})
     if shown() > 1
-      a(part="step" href={href(shown() - 1)} rel="prev") {previousLabel}
+      a(part="step" href={href(shown() - 1)} rel="prev" aria-label={step ? previousLabel : undefined}) {words('previous')}
     else
-      span(part="step") {previousLabel}
+      span(part="step" aria-label={step ? previousLabel : undefined}) {words('previous')}
     for item, index of pageItems(shown(), total, siblings) key={index}
       if item === 'gap'
         span(part="gap" aria-hidden="true") …
       else
         a(part="page" href={href(item)} aria-current={item === shown() ? 'page' : undefined}) {item}
     if shown() < total
-      a(part="step" href={href(shown() + 1)} rel="next") {nextLabel}
+      a(part="step" href={href(shown() + 1)} rel="next" aria-label={step ? nextLabel : undefined}) {words('next')}
     else
-      span(part="step") {nextLabel}
+      span(part="step" aria-label={step ? nextLabel : undefined}) {words('next')}
+

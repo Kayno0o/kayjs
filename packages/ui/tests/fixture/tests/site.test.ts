@@ -890,6 +890,18 @@ describe('Pagination', () => {
     expect(await find('/paging', '#open-single nav')).toEqual([])
   })
 
+  test('links the page on screen when given no url, and draws the step block in place of the words, the labels still naming the links', async () => {
+    expect(await strip('/paging?tag=kay', 'bare')).toEqual([
+      ['Previous', '/paging?tag=kay', null, 'prev'],
+      ['1', '/paging?tag=kay', null, null],
+      ['2', '/paging?tag=kay&page=2', 'page', null],
+      ['3', '/paging?tag=kay&page=3', null, null],
+      ['Next', '/paging?tag=kay&page=3', null, 'next'],
+    ])
+    expect(await strip('/paging', 'steps')).toEqual([['<', '/gallery', null, 'prev'], ['>', '/gallery?page=3', null, 'next']])
+    expect((await attributes('/paging', '#steps a', ['aria-label'])).map(one => one['aria-label'])).toEqual(['Back', 'Forward'])
+  })
+
   test('shows a page past the ends, or none at all, as the nearest that exists', async () => {
     const current = async (path: string) => (await strip(path, 'middle')).find(([, , page]) => page === 'page')
 

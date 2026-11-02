@@ -13,6 +13,10 @@
 - `CopyButton(text={() => signedLink()} onCopy={copied => ...} onFail={error => ...})`: `text` is a string, a function returning one or a promise of one, copied inside the click so Safari accepts it. `onCopy(text)` follows a successful copy, `onFail(error)` a text that could not be built or a refused copy, beside the `failure` toast.
 - `AudioPlayer` takes `onPlay`, `onPause`, `onEnded` and `onError(error)`, the `MediaError` of a file that fails to load or the `DOMException` of a refused play.
 
+### Pagination
+
+- `Pagination(page pages)` with no `url` links the address the page has, the page parameter set. `@step(direction)` draws the content of Previous and Next (`'previous'` or `'next'`) in place of their words, an icon for instance, and `previousLabel` and `nextLabel` still name the links. It stays a static component of plain links: a handler for a list paged in the browser is not offered, since it would make every `Pagination(of={list})` of a page an island whose props must serialize.
+
 ## Reference
 
 - The shape every component of the library follows: state the app can hold is a prop followed when it changes plus a callback on each transition (`open`/`onOpenChange` as Popover, `value`/`onChange` as the pickers), a data source is a list or a function returning a promise, and each visible part can be replaced by a block.

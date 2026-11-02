@@ -21,6 +21,12 @@ main
     Pagination(offset={40} limit={20} more={false} url="/gallery?offset=40&tag=kay")
   article#open-single
     Pagination(offset={0} limit={20} more={false} url="/gallery")
+  article#bare
+    Pagination(page={2} pages={3})
+  article#steps
+    Pagination(page={2} more url="/gallery" previousLabel="Back" nextLabel="Forward")
+      @step(direction)
+        b {direction === 'previous' ? '<' : '>'}
   article#qr
     QrCode(value="https://kaynooo.fr" label="kaynooo.fr" pixels={160})
   article#qr-other
