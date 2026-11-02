@@ -421,7 +421,7 @@ describe('CommandPalette with search', () => {
   test('says the search failed, still listing the entries', async () => {
     const realError = console.error
 
-    console.error = () => {}
+    console.error = () => undefined
 
     const { root, input, labels } = await palette({
       search: async () => {
