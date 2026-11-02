@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - kayjs-ui's RelativeTime takes `focusable={false}` to leave out its tab stop inside a link or a focusable row: [basics](../packages/ui/llms/basics.md).
 - kayjs-ui's `infiniteList` has `reload()`, which loads again every row loaded so far and swaps them in at once, keeping the DOM of rows whose key is unchanged: [kayjs-ui infinite lists](../packages/ui/llms/infinite-list.md).
+- `kay/test`'s browser page has `drag(from, to, { steps, at, to, hold })`: a mouse drag from one element to another, or a touch drag with `hold`, so a test of a sortable list or a board needs no raw `cdp` mouse events: [browser tests](testing-browser.md).
 - `kay` runs on `@kaynooo/cli-kit`: `kay --version`, shell completion through `kay __complete`, `--plain` and `--color`, a typo naming the command or option it likely meant, and a usage error (unknown command or option, a missing argument, a `refuse(reason)`) exiting 2 where it exited 1; `kay <command> --help` lists the options with a line each: [project](project.md#commands).
 - kayjs-ui's Combobox draws no second line for an option whose `description` is only whitespace: [tables, tabs and navigation](../packages/ui/llms/tables-navigation-and-layout.md).
 - `kay dev` warns in the browser console of a keyed live value an island reads only in an effect, which the page's render never noted and so no connection follows: [live values](live-values.md).

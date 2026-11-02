@@ -1701,6 +1701,21 @@ inBrowser('the states of a Combobox option and a FileDrop', () => {
     expect(await page.evaluate((() => document.querySelector('#dropped')!.textContent) as never)).toBe('live')
     expect(page.errors).toEqual([])
   }, 120_000)
+
+  test('Sortable reorders a list dragged with the page\'s own drag, by mouse and by touch', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/sortable')
+
+    const order = async (names: string) => page.waitUntil((expected: string) => [...document.querySelectorAll('li button')].map(button => button.textContent).join() === expected, { what: `the order ${names}` }, names)
+
+    await order('Read,Run,Write')
+    await page.drag('li:nth-child(1) button', 'li:nth-child(3) button', { to: { x: 5, y: 20 } })
+    await order('Run,Write,Read')
+    await page.drag('li:nth-child(1) button', 'li:nth-child(3) button', { hold: 300, to: { x: 5, y: 20 } })
+    await order('Write,Read,Run')
+    expect(page.errors).toEqual([])
+  })
 })
 
 inBrowser('TreeView link rows in the browser', () => {

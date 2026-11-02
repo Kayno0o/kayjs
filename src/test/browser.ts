@@ -64,6 +64,17 @@ export interface PointerOptions extends WaitOptions {
   at?: { x: number, y: number } | undefined
 }
 
+export interface DragOptions extends WaitOptions {
+  // Aims at a point of the source, CSS pixels from its top-left corner, instead of its middle.
+  at?: { x: number, y: number } | undefined
+  // Aims at a point of the target instead of its middle.
+  to?: { x: number, y: number } | undefined
+  // How many moves the pointer makes between the two points, 8 by default.
+  steps?: number | undefined
+  // Milliseconds the pointer rests on the source before it moves, as a touch does to start a drag: a hold drags with touch events, none with the mouse.
+  hold?: number | undefined
+}
+
 export interface ClickOptions extends PointerOptions {
   // Keys held down during the click, such as `['Alt']`.
   modifiers?: Bun.WebView.Modifier[] | undefined
@@ -129,6 +140,8 @@ export interface TestPage {
   // Moves the pointer onto the middle of the element, scrolled into view, and leaves it there.
   // `at` aims at a point of the element, scrolled into view, instead of its middle; a click with `at` neither waits for the element to keep still nor checks that nothing covers the point.
   hover: (selector: string, options?: PointerOptions) => Promise<void>
+  // Presses the pointer on `from`, scrolled into view, moves it to `to` in `steps` moves and releases it there: a mouse drag, or a touch drag with `hold`, which rests on `from` first. `at` and `to` aim at a point of each element instead of its middle.
+  drag: (from: string, to: string, options?: DragOptions) => Promise<void>
   // The first match's text, or null when nothing matches.
   text: (selector: string) => Promise<string | null>
   // The first match's form value, or null when nothing matches.
@@ -725,6 +738,54 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       const [x, y] = at === undefined ? await center(selector) : await pointAt(selector, at)
 
       await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
+    }),
+    drag: async (from, to, { at, to: toAt, steps = 8, hold = 0, ...wait } = {}) => serial(async () => {
+      if (!Number.isInteger(steps) || steps < 1)
+        throw new Error(`kay: drag steps must be a whole number of at least 1, got ${steps}`)
+
+      await untilLoaded()
+      await poll(script(scrolledTo, [from, true]), from, waitMs(wait.timeout))
+
+      const [x, y] = at === undefined ? await center(from) : await pointAt(from, at)
+      const touch = hold > 0
+      const send = async (type: 'down' | 'move' | 'up', px: number, py: number) => {
+        if (touch)
+          await cdp('Input.dispatchTouchEvent', { type: { down: 'touchStart', move: 'touchMove', up: 'touchEnd' }[type], touchPoints: type === 'up' ? [] : [{ x: px, y: py }] })
+        else
+          await cdp('Input.dispatchMouseEvent', { type: { down: 'mousePressed', move: 'mouseMoved', up: 'mouseReleased' }[type], x: px, y: py, button: 'left', buttons: type === 'up' ? 0 : 1, clickCount: type === 'move' ? 0 : 1 })
+      }
+
+      await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
+      await send('down', x, y)
+
+      let released = false
+
+      try {
+        if (touch)
+          await Bun.sleep(hold)
+
+        // The target is found once the pointer is down, as scrolling it into view may move the source away from where the pointer is.
+        await poll(script(scrolledTo, [to, true]), to, waitMs(wait.timeout))
+
+        const [tx, ty] = toAt === undefined ? await center(to) : await pointAt(to, toAt)
+
+        for (let step = 1; step <= steps; step++)
+          await send('move', x + ((tx - x) * step / steps), y + ((ty - y) * step / steps))
+
+        released = true
+        await send('up', tx, ty)
+      }
+      finally {
+        // A drag that failed on the way leaves no button held down.
+        if (!released) {
+          try {
+            await send('up', x, y)
+          }
+          catch {
+            // The failure that ended the drag is the one reported.
+          }
+        }
+      }
     }),
     goto: async path => serial(async () => {
       const target = new URL(path, origin)

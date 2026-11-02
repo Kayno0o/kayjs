@@ -12,7 +12,15 @@ const PAGE = `<!doctype html><meta name="viewport" content="width=device-width">
   c.addEventListener('click', e => log.push(['click', e.isTrusted, e.offsetX, e.offsetY]))
 </script>`
 
-const server = Bun.serve({ port: 0, fetch: () => new Response(PAGE, { headers: { 'content-type': 'text/html' } }) })
+const DRAG = `<!doctype html><meta name="viewport" content="width=device-width"><title>t</title><style>body{margin:0}div{height:40px}#to{margin-top:2000px}</style>
+<div id="from">from</div><div id="to">to</div>
+<script>
+  window.log = []
+  for (const type of ['pointerdown', 'pointermove', 'pointerup'])
+    document.addEventListener(type, e => log.push([type, e.pointerType, e.target.id, e.isTrusted]), true)
+</script>`
+
+const server = Bun.serve({ port: 0, fetch: request => new Response(new URL(request.url).pathname === '/drag' ? DRAG : PAGE, { headers: { 'content-type': 'text/html' } }) })
 const url = `http://127.0.0.1:${server.port}/`
 
 afterAll(async () => server.stop(true))
@@ -32,6 +40,27 @@ describe.skipIf(browserPath() === undefined && (process.env.CI ?? '') === '')('t
     const log = await page.evaluate(() => (window as unknown as { log: unknown[][] }).log)
 
     expect(log.at(-1)).toEqual(['click', true, 100, 10])
+  }, 60_000)
+
+  it('drags from one element to another far below, by mouse and by touch', async () => {
+    await using page = await browse(`${url}drag`)
+    const rows = async () => page.evaluate(() => (window as unknown as { log: unknown[][] }).log)
+
+    await page.drag('#from', '#to', { steps: 4 })
+
+    const mouse = (await rows()).filter(row => row[0] !== 'pointermove' || row[2] === 'to')
+
+    expect(mouse[0]).toEqual(['pointerdown', 'mouse', 'from', true])
+    expect(mouse.at(-1)).toEqual(['pointerup', 'mouse', 'to', true])
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+
+    await page.evaluate(() => ((window as unknown as { log: unknown[][] }).log.length = 0))
+    await page.drag('#from', '#to', { hold: 50 })
+
+    const touch = await rows()
+
+    expect(touch.find(row => row[0] === 'pointerdown')).toEqual(['pointerdown', 'touch', 'from', true])
+    await expect(page.drag('#from', '#to', { steps: 0 })).rejects.toThrow('steps')
   }, 60_000)
 
   it('opens a page at a phone size from its first load', async () => {

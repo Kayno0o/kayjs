@@ -3510,6 +3510,14 @@ interface CookieJar
 [./test] DialogHandler
 type DialogHandler = (dialog: PageDialog) => boolean | string | Promise<boolean | string>
 
+[./test] DragOptions
+interface DragOptions extends WaitOptions
+  at?: { x: number; y: number; } | undefined
+  hold?: number | undefined
+  steps?: number | undefined
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  to?: { x: number; y: number; } | undefined
+
 [./test] EnvOverride
 type EnvOverride<Env extends object> = { [Name in keyof Env]?: Env[Name] | undefined }
 
@@ -3779,6 +3787,7 @@ interface TestPage
   click: (selector: string, options?: ClickOptions | undefined) => Promise<void>
   close: () => void
   count: (selector: string) => Promise<number>
+  drag: (from: string, to: string, options?: DragOptions | undefined) => Promise<void>
   errors: string[]
   evaluate: <Args extends unknown[], Result>(run: (...args: Args) => Result | Promise<Result>, ...args: Args) => Promise<Result>
   fill: (selector: string, text: string) => Promise<void>

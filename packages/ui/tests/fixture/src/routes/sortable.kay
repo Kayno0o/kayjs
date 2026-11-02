@@ -1,0 +1,6 @@
+---
+import SortableList from '../components/sortable-list.kay'
+import '../app.css'
+---
+main
+  SortableList

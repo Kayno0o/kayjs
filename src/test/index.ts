@@ -57,7 +57,7 @@ import { socketsOf } from './site-socket'
 import { closeAfterTests, openSites } from './sites'
 import { assertKayWritable } from './writable'
 
-export type { A11yViolation, BrowserOptions, ClickOptions, DialogHandler, FetchedResponse, FulfillOptions, PageDialog, PageRequest, PageResponse, PointerOptions, RouteHandler, RouteMatch, TestPage, WaitForOptions, WaitOptions } from './browser'
+export type { A11yViolation, BrowserOptions, ClickOptions, DialogHandler, DragOptions, FetchedResponse, FulfillOptions, PageDialog, PageRequest, PageResponse, PointerOptions, RouteHandler, RouteMatch, TestPage, WaitForOptions, WaitOptions } from './browser'
 export { browse, browserPath } from './browser'
 export type { ContentSeed, SeedEntry, TestContent } from './content'
 export type { CookieJar } from './cookies'
