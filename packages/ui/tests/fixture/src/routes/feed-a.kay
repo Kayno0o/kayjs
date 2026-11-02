@@ -1,0 +1,6 @@
+---
+import SwapFeed from '../components/swap-feed.kay'
+---
+h1#title Feed a
+a#next(href="/feed-b") B
+SwapFeed(persist rows={[{ id: 1 }, { id: 2 }, { id: 3 }]})

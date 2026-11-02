@@ -1750,4 +1750,24 @@ inBrowser('TreeView link rows in the browser', () => {
     expect(await focusedRow()).toBe('Here')
     expect(page.errors).toEqual([])
   }, 120_000)
+
+  test('an infiniteList in a kept island starts over when the next page gives other rows', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/feed-a')
+
+    await page.evaluate(() => {
+      (window as { feed?: Element | null }).feed = document.querySelector('#more')
+    })
+    await page.click('#more')
+    await page.waitUntil(() => document.querySelector('#ids')!.textContent === '1,2,3,4,5,6')
+    await page.click('#next')
+    await page.waitUntil(() => document.querySelector('#title')!.textContent === 'Feed b')
+    await page.waitUntil(() => document.querySelector('#ids')!.textContent === '10,11,12')
+    await page.click('#more')
+    await page.waitUntil(() => document.querySelector('#ids')!.textContent === '10,11,12,13,14,15')
+    expect(await page.evaluate(() => document.querySelector('#more') === (window as { feed?: Element }).feed)).toBe(true)
+    expect(await page.path()).toBe('/feed-b')
+    expect(page.errors).toEqual([])
+  }, 120_000)
 })

@@ -380,6 +380,15 @@ describe('infiniteList following its island', () => {
     expect(list.rows().map(row => row.id)).toEqual([10, 11, 12])
   })
 
+  test('function rows returning a fresh but equal array each call keep the pages loaded before the effect first ran', async () => {
+    const list = infiniteList(() => bans(1, 3), { pageSize: 3, key: row => row.id, load: source(bans(4, 3)).load })
+
+    await list.more()
+    flush()
+
+    expect(list.rows().map(row => row.id)).toEqual([1, 2, 3, 4, 5, 6])
+  })
+
   test('function rows that stay the same keep the loaded pages', async () => {
     const other = signal(0)
     const rows = bans(1, 3)

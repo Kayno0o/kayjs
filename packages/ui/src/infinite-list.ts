@@ -98,6 +98,19 @@ export interface InfiniteList<Row> {
 // What `patch` applies to a row: the fields to merge over it, or a function of the row returning the row.
 export type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
 
+// Whether two rows hold the same fields, so a rows function building its objects anew on each call is not read as other rows.
+function sameRow(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b))
+    return true
+
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null)
+    return false
+
+  const [left, right] = [Object.entries(a), Object.entries(b)]
+
+  return left.length === right.length && left.every(([name, value]) => Object.is(value, (b as Record<string, unknown>)[name]))
+}
+
 const filterOf = (given: Partial<ListFilter> | undefined): ListFilter => ({ text: given?.text ?? '', fields: given?.fields ?? {} })
 
 // The page loader of an action source.
@@ -348,7 +361,11 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
       watching = true
 
       untrack(() => {
-        if (next !== current) {
+        // The first run compares with the rows the same function gave a moment before, which a fresh but equal array is not a change from.
+        if (initial && next !== current && next.length === current.length && next.every((row, at) => sameRow(row, current[at]))) {
+          current = next
+        }
+        else if (next !== current) {
           current = next
           reset(next)
         }
