@@ -21,7 +21,9 @@ kay editor install helix
 
 It starts the server with `kay` when that is on the PATH, else with the kay installed in the project (`bun node_modules/kay/src/cli.ts lsp --stdio`). `kay new` offers the same step for the editors it finds, and `kay new --editor helix,zed` does it without asking.
 
-For Helix it adds a `kay` section to `languages.toml`, copies the queries and builds the grammar. For Zed it writes an extension you load once, as the Zed section below says, and turns on the server's semantic tokens in `.zed/settings.json`. The sections below are the same setup by hand.
+For Helix it adds a `kay` section to `languages.toml`, copies the queries and builds the grammar. For Zed it writes an extension you load once, as the Zed section below says, and turns on the server's semantic tokens in `.zed/settings.json`.
+
+The sections below are the same setup by hand: remove a `kay` language you declared yourself first, as the command refuses to write beside it. Helix runs the project's kay by a path relative to the project, so a project without kay installed needs `kay` on the PATH.
 
 ## Neovim
 
@@ -109,7 +111,9 @@ cp editors/tree-sitter-kay/queries/*.scm ~/.config/helix/runtime/queries/kay/
 
 Zed runs a language server and highlights a language only through an extension, and kay has one in the `editors/zed` folder of the repository. It adds the `Kay` language with the grammar and its queries, and starts `kay lsp --stdio` from the `kay` on the PATH, else the kay installed in the project, else through `bunx`.
 
-`kay editor install zed` copies the extension to `~/.config/zed/kay-extension`, and you load it once: run `zed: install dev extension` from the command palette and pick that folder. By hand, do the same from a checkout of the repository at the tag of the kay release you use (its `extension.toml` names that tag as the grammar's revision) and pick `editors/zed`. Rust installed through rustup is needed to build the extension, and Zed fetches the target and the wasi-sdk the grammar needs.
+`kay editor install zed` copies the extension to `kay-extension` in Zed's configuration folder (`~/.config/zed`), and you load it once: run `zed: install dev extension` from the command palette and pick that folder.
+
+By hand, do the same from a checkout of the repository at the tag of the kay release you use (its `extension.toml` names that tag as the grammar's revision) and pick `editors/zed`. Rust installed through rustup is needed to build the extension, and Zed fetches the target and the wasi-sdk the grammar needs.
 
 This setting then formats the language with `kay fmt`:
 

@@ -1,7 +1,6 @@
 import type { Editor } from '../editors'
 import type { Command } from './command'
-import process from 'node:process'
-import { EDITORS, findEditors, installEditor } from '../editors'
+import { EDITORS, findEditors, installEditor, printSetups } from '../editors'
 import { formatOption, printDocument, printFailure, projectRoot } from './command'
 
 // Sets up the editors that read `.kay` through tree-sitter and the language server: the files they need, written in their own configuration.
@@ -50,12 +49,7 @@ export const editorInstall: Command = {
       return 0
     }
 
-    for (const { summary, notes } of setups) {
-      console.log(summary)
-
-      for (const note of notes)
-        process.stderr.write(`  ${note}\n`)
-    }
+    printSetups(setups)
 
     return 0
   },

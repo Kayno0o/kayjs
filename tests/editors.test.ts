@@ -1,4 +1,4 @@
-import { chmod } from 'node:fs/promises'
+import { chmod, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
@@ -10,8 +10,6 @@ const cli = join(import.meta.dir, '../src/cli.ts')
 const dirs: string[] = []
 
 afterAll(async () => {
-  const { rm } = await import('node:fs/promises')
-
   await Promise.all(dirs.map(async dir => rm(dir, { recursive: true, force: true })))
 })
 
@@ -171,7 +169,7 @@ describe('zed', () => {
 
     expect(await Bun.file(join(merged, '.zed/settings.json')).json()).toEqual({ theme: 'One', languages: { Kay: { tab_size: 4, semantic_tokens: 'combined' }, Rust: { tab_size: 2 } } })
     expect(await Bun.file(join(commented, '.zed/settings.json')).text()).toBe('{\n  // mine\n  "theme": "One"\n}\n')
-    expect(setup.notes.some(note => note.includes('has comments'))).toBe(true)
+    expect(setup.notes.some(note => note.includes('is not plain JSON'))).toBe(true)
     expect(setup.notes.some(note => note.includes('rustup is not installed'))).toBe(true)
   })
 

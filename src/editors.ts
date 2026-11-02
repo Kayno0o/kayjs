@@ -42,9 +42,8 @@ const EDITOR_ROOT = join(import.meta.dir, '..', 'editors')
 const QUERIES = ['highlights.scm', 'indents.scm', 'injections.scm']
 const ZED_EXTENSION = 'kay-extension'
 const ZED_COPIED = ['extension.toml', 'Cargo.toml', 'src', 'languages']
-const DIRTY_LINE = /\r?\n$/
-// Matches a JSON text without comments or trailing commas, which is all that is rewritten.
-const PLAIN_JSON = /^\s*\{[\s\S]*\}\s*$/
+const TRAILING_NEWLINE = /\r?\n$/
+const BIN_FOLDER = /[\\/]node_modules[\\/]\.bin[\\/]/
 
 function escapeRegExp(text: string): string {
   return text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
@@ -54,11 +53,12 @@ export function configHomeOf(env: Record<string, string | undefined> = process.e
   return env.XDG_CONFIG_HOME !== undefined && env.XDG_CONFIG_HOME !== '' ? env.XDG_CONFIG_HOME : join(homedir(), '.config')
 }
 
+// A program found in a `node_modules/.bin` is the project's own, on the PATH only while a package script runs, so it is not one an editor will find.
 function whichOf(names: string[], path: string | undefined): string | undefined {
   for (const name of names) {
     const found = Bun.which(name, { PATH: path ?? process.env.PATH ?? '' })
 
-    if (found !== null)
+    if (found !== null && !BIN_FOLDER.test(found))
       return found
   }
 
@@ -127,7 +127,7 @@ export async function installHelix(options: EditorOptions): Promise<EditorSetup>
     throw new Error(`${languages} already declares a language named kay: remove it, or the kay section it holds, and run the command again`)
 
   const block = helixBlock(serverCommand(options))
-  const text = MANAGED.test(existing) ? existing.replace(MANAGED, () => block) : `${existing === '' ? '' : `${existing.replace(DIRTY_LINE, '')}\n\n`}${block}`
+  const text = MANAGED.test(existing) ? existing.replace(MANAGED, () => block) : `${existing === '' ? '' : `${existing.replace(TRAILING_NEWLINE, '')}\n\n`}${block}`
   const queries = join(home, 'runtime', 'queries', 'kay')
   const files = [languages, ...QUERIES.map(name => join(queries, name))]
   const notes: string[] = []
@@ -143,6 +143,8 @@ export async function installHelix(options: EditorOptions): Promise<EditorSetup>
 
     return { editor: 'helix', summary: `Helix: language, queries and grammar entry written to ${home}`, notes, files }
   }
+
+  process.stderr.write('  building the grammar, which can take a minute...\n')
 
   const failure = await run([helix, '--grammar', 'fetch'], home, options.path) ?? await run([helix, '--grammar', 'build'], home, options.path)
 
@@ -175,7 +177,7 @@ export async function installZed(options: EditorOptions): Promise<EditorSetup> {
     let parsed: unknown
 
     try {
-      parsed = PLAIN_JSON.test(text) ? JSON.parse(text) : undefined
+      parsed = JSON.parse(text)
     }
     catch {
       parsed = undefined
@@ -189,7 +191,7 @@ export async function installZed(options: EditorOptions): Promise<EditorSetup> {
       files.push(settings)
     }
     else {
-      notes.push(`${settings} has comments, so it was left as it is: add ${JSON.stringify(wanted)} to it to colour the server's tokens`)
+      notes.push(`${settings} is not plain JSON (comments, or a syntax error), so it was left as it is: add ${JSON.stringify(wanted)} to it to colour the server's tokens`)
     }
   }
   else {
@@ -204,6 +206,16 @@ export async function installZed(options: EditorOptions): Promise<EditorSetup> {
   notes.push(`in Zed, run "zed: install dev extension" from the command palette and pick ${target}`)
 
   return { editor: 'zed', summary: `Zed: extension written to ${target}`, notes, files }
+}
+
+// One line per editor on stdout, what is left to do under it on stderr.
+export function printSetups(setups: EditorSetup[]): void {
+  for (const { summary, notes } of setups) {
+    console.log(summary)
+
+    for (const note of notes)
+      process.stderr.write(`  ${note}\n`)
+  }
 }
 
 export async function installEditor(editor: Editor, options: EditorOptions): Promise<EditorSetup> {

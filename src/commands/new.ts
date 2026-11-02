@@ -4,7 +4,7 @@ import type { Command, Parsed } from './command'
 import process from 'node:process'
 import { confirm } from '@kaynooo/cli-kit/prompt'
 import { colors } from '@kaynooo/utils/tools/colors'
-import { EDITORS, findEditors, installEditor } from '../editors'
+import { EDITORS, findEditors, installEditor, printSetups } from '../editors'
 import { createProject, detectHost, FEATURE_NAMES, HOSTS, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from '../new'
 import { count, done, formatOption, printDocument, reportFailure, shellQuote } from './command'
 
@@ -97,12 +97,7 @@ export const scaffold: Command = {
 
       done(dryRun ? 'would create' : 'created', `${dir}, ${features.length > 0 ? features.join(', ') : 'blank'}, ${count(files.length, 'file')}`)
 
-      for (const { summary, notes } of editors) {
-        console.log(summary)
-
-        for (const note of notes)
-          process.stderr.write(`  ${note}\n`)
-      }
+      printSetups(editors)
 
       if (dryRun && values.quiet !== true) {
         for (const path of files)
