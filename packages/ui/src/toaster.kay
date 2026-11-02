@@ -1,8 +1,9 @@
 ---
 import type { IconSlot } from './defaults'
-import type { ToastType } from './toast'
+import type { Toast, ToastType } from './toast'
 import { effect, onMount, recipe, shortcut, signal } from 'kay'
 import { claim } from './claim'
+import Button from './button.kay'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { dismissToast, holdToasts, toasts } from './toast'
@@ -22,6 +23,7 @@ const look = recipe({
     toast: 'kui-toast pointer-events-auto flex items-start gap-2 rounded-lg border-solid border-[length:var(--border-width)] border-border-strong bg-surface px-3 py-2 [--_toast-tone:var(--color-accent)] data-[tone=danger]:[--_toast-tone:var(--color-danger)] data-[tone=success]:[--_toast-tone:var(--color-success)] data-[tone=info]:[--_toast-tone:var(--color-info)]',
     icon: 'mt-0.5 size-4 shrink-0 text-(--_toast-tone)',
     message: 'min-w-0 flex-1 text-xs/snug text-foreground',
+    action: 'shrink-0',
     dismiss: 'shrink-0 text-[var(--color-muted)] hover:text-foreground',
   },
 })
@@ -72,6 +74,18 @@ shortcut(() => hotkey ? `alt+${hotkey}` : null, (event) => {
   button.focus()
 }, { preventDefault: false })
 
+// The button is busy while the action runs, as a Button with an onClick is on its promise; the toast goes once it settles, a rejection being logged.
+async function acted(item: Toast) {
+  try {
+    await item.action?.run()
+  }
+  catch (error) {
+    console.error('kayjs-ui: the action of a toast threw', error)
+  }
+
+  dismissToast(item.id)
+}
+
 // Escape dismisses the focused toast alone, not the dialog under it, and focus moves on to the next toast's button rather than falling to the page.
 function dismissed(event: KeyboardEvent) {
   const toast = event.currentTarget as HTMLElement
@@ -102,4 +116,6 @@ if owns()
       div(part="toast" data-id={item.id} data-tone={toneOf(item)} data-type={item.type} onKeyDown={dismissed})
         Icon(icon={ICONS[item.type]} part="icon")
         p(part="message") {item.message}
+        if item.action as action
+          Button(part="action" size="sm" variant="ghost" label={action.label} onClick={() => acted(item)})
         IconButton(icon="close" label={dismissLabel} size="sm" variant="inline" part="dismiss" onClick={() => dismissToast(item.id)})

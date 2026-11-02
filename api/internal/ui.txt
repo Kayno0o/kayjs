@@ -950,6 +950,7 @@ interface AttemptOptions<Data = unknown>
   failure: string
   onRefused?: ((data: Data) => unknown) | undefined
   refused?: ((data: Data) => string | undefined) | undefined
+  refusedAction?: ((data: Data) => ToastAction | undefined) | undefined
   success?: string | undefined
 
 [./lib/index] AudioChapter
@@ -1333,16 +1334,23 @@ const toast: {
 
 [./lib/index] Toast
 interface Toast
+  action?: ToastAction | undefined
   id: number
   message: string
   tone?: ToastTone | undefined
   type: ToastType
+
+[./lib/index] ToastAction
+interface ToastAction
+  label: string
+  run: () => unknown
 
 [./lib/index] ToastHold
 type ToastHold = 'pointer' | 'focus'
 
 [./lib/index] ToastOptions
 interface ToastOptions
+  action?: ToastAction | undefined
   duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
 
 [./lib/index] toasts
@@ -2059,6 +2067,7 @@ interface AttemptOptions<Data = unknown>
   failure: string
   onRefused?: ((data: Data) => unknown) | undefined
   refused?: ((data: Data) => string | undefined) | undefined
+  refusedAction?: ((data: Data) => ToastAction | undefined) | undefined
   success?: string | undefined
 
 [./lib/toast] dismissToast
@@ -2079,16 +2088,23 @@ const toast: {
 
 [./lib/toast] Toast
 interface Toast
+  action?: ToastAction | undefined
   id: number
   message: string
   tone?: ToastTone | undefined
   type: ToastType
+
+[./lib/toast] ToastAction
+interface ToastAction
+  label: string
+  run: () => unknown
 
 [./lib/toast] ToastHold
 type ToastHold = 'pointer' | 'focus'
 
 [./lib/toast] ToastOptions
 interface ToastOptions
+  action?: ToastAction | undefined
   duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
 
 [./lib/toast] toasts

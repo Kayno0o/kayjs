@@ -32,6 +32,9 @@ toast.info('Copied')
 // `duration` is a string such as `'3s'` (`'6s'` by default; an error stays until the reader dismisses it, so `'10s'` gives it back a clock); `false` keeps any toast until the reader dismisses it, or `dismissToast(id)` does, each call answering its id. Its `tone` is `danger`, `success` or `info`; `type`, `error` for `danger`, is its deprecated name.
 const sticky = toast.error('Offline', { duration: false })
 
+// `action` adds one button before the close button, for the obvious next step: it is busy while `run`'s promise is pending, the toast goes once it settles (a rejection is logged), and Alt+t reaches it. An action toast keeps the clock of its tone, none for an error.
+toast.error('Could not pull: the branch diverged', { action: { label: 'Rebase onto origin/main', run: () => rebase() } })
+
 // Resolves to what the call returned (`true` for a call returning nothing), or to undefined once it threw and `failure` was toasted, or a refusal of the whole call such as a limit.
 const post = await attempt(() => publish({ id }), 'Could not publish')
 
@@ -43,7 +46,7 @@ if (await attempt(() => archive({ id }), { failure: 'Could not archive', success
 await attempt(() => publish({ id }), 'Could not publish', (data: { error: string }) => data.error)
 ```
 
-`attempt(run, failure, refused?)`, or `attempt(run, { failure, success?, refused?, onRefused? })`, toasts, for a call that throws, the message `refused` reads from the data the action's handler passed to `ctx.fail`; else a refusal of the whole call, such as a limit; else `failure`. An empty or undefined answer from `refused` falls through to the next, and the next after `refused` is the data itself when it is a string or has a string `error` or `message` that reads as a message (below), so `refused` is only for another field or to override it. Type `refused`'s parameter as the handler's data: `(data: { error: string }) => data.error`.
+`attempt(run, failure, refused?)`, or `attempt(run, { failure, success?, refused?, refusedAction?, onRefused? })`, toasts, for a call that throws, the message `refused` reads from the data the action's handler passed to `ctx.fail`; else a refusal of the whole call, such as a limit; else `failure`. An empty or undefined answer from `refused` falls through to the next, and the next after `refused` is the data itself when it is a string or has a string `error` or `message` that reads as a message (below), so `refused` is only for another field or to override it. Type `refused`'s parameter as the handler's data: `(data: { error: string }) => data.error`. `refusedAction(data)` reads the same data for the toast's button, `data => data.diverged ? { label: 'Rebase', run: rebase } : undefined`; only a refusal gets it, not `failure`, and one that throws offers no button and is logged.
 
 A call to an API route made with `call()` throws `ApiError`, which `attempt` reads too: `refused` gets its `answer`, else the words the route gave (the text it answered or the `message` or `error` of its JSON) are toasted for a 4xx when they read as a message (one line of at most 200 characters, not markup nor a code such as `NOT_FOUND` or `404`; `ACCESS DENIED` is a message), `refused` is called only for a JSON object answer, and one that throws counts as saying nothing and is logged with `console.error`, and `failure` stands for status 0 (no answer came), a 5xx or an answer with no words: `await attempt(() => call(notes, '/:id', { method: 'delete', params: { id } }), 'Could not delete')`.
 

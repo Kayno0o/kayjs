@@ -48,6 +48,18 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
     expect(page.errors).toEqual([])
   }, 60_000)
 
+  it('runs a toast\'s action from its button and goes once it resolves', async () => {
+    const page = await site.open('/shell')
+
+    await page.click('#acted')
+    await page.waitFor('.kui-toast [data-part=action]')
+    expect(await page.text('.kui-toast [data-part=action]')).toContain('Rebase')
+    await page.click('.kui-toast [data-part=action]')
+    await page.waitUntil(() => document.body.dataset.rebased === 'yes')
+    await page.waitUntil(() => document.querySelector('.kui-toast') === null)
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
   it('keeps a page that mounts its own Toaster showing each toast once', async () => {
     const page = await site.open('/toast-a')
 

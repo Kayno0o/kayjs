@@ -15,6 +15,7 @@ interface AttemptOptions<Data = unknown>
   failure: string
   onRefused?: ((data: Data) => unknown) | undefined
   refused?: ((data: Data) => string | undefined) | undefined
+  refusedAction?: ((data: Data) => ToastAction | undefined) | undefined
   success?: string | undefined
 
 [.] AudioChapter
@@ -398,16 +399,23 @@ const toast: {
 
 [.] Toast
 interface Toast
+  action?: ToastAction | undefined
   id: number
   message: string
   tone?: ToastTone | undefined
   type: ToastType
+
+[.] ToastAction
+interface ToastAction
+  label: string
+  run: () => unknown
 
 [.] ToastHold
 type ToastHold = 'pointer' | 'focus'
 
 [.] ToastOptions
 interface ToastOptions
+  action?: ToastAction | undefined
   duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
 
 [.] toasts
@@ -2115,6 +2123,10 @@ component default
     root?: string | undefined;
   } | undefined;
   message?: string | undefined;
+  action?: string | {
+    root?: any;
+    spinner?: any;
+  } | undefined;
   dismiss?: string | {
     root?: string | {
       root?: string | undefined;

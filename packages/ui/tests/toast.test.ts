@@ -42,6 +42,53 @@ describe('toast', () => {
   })
 })
 
+describe('a toast\'s action', () => {
+  const action = { label: 'Retry', run: () => 1 }
+
+  test('is kept on the toast, and an error with the same words open is shown once', () => {
+    toast.error('Offline', { action })
+    toast.error('Offline', { action: { label: 'Other', run: () => 2 } })
+
+    expect(toasts()).toHaveLength(1)
+    expect(toasts()[0]!.action).toBe(action)
+  })
+
+  test('keeps the clock of its tone: none for an error, six seconds otherwise', () => {
+    jest.useFakeTimers()
+
+    toast.error('Refused', { action })
+    toast.success('Saved', { action })
+    jest.advanceTimersByTime(6000)
+
+    expect(shown().map(item => item.message)).toEqual(['Refused'])
+    jest.useRealTimers()
+  })
+
+  test('comes from `refusedAction` for a refusal, not for a failure', async () => {
+    const refusedAction = (data: { error: string, diverged: boolean }) => data.diverged ? action : undefined
+    const reject = (error: Error) => async () => Promise.reject(error)
+    const refused = (data: { error: string, diverged: boolean }) => data.error
+
+    await attempt(reject(new ActionError(400, '', {}, { error: 'Diverged', diverged: true })), { failure: 'Could not pull', refused, refusedAction })
+    await attempt(reject(new ActionError(400, '', {}, { error: 'Locked', diverged: false })), { failure: 'Could not pull', refused, refusedAction })
+    await attempt(reject(new Error('offline')), { failure: 'Could not pull', refused, refusedAction })
+
+    expect(toasts().map(item => [item.message, item.action])).toEqual([['Diverged', action], ['Locked', undefined], ['Could not pull', undefined]])
+  })
+
+  test('is dropped, with the throw logged, when `refusedAction` throws', async () => {
+    const error = jest.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    await attempt(async () => Promise.reject(new ActionError(400, '', {}, { error: 'No' })), { failure: 'Could not pull', refused: (data: { error: string }) => data.error, refusedAction: () => {
+      throw new Error('bug')
+    } })
+
+    expect(toasts().map(item => [item.message, item.action])).toEqual([['No', undefined]])
+    expect(error).toHaveBeenCalledTimes(1)
+    error.mockRestore()
+  })
+})
+
 describe('a toast\'s time', () => {
   beforeEach(() => {
     jest.useFakeTimers()

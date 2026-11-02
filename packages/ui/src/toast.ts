@@ -8,9 +8,16 @@ export type ToastTone = 'danger' | 'success' | 'info'
 /** @deprecated The old name of a toast's tone, `error` for `danger`: read `Toast.tone`. Removed in 2.0.0. */
 export type ToastType = 'error' | 'success' | 'info'
 
+// A button in a toast for the obvious next step of its message: busy while `run`'s promise is pending, the toast dismissed once it settles, a rejection logged.
+export interface ToastAction {
+  label: string
+  run: () => unknown
+}
+
 export interface Toast {
   id: number
   message: string
+  action?: ToastAction | undefined
   // A toast pushed by hand with only a `type` takes its tone from it.
   tone?: ToastTone | undefined
   /** @deprecated Read `tone`, where `error` is `danger`. Removed in 2.0.0, when a toast is `{ id, message, tone }`. */
@@ -20,6 +27,8 @@ export interface Toast {
 export interface ToastOptions {
   // How long it stays, such as `'3s'`: 6 seconds by default, an error until the reader dismisses it, as it asks them to act. `false` keeps any toast until the reader dismisses it, or `dismissToast(id)` does.
   duration?: Duration | false | undefined
+  // One button before the close button, such as Retry or Undo. An error already open with the same words is shown once, whatever action the second asks.
+  action?: ToastAction | undefined
 }
 
 // Long enough to read a sentence; an error has no clock, as a reader who needs longer than any limit must not lose it.
@@ -91,7 +100,7 @@ function askedMs(duration: Duration | false | undefined): number | undefined {
 }
 
 // Untracked: an effect toasting a settled task would otherwise read the list, and toast again on every toast it adds.
-function push(message: string, type: ToastType, duration: Duration | false | undefined): number {
+function push(message: string, type: ToastType, { duration, action }: ToastOptions): number {
   // An error already open with the same words is not stacked again, so a failing poll cannot cover the page.
   const open = type === 'error' ? untrack(toasts).find(shown => shown.type === 'error' && shown.message === message) : undefined
 
@@ -103,7 +112,7 @@ function push(message: string, type: ToastType, duration: Duration | false | und
   const wanted = asked === undefined || Number.isNaN(asked) || asked < 0 ? undefined : asked
   const timer: Timer = { remaining: wanted ?? (type === 'error' ? Number.POSITIVE_INFINITY : DURATION_MS), started: Date.now() }
 
-  untrack(() => toasts.set(list => [...list, { id, message, tone: type === 'error' ? 'danger' : type, type }]))
+  untrack(() => toasts.set(list => [...list, { id, message, action, tone: type === 'error' ? 'danger' : type, type }]))
   timers.set(id, timer)
 
   if (holds.size === 0)
@@ -114,9 +123,9 @@ function push(message: string, type: ToastType, duration: Duration | false | und
 
 // Each shows a message and answers its id, for `dismissToast` to close a sticky one.
 export const toast = {
-  error: (message: string, options: ToastOptions = {}) => push(message, 'error', options.duration),
-  success: (message: string, options: ToastOptions = {}) => push(message, 'success', options.duration),
-  info: (message: string, options: ToastOptions = {}) => push(message, 'info', options.duration),
+  error: (message: string, options: ToastOptions = {}) => push(message, 'error', options),
+  success: (message: string, options: ToastOptions = {}) => push(message, 'success', options),
+  info: (message: string, options: ToastOptions = {}) => push(message, 'info', options),
 }
 
 export interface AttemptOptions<Data = unknown> {
@@ -124,6 +133,8 @@ export interface AttemptOptions<Data = unknown> {
   // Toasted once the call goes through.
   success?: string | undefined
   refused?: ((data: Data) => string | undefined) | undefined
+  // The button of a refusal's toast, read from the same data as `refused`: `data => data.diverged ? { label: 'Rebase', run: rebase } : undefined`. Only a refusal gets it, not `failure`.
+  refusedAction?: ((data: Data) => ToastAction | undefined) | undefined
   // Handed what a refusal carries, an action's `ctx.fail` data or a route's JSON answer, instead of toasting anything, for a page that shows the refusal where it is. A failure that is no refusal still toasts `failure`.
   onRefused?: ((data: Data) => unknown) | undefined
 }
@@ -147,10 +158,13 @@ export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure:
   }
   catch (error) {
     const { onRefused } = options
-    const data = onRefused === undefined ? undefined : refusalData<Data>(error)
+    const { refusedAction } = options
+    const data = onRefused === undefined && refusedAction === undefined ? undefined : refusalData<Data>(error)
 
     if (onRefused === undefined || data === undefined) {
-      toast.error(refusalOf(error, options.refused) ?? options.failure)
+      const message = refusalOf(error, options.refused)
+
+      toast.error(message ?? options.failure, message !== undefined && data !== undefined && refusedAction !== undefined ? { action: readAction(refusedAction, data.value) } : {})
     }
     else {
       // The app shows the refusal itself, so a handler that throws or rejects leaves `failure` and the console.
@@ -162,6 +176,18 @@ export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure:
         toast.error(options.failure)
       }
     }
+
+    return undefined
+  }
+}
+
+// A `refusedAction` that throws offers no button, and goes to the console as a bug in the app's own code.
+function readAction<Data>(refusedAction: (data: Data) => ToastAction | undefined, data: Data): ToastAction | undefined {
+  try {
+    return refusedAction(data)
+  }
+  catch (error) {
+    console.error('kayjs-ui: the `refusedAction` of a toast threw', error)
 
     return undefined
   }
