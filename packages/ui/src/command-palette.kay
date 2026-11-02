@@ -59,7 +59,7 @@ const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentC
   resultsLabel?: ((count: number) => string) | undefined
   // How many more times a section found holds the words searched for, past the line shown.
   siteSearchMore?: ((count: number) => string) | undefined
-  // Rows for a query the app looks up itself, such as a server's: called once typing pauses, with the query as typed, and its rows are listed under `searchLabel` after the entries and the site's sections. An answer for an older query is dropped; a rejection shows `searchError`. An action works as is.
+  // Rows for a query the app looks up itself, such as a server's: called once typing pauses, with the query trimmed, and its rows are listed under `searchLabel` after the entries and the site's sections. An answer for an older query is dropped; a rejection shows `searchError`. An action works as is.
   search?: ((query: string) => PromiseLike<PaletteEntry[]>) | undefined
   searchLabel?: string | undefined
   searchError?: string | undefined

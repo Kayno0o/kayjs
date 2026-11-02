@@ -419,6 +419,10 @@ describe('CommandPalette with search', () => {
   })
 
   test('says the search failed, still listing the entries', async () => {
+    const realError = console.error
+
+    console.error = () => {}
+
     const { root, input, labels } = await palette({
       search: async () => {
         throw new Error('down')
@@ -432,6 +436,7 @@ describe('CommandPalette with search', () => {
 
     expect(labels()).toEqual(['Table'])
     expect(root.querySelector('[data-part=empty]')?.textContent).toBe('The search failed')
+    console.error = realError
   })
 
   test('runs a found action on Enter and closes', async () => {
