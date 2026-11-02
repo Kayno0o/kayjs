@@ -50,13 +50,14 @@ const WEB = /^https?:\/\//
 const custom = source !== undefined
 const inbox = custom ? undefined : resource(inboxApi, '/')
 // A function source is asked once the Bell is in the page, again when a signal it reads changes and after a read.
-const asked = typeof source === 'function' ? resource(async () => await source()) : undefined
+const load = typeof source === 'function' ? source : undefined
+const asked = load ? resource(async () => await load()) : undefined
 
 const items = (): readonly BellItem[] => {
   if (!custom)
     return inbox?.value()?.items ?? []
 
-  return typeof source === 'function' ? asked?.value() ?? [] : source
+  return typeof source === 'function' ? asked?.value() ?? [] : source ?? []
 }
 // A function source still on its first answer has nothing to say yet, so the list does not claim to be empty.
 const waiting = () => asked !== undefined && asked.value() === undefined && asked.error() === undefined
