@@ -1,0 +1,16 @@
+--- server
+import { s } from 'kay'
+
+export const contact = action(s.Object({
+  name: s.String({ minLength: 2 }),
+  email: s.String({ format: 'email' }),
+  message: s.String({ minLength: 5 }),
+}), async () => undefined, { protect: { honeypot: 'website', minTime: '3s' } })
+---
+---
+import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
+
+let sent = 0
+---
+main
+  ContactForm(action={contact} onSent={() => { sent++ }})

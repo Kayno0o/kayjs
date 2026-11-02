@@ -3,6 +3,7 @@ import { honeypotField, minTimeOf } from './action-protection'
 import { isAction } from './action-shared'
 import { escapeAttribute } from './escape'
 import { holdInvalid } from './invalid'
+import { KEPT_END, KEPT_START } from './markers'
 import { untrack } from './reactive'
 
 const SPACES = /\s+/
@@ -93,7 +94,14 @@ export const STAMP_FIELD = 'kay_since'
 let stamper: ((action: string, sent: string | undefined, maxAge: number) => string) | undefined
 
 // What a form posting to `target` renders besides its own fields: the honeypot, out of sight and out of reach of the keyboard, screen readers and password managers, whose autofill would otherwise refuse a person, and the stamp `minTime` reads.
-export function formProtection(target: unknown): string {
+// `kept` is an island's: its markup sits between comments the browser finds, as the template that claims the form's content has no node for it.
+export function formProtection(target: unknown, kept = false): string {
+  const markup = protectionMarkup(target)
+
+  return kept && markup !== '' ? `<!--${KEPT_START}-->${markup}<!--${KEPT_END}-->` : markup
+}
+
+function protectionMarkup(target: unknown): string {
   if (!isAction(target))
     return ''
 

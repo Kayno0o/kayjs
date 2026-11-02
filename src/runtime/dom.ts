@@ -4,7 +4,7 @@
 import type { Owner } from './reactive'
 import { rebasedAttribute } from './base'
 import { frenchText, frenchTree } from './french'
-import { ISLAND, PART_END, PART_START } from './markers'
+import { ISLAND, KEPT_END, KEPT_START, PART_END, PART_START } from './markers'
 import { place } from './move'
 import { browserKeepsSameTab, leavesSite } from './outside'
 import { activeOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
@@ -57,6 +57,8 @@ interface DelegatingDocument extends Document {
 }
 
 let claim: Claim | undefined
+// The server-only markup of the forms being claimed, taken out of their content so the template's nodes claim in order, and put back once the island hydrated.
+let setAside: (() => void)[] = []
 
 // Whether an island is hydrating, claiming the server's nodes rather than building them.
 export function claiming(): boolean {
@@ -99,14 +101,20 @@ type ElementRecord = Element & Record<string, unknown>
 // Runs `render` claiming the nodes already inside `container`, the server's markup of an island.
 export function hydrate<T>(render: () => T, container: Node): T {
   const previous = claim
+  const outer = setAside
 
   claim = { parent: container, next: container.firstChild }
+  setAside = []
   hydrationStarted()
 
   try {
     return untrack(render)
   }
   finally {
+    for (const putBack of setAside)
+      putBack()
+
+    setAside = outer
     claim = previous
     hydrationEnded()
   }
@@ -162,6 +170,31 @@ function claimText(data: string): Text {
   return text
 }
 
+// Takes a form's leading server-only markup, its honeypot, out of the form until the island hydrated: the template knows nothing of it.
+function setAsideKept(form: Node): void {
+  const first = form.firstChild
+
+  if (first?.nodeType !== 8 || (first as Comment).data !== KEPT_START)
+    return
+
+  const kept = document.createDocumentFragment()
+  let node: ChildNode | null = first
+
+  while (node) {
+    const next: ChildNode | null = node.nextSibling
+    const last = node.nodeType === 8 && (node as Comment).data === KEPT_END
+
+    kept.appendChild(node)
+
+    if (last)
+      break
+
+    node = next
+  }
+
+  setAside.push(() => form.insertBefore(kept, form.firstChild))
+}
+
 // The `]` closing the `[` given, past any dynamic part nested between them: the server leaves a part's content between its markers.
 export function close(start: Node): Node {
   let depth = 0
@@ -194,6 +227,9 @@ export function template(html: string): () => Element {
 
       if (claimed.nodeName.toUpperCase() !== tag)
         throw new HydrationMismatchError(`expected <${tag.toLowerCase()}> where the server markup holds ${claimed.nodeName.toLowerCase()}`)
+
+      if (tag === 'FORM')
+        setAsideKept(claimed)
 
       return claimed as Element
     }

@@ -38,6 +38,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay lint --cache` drops ESLint's cache when `tsconfig.json` or a file under `.kay/types` changed, so a parsing error does not outlive the tsconfig that caused it: [checks](checks.md).
 - `infiniteList` starts over when what it follows changes, as the props a `persist` island gets from the next page: the props an action source's function `input` reads, or first rows given as a function (`infiniteList(() => rows, ...)`): [kayjs-ui infinite lists](../packages/ui/llms/infinite-list.md).
 - kayjs-ui's `SplitLayout` keeps the list's width under `listWidthKey` in a cookie the server reads, not in `localStorage`, so the saved width is drawn from the first paint; a width kept in `localStorage` moves to the cookie once: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
+- kayjs-ui's `SidePanel` takes `scrollKey`, whose change brings its body back to the top, so a panel kept in a `persist` island needs no ref into its parts: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
+- A form posting to an action keeps its honeypot and time stamp inside an island, so kayjs-ui's ContactForm and SubscribeForm given `onSent` or `onError` no longer drop them from the server HTML.
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
 

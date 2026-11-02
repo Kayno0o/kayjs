@@ -10,3 +10,6 @@ export const ISLAND = 'slot[data-component]'
 // The island the server rendered with a title of its own set in its `head`, which the browser leaves the page's title to the last of.
 export const TITLED_ATTRIBUTE = 'data-titled'
 export const TITLED = `slot[${TITLED_ATTRIBUTE}]`
+// The comments around the markup a form posting to an action carries for the server alone, as its honeypot: the browser sets it aside while it claims the form's content and puts it back.
+export const KEPT_START = 'kay-kept'
+export const KEPT_END = '/kay-kept'

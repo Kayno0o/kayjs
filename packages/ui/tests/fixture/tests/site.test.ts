@@ -933,6 +933,13 @@ describe('FormDialog', () => {
 })
 
 describe('ContactForm', () => {
+  test('keeps the honeypot and the time stamp when given a callback, which renders it inside an island', async () => {
+    const { html } = await site.visit('/contact-island')
+
+    expect(html).toContain('name="website"')
+    expect(html).toContain('name="kay_since"')
+  })
+
   test('posts to the action with its fields, the honeypot and the extra field between the email and the message', async () => {
     const { html } = await site.visit('/contact')
 
@@ -1017,6 +1024,13 @@ describe('ContactForm', () => {
 })
 
 describe('SubscribeForm', () => {
+  test('keeps the honeypot and the time stamp when given a callback, which renders it inside an island', async () => {
+    const { html } = await site.visit('/subscribe-island')
+
+    expect(html).toContain('name="website"')
+    expect(html).toContain('name="kay_since"')
+  })
+
   test('draws a required email field, the notice with the privacy link and the wording id the proof keeps', async () => {
     const { html } = await site.visit('/subscribe')
 

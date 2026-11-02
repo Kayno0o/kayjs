@@ -904,14 +904,14 @@ export class HtmlTemplate extends TemplateWriter {
     return element.name === 'a' && !this.named(element, 'hreflang')
   }
 
-  // A form posting to an action renders the action's honeypot field first; an island leaves it to the template, its markup claimed node by node as it hydrates.
+  // A form posting to an action renders the action's honeypot field first; an island's sits between comments, as the browser sets it aside while it claims the form's content and puts it back.
   private honeypot(element: ElementNode, emit: () => void): void {
-    if (actionOf(element, this.src) && !this.options.hydratable)
+    if (actionOf(element, this.src))
       emit()
   }
 
   private honeypotField(element: ElementNode): void {
-    this.b.add('KayFormProtection((').addSource(actionOf(element, this.src)!.expression).add('))')
+    this.b.add('KayFormProtection((').addSource(actionOf(element, this.src)!.expression).add(this.options.hydratable ? '), true)' : '))')
   }
 
   // An element with a spread renders through `element`, which reads every attribute the spread brings at render time.

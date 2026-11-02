@@ -1771,3 +1771,22 @@ inBrowser('TreeView link rows in the browser', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 })
+
+inBrowser('forms with a callback in the browser', () => {
+  test('ContactForm and SubscribeForm keep their honeypot and time stamp once their island hydrated, in the same place', async () => {
+    const site = await shared()
+
+    for (const [path, honeypot] of [['/contact-island', 'website'], ['/subscribe-island', 'website']] as const) {
+      await using page = await site.open(path)
+
+      const names = () => page.evaluate(() => [...document.querySelectorAll('form input')].map(input => (input as HTMLInputElement).name))
+
+      expect(await names()).toContain(honeypot)
+      expect(await names()).toContain('kay_since')
+      expect((await names())[0]).toBe(honeypot)
+      expect(await page.evaluate(() => document.querySelectorAll('form').length)).toBe(1)
+      expect(await page.evaluate(() => [...document.querySelector('form')!.childNodes].some(node => node.nodeType === 8 && (node as Comment).data.includes('kay-kept')))).toBe(true)
+      expect(page.errors).toEqual([])
+    }
+  }, 120_000)
+})
