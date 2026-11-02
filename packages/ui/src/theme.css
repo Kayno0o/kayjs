@@ -881,7 +881,7 @@
   }
 
   .kui-markdown-toggle {
-    @apply ml-auto;
+    @apply order-1 ml-auto;
 
     &[aria-pressed='true'] {
       @apply bg-surface-strong text-foreground;

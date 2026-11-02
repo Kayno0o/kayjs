@@ -14,6 +14,17 @@ A toolbar over the field offers bold, italic, a heading, bulleted and numbered l
 
 A list keeps only the buttons it names, in its order: `toolbar={['bold', 'italic', 'link']}`. The other names are `heading`, `bulletList`, `numberedList` and `image`. The image button opens the file picker when `onImage` is given, and otherwise writes `![](url)` to fill in.
 
+Your own buttons go in the `toolbarExtra(tools)` block, after the built-in ones; they show with `toolbar={false}` too. `tools.wrap(open, closing)` puts text around the selection (and takes it off again when it already surrounds it), `tools.edit({ text, start, end })` replaces a range, the selection by default, and `tools.selection()` reads it. Both go through the same path as the built-in buttons, so Ctrl+Z undoes them. Each of your buttons is a Tab stop of its own.
+
+```kay
+---
+import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+---
+MarkdownEditor(value="Note" toolbar={['bold', 'link']})
+  @toolbarExtra(tools)
+    button(type="button" onClick={() => tools.wrap('> [!NOTE]\n> ', '')}) Callout
+```
+
 ## Preview
 
 `preview` is a function that takes the text and resolves with its HTML. Given, a Preview button shows the result beside the field, or in place of it when the editor is narrow.
@@ -37,11 +48,15 @@ In the page, `preview={async markdown => call(preview, '/', { method: 'post', bo
 
 The editor puts the HTML through `sanitizeHtml` (images and tables kept), so a script or a `javascript:` link in the text never runs. Set `previewTrusted` to insert the HTML as it comes, for a renderer that has sanitized it already. The preview waits for a short pause in typing, and if the call throws, the pane says it could not be shown. kayjs-cms does all of this for you.
 
+`previewing` shows or hides the preview from the page, and `onPreviewChange(previewing)` hears each toggle, so a page driving `previewing` can set it back.
+
 ## Image uploads
 
 With `onImage(file)`, a pasted or dropped image is embedded behind a placeholder at once and swapped for its url once the function resolves. If it throws, the placeholder is removed and `uploadFailure` is toasted. `name` submits the text in a plain form.
 
 <Demo name="markdown-editor/upload" />
+
+`onImageError(file, error)` is called when an upload fails, besides the toast, with what `onImage` threw (`undefined` for a refusal of the whole call), once the placeholder is gone.
 
 ## Start text
 

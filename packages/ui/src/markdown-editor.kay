@@ -1,6 +1,6 @@
 ---
-import type { JSX } from 'kay'
-import type { TextEdit, ToolbarAction } from './markdown-edit'
+import type { JSX, Snippet } from 'kay'
+import type { TextEdit, ToolbarAction, ToolbarTools } from './markdown-edit'
 import { entriesFromDataTransfer } from '@kaynooo/utils/browser/clipboard'
 import { effect, onMount, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
@@ -21,9 +21,10 @@ const EDITS: Record<ToolbarAction, (text: string, start: number, end: number) =>
   image: imageEdit,
 }
 
-const look = recipe({ parts: { wrap: 'kui-markdown', grid: 'kui-markdown-grid', root: 'kui-markdown-editor', bar: 'kui-markdown-bar', barFailed: 'kui-markdown-bar-failed' } })
+const look = recipe({ parts: { wrap: 'kui-markdown', grid: 'kui-markdown-grid', root: 'kui-markdown-editor', bar: 'kui-markdown-bar', barFailed: 'kui-markdown-bar-failed', extra: 'kui-markdown-extra flex flex-wrap items-center gap-0.5' } })
 
-const { value = '', onInput, onImage, toolbar = true, preview, previewTrusted = false, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
+
+const { value = '', onInput, onImage, onImageError, toolbar = true, toolbarExtra, preview, previewing, onPreviewChange, previewTrusted = false, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
   // The text to start with; an editor whose parent passes other text follows it.
   value?: string | undefined
   // The text after every change, typed or applied by a shortcut, a paste or an upload.
@@ -32,13 +33,20 @@ const { value = '', onInput, onImage, toolbar = true, preview, previewTrusted = 
   onImage?: ((file: File) => Promise<string>) | undefined
   // Toasted when an upload throws.
   uploadFailure?: string | undefined
+  // Called with the file and what `onImage` threw or the refusal of the call (`undefined` when the call was refused without an error), besides the toast, once its placeholder is gone.
+  onImageError?: ((file: File, error: unknown) => unknown) | undefined
   // The buttons over the field, in order: `false` for none, else any of `bold`, `italic`, `heading`, `bulletList`, `numberedList`, `link` and `image`, all of them by default.
   // `image` opens the file picker when `onImage` is given, else writes an image to fill in.
   toolbar?: boolean | readonly ToolbarAction[] | undefined
+  // Your own buttons after the built-in ones: `tools` changes the field as the built-in buttons do, undone with Ctrl+Z. Each is a Tab stop of its own, and shows with `toolbar={false}` too.
+  toolbarExtra?: Snippet<[tools: ToolbarTools]> | undefined
   // Renders the text as the page shows it, as HTML, on the server: given, a Preview button shows it beside the field, or in place of it on a narrow one. The HTML goes through `sanitizeHtml`, keeping images and tables, unless `previewTrusted` is set.
   preview?: ((markdown: string) => Promise<string>) | undefined
   // Inserts the preview's HTML as it comes, for an app whose renderer already sanitizes the text it renders.
   previewTrusted?: boolean | undefined
+  // Whether the preview shows, when the parent sets it; the Preview button toggles it on its own, and `onPreviewChange` reports each change so a parent driving `previewing` can set it back.
+  previewing?: boolean | undefined
+  onPreviewChange?: ((previewing: boolean) => unknown) | undefined
   // Classes for the HTML of the preview, so it takes the styles the page gives rendered Markdown, such as a prose class.
   previewClass?: string | undefined
   // Tells screen readers how to leave the field, since Tab on a list item indents it.
@@ -83,10 +91,15 @@ function actions(): readonly ToolbarAction[] {
   return chosen
 }
 const text = signal(untrack(() => value))
-const previewing = signal(false)
+const previewShown = signal(untrack(() => previewing ?? false))
 
 effect(() => {
   text = value
+})
+
+effect(() => {
+  if (previewing !== undefined)
+    previewShown = previewing
 })
 
 // The toolbar and the preview pane are separate chunks, fetched once the editor shows buttons or the preview is first asked for: an editor with neither never loads their icons and code.
@@ -113,7 +126,7 @@ effect(() => {
 })
 
 effect(() => {
-  if (previewing() && untrack(previewView).length === 0)
+  if (previewShown() && untrack(previewView).length === 0)
     void loadView(async () => import('./internal/markdown-preview.kay'), view => previewView = [view])
 })
 
@@ -149,7 +162,36 @@ function applyEdit(el: HTMLTextAreaElement, edit: TextEdit, takeFocus = true): v
 }
 
 function togglePreview(): void {
-  previewing.set(on => !on)
+  const next = !previewShown()
+
+  previewShown = next
+  onPreviewChange?.(next)
+}
+
+// What `toolbarExtra` gets: the field's selection and an edit through the same path as the built-in buttons.
+const tools: ToolbarTools = {
+  selection: () => ({ start: area?.selectionStart ?? 0, end: area?.selectionEnd ?? 0, text: area?.value.slice(area.selectionStart, area.selectionEnd) ?? '' }),
+  edit({ text, start, end, selectionStart, selectionEnd }) {
+    if (!area)
+      return
+
+    const from = start ?? area.selectionStart
+    const to = end ?? area.selectionEnd
+    const after = from + text.length
+
+    applyEdit(area, { start: from, end: to, text, selectionStart: selectionStart ?? after, selectionEnd: selectionEnd ?? after })
+  },
+  wrap(open, closing = open) {
+    if (!area)
+      return
+
+    const { selectionStart: start, selectionEnd: end, value: whole } = area
+    const surrounded = whole.slice(start - open.length, start) === open && whole.slice(end, end + closing.length) === closing
+
+    tools.edit(surrounded
+      ? { start: start - open.length, end: end + closing.length, text: whole.slice(start, end), selectionStart: start - open.length, selectionEnd: end - open.length }
+      : { text: `${open}${whole.slice(start, end)}${closing}`, selectionStart: start + open.length, selectionEnd: end + open.length })
+  },
 }
 
 function pickImage(): void {
@@ -254,20 +296,44 @@ async function upload(files: File[]): Promise<void> {
     applyEdit(el, { start: selectionStart, end: selectionEnd, text, selectionStart: selectionStart + text.length, selectionEnd: selectionStart + text.length })
     uploading.set(count => count + 1)
 
+    let failure: unknown
+
     try {
-      const url = await attempt(async () => send(file), uploadFailure)
+      const url = await attempt(async () => {
+        try {
+          return await send(file)
+        }
+        catch (error) {
+          failure = error
+
+          throw error
+        }
+      }, uploadFailure)
 
       // A failed upload takes the line break the placeholder came with, unless typing has parted them.
       // `attempt` answers `true` for a send that gave nothing back, which is no address to link to.
-      if (typeof url !== 'string')
+      if (typeof url !== 'string') {
         swap(text, '') || swap(placeholder, '')
-      else
+        await failed(file, failure)
+      }
+      else {
         swap(placeholder, `![](${escaped(url)})`)
+      }
     }
     finally {
       uploading.set(count => count - 1)
     }
   }))
+}
+
+// A callback of the app's that throws is a bug of the app's, not an upload that failed twice.
+async function failed(file: File, error: unknown): Promise<void> {
+  try {
+    await onImageError?.(file, error)
+  }
+  catch (thrown) {
+    console.error('kayjs-ui: the `onImageError` of a MarkdownEditor threw', thrown)
+  }
 }
 
 function paste(event: ClipboardEvent) {
@@ -328,14 +394,17 @@ const previewParts = () => previewClass === undefined ? undefined : { body: prev
 // A markdown field that writes like an editor, under a toolbar and beside a preview if asked: Ctrl+B, Ctrl+I and Ctrl+K wrap the selection, Enter continues a list and Tab indents one, Escape then Tab leaving the field, a pasted page turns into markdown, and pasted or dropped images upload behind a placeholder.
 // The textarea comes first in the document, so the label a form field puts around the editor names it and not the first button; the bar is placed above it by the grid.
 div(part="wrap")
-  div(part="grid" data-preview={previewing() ? '' : undefined})
+  div(part="grid" data-preview={previewShown() ? '' : undefined})
     textarea.kui-field-input(part="root" {...rest} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} onInput={event => { heard(event.currentTarget.value); text = event.currentTarget.value; onInput?.(event.currentTarget.value) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
-    if actions().length > 0 || preview
+    if actions().length > 0 || preview || toolbarExtra
       div(part="bar" role="toolbar" aria-label={wording('ui.markdownEditor.toolbar', 'Formatting')})
         if toolbarFailed()
           span(part="barFailed" role="alert") {wording('ui.markdownEditor.toolbarFailure', 'The toolbar could not be loaded')}
         for View of toolbarView() key={View}
-          View(actions={actions()} hasPreview={preview !== undefined} previewing={previewing()} onAction={action => action === 'image' ? pickImage() : runAction(action)} onPreview={togglePreview})
-    if previewing() && preview
+          View(actions={actions()} hasPreview={preview !== undefined} previewing={previewShown()} onAction={action => action === 'image' ? pickImage() : runAction(action)} onPreview={togglePreview})
+        if toolbarExtra
+          div(part="extra")
+            | {toolbarExtra(tools)}
+    if previewShown() && preview
       for View of previewView() key={View}
         View(text={text()} render={preview} trusted={previewTrusted} class={previewParts()})

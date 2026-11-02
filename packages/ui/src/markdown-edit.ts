@@ -7,6 +7,16 @@ export interface TextEdit {
   selectionEnd: number
 }
 
+// What an app's own toolbar button changes in the field, through the same undoable path as the built-in buttons.
+export interface ToolbarTools {
+  // The selected text and where it sits in the field.
+  selection: () => { start: number, end: number, text: string }
+  // Replaces `start` to `end` (the selection by default) with `text`, and selects `selectionStart` to `selectionEnd` (after the text by default).
+  edit: (change: { text: string, start?: number | undefined, end?: number | undefined, selectionStart?: number | undefined, selectionEnd?: number | undefined }) => void
+  // Puts `open` before the selection and `closing` (`open` by default) after it, and takes them off again when they already surround it.
+  wrap: (open: string, closing?: string) => void
+}
+
 // The buttons a MarkdownEditor's toolbar can offer, in the order it offers them by default.
 export const TOOLBAR_ACTIONS = ['bold', 'italic', 'heading', 'bulletList', 'numberedList', 'link', 'image'] as const
 export type ToolbarAction = typeof TOOLBAR_ACTIONS[number]

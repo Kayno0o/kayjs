@@ -16,7 +16,7 @@ export type { ActionSource, InfiniteList, InfiniteListOptions, InfinitePage, Lis
 export { infiniteList } from './infinite-list'
 export type { MapMarker, MapPoint } from './map-view'
 export { TOOLBAR_ACTIONS } from './markdown-edit'
-export type { ToolbarAction } from './markdown-edit'
+export type { ToolbarAction, ToolbarTools } from './markdown-edit'
 export type { MediaItem } from './media'
 export type { MenuAction, MenuEntry, MenuTriggerProps } from './menu'
 export type { MultiSelectOption } from './multi-select'

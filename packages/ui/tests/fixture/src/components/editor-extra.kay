@@ -1,0 +1,12 @@
+---
+import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+
+// An editor with an app button wrapping the selection in a callout, a failure and a preview callback.
+const { onInput, onImage, onImageError, onPreviewChange, previewing } = props<{ onInput: (value: string) => void, onImage?: (file: File) => Promise<string>, onImageError?: (file: File, error: unknown) => void, onPreviewChange?: (previewing: boolean) => void, previewing?: boolean }>()
+---
+MarkdownEditor#editor(value="note" onInput={onInput} onImage={onImage} onImageError={onImageError} toolbar={false} preview={async markdown => markdown} previewing={previewing} onPreviewChange={onPreviewChange})
+  @toolbarExtra(tools)
+    button#callout(type="button" onClick={() => tools.wrap('> [!NOTE]\n> ', '')}) Callout
+    button#emoji(type="button" onClick={() => tools.edit({ text: ':)' })}) Emoji
+Toaster
