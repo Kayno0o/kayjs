@@ -227,8 +227,8 @@ const opened = signal(expanded ?? noneOpen)
 effect(() => opened = expanded ?? noneOpen)
 
 const openSet = memo(() => new Set(opened()))
-const detailId = (row: Row) => `${tableId}-detail-${rowKeyOf(row, rowKey)}`
-const span = () => given.length + (selectable ? 1 : 0) + (expandable ? 1 : 0)
+const detailId = (row: Row) => `${tableId}-detail-${String(rowKeyOf(row, rowKey)).replace(/\s/g, '_')}`
+const columnCount = () => given.length + (selectable ? 1 : 0) + (expandable ? 1 : 0)
 const countChosen = selectedLabel ?? ((count: number) => wording('ui.table.selected', '{count} selected', { count }))
 
 // A row that left `rows` leaves the selection for good, so it is not picked again if it comes back.
@@ -363,7 +363,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
     tbody(part="body" ref={element => body = element})
       if windowed && windowed.before() > 0
         tr(part="spacer" aria-hidden="true" style={`height: ${windowed.before()}px`})
-          td(colspan={span()} style="padding: 0; border: 0")
+          td(colspan={columnCount()} style="padding: 0; border: 0")
       for row, position of drawn() key={rowKeyOf(row, rowKey)}
         tr(part="row" data-virtual-index={windowed ? windowed.start() + position : undefined} aria-rowindex={windowed ? windowed.start() + position + 2 : undefined} aria-selected={selectable ? (chosenSet().has(rowKeyOf(row, rowKey)) ? 'true' : 'false') : undefined})
           if expandable
@@ -384,19 +384,19 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                   | {cellText(row, column)}
         if expandable && detail && openSet().has(rowKeyOf(row, rowKey))
           tr(part="detailRow" id={detailId(row)})
-            td(part="detailCell" colspan={span()})
+            td(part="detailCell" colspan={columnCount()})
               | {detail(row)}
       else
         if (list ? filtering() : rows().length > 0) && noMatch
           tr
-            td(part="emptyCell" colspan={span()})
+            td(part="emptyCell" colspan={columnCount()})
               | {noMatch}
         else if empty
           tr
-            td(part="emptyCell" colspan={span()})
+            td(part="emptyCell" colspan={columnCount()})
               | {empty}
       if windowed && windowed.after() > 0
         tr(part="spacer" aria-hidden="true" style={`height: ${windowed.after()}px`})
-          td(colspan={span()} style="padding: 0; border: 0")
+          td(colspan={columnCount()} style="padding: 0; border: 0")
   if list
     LoadMore(list={list})
