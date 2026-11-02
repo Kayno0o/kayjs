@@ -112,3 +112,39 @@ it('starts a suite server that ignores SIGTERM and goes with stopSuiteServer', a
   await stopSuiteServer(server)
   await expect(fetch(`http://localhost:${port}/`)).rejects.toThrow()
 })
+
+it('ends a suite server when the run that started it is killed', async () => {
+  const parentScript = `
+import { listeningPort, spawnSuiteServer } from ${JSON.stringify(join(import.meta.dir, 'listening'))}
+
+const server = spawnSuiteServer([process.execPath, '-e', ${JSON.stringify(LOGGING)}])
+
+console.log(await listeningPort(server))
+setInterval(() => {}, 1000)
+`
+  const file = join(await scratchDir('suite-server-'), 'parent.ts')
+
+  await Bun.write(file, parentScript)
+
+  const parent = Bun.spawn([process.execPath, file], { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' })
+  const { value } = await parent.stdout.getReader().read()
+  const port = new TextDecoder().decode(value).trim()
+
+  expect(await (await fetch(`http://localhost:${port}/`)).text()).toBe('ok')
+  parent.kill('SIGKILL')
+  await parent.exited
+
+  let gone = false
+
+  for (let attempt = 0; attempt < 50 && !gone; attempt++) {
+    try {
+      await fetch(`http://localhost:${port}/`, { signal: AbortSignal.timeout(1000) })
+      await Bun.sleep(200)
+    }
+    catch {
+      gone = true
+    }
+  }
+
+  expect(gone).toBe(true)
+}, 30_000)
