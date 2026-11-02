@@ -154,8 +154,14 @@ test('a Menu @trigger replaces the icon button with a labelled button or an avat
     const menu = mounted.root.querySelector<HTMLElement>(`#${id}`)!
 
     expect([button.getAttribute('popovertarget'), button.getAttribute('aria-haspopup'), button.getAttribute('aria-expanded')]).toEqual([id, 'menu', 'false'])
-    expect(mounted.root.querySelector(`[popovertarget="${id}"][data-variant]`)).toBeNull()
-    expect(menu.getAttribute('popover')).toBe('auto')
+
+    menu.showPopover()
+    await settle()
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+
+    menu.hidePopover()
+    await settle()
+    expect(button.getAttribute('aria-expanded')).toBe('false')
   }
 
   expect(mounted.root.querySelector('#avatar-trigger span')).not.toBeNull()

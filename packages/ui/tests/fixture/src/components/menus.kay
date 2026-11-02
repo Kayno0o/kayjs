@@ -2,6 +2,7 @@
 // kay-island
 import type { MenuEntry } from '@kaynooo/kayjs-ui'
 import { signal } from 'kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Menu from '@kaynooo/kayjs-ui/menu.kay'
 
@@ -26,7 +27,7 @@ Menu(id="links" items={[{ label: 'Same', href: '/here', onSelect: () => picked =
 p#picked {picked()}
 Menu(id="labelled" items={items} label="Actions")
   @trigger(attributes)
-    button#labelled-trigger.kui-btn({...attributes}) Actions
+    Button#labelled-trigger({...attributes} label="Actions")
 Menu(id="avatar" items={items} label="Account")
   @trigger(attributes)
     button#avatar-trigger({...attributes})

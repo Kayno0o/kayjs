@@ -60,3 +60,19 @@ test('an inline ask armed by the app draws the pair with no trigger, and Escape 
 
   expect(pair(root)).toBeNull()
 })
+
+test('an inline ask armed by the app hands the focus back to the element that held it', async () => {
+  const root = await controlled()
+  const asker = root.querySelector<HTMLElement>('#ask-inline')!
+
+  asker.focus()
+  click(asker)
+  await settle()
+
+  expect(document.activeElement).not.toBe(asker)
+
+  pair(root)!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  await settle()
+
+  expect(document.activeElement).toBe(asker)
+})

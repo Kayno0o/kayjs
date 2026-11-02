@@ -71,7 +71,9 @@ let armed: HTMLElement | undefined
 // Opened from elsewhere than the trigger, the focus goes back to what held it before.
 effect(() => {
   if (isOpen() && typeof document !== 'undefined')
-    opener ??= document.activeElement instanceof HTMLElement ? document.activeElement : undefined
+    opener ??= ask === 'inline' && document.activeElement instanceof HTMLElement ? document.activeElement : undefined
+  else if (!isOpen())
+    opener = undefined
 })
 
 function setOpen(next: boolean) {

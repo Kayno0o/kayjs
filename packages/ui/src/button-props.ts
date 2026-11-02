@@ -55,7 +55,8 @@ export function buttonOf(attributes: TagAttributes) {
     return undefined
 
   const { type = 'button', expanded, pressed, disabled, ...others } = attributes
-  const aria = { 'aria-expanded': expanded === undefined ? undefined : String(expanded), 'aria-pressed': pressed === undefined ? undefined : String(pressed) }
+  // Left out when not given, so an `aria-expanded` handed in as an attribute, such as a Popover trigger's, stays.
+  const aria = { ...expanded === undefined ? {} : { 'aria-expanded': String(expanded) }, ...pressed === undefined ? {} : { 'aria-pressed': String(pressed) } }
 
   // A locked submit or reset button turns plain, as nothing may submit or reset the form it sits in.
   if (lockedWithTooltip(attributes))

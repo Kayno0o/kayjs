@@ -15,3 +15,4 @@ Menu(id="row-menu" label="Row" icon="plus" items={[{ label: 'Delete row', tone: 
 ConfirmDelete(message="Delete the row?" failure="Could not" onConfirm={onDelete} trigger="none" open={row()} onOpenChange={open => { row = open; states = [...states(), open ? 'open' : 'closed'] }})
 Menu(id="inline-menu" label="Inline" icon="plus" items={[{ label: 'Remove row', onSelect: () => inline = true }]})
 ConfirmDelete(message="Remove the row?" failure="Could not" onConfirm={onDelete} trigger="none" ask="inline" open={inline()} onOpenChange={open => inline = open})
+button#ask-inline(onClick={() => inline = true}) Ask

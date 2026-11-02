@@ -107,4 +107,8 @@ test('an AppSwitcher @trigger replaces the icon button and keeps the popover att
 
   expect([button.getAttribute('popovertarget'), button.getAttribute('aria-haspopup'), button.getAttribute('aria-expanded')]).toEqual(['trigger', 'true', 'false'])
   expect(view.root.querySelector('#trigger [data-part=tile]')).not.toBeNull()
+
+  view.root.querySelector<HTMLElement>('#trigger')!.showPopover()
+  await clock.settle()
+  expect(button.getAttribute('aria-expanded')).toBe('true')
 })
