@@ -109,6 +109,7 @@ A page, with or without a `server` fence, hands the action straight to `Chat`. T
 - A table wider than the chat scrolls sideways inside it, and the keyboard can scroll it.
 - A message the action's schema refuses (422) goes back to the field, also when it was a retry, and the refusal's message shows.
 - A link in a reply opens in a new tab, so following it never loses the conversation; `links="here"` opens a link to your own site in place, which `ChatLauncher` sets.
+- A reply shows no image, since a model reading a hostile page could point one at an address carrying the conversation. `images="/files"` lets a reply show the images under that path of your site, such as a picture a tool returned the address of; images of other hosts or paths stay out.
 - Images in a reply are not shown. A model that read a hostile page could point an image at a link carrying your visitor's conversation.
 
 A reply grounded in documents cites them as `[1]`, `[2]`. Give `ask` the documents and the chat links each number outside code to its document and lists the cited ones under the turn, in a new tab for an outside link:

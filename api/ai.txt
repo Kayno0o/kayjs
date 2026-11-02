@@ -649,6 +649,7 @@ component default
   fill?: boolean | undefined
   greeting?: string | undefined
   icon?: Element
+  images?: string | string[] | undefined
   initial?: ChatTurn[] | undefined
   keep?: number | undefined
   keepOnServer?: boolean | undefined
@@ -813,6 +814,7 @@ component default
   failedLabel?: string | undefined
   fill?: boolean | undefined
   greeting?: string | undefined
+  images?: string | string[] | undefined
   initial?: ChatTurn[] | undefined
   keep?: number | undefined
   keepOnServer?: boolean | undefined

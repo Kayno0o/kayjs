@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ai's Chat takes `images`, the paths of the site a reply may show an image from (`images="/files"`), so a tool's picture shows in the reply instead of as a link; images of other hosts or paths stay dropped: [Chat](../packages/ai/llms/chat.md).
 - kayjs-ui's RelativeTime takes `focusable={false}` to leave out its tab stop inside a link or a focusable row: [basics](../packages/ui/llms/basics.md).
 - kayjs-ui's `infiniteList` has `reload()`, which loads again every row loaded so far and swaps them in at once, keeping the DOM of rows whose key is unchanged: [kayjs-ui infinite lists](../packages/ui/llms/infinite-list.md).
 - `kay/test`'s browser page has `drag(from, to, { steps, at, to, hold })`: a mouse drag from one element to another, or a touch drag with `hold`, so a test of a sortable list or a board needs no raw `cdp` mouse events: [browser tests](testing-browser.md).
