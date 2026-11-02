@@ -62,6 +62,16 @@ function previousStart(chapters: readonly AudioChapter[], seconds: number): numb
 [./lib/audio] RESTART_CHAPTER_SECONDS
 const RESTART_CHAPTER_SECONDS: 3
 
+[./lib/bell] BellItem
+interface BellItem
+  id: string
+  read?: boolean | undefined
+  title: string
+  url?: string | undefined
+
+[./lib/bell] BellItems
+type BellItems<Item extends BellItem = BellItem> = readonly Item[] | (() => PromiseLike<readonly Item[]> | readonly Item[])
+
 [./lib/button-props] AsButton
 type AsButton = Omit<JSX.IntrinsicElements['button'], 'type' | 'class'> & Look & {
   href?: undefined type?: 'button' | 'submit' | 'reset' | undefined // Whether the disclosure the button opens is showing, for a popover or a panel it toggles. expanded?: boolean | undefined // For a toggle button: whether it is on. Written as `aria-pressed`, and the button draws an accent keyline while it is. pressed?: boolean | undefined

@@ -194,3 +194,26 @@ describe('the Bell with trailingSlash always', () => {
     slashed = undefined
   })
 })
+
+describe('the Bell with a source of its own', () => {
+  it('draws for a visitor nobody is signed in as, with the unread count and a row per note', async () => {
+    const page = await get('/custom')
+
+    expect(page.status).toBe(200)
+    expect(page.text).toContain('kui-bell')
+    expect(page.text).toContain('Notifications, 2 unread')
+    expect(page.text).toContain('Deploy done')
+  })
+
+  it('links a path of the site and draws a hostile url as a button', async () => {
+    const text = (await get('/custom')).text
+
+    expect(text).toContain('href="/plain"')
+    expect(text).not.toContain('href="javascript:')
+  })
+
+  it('draws the same for a signed-in visitor, and leaves the inbox of a page without items as it was', async () => {
+    expect((await get('/custom', ADA)).text).toContain('Notifications, 2 unread')
+    expect((await get('/', {})).text).not.toContain('kui-bell')
+  })
+})

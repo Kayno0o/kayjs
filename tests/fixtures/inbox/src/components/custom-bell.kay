@@ -1,0 +1,30 @@
+---
+// kay-island
+import { signal, untrack } from 'kay'
+import BellInbox from '@kaynooo/kayjs-ui/bell-inbox.kay'
+
+const all = [{ id: 'a', title: 'Deploy done', who: 'Ada', url: '/plain' }, { id: 'b', title: 'Review asked', who: 'Grace' }]
+const read = signal<string[]>([])
+const log = signal<string[]>([])
+const loads = signal(0)
+
+// The app's own source: asked once the Bell is in the page and again after every read.
+async function load() {
+  const done = read()
+
+  loads = untrack(loads) + 1
+
+  return all.map(note => ({ ...note, read: done.includes(note.id) }))
+}
+
+function onRead(id: string | undefined) {
+  log = [...log(), String(id)]
+  read = id === undefined ? all.map(note => note.id) : [...read(), id]
+}
+---
+BellInbox(items={load} onRead={onRead} onOpenChange={open => log = [...log(), open ? 'open' : 'close']})
+  @item(note)
+    strong {note.who}
+    em {note.title}
+p#log {log().join(',')}
+p#loads {loads()}

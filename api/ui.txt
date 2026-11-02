@@ -676,13 +676,20 @@ component default
   announce?: string | undefined;
   count?: string | undefined;
 } | undefined
+  item?: ((note: Item) => Element) | undefined
+  items?: BellItems<Item> | undefined
   label?: string | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onRead?: ((id: string | undefined) => unknown) | undefined
   placement?: PopoverPlacement | undefined
+  unread?: number | undefined
 
 [./bell.kay] default
 component default
+  items?: readonly BellItem[] | undefined
   label?: string | undefined
   placement?: PopoverPlacement | undefined
+  unread?: number | undefined
 
 [./breadcrumb.kay] default
 component default

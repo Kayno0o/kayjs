@@ -1,0 +1,7 @@
+---
+import Bell from '@kaynooo/kayjs-ui/bell.kay'
+
+const notes = [{ id: 'a', title: 'Deploy done', read: false, url: '/plain' }, { id: 'b', title: 'Review asked', read: true }, { id: 'c', title: 'Hostile', read: false, url: 'javascript:alert(1)' }]
+---
+h1 Custom
+Bell(items={notes})

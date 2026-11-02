@@ -64,6 +64,8 @@ header
 - The visitor is the user the auth library names (kayjs-auth does), read on the server: `Bell` has no `user` prop. A page with a `Bell` is private and rendered per request, and `ui()` serves its `GET /_kay/ui/inbox` and `POST /_kay/ui/inbox/read`.
 - `label` (`Notifications`) names the button and `placement` is the menu's, as `Menu` takes it. The `bell` icon slot maps its icon ([Setup](setup.md)); `ui.bell.*` are its words ([Words](words.md)).
 - A title is text and a link is drawn only for a path of the site or an http(s) URL; an external one opens in a new tab.
+- `items={notes}` (`{ id, title, read?, url? }[]`, read by the page) lists the app's own notifications in place of the inbox, and the Bell then draws for anyone, signed in or not; `unread` sets the count (the unread items by default). The page stays static, so a source loaded in the browser or a callback goes through `BellInbox` (`@kaynooo/kayjs-ui/bell-inbox.kay`) in an island, which takes the same props and reads no `ctx`: `BellInbox(items={load} onRead={onRead} onOpenChange={onOpenChange})`.
+- `items` on `BellInbox` is a list or a function returning a list or a promise of one (`() => fetchNotes()`), asked once the Bell is in the page, again when a signal it reads changes and after every read. `onRead(id | undefined)` hears an item opened (`undefined` for "Mark all as read"), a custom source marking the read there (a promise is awaited, then the list is asked again) and the inbox source having been marked already. `onOpenChange(open)` hears the list shown or hidden. `@item(note)` draws a row in place of its dot and title, the row staying the link or button that reads it: `BellInbox(items={load})` then `@item(note)` with `strong {note.who}`.
 
 ### TreeView
 

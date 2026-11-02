@@ -1,4 +1,6 @@
----
+--- <Item extends BellItem>
+import type { Snippet } from 'kay'
+import type { BellItem, BellItems } from './bell'
 import type { PopoverPlacement } from './popover'
 import { call, effect, recipe, resource, signal } from 'kay'
 import { wording } from 'kay/words'
@@ -25,19 +27,36 @@ const look = recipe({
   },
 })
 
-const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-end' } = props<{
+const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-end', items: source, unread: unreadCount, onRead, onOpenChange, item: drawRow } = props<{
   // Names the button and the list it opens; the `ui.bell.label` message by default.
   label?: string | undefined
   placement?: PopoverPlacement | undefined
+  // The app's own notifications in place of the signed-in visitor's inbox: a list, or a function answering one.
+  items?: BellItems<Item> | undefined
+  // The unread count of a custom source; the unread items of `items` by default.
+  unread?: number | undefined
+  // Called with the id of an item opened, or `undefined` for "Mark all as read". The inbox is marked first when it is the source; a custom source marks here, and a promise is awaited before the list is asked again.
+  onRead?: ((id: string | undefined) => unknown) | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  // Draws each row in place of its dot and title: `@item(note)`.
+  item?: Snippet<[note: Item]> | undefined
 }>()
 
 // The routes answer a path of the site or an http(s) URL only; checked again here, as the link is drawn.
 const LINKED = /^(?:\/(?![/\\])|https?:\/\/)/
 const WEB = /^https?:\/\//
-const inbox = resource(inboxApi, '/')
+const custom = source !== undefined
+const inbox = custom ? undefined : resource(inboxApi, '/')
+// A function source is asked once the Bell is in the page, again when a signal it reads changes and after a read.
+const asked = typeof source === 'function' ? resource(async () => await source()) : undefined
 
-const unread = () => inbox.value()?.unread ?? 0
-const items = () => inbox.value()?.items ?? []
+const items = (): readonly BellItem[] => {
+  if (!custom)
+    return inbox?.value()?.items ?? []
+
+  return typeof source === 'function' ? asked?.value() ?? [] : source
+}
+const unread = () => custom ? unreadCount ?? items().filter(note => !note.read).length : inbox?.value()?.unread ?? 0
 const linked = (url: string | undefined) => url !== undefined && LINKED.test(url) ? url : undefined
 const external = (url: string | undefined) => url !== undefined && WEB.test(url)
 
@@ -46,7 +65,7 @@ const announced = signal('')
 let known: Set<string> | undefined
 
 effect(() => {
-  if (inbox.value() === undefined)
+  if (typeof source === 'function' ? asked?.value() === undefined : inbox?.value() === undefined)
     return
 
   const fresh = items().find(note => !note.read && known !== undefined && !known.has(note.id))
@@ -59,18 +78,28 @@ effect(() => {
 
 // A failed call changes nothing: the live update or the next visit shows how the inbox stands.
 async function send(id?: string) {
-  try {
-    await call(inboxApi, '/read', { method: 'post', body: id === undefined ? {} : { id } })
-  }
-  catch {
-    // nothing to undo
+  if (!custom) {
+    try {
+      await call(inboxApi, '/read', { method: 'post', body: id === undefined ? {} : { id } })
+    }
+    catch {
+      // nothing to undo
+    }
   }
 
-  inbox.refresh()
+  try {
+    await onRead?.(id)
+  }
+  catch (error) {
+    console.error('kayjs-ui: a Bell could not run its onRead', error)
+  }
+
+  inbox?.refresh()
+  asked?.refresh()
 }
 ---
 span(part="root")
-  Popover(placement={placement} part="menu")
+  Popover(placement={placement} part="menu" onOpenChange={onOpenChange})
     @trigger(attributes)
       IconButton({...attributes} icon="bell" label={unread() > 0 ? wording('ui.bell.unread', '{label}, {count} unread', { label, count: unread() }) : label} variant="ghost" aria-haspopup="true")
     div(part="list" aria-label={label})
@@ -79,14 +108,20 @@ span(part="root")
       for note of items() key={note.id}
         if linked(note.url) as url
           a(part="item" href={url} {...external(url) ? OUTSIDE : {}} onClick={() => send(note.id)})
-            span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
-            span(part="title") {note.title}
+            if drawRow
+              | {drawRow(note as Item)}
+            else
+              span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
+              span(part="title") {note.title}
             if !note.read
               span(part="unread") {wording('ui.bell.unreadMark', '(unread)')}
         else
           button(part="item" type="button" onClick={() => send(note.id)})
-            span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
-            span(part="title") {note.title}
+            if drawRow
+              | {drawRow(note as Item)}
+            else
+              span(part="dot" data-read={note.read ? '' : undefined} aria-hidden="true")
+              span(part="title") {note.title}
             if !note.read
               span(part="unread") {wording('ui.bell.unreadMark', '(unread)')}
       if unread() > 0

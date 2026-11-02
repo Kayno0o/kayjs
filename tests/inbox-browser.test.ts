@@ -140,3 +140,35 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
     expect(await page.count('.kui-bell [data-part=list] a, .kui-bell [data-part=list] button')).toBe(0)
   }, 30_000)
 })
+
+describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell with a source of its own in a browser', () => {
+  let main: TestSite
+
+  beforeAll(async () => {
+    main = await site()
+  }, 180_000)
+
+  afterAll(async () => {
+    await main?.close()
+  })
+
+  it('loads a function source with nobody signed in, draws its rows with @item and tells onRead and onOpenChange', async () => {
+    visitor.name = undefined
+    await using page = await main.open('/custom-island')
+
+    await page.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications, 2 unread')
+    expect(await page.evaluate(() => performance.getEntriesByType('resource').filter(entry => entry.name.includes('/_kay/ui/inbox')).length)).toBe(0)
+    await page.click('.kui-bell button')
+    await page.waitFor('.kui-bell [data-part=list] strong')
+    expect(await page.count('.kui-bell [data-part=dot]')).toBe(0)
+    expect(await page.text('.kui-bell [data-part=list] button[data-part=item]')).toContain('Grace')
+    await page.click('.kui-bell [data-part=list] button[data-part=item]')
+    await page.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications, 1 unread')
+    expect(await page.text('#log')).toBe('open,b')
+    expect(Number(await page.text('#loads'))).toBeGreaterThanOrEqual(2)
+    await page.click('.kui-bell [data-part=all]')
+    await page.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications')
+    expect(await page.text('#log')).toBe('open,b,undefined')
+    expect(page.errors).toEqual([])
+  }, 60_000)
+})
