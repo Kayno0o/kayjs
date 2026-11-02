@@ -1,5 +1,5 @@
 --- <Row extends Record<string, string>>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { announce } from './announce'
 import { defaultKept, onFormReset } from './form-reset'
 import { effect, flush, recipe, signal, untrack } from 'kay'
@@ -23,18 +23,23 @@ const look = recipe({
 
 const NONE: never[] = []
 
-const { rows = NONE, style, columns, label, name, onChange, min = 0, max, addLabel = wording('ui.rowsField.add', 'Add row'), removeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'style'> & {
+const { rows = NONE, style, columns, label, name, onChange, onAdd, onRemove, cell, min = 0, max, addLabel = wording('ui.rowsField.add', 'Add row'), removeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'style'> & {
   style?: string | undefined
   // The rows to start with, and the ones to show whenever the parent passes others: a field in a form posting to an action needs nothing else, and an editor keeping them in a signal writes them back in `onChange`.
   rows?: readonly Row[] | undefined
-  // One text box per column of a row: `key` is the property of the row it edits (a plain string, so a `columns` array declared apart from the call needs no `as const`), `label` names it for screen readers and heads its column, `placeholder` defaults to the label.
-  columns: readonly { key: string, label: string, placeholder?: string | undefined, type?: 'text' | 'email' | 'url' | 'tel' | 'search' | undefined, name?: string | undefined }[]
+  // One text box per column of a row: `key` is the property of the row it edits (a plain string, so a `columns` array declared apart from the call needs no `as const`), `label` names it for screen readers and heads its column, `placeholder` defaults to the label. A `number` column holds the figure as text in the row, `''` once emptied. A column marked `cell: true` is drawn by the `@cell` block instead.
+  columns: readonly { key: string, label: string, placeholder?: string | undefined, type?: 'text' | 'email' | 'url' | 'tel' | 'search' | 'number' | undefined, name?: string | undefined, cell?: boolean | undefined }[]
   // Names the field for screen readers.
   label: string
   // Inside a form, each column posts under `<name>_<key>` (or its own `name`), once per row in the order shown, so a blank cell keeps its place: an action reads them as `s.Array(s.String())` fields of one length.
   name?: string | undefined
   // Gets the new rows after every edit, an added row and a removed one. Called without a wait: it can store the rows, not refuse a change.
   onChange?: ((rows: Row[]) => unknown) | undefined
+  // Called with the row an Add button appended and its place, and with the row a Remove button took out and the place it had, besides `onChange`.
+  onAdd?: ((row: Row, index: number) => unknown) | undefined
+  onRemove?: ((row: Row, index: number) => unknown) | undefined
+  // Draws the control of each column marked `cell: true`, such as a Select of units, a checkbox or a Combobox: `set(text)` writes the value into the row, so the cell takes part in `onChange`, adding and removing, posting and reset like a text box. The `column` it gets carries the `name` the cell posts under (`<name>_<key>`, or the column's own), which the control takes as its `name`; name the control by `${column.label} ${index + 1}` for screen readers, and read its value off `row[column.key]`.
+  cell?: Snippet<[column: { key: string, label: string, name: string | undefined }, row: Row, index: number, set: (value: string) => void]> | undefined
   // The fewest rows: Remove stops there. The most: Add stops there.
   min?: number | undefined
   max?: number | undefined
@@ -79,14 +84,21 @@ function edit(index: number, key: string, text: string) {
   commit(current().map((row, at) => at === index ? { ...row, [key]: text } : row))
 }
 
+// The name a column posts under, which a cell block hands to its control.
+const postName = (column: { key: string, name?: string | undefined }) => column.name ?? (name === undefined ? undefined : `${name}_${column.key}`)
+const FIELD = 'input, select, textarea, button, [tabindex]'
+
 function add() {
   if (full())
     return
 
+  const row = Object.fromEntries(columns.map(column => [column.key, ''])) as Row
+
   ids = [...ids(), nextId++]
-  commit([...current(), Object.fromEntries(columns.map(column => [column.key, ''])) as Row])
+  commit([...current(), row])
   flush()
-  boxes().at(-1)?.querySelector('input')?.focus()
+  boxes().at(-1)?.querySelector<HTMLElement>(FIELD)?.focus()
+  onAdd?.(row, current().length - 1)
   announce(wording('ui.rowsField.added', 'Row {n} added', { n: current().length }))
 }
 
@@ -94,14 +106,17 @@ function drop(index: number) {
   if (current().length <= min)
     return
 
+  const removed = current()[index]!
+
   ids = ids().filter((_, at) => at !== index)
   commit(current().filter((_, at) => at !== index))
+  onRemove?.(removed, index)
   flush()
 
   // Focus goes to the row that took its place, else the one before it, else the Add button.
   const rowsLeft = boxes()
 
-  ;(rowsLeft[index] ?? rowsLeft.at(-1))?.querySelector('input')?.focus()
+  ;(rowsLeft[index] ?? rowsLeft.at(-1))?.querySelector<HTMLElement>(FIELD)?.focus()
 
   if (rowsLeft.length === 0)
     root?.querySelector<HTMLElement>('[data-part=add]')?.focus()
@@ -125,6 +140,11 @@ div(part="root" {...rest} ref={element => root = element} role="group" aria-labe
   for entry of entries() key={entry.id}
     div(part="row")
       for column of columns key={column.key}
-        TextInput(part="input" type={column.type} name={column.name ?? (name === undefined ? undefined : `${name}_${column.key}`)} aria-label={`${column.label} ${entry.index + 1}`} placeholder={column.placeholder ?? column.label} value={entry.row[column.key] ?? ''} onInput={text => edit(entry.index, column.key, text)})
+        if column.cell === true && cell
+          | {cell({ key: column.key, label: column.label, name: postName(column) }, entry.row, entry.index, text => edit(entry.index, column.key, text))}
+        else if column.type === 'number'
+          TextInput(part="input" type="number" name={postName(column)} aria-label={`${column.label} ${entry.index + 1}`} placeholder={column.placeholder ?? column.label} value={entry.row[column.key] ?? ''} onInput={figure => edit(entry.index, column.key, figure === null ? '' : String(figure))})
+        else
+          TextInput(part="input" type={column.type} name={postName(column)} aria-label={`${column.label} ${entry.index + 1}`} placeholder={column.placeholder ?? column.label} value={entry.row[column.key] ?? ''} onInput={text => edit(entry.index, column.key, text)})
       IconButton(part="remove" icon="close" variant="ghost" size="sm" label={removeName(entry.index)} disabled={current().length <= min} onClick={() => drop(entry.index)})
   Button(part="add" icon="plus" variant="ghost" size="sm" label={addLabel} disabled={full()} onClick={add})

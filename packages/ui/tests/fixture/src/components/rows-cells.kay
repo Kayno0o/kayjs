@@ -1,0 +1,17 @@
+---
+import { signal } from 'kay'
+import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+
+// Lines of a quote: a text name, a number quantity and a Select of units drawn by the cell block.
+const { adds, removes } = props<{ adds: string[], removes: string[] }>()
+const lines = signal([{ name: 'Cable', qty: '2', unit: 'm' }])
+const units = [{ value: 'm', label: 'metres' }, { value: 'kg', label: 'kilos' }]
+const columns = [{ key: 'name', label: 'Item' }, { key: 'qty', label: 'Quantity', type: 'number' as const }, { key: 'unit', label: 'Unit', cell: true }]
+---
+form#quote
+  RowsField#lines(rows={lines()} columns={columns} name="line" label="Quote" onChange={lines.set} onAdd={(row, index) => adds.push(`${index}:${row.unit}`)} onRemove={(row, index) => removes.push(`${index}:${row.name}`)})
+    @cell(column, row, index, set)
+      Select(name={column.name} aria-label={`${column.label} ${index + 1}`} options={units} value={row.unit || 'm'} onChange={value => set(String(value))})
+  button#reset(type="reset") Reset
+p#out {JSON.stringify(lines())}
