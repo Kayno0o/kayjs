@@ -37,3 +37,11 @@ Menu(label="Actions" items={items})
 ```
 
 Other attributes, such as a `data-testid`, an `aria-describedby` or a `style`, go on the default icon button. A `style` is written after the anchor's.
+
+## Entries fetched when the menu opens
+
+`items` may be a function returning the entries, or a promise of them. A function is called each time the menu opens, a loading row showing until the answer is in, and the first entry then takes focus. When it throws or rejects, a failure row shows with a `Try again` entry that loads again. `loadingLabel`, `failureLabel` and `retryLabel` replace the words.
+
+## Drawing an entry
+
+`@item(entry)` draws an entry's content in place of its icon and label, such as a shortcut hint, a check mark or a badge. The entry stays a button or a link, with its keys and its tone.

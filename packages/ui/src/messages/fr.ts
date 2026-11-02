@@ -116,6 +116,7 @@ export default defineMessages({
       open: 'Ouvrir en taille réelle',
       previous: 'Précédent',
     },
+    menu: { failure: 'Impossible de charger.', loading: 'Chargement…', retry: 'Réessayer' },
     multiSelect: {
       all: 'Tout',
       empty: 'Aucune correspondance',

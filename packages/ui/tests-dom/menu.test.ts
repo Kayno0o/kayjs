@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import MenuSource from '../tests/fixture/src/components/menu-source.kay'
 import Menus from '../tests/fixture/src/components/menus.kay'
 import { click } from './dom'
 
@@ -165,4 +166,63 @@ test('a Menu @trigger replaces the icon button with a labelled button or an avat
   }
 
   expect(mounted.root.querySelector('#avatar-trigger span')).not.toBeNull()
+})
+
+async function source() {
+  const calls: string[] = []
+
+  mounted = await mountComponent(MenuSource, { calls })
+
+  const root = mounted.root
+
+  return { root, calls, menu: root.querySelector<HTMLElement>('#source')!, show: () => click(root.querySelector('#show')), hide: () => click(root.querySelector('#hide')), texts: () => [...root.querySelectorAll('#source [role=menu] > *')].map(one => one.textContent) }
+}
+
+test('a Menu given a function loads its entries each time it opens, with a loading row meanwhile', async () => {
+  const { root, calls, menu, show, hide, texts } = await source()
+
+  show()
+  await settle()
+  expect(menu.matches(':popover-open')).toBe(true)
+  expect(texts()).toEqual(['Loading…'])
+
+  click(root.querySelector('#answer'))
+  await settle()
+  expect(texts()).toEqual(['Alpha', 'Beta'])
+  expect(document.activeElement?.textContent).toBe('Alpha')
+
+  hide()
+  await settle()
+  show()
+  await settle()
+  expect(calls).toEqual(['load', 'load'])
+  expect(texts()).toEqual(['Loading…'])
+})
+
+test('a Menu whose entries fail to load says so and loads them again from its retry entry', async () => {
+  const { root, calls, show, texts } = await source()
+
+  show()
+  await settle()
+  click(root.querySelector('#refuse'))
+  await settle()
+  expect(texts()).toEqual(['Could not load.', 'Try again'])
+
+  click(root.querySelector('#source [data-part=item]'))
+  await settle()
+  expect(texts()).toEqual(['Loading…'])
+
+  click(root.querySelector('#answer'))
+  await settle()
+  expect(texts()).toEqual(['Alpha', 'Beta'])
+  expect(calls).toEqual(['load', 'load'])
+})
+
+test('a Menu draws an entry with its item block, the entry keeping its button or link', async () => {
+  mounted = await mountComponent(MenuSource, { calls: [] })
+
+  const [rename, away] = [...mounted.root.querySelectorAll('#drawn [data-part=item]')]
+
+  expect([rename!.tagName, rename!.querySelector('.row')?.textContent, rename!.querySelector('.hint')?.textContent]).toEqual(['BUTTON', 'Rename', 'F2'])
+  expect([away!.tagName, away!.getAttribute('href')]).toEqual(['A', '/away'])
 })

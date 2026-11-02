@@ -7,6 +7,11 @@
 - `CollapsibleSection(title open={open()} onOpenChange={now => ...})`: `open` follows the page when it changes, `onOpenChange(open)` is called on every fold and unfold, however it came about. Passing it makes the section an island; without it the section stays static. `disabled` keeps it as it is, `title` takes a string or a block.
 - `Accordion(items value={open()} onChange={values => ...})`: `value` is the open value, or an array of them with `multiple`, and the accordion follows it when the page passes a new one; left out, the reader decides. `onChange(values)` gets the values open (at most one without `multiple`), and closing a section as another opens reports only the opening. An item takes `disabled` and `meta` (a string); `@title(value)` and `@meta(value)` replace the heading and the band content.
 
+### Menu
+
+- `Menu(items={() => loadTargets()} label="Move to")`: `items` is a list, a function returning one or a promise of one, or a promise; a function runs each time the menu opens (a promise is awaited once), the latest answer winning, with a `status` row (`ui.menu.loading`) meanwhile and, when it throws or rejects, an alert row (`ui.menu.failure`) and a `Try again` entry (`ui.menu.retry`). The first entry takes focus when the answer arrives.
+- `@item(entry)` replaces an entry's icon and label with your block (a shortcut hint, a check, a badge); the entry keeps its role, its keys and its link or button. New part `status`.
+
 ### TreeView
 
 - `TreeNode.children` may be `() => TreeNode[] | Promise<TreeNode[]>`, called once the first time the branch opens, the nodes kept; the row is `aria-busy` with a spinner meanwhile, and a throw or rejection shows `failureLabel` (`ui.treeView.failure`) beside a `retryLabel` button (`ui.treeView.retry`), opening the branch again also retrying. A tree with such a branch is an island.

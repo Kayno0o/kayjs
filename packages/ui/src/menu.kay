@@ -5,7 +5,8 @@ import type { IconSlot } from './defaults'
 import type { MenuAction, MenuEntry, MenuTriggerProps } from './menu'
 import type { PopoverPlacement } from './popover'
 import type { Snippet } from 'kay'
-import { recipe, uid } from 'kay'
+import { recipe, signal, uid } from 'kay'
+import { wording } from 'kay/words'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
@@ -22,6 +23,7 @@ const look = recipe({
     menu: 'kui-menu max-h-[calc(100dvh-1rem)] min-w-48 overflow-y-auto',
     list: MENU_LIST,
     separator: 'my-1 border-0 border-t border-border',
+    status: 'm-0 px-3 py-2 text-sm text-muted',
     icon: 'size-4 shrink-0',
     item: `${MENU_ITEM} no-underline pointer-coarse:min-h-11 data-danger:text-danger disabled:cursor-default disabled:opacity-50`,
   },
@@ -35,12 +37,13 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
   End: (_, count) => count - 1,
 }
 
-const { id, items, label, icon, size = 'md', variant = 'ghost', tone, placement, at, open, onOpenChange, trigger, style, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'id' | 'type' | 'class' | 'children' | 'onToggle' | 'style'> & {
+const { id, items, label, icon, size = 'md', variant = 'ghost', tone, placement, at, open, onOpenChange, trigger, item, loadingLabel = wording('ui.menu.loading', 'Loading…'), failureLabel = wording('ui.menu.failure', 'Could not load.'), retryLabel = wording('ui.menu.retry', 'Try again'), style, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'id' | 'type' | 'class' | 'children' | 'onToggle' | 'style'> & {
   // Written after the trigger's own declarations, so it wins; it reaches the default icon button only.
   style?: string | undefined
   // The menu's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
-  items: MenuEntry[]
+  // The entries; a function returning them, or a promise of them, is called each time the menu opens, with a loading row meanwhile and a failure row with a retry if it throws or rejects.
+  items: MenuEntry[] | (() => MenuEntry[] | Promise<MenuEntry[]>) | Promise<MenuEntry[]>
   // Names the trigger and the menu it opens.
   label: string
   // The trigger's icon, such as a row of dots; not needed for a menu opened `at` a point.
@@ -57,10 +60,47 @@ const { id, items, label, icon, size = 'md', variant = 'ghost', tone, placement,
   onOpenChange?: ((open: boolean) => unknown) | undefined
   // Replaces the icon button that opens the menu, such as a labelled Button or a user name with an avatar: `@trigger(attributes)`, then `button({...attributes})`. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup="menu"` and the anchor style, and `icon`, `size`, `variant` and `tone` then have nothing to style.
   trigger?: Snippet<[attributes: MenuTriggerProps]> | undefined
+  // Draws an entry's content in place of its icon and label: `@item(entry)`. The entry keeps its role, its keys and its link or button.
+  item?: Snippet<[entry: MenuAction]> | undefined
+  loadingLabel?: string | undefined
+  failureLabel?: string | undefined
+  retryLabel?: string | undefined
 }>()
 
 const menuId = id ?? uid()
 let list: HTMLElement | undefined
+
+// Entries that come from a function or a promise: loaded each time the menu opens, the latest answer winning.
+const asked = signal<MenuEntry[] | undefined>(undefined)
+const failed = signal(false)
+const waits = () => typeof items === 'function' || items instanceof Promise
+const shown = () => waits() ? asked() ?? [] : items as MenuEntry[]
+let latest = 0
+
+async function load() {
+  const mine = ++latest
+
+  asked = undefined
+  failed = false
+
+  try {
+    const answer = await (typeof items === 'function' ? items() : items)
+
+    if (mine !== latest)
+      return
+
+    asked = answer
+    // The first entry takes focus once the answer is in, if the menu is still the reader's.
+    queueMicrotask(() => {
+      if (document.getElementById(menuId)?.matches(':popover-open'))
+        entries()[0]?.focus()
+    })
+  }
+  catch {
+    if (mine === latest)
+      failed = true
+  }
+}
 
 function entries(): HTMLElement[] {
   return [...list?.querySelectorAll<HTMLElement>('[data-part=item]:not(:disabled)') ?? []]
@@ -107,24 +147,42 @@ function select(action: MenuAction) {
   action.onSelect?.()
 }
 ---
-Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')} at={at} open={open} part="menu" onOpenChange={shown => { if (shown) entries()[0]?.focus(); onOpenChange?.(shown) }})
+Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')} at={at} open={open} part="menu" onOpenChange={opened => {
+  if (opened && waits())
+    void load()
+  else if (opened)
+    entries()[0]?.focus()
+
+  onOpenChange?.(opened)
+}})
   @trigger(attributes)
     if trigger
       | {trigger(withPopup(attributes, 'menu'))}
     else
       IconButton({...rest} {...attributes} style={[attributes.style, style].filter(Boolean).join('; ')} icon={icon!} label={label} size={size} variant={variant} tone={tone} aria-haspopup="menu" part="root")
   div(part="list" ref={element => list = element} role="menu" aria-label={label} tabindex="-1" onKeyDown={keyDown})
-    for item, index of items key={index}
-      if item === 'separator'
+    if waits() && failed()
+      p(part="status" role="alert") {failureLabel}
+      button(part="item" type="button" role="menuitem" tabindex="-1" onClick={load}) {retryLabel}
+    else if waits() && asked() === undefined
+      p(part="status" role="status") {loadingLabel}
+    for entry, index of shown() key={index}
+      if entry === 'separator'
         hr(part="separator")
       else
-        if item.href !== undefined && !item.disabled
-          a(part="item" href={item.href} {...opensOutside(item.href) ? OUTSIDE : {}} role="menuitem" tabindex="-1" data-danger={isDanger(item) || undefined} onClick={() => select(item)})
-            if item.icon
-              Icon(icon={item.icon} part="icon")
-            | {item.label}
+        if entry.href !== undefined && !entry.disabled
+          a(part="item" href={entry.href} {...opensOutside(entry.href) ? OUTSIDE : {}} role="menuitem" tabindex="-1" data-danger={isDanger(entry) || undefined} onClick={() => select(entry)})
+            if item
+              | {item(entry)}
+            else
+              if entry.icon
+                Icon(icon={entry.icon} part="icon")
+              | {entry.label}
         else
-          button(part="item" type="button" role="menuitem" tabindex="-1" disabled={item.disabled} data-danger={isDanger(item) || undefined} onClick={() => select(item)})
-            if item.icon
-              Icon(icon={item.icon} part="icon")
-            | {item.label}
+          button(part="item" type="button" role="menuitem" tabindex="-1" disabled={entry.disabled} data-danger={isDanger(entry) || undefined} onClick={() => select(entry)})
+            if item
+              | {item(entry)}
+            else
+              if entry.icon
+                Icon(icon={entry.icon} part="icon")
+              | {entry.label}

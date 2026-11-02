@@ -1492,19 +1492,24 @@ component default
     anchor?: string | undefined;
   } | undefined;
   list?: string | undefined;
-  separator?: string | undefined;
+  status?: string | undefined;
   item?: string | undefined;
+  separator?: string | undefined;
   icon?: string | {
     root?: string | undefined;
   } | undefined;
 } | undefined
+  failureLabel?: string | undefined
   icon?: IconProps | IconSlot | undefined
   id?: string | undefined
-  items: MenuEntry[]
+  item?: ((entry: MenuAction) => Element) | undefined
+  items: MenuEntry[] | (() => MenuEntry[] | Promise<MenuEntry[]>) | Promise<MenuEntry[]>
   label: string
+  loadingLabel?: string | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
   placement?: PopoverPlacement | undefined
+  retryLabel?: string | undefined
   size?: "xs" | "sm" | "md" | "lg" | undefined
   style?: string | undefined
   tone?: "neutral" | "danger" | "accent" | undefined

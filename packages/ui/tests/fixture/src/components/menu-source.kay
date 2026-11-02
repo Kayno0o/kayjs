@@ -1,0 +1,34 @@
+---
+// kay-island
+import type { MenuEntry } from '@kaynooo/kayjs-ui'
+import Menu from '@kaynooo/kayjs-ui/menu.kay'
+import { signal } from 'kay'
+
+const { calls } = props<{ calls: string[] }>()
+const opened = signal(false)
+const waiting: ((answer: MenuEntry[] | Error) => void)[] = []
+
+async function projects(): Promise<MenuEntry[]> {
+  calls.push('load')
+
+  const answer = await new Promise<MenuEntry[] | Error>((resolve) => { waiting.push(resolve) })
+
+  if (answer instanceof Error)
+    throw answer
+
+  return answer
+}
+
+function answer(entries: MenuEntry[] | Error) {
+  waiting.shift()?.(entries)
+}
+---
+Menu#source(items={projects} label="Move to" icon="plus" open={opened()} onOpenChange={now => opened = now})
+button#show(type="button" onClick={() => opened = true}) Show
+button#hide(type="button" onClick={() => opened = false}) Hide
+button#answer(type="button" onClick={() => answer([{ label: 'Alpha', onSelect: () => calls.push('Alpha') }, { label: 'Beta', onSelect: () => undefined }])}) Answer
+button#refuse(type="button" onClick={() => answer(new Error('down'))}) Refuse
+Menu#drawn(items={[{ label: 'Rename', onSelect: () => calls.push('Rename') }, { label: 'Away', href: '/away' }]} label="Drawn" icon="plus")
+  @item(entry)
+    b.row {entry.label}
+    kbd.hint F2
