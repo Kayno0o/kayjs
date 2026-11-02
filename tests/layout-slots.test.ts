@@ -151,7 +151,7 @@ describe('a block holding a server island', () => {
       expect(SIDE.exec(first)![1]).toMatch(STAMPED)
       expect(SIDE.exec(second)![1]).toMatch(STAMPED)
       expect(STAMPED.exec(first)![1]).not.toBe(STAMPED.exec(second)![1])
-      expect(STAMPED.exec(first)![1]).not.toBe(STAMPED.exec(built)?.[1])
+      expect(STAMPED.exec(built)).toBeNull()
       expect(MAIN.exec(first)![1]).toContain('<h1>Islanded</h1>')
     }
     finally {
