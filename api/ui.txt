@@ -211,6 +211,9 @@ interface MenuAction
 [.] MenuEntry
 type MenuEntry = MenuAction | 'separator'
 
+[.] MenuTriggerProps
+type MenuTriggerProps = PopoverTriggerProps & { 'aria-haspopup': 'menu' | 'true' }
+
 [.] messageOf
 function messageOf(error: unknown, fallback: string): string
 
@@ -528,6 +531,7 @@ component default
   newTab?: boolean | undefined
   placement?: PopoverPlacement | undefined
   tile?: ((app: SwitcherApp) => Element) | undefined
+  trigger?: ((attributes: MenuTriggerProps) => Element) | undefined
 
 [./audio-player.kay] default
 component default
@@ -897,13 +901,14 @@ component default
   message: string
   onConfirm: () => unknown
   onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
   pendingLabel?: string | undefined
   refused?: ((data: Data) => string | undefined) | undefined
   size?: "xs" | "sm" | "md" | "lg" | undefined
   success?: string | undefined
   title?: string | undefined
   tone?: "neutral" | "danger" | undefined
-  trigger?: "link" | "button" | "icon" | undefined
+  trigger?: "none" | "link" | "button" | "icon" | undefined
   variant?: "solid" | "ghost" | "inline" | undefined
 
 [./contact-form.kay] default
@@ -1453,6 +1458,7 @@ component default
   placement?: PopoverPlacement | undefined
   size?: "xs" | "sm" | "md" | "lg" | undefined
   tone?: "neutral" | "danger" | "accent" | undefined
+  trigger?: ((attributes: MenuTriggerProps) => Element) | undefined
   variant?: "solid" | "ghost" | "inline" | undefined
 
 [./meter.kay] default

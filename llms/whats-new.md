@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui's ConfirmDelete takes `open` and `trigger="none"`, so a Menu entry, a context menu or a shortcut can ask for the confirmation, and Menu and AppSwitcher take a `@trigger(attributes)` block in place of the icon button: [basics](../packages/ui/llms/basics.md), [forms](../packages/ui/llms/forms.md).
 - kayjs-ai's Chat takes `images`, the paths of the site a reply may show an image from (`images="/files"`), so a tool's picture shows in the reply instead of as a link; images of other hosts or paths stay dropped: [Chat](../packages/ai/llms/chat.md).
 - kayjs-ui's Table takes `expandable` with an `@detail(row)` block: a toggle per row opens a full-width detail under it, or under its card when stacked, and `expanded` and `onToggle(key, open)` control it: [tables](../packages/ui/llms/tables-navigation-and-layout.md).
 - kayjs-ui's `attempt`, ConfirmDelete and FormDialog toast a `ctx.fail` refusal that is a string or carries a string `error` or `message` without a `refused` reader, and an `ApiError` answer's `error` is read like its `message`: [basics](../packages/ui/llms/basics.md).

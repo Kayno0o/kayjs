@@ -1146,6 +1146,9 @@ interface MenuAction
 [./lib/index] MenuEntry
 type MenuEntry = MenuAction | 'separator'
 
+[./lib/index] MenuTriggerProps
+type MenuTriggerProps = PopoverTriggerProps & { 'aria-haspopup': 'menu' | 'true' }
+
 [./lib/index] messageOf
 function messageOf(error: unknown, fallback: string): string
 
@@ -1607,8 +1610,14 @@ interface MenuAction
 [./lib/menu] MenuEntry
 type MenuEntry = MenuAction | 'separator'
 
+[./lib/menu] MenuTriggerProps
+type MenuTriggerProps = PopoverTriggerProps & { 'aria-haspopup': 'menu' | 'true' }
+
 [./lib/menu] opensOutside
 function opensOutside(href: string): boolean
+
+[./lib/menu] withPopup
+function withPopup(attributes: PopoverTriggerProps, popup: "menu" | "true"): MenuTriggerProps
 
 [./lib/menu-look] MENU_FOOTER
 const MENU_FOOTER: "flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm outline-none hover:bg-hover focus:bg-hover focus-visible:[box-shadow:inset_2px_0_0_var(--color-accent)] focus-visible:[outline-offset:-2px] focus-visible:[outline:2px_solid_transparent] border-0 border-t border-solid border-border font-medium text-accent"
