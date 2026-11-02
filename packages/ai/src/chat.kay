@@ -38,8 +38,9 @@ const look = recipe({
 })
 
 // What a reply keeps of markdown: no image, which a model reading a hostile page could point at a URL carrying the conversation, unless it sits under a path of `images`, and no task checkbox. Tables stay.
-const REPLY: SanitizeOptions = { tags: ['table', 'thead', 'tbody', 'tr', 'th', 'td'] }
-const REPLY_WITH_IMAGES: SanitizeOptions = { tags: [...REPLY.tags!, 'img'], attributes: { img: ['src', 'alt'] } }
+const TABLE_TAGS = ['table', 'thead', 'tbody', 'tr', 'th', 'td']
+const REPLY: SanitizeOptions = { tags: TABLE_TAGS }
+const REPLY_WITH_IMAGES: SanitizeOptions = { tags: [...TABLE_TAGS, 'img'], attributes: { img: ['src', 'alt'] } }
 // How close to the end of the log the visitor must be for new text to keep it scrolled down.
 const PINNED_PX = 48
 // How long a page that announced it was leaving is waited on before it is taken to have stayed.
