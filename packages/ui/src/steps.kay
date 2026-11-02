@@ -1,30 +1,32 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { StepItem } from './steps'
 import { wording } from 'kay/words'
 import { stepHref } from './steps'
 import { recipe } from 'kay'
+import Icon from './icon.kay'
 
 // 'kui-steps' stays as the component's name for an app's CSS. A numbered row, the current step marked by aria-current and the ones behind it links.
 const look = recipe({
   parts: {
     root: 'kui-steps block',
     list: 'm-0 flex list-none flex-wrap gap-x-6 gap-y-2 p-0',
-    item: 'group/step flex items-center text-sm text-muted data-[step=current]:font-medium data-[step=current]:text-foreground',
-    link: 'flex items-center gap-2 rounded-md no-underline [&:is(a)]:text-foreground [&:is(a)]:hover:text-accent',
-    marker: 'flex size-6 shrink-0 items-center justify-center rounded-full border border-border-strong text-xs group-data-[step=current]/step:border-accent group-data-[step=current]/step:bg-accent group-data-[step=current]/step:text-accent-foreground group-data-[step=done]/step:border-accent group-data-[step=done]/step:text-accent',
+    item: 'group/step flex items-center text-sm text-muted data-[step=current]:font-medium data-[step=current]:text-foreground data-[outcome=skipped]:line-through',
+    link: 'flex items-center gap-2 rounded-md border-0 bg-transparent p-0 text-left font-[inherit] text-[length:inherit] no-underline [&:is(a,button)]:cursor-pointer [&:is(a,button)]:text-foreground [&:is(a,button)]:hover:text-accent',
+    marker: 'flex size-6 shrink-0 items-center justify-center rounded-full border border-border-strong text-xs group-data-[step=current]/step:border-accent group-data-[step=current]/step:bg-accent group-data-[step=current]/step:text-accent-foreground group-data-[step=done]/step:border-accent group-data-[step=done]/step:text-accent group-data-[outcome=error]/step:border-danger group-data-[outcome=error]/step:text-danger',
+    icon: 'size-3.5',
     label: 'min-w-0',
     state: 'sr-only',
   },
 })
 
-const { steps, current, url, done = [], param = 'step', label, doneLabel = wording('ui.steps.done', 'completed'), ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
+const { steps, current, url, done = [], param = 'step', label, doneLabel = wording('ui.steps.done', 'completed'), errorLabel = wording('ui.steps.error', 'has an error'), skippedLabel = wording('ui.steps.skipped', 'skipped'), onSelect, stepLabel, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children' | 'onSelect'> & {
   steps: readonly StepItem[]
   // The key of the step on screen, which `currentStep(ctx.url, keys, done)` reads off the URL.
   current: string
-  // The page's URL, `ctx.url`: each link to a step keeps its other params.
-  url: string | URL
-  // The keys of the steps whose values were kept; a step before the current one or in this list is a link back, any other plain text.
+  // The page's URL, `ctx.url`: each link to a step keeps its other params. Left out when `onSelect` drives the steps, whose clickable ones are then buttons.
+  url?: string | URL | undefined
+  // The keys of the steps whose values were kept; a step before the current one or in this list is a link back, any other plain text unless its own `linkable` says otherwise.
   done?: readonly string[] | undefined
   // The query param holding the step.
   param?: string | undefined
@@ -32,21 +34,53 @@ const { steps, current, url, done = [], param = 'step', label, doneLabel = wordi
   label: string
   // What a screen reader hears after a completed step's name.
   doneLabel?: string | undefined
+  // What it hears after a step whose `state` is `error`, and after one that is `skipped`.
+  errorLabel?: string | undefined
+  skippedLabel?: string | undefined
+  // Called with the key of the step a plain click picks, for a wizard an island drives with no navigation. With a `url` the step stays a link, so a middle click or a new tab still opens its address, and a plain click calls this instead of following it.
+  onSelect?: ((key: string) => unknown) | undefined
+  // Replaces the text of a step; the number, the state words and the link around it stay.
+  stepLabel?: Snippet<[step: StepItem, state: 'current' | 'done' | 'upcoming']> | undefined
 }>()
 
 const at = () => steps.findIndex(step => step.key === current)
 const state = (index: number, key: string) => key === current ? 'current' : index < at() || done.includes(key) ? 'done' : 'upcoming'
+const reached = (step: StepItem, index: number) => state(index, step.key) === 'done' || (step.linkable === true && step.key !== current)
+const target = (step: StepItem) => url === undefined ? undefined : { href: stepHref(url, step.key, param) }
+const spoken = (step: StepItem, shown: 'current' | 'done' | 'upcoming') => step.state === 'error' ? errorLabel : step.state === 'skipped' ? skippedLabel : shown === 'done' ? doneLabel : undefined
+
+// A plain click goes to the handler; a modified or middle one is left to the browser for a link.
+function pick(event: MouseEvent, key: string) {
+  if (!onSelect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+    return
+
+  event.preventDefault()
+  void onSelect(key)
+}
 ---
+snippet body(step: StepItem, index: number, shown: 'current' | 'done' | 'upcoming')
+  span(part="marker" aria-hidden="true")
+    if step.icon
+      Icon(icon={step.icon} part="icon")
+    else
+      | {index + 1}
+  span(part="label")
+    if stepLabel
+      | {stepLabel(step, shown)}
+    else
+      | {step.label}
+  if spoken(step, shown)
+    span(part="state") {spoken(step, shown)}
 nav(part="root" {...rest} aria-label={label})
   ol(part="list")
     for step, index of steps key={step.key}
-      li(part="item" data-step={state(index, step.key)})
-        if state(index, step.key) === 'done'
-          a(part="link" href={stepHref(url, step.key, param)})
-            span(part="marker" aria-hidden="true") {index + 1}
-            span(part="label") {step.label}
-            span(part="state") {doneLabel}
+      li(part="item" data-step={state(index, step.key)} data-outcome={step.state})
+        if reached(step, index) && target(step)
+          a(part="link" {...target(step)} onClick={event => pick(event, step.key)})
+            {body(step, index, state(index, step.key))}
+        else if reached(step, index) && onSelect
+          button(part="link" type="button" onClick={() => void onSelect?.(step.key)})
+            {body(step, index, state(index, step.key))}
         else
           span(part="link" aria-current={step.key === current ? 'step' : undefined})
-            span(part="marker" aria-hidden="true") {index + 1}
-            span(part="label") {step.label}
+            {body(step, index, state(index, step.key))}

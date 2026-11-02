@@ -76,4 +76,14 @@ else
 - Keep no password in it. The cookie is not tied to a session, so call `clear()` on sign-out, or the next visitor of a shared browser inherits the draft for the hour.
 - Back keeps what was typed, since the values come from the draft. A step posted again replaces its values.
 - `check` is required: `done()` lists only the steps whose values pass it, and `currentStep` sends the visitor back to the first one that does not, so a hand-edited cookie or URL skips nothing. The schemas say `additionalProperties: false`, so an edited cookie adds no key either.
-- `Steps` takes the standard parts: `list`, `item`, `link`, `marker` and `label`.
+- `Steps` takes the standard parts: `list`, `item`, `link`, `marker`, `icon`, `label` and `state`.
+
+## A wizard with no navigation
+
+`onSelect(key)` makes the steps clickable for an island that swaps the panel itself: `url` can then be left out, and a done step (or one with `linkable: true`) is a button. With a `url` the step stays a link, so a middle click or a new tab opens its address, and a plain click calls `onSelect` instead of following it.
+
+```kay
+Steps(steps={STEPS} current={step()} done={done()} label="Booking" onSelect={key => step = key})
+```
+
+A step may carry `state: 'error'` or `'skipped'` (the item gets `data-outcome`, and a screen reader hears `errorLabel` or `skippedLabel`), an `icon` in place of its number, and `linkable` to be reachable before it is done, for a flow that can be entered at any step. `stepLabel(step, state)` is a block that draws the text of a step; the number, the state words and the link around it stay.

@@ -1,12 +1,20 @@
 // The step a URL names, and the draft a multi-step form keeps between its posts.
 
 import type { Duration } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
 import { durationMs } from 'kay'
 import { ORIGIN } from './tab-nav'
 
 export interface StepItem<Key extends string = string> {
   key: Key
   label: string
+  // A step the visitor failed or passed over: it says so to screen readers and carries `data-outcome`.
+  state?: 'error' | 'skipped' | undefined
+  // Replaces the number in the marker.
+  icon?: IconSlot | IconProps | undefined
+  // Makes an upcoming step a link (or, with `onSelect` and no `url`, a button) too, for a flow that can be entered at any step.
+  linkable?: boolean | undefined
 }
 
 // What `ctx.cookies` is, which is all the draft asks of it.

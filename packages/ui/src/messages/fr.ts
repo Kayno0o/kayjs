@@ -160,7 +160,7 @@ export default defineMessages({
     sidePanel: { close: 'Fermer', resize: 'Redimensionner' },
     siteNav: { expand: 'Afficher les pages de {label}', menu: 'Menu' },
     splitLayout: { back: 'Retour', resize: 'Redimensionner la liste' },
-    steps: { done: 'terminée' },
+    steps: { done: 'terminée', error: 'en erreur', skipped: 'ignorée' },
     subscribeForm: {
       email: 'E-mail',
       notice: 'Nous utilisons votre adresse pour vous envoyer les mails de ce site, jusqu\'à ce que vous vous désabonniez avec le lien de chacun.',

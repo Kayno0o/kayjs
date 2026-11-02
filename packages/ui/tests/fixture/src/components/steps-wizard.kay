@@ -1,0 +1,14 @@
+--- client
+import Steps from '@kaynooo/kayjs-ui/steps.kay'
+import { signal } from 'kay'
+
+const { picks, withUrl = false } = props<{ picks: string[], withUrl?: boolean }>()
+const steps = [{ key: 'account', label: 'Account' }, { key: 'details', label: 'Details', state: 'error' as const }, { key: 'review', label: 'Review', linkable: true, icon: 'star' as const }, { key: 'extra', label: 'Extra', state: 'skipped' as const }]
+const current = signal('details')
+---
+snippet named(step: { label: string }, shown: string)
+  | {shown}: {step.label}
+if withUrl
+  Steps#linked(steps={steps} current={current()} done={['account']} url="/wizard?plan=pro" label="Wizard" onSelect={key => picks.push(key)})
+else
+  Steps#plain(steps={steps} current={current()} done={['account']} label="Wizard" onSelect={key => { picks.push(key); current = key }} stepLabel={named})
