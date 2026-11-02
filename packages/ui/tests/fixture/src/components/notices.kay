@@ -1,0 +1,25 @@
+---
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
+
+const { onDismiss } = props<{ onDismiss: () => void }>()
+
+const shown = signal(true)
+---
+#plain
+  Notice(tone="warning" label="Plain")
+#toned
+  Notice(tone="danger" label="Toned" icon={true})
+#custom
+  Notice(label="Custom" icon="success")
+#acting
+  Notice(label="Retry?")
+    @actions
+      button#retry(type="button") Retry
+#closable
+  Notice(label="Closable" dismissible onDismiss={onDismiss})
+#controlled
+  Notice(label="Controlled" open={shown()} onDismiss={() => shown = false})
+#reopen
+  button#show(type="button" onClick={() => shown = true}) Show
+#hidden
+  Notice(label="Hidden" open={false})

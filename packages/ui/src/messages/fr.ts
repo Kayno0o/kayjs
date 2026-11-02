@@ -127,6 +127,7 @@ export default defineMessages({
       search: 'Rechercher',
       selected: { one: '{count} sélectionné', other: '{count} sélectionnés' },
     },
+    notice: { dismiss: 'Fermer' },
     pagination: { label: 'Pagination', next: 'Suivant', previous: 'Précédent' },
     rangeInput: { from: '{label} de', to: '{label} à' },
     recordButton: {

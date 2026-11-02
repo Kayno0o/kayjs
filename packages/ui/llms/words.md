@@ -55,6 +55,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.mediaGallery.*`: `close` (`Close`), `empty` (`No media.`), `item` (`Media {n}`), `next` (`Next`), `open` (`Open full size`), `previous` (`Previous`)
 - `ui.menu.*`: `failure` (`Could not load.`, when a menu's entries function fails), `loading` (`Loading…`), `retry` (`Try again`)
 - `ui.multiSelect.*`: `all` (`All`), `empty` (`No match`), `failure` (`Could not load the options`), `loading` (`Loading…`), `none` (`None`), `placeholder` (`Any`), `search` (`Search`), `selected` (`{count} selected`)
+- `ui.notice.*`: `dismiss` (`Dismiss`)
 - `ui.pagination.*`: `label` (`Pagination`), `next` (`Next`), `previous` (`Previous`)
 - `ui.rangeInput.*`: `from` (`{label} from`), `to` (`{label} to`)
 - `ui.recordButton.*`: `label` (`Record`), `failure` (`The recording could not be sent.`), `recording` (`Recording`), `stopped` (`Recording stopped`), `cancelled` (`Recording cancelled`), `insecure` (`The microphone needs the page opened over https.`), `unsupported` (`This browser cannot record sound.`), `denied` (`The microphone is blocked: allow it for this site in the browser's settings.`), `missing` (`No microphone was found.`), `taken` (`The microphone is in use by another application.`), `failed` (`The microphone could not be opened.`), `lost` (`The microphone was disconnected, so the recording was dropped.`), `empty` (`Nothing was recorded.`); Chat's microphone (kayjs-ai) says the same

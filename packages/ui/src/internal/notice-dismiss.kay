@@ -1,0 +1,35 @@
+---
+import { effect, recipe, signal } from 'kay'
+import IconButton from '../icon-button.kay'
+
+const look = recipe({ parts: { root: '' } })
+
+const { label, open, onDismiss } = props<{
+  // Names the button.
+  label: string
+  // Shows the notice when the page sets it; the button hides it on its own, and a page passing `open` again shows it.
+  open?: boolean | undefined
+  // Called when the button is pressed, after the notice is hidden.
+  onDismiss?: (() => unknown) | undefined
+}>()
+
+const shown = signal(open ?? true)
+let button: HTMLElement | undefined
+
+effect(() => shown = open ?? true)
+
+// The notice around the button is static markup that this island only hides, so a Notice without a dismiss button ships no script.
+effect(() => {
+  const box = button?.closest<HTMLElement>('.kui-notice')
+
+  if (box)
+    box.hidden = !shown()
+})
+
+function dismiss() {
+  shown = false
+  onDismiss?.()
+}
+---
+// The close button of a Notice with `dismissible`, rendered only then.
+IconButton(part="root" icon="close" label={label} size="xs" variant="ghost" ref={element => button = element} onClick={dismiss})

@@ -1,9 +1,20 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
 import { recipe } from 'kay'
+import { wording } from 'kay/words'
+import Icon from './icon.kay'
+import NoticeDismiss from './internal/notice-dismiss.kay'
 
 const look = recipe({
-  parts: { root: 'kui-notice [overflow-wrap:anywhere] rounded-lg border-solid px-4 py-3 text-sm [font-weight:var(--font-weight-normal)] [background-color:var(--_notice-ground,var(--color-surface-strong))] [border-color:var(--_notice-tone,var(--color-border-strong))] [border-width:var(--border-width)] [color:var(--_notice-tone,var(--color-foreground))] data-compact:border-0 data-compact:bg-transparent data-compact:p-0' },
+  parts: {
+    root: 'kui-notice [overflow-wrap:anywhere] rounded-lg border-solid px-4 py-3 text-sm [font-weight:var(--font-weight-normal)] [background-color:var(--_notice-ground,var(--color-surface-strong))] [border-color:var(--_notice-tone,var(--color-border-strong))] [border-width:var(--border-width)] [color:var(--_notice-tone,var(--color-foreground))] data-compact:border-0 data-compact:bg-transparent data-compact:p-0 data-framed:flex data-framed:items-start data-framed:gap-3 [&[hidden]]:hidden',
+    icon: 'mt-0.5 size-4 shrink-0',
+    body: 'min-w-0 flex-1',
+    actions: 'flex shrink-0 flex-wrap items-center gap-2',
+    dismiss: '',
+  },
   variants: {
     // A danger is an alert, read out at once; the other tones are a status, read once the reader is idle.
     tone: { info: '', success: '[--_notice-tone:var(--color-success)]', warning: '[--_notice-tone:var(--color-warning)]', danger: '[--_notice-ground:var(--color-background)] [--_notice-tone:var(--color-danger)]' },
@@ -11,13 +22,44 @@ const look = recipe({
   defaults: { tone: 'info' },
 })
 
-const { tone = 'info', label, size = 'md', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
+// What `icon` set to `true` draws for each tone.
+const TONE_ICON = { info: 'info', success: 'success', warning: 'alert', danger: 'alert' } as const
+
+const { tone = 'info', label, size = 'md', icon, actions, dismissible = false, open, onDismiss, dismissLabel = wording('ui.notice.dismiss', 'Dismiss'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
   label?: string | undefined
   // `sm` is a line of text without the box, such as under a form's fields.
   size?: 'sm' | 'md' | undefined
+  // Drawn before the text: the icon of the tone for `true`, or an icon of your own. Without it a notice draws none.
+  icon?: IconSlot | IconProps | boolean | undefined
+  // At the end of the notice, such as a retry button or a link: a `@actions` block.
+  actions?: Snippet
+  // Adds a close button that hides the notice. Only a notice with this, or an `open`, ships script.
+  dismissible?: boolean | undefined
+  // Whether the notice is shown, when the page decides: set it back to `false` in `onDismiss` to keep it hidden. Giving it adds the close button as `dismissible` does.
+  open?: boolean | undefined
+  // Called when the close button is pressed, after the notice is hidden. Passing one makes the whole notice hydrate, as any function a static component passes an island.
+  onDismiss?: (() => unknown) | undefined
+  // Names the close button.
+  dismissLabel?: string | undefined
 }>()
+
+const drawn = (): IconSlot | IconProps | undefined => icon === true ? TONE_ICON[tone] : icon || undefined
+const closable = () => dismissible || open !== undefined
+const framed = () => drawn() !== undefined || actions !== undefined || closable()
 ---
 // A form's outcome or a refusal, in place: what a toast says in passing, said where the page stays.
-div({...rest} role={tone === 'danger' ? 'alert' : 'status'} data-tone={tone} data-compact={size === 'sm' ? '' : undefined})
-  | {label}
-  slot
+div({...rest} role={tone === 'danger' ? 'alert' : 'status'} data-tone={tone} data-compact={size === 'sm' ? '' : undefined} data-framed={framed() ? '' : undefined} hidden={open === false ? '' : undefined})
+  if drawn()
+    Icon(icon={drawn()!} part="icon")
+  if framed()
+    div(part="body")
+      | {label}
+      slot
+  else
+    | {label}
+    slot
+  if actions
+    div(part="actions")
+      | {actions}
+  if closable()
+    NoticeDismiss(part="dismiss" label={dismissLabel} open={open} onDismiss={onDismiss})
