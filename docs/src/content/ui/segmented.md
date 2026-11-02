@@ -44,6 +44,8 @@ While the group is busy, a pick takes nothing: the radio is put back, and keyboa
 Segmented(options={PERIODS} value={period} param="period" paramDefault="7d" label="Period")
 ```
 
+Each option also covers a link (the `link` part) to that address, with the param left out for `paramDefault`, so a middle click, a new tab, a copied address or a crawler finds the view. A plain click still goes through the radio, so an `onChange` that answers `false` holds it; a modified click is left to the browser. The link is out of the tab order, since the arrow keys already move between the radios.
+
 An `onChange` of your own still runs first, and a `false` from it stops the move. The radios take `param` as their name, so inside a GET form with a button the group works without JavaScript. Alone, it needs JavaScript.
 
 ## Label

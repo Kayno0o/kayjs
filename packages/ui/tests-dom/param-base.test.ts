@@ -64,3 +64,38 @@ test('a TabNav of a param links to the page under the base and the locale, the o
 
   expect([...root.querySelectorAll('#first a')].map(link => [link.getAttribute('href'), link.getAttribute('aria-current')])).toEqual([['/docs/fr/traffic?tab=findings&period=7d', null], ['/docs/fr/traffic?tab=hosts&period=7d', 'page'], ['/docs/fr/traffic?tab=ports&period=7d', null]])
 })
+
+test('each option of a Segmented with a param is also a link to the page with the param set, under the base and the locale', async () => {
+  const links = async (search: string) => [...(await open(ParamPickers, search)).querySelectorAll('#segmented a')].map(link => [link.getAttribute('href'), link.getAttribute('aria-current')])
+
+  expect(await links('?site=a')).toEqual([['/docs/fr/traffic?site=a&period=24h', null], ['/docs/fr/traffic?site=a', 'true'], ['/docs/fr/traffic?site=a&period=30d', null]])
+  expect(await links('?period=30d&site=a')).toEqual([['/docs/fr/traffic?period=24h&site=a', null], ['/docs/fr/traffic?site=a', null], ['/docs/fr/traffic?period=30d&site=a', 'true']])
+})
+
+test('a plain click on an option link goes through the radio and a refusing onChange holds it, a modified click is left to the browser', async () => {
+  const root = await open(ParamPickers, '?site=a')
+  const assign = spyOn(location, 'assign').mockImplementation(() => undefined)
+
+  try {
+    const modified = new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true })
+
+    root.querySelector('#segmented a[href*="30d"]')!.dispatchEvent(modified)
+    expect(modified.defaultPrevented).toBe(false)
+
+    await settle()
+    assign.mockClear()
+
+    const plain = new MouseEvent('click', { bubbles: true, cancelable: true })
+
+    root.querySelector('#refused a[href*="30d"]')!.dispatchEvent(plain)
+    await settle()
+    expect([plain.defaultPrevented, assign.mock.calls.length]).toEqual([true, 0])
+
+    root.querySelector('#segmented a[href*="30d"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    await settle()
+    expect(assign.mock.calls.length).toBe(1)
+  }
+  finally {
+    assign.mockRestore()
+  }
+})

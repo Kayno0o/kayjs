@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
-import { recipe, uid, untrack } from 'kay'
+import { recipe, uid, untrack, withQuery } from 'kay'
 import type { NullOption } from './null-option'
 import { controlledRadios } from './controlled-radios'
 import { LABEL_TEXT } from './field-look'
@@ -17,6 +17,7 @@ const look = recipe({
     input: 'peer/option absolute size-0 opacity-0',
     label: 'flex items-center gap-1 px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground peer-checked/option:bg-accent peer-checked/option:text-accent-foreground peer-checked/option:hover:text-accent-foreground peer-focus-visible/option:outline-2 peer-focus-visible/option:-outline-offset-2 peer-focus-visible/option:outline-accent',
     icon: 'size-3.5 shrink-0',
+    link: 'absolute inset-0 overflow-hidden text-transparent no-underline outline-none',
     field: 'inline-flex flex-col items-start gap-1',
     heading: LABEL_TEXT,
   },
@@ -35,7 +36,7 @@ const { options, value, label, showLabel = false, name, param, paramDefault, dis
   disabled?: boolean | undefined
   // The radios' name, which the group submits under inside a form; one unique on the page is drawn when none is given.
   name?: string | undefined
-  // Holds a query param of the page instead of, or besides, `onChange`: a pick goes to the current page with `param` set to the option and every other param kept, the group busy until the page shows it. Give `value` the param as the page read it. The radios take its name, so a GET form around the group sends it without JavaScript.
+  // Holds a query param of the page instead of, or besides, `onChange`: a pick goes to the current page with `param` set to the option and every other param kept, the group busy until the page shows it, and each option also covers a link to that address, so a middle click, a new tab, a copy or a crawler finds it. Give `value` the param as the page read it. The radios take its name, so a GET form around the group sends it without JavaScript.
   param?: string | undefined
   // The value the page shows while `param` is left out: picking it leaves the param out.
   paramDefault?: string | number | undefined
@@ -60,6 +61,30 @@ const { group, picked, busy, ref, pick } = controlledRadios({
 })
 
 // The heading's id while `showLabel` writes it, which then names the group in place of `aria-label`.
+// The address of an option while `param` holds the group: the current page with the param set, other params kept and the default left out. A page rendered once at build time has no query to start from, so its options carry no link.
+function optionLink(value: Value): { href: string } | undefined {
+  if (param === undefined)
+    return undefined
+
+  try {
+    return { href: withQuery({ [param]: paramDefault !== undefined && String(value) === String(paramDefault) ? null : value }) }
+  }
+  catch {
+    return undefined
+  }
+}
+
+// A plain click keeps going through the radio, so a refusing `onChange` holds it; a modified or middle click is left to the browser.
+function follow(event: MouseEvent, value: Value) {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+    return
+
+  event.preventDefault()
+
+  if (value !== picked())
+    void pick(value)
+}
+
 const heading = showLabel ? uid() : undefined
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field.
@@ -75,6 +100,8 @@ snippet radios()
             if option.icon
               Icon(icon={option.icon} part="icon")
             | {option.label}
+          if param !== undefined && !disabled && !option.disabled
+            a(part="link" {...optionLink(option.value)} tabindex="-1" draggable="false" aria-current={picked() === option.value ? 'true' : undefined} onClick={event => follow(event, option.value)}) {option.label}
 if showLabel
   div(part="field")
     span(part="heading" id={heading}) {label}
