@@ -19,11 +19,12 @@ import { mountedAt } from '../dev/base-proxy'
 import { BuildStamps } from '../dev/fingerprint'
 import { clientOptionsOf, PRODUCTION, resolveProject } from '../project'
 import { joinBase } from '../runtime/base'
+import { installClassTable } from '../runtime/class-table'
 import { solveWork } from '../runtime/work'
 import { MCP_PATH, mcpPath } from '../server/api-modules'
 import { servePages } from '../server/app'
 import { basePath, routerPath } from '../server/base'
-import { clientOptionsKey } from '../server/client'
+import { clientOptionsKey, readManifest } from '../server/client'
 import { shutdown } from '../server/lifecycle'
 import { forgetStamps } from '../server/live'
 import { loaderRoot } from '../server/loader'
@@ -90,6 +91,13 @@ function nextClient(): string {
 // What a site loading no browser holds of a check that found nothing to build again: its islands are never read.
 const CHECKED: ClientBuild = { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: '' }
 
+// The check a record found fresh builds nothing, so the class table the server merges with is installed from the manifest it kept, as a build would.
+async function checked(root: string, output: string): Promise<ClientBuild> {
+  installClassTable((await readManifest(root, join(root, KAY_DIR, output)))?.classTable)
+
+  return CHECKED
+}
+
 const ROOT_MANIFEST = /^(?:package\.json|bun\.lockb?|tsconfig.*\.json|kay\.config\.\w+)$/
 
 // The options key and a hash of the root files that shape a build without being read by it (the dependencies they pin, the paths it resolves, the config), so a record kept across runs is not trusted past a change to them.
@@ -154,7 +162,7 @@ async function islandsBuilt(root: string, options: ClientOptions, inBrowser: boo
     catch {}
 
     try {
-      return await (inBrowser ? buildClient(root, options, stamps) : inOutput(output, async () => await recordFresh(stamps) ? CHECKED : buildClient(root, options, stamps)))
+      return await (inBrowser ? buildClient(root, options, stamps) : inOutput(output, async () => await recordFresh(stamps) ? checked(root, output) : buildClient(root, options, stamps)))
     }
     finally {
       running = false
