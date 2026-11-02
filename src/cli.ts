@@ -24,14 +24,15 @@ async function main(args: string[]): Promise<number> {
   const completing = args[0] === COMPLETE
   let extensions: Promise<Record<string, CliCommand>> | undefined
   // Read once, for whichever level asks first.
-  const extension = async (words: string[]) => extensions ??= extensionCommandTree(words, completing)
+  const extension = async (typed: string[]) => extensions ??= extensionCommandTree(typed, completing)
   const commands = tree(COMMANDS)
 
   // An extension may add a command to a group of kay's own, `kay i18n translate`.
   for (const [word, command] of Object.entries(commands)) {
     if ('commands' in command) {
       command.extraCommands = async (words) => {
-        const added = (await extension(words))[word]
+        // The word after the group says whether a command is asked for or a help.
+        const added = (await extension(words.slice(1)))[word]
 
         return added !== undefined && 'commands' in added && typeof added.commands !== 'function' ? added.commands : {}
       }

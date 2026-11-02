@@ -399,6 +399,14 @@ describe('commands an extension adds', () => {
     expect(top.stdout).toContain('  other       commands of kay other\n')
   })
 
+  it('leave kay\'s own group help listing when the config does not load', async () => {
+    const root = await project({ 'kay.config.ts': 'throw new Error(\'config broke\')\n' })
+    const { stdout, code } = await kay(['i18n', '--help'], root)
+
+    expect(code).toBe(0)
+    expect(stdout).toContain('Usage: kay i18n')
+  })
+
   it('stop at a name kay has, one under a kay command, or one two extensions give, naming both', async () => {
     const clash = async (commands: string, more = '') => project({ ...library, 'kay.config.ts': `export default { favicon: false, extensions: [{ name: 'kay-lib', commands: ${commands} }${more}] }\n` })
 
