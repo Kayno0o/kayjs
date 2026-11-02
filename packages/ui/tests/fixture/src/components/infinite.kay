@@ -3,7 +3,7 @@
 import { infiniteList } from '@kaynooo/kayjs-ui'
 import LoadMore from '@kaynooo/kayjs-ui/load-more.kay'
 
-const { first = [{ id: 1 }, { id: 2 }, { id: 3 }], size, onLoad, loadingLabel, failureLabel, retryLabel, button } = props<{
+const { first = [{ id: 1 }, { id: 2 }, { id: 3 }], size, onLoad, loadingLabel, failureLabel, retryLabel, button, expose } = props<{
   first?: { id: number }[]
   size: number
   onLoad: (offset: number) => Promise<{ id: number }[] | undefined>
@@ -11,9 +11,12 @@ const { first = [{ id: 1 }, { id: 2 }, { id: 3 }], size, onLoad, loadingLabel, f
   failureLabel?: string
   retryLabel?: string
   button?: boolean
+  expose?: (list: ReturnType<typeof infiniteList<{ id: number }>>) => void
 }>()
 
 const feed = infiniteList(first, { pageSize: size, key: row => row.id, load: ({ offset }) => onLoad(offset) })
+
+expose?.(feed)
 ---
 for row of feed.rows() key={row.id}
   p.row {row.id}

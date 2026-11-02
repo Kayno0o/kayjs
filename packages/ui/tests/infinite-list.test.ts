@@ -397,3 +397,93 @@ describe('infiniteList following its island', () => {
     expect(list.rows()).toHaveLength(6)
   })
 })
+
+describe('reload', () => {
+  test('loads every loaded row again, page after page, and swaps them in at once', async () => {
+    const { asked, load } = source(bans(4, 3), bans(0, 3), bans(3, 3))
+    const list = infiniteList(bans(1, 3), { pageSize: 3, key: row => row.id, load })
+
+    await list.more()
+
+    const seen: number[] = []
+    const stop = list.rows
+
+    const reloading = list.reload()
+
+    seen.push(stop().length)
+    await reloading
+
+    expect(seen).toEqual([6])
+    expect(asked.slice(1)).toEqual([
+      { offset: 0, last: undefined, sort: undefined, filter: NONE },
+      { offset: 3, last: { id: 2 }, sort: undefined, filter: NONE },
+    ])
+    expect(list.rows().map(row => row.id)).toEqual([0, 1, 2, 3, 4, 5])
+    expect(list.ended()).toBe(false)
+
+    await list.more()
+    expect(asked.at(-1)?.offset).toBe(6)
+  })
+
+  test('a short page ends the reload and the list', async () => {
+    const { load } = source(bans(0, 2))
+    const list = infiniteList(bans(1, 3), { pageSize: 3, load })
+
+    await list.reload()
+
+    expect(list.rows().map(row => row.id)).toEqual([0, 1])
+    expect(list.ended()).toBe(true)
+  })
+
+  test('a failed reload keeps the rows and fails nothing', async () => {
+    const { load } = source(undefined, new Error('x'))
+    const list = infiniteList(bans(1, 3), { pageSize: 3, load })
+
+    await list.reload()
+    await list.reload()
+
+    expect(list.rows().map(row => row.id)).toEqual([1, 2, 3])
+    expect(list.failed()).toBe(false)
+    expect(list.pending()).toBe(false)
+
+    await list.more()
+
+    expect(list.failed()).toBe(true)
+  })
+
+  test('a restart while reloading drops the reload', async () => {
+    let release: (page: Ban[]) => void = () => undefined
+    const hold = new Promise<Ban[]>((resolve) => {
+      release = resolve
+    })
+    const answers = [hold, Promise.resolve(bans(50, 3))]
+    const list = infiniteList(bans(1, 3), { pageSize: 3, load: async () => answers.shift()! })
+
+    const reloading = list.reload()
+
+    await list.restart({})
+    release(bans(0, 3))
+    await reloading
+
+    expect(list.rows().map(row => row.id)).toEqual([50, 51, 52])
+  })
+
+  test('the rows given stand for the first ones, and duplicates are dropped by key', async () => {
+    const { asked, load } = source(bans(3, 3))
+    const list = infiniteList(bans(1, 5), { pageSize: 3, key: row => row.id, load })
+
+    await list.reload(bans(1, 3))
+
+    expect(asked).toEqual([{ offset: 3, last: { id: 3 }, sort: undefined, filter: NONE }])
+    expect(list.rows().map(row => row.id)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  test('a list that ended loads on until a short page', async () => {
+    const { load } = source(bans(1, 3), bans(4, 1))
+    const list = infiniteList(bans(1, 2), { pageSize: 3, load })
+
+    await list.reload()
+
+    expect(list.rows()).toHaveLength(4)
+  })
+})

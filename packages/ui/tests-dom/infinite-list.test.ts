@@ -64,6 +64,29 @@ function reach(root: Element): void {
   Observer.made.find(made => made.observed.includes(sentinel))!.callback([{ isIntersecting: true }])
 }
 
+describe('reload', () => {
+  test('keeps the DOM of the rows whose key is unchanged and adds the new ones', async () => {
+    let feed: { reload: () => Promise<void> } | undefined
+    const root = await list({ expose: (made: typeof feed) => {
+      feed = made
+    } })
+    const before = [...root.querySelectorAll('.row')]
+
+    const done = feed!.reload()
+
+    release[0]!([{ id: 0 }, { id: 1 }, { id: 2 }])
+    release.length = 0
+    await settle()
+    await done
+
+    const after = [...root.querySelectorAll('.row')]
+
+    expect(ids(root)).toEqual(['0', '1', '2'])
+    expect(after[1]).toBe(before[0])
+    expect(after[2]).toBe(before[1])
+  })
+})
+
 describe('LoadMore', () => {
   test('draws no sentinel for a list whose first page was short', async () => {
     const root = await list({ first: [{ id: 1 }] })

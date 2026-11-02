@@ -28,6 +28,8 @@ The table's `sort` and the URL's `sortParam` sort reach the list too, and a sort
 
 `list.patch(id, change)` updates one loaded row, the one `key` reads as `id`, with the fields to merge over it or a function of the row returning it. An action that toggles a row and answers it as the server now holds it feeds the list with `list.patch(row.id, answer)`, and the other rows stay as they are. It answers whether a row matched, and an `undefined` change, such as a failed `attempt`'s, does nothing.
 
+`list.reload()` loads again every row loaded so far and swaps them in at once, for a page whose data changed on the server. A page on its way is dropped, and a `for` keyed by the list's `key` keeps the DOM of the rows whose key is unchanged, so the view stays where it was. `list.reload(rows)` takes the first rows from the page instead of loading them again. A failed reload keeps the rows shown, unlike `restart`, `sortBy` and `filterBy`, which start over from the first page.
+
 ## Over an action
 
 A list follows what it reads, which the props a `persist` island gets from the next page change. An action source whose `input` is a function reading a signal or a prop starts over from the first page that input asks for.

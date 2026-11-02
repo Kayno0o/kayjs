@@ -83,6 +83,10 @@ export interface InfiniteList<Row> {
   filterBy: (filter: Partial<ListFilter>) => Promise<void>
   // Starts the list over once with a new sort, a new filter or both, which a table asking for the two at a time needs to load a single first page.
   restart: (change: { sort?: SortState | undefined, filter?: Partial<ListFilter> }) => Promise<void>
+  // Loads again every row loaded so far, page after page, and swaps them in at once when they land, so the rows and the scroll stay while the page refreshes: a row whose key is unchanged is the same row for a keyed `for`. A page on its way is dropped. The rows given, if any, stand for the first ones instead of loading them. A failed reload keeps the rows shown and fails nothing; a list that ended loads on until a short page, so rows added at its end show; nothing while a `sortBy`, `filterBy` or `restart` is loading its first page.
+  // A method for the same reason as `patch`.
+  // eslint-disable-next-line ts/method-signature-style
+  reload(rows?: Row[]): Promise<void>
   // Loads again the page that failed; nothing when no page failed.
   retry: () => Promise<void>
   // Changes the loaded row `key` reads as `id`, from the fields to merge over it or a function returning the row; `undefined` changes nothing, so the answer of an `attempt` that failed passes as is. Answers whether a loaded row matched, which needs the `key` option.
@@ -246,6 +250,59 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
     return true
   }
 
+  async function reload(given?: Row[]): Promise<void> {
+    if (replacing)
+      return
+
+    order += 1
+
+    const mine = order
+    const was = ended()
+    const target = fetched
+    const got = given === undefined ? [] : [...given]
+
+    running = true
+    pending.set(false)
+
+    let last = got.at(-1)
+    let done = false
+    // Loads until the rows asked for, or on to a short page for a list that ended.
+    const wants = () => !done && (got.length < target || was || got.length === 0)
+
+    try {
+      while (wants()) {
+        const page = await load({ offset: got.length, last, sort, filter })
+
+        if (mine !== order)
+          return
+
+        if (page === undefined)
+          return
+
+        got.push(...page)
+        last = page.at(-1) ?? last
+        done = page.length < size
+      }
+
+      shown.clear()
+
+      const fresh = key === undefined ? got : got.filter(row => shown.size < shown.add(key(row)).size)
+
+      fetched = got.length
+      lastFetched = last
+      ended.set(done)
+      failed.set(false)
+      rows.set(fresh)
+    }
+    catch {
+      // A throwing load keeps the rows shown, as a page that gave none.
+    }
+    finally {
+      if (mine === order)
+        running = false
+    }
+  }
+
   // Starts over from rows the page brought, as a list made from them.
   function reset(next: Row[]): void {
     order += 1
@@ -305,5 +362,5 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
   const more = async () => failed() ? undefined : loadPage()
   const retry = async () => failed() ? loadPage() : undefined
 
-  return { rows, ended, failed, pending, more, retry, sort: () => sort, sortBy, filter: () => filter, filterBy, restart, patch }
+  return { rows, ended, failed, pending, more, retry, reload, sort: () => sort, sortBy, filter: () => filter, filterBy, restart, patch }
 }

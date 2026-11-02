@@ -154,6 +154,7 @@ interface InfiniteList<Row>
   more: () => Promise<void>
   patch: (id: unknown, change: RowChange<Row> | undefined) => boolean
   pending: () => boolean
+  reload: (rows?: Row[] | undefined) => Promise<void>
   restart: (change: { sort?: SortState | undefined; filter?: Partial<ListFilter>; }) => Promise<void>
   retry: () => Promise<void>
   rows: () => Row[]
