@@ -791,14 +791,14 @@ component default
   file?: string | undefined;
   actions?: string | undefined;
   save?: string | undefined;
-  text?: string | undefined;
-  reasoning?: string | undefined;
-  reasoningText?: string | undefined;
-  note?: string | undefined;
   approval?: string | undefined;
   approvalText?: string | undefined;
   allow?: string | undefined;
   deny?: string | undefined;
+  text?: string | undefined;
+  reasoning?: string | undefined;
+  reasoningText?: string | undefined;
+  note?: string | undefined;
   edit?: any;
   regenerate?: any;
   thinking?: string | undefined;
