@@ -2,7 +2,6 @@
 import { stamp } from '../stamp'
 
 const current = stamp()
----
 --- script
 import Stamped from '../components/stamped.kay'
 ---
