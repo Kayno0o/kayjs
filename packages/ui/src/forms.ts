@@ -128,7 +128,7 @@ export async function callAction<Output>(form: HTMLFormElement, action: Action<n
   catch (error) {
     const read = error instanceof ActionError && error.data !== undefined ? refused?.(error.data as FailureData<Output>) : undefined
     // As in `attempt`, a `refused` saying nothing leaves the words of the data itself.
-    const said = read === undefined || read === '' ? error instanceof ActionError ? answerMessage(error.data) : undefined : read
+    const said = read === undefined || read === '' ? answerMessage(error instanceof ActionError ? error.data : undefined) : read
     const byField = { ...error instanceof ActionError ? error.errors : {}, ...messagesOf(said) }
     const messages = Object.entries(byField)
     const shown = (name: string) => [...form.querySelectorAll('[data-field]')].some(field => field.getAttribute('data-field') === name)
