@@ -23,6 +23,16 @@ test('a RelativeTime in the browser words the date relative to now, with the ful
   expect(time.getAttribute('data-tooltip')).toContain(String(date.getFullYear()))
 })
 
+test('a RelativeTime with focusable false has no tab stop and keeps its tooltip', async () => {
+  mounted = await mountComponent(RelativeTime, { date: new Date(Date.now() - 3_600_000), focusable: false })
+  await settle()
+
+  const time = mounted.root.querySelector('time')!
+
+  expect(time.hasAttribute('tabindex')).toBe(false)
+  expect(time.getAttribute('data-tooltip')).toBeTruthy()
+})
+
 test('a RelativeTime renders nothing for a date it cannot read', async () => {
   mounted = await mountComponent(RelativeTime, { date: 'nope' })
   await settle()

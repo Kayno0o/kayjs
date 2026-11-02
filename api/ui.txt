@@ -1631,6 +1631,7 @@ component default
   class?: string | { root?: string | undefined; } | undefined
   date: string | number | Date
   dateOptions?: DateTimeFormatOptions | undefined
+  focusable?: boolean | undefined
   options?: RelativeTimeFormatOptions | undefined
 
 [./rows-field.kay] default
