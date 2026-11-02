@@ -8,7 +8,7 @@ const FIELD_MESSAGE: { hint: string; issues: string; issue: string; }
 const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]"
 
 [./lib/accept] acceptsFile
-function acceptsFile(accept: string | undefined, file: Pick<File, "name" | "type">): boolean
+function acceptsFile(accept: string | undefined, file: Pick<File, "type" | "name">): boolean
 
 [./lib/add] default
 const default: { description: string; extension: { import: string; expression: string; }; notes: string[]; }
@@ -71,6 +71,9 @@ interface BellItem
 
 [./lib/bell] BellItems
 type BellItems<Item extends BellItem = BellItem> = readonly Item[] | (() => PromiseLike<readonly Item[]> | readonly Item[])
+
+[./lib/bell] BellTriggerProps
+type BellTriggerProps = MenuTriggerProps & { 'aria-label': string }
 
 [./lib/button-props] AsButton
 type AsButton = Omit<JSX.IntrinsicElements['button'], 'type' | 'class'> & Look & {
@@ -237,7 +240,6 @@ function buttonOf(attributes: TagAttributes): {
   'transition:leave'?: string | undefined;
   'transition:leave-from'?: string | undefined;
   'transition:leave-to'?: string | undefined;
-  name?: Value;
   commandForElement?: Value;
   formAction?: Value;
   formEnctype?: Value;
@@ -245,6 +247,7 @@ function buttonOf(attributes: TagAttributes): {
   formNoValidate?: Value;
   formTarget?: Value;
   labels?: Value;
+  name?: Value;
   validationMessage?: Value;
   validity?: Value;
   value?: Value;
@@ -422,7 +425,6 @@ function buttonOf(attributes: TagAttributes): {
   'transition:leave'?: string | undefined;
   'transition:leave-from'?: string | undefined;
   'transition:leave-to'?: string | undefined;
-  name?: Value;
   commandForElement?: Value;
   formAction?: Value;
   formEnctype?: Value;
@@ -430,6 +432,7 @@ function buttonOf(attributes: TagAttributes): {
   formNoValidate?: Value;
   formTarget?: Value;
   labels?: Value;
+  name?: Value;
   validationMessage?: Value;
   validity?: Value;
   value?: Value;

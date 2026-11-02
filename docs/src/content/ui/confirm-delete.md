@@ -58,3 +58,7 @@ A deletion made with `call()` throws an `ApiError` when the route refuses. It is
 Menu(label="Row" icon="menu" items={[{ label: 'Delete', tone: 'danger', onSelect: () => asking = true }]})
 ConfirmDelete(trigger="none" open={asking()} onOpenChange={open => asking = open} message="Delete this row?" failure="Could not delete" onConfirm={remove})
 ```
+
+## Attributes
+
+Other attributes, such as a `data-testid` or an `aria-describedby`, go on the trigger. A `trigger="none"` has none to receive them.

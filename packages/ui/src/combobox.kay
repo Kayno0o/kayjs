@@ -22,7 +22,7 @@ const look = recipe({
 // A remote search waits this long after the last key.
 const DEBOUNCE_MS = 200
 
-const { id, options, value = '', valueLabel, label, name, minLength = 1, create = false, createLabel = (text: string) => wording('ui.combobox.create', 'Create "{text}"', { text }), loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, onChange, onCreate, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'disabled' | 'role' | 'minLength'> & {
+const { id, options, value = '', valueLabel, label, name, minLength = 1, create = false, createLabel = (text: string) => wording('ui.combobox.create', 'Create "{text}"', { text }), loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, open, onOpenChange, onChange, onCreate, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'disabled' | 'role' | 'minLength'> & {
   // The listbox's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
   // A list, filtered as the visitor types, or a function handed `{ q }` that answers the options for it: an action, or an API call wrapped in one. Only the latest answer is shown.
@@ -44,6 +44,9 @@ const { id, options, value = '', valueLabel, label, name, minLength = 1, create 
   emptyLabel?: string | undefined
   failureLabel?: string | undefined
   disabled?: boolean | undefined
+  // Shows the list when the page sets it; focus, typing, Escape, a pick and focus leaving open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
+  open?: boolean | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
   onChange?: ((value: Value | '', option: ComboboxOption<Value> | undefined) => unknown) | undefined
   // Called with the text of a created option, once it is picked.
   onCreate?: ((text: string) => unknown) | undefined
@@ -62,7 +65,7 @@ const startLabel = () => startOption()?.label ?? fallbackLabel(value)
 
 const text = signal(startLabel())
 const picked = signal<ComboboxOption<Value> | undefined>(startOption() ?? (value ? { value: value as Value, label: startLabel() } : undefined))
-const open = signal(false)
+const opened = signal(false)
 const active = signal(-1)
 const found = signal<readonly ComboboxOption<Value>[]>([])
 // The text the answers held in `found` are for.
@@ -116,7 +119,7 @@ const rows = () => remote ? found() : matchingOptions(known(), text())
 // A remote list is asked for once the text reaches `minLength`, and is waiting until its answer lands.
 const waiting = () => remote && text().trim().length >= minLength && answered() !== text()
 const offered = () => create && !waiting() && offersCreate(remote ? found() : known(), text())
-const shown = () => open() && count() > 0
+const shown = () => opened() && count() > 0
 const count = () => rows().length + (offered() ? 1 : 0)
 // The description, none when it is only whitespace.
 const described = (option: ComboboxOption<Value>) => option.description?.trim() || undefined
@@ -125,7 +128,7 @@ const optionId = (index: number) => `${listId}-option-${index}`
 const flags = () => [...rows().map(option => option.disabled === true), ...offered() ? [false] : []]
 
 const status = () => {
-  if (!open() || (remote && text().trim().length < minLength))
+  if (!opened() || (remote && text().trim().length < minLength))
     return ''
 
   if (waiting())
@@ -169,11 +172,35 @@ async function load(query: string) {
   }
 }
 
+// What the page was last told, so a change it made itself is not echoed back.
+let told = untrack(() => opened())
+
+effect(() => {
+  if (open === undefined)
+    return
+
+  told = open
+  opened = open
+
+  if (open && untrack(() => remote && found().length === 0))
+    void load(untrack(() => text()))
+})
+
+effect(() => {
+  const now = opened()
+
+  if (now === told)
+    return
+
+  told = now
+  untrack(() => onOpenChange?.(now))
+})
+
 // The search waits for a pause in typing; a list filters at once.
 effect(() => {
   const query = text()
 
-  if (!untrack(() => open()) || !remote)
+  if (!untrack(() => opened()) || !remote)
     return
 
   const timer = setTimeout(() => void load(query), DEBOUNCE_MS)
@@ -184,7 +211,7 @@ effect(() => {
 // A new key drops the rows and the answer still on its way: they are for an older text.
 function type(next: string) {
   request++
-  open = true
+  opened = true
   text = next
   active = -1
   failed = false
@@ -207,7 +234,7 @@ function pick(index: number) {
 
   picked = option
   text = option.label
-  open = false
+  opened = false
   active = -1
 
   if (!row)
@@ -234,8 +261,8 @@ function adopt(): boolean {
 }
 
 function move(step: 1 | -1) {
-  if (!open()) {
-    open = true
+  if (!opened()) {
+    opened = true
 
     if (remote)
       void load(text())
@@ -248,7 +275,7 @@ function move(step: 1 | -1) {
 function keyDown(event: KeyboardEvent) {
   if (event.altKey && event.key === 'ArrowDown') {
     event.preventDefault()
-    open = true
+    opened = true
 
     return
   }
@@ -272,17 +299,17 @@ function keyDown(event: KeyboardEvent) {
       }
       else if (adopt()) {
         event.preventDefault()
-        open = false
+        opened = false
       }
 
       break
     case 'Escape':
-      if (open()) {
+      if (opened()) {
         // An open list with no row to hold the press leaves it to an enclosing dialog.
         if (shown())
           event.preventDefault()
 
-        open = false
+        opened = false
         active = -1
       }
       else if (text() !== '' || picked()) {
@@ -306,7 +333,7 @@ function focusIn() {
   if (remote && (picked() || text().trim().length < minLength))
     return
 
-  open = true
+  opened = true
 
   if (remote && found().length === 0)
     void load(text())
@@ -315,7 +342,7 @@ function focusIn() {
 // A click on an option keeps focus in the input, so the list closes on focus leaving rather than on that press.
 function focusOut() {
   adopt()
-  open = false
+  opened = false
   active = -1
 }
 
@@ -332,7 +359,7 @@ const initial = defaultKept(() => input, () => ({ text: text(), picked: picked()
 onFormReset(() => input, () => {
   text = initial().text
   picked = initial().picked
-  open = false
+  opened = false
   active = -1
 })
 

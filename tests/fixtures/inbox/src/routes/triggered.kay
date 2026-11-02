@@ -1,0 +1,5 @@
+---
+import TriggeredBell from '../components/triggered-bell.kay'
+---
+h1 Triggered
+TriggeredBell

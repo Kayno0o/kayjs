@@ -41,3 +41,5 @@ To keep what a refusal carries instead of its words, such as the output of a com
 `dismissLabel` names each toast's close button for screen readers, `Dismiss notification` by default.
 
 `hotkey` is the key that, with Alt, moves the focus to the first toast's first button, its action when it has one, `t` by default. Pass `hotkey={null}` to turn it off.
+
+Other attributes, such as a `data-testid` or an `aria-label`, go on the toast stack's element.

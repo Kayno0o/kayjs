@@ -35,3 +35,5 @@ Menu(label="Actions" items={items})
   @trigger(attributes)
     Button({...attributes} label="Actions")
 ```
+
+Other attributes, such as a `data-testid`, an `aria-describedby` or a `style`, go on the default icon button. A `style` is written after the anchor's.

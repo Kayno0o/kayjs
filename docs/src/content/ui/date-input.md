@@ -17,3 +17,7 @@ The field is a native `input type="date"`, so a form posts its value with no Jav
 The calendar opens on the chosen day, or today. The arrows move by day and week, Home and End to the ends of the week, PageUp and PageDown by month and with Shift by year, Enter or Space picks the day and Escape closes it, focus going back to the button. The days are named in full for screen readers and the month is announced as it changes.
 
 The button, month and Today labels read the `ui.dateInput.*` messages, or `openLabel`, `previousLabel`, `nextLabel` and `todayLabel`.
+
+## Opened by the app
+
+`open` shows the calendar when your code sets it, and `onOpenChange(open)` is called whenever it shows or hides: the button, a click outside, Escape or a pick. When you drive `open`, set your own value back in `onOpenChange`. `DateRangeInput` takes `onOpenChange(open, box)` too, `box` being `'from'` or `'to'`.

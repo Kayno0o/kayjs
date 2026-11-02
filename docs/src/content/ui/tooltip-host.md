@@ -33,3 +33,7 @@ A `span` with `data-tooltip` is not a tab stop, so the keyboard never shows its 
 An `IconButton` sets `data-tooltip` to its `label`, so an icon-only button names itself with no extra markup.
 
 <Demo name="tooltip-host/icon-button" />
+
+## Attributes
+
+TooltipHost takes only `showDelay` and `hideDelay`. Its tooltip's `id` is the one every tooltip's element points at with `aria-describedby`, so an `id` of your own, or any other attribute, has nowhere to go.

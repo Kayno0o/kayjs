@@ -9,3 +9,7 @@ Use `BellInbox` inside an island when your notifications live elsewhere and load
 `onRead(id)` hears an item opened, and `onRead(undefined)` hears "Mark all as read". It is where your own source marks the read, and a promise is awaited before the list is asked again. Without `onRead` a custom source draws no "Mark all as read".
 
 `onOpenChange(open)` hears the list shown or hidden, and `open` shows it from the page. `@item(note)` draws a row in place of its dot and title, and the row stays the link or button that reads the item. A title is text, and a link is drawn only for a path of your site or an http or https address.
+
+## Your own trigger
+
+`@trigger(attributes, unread)` replaces the icon button: spread the attributes on any element, and `unread` is the count, for a badge of your own, as the one over the default button is not drawn. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup`, the style that anchors the list and an `aria-label` of the `label` and the unread count, so the count stays in the button's name.

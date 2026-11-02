@@ -4,6 +4,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui's MultiSelect, DateInput (and DateRangeInput, with the box in `onOpenChange(open, box)`), Combobox and AppSwitcher take `open` and `onOpenChange`, HoverCard takes `onOpenChange` and tells it when Escape or a detached anchor hid it so the app clears its anchor, and BellInbox takes a `@trigger(attributes, unread)` block: [forms](../packages/ui/llms/forms.md), [basics](../packages/ui/llms/basics.md).
+- kayjs-ui's Menu, AppSwitcher and ConfirmDelete spread the attributes they are given on their trigger, CommandPalette on its dialog and Toaster on its root; only TooltipHost, whose `id` its tooltips point at, still takes none: [basics](../packages/ui/llms/basics.md).
 - kayjs-ui's ConfirmDelete takes `open` and `trigger="none"`, so a Menu entry, a context menu or a shortcut can ask for the confirmation, and Menu and AppSwitcher take a `@trigger(attributes)` block in place of the icon button: [basics](../packages/ui/llms/basics.md), [forms](../packages/ui/llms/forms.md).
 - kayjs-ui's `Bell` takes `items` (and `unread`) for notifications from the app's own source, drawing for anyone, and `BellInbox` in an island takes a function or promise source, `onRead(id | undefined)`, `onOpenChange` and an `@item(note)` row: [Bell](../packages/ui/llms/page-layout-palette-and-trees.md#bell).
 - kayjs-ai's Chat takes `@turn(turn, index)`, `@actions(turn)`, `@call(call)`, `@source(source, n)`, `@empty({ send })` and `@footer` blocks that replace how a turn, the buttons under it, a tool call (a result card), a cited source, the empty chat and the area under the form are drawn, and ChatLauncher forwards them: [Chat blocks](../packages/ai/llms/chat-blocks.md).

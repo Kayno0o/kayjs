@@ -14,7 +14,7 @@ const look = recipe({
   },
 })
 
-const { value = [null, null], min, max, firstDay, label, fromLabel, toLabel, fromName, toName, disabled, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { value = [null, null], min, max, firstDay, label, fromLabel, toLabel, fromName, toName, disabled, onOpenChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // The dates to start with as `YYYY-MM-DD`, each open when null; a pair whose parent passes another follows it.
   value?: DateRange | undefined
   // The earliest and latest date allowed, as `YYYY-MM-DD`.
@@ -31,6 +31,8 @@ const { value = [null, null], min, max, firstDay, label, fromLabel, toLabel, fro
   fromName?: string | undefined
   toName?: string | undefined
   disabled?: boolean | undefined
+  // Called as either calendar shows or hides, with the box it belongs to.
+  onOpenChange?: ((open: boolean, box: 'from' | 'to') => unknown) | undefined
   // Runs once a date is set, with the pair in order, and only when the range changed.
   onChange?: ((value: DateRange) => unknown) | undefined
 }>()
@@ -69,6 +71,6 @@ function commit(from: string, to: string) {
 }
 ---
 div({...rest} ref={ref} role="group" aria-label={label})
-  DateInput(name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} aria-label={fromLabel ?? wording('ui.dateRangeInput.from', '{label} from', { label })} value={pair()[0] ?? ''} onChange={next => commit(next, pair()[1] ?? '')})
+  DateInput(name={fromName} min={min} max={max} firstDay={firstDay} disabled={disabled} onOpenChange={now => onOpenChange?.(now, 'from')} aria-label={fromLabel ?? wording('ui.dateRangeInput.from', '{label} from', { label })} value={pair()[0] ?? ''} onChange={next => commit(next, pair()[1] ?? '')})
   span(part="separator" aria-hidden="true") -
-  DateInput(name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} aria-label={toLabel ?? wording('ui.dateRangeInput.to', '{label} to', { label })} value={pair()[1] ?? ''} onChange={next => commit(pair()[0] ?? '', next)})
+  DateInput(name={toName} min={min} max={max} firstDay={firstDay} disabled={disabled} onOpenChange={now => onOpenChange?.(now, 'to')} aria-label={toLabel ?? wording('ui.dateRangeInput.to', '{label} to', { label })} value={pair()[1] ?? ''} onChange={next => commit(pair()[0] ?? '', next)})

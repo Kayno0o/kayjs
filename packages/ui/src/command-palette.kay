@@ -1,8 +1,9 @@
 ---
-import type { SearchHit } from 'kay'
+import type { JSX, SearchHit } from 'kay'
 import type { PaletteAction, PaletteEntry, PaletteLink } from './palette'
 import { effect, memo, onCleanup, recipe, searchResults, shortcut, signal, uid } from 'kay'
 import { stepIndex } from './cycle'
+import { startRef } from './form-reset'
 import Icon from './icon.kay'
 import { OUTSIDE } from './outside'
 import { isPaletteLink, paletteHits, paletteMatches, paletteSections, splitMatches, withRecent } from './palette'
@@ -33,7 +34,7 @@ const look = recipe({
   },
 })
 
-const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearch', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.empty', 'No results'), recentLabel = wording('ui.commandPalette.recent', 'Recent'), resultsLabel, siteSearchMore, search, searchLabel = wording('ui.commandPalette.search', 'Found'), searchError = wording('ui.commandPalette.searchError', 'The search failed') } = props<{
+const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearch', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.empty', 'No results'), recentLabel = wording('ui.commandPalette.recent', 'Recent'), resultsLabel, siteSearchMore, search, searchLabel = wording('ui.commandPalette.search', 'Found'), searchError = wording('ui.commandPalette.searchError', 'The search failed'), ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'class' | 'children' | 'open' | 'onClose' | 'closedby'> & {
   // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
@@ -84,6 +85,7 @@ const followedRecently = signal<string[]>(recent)
 const query = signal('')
 const selected = signal(0)
 let dialog: HTMLDialogElement | undefined
+const ref = startRef<HTMLDialogElement>(element => dialog = element, rest.ref)
 const searching = siteSearch
 const site = searching ? searchResults(query, searching === true ? {} : searching) : undefined
 // The rows `search` answered, with the query they answer.
@@ -261,7 +263,7 @@ function keyDown(event: KeyboardEvent) {
   document.getElementById(optionId(active()))?.click()
 }
 ---
-dialog(part="root" ref={element => dialog = element} closedby="any" aria-label={label} onClose={closed})
+dialog({...rest} part="root" ref={ref} closedby="any" aria-label={label} onClose={closed})
   if shown()
     div(part="search")
       Icon(icon="search" part="icon")

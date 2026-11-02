@@ -1,11 +1,13 @@
 --- <Item extends BellItem>
 import type { Snippet } from 'kay'
-import type { BellItem, BellItems } from './bell'
+import type { BellItem, BellItems, BellTriggerProps } from './bell'
+import type { PopoverTriggerProps } from './popover'
 import type { PopoverPlacement } from './popover'
 import { call, effect, recipe, resource, signal } from 'kay'
 import { wording } from 'kay/words'
 import inboxApi from './api/inbox'
 import IconButton from './icon-button.kay'
+import { withPopup } from './menu'
 import { MENU_FOOTER, MENU_ITEM, MENU_LIST } from './menu-look'
 import { OUTSIDE } from './outside'
 import Popover from './popover.kay'
@@ -27,7 +29,7 @@ const look = recipe({
   },
 })
 
-const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-end', items: source, unread: unreadCount, onRead, open, onOpenChange, item: drawRow } = props<{
+const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-end', items: source, unread: unreadCount, onRead, open, onOpenChange, item: drawRow, trigger } = props<{
   // Names the button and the list it opens; the `ui.bell.label` message by default.
   label?: string | undefined
   placement?: PopoverPlacement | undefined
@@ -42,6 +44,8 @@ const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-e
   onOpenChange?: ((open: boolean) => unknown) | undefined
   // Draws each row in place of its dot and title: `@item(note)`.
   item?: Snippet<[note: Item]> | undefined
+  // Replaces the icon button that opens the list: `@trigger(attributes, unread)`, then `button({...attributes})`. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup`, the anchor style and an `aria-label` made of `label` and the unread count; `unread` is the count, to draw a badge of your own (the one over the default button is not drawn).
+  trigger?: Snippet<[attributes: BellTriggerProps, unread: number]> | undefined
 }>()
 
 // The routes answer a path of the site or an http(s) URL only; checked again here, as the link is drawn.
@@ -63,6 +67,13 @@ const items = (): readonly BellItem[] => {
 const waiting = () => asked !== undefined && asked.value() === undefined && asked.error() === undefined
 const unread = () => custom ? unreadCount ?? items().filter(note => !note.read).length : inbox?.value()?.unread ?? 0
 const linked = (url: string | undefined) => url !== undefined && LINKED.test(url) ? url : undefined
+const name = () => unread() > 0 ? wording('ui.bell.unread', '{label}, {count} unread', { label, count: unread() }) : label
+
+// The popover's attributes with the role of the list and a name that follows the unread count.
+function named(attributes: PopoverTriggerProps): BellTriggerProps {
+  return Object.defineProperty(withPopup(attributes, 'true'), 'aria-label', { get: name, enumerable: true }) as BellTriggerProps
+}
+
 const external = (url: string | undefined) => url !== undefined && WEB.test(url)
 
 // A live region naming a notification that arrives while the page is open; the first load announces nothing.
@@ -106,7 +117,10 @@ async function send(id?: string) {
 span(part="root")
   Popover(placement={placement} part="menu" open={open} onOpenChange={onOpenChange})
     @trigger(attributes)
-      IconButton({...attributes} icon="bell" label={unread() > 0 ? wording('ui.bell.unread', '{label}, {count} unread', { label, count: unread() }) : label} variant="ghost" aria-haspopup="true")
+      if trigger
+        | {trigger(named(attributes), unread())}
+      else
+        IconButton({...attributes} icon="bell" label={name()} variant="ghost" aria-haspopup="true")
     div(part="list" aria-label={label})
       if items().length === 0 && !waiting()
         p(part="empty") {wording('ui.bell.empty', 'No notifications')}
@@ -132,5 +146,5 @@ span(part="root")
       if unread() > 0 && (!custom || onRead)
         button(part="all" type="button" onClick={() => send()}) {wording('ui.bell.markAll', 'Mark all as read')}
   span(part="announce" role="status") {announced()}
-  if unread() > 0
+  if unread() > 0 && !trigger
     span(part="count" aria-hidden="true") {unread() > 99 ? '99+' : unread()}

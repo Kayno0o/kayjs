@@ -21,3 +21,7 @@ The trigger opens the panel on its search box, or its first checkbox. ArrowDown 
 `disabled` stops the trigger opening. `placement` is where the panel opens, `bottom-start` by default, and `id` is the panel's id, unique on the page. kay draws one when you give none.
 
 `searchLabel` is the search box's placeholder, and with `label` after it, its name for screen readers. `allLabel` and `noneLabel` word the buttons picking every option shown and none of them. `emptyLabel` is what a search matching none says. They read `Search`, `All`, `None` and `No match` by default.
+
+## Opened by the app
+
+`open` shows the panel when your code sets it, and `onOpenChange(open)` is called with the new state whenever the panel shows or hides: the trigger, a click outside, Escape or focus leaving it. When you drive `open`, set your own value back in `onOpenChange`, or a click outside would leave it saying "open".

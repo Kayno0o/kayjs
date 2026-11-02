@@ -1,7 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import type { HoverCardPlacement } from './hover-card'
-import { effect, onCleanup, recipe, uid } from 'kay'
+import { effect, onCleanup, recipe, uid, untrack } from 'kay'
 
 // 'kui-hover-card' stays as the component's name for an app's CSS and the always-hidden guard.
 // It never takes the pointer, so it cannot flicker the hover that shows it.
@@ -13,7 +13,7 @@ const look = recipe({
   },
 })
 
-const { id, anchor, placement = 'top', style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'role' | 'style'> & {
+const { id, anchor, placement = 'top', onOpenChange, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'popover' | 'class' | 'children' | 'role' | 'style'> & {
   // Written after the component's own declarations, so it wins.
   style?: string | undefined
   // The panel's id, unique on the page; one is drawn when none is given.
@@ -22,6 +22,8 @@ const { id, anchor, placement = 'top', style, ...rest } = props<Omit<JSX.Intrins
   anchor?: Element | null | undefined
   // Which side of the anchor it sits on, flipped by the browser when there is no room there.
   placement?: HoverCardPlacement | undefined
+  // Called with `true` as the card shows and `false` as it hides, also when it hides on its own (Escape, or an anchor that left the page) while the page still holds the anchor: clear it there, and the same element can show the card again.
+  onOpenChange?: ((open: boolean) => unknown) | undefined
 }>()
 
 const panelId = id ?? uid()
@@ -33,6 +35,17 @@ let frame = 0
 let described: Element | undefined
 // Where the stand-in was last put, so a frame with nothing moved writes nothing.
 let placed = ''
+
+// Whether the page was told the card is open, so each change is reported once.
+let reported = false
+
+function report(open: boolean) {
+  if (reported === open)
+    return
+
+  reported = open
+  untrack(() => onOpenChange?.(open))
+}
 
 // The card's id is listed in the anchor's `aria-describedby` while it is open, beside whatever ids the app put there.
 function describe(target: Element) {
@@ -85,6 +98,8 @@ function close() {
 
   if (stand?.isConnected && stand.matches(':popover-open'))
     stand.hidePopover()
+
+  report(false)
 }
 
 // Every anchor is followed by a frame loop while the card is open: the stand-in trails a native scroll by a frame, and an anchor that is `display: none` has no box to follow.
@@ -137,6 +152,8 @@ effect(() => {
 
   if (!panel.matches(':popover-open'))
     panel.showPopover()
+
+  report(true)
 })
 
 onCleanup(unmark)

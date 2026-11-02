@@ -27,3 +27,7 @@ Opening the panel focuses the current tile. The arrow keys move between tiles, t
 ## Your own trigger
 
 `@trigger(attributes)` replaces the icon button, as in [Menu](/ui/menu#your-own-trigger): spread the attributes on any element, and `icon` then has nothing to draw.
+
+## Opened by the app
+
+`open` shows the panel when your code sets it, and `onOpenChange(open)` is called whenever it shows or hides. When you drive `open`, set your own value back in `onOpenChange`. Other attributes, such as a `data-testid`, an `aria-describedby` or a `style`, go on the default icon button.

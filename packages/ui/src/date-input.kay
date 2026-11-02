@@ -26,7 +26,7 @@ const look = recipe({
   },
 })
 
-const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Choose a date'), previousLabel = wording('ui.dateInput.previous', 'Previous month'), nextLabel = wording('ui.dateInput.next', 'Next month'), todayLabel = wording('ui.dateInput.today', 'Today'), onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
+const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Choose a date'), previousLabel = wording('ui.dateInput.previous', 'Previous month'), nextLabel = wording('ui.dateInput.next', 'Next month'), todayLabel = wording('ui.dateInput.today', 'Today'), open, onOpenChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
   // The date as `YYYY-MM-DD`, or `''` for none. Without it, the box starts empty and keeps what is picked, for a form posting it by its `name`.
   value?: string | undefined
   // The earliest and latest date allowed, as `YYYY-MM-DD`; the calendar greys out the days outside them.
@@ -39,6 +39,9 @@ const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Cho
   previousLabel?: string | undefined
   nextLabel?: string | undefined
   todayLabel?: string | undefined
+  // Shows the calendar when the page sets it; the button, a click outside and Escape open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
+  open?: boolean | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
   // Called with the new date, or `''` once emptied, however it was set: typed, picked in the calendar or reset by a form.
   onChange?: ((value: string) => unknown) | undefined
 }>()
@@ -74,10 +77,17 @@ effect(() => {
     current = value
 })
 
-function toggled(open: boolean) {
-  opened = open
+// A page driving `open` sets the calendar; the browser's light dismiss still closes it, and reports `false`.
+effect(() => {
+  if (open !== undefined)
+    opened = open
+})
 
-  if (!open)
+function toggled(isOpen: boolean) {
+  opened = isOpen
+  onOpenChange?.(isOpen)
+
+  if (!isOpen)
     return
 
   now = today()

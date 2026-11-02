@@ -1,3 +1,8 @@
+import type { MenuTriggerProps } from './menu'
+
+// What a `@trigger` snippet of a BellInbox is handed: a Menu trigger's attributes with a name that follows the unread count, to spread on any element.
+export type BellTriggerProps = MenuTriggerProps & { 'aria-label': string }
+
 // A notification the `Bell` lists: what kayjs-auth's inbox answers, and what an app's own source gives it.
 export interface BellItem {
   id: string

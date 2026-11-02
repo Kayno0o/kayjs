@@ -529,7 +529,10 @@ component default
   id?: string | undefined
   label?: string | undefined
   newTab?: boolean | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
   placement?: PopoverPlacement | undefined
+  style?: string | undefined
   tile?: ((app: SwitcherApp) => Element) | undefined
   trigger?: ((attributes: MenuTriggerProps) => Element) | undefined
 
@@ -683,6 +686,7 @@ component default
   onRead?: ((id: string | undefined) => unknown) | undefined
   open?: boolean | undefined
   placement?: PopoverPlacement | undefined
+  trigger?: ((attributes: BellTriggerProps, unread: number) => Element) | undefined
   unread?: number | undefined
 
 [./bell.kay] default
@@ -839,6 +843,8 @@ component default
   name?: string | undefined
   onChange?: ((value: "" | Value, option: ComboboxOption<Value> | undefined) => unknown) | undefined
   onCreate?: ((text: string) => unknown) | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
   option?: ((option: ComboboxOption<Value>) => Element) | undefined
   options: ComboboxOptions<Value>
   value?: "" | Value | undefined
@@ -995,6 +1001,8 @@ component default
   min?: string | undefined
   nextLabel?: string | undefined
   onChange?: ((value: string) => unknown) | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
   openLabel?: string | undefined
   previousLabel?: string | undefined
   todayLabel?: string | undefined
@@ -1011,6 +1019,7 @@ component default
   max?: string | undefined
   min?: string | undefined
   onChange?: ((value: DateRange) => unknown) | undefined
+  onOpenChange?: ((open: boolean, box: "from" | "to") => unknown) | undefined
   toLabel?: string | undefined
   toName?: string | undefined
   value?: DateRange | undefined
@@ -1218,6 +1227,7 @@ component default
   children?: Element
   class?: string | { root?: string | undefined; stand?: string | undefined; } | undefined
   id?: string | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
   placement?: HoverCardPlacement | undefined
   style?: string | undefined
 
@@ -1465,6 +1475,7 @@ component default
   open?: boolean | undefined
   placement?: PopoverPlacement | undefined
   size?: "xs" | "sm" | "md" | "lg" | undefined
+  style?: string | undefined
   tone?: "neutral" | "danger" | "accent" | undefined
   trigger?: ((attributes: MenuTriggerProps) => Element) | undefined
   variant?: "solid" | "ghost" | "inline" | undefined
@@ -1510,6 +1521,8 @@ component default
   name?: string | undefined
   noneLabel?: string | undefined
   onChange?: ((value: Value[]) => unknown) | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
   options: readonly MultiSelectOption<Value>[]
   placeholder?: string | undefined
   placement?: PopoverPlacement | undefined

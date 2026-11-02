@@ -171,4 +171,20 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
     expect(await page.text('#log')).toBe('open,b,undefined')
     expect(page.errors).toEqual([])
   }, 60_000)
+
+  it('opens from the app, draws the @trigger block with the unread count in its name and tells onOpenChange', async () => {
+    visitor.name = undefined
+    await using page = await main.open('/triggered')
+
+    await page.waitUntil(() => document.querySelector('#bell')?.getAttribute('aria-label') === 'Notifications, 2 unread')
+    expect(await page.text('#bell')).toBe('Inbox (2)')
+    expect(await page.count('.kui-bell [data-part=count]')).toBe(0)
+    await page.click('#show')
+    await page.waitFor('.kui-bell [data-part=list] [data-part=item]')
+    await page.waitUntil(() => document.querySelector('#bell')?.getAttribute('aria-expanded') === 'true')
+    await page.click('h1')
+    await page.waitUntil(() => document.querySelector('#bell')?.getAttribute('aria-expanded') === 'false')
+    expect(await page.text('#log')).toBe('true,false')
+    expect(page.errors).toEqual([])
+  }, 60_000)
 })

@@ -1,4 +1,5 @@
 --- <Data>
+import type { JSX } from 'kay'
 import { effect, recipe, signal } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
@@ -19,7 +20,7 @@ const frame = recipe({
   },
 })
 
-const { message, onConfirm, open, onOpenChange, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancel', 'Cancel'), size, variant } = props<{
+const { message, onConfirm, open, onOpenChange, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancel', 'Cancel'), size, variant, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children' | 'title' | 'onClick' | 'disabled' | 'hidden'> & {
   // The dialog's question; asked inline, the armed pair's name for screen readers and the confirm button's tooltip.
   message: string
   // Deletes, or does what a neutral confirm asks. The dialog stays open, its buttons disabled, until a returned promise settles, and closes once it resolves.
@@ -124,11 +125,11 @@ function keyDown(event: KeyboardEvent) {
 }
 ---
 if trigger === 'button'
-  Button(label={triggerLabel()} tone={look()} disabled={disabled} hidden={ask === 'inline' && isOpen()} part="root" onClick={start})
+  Button({...rest} label={triggerLabel()} tone={look()} disabled={disabled} hidden={ask === 'inline' && isOpen()} part="root" onClick={start})
 else if trigger === 'link'
-  button.kui-confirm-delete-link(part="root" type="button" disabled={disabled} hidden={ask === 'inline' && isOpen()} onClick={start}) {triggerLabel()}
+  button.kui-confirm-delete-link({...rest} part="root" type="button" disabled={disabled} hidden={ask === 'inline' && isOpen()} onClick={start}) {triggerLabel()}
 else if trigger !== 'none'
-  IconButton(icon={danger() ? 'delete' : 'success'} label={triggerLabel()} size={size} variant={variant} tone={variant === undefined ? undefined : tone} disabled={disabled} hidden={ask === 'inline' && isOpen()} part="root" onClick={start})
+  IconButton({...rest} icon={danger() ? 'delete' : 'success'} label={triggerLabel()} size={size} variant={variant} tone={variant === undefined ? undefined : tone} disabled={disabled} hidden={ask === 'inline' && isOpen()} part="root" onClick={start})
 if ask === 'inline'
   if isOpen()
     // Armed by a click, so the focus moves onto the button that deletes.

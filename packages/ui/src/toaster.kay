@@ -1,8 +1,10 @@
 ---
+import type { JSX } from 'kay'
 import type { IconSlot } from './defaults'
 import type { Toast, ToastType } from './toast'
 import { effect, onMount, recipe, shortcut, signal } from 'kay'
 import { claim } from './claim'
+import { startRef } from './form-reset'
 import Button from './button.kay'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
@@ -28,7 +30,7 @@ const look = recipe({
   },
 })
 
-const { dismissLabel = wording('ui.toaster.dismiss', 'Dismiss notification'), hotkey = 't' } = props<{
+const { dismissLabel = wording('ui.toaster.dismiss', 'Dismiss notification'), hotkey = 't', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'popover'> & {
   // Names each toast's close button for screen readers.
   dismissLabel?: string | undefined
   // Alt and this key move focus to the toasts on screen, where Escape dismisses the focused one; `null` leaves it to the app.
@@ -36,6 +38,7 @@ const { dismissLabel = wording('ui.toaster.dismiss', 'Dismiss notification'), ho
 }>()
 
 const toaster = signal<HTMLElement>()
+const ref = startRef<HTMLElement>(element => toaster = element, rest.ref)
 // An extension rendering its own Toaster inside an app that has one shows each toast once.
 const owns = claim('toaster')
 // The toasts outlive a page swap, so one on screen when the next page's Toaster hydrates is not in the server markup: shown from the mount on, hydration meets the markup it was given.
@@ -111,7 +114,7 @@ if owns()
     for item of listed().filter(item => toneOf(item) === 'danger') key={item.id}
       span {item.message}
   // Holding still while the pointer is on the toasts or focus is in them, as timed content must let itself be paused.
-  div(part="root" ref={element => toaster = element} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
+  div({...rest} part="root" ref={ref} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
     for item of listed() key={item.id}
       div(part="toast" data-id={item.id} data-tone={toneOf(item)} data-type={item.type} onKeyDown={dismissed})
         Icon(icon={ICONS[item.type]} part="icon")
