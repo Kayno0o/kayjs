@@ -332,9 +332,11 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const sources = files.map(file => readSource(file).text)
 
   const cacheDir = projectPaths(root).cache
-  // A file outside the routes and the mounted pages is a component, where a root `@block` has no layout to fill a slot of.
-  const pageDirs = [projectPaths(root, options).routes, ...routeMounts(root, options.extensions).map(mount => mount.dir)]
-  const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir, options.hot, options.lints, !pageDirs.some(dir => file.startsWith(dir + sep)) && file !== editor && !mounted.includes(file))))
+  // A file beside the routes directory, outside it and the mounted pages, is a component, where a root `@block` has no layout to fill a slot of; one outside the app's source, as another project's pages under a root above it, is left alone.
+  const routes = projectPaths(root, options).routes
+  const pageDirs = [routes, ...routeMounts(root, options.extensions).map(mount => mount.dir)]
+  const isComponent = (file: string): boolean => file.startsWith(dirname(routes) + sep) && !pageDirs.some(dir => file.startsWith(dir + sep)) && file !== editor && !mounted.includes(file)
+  const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir, options.hot, options.lints, isComponent(file))))
 
   // What the files gone held, kept no longer.
   keepAnalyses(new Set(files))

@@ -240,6 +240,23 @@ describe('a block at the root of a component', () => {
       await rm(root, { recursive: true, force: true })
     }
   }, 120_000)
+
+  it('leaves a page of another project under the root alone', async () => {
+    const root = resolve(await fixtureCopy('layout-slots'))
+
+    try {
+      await Bun.write(join(root, 'src/routes/home.kay'), 'h1 Home\n')
+      await Bun.write(join(root, 'other/src/routes/page.kay'), '@aside\n  p Hi\nh1 Other\n')
+
+      const { code, output } = await kayBuildSpawned([root, '--no-check'])
+
+      expect(output).not.toContain('must sit directly under a component')
+      expect(code).toBe(0)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 120_000)
 })
 
 describe('kay check on a route tree with slots', () => {
