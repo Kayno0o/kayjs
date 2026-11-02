@@ -151,13 +151,26 @@ function failed() {
 // An image already decoded, from the cache, fires no load event of its own.
 onMount(() => {
   if (image?.complete) {
-    // An image that failed before the island hydrated fires no error event of its own.
     if (image.naturalWidth)
       loaded()
-    else if (src)
-      failed()
+    else if (image.currentSrc)
+      void probe(image)
   }
 })
+
+// An image that failed before the island hydrated fires no error event of its own: decoding it tells, and rejects for a broken one.
+async function probe(img: HTMLImageElement) {
+  if (typeof img.decode !== 'function')
+    return
+
+  try {
+    await img.decode()
+  }
+  catch {
+    if (image === img && !img.naturalWidth)
+      failed()
+  }
+}
 
 function start(event: PointerEvent, mode: 'move' | CropHandle) {
   const rect = stage?.getBoundingClientRect()
