@@ -27,7 +27,7 @@ const look = recipe({
   },
 })
 
-const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-end', items: source, unread: unreadCount, onRead, onOpenChange, item: drawRow } = props<{
+const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-end', items: source, unread: unreadCount, onRead, open, onOpenChange, item: drawRow } = props<{
   // Names the button and the list it opens; the `ui.bell.label` message by default.
   label?: string | undefined
   placement?: PopoverPlacement | undefined
@@ -37,6 +37,8 @@ const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-e
   unread?: number | undefined
   // Called with the id of an item opened, or `undefined` for "Mark all as read". The inbox is marked first when it is the source; a custom source marks here, and a promise is awaited before the list is asked again.
   onRead?: ((id: string | undefined) => unknown) | undefined
+  // Shows the list when the page sets it; the button, a click outside and Escape open and close it on their own.
+  open?: boolean | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   // Draws each row in place of its dot and title: `@item(note)`.
   item?: Snippet<[note: Item]> | undefined
@@ -56,6 +58,8 @@ const items = (): readonly BellItem[] => {
 
   return typeof source === 'function' ? asked?.value() ?? [] : source
 }
+// A function source still on its first answer has nothing to say yet, so the list does not claim to be empty.
+const waiting = () => asked !== undefined && asked.value() === undefined && asked.error() === undefined
 const unread = () => custom ? unreadCount ?? items().filter(note => !note.read).length : inbox?.value()?.unread ?? 0
 const linked = (url: string | undefined) => url !== undefined && LINKED.test(url) ? url : undefined
 const external = (url: string | undefined) => url !== undefined && WEB.test(url)
@@ -99,11 +103,11 @@ async function send(id?: string) {
 }
 ---
 span(part="root")
-  Popover(placement={placement} part="menu" onOpenChange={onOpenChange})
+  Popover(placement={placement} part="menu" open={open} onOpenChange={onOpenChange})
     @trigger(attributes)
       IconButton({...attributes} icon="bell" label={unread() > 0 ? wording('ui.bell.unread', '{label}, {count} unread', { label, count: unread() }) : label} variant="ghost" aria-haspopup="true")
     div(part="list" aria-label={label})
-      if items().length === 0
+      if items().length === 0 && !waiting()
         p(part="empty") {wording('ui.bell.empty', 'No notifications')}
       for note of items() key={note.id}
         if linked(note.url) as url
@@ -124,7 +128,7 @@ span(part="root")
               span(part="title") {note.title}
             if !note.read
               span(part="unread") {wording('ui.bell.unreadMark', '(unread)')}
-      if unread() > 0
+      if unread() > 0 && (!custom || onRead)
         button(part="all" type="button" onClick={() => send()}) {wording('ui.bell.markAll', 'Mark all as read')}
   span(part="announce" role="status") {announced()}
   if unread() > 0
