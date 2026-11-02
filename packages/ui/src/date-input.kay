@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { effect, memo, onMount, recipe, signal, untrack } from 'kay'
 import { addDays, addMonths, clampDate, dayName, firstDayOf, isDate, monthTitle, monthWeeks, sameMonth, today, weekdays, weekEdge, withinBounds } from './date'
 import { startRef } from './form-reset'
@@ -26,7 +26,7 @@ const look = recipe({
   },
 })
 
-const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Choose a date'), previousLabel = wording('ui.dateInput.previous', 'Previous month'), nextLabel = wording('ui.dateInput.next', 'Next month'), todayLabel = wording('ui.dateInput.today', 'Today'), open, onOpenChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
+const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Choose a date'), previousLabel = wording('ui.dateInput.previous', 'Previous month'), nextLabel = wording('ui.dateInput.next', 'Next month'), todayLabel = wording('ui.dateInput.today', 'Today'), unavailableLabel = wording('ui.dateInput.unavailable', 'This date is not available'), isDisabled, day, open, onOpenChange, onMonthChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
   // The date as `YYYY-MM-DD`, or `''` for none. Without it, the box starts empty and keeps what is picked, for a form posting it by its `name`.
   value?: string | undefined
   // The earliest and latest date allowed, as `YYYY-MM-DD`; the calendar greys out the days outside them.
@@ -39,6 +39,14 @@ const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Cho
   previousLabel?: string | undefined
   nextLabel?: string | undefined
   todayLabel?: string | undefined
+  // What a typed date `isDisabled` refuses says to the browser's validation, which holds a form back from posting it.
+  unavailableLabel?: string | undefined
+  // Whether a single day cannot be chosen, such as a closed day or a booked one: its button is disabled, the arrow keys skip it, a click cannot pick it, and a typed date it refuses is flagged as invalid and not reported to `onChange`, as one outside `min` and `max` is flagged. The earliest and latest date stay `min` and `max`.
+  isDisabled?: ((iso: string) => boolean) | undefined
+  // Draws the inside of a day's button in place of its number, which the block writes itself (`{Number(iso.slice(8))}`), for a price or a dot under it; the button, its `aria-label` and the selection stay.
+  day?: Snippet<[iso: string, state: { selected: boolean, today: boolean, outside: boolean, disabled: boolean }]> | undefined
+  // Called with the month on show as `YYYY-MM` each time the calendar opens on it or moves to another, so an app can load that month's availability.
+  onMonthChange?: ((month: string) => unknown) | undefined
   // Shows the calendar when the page sets it; the button, a click outside and Escape open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
@@ -55,7 +63,10 @@ const now = signal(today())
 let box: HTMLInputElement | undefined
 let root: HTMLElement | undefined
 
-onMount(() => ready = true)
+onMount(() => {
+  ready = true
+  flag(untrack(current))
+})
 
 const first = () => firstDay ?? firstDayOf(pageLocale())
 const weeks = memo(() => monthWeeks(cursor(), first()))
@@ -63,8 +74,20 @@ const names = memo(() => weekdays(pageLocale(), first()))
 
 const ref = startRef<HTMLInputElement>(element => box = element, rest.ref)
 
+// Whether a day cannot be chosen, outside the bounds or refused by the app.
+const blocked = (iso: string) => !withinBounds(iso, min, max) || isDisabled?.(iso) === true
+
+// A typed date the app refuses stays out of the value and holds the form back, as one outside the bounds does through the browser's own validation.
+function flag(next: string): boolean {
+  const refused = isDate(next) && isDisabled?.(next) === true
+
+  box?.setCustomValidity(refused ? unavailableLabel : '')
+
+  return refused
+}
+
 function heard(next: string) {
-  if (next === current())
+  if (flag(next) || next === current())
     return
 
   current = next
@@ -83,6 +106,44 @@ effect(() => {
     opened = open
 })
 
+// The month on show is reported on opening and on each move, once.
+let announced = ''
+
+effect(() => {
+  if (!opened()) {
+    announced = ''
+
+    return
+  }
+
+  const month = cursor().slice(0, 7)
+
+  if (month === announced)
+    return
+
+  announced = month
+  untrack(() => onMonthChange?.(month))
+})
+
+// The nearest day of the month of `iso` that can be chosen, `iso` itself when none can.
+function nearest(iso: string): string {
+  const target = clampDate(iso, min, max)
+
+  if (!blocked(target))
+    return target
+
+  for (let step = 1; step < 31; step++) {
+    for (const sign of [1, -1]) {
+      const near = addDays(target, sign * step)
+
+      if (sameMonth(near, target) && !blocked(near))
+        return near
+    }
+  }
+
+  return target
+}
+
 function toggled(isOpen: boolean) {
   opened = isOpen
   onOpenChange?.(isOpen)
@@ -91,7 +152,7 @@ function toggled(isOpen: boolean) {
     return
 
   now = today()
-  cursor = clampDate(isDate(current()) ? current() : today(), min, max)
+  cursor = nearest(isDate(current()) ? current() : today())
   focusCursor()
 }
 
@@ -101,13 +162,32 @@ function focusCursor() {
 }
 
 function go(iso: string) {
-  cursor = clampDate(iso, min, max)
+  cursor = nearest(iso)
   focusCursor()
+}
+
+// Moves by `step` days until a day that can be chosen, and not past the bounds nor a year on: the cursor stays where it is when there is none.
+function skipTo(target: string, step: number) {
+  let at = clampDate(target, min, max)
+
+  for (let tries = 0; tries < 366; tries++) {
+    if (!blocked(at)) {
+      cursor = at
+      focusCursor()
+
+      return
+    }
+
+    at = addDays(at, step)
+
+    if (!withinBounds(at, min, max))
+      return
+  }
 }
 
 // Written into the field as if typed, so a controlled parent, a form and the app's `onChange` all hear it.
 function pick(iso: string) {
-  if (!box || box.readOnly || box.disabled || !withinBounds(iso, min, max))
+  if (!box || box.readOnly || box.disabled || blocked(iso))
     return
 
   box.value = iso
@@ -135,7 +215,11 @@ function keyDown(event: KeyboardEvent) {
     return
 
   event.preventDefault()
-  go(move(cursor(), event.shiftKey))
+
+  const target = move(cursor(), event.shiftKey)
+  const jump = event.key === 'ArrowUp' || event.key === 'ArrowDown' ? 7 : 1
+
+  skipTo(target, target < cursor() ? -jump : jump)
 }
 
 // Tab past the last control closes the panel rather than leaving it open over the page; focus going nowhere, as on a click on the panel's padding, keeps it.
@@ -175,7 +259,11 @@ div(ref={element => root = element})
           tbody
             for week of weeks() key={week[0]}
               tr(part="week")
-                for day of week key={day}
-                  td(part="cell" role="gridcell" aria-selected={current() === day ? 'true' : 'false'})
-                    button(part="day" type="button" tabindex={day === cursor() ? 0 : -1} data-day={day} data-cursor={day === cursor() ? '' : undefined} data-outside={sameMonth(day, cursor()) ? undefined : ''} aria-label={dayName(day, pageLocale())} aria-current={day === now() ? 'date' : undefined} disabled={!withinBounds(day, min, max)} onClick={() => pick(day)}) {Number(day.slice(8))}
-      button(part="today" type="button" disabled={!withinBounds(now(), min, max)} onClick={() => pick(now())}) {todayLabel}
+                for iso of week key={iso}
+                  td(part="cell" role="gridcell" aria-selected={current() === iso ? 'true' : 'false'})
+                    button(part="day" type="button" tabindex={iso === cursor() ? 0 : -1} data-day={iso} data-cursor={iso === cursor() ? '' : undefined} data-outside={sameMonth(iso, cursor()) ? undefined : ''} aria-label={dayName(iso, pageLocale())} aria-current={iso === now() ? 'date' : undefined} disabled={blocked(iso)} onClick={() => pick(iso)})
+                      if day
+                        | {day(iso, { selected: current() === iso, today: iso === now(), outside: !sameMonth(iso, cursor()), disabled: blocked(iso) })}
+                      else
+                        | {Number(iso.slice(8))}
+      button(part="today" type="button" disabled={blocked(now())} onClick={() => pick(now())}) {todayLabel}

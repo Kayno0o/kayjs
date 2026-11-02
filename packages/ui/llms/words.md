@@ -43,7 +43,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.contactForm.*`: `consent` (`I agree that my details are used to answer my message.`), `email` (`Email`), `message` (`Message`), `name` (`Name`), `privacy` (`Privacy policy`), `sent` (`Thank you, your message has been sent.`), `submit` (`Send`)
 - `ui.contributionGraph.*`: `label` (`Contributions`)
 - `ui.copyButton.*`: `copied` (`Copied!`), `failure` (`Could not copy to the clipboard`)
-- `ui.dateInput.*`: `next` (`Next month`), `open` (`Choose a date`), `previous` (`Previous month`), `today` (`Today`)
+- `ui.dateInput.*`: `next` (`Next month`), `open` (`Choose a date`), `previous` (`Previous month`), `today` (`Today`), `unavailable` (`This date is not available`)
 - `ui.dateRangeInput.*`: `from` (`{label} from`), `to` (`{label} to`)
 - `ui.dnd.*`: `handleItem` (`Reorder {item}`), `handle` (`Reorder`), `moved` (`Moved to {position} of {count}`)
 - `ui.formDialog.*`: `cancel` (`Cancel`), `saving` (`Saving…`)

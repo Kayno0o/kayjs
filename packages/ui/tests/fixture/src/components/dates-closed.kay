@@ -1,0 +1,14 @@
+---
+import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
+import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
+
+// A booking picker: weekends and one booked day are closed, each open day shows a price, and the months on show are told.
+const { closed, months, onDate } = props<{ closed: Set<string>, months: string[], onDate: (value: string) => void }>()
+---
+snippet price(iso: string, state: { selected: boolean, disabled: boolean })
+  span {Number(iso.slice(8))}
+  if !state.disabled
+    small.price(data-selected={state.selected ? '' : undefined}) 50
+form
+  DateInput#date(aria-label="Day" name="day" value="2026-10-21" isDisabled={iso => closed.has(iso)} day={price} onMonthChange={month => months.push(month)} onChange={onDate})
+  DateRangeInput#range(label="Stay" fromName="from" toName="to" isDisabled={iso => closed.has(iso)} onMonthChange={(month, box) => months.push(`${box}:${month}`)})
