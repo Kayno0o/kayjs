@@ -1,5 +1,5 @@
 --- <Data>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { effect, recipe, signal } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
@@ -13,6 +13,7 @@ const frame = recipe({
     root: '',
     armed: 'inline-flex items-center gap-1',
     message: 'text-muted',
+    details: 'mt-2 text-sm',
   },
   variants: {
     // An icon by default; `button` is a labelled danger button, for a dialog footer, `link` a plain underlined text button, for a confirm inside running text, and `none` draws no trigger, for an app that opens it from elsewhere with `open`.
@@ -20,9 +21,11 @@ const frame = recipe({
   },
 })
 
-const { message, onConfirm, open, onOpenChange, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancel', 'Cancel'), size, variant, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children' | 'title' | 'onClick' | 'disabled' | 'hidden'> & {
+const { message, details, onConfirm, open, onOpenChange, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancel', 'Cancel'), size, variant, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children' | 'title' | 'onClick' | 'disabled' | 'hidden'> & {
   // The dialog's question; asked inline, the armed pair's name for screen readers and the confirm button's tooltip.
   message: string
+  // Markup under the message in the dialog, such as a count, the names of what goes or a consequence; the message stays the name asked inline, where there is no room for it.
+  details?: Snippet
   // Deletes, or does what a neutral confirm asks. The dialog stays open, its buttons disabled, until a returned promise settles, and closes once it resolves.
   onConfirm: () => unknown
   // Shows the dialog or the armed pair when the app sets it, such as from a Menu entry, a context menu or a shortcut; left out, the component keeps it itself. Given, `onOpenChange` is how the app learns of a cancel, a confirmed delete or Escape, to set it back to `false`.
@@ -142,3 +145,6 @@ else
       Button(label={cancelLabel} disabled={pending()} onClick={close})
       Button(label={pending() ? pendingText() : confirmText()} tone={look()} busy={pending()} disabled={pending() || disabled} onClick={confirm})
     p(part="message") {message}
+    if details
+      div(part="details")
+        | {details}

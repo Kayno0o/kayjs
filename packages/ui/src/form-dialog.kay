@@ -9,10 +9,12 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: '', footer: 'flex w-full flex-wrap items-center gap-2', actions: 'ml-auto flex flex-wrap justify-end gap-2', form: 'kui-form-grid' } })
 
-const { open, title, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failure, refused, onSaved, onError, onOpenChange, extra, id } = props<{
+const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failure, refused, onSaved, onError, onOpenChange, extra, id } = props<{
   // Shows the dialog; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
+  // Markup in the heading in place of the title's text, as a Dialog's.
+  heading?: Snippet
   // The page's action the form calls with its fields, imported from the page: the server reads them as a plain form post, coercing numbers, booleans and lists.
   action: Action<never, Output>
   submitLabel: string
@@ -73,7 +75,7 @@ function submitOnCtrlEnter(event: KeyboardEvent) {
 }
 ---
 // Only a click outside or Escape closes the dialog while `open` is still true; every other way has already closed it.
-Dialog(open={open} title={title} dirty={action.pending()} part="root" onOpenChange={shown => !shown && open && onOpenChange(false)})
+Dialog(open={open} title={title} heading={heading} dirty={action.pending()} part="root" onOpenChange={shown => !shown && open && onOpenChange(false)})
   @footer
     div(part="footer")
       | {extra}

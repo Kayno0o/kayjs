@@ -20,10 +20,13 @@ const look = recipe({
   },
 })
 
-const { open, title, actions, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, sizeKey, onSizeChange, scrollKey, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
+const { open, title, heading, actions, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, sizeKey, onSizeChange, scrollKey, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
   // Shows the panel along the edge, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
+  // Names the panel for screen readers, and is the heading unless a `@heading` block draws it.
   title: string
+  // Markup in the heading in place of the title's text, such as an icon, a status badge or an emphasised name: the panel is still named by `title`.
+  heading?: Snippet
   // Controls in the head line, before its close button, such as previous and next.
   actions?: Snippet
   footer?: Snippet
@@ -319,7 +322,7 @@ dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={
       div(part="grip" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation={edge === 'right' ? 'vertical' : 'horizontal'} aria-valuenow={shownSize()} aria-valuemin={limits(edge).min} aria-valuemax={Number.isFinite(limits(edge).max) ? limits(edge).max : undefined} data-dock={edge} onPointerDown={startResize} onKeyDown={resizeByKey})
         span(part="line" data-dock={edge})
     header(part="head")
-      h2(part="title") {title}
+      h2(part="title") {heading ?? title}
       | {actions}
       IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} onClick={() => follows() || panel?.close()})
     div(part="body" ref={element => body = element})

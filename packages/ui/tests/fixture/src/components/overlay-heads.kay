@@ -1,0 +1,37 @@
+---
+import type { Action } from 'kay'
+import ConfirmDelete from '@kaynooo/kayjs-ui/confirm-delete.kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+
+// A page's action as an island holds it: a call with a `pending()` and a `url`.
+const save = Object.assign(async () => 'saved', { pending: () => false, url: '/_kay/action/form/save' }) as unknown as Action<Record<string, never>, string>
+---
+Dialog#dialog-heading(open={true} title="Rename planet" onOpenChange={() => undefined})
+  @heading
+    em Mars
+  p Body
+Dialog#dialog-plain(open={true} title="Plain" onOpenChange={() => undefined})
+  p Body
+SidePanel#panel-heading(open={true} modal={false} closeHref="/list" title="Details of Venus")
+  @heading
+    em Venus
+  p Body
+#form-heading
+  FormDialog(open={true} title="Edit moon" action={save} submitLabel="Save" failure="Failed" onOpenChange={() => undefined})
+    @heading
+      em Phobos
+    p Body
+#confirm-details
+  ConfirmDelete(open={true} message="Delete 2 moons?" failure="Failed" onConfirm={() => undefined})
+    @details
+      ul
+        li Phobos
+        li Deimos
+#confirm-plain
+  ConfirmDelete(open={true} message="Delete the moon?" failure="Failed" onConfirm={() => undefined})
+#confirm-inline
+  ConfirmDelete(open={true} ask="inline" message="Delete 2 moons?" failure="Failed" onConfirm={() => undefined})
+    @details
+      p Phobos
