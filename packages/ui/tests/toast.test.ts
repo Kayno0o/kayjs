@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test'
-import { ActionError, ApiError } from 'kay'
+import { ActionError, ApiError, signal } from 'kay'
+import { callAction } from '../src/forms'
 import { attempt, dismissToast, holdToasts, messageOf, toast, toasts } from '../src/toast'
 
 function shown() {
@@ -374,5 +375,37 @@ describe('messageOf', () => {
     expect(messageOf(new Error('secret internals'), 'Could not save')).toBe('Could not save')
     expect(messageOf(undefined, 'Could not save')).toBe('Could not save')
     expect(messageOf('<script>', 'Could not save')).toBe('Could not save')
+  })
+})
+
+describe('callAction reading a refusal without `refused`', () => {
+  const form = { querySelectorAll: () => [] } as unknown as HTMLFormElement
+  const fail = (data: unknown, errors: Record<string, string> = {}) => async () => Promise.reject(new ActionError(409, '', errors, data))
+
+  async function run(data: unknown, refused?: (data: never) => Record<string, string> | string | undefined) {
+    toasts.set([])
+    await callAction(form, fail(data) as never, signal<Record<string, string>>({}), 'Could not save', refused as never)
+
+    return shown().map(({ message }) => message)
+  }
+
+  test('toasts a string, or a string error or message, that reads as one', async () => {
+    expect(await run('Name taken')).toEqual(['Name taken'])
+    expect(await run({ error: 'Branch is behind' })).toEqual(['Branch is behind'])
+    expect(await run({ message: 'Locked' })).toEqual(['Locked'])
+  })
+
+  test('falls back to `failure` for a code, several lines, markup or no words', async () => {
+    expect(await run({ error: 'NOT_FOUND' })).toEqual(['Could not save'])
+    expect(await run({ error: 'a\nb' })).toEqual(['Could not save'])
+    expect(await run('<html>')).toEqual(['Could not save'])
+    expect(await run({ error: 'x'.repeat(201) })).toEqual(['Could not save'])
+    expect(await run({ error: 5 })).toEqual(['Could not save'])
+  })
+
+  test('`refused` overrides the data, and one saying nothing leaves it', async () => {
+    expect(await run({ error: 'Raw' }, () => 'Mine')).toEqual(['Mine'])
+    expect(await run({ error: 'Raw' }, () => undefined)).toEqual(['Raw'])
+    expect(await run({ error: 'Raw' }, () => '')).toEqual(['Raw'])
   })
 })
