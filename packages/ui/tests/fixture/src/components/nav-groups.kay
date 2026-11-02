@@ -1,0 +1,21 @@
+---
+import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
+import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+
+// kay-island
+const { onOpenChange, onReady } = props<{ onOpenChange: (open: boolean) => void, onReady: (set: (open: boolean) => void) => void }>()
+
+const menu = signal(false)
+
+onReady(next => menu = next)
+
+const links = [
+  { href: 'https://example.com/home', label: 'Home' },
+  { href: 'https://example.com/products', label: 'Products', children: [{ href: 'https://example.com/products/a', label: 'Alpha' }, { href: 'https://example.com/products/b', label: 'Beta', icon: 'info' }] },
+] as const
+---
+SiteNav#plain(links={links} current="https://example.com/products/a" label="Plain")
+SiteNav#block(links={links} current="https://example.com/home" label="Block")
+  @link(link)
+    em {link.label}!
+AppHeader#controlled(links={links} current="https://example.com/home" label="Controlled" open={menu()} onOpenChange={(open) => { menu = open; onOpenChange(open) }})

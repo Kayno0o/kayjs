@@ -27,11 +27,12 @@ import zoomFit from '~icons/tabler/zoom-reset'
 // The icons the library's own components ask for, by what they mean rather than by a name in some set.
 export type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
-// A link of a site's navigation: `icon` is drawn before its label.
+// A link of a site's navigation: `icon` is drawn before its label, and `children` are the links under it, one level deep.
 export interface NavLink {
   href: string
   label: string
   icon?: IconSlot | IconProps | undefined
+  children?: readonly NavLink[] | undefined
 }
 
 // The slots added since apps first wrote icon maps of their own: optional, so such a map still type-checks, each drawing its default when left out.

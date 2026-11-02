@@ -157,7 +157,7 @@ export default defineMessages({
     scatterChart: { empty: 'Aucune donnée pour le moment.' },
     select: { failure: 'Impossible de charger les options', loading: 'Chargement…' },
     sidePanel: { close: 'Fermer', resize: 'Redimensionner' },
-    siteNav: { menu: 'Menu' },
+    siteNav: { expand: 'Afficher les pages de {label}', menu: 'Menu' },
     splitLayout: { back: 'Retour', resize: 'Redimensionner la liste' },
     steps: { done: 'terminée' },
     subscribeForm: {

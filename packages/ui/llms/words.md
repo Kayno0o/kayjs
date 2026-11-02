@@ -63,7 +63,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.scatterChart.*`: `empty` (`No data yet.`)
 - `ui.select.*`: `failure` (`Could not load the options`), `loading` (`Loading…`)
 - `ui.sidePanel.*`: `close` (`Close`), `resize` (`Resize`)
-- `ui.siteNav.*`: `menu` (`Menu`)
+- `ui.siteNav.*`: `expand` (`Show the pages under {label}`), `menu` (`Menu`)
 - `ui.splitLayout.*`: `back` (`Back`), `resize` (`Resize list`)
 - `ui.steps.*`: `done` (`completed`)
 - `ui.subscribeForm.*`: `email` (`Email`), `notice` (`We use your address to send you the mails of this site, until you unsubscribe with the link in each one.`), `privacy` (`Privacy policy`), `sent` (`Almost done: open the mail we just sent you and confirm your address.`), `submit` (`Subscribe`)

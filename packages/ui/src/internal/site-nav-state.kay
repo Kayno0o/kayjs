@@ -1,0 +1,46 @@
+---
+import { effect, onCleanup, onMount, recipe } from 'kay'
+
+const look = recipe({ parts: { root: 'hidden' } })
+
+const { listId, open, onOpenChange } = props<{
+  // The id of the SiteNav list, the popover this follows.
+  listId: string
+  // Shows the list when the page sets it; the toggle, a press outside and Escape open and close it on their own.
+  open?: boolean | undefined
+  // Called with the new state whenever the list shows or hides, however it did.
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+}>()
+
+const find = () => document.getElementById(listId)
+
+// The browser's popover owns showing, light dismiss, Escape and giving focus back; this only follows `open` when the page sets it.
+effect(() => {
+  const wanted = open
+  const list = typeof document === 'undefined' ? null : find()
+
+  if (wanted === undefined || !list)
+    return
+
+  const now = list.matches(':popover-open')
+
+  if (wanted && !now)
+    list.showPopover()
+  else if (!wanted && now)
+    list.hidePopover()
+})
+
+onMount(() => {
+  const list = find()
+
+  if (!list)
+    return
+
+  const toggled = (event: Event) => onOpenChange?.((event as ToggleEvent).newState === 'open')
+
+  list.addEventListener('toggle', toggled)
+  onCleanup(() => list.removeEventListener('toggle', toggled))
+})
+---
+// Draws nothing: an island that holds the SiteNav list's open state for the page, rendered only when the page asks for it, so a SiteNav that does not ships no script.
+span(part="root" hidden)
