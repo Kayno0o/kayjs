@@ -147,6 +147,8 @@ const save = () => toast.success('Saved')
 Button(label="Save" tone="accent" onClick={save})
 ```
 
+A title, a heading or a tab is a string by default, and a block puts markup in its place: `@title` on Card, PageHeader and the other heads, `@heading` on Dialog and SidePanel, and a block named after one entry, such as `@tab(tab)`, on Tabs, TabNav, Breadcrumb, SiteNav, Carousel and MediaGallery. Card, CardRow, Avatar, Badge and a Timeline entry take `href` and become a link. [All of them](/llms/kayjs-ui-slots-and-links).
+
 ## Restyle a component
 
 A component with parts takes its `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its name, with its import path as the fallback ([Restyle a component from src/ui.ts](/essentials/styling-and-assets/#restyle-a-component-from-srcuits)):
@@ -168,7 +170,7 @@ A variant or value the component lacks is added: `Button(tone="brand")` types an
 - RadioGroup, Segmented, Rating, Slider, ColorInput, DateInput, DateRangeInput, Combobox, MultiSelect, ChipGroup, FileDrop, CopyButton and ConfirmDelete follow the same way (1.72), and so do the overlays: Dialog, FormDialog, Menu, BellInbox, Popover, HoverCard, SidePanel, CommandPalette, Toaster and TooltipHost. A Dialog `size` is a recipe variant, so a `max-w-*` in `src/ui.ts` or `class` replaces its width.
 - In those, the root keeps its `kui-` class (`kui-card`, `kui-badge`, `kui-stat-badge`) as a name for your CSS, and the other parts carry `data-part` alone (`.kui-card > [data-part='head']`, a child selector, as `head`, `title` and `body` are names other components use too).
 - A recipe holds the look as utilities, so `src/ui.ts` or `class` replaces the one it sets, such as `p-6` for the padding it sets, instead of overriding a rule. A rule of yours selecting a removed part class matches nothing. A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
-- A part is named after what its `kui-` class draws: Card has `root`, `head`, `title` and `body`, Dialog `root`, `title`, `body` and `footer`, Button `root` and `spinner`.
+- A part is named after what its `kui-` class draws: Card has `root`, `head`, `title`, `body` and `link`, Dialog `root`, `title`, `body` and `footer`, Button `root` and `spinner`.
 - Table has `root` (the wrapper), `table`, `head`, `headRow`, `headCell`, `body`, `row`, `cell`, `cellBody`, `cellLabel`, `sortButton`, `sortIcon`, `filter`, `field`, `filterLabel`, `filterInput`, `count`, `selection`, `selected`, `bulk`, `selectHead`, `selectCell`, `selectText`, `spacer` and `emptyCell`.
 - DateInput has `root`, `input`, `trigger`, `panel`, `head`, `title`, `step`, `stepIcon`, `grid`, `weekday`, `weekdayRow`, `week`, `cell`, `day` and `today`, DateRangeInput `root` and `separator`, DateTimeInput `root` and `input`, TimeInput `root`.
 - The variants are the props that already exist, and `src/ui.ts` can add more: `tone` (Button, Badge, Notice, CopyButton), `variant` and `size` (Button). `kay check` reports a part that does not exist.
@@ -180,9 +182,10 @@ A variant or value the component lacks is added: `Button(tone="brand")` types an
 - Popover has `root` (the panel), HoverCard `root` and TooltipHost `root`; Toaster `root`, `live`, `toast`, `icon`, `message`, `action` and `dismiss`; SidePanel `root`, `head`, `title`, `body`, `footer` and `launcher`; Toolbar `root` and `caption`; PageSection `root`, `head`, `title`, `heading` and `subtitle`; CollapsibleSection `root`, `summary`, `title`, `meta`, `chevron` and `body`; Widget `root`, `head` and `title`.
 - Meter has `root` and `fill` (its deprecated `fillClass` still works); BarList `root`, `item`, `row`, `label`, `value`, `track` and `fill`, `root` being the empty message too; ChipGroup `root`, `chip`, `input`, `label` and `icon`, with `field` and `heading` under `showLabel`; SaveForm `root`, `grid`, `bar`, `status`, `actions` and `confirm`; RowsField `root`, `head`, `heading`, `row`, `input`, `remove` and `add`.
 - CommandPalette has `root`, `search`, `input`, `list`, `section`, `heading`, `option`, `text`, `label`, `snippet`, `more`, `group`, `empty` and `count`; FormDialog `root` (the Dialog), `footer`, `actions` and `form`; ContactForm `root`, `consent`, `link`, `privacy`, `issues` and `issue`; SubscribeForm `root`, `notice` and `link`.
-- ConfirmDelete has `root` (the trigger, where `class` has always gone), `armed` and `message`.
+- ConfirmDelete has `root` (the trigger, where `class` has always gone), `armed`, `message` and `details`.
 - Stat has `root`, `icon`, `value`, `label`, and `delta`, `deltaIcon`, `deltaValue` and `deltaLabel` once it shows a change.
-- Tabs has `root`, `list`, `tab`, `icon` and `panel`; TabNav `root` and `link`; SiteNav `root`, `toggle`, `menuIcon`, `closeIcon`, `list`, `item`, `link` and `icon`; AppHeader `root`, `brand`, `nav` (its SiteNav) and `end`; AppSwitcher `root` (the trigger), `menu`, `grid`, `tile`, `icon`, `initial` and `name`; Pagination `root`, `step`, `gap` and `page`; Timeline `root`, `item`, `entry`, `time`, `icon` and `text`; DescriptionList `root`, `item`, `term` and `detail`.
+- Tabs has `root`, `list`, `tab`, `icon`, `badge` and `panel`; TabNav `root`, `link`, `icon` and `badge`; SiteNav `root`, `toggle`, `menuIcon`, `closeIcon`, `list`, `item`, `link`, `icon`, `expand`, `expandIcon` and `children`; AppHeader `root`, `brand`, `nav` (its SiteNav) and `end`; AppSwitcher `root` (the trigger), `menu`, `grid`, `tile`, `icon`, `initial` and `name`; Pagination `root`, `step`, `gap` and `page`.
+- Timeline `root`, `item`, `entry`, `time`, `icon` and `text`; DescriptionList `root`, `item`, `term` and `detail`.
 - SplitLayout has `root`, `sidebar`, `sidebarHead`, `sidebarTitle`, `sidebarBody`, `list`, `listHead`, `resizer`, `detail` and `detailHead`; TreeView `root`, `item`, `toggle`, `icon`, `label`, `link` and `trailing`; LoadMore `root`, `failed`, `message`, `loading`, `text` and `announced`; VirtualList `root`, `content` and `item`.
 - BarChart has `root` (the empty message too), `plot`, `grid`, `tick`, `columns`, `column`, `bar`, `axis`, `axisLabel`, `legend`, `legendItem` and `key`.
 - LineChart has `root`, `frame`, `plot`, `cursor`, `dot`, `band`, `overlay`, `tooltip`, `tooltipLabel`, `tooltipRow`, `tooltipName`, `tooltipValue`, `swatch`, `data`, `hint`, `legend`, `legendItem` and `key`; ScatterChart `root` (the empty message too), `axisLabel`, `plot`, `grid`, `tick`, `guide`, `corner` and `dot`; ContributionGraph `root`, `month` and `cell`; Sparkline `root`, `item` and `bar`; StatusStrip `root` and `cell`.
@@ -292,6 +295,7 @@ Topics of the kayjs-ui reference the sections above do not link:
 - [MarkdownEditor](/llms/kayjs-ui-markdown-editor)
 - [Forms, FormDialog and Steps](/llms/kayjs-ui-forms-and-steps)
 - [Tables, tabs and pagination](/llms/kayjs-ui-tables-navigation-and-layout)
+- [Blocks, links and parts of the components](/llms/kayjs-ui-slots-and-links)
 - [Page layout, command palette and trees](/llms/kayjs-ui-page-layout-palette-and-trees)
 - [Infinite lists, LoadMore and a Table over them](/llms/kayjs-ui-infinite-list)
 - [Open state, transitions and option sources](/llms/kayjs-ui-open-state-and-sources)

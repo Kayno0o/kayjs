@@ -1,6 +1,6 @@
+import type { NavItem } from './nav-item'
 import { withBase } from 'kay'
 import { localize } from 'kay/i18n'
-import type { NavItem } from './nav-item'
 
 // Stands in for the origin while a relative address is read as a URL.
 export const ORIGIN = 'http://kay.invalid'

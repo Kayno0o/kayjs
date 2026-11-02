@@ -689,6 +689,7 @@ type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chev
 
 [./lib/defaults] NavLink
 interface NavLink
+  children?: readonly NavLink[] | undefined
   href: string
   icon?: IconProps | IconSlot | undefined
   label: string
@@ -1174,6 +1175,7 @@ interface MultiSelectOption<Value extends string = string>
 
 [./lib/index] NavLink
 interface NavLink
+  children?: readonly NavLink[] | undefined
   href: string
   icon?: IconProps | IconSlot | undefined
   label: string
@@ -1334,6 +1336,7 @@ interface SwitcherApp
 
 [./lib/index] TimelineEntry
 interface TimelineEntry<Key extends string | number = string>
+  href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   key: Key
   pickable?: boolean | undefined
@@ -1659,6 +1662,13 @@ function selectionSummary<Value extends string>(options: readonly MultiSelectOpt
 
 [./lib/multi-select] toggledValue
 function toggledValue<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], option: Value): Value[]
+
+[./lib/nav-item] NavItem
+interface NavItem
+  badge?: string | number | undefined
+  disabled?: boolean | undefined
+  icon?: IconProps | IconSlot | undefined
+  label: string
 
 [./lib/null-option] NullOption
 type NullOption<Value, Held> = null extends Value ? null extends Held ? '' extends Value ? string extends Value ? unknown : {
@@ -1998,6 +2008,15 @@ function keptHref(href: string, current: string | URL, keep: readonly string[]):
 [./lib/tab-nav] ORIGIN
 const ORIGIN: "http://kay.invalid"
 
+[./lib/tab-nav] TabEntry
+interface TabEntry extends NavItem
+  badge?: string | number | undefined
+  disabled?: boolean | undefined
+  href?: string | undefined
+  icon?: IconProps | IconSlot | undefined
+  label: string
+  value?: string | number | undefined
+
 [./lib/tab-nav] TabLink
 interface TabLink
   also?: readonly string[] | undefined
@@ -2081,6 +2100,7 @@ function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string
 
 [./lib/timeline] TimelineEntry
 interface TimelineEntry<Key extends string | number = string>
+  href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   key: Key
   pickable?: boolean | undefined
