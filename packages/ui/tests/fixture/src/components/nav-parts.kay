@@ -1,0 +1,35 @@
+---
+import Breadcrumb from '@kaynooo/kayjs-ui/breadcrumb.kay'
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+
+// kay-island
+
+const links = [
+  { href: 'https://example.com/a', label: 'Overview', icon: 'success' },
+  { href: 'https://example.com/b', label: 'Inbox', badge: 3 },
+  { href: 'https://example.com/c', label: 'Locked', disabled: true },
+] as const
+
+const tabs = [
+  { value: 'a', label: 'Alpha', icon: 'success', badge: 2 },
+  { value: 'b', label: 'Beta', disabled: true },
+  { value: 'c', label: 'Gamma' },
+] as const
+---
+TabNav#plain-nav(links={links} current="https://example.com/a" label="Sections")
+TabNav#block-nav(links={links} current="https://example.com/a" label="Sections")
+  @tab(tab)
+    em {tab.label}!
+Tabs#plain-tabs(tabs={tabs} value="a" label="Planets")
+  @panel(value)
+    p {value}
+Tabs#block-tabs(tabs={tabs} value="a" label="Planets")
+  @tab(tab)
+    em {tab.label}!
+  @panel(value)
+    p {value}
+Breadcrumb#crumbs(items={[{ label: 'Home', href: 'https://example.com/', icon: 'success' }, { label: 'Planets' }]} label="Trail")
+Breadcrumb#block-crumbs(items={[{ label: 'Home', href: 'https://example.com/' }, { label: 'Planets' }]} label="Trail")
+  @item(crumb)
+    em {crumb.label}!

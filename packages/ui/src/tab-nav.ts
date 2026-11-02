@@ -1,5 +1,6 @@
 import { withBase } from 'kay'
 import { localize } from 'kay/i18n'
+import type { NavItem } from './nav-item'
 
 // Stands in for the origin while a relative address is read as a URL.
 export const ORIGIN = 'http://kay.invalid'
@@ -101,4 +102,10 @@ export function keptHref(href: string, current: string | URL, keep: readonly str
   const search = params.toString()
 
   return `${path}${search ? `?${search}` : ''}${hash}`
+}
+
+// A link or a tab of a TabNav as the app wrote it, which its `@tab(tab)` block is given.
+export interface TabEntry extends NavItem {
+  href?: string | undefined
+  value?: string | number | undefined
 }

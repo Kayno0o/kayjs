@@ -1,24 +1,30 @@
 ---
-import type { JSX } from 'kay'
-import type { TabLink } from './tab-nav'
+import type { JSX, Snippet } from 'kay'
+import type { NavItem } from './nav-item'
+import type { TabEntry, TabLink } from './tab-nav'
 import { onMount, recipe, withQuery } from 'kay'
+import Icon from './icon.kay'
 import { currentTab, keptHref } from './tab-nav'
 
 // 'kui-tab-nav' stays as the component's name for an app's CSS.
 const look = recipe({
   parts: {
     root: 'kui-tab-nav flex gap-1 overflow-x-auto border-b border-border pb-px',
-    link: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground aria-[current=page]:border-accent aria-[current=page]:text-accent',
+    link: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground aria-[current=page]:border-accent aria-[current=page]:text-accent inline-flex items-center gap-1 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:text-muted',
+    icon: 'size-3.5 shrink-0',
+    badge: 'rounded-full bg-surface-strong px-1.5 text-xs tabular-nums text-muted',
   },
 })
 
-const { links, current, keep = [], tabs, param, paramDefault, label, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
+const { links, current, keep = [], tabs, param, paramDefault, label, tab, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
   // Names the navigation for screen readers.
   label: string
+  // Draws the text of each tab in place of its `label`: `@tab(tab)`, given the link or tab as written. The icon and the badge it names are still drawn around it.
+  tab?: Snippet<[tab: TabEntry]> | undefined
 } & (
   {
-    // Each tab is a page of its own. `prefix` keeps a link current on the pages under its path, `also` on the pages under the listed paths, such as a detail page of the tab; both need a URL `current`.
-    links: readonly ({ href: string, label: string } & Omit<TabLink, 'href'>)[]
+    // Each tab is a page of its own, with an `icon` before its label and a `badge` after it. `disabled` draws a text that is no link, with `aria-disabled`. `prefix` keeps a link current on the pages under its path, `also` on the pages under the listed paths, such as a detail page of the tab; both need a URL `current`.
+    links: readonly ({ href: string } & NavItem & Omit<TabLink, 'href'>)[]
     // The `href` of the page on screen, which the link to it marks as current; or its URL, `ctx.url`, matched by its path and the params a link sets.
     current: string | URL
     // The params of `current` each link carries on, such as a period or a filter the tabs share, unless the link sets its own.
@@ -28,7 +34,7 @@ const { links, current, keep = [], tabs, param, paramDefault, label, ...rest } =
     paramDefault?: undefined
   } | {
     // The tabs of one query param instead of `links`: each links to the current page with `param` set to its value and every other param kept, and the one the address names is current, with no `current` to hand over.
-    tabs: readonly { value: string | number, label: string }[]
+    tabs: readonly ({ value: string | number } & NavItem)[]
     param: string
     // The value the page shows while `param` is left out: its tab is current then, and its link leaves the param out. Without it the first tab is the one shown, and its link sets the param like any other.
     paramDefault?: string | number | undefined
@@ -41,11 +47,11 @@ const { links, current, keep = [], tabs, param, paramDefault, label, ...rest } =
 let nav: HTMLElement | undefined
 
 // A tab of `tabs` links to the page with its value set, and is current when that link is the address itself, else when it is the default one.
-const items = () => {
+const items = (): { key: string, to: string, entry: TabEntry, on: boolean, scrolls: boolean }[] => {
   if (tabs === undefined || param === undefined) {
     const marked = currentTab(links ?? [], current ?? '')
 
-    return (links ?? []).map(link => ({ key: link.href, to: keptHref(link.href, current ?? '', keep), label: link.label, on: link.href === marked, scrolls: link.href.includes('#') }))
+    return (links ?? []).map(link => ({ key: link.href, to: keptHref(link.href, current ?? '', keep), entry: link, on: link.href === marked && !link.disabled, scrolls: link.href.includes('#') }))
   }
 
   const here = withQuery({})
@@ -53,7 +59,7 @@ const items = () => {
   const pick = (value: string | number) => withQuery({ [name]: paramDefault !== undefined && String(value) === String(paramDefault) ? null : value })
   const shown = tabs.find(tab => pick(tab.value) === here)?.value ?? paramDefault ?? tabs[0]?.value
 
-  return tabs.map(tab => ({ key: String(tab.value), to: pick(tab.value), label: tab.label, on: String(tab.value) === String(shown), scrolls: false }))
+  return tabs.map(entry => ({ key: String(entry.value), to: pick(entry.value), entry, on: String(entry.value) === String(shown) && !entry.disabled, scrolls: false }))
 }
 
 // A tab bar wider than a phone scrolls, so the current tab is centred in it rather than left off screen. Only the bar scrolls: `scrollIntoView` would also move the page to it.
@@ -64,12 +70,27 @@ onMount(() => {
     return
 
   const bar = nav.getBoundingClientRect()
-  const tab = link.getBoundingClientRect()
+  const box = link.getBoundingClientRect()
 
-  nav.scrollLeft += tab.left - bar.left - (bar.width - tab.width) / 2
+  nav.scrollLeft += box.left - bar.left - (bar.width - box.width) / 2
 })
 ---
+// The inside of a tab, the same on a link and on a disabled text.
+snippet inside(item: { entry: TabEntry })
+  if item.entry.icon
+    Icon(icon={item.entry.icon} part="icon")
+  if tab
+    slot tab(item.entry)
+  else
+    | {item.entry.label}
+  if item.entry.badge !== undefined
+    span(part="badge") {item.entry.badge}
 // Links rather than buttons: each tab is a page of its own, which a reload, a new tab or a shared url opens. The bar sits mid-page, so following a tab keeps the window where it was (`data-keep-scroll` on the link), except a link to a `#section`, which scrolls to it.
 nav(part="root" {...rest} ref={element => nav = element} aria-label={label})
   for item of items() key={item.key}
-    a(part="link" data-keep-scroll={item.scrolls ? undefined : ''} href={item.to} aria-current={item.on ? 'page' : undefined}) {item.label}
+    if item.entry.disabled
+      span(part="link" aria-disabled="true")
+        | {inside(item)}
+    else
+      a(part="link" data-keep-scroll={item.scrolls ? undefined : ''} href={item.to} aria-current={item.on ? 'page' : undefined})
+        | {inside(item)}

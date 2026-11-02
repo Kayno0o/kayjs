@@ -1,7 +1,6 @@
 --- <Value extends string>
 import type { JSX, Snippet } from 'kay'
-import type { IconProps } from 'kay/icons'
-import type { IconSlot } from './defaults'
+import type { NavItem } from './nav-item'
 import { effect, persisted, recipe, signal, uid, untrack } from 'kay'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
@@ -23,17 +22,20 @@ const look = recipe({
     list: 'flex gap-1 overflow-x-auto border-b border-border pb-px',
     tab: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground inline-flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted aria-selected:border-accent aria-selected:text-accent',
     icon: 'size-3.5 shrink-0',
+    badge: 'rounded-full bg-surface-strong px-1.5 text-xs tabular-nums text-muted',
     // A hidden panel is hidden until found, which keeps its box with its content skipped: it takes no room.
     panel: 'pt-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&[hidden]]:p-0',
   },
 })
 
-const { tabs, value, param, paramDefault, label, onChange, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
-  // `icon` sits before the label; `disabled` keeps that tab from being shown, and the arrow keys skip it.
-  tabs: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
+const { tabs, value, param, paramDefault, label, onChange, tab, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
+  // `icon` sits before the label and `badge` after it; `disabled` keeps that tab from being shown, and the arrow keys skip it.
+  tabs: readonly ({ value: Value } & NavItem)[]
   // Names the tab list for screen readers.
   label: string
   onChange?: ((value: Value) => unknown) | undefined
+  // Draws the text of each tab in place of its `label`: `@tab(tab)`, given the tab. The icon and the badge it names are still drawn around it; `label` is still the string the data holds.
+  tab?: Snippet<[tab: { value: Value } & NavItem]> | undefined
   // Draws each tab's panel: `@panel(tab)`, given the tab's value. Every panel is drawn once and hidden while its tab is not shown, so what it holds survives a switch.
   // A hidden panel is hidden until found: find in page, a link to an id inside it, or kay's `focusInvalid` reaching a field in it shows its tab.
   panel: Snippet<[value: Value]>
@@ -117,12 +119,17 @@ function keyDown(event: KeyboardEvent) {
 ---
 div(part="root" {...rest})
   div(part="list" ref={element => list = element} role="tablist" aria-label={label} onKeyDown={keyDown})
-    for tab, index of tabs key={tab.value}
-      button(part="tab" type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={active() === tab.value ? 'true' : 'false'} tabindex={active() === tab.value ? 0 : -1} disabled={tab.disabled} onClick={() => show(tab.value)})
-        if tab.icon
-          Icon(icon={tab.icon} part="icon")
-        | {tab.label}
-  for tab, index of tabs key={tab.value}
-    div(part="panel" ref={element => element.addEventListener('beforematch', () => show(tab.value))} role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex={active() === tab.value ? 0 : undefined} hidden={active() === tab.value ? undefined : 'until-found'})
+    for entry, index of tabs key={entry.value}
+      button(part="tab" type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={active() === entry.value ? 'true' : 'false'} tabindex={active() === entry.value ? 0 : -1} disabled={entry.disabled} onClick={() => show(entry.value)})
+        if entry.icon
+          Icon(icon={entry.icon} part="icon")
+        if tab
+          slot tab(entry)
+        else
+          | {entry.label}
+        if entry.badge !== undefined
+          span(part="badge") {entry.badge}
+  for entry, index of tabs key={entry.value}
+    div(part="panel" ref={element => element.addEventListener('beforematch', () => show(entry.value))} role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex={active() === entry.value ? 0 : undefined} hidden={active() === entry.value ? undefined : 'until-found'})
       // Untracked, so a tab relabelled, such as with a count, keeps its panel and the focus inside it.
-      | {untrack(() => panel(tab.value))}
+      | {untrack(() => panel(entry.value))}
