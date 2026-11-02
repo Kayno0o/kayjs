@@ -60,3 +60,35 @@ it('opens the panel, then sends a question sent before the chat was loaded', asy
   await page.waitFor('.kai-chat-turn[data-role=assistant]', { text: 'Hello back' })
   expect(page.errors).toEqual([])
 }, 120_000)
+
+it('stays closed after the visitor closes a panel that a #chat address opened', async () => {
+  await using page = await site.open('/linking#chat')
+
+  await page.waitFor('.kai-launcher-panel:not([hidden])')
+  await page.click('.kai-launcher-button')
+  await page.waitFor('.kai-launcher-panel[hidden]')
+  await page.evaluate(async () => new Promise(done => setTimeout(done, 200)))
+  expect(await page.evaluate(shut)).toBe(true)
+  expect(await page.text('.changes')).toBe('true;false')
+}, 120_000)
+
+it('opens again on a second click on the link while the address already holds the fragment', async () => {
+  await using page = await site.open('/linking#chat')
+
+  await page.waitFor('.kai-launcher-panel:not([hidden])')
+  await page.click('.kai-launcher-button')
+  await page.waitFor('.kai-launcher-panel[hidden]')
+  await page.click('.link')
+  await page.waitFor('.kai-launcher-panel:not([hidden])')
+  expect(await page.text('.changes')).toBe('true;false;true')
+}, 120_000)
+
+it('fires one change for an event while the panel is open, and none for blank text', async () => {
+  await using page = await site.open('/linking')
+
+  await page.click('.event')
+  await page.waitFor('.kai-launcher-panel:not([hidden])')
+  await page.click('.event')
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('kai-chat-draft', { detail: '  ' })))
+  expect(await page.text('.changes')).toBe('true')
+}, 120_000)

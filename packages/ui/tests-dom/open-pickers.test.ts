@@ -90,6 +90,7 @@ test('a DateRangeInput given open shows the calendar of that box, hears the ligh
 
   expect(panels[1]!.matches(':popover-open')).toBe(false)
   expect(calls).toContain('held to false')
+  expect(panels[0]!.matches(':popover-open')).toBe(false)
 })
 
 test('a HoverCard tells the app it closed on Escape, and shows again once the app re-anchors', async () => {

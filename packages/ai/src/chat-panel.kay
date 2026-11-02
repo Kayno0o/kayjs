@@ -99,6 +99,17 @@ function hashMatches() {
     visitorOpens()
 }
 
+// A link to the fragment opens the panel whether or not the address changes: a second click on it, or a link to another page that the page swap follows, fires no `hashchange`.
+function linkClicked(event: MouseEvent) {
+  if (hash === false || hash === '' || !(event.target instanceof Element))
+    return
+
+  if (event.target.closest('a')?.hash === hash)
+    visitorOpens()
+}
+
+let disposed = false
+
 const RETRY_MS = 50
 const RETRY_LIMIT = 200
 
@@ -107,7 +118,7 @@ function forward(type: string, text: unknown, tries = 0) {
   const chat = panel?.querySelector('.kai-chat')
   const handled = chat !== null && chat !== undefined && !chat.dispatchEvent(new CustomEvent(type, { detail: text, cancelable: true }))
 
-  if (!handled && tries < RETRY_LIMIT)
+  if (!handled && !disposed && tries < RETRY_LIMIT)
     setTimeout(forward, RETRY_MS, type, text, tries + 1)
 }
 
@@ -126,13 +137,18 @@ function relay(event: Event) {
 }
 
 effect(() => {
-  hashMatches()
+  disposed = false
+  // Untracked, or the effect would run again as the panel closes and open it once more.
+  untrack(hashMatches)
   window.addEventListener('hashchange', hashMatches)
+  document.addEventListener('click', linkClicked)
   window.addEventListener('kai-chat-open', visitorOpens)
   window.addEventListener('kai-chat-send', relay)
   window.addEventListener('kai-chat-draft', relay)
 
   onCleanup(() => {
+    disposed = true
+    document.removeEventListener('click', linkClicked)
     window.removeEventListener('hashchange', hashMatches)
     window.removeEventListener('kai-chat-open', visitorOpens)
     window.removeEventListener('kai-chat-send', relay)

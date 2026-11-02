@@ -40,7 +40,7 @@ window.dispatchEvent(new CustomEvent('kai-chat-draft', { detail: 'Tell me about 
 
 ### Open the launcher from a link
 
-The launcher opens whenever the address fragment is its `hash` (`#chat` by default), on load and on every change to it, so `a(href="#chat")` needs no script; `hash={false}` turns it off. A `kai-chat-open` event on `window` opens it too. All of these count as the visitor opening it: `onOpenChange(true)` is called, unless the panel was open already.
+The launcher opens whenever the address fragment is its `hash` (`#chat` by default, written with the `#`), on load and on every change to it, and on a click on any link to that fragment (a second click, or a link to another page), so `a(href="#chat")` needs no script; `hash={false}` turns it off. A `kai-chat-open` event on `window` opens it too. All of these count as the visitor opening it: `onOpenChange(true)` is called, unless the panel was open already.
 
 ```ts
 window.dispatchEvent(new CustomEvent('kai-chat-open'))
