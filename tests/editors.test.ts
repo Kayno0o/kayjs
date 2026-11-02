@@ -39,7 +39,7 @@ async function callsOf(file: string): Promise<string[]> {
 }
 
 async function kay(args: string[], env: Record<string, string>, cwd?: string) {
-  const child = Bun.spawn([process.execPath, cli, ...args], { cwd, env: { HOME: env.XDG_CONFIG_HOME, ...env }, stdout: 'pipe', stderr: 'pipe' })
+  const child = Bun.spawn([process.execPath, cli, ...args], { ...cwd === undefined ? {} : { cwd }, env: { HOME: env.XDG_CONFIG_HOME, ...env }, stdout: 'pipe', stderr: 'pipe' })
   const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   return { stdout, stderr, code }
@@ -144,7 +144,7 @@ describe('zed', () => {
 
     expect(Object.keys(manifest.grammars)).toEqual(['kay'])
     expect(manifest.version).toBe(version)
-    expect(manifest.grammars.kay.rev).toBe(`v${version}`)
+    expect(manifest.grammars.kay?.rev).toBe(`v${version}`)
 
     for (const file of ['Cargo.toml', 'src/lib.rs', 'languages/kay/config.toml', 'languages/kay/highlights.scm', 'languages/kay/indents.scm', 'languages/kay/injections.scm'])
       expect(await Bun.file(join(extension, file)).exists()).toBe(true)
