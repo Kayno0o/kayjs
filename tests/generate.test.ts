@@ -452,7 +452,8 @@ for (const ui of [true, false]) {
 
       expect({ generated: generated.includes('Generated'), errors }).toEqual({ generated: true, errors: expect.not.stringContaining('rror') })
 
-      const tests = await runWith(dir, { DATABASE_URL: TEST_DATABASE_URL! }, 'test', 'tests/blog-posts.test.ts', 'tests/news.test.ts')
+      // The tests copy a template named after this database, and a run on another app's name would drop the templates of the apps running beside it.
+      const tests = await runWith(dir, { DATABASE_URL: Object.assign(new URL(scratch), { pathname: `/${name}` }).href }, 'test', 'tests/blog-posts.test.ts', 'tests/news.test.ts')
 
       expect({ code: tests.code, report: tests.stderr + tests.stdout }).toEqual({ code: 0, report: expect.stringContaining(' 6 pass') })
     }

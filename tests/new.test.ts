@@ -918,7 +918,8 @@ describe('kay new', () => {
 
         expect({ generated: generated.includes('Generated'), generateErrors }).toEqual({ generated: true, generateErrors: expect.not.stringContaining('rror') })
 
-        const tests = Bun.spawn([process.execPath, 'run', 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env })
+        // The templates of a test database are named after it, so a name of this run's own keeps another test's apps from dropping them while they copy.
+        const tests = Bun.spawn([process.execPath, 'run', 'test'], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...env, ...scratch && { DATABASE_URL: Object.assign(new URL(scratch), { pathname: `/${name}` }).href } } })
         const [report, output, code] = await Promise.all([new Response(tests.stderr).text(), new Response(tests.stdout).text(), tests.exited])
 
         // A run that passed its tests and still exited 1 failed in CI once with no report to read, so a failure prints both streams.
