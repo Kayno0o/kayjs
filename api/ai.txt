@@ -20,11 +20,16 @@ type AiErrorKind = | 'auth' // Too many requests (429): `retryAfter` is the seco
 type AiLimit = 'asks' | 'budget' | 'total'
 
 [.] AiOptions
-interface AiOptions
+interface AiOptions extends AskHooks
   budget?: false | BudgetOptions | undefined
   conversations?: ConversationStore | undefined
   imageAlt?: boolean | { reviewed?: string[] | undefined; } | undefined
   key?: ((request: Request) => string | Promise<string | undefined> | undefined) | undefined
+  onError?: ((error: unknown) => unknown) | undefined
+  onFinish?: ((done: FinishHookCall) => unknown) | undefined
+  onRequest?: ((call: RequestHookCall) => void | RequestHookChange | Promise<void | RequestHookChange | undefined> | undefined) | undefined
+  onStep?: ((step: Step) => unknown) | undefined
+  onToolCall?: ((call: ToolCall) => unknown) | undefined
   rateLimit?: false | LimitOptions | undefined
 
 [.] anthropic
@@ -54,8 +59,16 @@ interface Asked
   temperature: number | undefined
   tools?: ToolSpec[] | undefined
 
+[.] AskHooks
+interface AskHooks
+  onError?: ((error: unknown) => unknown) | undefined
+  onFinish?: ((done: FinishHookCall) => unknown) | undefined
+  onRequest?: ((call: RequestHookCall) => void | RequestHookChange | Promise<void | RequestHookChange | undefined> | undefined) | undefined
+  onStep?: ((step: Step) => unknown) | undefined
+  onToolCall?: ((call: ToolCall) => unknown) | undefined
+
 [.] AskOptions
-interface AskOptions
+interface AskOptions extends AskHooks
   body?: Record<string, unknown> | undefined
   cache?: boolean | "1h" | undefined
   confirm?: false | Confirm | undefined
@@ -65,6 +78,11 @@ interface AskOptions
   maxSteps?: number | undefined
   maxTokens?: number | undefined
   model?: string | undefined
+  onError?: ((error: unknown) => unknown) | undefined
+  onFinish?: ((done: FinishHookCall) => unknown) | undefined
+  onRequest?: ((call: RequestHookCall) => void | RequestHookChange | Promise<void | RequestHookChange | undefined> | undefined) | undefined
+  onStep?: ((step: Step) => unknown) | undefined
+  onToolCall?: ((call: ToolCall) => unknown) | undefined
   outlive?: boolean | undefined
   provider?: Provider | undefined
   reasoning?: Reasoning | undefined
@@ -241,6 +259,14 @@ type FakeAnswer<Given, Value> = Value | Error | ((given: Given) => Value)
 [.] Finish
 type Finish = 'stop' | 'length' | 'filtered' | 'steps'
 
+[.] FinishHookCall
+interface FinishHookCall
+  finish: Finish | undefined
+  steps: Step[]
+  stopped: boolean
+  text: string
+  usage: Usage | undefined
+
 [.] FunctionTool
 interface FunctionTool
   description: string
@@ -411,6 +437,18 @@ interface Reply extends PromiseLike<string>, AsyncIterable<string>
 [.] ReplyOf
 type ReplyOf<Schema extends TSchema> = StructuredReply<Static<Schema>>
 
+[.] RequestHookCall
+interface RequestHookCall
+  messages: Message[]
+  model: string
+  options: AskOptions
+  system: string | undefined
+
+[.] RequestHookChange
+interface RequestHookChange
+  messages?: Message[] | undefined
+  system?: string | undefined
+
 [.] resuming
 function resuming(request?: Request | undefined): boolean
 
@@ -496,6 +534,11 @@ interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOpti
   maxSteps?: number | undefined
   maxTokens?: number | undefined
   model?: string | undefined
+  onError?: ((error: unknown) => unknown) | undefined
+  onFinish?: ((done: FinishHookCall) => unknown) | undefined
+  onRequest?: ((call: RequestHookCall) => void | RequestHookChange | Promise<void | RequestHookChange | undefined> | undefined) | undefined
+  onStep?: ((step: Step) => unknown) | undefined
+  onToolCall?: ((call: ToolCall) => unknown) | undefined
   outlive?: boolean | undefined
   provider?: Provider | undefined
   reasoning?: Reasoning | undefined

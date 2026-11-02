@@ -225,7 +225,44 @@ export interface ToolRequest {
 // Answers whether the visitor agreed to a call; only `true` lets it run.
 export type Confirm = (call: ToolRequest) => boolean | Promise<boolean>
 
-export interface AskOptions {
+// What `onRequest` is given before the provider is called: the messages (with their attachments) and the system prompt as the ask has them, the model chosen, and the options of the ask.
+export interface RequestHookCall {
+  messages: Message[]
+  system: string | undefined
+  model: string
+  options: AskOptions
+}
+
+// What `onRequest` returns to change the request: the messages and system prompt to send instead; a field left out stays as it was, and `system: undefined` sends none.
+export interface RequestHookChange {
+  messages?: Message[] | undefined
+  system?: string | undefined
+}
+
+// What `onFinish` is given once a reply ended: its text, the tokens (undefined when the provider gave none), one entry per request, why it stopped, and whether it was stopped (by `reply.stop()`, an aborted request or a reader that left) rather than ending on its own.
+export interface FinishHookCall {
+  text: string
+  usage: Usage | undefined
+  steps: Step[]
+  finish: Finish | undefined
+  stopped: boolean
+}
+
+// Hooks around an ask, set once in `ai({ ... })` and replaced one by one by the same names in `ask(..., { ... })`. A throw in a hook that only notifies is logged and never fails the reply.
+export interface AskHooks {
+  // Called before the provider is asked, after the input-length check, and before the limits count the ask: may return the `messages` and `system` to send instead (redact, add context), or throw an `AiError` (or any error) to refuse the ask, which fails the reply with it and calls `onError`.
+  onRequest?: ((call: RequestHookCall) => RequestHookChange | undefined | void | Promise<RequestHookChange | undefined | void>) | undefined
+  // Called after each request of the reply to the provider, a tool loop making one per round.
+  onStep?: ((step: Step) => unknown) | undefined
+  // Called as each tool call starts (`running`) and again as it ends (`done` or `failed`).
+  onToolCall?: ((call: ToolCall) => unknown) | undefined
+  // Called once the reply ended, finished, cut short or stopped (`stopped`).
+  onFinish?: ((done: FinishHookCall) => unknown) | undefined
+  // Called when the reply fails, with the error its readers get.
+  onError?: ((error: unknown) => unknown) | undefined
+}
+
+export interface AskOptions extends AskHooks {
   system?: string | undefined
   // The model for this reply, `AI_MODEL` when left out.
   model?: string | undefined

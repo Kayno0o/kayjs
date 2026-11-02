@@ -1,7 +1,8 @@
-import type { CodeBlock, DeltasOptions, Finish, Piece, Progress, Reply, Source, Step, ToolCall, Usage } from './types'
+import type { AskHooks, CodeBlock, DeltasOptions, Finish, Piece, Progress, Reply, Source, Step, ToolCall, Usage } from './types'
 import { logFrom } from 'kay'
 import { AiError } from './errors'
 import { highlighting } from './highlight'
+import { tell } from './hooks'
 
 const log = logFrom('kayjs-ai')
 
@@ -11,7 +12,7 @@ function snapshot(call: ToolCall): ToolCall {
 
 // A reply over what `open` yields once first read, with `signals` stopping it when any aborts.
 // The text is kept as it comes, so any number of readers (`await`, `for await`, `usage`) share one provider request.
-export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting, outlive = false, onEnd?: () => void, { resumed = false, sources = [] }: { resumed?: boolean | undefined, sources?: readonly Source[] | undefined } = {}): Reply {
+export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting, outlive = false, onEnd?: () => void, { resumed = false, sources = [], hooks = {} }: { resumed?: boolean | undefined, sources?: readonly Source[] | undefined, hooks?: AskHooks | undefined } = {}): Reply {
   const controller = new AbortController()
   const deltas: string[] = []
   // Appended to as it streams, so a snapshot reads it without joining the pieces again.
@@ -73,12 +74,14 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
             calls[at] = piece.tool
 
           version++
+          tell('onToolCall', hooks.onToolCall, snapshot(piece.tool))
         }
         else if ('finish' in piece) {
           reason = piece.finish
         }
         else if ('step' in piece) {
           steps.push(piece.step)
+          tell('onStep', hooks.onStep, piece.step)
         }
 
         notify()
@@ -102,6 +105,15 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
       counted.resolve(failure === undefined && total.inputTokens !== undefined && total.outputTokens !== undefined ? { ...total, inputTokens: total.inputTokens, outputTokens: total.outputTokens } : undefined)
       ending.resolve(failure === undefined ? reason : undefined)
       notify()
+
+      if (failure !== undefined) {
+        tell('onError', hooks.onError, failure.error)
+      }
+      else {
+        const { inputTokens, outputTokens } = total
+
+        tell('onFinish', hooks.onFinish, { text: deltas.join(''), usage: inputTokens !== undefined && outputTokens !== undefined ? { ...total, inputTokens, outputTokens } : undefined, steps: [...steps], finish: reason, stopped: controller.signal.aborted })
+      }
     }
   }
 

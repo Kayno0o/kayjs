@@ -11,6 +11,7 @@ import { recorded } from './dev-log'
 import { AiError } from './errors'
 import { extraBody } from './extra'
 import { isFunctionTool, plainTool } from './function-tool'
+import { hooksFor, requested } from './hooks'
 import { keep, keptFor, markEnded, stopKept } from './kept'
 import { guarded, visitorOf } from './limits'
 import { converse, single } from './loop'
@@ -287,14 +288,11 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
   if (model === undefined)
     throw configError('no model to ask; set AI_MODEL or pass { model }')
 
+  const hooks = hooksFor(options, provider)
   const answering = currentRequest()
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS
   const described = answer === undefined ? undefined : answerSchema(answer)
   const schema = described?.plain
-  const attached = messages.some(message => message.attachments !== undefined)
-  // Without attachments the messages are a provider's as they are; with them the request is completed once they are read.
-  const request: ProviderRequest = { messages: attached ? [] : messages as ProviderMessage[], system: options.system, model, maxTokens, temperature: options.temperature, reasoning: options.reasoning, cache: options.cache, body: extraBody(options.body, 'ask({ body })'), timeouts: timeoutsOf(options.timeout), schema }
-  const messageChars = messages.reduce((sum, message) => sum + message.content.length + estimatedChars(message) + toolChars(message as ProviderMessage), 0)
   const maxInputChars = options.maxInputChars ?? DEFAULT_MAX_INPUT_CHARS
   const maxAttachmentBytes = options.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES
 
@@ -304,39 +302,82 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
   if (typeof maxAttachmentBytes !== 'number' || !(maxAttachmentBytes >= 1))
     throw configError('maxAttachmentBytes is a number of bytes of 1 or more')
 
-  const asker = { request: answering, visitor: options.key, chars: messageChars + (options.system?.length ?? 0) + (described?.chars ?? 0), maxTokens }
-  // Every step may use `maxTokens`, which is what the budget holds for a tool loop while it runs.
-  const looping = { ...asker, maxTokens: maxTokens * (options.maxSteps ?? DEFAULT_MAX_STEPS) }
-  const via: Via = attached
-    ? reading(request, messages, maxAttachmentBytes, maxInputChars, provider, (extra) => {
-      asker.chars += extra
-      looping.chars += extra
-    })
-    : (_signal, make) => make(request)
   const outlive = options.outlive === true
   const kept = call?.key
   const ended = outlive && kept !== undefined ? () => markEnded(kept) : undefined
   // A reply that outlives its request is not stopped by it.
   const signals = [outlive ? undefined : answering?.signal, options.signal]
-  const about = { provider: provider.name, model, prompt: messages.findLast(message => message.role === 'user')?.content ?? '', chars: asker.chars }
+  const extras = { sources: options.sources, hooks }
+  const tools = options.tools !== undefined && options.tools.length > 0
+  let offered: Offered[] = []
+  let maxSteps = DEFAULT_MAX_STEPS
 
-  if (messageChars > maxInputChars)
-    return createReply(() => tooLong(messageChars, maxInputChars), signals, undefined, outlive, ended, { sources: options.sources })
+  // What goes to the provider for these messages and this system prompt; `onRequest` may change both, so it is built again for what it returns.
+  const plan = (current: Message[], system: string | undefined) => {
+    const attached = current.some(message => message.attachments !== undefined)
+    // Without attachments the messages are a provider's as they are; with them the request is completed once they are read.
+    const request: ProviderRequest = { messages: attached ? [] : current as ProviderMessage[], system, model, maxTokens, temperature: options.temperature, reasoning: options.reasoning, cache: options.cache, body: extraBody(options.body, 'ask({ body })'), timeouts: timeoutsOf(options.timeout), schema }
+    const messageChars = current.reduce((sum, message) => sum + message.content.length + estimatedChars(message) + toolChars(message as ProviderMessage), 0)
+    const asker = { request: answering, visitor: options.key, chars: messageChars + (system?.length ?? 0) + (described?.chars ?? 0), maxTokens }
+    // Every step may use `maxTokens`, which is what the budget holds for a tool loop while it runs.
+    const looping = { ...asker, maxTokens: maxTokens * (options.maxSteps ?? DEFAULT_MAX_STEPS) }
+    const via: Via = attached
+      ? reading(request, current, maxAttachmentBytes, maxInputChars, provider, (extra) => {
+        asker.chars += extra
+        looping.chars += extra
+      })
+      : (_signal, make) => make(request)
 
-  if (options.tools === undefined || options.tools.length === 0)
-    return createReply(signal => recorded(guarded(() => via(signal, request => single(provider.stream(request, signal))), asker, signal), about, signal), signals, undefined, outlive, ended, { sources: options.sources })
+    return {
+      messageChars,
+      about: { provider: provider.name, model, prompt: current.findLast(message => message.role === 'user')?.content ?? '', chars: asker.chars },
+      open: (signal: AbortSignal): AsyncIterable<Piece> => {
+        if (!tools)
+          return guarded(() => via(signal, request => single(provider.stream(request, signal))), asker, signal)
 
-  const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
+        looping.maxTokens = maxTokens * maxSteps
 
-  if (!Number.isInteger(maxSteps) || maxSteps < 1)
-    throw configError('maxSteps is a whole number of 1 or more')
+        return guarded(() => via(signal, request => converse(provider, request, offered, maxSteps, answering, signal, options.confirm)), looping, signal)
+      },
+    }
+  }
 
-  const offered = offer(options.tools)
+  const first = plan(messages, options.system)
 
-  if (!answering && offered.some(item => item.tool))
-    throw configError('an action runs as the visitor, so ask() with one needs the request being answered; call it from a page, an action or a handler kay is answering, or offer tool({ ... }) functions, which run with no visitor')
+  if (first.messageChars > maxInputChars)
+    return createReply(() => tooLong(first.messageChars, maxInputChars), signals, undefined, outlive, ended, extras)
 
-  looping.maxTokens = maxTokens * maxSteps
+  if (tools) {
+    maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
 
-  return createReply(signal => recorded(guarded(() => via(signal, request => converse(provider, request, offered, maxSteps, answering, signal, options.confirm)), looping, signal), about, signal), signals, undefined, outlive, ended, { sources: options.sources })
+    if (!Number.isInteger(maxSteps) || maxSteps < 1)
+      throw configError('maxSteps is a whole number of 1 or more')
+
+    offered = offer(options.tools!)
+
+    if (!answering && offered.some(item => item.tool))
+      throw configError('an action runs as the visitor, so ask() with one needs the request being answered; call it from a page, an action or a handler kay is answering, or offer tool({ ... }) functions, which run with no visitor')
+  }
+
+  const about = { ...first.about }
+  const onRequest = hooks.onRequest
+
+  // `onRequest` runs before the limits count the ask, so what they and the dev tool see is the request it left, once.
+  async function* changed(signal: AbortSignal): AsyncGenerator<Piece> {
+    const change = await requested(onRequest!, { messages: messages.map(message => ({ ...message })), system: options.system, model: first.about.model, options })
+    let used = first
+
+    if (change !== undefined && (change.messages !== undefined || 'system' in change)) {
+      used = plan(change.messages === undefined ? messages : messagesOf(change.messages, replayed), 'system' in change ? change.system : options.system)
+
+      if (used.messageChars > maxInputChars)
+        throw tooManyChars(used.messageChars, maxInputChars)
+
+      Object.assign(about, used.about)
+    }
+
+    yield* used.open(signal)
+  }
+
+  return createReply(signal => recorded(onRequest === undefined ? first.open(signal) : changed(signal), about, signal), signals, undefined, outlive, ended, extras)
 }

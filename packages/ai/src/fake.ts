@@ -108,6 +108,7 @@ export interface Fake extends Provider {
 }
 
 const FAKE = Symbol.for('kayjs-ai.fake')
+
 const WORDS = /\S+\s*|\s+/g
 const CHARS_PER_TOKEN = 4
 const DEV_PACE_MS = 20
@@ -322,7 +323,13 @@ function createFake(): Fake {
     model: 'fake',
     asked,
     last: () => asked.at(-1),
-    standIn: provider => ({ name: provider.name, model: provider.model, accepts: provider.accepts, stream: (request, signal) => answer(request, signal, provider.name), ...calls(provider.name, call => provider[call] !== undefined) }),
+    standIn: (provider) => {
+      const stand: Provider = { name: provider.name, model: provider.model, accepts: provider.accepts, stream: (request, signal) => answer(request, signal, provider.name), ...calls(provider.name, call => provider[call] !== undefined) }
+
+      Object.defineProperty(stand, FAKE, { value: true })
+
+      return stand
+    },
     reply: (script, when) => void scripts.push({ script, when }),
     fail: (error, when) => void scripts.push({ script: error, when }),
     heard,
@@ -388,3 +395,8 @@ function createFake(): Fake {
 // Answers `ask` in development and under `bun test` instead of a provider, and a test scripts it and reads what was asked, as it reads kayjs-mail's `outbox`.
 // Without a script it answers `Fake reply to: <the last user message>`.
 export const fakeAi: Fake = ((globalThis as { [FAKE]?: Fake })[FAKE] ??= createFake())
+
+// Whether the fake answers for this provider: it is the fake, or a stand-in made by `standIn` for the provider an ask was given under `bun test`.
+export function answersAsFake(provider: Provider): boolean {
+  return provider === fakeAi || (provider as { [FAKE]?: boolean })[FAKE] === true
+}
