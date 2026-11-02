@@ -22,6 +22,12 @@ Call `toast` once what the user started has finished, with the outcome as its ty
 
 <Demo name="toaster/action" />
 
+## A button in the toast
+
+`toast.error('Could not pull', { action: { label: 'Rebase', run: rebase } })` adds one button before the close button, for the obvious next step. It is busy while `run` is pending, and the toast goes once it settles. A `run` that rejects is logged. A toast with an action keeps the clock of its tone, so an error stays until it is dismissed.
+
+`attempt` gives a refusal's toast one with `refusedAction`, which reads the same data as `refused`: `attempt(run, { failure, refused: data => data.error, refusedAction: data => data.diverged ? { label: 'Rebase', run: rebase } : undefined })`. A `failure` gets none, and neither does a refusal given to `onRefused`, which shows no toast.
+
 ## Showing a failure in the page
 
 `attempt` toasts a failed call. To show its message where it happens instead, in a notice or beside a field, `messageOf(error, fallback)` reads the words the route answered with, or an action's refusal, when they read as a message, and gives `fallback` for a network failure, a 5xx or any other error.
@@ -34,4 +40,4 @@ To keep what a refusal carries instead of its words, such as the output of a com
 
 `dismissLabel` names each toast's close button for screen readers, `Dismiss notification` by default.
 
-`hotkey` is the key that, with Alt, moves the focus to the first toast's close button, `t` by default. Pass `hotkey={null}` to turn it off.
+`hotkey` is the key that, with Alt, moves the focus to the first toast's first button, its action when it has one, `t` by default. Pass `hotkey={null}` to turn it off.

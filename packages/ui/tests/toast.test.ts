@@ -89,6 +89,14 @@ describe('a toast\'s action', () => {
   })
 })
 
+describe('a toast\'s action with onRefused', () => {
+  test('shows no toast, so no button', async () => {
+    await attempt(async () => Promise.reject(new ActionError(400, '', {}, { error: 'No' })), { failure: 'Could not pull', onRefused: () => undefined, refusedAction: () => ({ label: 'Retry', run: () => 1 }) })
+
+    expect(shown()).toEqual([])
+  })
+})
+
 describe('a toast\'s time', () => {
   beforeEach(() => {
     jest.useFakeTimers()

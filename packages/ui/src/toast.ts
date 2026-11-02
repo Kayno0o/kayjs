@@ -133,7 +133,7 @@ export interface AttemptOptions<Data = unknown> {
   // Toasted once the call goes through.
   success?: string | undefined
   refused?: ((data: Data) => string | undefined) | undefined
-  // The button of a refusal's toast, read from the same data as `refused`: `data => data.diverged ? { label: 'Rebase', run: rebase } : undefined`. Only a refusal gets it, not `failure`.
+  // The button of a refusal's toast, read from the same data as `refused`, and not used with `onRefused`, which shows no toast: `data => data.diverged ? { label: 'Rebase', run: rebase } : undefined`. Only a refusal gets it, not `failure`.
   refusedAction?: ((data: Data) => ToastAction | undefined) | undefined
   // Handed what a refusal carries, an action's `ctx.fail` data or a route's JSON answer, instead of toasting anything, for a page that shows the refusal where it is. A failure that is no refusal still toasts `failure`.
   onRefused?: ((data: Data) => unknown) | undefined
@@ -157,8 +157,7 @@ export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure:
     return (value === undefined ? true : value) as Attempted<T>
   }
   catch (error) {
-    const { onRefused } = options
-    const { refusedAction } = options
+    const { onRefused, refusedAction } = options
     const data = onRefused === undefined && refusedAction === undefined ? undefined : refusalData<Data>(error)
 
     if (onRefused === undefined || data === undefined) {

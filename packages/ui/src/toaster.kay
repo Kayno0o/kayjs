@@ -65,7 +65,7 @@ effect(() => {
 })
 
 shortcut(() => hotkey ? `alt+${hotkey}` : null, (event) => {
-  const button = owns() ? toaster()?.querySelector('button') : null
+  const button = owns() ? toaster()?.querySelector<HTMLElement>('button:not(:disabled)') : null
 
   if (!button)
     return
