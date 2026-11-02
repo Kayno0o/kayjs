@@ -216,6 +216,43 @@ test('asks for nothing under minLength, says when the load failed and when nothi
   expect(root.querySelector('[role="status"]')?.textContent).toBe('Could not load the options')
 })
 
+test('reports the typed text, each latest answer and the latest failure, never a stale one', async () => {
+  const typed: string[] = []
+  const loaded: [string[], string][] = []
+  const failed: [string, string][] = []
+  const answers = new Map<string, (value: { value: string, label: string }[]) => void>()
+  const { input } = await combobox(async ({ q }: { q: string }) => {
+    if (q === 'boom')
+      throw new Error('down')
+
+    return new Promise(resolve => answers.set(q, resolve))
+  }, 1, false, { onInput: (text: string) => typed.push(text), onLoad: (options: { label: string }[], query: string) => loaded.push([options.map(option => option.label), query]), onError: (error: Error, query: string) => failed.push([error.message, query]) })
+
+  clock.start()
+  type(input, 'm')
+  await clock.elapse(260)
+  type(input, 'ma')
+  await clock.elapse(260)
+  answers.get('ma')!([{ value: 'mars', label: 'Mars' }])
+  await clock.settle()
+  answers.get('m')!([{ value: 'moon', label: 'Moon' }])
+  await clock.settle()
+
+  expect(typed).toEqual(['m', 'ma'])
+  expect(loaded).toEqual([[['Mars'], 'ma']])
+
+  const logged = console.error
+
+  console.error = () => undefined
+  type(input, 'boom')
+  await clock.elapse(260)
+  await clock.settle()
+  console.error = logged
+
+  expect(failed).toEqual([['down', 'boom']])
+  expect(loaded).toHaveLength(1)
+})
+
 test('hands the browser\'s own suggestions over to the listbox once the script runs', async () => {
   const { root, input } = await combobox()
 

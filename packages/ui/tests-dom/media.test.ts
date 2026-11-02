@@ -44,8 +44,8 @@ afterEach(() => {
   seen.more = 0
 })
 
-async function media() {
-  mounted = await mountComponent(MediaComponent, { onIndexChange: (index: number) => seen.index.push(index), onCrop: (crop: typeof seen.crops[number]) => seen.crops.push(crop), onMore: () => seen.more++, onTiles: (set: typeof setTiles) => setTiles = set })
+async function media(extra: Record<string, unknown> = {}) {
+  mounted = await mountComponent(MediaComponent, { ...extra, onIndexChange: (index: number) => seen.index.push(index), onCrop: (crop: typeof seen.crops[number]) => seen.crops.push(crop), onMore: () => seen.more++, onTiles: (set: typeof setTiles) => setTiles = set })
 
   return mounted.root
 }
@@ -314,6 +314,73 @@ describe('ImageCropper', () => {
     press(crop, 'ArrowLeft', { shiftKey: true })
 
     expect(seen.crops.at(-1)!.w).toBeLessThan(200)
+  })
+})
+
+describe('ImageCropper callbacks and crop', () => {
+  async function loadedCropper(extra: Record<string, unknown> = {}) {
+    const root = await media(extra)
+    const image = root.querySelector<HTMLImageElement>('.kui-image-cropper [data-part="image"]')!
+    const stage = root.querySelector('.kui-image-cropper [data-part="stage"]')!
+
+    sized(stage, 400, 300)
+    Object.defineProperties(image, { naturalWidth: { value: 400 }, naturalHeight: { value: 300 } })
+    image.dispatchEvent(new Event('load'))
+    await settle()
+
+    return { root, stage, image }
+  }
+
+  test('starts on the crop given, clamped to the image and the ratio, and follows a changed one', async () => {
+    const { root } = await loadedCropper({ startCrop: { x: 380, y: 0, w: 100, h: 90 } })
+
+    // 100 wide at ratio 2 is 50 high, and the right edge pulls it back inside the 400 wide image; the clamp is reported.
+    expect(seen.crops).toEqual([{ x: 300, y: 0, w: 100, h: 50 }])
+
+    click(root.querySelector('#preset'))
+    await settle()
+
+    expect(root.querySelector('.kui-image-cropper [data-part="crop"]')!.getAttribute('aria-valuetext')).toBe('100 by 50 pixels at 40, 20')
+    // The crop given already fits: nothing to report.
+    expect(seen.crops).toHaveLength(1)
+  })
+
+  test('onCropEnd runs once per drag and after each key press, while onCrop runs per move', async () => {
+    const ends: unknown[] = []
+    const { root, stage } = await loadedCropper({ onCropEnd: (crop: unknown) => ends.push(crop) })
+    const crop = root.querySelector('.kui-image-cropper [data-part="crop"]')!
+
+    pointer(crop, 'pointerdown', 200, 150)
+    pointer(stage, 'pointermove', 200, 140)
+    pointer(stage, 'pointermove', 200, 130)
+    pointer(stage, 'pointermove', 200, 120)
+
+    expect(ends).toEqual([])
+
+    pointer(stage, 'pointerup', 200, 120)
+
+    expect(ends).toEqual([{ x: 0, y: 20, w: 400, h: 200 }])
+
+    // A press with no move ends nothing.
+    pointer(crop, 'pointerdown', 200, 150)
+    pointer(stage, 'pointerup', 200, 150)
+
+    expect(ends).toHaveLength(1)
+
+    press(crop, 'ArrowDown')
+
+    expect(ends).toHaveLength(2)
+  })
+
+  test('onError runs when the image does not load, and the stage says so', async () => {
+    let failures = 0
+    const root = await media({ onCropError: () => failures++ })
+
+    root.querySelector('.kui-image-cropper [data-part="image"]')!.dispatchEvent(new Event('error'))
+    await settle()
+
+    expect(failures).toBe(1)
+    expect(root.querySelector('.kui-image-cropper [data-part="error"]')?.textContent).toBe('The image could not be loaded.')
   })
 })
 

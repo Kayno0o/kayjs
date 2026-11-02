@@ -36,7 +36,18 @@ export interface RecorderOptions {
   sending?: string | undefined
   // How long a recording runs before it is handed over as if pressed.
   maxMs: number
+  // Called once the microphone is open and the recording runs.
+  onStart?: (() => unknown) | undefined
+  // Called when a recording ends and is handed to `onAudio`: `press` when the visitor stopped it, `limit` when `maxMs` ran out. Before `onAudio`.
+  onStop?: ((reason: RecordStop) => unknown) | undefined
+  // Called when the recording under way is dropped (Escape).
+  onCancel?: (() => unknown) | undefined
+  // Called with why nothing was recorded (the microphone's problem), or `send` and the rejection when `onAudio` rejected.
+  onError?: ((problem: RecordProblem | 'send', cause?: unknown) => unknown) | undefined
 }
+
+// What ended a recording that was handed over.
+export type RecordStop = 'press' | 'limit'
 
 export interface Recorder {
   // Asking for the microphone, recording, or waiting on `onAudio`.
@@ -64,6 +75,8 @@ export function recorder(options: RecorderOptions): Recorder {
   let current: Recording | undefined
   let ticker: ReturnType<typeof setInterval> | undefined
   let gone = false
+  // Set by the press that stops a recording, which tells it from one the time limit ended.
+  let pressed = false
 
   // Fetched as the component mounts, so the first press does not wait on it.
   const load = async () => loading ??= import('./recording')
@@ -103,10 +116,12 @@ export function recorder(options: RecorderOptions): Recorder {
       state.set('idle')
       said.set('')
       problem.set(words[result])
+      options.onError?.(result)
 
       return
     }
 
+    options.onStop?.(pressed ? 'press' : 'limit')
     state.set('sending')
     said.set(options.sending ?? words.stopped)
 
@@ -116,6 +131,7 @@ export function recorder(options: RecorderOptions): Recorder {
     catch (error) {
       console.error('kayjs-ui: a recording\'s onRecord failed', error)
       problem.set(options.failure)
+      options.onError?.('send', error)
     }
     finally {
       said.set('')
@@ -126,6 +142,7 @@ export function recorder(options: RecorderOptions): Recorder {
   async function start() {
     problem.set(undefined)
     said.set('')
+    pressed = false
     state.set('asking')
 
     let started: Recording | RecordProblem
@@ -151,6 +168,7 @@ export function recorder(options: RecorderOptions): Recorder {
     if (typeof started === 'string') {
       state.set('idle')
       problem.set(words[started])
+      options.onError?.(started)
 
       return
     }
@@ -160,10 +178,12 @@ export function recorder(options: RecorderOptions): Recorder {
     ticker = setInterval(() => seconds.set(seconds() + 1), 1000)
     state.set('recording')
     said.set(words.recording)
+    options.onStart?.()
   }
 
   async function press() {
     if (state() === 'recording') {
+      pressed = true
       state.set('sending')
       finish()?.stop()
 
@@ -182,6 +202,7 @@ export function recorder(options: RecorderOptions): Recorder {
     finish()
     state.set('idle')
     said.set(words.cancelled)
+    options.onCancel?.()
 
     return true
   }

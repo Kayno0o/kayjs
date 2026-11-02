@@ -271,3 +271,56 @@ test('a RecordButton removed while it records releases the microphone', async ()
 
   expect([tracks[0]!.readyState, given.length]).toEqual(['ended', 0])
 })
+
+test('reports the start, how a recording stopped before onRecord, a cancel and each problem', async () => {
+  const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+  const events: unknown[] = []
+  const hear = (name: string) => (...args: unknown[]) => events.push([name, ...args])
+
+  try {
+    const { button } = await mount({
+      maxDuration: '30ms',
+      onRecord: async () => {
+        events.push(['record'])
+
+        return Promise.reject(new Error('down'))
+      },
+      onStart: hear('start'),
+      onStop: hear('stop'),
+      onCancel: hear('cancel'),
+      onError: (problem: string, cause?: Error) => events.push(['error', problem, cause?.message]),
+    })
+
+    microphone(async () => Promise.reject(new DOMException('no', 'NotAllowedError')))
+    click(button)
+    await settle()
+    microphone(async () => stream())
+    click(button)
+    await settle()
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    await settle()
+
+    events.push(['--'])
+    click(button)
+    await settle()
+    await Bun.sleep(60)
+    await settle()
+
+    expect(events).toEqual([['error', 'denied', undefined], ['start'], ['cancel'], ['--'], ['start'], ['stop', 'limit'], ['record'], ['error', 'send', 'down']])
+  }
+  finally {
+    logged.mockRestore()
+  }
+})
+
+test('onStop says press for the press that stopped a recording, then onRecord follows', async () => {
+  const events: string[] = []
+  const { button } = await mount({ onStart: () => events.push('start'), onStop: (reason: string) => events.push(`stop:${reason}`), onRecord: () => events.push('record') })
+
+  click(button)
+  await settle()
+  click(button)
+  await settle()
+
+  expect(events).toEqual(['start', 'stop:press', 'record'])
+})

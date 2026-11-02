@@ -20,6 +20,8 @@ Combobox(label="Customer" options={searchCustomers} value={customer()} valueLabe
 
 A `value` a remote list holds no label for yet, such as the saved id of a customer, leaves the input empty while the value is still posted. Give `valueLabel` the text to show, and the loader is not asked for it when the input takes focus. A fixed list shows the value itself.
 
+`onInput` is called with the text on every edit of it. `onLoad` is called with the options a function answered and the text it was asked for, and `onError` with what it rejected with and that text, while `failureLabel` still shows. Only the latest question is reported: an answer that arrives after a newer key press is dropped, and so is its failure.
+
 ## Rows with more than a label
 
 An option can carry a `description`, drawn as a quieter second line under its label. It is plain data, so an action can answer it, such as a commit's author and date. The input shows the label alone once the option is picked, typing filters on the label alone, and a screen reader hears the label first and the description after it.

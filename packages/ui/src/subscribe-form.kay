@@ -1,15 +1,16 @@
 ---
 import { recipe } from 'kay'
-import type { Action } from 'kay'
+import type { Action, FormFailure, Snippet } from 'kay'
 import { wording } from 'kay/words'
 import Button from './button.kay'
 import { FIELD_MESSAGE } from './field-look'
 import FormField from './form-field.kay'
+import FormOutcome from './internal/form-outcome.kay'
 import Notice from './notice.kay'
 
 const look = recipe({ parts: { root: 'kui-subscribe-form', notice: FIELD_MESSAGE.hint } })
 
-const { action, noticeText, label = wording('ui.subscribeForm.email', wording('mail.list.form.email', 'Email')), submitLabel = wording('ui.subscribeForm.submit', wording('mail.list.form.submit', 'Subscribe')), sentLabel = wording('ui.subscribeForm.sent', wording('mail.list.form.sent', 'Almost done: open the mail we just sent you and confirm your address.')), privacyLabel = wording('ui.subscribeForm.privacy', wording('mail.list.form.privacy', 'Privacy policy')), privacy, wordingId } = props<{
+const { action, noticeText, label = wording('ui.subscribeForm.email', wording('mail.list.form.email', 'Email')), submitLabel = wording('ui.subscribeForm.submit', wording('mail.list.form.submit', 'Subscribe')), sentLabel = wording('ui.subscribeForm.sent', wording('mail.list.form.sent', 'Almost done: open the mail we just sent you and confirm your address.')), privacyLabel = wording('ui.subscribeForm.privacy', wording('mail.list.form.privacy', 'Privacy policy')), privacy, wordingId, onSent, onError, sent } = props<{
   // The action `mail.list().form()` from kayjs-mail gives, or any with an `email` field.
   action: Action<never, unknown>
   // The labels read the `ui.subscribeForm.*` messages, then kayjs-mail's `mail.list.form` ones in the page's language, English and French, which these replace.
@@ -17,6 +18,12 @@ const { action, noticeText, label = wording('ui.subscribeForm.email', wording('m
   submitLabel?: string | undefined
   // Shown once the post went through, whether or not the address was already listed.
   sentLabel?: string | undefined
+  // Replaces the success notice, whatever `sentLabel` says.
+  sent?: Snippet
+  // Called once the post went through, with what the action returned: for an analytics conversion, closing a dialog around the form or a redirect.
+  onSent?: ((data: unknown) => unknown) | undefined
+  // Called when the post was refused or failed, with the messages by field, the status and the failure's data; the notice and the field messages still show.
+  onError?: ((failure: FormFailure<never, unknown>) => unknown) | undefined
   // The line saying what the address is used for, shown by default; replace it with the sender, the content and the frequency of your list.
   noticeText?: string | undefined
   privacyLabel?: string | undefined
@@ -35,13 +42,20 @@ const shownWording = wordingId ?? (noticeText === undefined ? 'stock' : 'custom'
 form(part="root" action={action} novalidate)
   FormField(label={label} required issue={action.error('email')})
     input(field="email" type="email" autocomplete="email")
+  // Fields beyond the email, between it and the notice.
+  slot
   p(part="notice")
     | {notice}{' '}
     if policy
       a(part="link" href={policy} target="_blank" rel="noopener") {privacyLabel}
   input(type="hidden" name="wording" value={shownWording})
   Button(type="submit" tone="accent" label={submitLabel})
+  if onSent || onError
+    FormOutcome(action={action} onSent={onSent} onError={onError})
   if action.succeeded()
-    Notice(tone="success" size="sm") {sentLabel}
+    if sent
+      | {sent}
+    else
+      Notice(tone="success" size="sm") {sentLabel}
   else if action.error() as message
     Notice(tone="danger" size="sm") {message}

@@ -48,6 +48,18 @@ describe('FormDialog', () => {
     expect(root.querySelector<HTMLInputElement>('#name')?.value).toBe('Ada')
   })
 
+  test('onError hears a refusal and stays quiet for a save', async () => {
+    const heard: unknown[] = []
+
+    mounted = await mountComponent(FormDialogComponent, { save: async () => ({ errors: { name: 'Taken' } }), plain: false, onSaved: (name: string) => saved.push(name), onError: (error: unknown) => heard.push(error) })
+    submit(mounted.root)
+    await settle()
+
+    expect(heard).toHaveLength(1)
+    expect((heard[0] as { errors: Record<string, string> }).errors).toEqual({ name: 'Taken' })
+    expect(saved).toEqual([])
+  })
+
   test('shows a refused field\'s message on its FormField and stays open, then drops it once saved', async () => {
     let answer: Answer = { errors: { name: 'Taken' } }
     const root = await formDialog(async () => answer)

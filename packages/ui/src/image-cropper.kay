@@ -16,6 +16,7 @@ const DIRECTIONS: Partial<Record<string, [number, number]>> = { ArrowLeft: [-1, 
 const look = recipe({
   parts: {
     root: 'kui-image-cropper flex flex-col gap-2',
+    error: 'm-0 p-4 text-sm text-danger',
     stage: 'relative cursor-crosshair touch-none overflow-hidden border-solid border-[length:var(--border-width)] border-border select-none',
     image: 'block h-auto w-full',
     crop: 'absolute cursor-move border-2 border-dashed border-white bg-no-repeat shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] outline-none focus-visible:border-solid focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-accent',
@@ -26,7 +27,7 @@ const look = recipe({
   },
 })
 
-const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wording('ui.imageCropper.crop', 'Crop area: arrows move it, Shift and the arrows resize it'), cropText = wording('ui.imageCropper.cropText', '{w} by {h} pixels at {x}, {y}'), onCrop, onLoad, footer, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wording('ui.imageCropper.crop', 'Crop area: arrows move it, Shift and the arrows resize it'), cropText = wording('ui.imageCropper.cropText', '{w} by {h} pixels at {x}, {y}'), errorLabel = wording('ui.imageCropper.error', 'The image could not be loaded.'), crop: given, onCrop, onCropEnd, onLoad, onError, fallback, footer, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   src: string
   // Width over height the crop is locked to; a change centres the crop again.
   ratio?: number | undefined
@@ -39,10 +40,19 @@ const { src, ratio = 1, minSize = 32, grid = false, alt = '', cropLabel = wordin
   cropLabel?: string | undefined
   // Reads the crop out as it changes, `{w}`, `{h}`, `{x}` and `{y}` standing for its size and place in natural pixels.
   cropText?: string | undefined
-  // The crop in the image's natural pixels, ready for a canvas draw, after every change.
+  // The crop in the image's natural pixels, to start from and to follow: it is clamped to the image and to `ratio` once the image has decoded (`onCrop` then hears the clamped crop when it differs), and a changed value moves the crop. Left out, the crop is centred; give back what `onCrop` or `onCropEnd` reported to control it.
+  crop?: CropRect | undefined
+  // The crop in the image's natural pixels, ready for a canvas draw, after every change, a drag's every move included.
   onCrop?: ((crop: CropRect) => unknown) | undefined
+  // The crop once a drag that moved it is released, after each arrow press, and after the footer's `reset()`: the moment to save it.
+  onCropEnd?: ((crop: CropRect) => unknown) | undefined
   // The image's natural size, once it has decoded.
   onLoad?: ((size: ImageSize) => unknown) | undefined
+  // Called when the image does not load; the stage then shows `fallback` or `errorLabel`, until `src` changes.
+  onError?: (() => unknown) | undefined
+  errorLabel?: string | undefined
+  // Replaces `errorLabel` where the image failed.
+  fallback?: Snippet | undefined
   // Shown under the image: `@footer(reset)`, where `reset()` centres the crop again.
   footer?: Snippet<[reset: () => void]> | undefined
 }>()
@@ -53,7 +63,8 @@ const stageSize = elementSize()
 const crop = signal<CropRect>({ x: 0, y: 0, w: 0, h: 0 })
 let stage: HTMLDivElement | undefined
 let image: HTMLImageElement | undefined
-let drag: { mode: 'move' | CropHandle, pointer: { x: number, y: number }, from: CropRect } | null = null
+const broken = signal(false)
+let drag: { mode: 'move' | CropHandle, pointer: { x: number, y: number }, from: CropRect, moved: boolean } | null = null
 
 const described = () => cropText.replace(/\{([whxy])\}/g, (_, key: 'w' | 'h' | 'x' | 'y') => String(Math.round(crop()[key])))
 
@@ -71,11 +82,43 @@ function reset() {
     set(createCenteredCrop(known.width, known.height, ratio))
 }
 
-// A new image or ratio starts from a centred crop again.
+// The crop asked for, kept inside the image at the ratio's shape: its width held within the image and `minSize`, its height following the ratio, both shrunk together when the height does not fit.
+function fitted(wanted: CropRect, known: ImageSize): CropRect {
+  let w = Math.min(Math.max(wanted.w, minSize), known.width)
+  let h = w / ratio
+
+  if (h > known.height) {
+    h = known.height
+    w = h * ratio
+  }
+
+  return { x: Math.min(Math.max(wanted.x, 0), known.width - w), y: Math.min(Math.max(wanted.y, 0), known.height - h), w, h }
+}
+
+// A new image or ratio starts from a centred crop again, or from the one given; a changed `crop` moves it.
 effect(() => {
-  void size()
+  const known = size()
+  const wanted = given
+
   void ratio
-  untrack(reset)
+
+  untrack(() => {
+    if (!wanted || !known)
+      return reset()
+
+    const next = fitted(wanted, known)
+
+    crop = next
+
+    if (next.x !== wanted.x || next.y !== wanted.y || next.w !== wanted.w || next.h !== wanted.h)
+      onCrop?.(next)
+  })
+})
+
+// A new source gets another chance.
+effect(() => {
+  void src
+  broken = false
 })
 
 function loaded() {
@@ -84,8 +127,14 @@ function loaded() {
 
   const next = { width: image.naturalWidth, height: image.naturalHeight }
 
+  broken = false
   size = next
   onLoad?.(next)
+}
+
+function failed() {
+  broken = true
+  onError?.()
 }
 
 // An image already decoded, from the cache, fires no load event of its own.
@@ -103,7 +152,7 @@ function start(event: PointerEvent, mode: 'move' | CropHandle) {
 
   event.preventDefault()
   event.stopPropagation()
-  drag = { mode, pointer: pointerToNatural(event.clientX, event.clientY, rect, known.width), from: crop() }
+  drag = { mode, pointer: pointerToNatural(event.clientX, event.clientY, rect, known.width), from: crop(), moved: false }
   stage?.setPointerCapture(event.pointerId)
 }
 
@@ -117,6 +166,7 @@ function move(event: PointerEvent) {
   const pointer = pointerToNatural(event.clientX, event.clientY, rect, known.width)
   const dx = pointer.x - drag.pointer.x
 
+  drag.moved = true
   set(drag.mode === 'move'
     ? moveCrop(drag.from, dx, pointer.y - drag.pointer.y, known.width, known.height)
     : resizeCrop(drag.from, dx, ratio, drag.mode, known.width, known.height, minSize))
@@ -126,8 +176,13 @@ function end(event: PointerEvent) {
   if (!drag)
     return
 
+  const { moved } = drag
+
   drag = null
   stage?.releasePointerCapture(event.pointerId)
+
+  if (moved)
+    onCropEnd?.(crop())
 }
 
 // Arrows move the crop, Shift with the arrows resizes it from its bottom-right corner, and Alt takes bigger steps.
@@ -146,6 +201,13 @@ function keyDown(event: KeyboardEvent) {
   set(event.shiftKey
     ? resizeCrop(crop(), (x + y) * step, ratio, 'se', known.width, known.height, minSize)
     : moveCrop(crop(), x * step, y * step, known.width, known.height))
+  onCropEnd?.(crop())
+}
+
+// What the footer's reset does: the crop centred again, as a commit.
+function resetCrop() {
+  reset()
+  onCropEnd?.(crop())
 }
 
 const area = () => {
@@ -159,7 +221,12 @@ const area = () => {
 div(part="root" {...rest})
   div(part="stage" ref={element => { stage = element; stageSize.ref(element) }} role="presentation" onPointerMove={move} onPointerUp={end} onPointerCancel={end})
     // kay-allow unsized-image
-    img(part="image" ref={element => image = element} src={src} alt={alt} draggable="false" onLoad={loaded})
+    img(part="image" ref={element => image = element} src={src} alt={alt} draggable="false" hidden={broken()} onLoad={loaded} onError={failed})
+    if broken()
+      if fallback
+        | {fallback}
+      else
+        p(part="error" role="alert") {errorLabel}
     if crop().w > 0
       div(part="crop" role="slider" tabindex="0" aria-label={cropLabel} aria-valuetext={described()} aria-valuemin={minSize} aria-valuemax={size()?.width ?? minSize} aria-valuenow={Math.round(crop().w)} style={area()} onPointerDown={event => start(event, 'move')} onKeyDown={keyDown})
         if grid
@@ -169,4 +236,4 @@ div(part="root" {...rest})
         for handle of HANDLES key={handle}
           span(part="handle" data-handle={handle} onPointerDown={event => start(event, handle)})
   if footer
-    | {footer(reset)}
+    | {footer(resetCrop)}

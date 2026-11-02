@@ -918,7 +918,7 @@ function resetWhenIdle(busy: () => boolean, restore: () => void): { reset: () =>
 function startRef<Target extends Element>(first: (element: Target) => void, app?: unknown): (element: Target) => void
 
 [./lib/forms] callAction
-function callAction<Output>(form: HTMLFormElement, action: Action<never, Output, never>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => string | Record<string, string> | undefined) | undefined): Promise<{
+function callAction<Output>(form: HTMLFormElement, action: Action<never, Output, never>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => string | Record<string, string> | undefined) | undefined, onError?: ((error: unknown) => unknown) | undefined): Promise<{
   result: Answer<Success<Output>>;
 } | undefined>
 
@@ -1887,11 +1887,18 @@ interface RecorderOptions
   failure: string
   maxMs: number
   onAudio: (audio: File) => unknown
+  onCancel?: (() => unknown) | undefined
+  onError?: ((problem: "send" | RecordProblem, cause?: unknown) => unknown) | undefined
+  onStart?: (() => unknown) | undefined
+  onStop?: ((reason: RecordStop) => unknown) | undefined
   sending?: string | undefined
   words: RecordWords
 
 [./lib/record] RecordProblem
 type RecordProblem = 'insecure' | 'unsupported' | 'denied' | 'missing' | 'taken' | 'failed' | 'lost' | 'empty'
+
+[./lib/record] RecordStop
+type RecordStop = 'press' | 'limit'
 
 [./lib/record] recordWords
 function recordWords(): RecordWords

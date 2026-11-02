@@ -10,6 +10,8 @@ description: A search box over a grid of icons, for picking one by name.
 
 <Demo name="icon-picker/more" />
 
+`onSearch` is called with the query each time a new search starts, not when Show more adds a page. `onError` is called with what the search rejected with, for the latest search only, while `errorLabel` still shows and the last grid stays.
+
 ## In a form
 
 `name` submits the chosen name inside a plain form, and an `input` event tells the form about each pick. Without a form, `value` is the chosen name and `onChange` gets the new name, or an empty string when the pick is cleared.

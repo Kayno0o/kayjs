@@ -121,11 +121,14 @@ function messagesOf(said: Record<string, string> | string | undefined): Record<s
 
 // Calls the action with the form's fields. A refusal sets the messages for each FormField, toasts the ones no field shows (or `failure` when it carries none) and focuses the first invalid field, answering undefined; what the action returned is answered inside an object, so a result of undefined is told apart.
 // The schema refuses fields; the handler refuses with data of its own, which `refused` reads, a single message going under the empty name as the whole form's.
-export async function callAction<Output>(form: HTMLFormElement, action: Action<never, Output>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined): Promise<{ result: Answer<Success<Output>> } | undefined> {
+export async function callAction<Output>(form: HTMLFormElement, action: Action<never, Output>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined, onError?: ((error: unknown) => unknown) | undefined): Promise<{ result: Answer<Success<Output>> } | undefined> {
   try {
     return { result: await action(new FormData(form)) }
   }
   catch (error) {
+    // Told first, before the toast, what the call was refused or failed with.
+    onError?.(error)
+
     const read = error instanceof ActionError && error.data !== undefined ? refused?.(error.data as FailureData<Output>) : undefined
     // As in `attempt`, a `refused` saying nothing leaves the words of the data itself.
     const said = read === undefined || read === '' ? answerMessage(error instanceof ActionError ? error.data : undefined) : read

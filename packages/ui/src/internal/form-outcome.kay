@@ -1,0 +1,26 @@
+---
+import type { Action, FormFailure } from 'kay'
+import { effect, untrack } from 'kay'
+
+// Reports how a form posting to `action` went to the app, drawing nothing. ContactForm and SubscribeForm render it only when given `onSent` or `onError`, so a form that asks for neither stays static and ships no JavaScript.
+const { action, onSent, onError } = props<{
+  action: Action<never, unknown>
+  onSent?: ((data: unknown) => unknown) | undefined
+  onError?: ((failure: FormFailure<never, unknown>) => unknown) | undefined
+}>()
+
+effect(() => {
+  const done = action.succeeded()
+
+  if (done)
+    untrack(() => onSent?.(done.data))
+})
+
+effect(() => {
+  const failure = action.failed()
+
+  if (failure)
+    untrack(() => onError?.(failure))
+})
+---
+| {''}

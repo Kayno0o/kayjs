@@ -34,6 +34,8 @@ A failure keeps the bar dirty. A refused field shows its message on its [FormFie
 
 A save toasts `saved` when given, calls `onSaved` with what the action returned and leaves the form clean.
 
+When a save is refused or fails, `onError` is called first with the error, before the toast. A refusal is an `ActionError` with its `errors` by field and its `data`, and any other failure is what the call threw. Use it to log the failure or scroll to the first bad field.
+
 ## Editors driven by signals
 
 An editor whose state is signals and whose save takes an object, not a `FormData`, gives SaveForm the `dirty` it computes and an `onSave` returning the call's promise, in place of `action`.

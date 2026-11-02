@@ -38,9 +38,16 @@ function found(query: string, limit: number, offset: number): IconChoice[] {
   return SET.filter(entry => entry.name.includes(query)).slice(offset, offset + limit)
 }
 
+const searched: string[] = []
+const errors: string[] = []
+
 async function picker(options: { value?: string, hold?: (query: string) => boolean, ignoreOffset?: boolean, fail?: (query: string) => boolean } = {}) {
+  searched.length = 0
+  errors.length = 0
   mounted = await mountComponent(IconPicker, {
     value: options.value,
+    onSearch: (query: string) => searched.push(query),
+    onError: (error: Error) => errors.push(error.message),
     onChange: (name: string) => changes.push(name),
     search: async (query: string, limit: number, offset: number) => {
       searches.push([query, limit, offset])
@@ -198,6 +205,8 @@ test('says the icons could not be loaded when a search is rejected, keeping the 
 
     expect(view.root.querySelector('.kui-icon-grid-error')?.textContent).toBe('The icons could not be loaded.')
     expect(view.names()).toHaveLength(50)
+    expect(searched).toEqual(['', 'x'])
+    expect(errors).toEqual(['search down'])
 
     type(view.search, 'house')
     await clock.elapse(TYPED_MS)

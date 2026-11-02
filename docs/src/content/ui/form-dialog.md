@@ -55,6 +55,10 @@ FormDialog(
 
 The dialog calls `action` with the form's data. Give each control the `name` of its field in the action's schema. When the action refuses a field, its message shows on the [FormField](/ui/form-field) with that `name` and the dialog stays open. `onSaved` receives what the action returned, then the dialog closes.
 
+## Failures
+
+When the action is refused or fails, `onError` is called with the error before the toast, and the dialog stays open. A refusal is an `ActionError` with its `errors` by field and its `data`, and any other failure is what the call threw.
+
 ## Refusals of the handler
 
 A handler refusing with `ctx.fail(400, { error: 'Slug taken' })` reaches the dialog through `refused`, which answers a message per field, or one message that is toasted. Without it, `failure` is toasted.

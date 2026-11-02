@@ -165,6 +165,42 @@ describe('SaveForm', () => {
     expect(root.querySelector('.kui-toast')).toBeNull()
   })
 
+  test('onError hears a refusal with its messages, and a thrown failure, before the toast', async () => {
+    const heard: unknown[] = []
+    let answer: Answer | Error = { errors: { name: 'Taken' } }
+
+    mounted = await mountComponent(SaveFormComponent, { save: async () => {
+      if (answer instanceof Error)
+        throw answer
+
+      return answer
+    }, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++, onError: (error: unknown) => heard.push(error) })
+
+    const root = mounted.root
+
+    type(root, 'Grace')
+    await settle()
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+
+    expect(heard).toHaveLength(1)
+    expect((heard[0] as { errors: Record<string, string> }).errors).toEqual({ name: 'Taken' })
+
+    answer = new Error('offline')
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+
+    expect(heard).toHaveLength(2)
+    expect((heard[1] as Error).message).toBe('offline')
+
+    answer = 'Grace'
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+
+    expect(heard).toHaveLength(2)
+    expect(saved).toEqual(['Grace'])
+  })
+
   test('a failure no field shows is toasted and the bar stays dirty', async () => {
     const root = await saveForm(async () => {
       throw new Error('offline')

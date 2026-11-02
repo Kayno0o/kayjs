@@ -1,0 +1,27 @@
+---
+import type { Action, FormFailure } from 'kay'
+import { signal } from 'kay'
+import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
+import SubscribeForm from '@kaynooo/kayjs-ui/subscribe-form.kay'
+
+// A stand-in for an action: the page's outcome of the last post is what `settle` and `refuse` set.
+const { onSent, onError } = props<{ onSent: (data: unknown) => void, onError: (failure: FormFailure<never, unknown>) => void }>()
+
+const done = signal<{ data: unknown } | undefined>(undefined)
+const failed = signal<FormFailure<never, unknown> | undefined>(undefined)
+
+const action = Object.assign(async () => undefined, {
+  url: '/_kay/action/mail/form',
+  pending: () => false,
+  succeeded: () => done(),
+  failed: () => failed(),
+  error: (field = '') => (failed()?.errors as Record<string, string> | undefined)?.[field],
+}) as unknown as Action<never, unknown>
+---
+button#sent(onClick={() => { failed = undefined; done = { data: 'ok' } }}) Sent
+button#refused(onClick={() => { done = undefined; failed = { status: 422, values: {}, errors: { email: 'Invalid' } } }}) Refused
+ContactForm(action={action} onSent={onSent} onError={onError})
+  @sent
+    p#custom-sent Custom
+SubscribeForm(action={action})
+  input#extra(name="extra")

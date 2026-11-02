@@ -9,7 +9,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: '', footer: 'flex w-full flex-wrap items-center gap-2', actions: 'ml-auto flex flex-wrap justify-end gap-2', form: 'kui-form-grid' } })
 
-const { open, title, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failure, refused, onSaved, onOpenChange, extra, id } = props<{
+const { open, title, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failure, refused, onSaved, onError, onOpenChange, extra, id } = props<{
   // Shows the dialog; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -25,6 +25,8 @@ const { open, title, action, submitLabel, savingLabel = wording('ui.formDialog.s
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   // What the action returned, for the page to patch into what it shows. The dialog closes once it has run.
   onSaved?: ((result: Answer<Success<Output>>) => unknown) | undefined
+  // Called with what the call was refused or failed with, before the toast: the `ActionError` of a refusal (its `errors` by field, its `data`), or whatever the call threw. The dialog stays open.
+  onError?: ((error: unknown) => unknown) | undefined
   // The left end of the footer, for a delete button.
   extra?: Snippet
   // Pairs the footer's submit button with the form; one unique on the page is drawn when none is given.
@@ -51,7 +53,7 @@ async function submit(event: SubmitEvent) {
   if (action.pending() || !form)
     return
 
-  const done = await callAction(form, action, issues, failure, refused)
+  const done = await callAction(form, action, issues, failure, refused, onError)
 
   if (!done)
     return

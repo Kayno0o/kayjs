@@ -8,6 +8,12 @@ description: A microphone button that records the visitor's voice and hands the 
 
 A press asks the browser for the microphone, which prompts the visitor the first time, and starts recording. The button is then pressed, draws a stop icon and shows the time beside it. The next press stops and hands the recording over. While the promise `onRecord` returns is pending the button is busy, and a rejection says `failure`. `maxDuration`, `5m` by default and a duration with its unit, stops a recording left running as if pressed, so it stays within the action's `maxSize`.
 
+## Callbacks
+
+`onStart` is called once the microphone is open and the recording runs, to dim the page or stop a player. `onStop` is called when a recording ends and is handed over, before `onRecord`, with `press` when the visitor stopped it and `limit` when `maxDuration` ran out. `onCancel` is called when Escape drops it.
+
+`onError` is called with why nothing was recorded, the code of the notice shown (`denied`, `missing`, `taken`, `insecure`, `unsupported`, `failed`, `lost` or `empty`), or with `send` and the rejection when `onRecord` rejected. The notice still shows.
+
 ## What it handles
 
 The microphone is released however the recording ends: stopped, dropped, unplugged, or the button removed from the page. A notice under the button says why nothing was recorded:
@@ -33,4 +39,4 @@ Its texts are `ui.recordButton.*` messages, the microphone's troubles included, 
 
 ## Drawn otherwise
 
-`recorder()` and `recordWords()` from `@kaynooo/kayjs-ui/lib/record` are the button's state, for a microphone drawn another way: `state`, `problem`, `said` and `seconds` are signals, `press()` starts or stops and `cancel()` drops. The recorder's browser code is a chunk of its own, loaded when the component mounts, so a page without a microphone ships none of it.
+`recorder()` and `recordWords()` from `@kaynooo/kayjs-ui/lib/record` are the button's state, for a microphone drawn another way: `state`, `problem`, `said` and `seconds` are signals, `press()` starts or stops and `cancel()` drops. It takes the same `onStart`, `onStop`, `onCancel` and `onError`. The recorder's browser code is a chunk of its own, loaded when the component mounts, so a page without a microphone ships none of it.

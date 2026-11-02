@@ -21,6 +21,8 @@ ContactForm(action={contact})
 
 - Fields beyond the name, email and message go in as the children, between the email and the message, each in a [FormField](/ui/form-field) with `issue={contact.error('topic')}`. They are named with `name`, as `field` is only valid in the form itself.
 - `nameLabel`, `emailLabel`, `messageLabel`, `submitLabel` and `sentLabel` replace the texts, which read the `ui.contactForm.*` messages, then kayjs-mail's `mail.contact.form` ones in the page's language (English and French), and are English without them, and `rows` sets the message box's height.
+- `onSent` is called once the message went out, with what the action returned, to count a conversion or close a dialog around the form. `onError` is called when the post is refused or fails, with the failure: its `status`, its `errors` by field and the `data` the handler passed to `ctx.fail`. The notice and the field messages show as before, and a form given neither stays static.
+- `@sent` replaces the notice that says the message went out: `ContactForm(action={contact})` then `@sent` and its markup.
 - When the action asks for a consent (`consent: true` in `contactForm`), the form draws the checkbox with `consentLabel`, and links the privacy page when `privacy` is given: `ContactForm(action={contact} privacy="/privacy")`. `privacyLabel` replaces the link's text, which opens in a new tab so the message is kept.
 - Only the field `consent: true` marks counts: an extra field of your own named `consent`, or a hand-written schema, gets no box. Write `consent` on the form to draw it anyway, which you need inside an island, where the action carries no schema.
 - The anti-spam fields the action asks for, the honeypot and the time stamp, are added by kay.
