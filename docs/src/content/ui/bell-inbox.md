@@ -12,4 +12,4 @@ Use `BellInbox` inside an island when your notifications live elsewhere and load
 
 ## Your own trigger
 
-`@trigger(attributes, unread)` replaces the icon button: spread the attributes on any element, and `unread` is the count, for a badge of your own, as the one over the default button is not drawn. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup`, the style that anchors the list and an `aria-label` of the `label` and the unread count, so the count stays in the button's name.
+`@trigger(attributes, unread)` replaces the icon button: spread the attributes on any element, and `unread()` is the count, for a badge of your own, as the one over the default button is not drawn. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup`, the style that anchors the list and an `aria-label` of the `label` and the unread count, so the count stays in the button's name.

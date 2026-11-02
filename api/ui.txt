@@ -686,7 +686,7 @@ component default
   onRead?: ((id: string | undefined) => unknown) | undefined
   open?: boolean | undefined
   placement?: PopoverPlacement | undefined
-  trigger?: ((attributes: BellTriggerProps, unread: number) => Element) | undefined
+  trigger?: ((attributes: BellTriggerProps, unread: () => number) => Element) | undefined
   unread?: number | undefined
 
 [./bell.kay] default

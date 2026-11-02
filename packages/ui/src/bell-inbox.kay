@@ -1,8 +1,8 @@
 --- <Item extends BellItem>
 import type { Snippet } from 'kay'
 import type { BellItem, BellItems, BellTriggerProps } from './bell'
-import type { PopoverTriggerProps } from './popover'
-import type { PopoverPlacement } from './popover'
+
+import type { PopoverPlacement, PopoverTriggerProps } from './popover'
 import { call, effect, recipe, resource, signal } from 'kay'
 import { wording } from 'kay/words'
 import inboxApi from './api/inbox'
@@ -44,8 +44,8 @@ const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-e
   onOpenChange?: ((open: boolean) => unknown) | undefined
   // Draws each row in place of its dot and title: `@item(note)`.
   item?: Snippet<[note: Item]> | undefined
-  // Replaces the icon button that opens the list: `@trigger(attributes, unread)`, then `button({...attributes})`. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup`, the anchor style and an `aria-label` made of `label` and the unread count; `unread` is the count, to draw a badge of your own (the one over the default button is not drawn).
-  trigger?: Snippet<[attributes: BellTriggerProps, unread: number]> | undefined
+  // Replaces the icon button that opens the list: `@trigger(attributes, unread)`, then `button({...attributes})`. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup`, the anchor style and an `aria-label` made of `label` and the unread count; `unread` is a function returning the count (a function, so the app's element is updated in place and keeps focus), to draw a badge of your own (the one over the default button is not drawn).
+  trigger?: Snippet<[attributes: BellTriggerProps, unread: () => number]> | undefined
 }>()
 
 // The routes answer a path of the site or an http(s) URL only; checked again here, as the link is drawn.
@@ -118,7 +118,7 @@ span(part="root")
   Popover(placement={placement} part="menu" open={open} onOpenChange={onOpenChange})
     @trigger(attributes)
       if trigger
-        | {trigger(named(attributes), unread())}
+        | {trigger(named(attributes), unread)}
       else
         IconButton({...attributes} icon="bell" label={name()} variant="ghost" aria-haspopup="true")
     div(part="list" aria-label={label})
