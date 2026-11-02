@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import TreeLazy from '../tests/fixture/src/components/tree-lazy.kay'
 import Tree from '../tests/fixture/src/components/tree.kay'
 import { click } from './dom'
 
@@ -139,4 +140,60 @@ test('a click on the blank before a leaf selects it, and new nodes never reopen 
   await settle()
 
   expect(rows(root)).toEqual(['Work 1 1/2 false false -1', 'Mail 1 2/2  true 0'])
+})
+
+async function lazy() {
+  const calls: string[] = []
+
+  mounted = await mountComponent(TreeLazy, { calls })
+  await settle()
+
+  const root = mounted.root
+
+  return { root, calls, labels: () => [...root.querySelectorAll('.kui-tree-view-label')].map(label => label.textContent), row: (label: string) => [...root.querySelectorAll<HTMLElement>('[role="treeitem"]')].find(item => item.textContent?.startsWith(label))! }
+}
+
+test('a branch whose children are a function loads them the first time it opens, busy meanwhile, and keeps them', async () => {
+  const { root, calls, labels, row } = await lazy()
+
+  click(row('Remote').querySelector('.kui-tree-view-toggle'))
+  await settle()
+  expect(row('Remote').getAttribute('aria-busy')).toBe('true')
+  expect(labels()).toEqual(['Remote', 'Flaky', 'Plain'])
+
+  click(root.querySelector('#release'))
+  await settle()
+  expect(row('Remote').getAttribute('aria-busy')).toBeNull()
+  expect(labels()).toEqual(['Remote', 'File', 'Flaky', 'Plain'])
+
+  click(row('Remote').querySelector('.kui-tree-view-toggle'))
+  click(row('Remote').querySelector('.kui-tree-view-toggle'))
+  await settle()
+  expect(labels()).toEqual(['Remote', 'File', 'Flaky', 'Plain'])
+  expect(calls).toEqual(['remote true', 'remote false', 'remote true'])
+})
+
+test('a branch whose children fail says so, and tries again from its button or by opening it again', async () => {
+  const { root, calls, labels, row } = await lazy()
+
+  click(row('Flaky').querySelector('.kui-tree-view-toggle'))
+  await settle()
+  expect(row('Flaky').querySelector('[role=alert]')?.textContent).toBe('Could not load.')
+  expect(calls).toEqual(['flaky true', 'flaky call'])
+
+  click(root.querySelector('#heal'))
+  click(row('Flaky').querySelector('.kui-tree-view-retry'))
+  await settle()
+  expect(labels()).toEqual(['Remote', 'Flaky', 'Ok', 'Plain'])
+  expect(row('Flaky').querySelector('[role=alert]')).toBeNull()
+  expect(calls).toEqual(['flaky true', 'flaky call', 'flaky call'])
+})
+
+test('expanded is followed when the parent passes a new list, and the reader\'s own toggles are not reported as the parent\'s', async () => {
+  const { root, calls, labels } = await lazy()
+
+  click(root.querySelector('#expand'))
+  await settle()
+  expect(labels()).toEqual(['Remote', 'Flaky', 'Plain', 'Leaf'])
+  expect(calls).toEqual([])
 })

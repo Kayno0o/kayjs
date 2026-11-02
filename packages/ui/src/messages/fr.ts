@@ -175,6 +175,7 @@ export default defineMessages({
       selected: { one: '{count} sélectionnée', other: '{count} sélectionnées' },
     },
     toaster: { dismiss: 'Fermer la notification' },
+    treeView: { failure: 'Impossible de charger.', retry: 'Réessayer' },
     zoomPane: { fit: 'Ajuster', zoomIn: 'Zoom avant', zoomOut: 'Zoom arrière' },
   },
 })

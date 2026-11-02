@@ -33,3 +33,11 @@ A node's `menu` lists the entries of its context menu, the ones a `Menu` takes. 
 ## Keyboard
 
 The tree is one stop in the tab order. The arrows walk the rows shown: Right opens a branch, then goes to its first child, Left closes it, else goes to the branch holding the row, and Home and End go to the first and the last row. A letter goes to the next row whose label starts with it. A chord, such as Alt+Left going back a page, stays the browser's. A link row follows the same keys: the row is the tab stop and the link inside it stays out of the tab order.
+
+## Children fetched when a branch opens
+
+A node's `children` may be a function returning the nodes below it, or a promise of them. It is called the first time the branch opens, once, and the nodes are kept. The row is busy meanwhile. When the function throws or rejects, the row says `failureLabel` beside a `retryLabel` button, and opening the branch again tries once more. A tree with such a branch is an island, since a page cannot hand it a function.
+
+## Which branches are open
+
+`expanded` lists the branches open. The tree follows it when the page passes a new list, and the reader opens and closes branches from then on. `onToggle(id, open, node)` is called whenever the reader opens or closes a branch, by a click or a key, so a page can keep the open branches in a URL or a cookie.

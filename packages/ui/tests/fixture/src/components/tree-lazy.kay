@@ -1,0 +1,27 @@
+---
+// kay-island
+import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+import { signal } from 'kay'
+
+const { calls } = props<{ calls: string[] }>()
+const expanded = signal<string[]>([])
+const waiting: (() => void)[] = []
+let healed = false
+
+const nodes = [
+  { id: 'remote', label: 'Remote', children: async () => new Promise<{ id: string, label: string }[]>((resolve) => { waiting.push(() => resolve([{ id: 'file', label: 'File' }])) }) },
+  { id: 'flaky', label: 'Flaky', children: async () => {
+    calls.push('flaky call')
+
+    if (!healed)
+      throw new Error('down')
+
+    return [{ id: 'ok', label: 'Ok' }]
+  } },
+  { id: 'plain', label: 'Plain', children: [{ id: 'leaf', label: 'Leaf' }] },
+]
+---
+button#release(type="button" onClick={() => waiting.shift()?.()}) Release
+button#heal(type="button" onClick={() => healed = true}) Heal
+button#expand(type="button" onClick={() => expanded.set(['plain'])}) Expand
+TreeView#tree(nodes={nodes} label="Files" expanded={expanded()} onToggle={(id, open) => calls.push(`${id} ${open}`)})

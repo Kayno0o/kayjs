@@ -94,6 +94,7 @@ function buttonOf(attributes: TagAttributes): {
   style?: StyleValue;
   title?: Value;
   children?: Element;
+  onChange?: EventHandler<HTMLButtonElement, Event> | undefined;
   onFocus?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
   onInput?: EventHandler<HTMLButtonElement, InputEvent> | undefined;
   onLoad?: EventHandler<HTMLButtonElement, Event> | undefined;
@@ -116,7 +117,6 @@ function buttonOf(attributes: TagAttributes): {
   onCancel?: EventHandler<HTMLButtonElement, Event> | undefined;
   onCanPlay?: EventHandler<HTMLButtonElement, Event> | undefined;
   onCanPlayThrough?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onChange?: EventHandler<HTMLButtonElement, Event> | undefined;
   onClick?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
   onCommand?: EventHandler<HTMLButtonElement, Event> | undefined;
   onCompositionEnd?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
@@ -279,6 +279,7 @@ function buttonOf(attributes: TagAttributes): {
   style?: StyleValue;
   title?: Value;
   children?: Element;
+  onChange?: EventHandler<HTMLButtonElement, Event> | undefined;
   onFocus?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
   onInput?: EventHandler<HTMLButtonElement, InputEvent> | undefined;
   onLoad?: EventHandler<HTMLButtonElement, Event> | undefined;
@@ -301,7 +302,6 @@ function buttonOf(attributes: TagAttributes): {
   onCancel?: EventHandler<HTMLButtonElement, Event> | undefined;
   onCanPlay?: EventHandler<HTMLButtonElement, Event> | undefined;
   onCanPlayThrough?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onChange?: EventHandler<HTMLButtonElement, Event> | undefined;
   onClick?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
   onCommand?: EventHandler<HTMLButtonElement, Event> | undefined;
   onCompositionEnd?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
@@ -1392,7 +1392,7 @@ type TreeId = string | number
 
 [./lib/index] TreeNode
 interface TreeNode<Id extends TreeId = string>
-  children?: readonly TreeNode<Id>[] | undefined
+  children?: TreeChildren<Id> | undefined
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   id: Id
@@ -2148,6 +2148,9 @@ type ToastTone = 'danger' | 'success' | 'info'
 [./lib/toast] ToastType
 type ToastType = 'error' | 'success' | 'info'
 
+[./lib/tree] TreeChildren
+type TreeChildren<Id extends TreeId = string> = readonly TreeNode<Id>[] | (() => readonly TreeNode<Id>[] | Promise<readonly TreeNode<Id>[]>)
+
 [./lib/tree] treeHasMenu
 function treeHasMenu<Id extends TreeId>(nodes: readonly TreeNode<Id>[]): boolean
 
@@ -2165,7 +2168,7 @@ type TreeMove<Id extends TreeId> = { focus: Id } | { open: Id } | { close: Id } 
 
 [./lib/tree] TreeNode
 interface TreeNode<Id extends TreeId = string>
-  children?: readonly TreeNode<Id>[] | undefined
+  children?: TreeChildren<Id> | undefined
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   id: Id
@@ -2184,7 +2187,7 @@ interface TreeRow<Id extends TreeId = string>
   size: number
 
 [./lib/tree] treeRows
-function treeRows<Id extends TreeId>(nodes: readonly TreeNode<Id>[], open: ReadonlySet<TreeId>, level?: number, parent?: Id | undefined): TreeRow<Id>[]
+function treeRows<Id extends TreeId>(nodes: readonly TreeNode<Id>[], open: ReadonlySet<TreeId>, level?: number, parent?: Id | undefined, kids?: (node: TreeNode<Id>) => readonly TreeNode<Id>[] | undefined): TreeRow<Id>[]
 
 [./lib/virtual] INITIAL_VIEWPORT
 const INITIAL_VIEWPORT: 640

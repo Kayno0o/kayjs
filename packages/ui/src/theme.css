@@ -1343,6 +1343,15 @@
     @apply min-w-0 truncate;
   }
 
+  /* A branch whose children failed to load says so beside its label, with a button to try again. */
+  .kui-tree-view-failed {
+    @apply ml-2 shrink-0 text-xs text-danger;
+  }
+
+  .kui-tree-view-retry {
+    @apply shrink-0 cursor-pointer text-xs text-muted underline hover:text-foreground;
+  }
+
   /* A link row is one link: the anchor stretches over the whole row, under the chevron and the row's own controls, so a click anywhere on it follows the link. */
   .kui-tree-view-item:has(> .kui-tree-view-link) {
     @apply relative;

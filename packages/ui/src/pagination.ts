@@ -71,24 +71,19 @@ export type OpenPosition = { page: number, offset?: never, limit?: never } | { p
 
 // The links either side of the page on screen of a list whose length is unknown: previous past the first page, next when the caller knows there is more. A position that is no whole number, such as `?offset=abc`, reads as the start.
 export function openSteps(position: OpenPosition, more: boolean, url: URL | string, param?: string): { previous: string | undefined, next: string | undefined } {
-  const { previous, next } = openTargets(position, more)
-  const link = position.limit === undefined ? pageHref : offsetHref
-
-  return {
-    previous: previous === undefined ? undefined : link(url, previous, param),
-    next: next === undefined ? undefined : link(url, next, param),
-  }
-}
-
-// The page, or the offset, each of those links leads to: what `onPage` is called with.
-export function openTargets(position: OpenPosition, more: boolean): { previous: number | undefined, next: number | undefined } {
   if (position.limit !== undefined) {
     const start = Math.max(Math.trunc(position.offset) || 0, 0)
 
-    return { previous: start > 0 ? Math.max(start - position.limit, 0) : undefined, next: more ? start + position.limit : undefined }
+    return {
+      previous: start > 0 ? offsetHref(url, Math.max(start - position.limit, 0), param) : undefined,
+      next: more ? offsetHref(url, start + position.limit, param) : undefined,
+    }
   }
 
   const page = Math.max(Math.trunc(position.page) || 1, 1)
 
-  return { previous: page > 1 ? page - 1 : undefined, next: more ? page + 1 : undefined }
+  return {
+    previous: page > 1 ? pageHref(url, page - 1, param) : undefined,
+    next: more ? pageHref(url, page + 1, param) : undefined,
+  }
 }

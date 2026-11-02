@@ -7,17 +7,23 @@ import Icon from './icon.kay'
 import Menu from './menu.kay'
 import { ORIGIN } from './tab-nav'
 import { treeHasMenu, treeHere, treeKey, treePath, treeRows } from './tree'
+import { wording } from 'kay/words'
 
-const look = recipe({ parts: { root: 'kui-tree-view', item: 'kui-tree-view-item', toggle: 'kui-tree-view-toggle', icon: 'kui-tree-view-icon', label: 'kui-tree-view-label', link: 'kui-tree-view-link', trailing: 'kui-tree-view-trailing' } })
+const look = recipe({ parts: { root: 'kui-tree-view', item: 'kui-tree-view-item', toggle: 'kui-tree-view-toggle', spinner: 'kui-tree-view-spinner animate-spin motion-reduce:animate-none', icon: 'kui-tree-view-icon', label: 'kui-tree-view-label', link: 'kui-tree-view-link', failed: 'kui-tree-view-failed', retry: 'kui-tree-view-retry', trailing: 'kui-tree-view-trailing' } })
 
-const { nodes, label, selected, expanded = [], onSelect, trailing, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect'> & {
+const { nodes, label, selected, expanded = [], onSelect, onToggle, trailing, failureLabel = wording('ui.treeView.failure', 'Could not load.'), retryLabel = wording('ui.treeView.retry', 'Try again'), ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect' | 'onToggle'> & {
   nodes: readonly TreeNode<Id>[]
   // Names the tree for screen readers.
   label: string
   // The node picked; a tree whose parent passes another follows it, opening the branches holding it. Left out, the node whose `href` is the page's address is the selected one, on the server's HTML too.
   selected?: Id | undefined
-  // The branches open to start with.
+  // The branches open; a tree whose parent passes another list follows it, and the reader opens and closes branches from then on.
   expanded?: readonly Id[] | undefined
+  // Called with the branch's id, whether it is now open and the node, whenever the reader opens or closes a branch, by a click or a key.
+  onToggle?: ((id: Id, open: boolean, node: TreeNode<Id>) => unknown) | undefined
+  // What a branch whose children failed to load says, beside a button that tries again.
+  failureLabel?: string | undefined
+  retryLabel?: string | undefined
   // Runs on a click on a row, or Enter or Space on the focused one, with the id `selected` takes and the node picked.
   onSelect?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
   // Controls at the end of a row, such as a star or a count, dimmed away until the row is hovered or holds focus: `@trailing(node)`.
@@ -51,12 +57,63 @@ const open = signal<ReadonlySet<TreeId>>(new Set<TreeId>([...expanded, ...path(t
 const current = signal<TreeId | undefined>(target())
 // The row in the page's tab order, as a tree is one stop the arrows move inside.
 const focused = signal<TreeId | undefined>(target())
-const rows = memo(() => treeRows(nodes, open()))
+// The children of the branches whose `children` is a function, once loaded, the branches loading and those that failed.
+const loaded = signal<ReadonlyMap<TreeId, readonly TreeNode<TreeId>[]>>(new Map())
+const loading = signal<ReadonlySet<TreeId>>(new Set())
+const failed = signal<ReadonlySet<TreeId>>(new Set())
+const kids = (node: TreeNode<Id>) => typeof node.children === 'function' ? loaded().get(node.id) as readonly TreeNode<Id>[] | undefined : node.children
+const rows = memo(() => treeRows(nodes, open(), 1, undefined, kids))
 // The selected node whose branches were last opened, so new nodes never reopen a branch closed since.
 let reached = path(target()) ? target() : undefined
 let list: HTMLUListElement | undefined
 
 effect(() => current = target())
+
+// The parent passing another `expanded` replaces the branches open, the selected node's still among them.
+effect(() => {
+  const wanted = [...expanded]
+
+  untrack(() => open.set(new Set<TreeId>([...wanted, ...path(target()) ?? []])))
+})
+
+function without<Item>(set: ReadonlySet<Item>, item: Item) {
+  return new Set([...set].filter(one => one !== item))
+}
+
+// Calls a branch's `children` once, the first time it is open and shown.
+async function load(node: TreeNode<Id>) {
+  const id = node.id
+
+  if (typeof node.children !== 'function' || loaded().has(id) || loading().has(id) || failed().has(id))
+    return
+
+  loading.set(shown => new Set([...shown, id]))
+
+  try {
+    const below = await node.children()
+
+    loaded.set(shown => new Map([...shown, [id, below]]))
+  }
+  catch {
+    failed.set(shown => new Set([...shown, id]))
+  }
+  finally {
+    loading.set(shown => without(shown, id))
+  }
+}
+
+function retry(node: TreeNode<Id>) {
+  failed.set(shown => without(shown, node.id))
+  void load(node)
+}
+
+// Every open branch shown whose children are still to come, from the start or once its parent's came.
+effect(() => {
+  for (const row of rows()) {
+    if (typeof row.node.children === 'function' && open().has(row.node.id))
+      void untrack(() => load(row.node))
+  }
+})
 
 // Waits for the nodes holding the selected one when they come later.
 effect(() => {
@@ -81,8 +138,18 @@ const stop = memo(() => {
   return [focused(), current()].find(id => id !== undefined && shown.has(id)) ?? rows()[0]?.node.id
 })
 
+// Opening a branch whose children failed tries them again.
 function toggle(id: TreeId) {
-  open.set(shown => shown.has(id) ? new Set([...shown].filter(one => one !== id)) : new Set([...shown, id]))
+  const opening = !open().has(id)
+  const node = rows().find(row => row.node.id === id)?.node
+
+  open.set(shown => opening ? new Set([...shown, id]) : without(shown, id))
+
+  if (opening)
+    failed.set(shown => without(shown, id))
+
+  if (node)
+    onToggle?.(id as Id, opening, node)
 }
 
 function pick(row: TreeRow<Id>) {
@@ -97,6 +164,12 @@ function click(event: MouseEvent, row: TreeRow<Id>) {
 
   if (element.closest('.kui-tree-view-trailing'))
     return
+
+  if (element.closest('.kui-tree-view-retry')) {
+    retry(row.node)
+
+    return
+  }
 
   // A new-tab click on a link row leaves the page where it is, so the row stays unselected.
   if (row.node.href !== undefined && (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) && !element.closest('.kui-tree-view-toggle'))
@@ -145,7 +218,7 @@ function focusRow(id: TreeId) {
 
 function keyDown(event: KeyboardEvent) {
   // The row's own controls keep their keys.
-  if ((event.target as Element).closest('.kui-tree-view-trailing'))
+  if ((event.target as Element).closest('.kui-tree-view-trailing, .kui-tree-view-retry'))
     return
 
   // Shift+F10 and the Menu key open the focused row's context menu below it, as a right click would at the pointer.
@@ -197,10 +270,13 @@ function keyDown(event: KeyboardEvent) {
 // The rows of every open branch in one list, each saying its depth and place for screen readers, so the arrows walk them in reading order.
 ul(part="root" {...rest} ref={element => list = element} role="tree" aria-label={label} onKeyDown={keyDown})
   for row of rows() key={row.node.id}
-    li(part="item" role="treeitem" aria-level={row.level} aria-posinset={row.position} aria-setsize={row.size} aria-expanded={row.node.children ? String(open().has(row.node.id)) : undefined} aria-selected={row.node.id === current() ? 'true' : 'false'} tabindex={row.node.id === stop() ? 0 : -1} style={`--_tree-level: ${row.level - 1}`} onFocus={() => focused = row.node.id} onClick={event => click(event, row)} onContextMenu={event => contextMenu(event, row)})
+    li(part="item" role="treeitem" aria-level={row.level} aria-posinset={row.position} aria-setsize={row.size} aria-expanded={row.node.children ? String(open().has(row.node.id)) : undefined} aria-busy={loading().has(row.node.id) ? 'true' : undefined} aria-selected={row.node.id === current() ? 'true' : 'false'} tabindex={row.node.id === stop() ? 0 : -1} style={`--_tree-level: ${row.level - 1}`} onFocus={() => focused = row.node.id} onClick={event => click(event, row)} onContextMenu={event => contextMenu(event, row)})
       if row.node.children
         span(part="toggle" aria-hidden="true")
-          Icon(icon="chevron")
+          if loading().has(row.node.id)
+            Icon(icon="spinner" part="spinner")
+          else
+            Icon(icon="chevron")
       else
         span(part="toggle")
       if row.node.icon
@@ -209,6 +285,9 @@ ul(part="root" {...rest} ref={element => list = element} role="tree" aria-label=
         a(part="link" href={row.node.href} tabindex="-1" aria-current={row.node.id === current() ? 'page' : undefined}) {row.node.label}
       else
         span(part="label") {row.node.label}
+      if failed().has(row.node.id)
+        span(part="failed" role="alert") {failureLabel}
+        button(part="retry" type="button") {retryLabel}
       if trailing
         span(part="trailing")
           | {trailing(row.node)}

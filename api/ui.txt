@@ -444,7 +444,7 @@ type TreeId = string | number
 
 [.] TreeNode
 interface TreeNode<Id extends TreeId = string>
-  children?: readonly TreeNode<Id>[] | undefined
+  children?: TreeChildren<Id> | undefined
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   id: Id
@@ -462,9 +462,13 @@ interface UiSettings
 component default
   boxed?: boolean | undefined
   class?: string | { root?: string | undefined; } | undefined
-  items: readonly { value: string; title: string; open?: boolean | undefined; }[]
+  items: readonly { value: string; title: string; open?: boolean | undefined; disabled?: boolean | undefined; meta?: string | undefined; }[]
+  meta?: ((value: string) => Element) | undefined
   multiple?: boolean | undefined
+  onChange?: ((value: string[]) => unknown) | undefined
   panel: (value: string) => Element
+  title?: ((value: string) => Element) | undefined
+  value?: string | readonly string[] | undefined
 
 [./add] default
 const default: { description: string; extension: { import: string; expression: string; }; notes: string[]; }
@@ -580,6 +584,10 @@ component default
   linkLabel?: string | undefined
   nextLabel?: string | undefined
   onChapterChange?: ((index: number) => unknown) | undefined
+  onEnded?: (() => unknown) | undefined
+  onError?: ((error: MediaError | DOMException | null) => unknown) | undefined
+  onPause?: (() => unknown) | undefined
+  onPlay?: (() => unknown) | undefined
   onPositionChange?: ((seconds: number) => unknown) | undefined
   pauseLabel?: string | undefined
   playLabel?: string | undefined
@@ -594,8 +602,11 @@ component default
 [./avatar.kay] default
 component default
   class?: string | { root?: string | undefined; image?: string | undefined; initial?: string | undefined; } | undefined
+  fallback?: Element
   label?: string | undefined
   name: string
+  onError?: ((event: Event) => unknown) | undefined
+  onLoad?: ((event: Event) => unknown) | undefined
   size?: "xs" | "sm" | "md" | "lg" | undefined
   src?: string | null | undefined
 
@@ -809,9 +820,11 @@ component default
   } | undefined;
   body?: string | undefined;
 } | undefined
+  disabled?: boolean | undefined
   meta?: Element
+  onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
-  title: string
+  title: Element
 
 [./color-input.kay] default
 component default
@@ -971,8 +984,10 @@ component default
   failure?: string | undefined
   html?: string | undefined
   label: string
+  onCopy?: ((text: string) => unknown) | undefined
+  onFail?: ((error: unknown) => unknown) | undefined
   size?: "xs" | "sm" | "md" | "lg" | undefined
-  text: string
+  text: string | (() => string | Promise<string>)
   tone?: "success" | "neutral" | "danger" | "accent" | undefined
   variant?: "solid" | "ghost" | "inline" | undefined
 
@@ -1589,10 +1604,10 @@ component default
 
 [./pagination.kay] default
 component default
-  | { class?: string | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; } | undefined; label?: string | undefined; limit?: never; more?: never; nextLabel?: string | undefined; of: PagedList; offset?: never; page?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; url?: never }
-  | { class?: string | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; } | undefined; label?: string | undefined; limit?: never; more?: never; nextLabel?: string | undefined; of?: never; offset?: never; page: number; pages: number; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; url: string | URL }
-  | { class?: string | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; } | undefined; label?: string | undefined; limit?: never; more: boolean; nextLabel?: string | undefined; of?: never; offset?: never; page: number; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; url: string | URL }
-  | { class?: string | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; } | undefined; label?: string | undefined; limit: number; more: boolean; nextLabel?: string | undefined; of?: never; offset: number; page?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; url: string | URL }
+  | { class?: string | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; } | undefined; label?: string | undefined; limit?: never; more?: never; nextLabel?: string | undefined; of: PagedList; offset?: never; page?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "previous" | "next") => Element) | undefined; url?: never }
+  | { class?: string | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; } | undefined; label?: string | undefined; limit?: never; more?: never; nextLabel?: string | undefined; of?: never; offset?: never; page: number; pages: number; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "previous" | "next") => Element) | undefined; url?: string | URL | undefined }
+  | { class?: string | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; } | undefined; label?: string | undefined; limit?: never; more: boolean; nextLabel?: string | undefined; of?: never; offset?: never; page: number; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "previous" | "next") => Element) | undefined; url?: string | URL | undefined }
+  | { class?: string | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; } | undefined; label?: string | undefined; limit: number; more: boolean; nextLabel?: string | undefined; of?: never; offset: number; page?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "previous" | "next") => Element) | undefined; url?: string | URL | undefined }
 
 [./popover.kay] default
 component default
@@ -1872,7 +1887,10 @@ component default
 [./site-favicon.kay] default
 component default
   class?: string | { root?: string | undefined; img?: string | undefined; icon?: string | { root?: string | undefined; } | undefined; } | undefined
+  fallback?: Element
   name: string
+  onError?: ((event: Event) => unknown) | undefined
+  onLoad?: ((event: Event) => unknown) | undefined
   src?: string | null | undefined
 
 [./site-nav.kay] default
@@ -2225,17 +2243,25 @@ component default
   root?: string | undefined;
   item?: string | undefined;
   toggle?: string | undefined;
+  spinner?: string | {
+    root?: string | undefined;
+  } | undefined;
   icon?: string | {
     root?: string | undefined;
   } | undefined;
   link?: string | undefined;
   label?: string | undefined;
+  failed?: string | undefined;
+  retry?: string | undefined;
   trailing?: string | undefined;
 } | undefined
   expanded?: readonly Id[] | undefined
+  failureLabel?: string | undefined
   label: string
   nodes: readonly TreeNode<Id>[]
   onSelect?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
+  onToggle?: ((id: Id, open: boolean, node: TreeNode<Id>) => unknown) | undefined
+  retryLabel?: string | undefined
   selected?: Id | undefined
   trailing?: ((args_0: TreeNode<Id>) => Element) | undefined
 

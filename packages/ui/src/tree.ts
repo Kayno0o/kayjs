@@ -13,11 +13,19 @@ export interface TreeNode<Id extends TreeId = string> {
   id: Id
   label: string
   icon?: IconSlot | IconProps | undefined
-  children?: readonly TreeNode<Id>[] | undefined
+  // The nodes below it; a function returning them, or a promise of them, is called the first time the branch opens, so a tree whose branches come from a request is fetched a branch at a time.
+  children?: TreeChildren<Id> | undefined
   // A site path or URL: the row is then a real link to it, and the node is the selected one while the page is on that address.
   href?: string | undefined
   // The row's context menu, opened by a right click, Shift+F10 or the Menu key on the focused row.
   menu?: readonly MenuEntry[] | undefined
+}
+
+export type TreeChildren<Id extends TreeId = string> = readonly TreeNode<Id>[] | (() => readonly TreeNode<Id>[] | Promise<readonly TreeNode<Id>[]>)
+
+// The nodes below a node when they are known: its list, else none yet.
+function listed<Id extends TreeId>(node: TreeNode<Id>): readonly TreeNode<Id>[] | undefined {
+  return typeof node.children === 'function' ? undefined : node.children
 }
 
 // A node as the tree shows it: its depth from 1, its place among its siblings, and the branch holding it.
@@ -30,14 +38,17 @@ export interface TreeRow<Id extends TreeId = string> {
 }
 
 // The rows a tree shows, in reading order: every root, and the children of each open branch.
-export function treeRows<Id extends TreeId>(nodes: readonly TreeNode<Id>[], open: ReadonlySet<TreeId>, level = 1, parent?: Id): TreeRow<Id>[] {
+// `kids` tells the nodes below a branch whose children are a function: those it loaded so far.
+export function treeRows<Id extends TreeId>(nodes: readonly TreeNode<Id>[], open: ReadonlySet<TreeId>, level = 1, parent?: Id, kids: (node: TreeNode<Id>) => readonly TreeNode<Id>[] | undefined = listed): TreeRow<Id>[] {
   const rows: TreeRow<Id>[] = []
 
   for (const [index, node] of nodes.entries()) {
     rows.push({ node, level, position: index + 1, size: nodes.length, parent })
 
-    if (node.children && open.has(node.id))
-      rows.push(...treeRows(node.children, open, level + 1, node.id))
+    const below = open.has(node.id) ? kids(node) : undefined
+
+    if (below)
+      rows.push(...treeRows(below, open, level + 1, node.id, kids))
   }
 
   return rows
@@ -49,7 +60,7 @@ export function treePath<Id extends TreeId>(nodes: readonly TreeNode<Id>[], id: 
     if (node.id === id)
       return []
 
-    const below = node.children && treePath(node.children, id)
+    const below = listed(node) && treePath(listed(node)!, id)
 
     if (below)
       return [node.id, ...below]
@@ -60,7 +71,7 @@ export function treePath<Id extends TreeId>(nodes: readonly TreeNode<Id>[], id: 
 
 // Whether any node, at any depth, has a context menu to open.
 export function treeHasMenu<Id extends TreeId>(nodes: readonly TreeNode<Id>[]): boolean {
-  return nodes.some(node => (node.menu?.length ?? 0) > 0 || (node.children !== undefined && treeHasMenu(node.children)))
+  return nodes.some(node => (node.menu?.length ?? 0) > 0 || (listed(node) !== undefined && treeHasMenu(listed(node)!)) || typeof node.children === 'function')
 }
 
 // The first node whose `href` is the page `current` names, by the rule of TabNav's current tab: the same path with every param the link sets matching, the link setting the most params winning.
@@ -72,8 +83,8 @@ export function treeHere<Id extends TreeId>(nodes: readonly TreeNode<Id>[], curr
       if (node.href !== undefined && LOCAL_PATH.test(node.href))
         linked.push(node)
 
-      if (node.children)
-        collect(node.children)
+      if (listed(node))
+        collect(listed(node)!)
     }
   }
 
