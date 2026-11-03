@@ -2,6 +2,7 @@
 import { recipe, signal } from 'kay'
 import type { JSX } from 'kay'
 import type { ContributionDay } from './contribution'
+import { activeMarks, markKind } from './chart-marks'
 import { monthStarts, steppedCell } from './contribution'
 import { shade } from './shade'
 import { wording } from 'kay/words'
@@ -11,11 +12,11 @@ const look = recipe({
     // With month labels the cells are placed by hand under a row of them, and fixed-width columns let a label run past its own week.
     root: 'kui-contribution-graph grid w-fit grid-flow-col grid-rows-7 gap-[3px] data-months:auto-cols-[0.75rem] data-months:grid-flow-row data-months:grid-rows-[auto_repeat(7,0.75rem)]',
     month: 'row-start-1 w-0 text-2xs leading-none whitespace-nowrap text-muted',
-    cell: 'size-3 rounded-[3px] bg-surface transition-transform hover:scale-125 data-today:ring-1 data-today:ring-accent data-today:ring-offset-1 data-today:ring-offset-surface',
+    cell: 'size-3 rounded-[3px] bg-surface transition-transform hover:scale-125 data-active:scale-125 data-[kind=link]:cursor-pointer data-[kind=button]:cursor-pointer data-[kind=button]:border-0 data-[kind=button]:p-0 data-today:ring-1 data-today:ring-accent data-today:ring-offset-1 data-today:ring-offset-surface',
   },
 })
 
-const { days, color, today, label = wording('ui.contributionGraph.label', 'Contributions'), months = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { days, color, today, label = wording('ui.contributionGraph.label', 'Contributions'), months = false, onSelect, href, onActive, active, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   // Ascending days starting on a Monday, as `gridDays` from `@kaynooo/utils` lists them, each with how full its cell is.
   days: readonly ContributionDay[]
   // The CSS colour the filled cells shade towards.
@@ -26,7 +27,37 @@ const { days, color, today, label = wording('ui.contributionGraph.label', 'Contr
   label?: string | undefined
   // Names each month above the week it starts in, placing every cell by hand.
   months?: boolean | undefined
+  // Makes every cell a button handing back its day; with `href` too, a cell that has an address stays a link and a plain click goes to this.
+  onSelect?: ((day: ContributionDay) => unknown) | undefined
+  // The address a cell links to, or `undefined` for none.
+  href?: ((day: ContributionDay) => string | undefined) | undefined
+  // Hears the index of the cell the pointer or the focus is on, `null` when it leaves.
+  onActive?: ((index: number | null) => unknown) | undefined
+  // The cell to draw as active, `null` for none; the app controls it when it gives it.
+  active?: number | null | undefined
 }>()
+
+const marks = activeMarks({ active: () => active, onActive: () => onActive })
+
+function link(day: ContributionDay) {
+  const to = href?.(day)
+
+  return to === undefined || to === '' ? undefined : { href: to }
+}
+
+// A plain click on a link goes to `onSelect` when the app gave one; a modified or middle click is left to the browser.
+function pressed(event: MouseEvent, day: ContributionDay) {
+  if (!onSelect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+    return
+
+  event.preventDefault()
+  void onSelect(day)
+}
+
+function focused(event: FocusEvent, index: number) {
+  stop = index
+  marks.enter(index, event.currentTarget as Element)
+}
 
 // A day without a description is read as how full it is, which its colour alone shows.
 const describe = (day: ContributionDay) => `${day.description ?? `${Math.round(day.intensity * 100)}%`} · ${day.day}`
@@ -48,7 +79,7 @@ function keyDown(event: KeyboardEvent) {
   event.preventDefault()
   stop = next
 
-  const target = (event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="img"]')[next]
+  const target = (event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[data-part="cell"]')[next]
 
   target?.focus()
 }
@@ -66,4 +97,9 @@ div(part="root" {...rest} role="group" aria-label={label} onKeyDown={keyDown} da
     for start of monthStarts(days.map(day => day.day)) key={start.column}
       span(part="month" aria-hidden="true" style={`grid-column: ${start.column + 1}`}) {start.label}
   for day, index of days key={day.day}
-    span(part="cell" role="img" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-today={day.day === today || undefined} style={style(day, index)} onFocus={() => stop = index})
+    if markKind(link(day)?.href, onSelect !== undefined) === 'link'
+      a(part="cell" {...link(day)} data-kind="link" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-active={marks.current() === index ? '' : undefined} data-today={day.day === today || undefined} style={style(day, index)} onClick={event => pressed(event, day)} onFocus={event => focused(event, index)} onBlur={() => marks.leave(index)} onPointerEnter={event => marks.enter(index, event.currentTarget)} onPointerLeave={() => marks.leave(index)})
+    else if onSelect
+      button(part="cell" type="button" data-kind="button" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-active={marks.current() === index ? '' : undefined} data-today={day.day === today || undefined} style={style(day, index)} onClick={() => void onSelect?.(day)} onFocus={event => focused(event, index)} onBlur={() => marks.leave(index)} onPointerEnter={event => marks.enter(index, event.currentTarget)} onPointerLeave={() => marks.leave(index)})
+    else
+      span(part="cell" role="img" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-active={marks.current() === index ? '' : undefined} data-today={day.day === today || undefined} style={style(day, index)} onFocus={event => focused(event, index)} onBlur={() => marks.leave(index)} onPointerEnter={event => marks.enter(index, event.currentTarget)} onPointerLeave={() => marks.leave(index)})

@@ -1,8 +1,10 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { LabelFormat } from './chart-axis'
 import type { BarSeries } from './plot'
+import type { ChartMark } from './chart-marks'
 import { memo, recipe, signal } from 'kay'
+import { activeMarks, chartTooltip, markKind, TOOLTIP_LOOK } from './chart-marks'
 import { headings, labelTimes, tickIndices, tickTexts } from './chart-axis'
 import { barRatios, PALETTE, steppedPoint, valueTicks } from './plot'
 import { wording } from 'kay/words'
@@ -15,18 +17,19 @@ const look = recipe({
     grid: 'absolute inset-x-0 h-px bg-border',
     tick: 'absolute right-full mr-2 -translate-y-1/2 text-2xs whitespace-nowrap text-[var(--color-muted)] tabular-nums',
     columns: 'absolute inset-0 flex gap-1',
-    column: 'flex min-w-0 flex-1 items-end gap-px outline-none hover:bg-surface focus-visible:outline-2 focus-visible:outline-foreground data-stacked:flex-col-reverse data-stacked:items-stretch data-stacked:justify-start data-stacked:gap-0',
+    column: 'flex min-w-0 flex-1 items-end gap-px outline-none hover:bg-surface data-active:bg-surface data-[kind=link]:no-underline data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer focus-visible:outline-2 focus-visible:outline-foreground data-stacked:flex-col-reverse data-stacked:items-stretch data-stacked:justify-start data-stacked:gap-0',
     // A stub is the mark a column keeps where its series gives it a colour or a note but no height; a stacked bar is squared and sized by its height alone.
     bar: 'min-h-px min-w-px flex-1 rounded-t-sm data-stub:h-1 data-stacked:flex-none data-stacked:rounded-none',
     axis: 'ml-10 flex gap-1',
     axisLabel: 'flex min-w-0 flex-1 justify-center text-2xs whitespace-nowrap text-[var(--color-muted)]',
+    tooltip: TOOLTIP_LOOK,
     legend: 'm-0 flex list-none flex-wrap gap-4 p-0 pl-1',
     legendItem: 'flex items-center gap-1.5 text-xs text-muted',
     key: 'size-2 shrink-0',
   },
 })
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.barChart.total', 'Total'), legend, emptyLabel, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.barChart.total', 'Total'), legend, emptyLabel, onSelect, href, onActive, active, tooltip, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   labels: string[]
   series: BarSeries[]
   // Formats the y-axis labels, the tooltips and the readings screen readers hear.
@@ -41,6 +44,16 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   totalLabel?: string | undefined
   // Names each series under the chart; shown by default once there is more than one.
   legend?: boolean | undefined
+  // Makes every column a button handing back its label, index and each series' value there; with `href` too, a column that has an address stays a link.
+  onSelect?: ((mark: ChartMark) => unknown) | undefined
+  // The address a column links to, or `undefined` for none: a middle click, a new tab or a crawler finds it, and a plain click goes through `onSelect` when the app gave one.
+  href?: ((mark: ChartMark) => string | undefined) | undefined
+  // Hears the index of the column the pointer or the focus is on, `null` when it leaves.
+  onActive?: ((index: number | null) => unknown) | undefined
+  // The column to draw as active, `null` for none; the app controls it when it gives it, and the pointer and focus then only report through `onActive`.
+  active?: number | null | undefined
+  // Replaces the tooltip under the pointer or focus with the app's own content for that column, drawn by the chart where the column is.
+  tooltip?: Snippet<[mark: ChartMark]> | undefined
   // What the chart reads with no labels.
   emptyLabel?: string | undefined
   // Names the chart for screen readers.
@@ -95,8 +108,38 @@ function keyDown(event: KeyboardEvent) {
     target.focus()
 }
 
+const mark = (at: number): ChartMark => ({ index: at, label: labels[at]!, values: series.map(item => item.values[at] ?? null) })
+const marks = activeMarks({ active: () => active, onActive: () => onActive })
+const tip = chartTooltip()
+
+function link(at: number) {
+  const to = href?.(mark(at))
+
+  return to === undefined || to === '' ? undefined : { href: to }
+}
+
+// A plain click on a link goes to `onSelect` when the app gave one; a modified or middle click is left to the browser.
+function pressed(event: MouseEvent, at: number) {
+  if (!onSelect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+    return
+
+  event.preventDefault()
+  void onSelect(mark(at))
+}
+
+function focused(event: FocusEvent, at: number) {
+  stop = at
+  marks.enter(at, event.currentTarget as Element)
+}
+
 const nothing = () => emptyLabel ?? wording('ui.barChart.empty', 'No data yet.')
 ---
+snippet bars(at: number)
+  for item, index of series key={item.name}
+    if ratios().heights[index]![at]
+      span(part="bar" data-stacked={stacked ? '' : undefined} style={`height: ${ratios().heights[index]![at]! * 100}%; background-color: ${colors(item, index, at)}`})
+    else if marked(item, at)
+      span(part="bar" data-stub data-stacked={stacked ? '' : undefined} style={`background-color: ${colors(item, index, at)}`})
 if labels.length === 0
   // The app's id and class stay on whichever element shows.
   p.kui-bar-chart-empty.text-xs.text-muted(part="root" id={rest.id}) {nothing()}
@@ -108,12 +151,18 @@ else
           span(part="tick") {formatValue(tick.ratio * ratios().top)}
       div(part="columns")
         for _, at of labels key={at}
-          span(part="column" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={summaries()[at]} data-stacked={stacked ? '' : undefined} onKeyDown={keyDown} onFocus={() => stop = at})
-            for item, index of series key={item.name}
-              if ratios().heights[index]![at]
-                span(part="bar" data-stacked={stacked ? '' : undefined} style={`height: ${ratios().heights[index]![at]! * 100}%; background-color: ${colors(item, index, at)}`})
-              else if marked(item, at)
-                span(part="bar" data-stub data-stacked={stacked ? '' : undefined} style={`background-color: ${colors(item, index, at)}`})
+          if markKind(link(at)?.href, onSelect !== undefined) === 'link'
+            a(part="column" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-active={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+              {bars(at)}
+          else if onSelect
+            button(part="column" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-active={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onClick={() => void onSelect?.(mark(at))} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+              {bars(at)}
+          else
+            span(part="column" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-active={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+              {bars(at)}
+    if tooltip && marks.current() !== null && marks.anchor()
+      div(part="tooltip" ref={tip.watch} style={tip.place(marks.anchor()!)} aria-hidden="true")
+        {tooltip(mark(marks.current()!))}
     if xLabels
       div(part="axis" aria-hidden="true")
         for _, at of labels key={at}

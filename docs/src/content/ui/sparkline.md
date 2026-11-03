@@ -19,3 +19,7 @@ description: Small bars with no axes, for a trend inside a row or a card.
 `hints` gives one note per bar, shown under the pointer by [TooltipHost](/ui/tooltip-host). The keyboard has `label` alone, which is why the notes are not tooltips on tab stops.
 
 For axes, a legend and a tooltip a keyboard reaches, use [BarChart](/ui/bar-chart).
+
+## Pressing and linking
+
+`onSelect` makes every bar a button handing back its mark, and `href` returns an address for a mark (or `undefined`) that makes it a link, so a middle click or a crawler finds it; a plain click on a link still goes to `onSelect` when given. `onActive` hears the index the pointer or focus is on, `null` when it leaves, and `active` draws one as active, taking over from the pointer.

@@ -1,18 +1,21 @@
 ---
 import type { JSX } from 'kay'
 import type { SparkTone } from './sparkline'
-import { memo, recipe } from 'kay'
+import type { SparkMark } from './chart-marks'
+import { memo, recipe, signal } from 'kay'
+import { activeMarks, markKind } from './chart-marks'
+import { steppedPoint } from './plot'
 
 // 'kui-sparkline' stays as the component's name for an app's CSS. A bar is coloured by its own `data-tone`, which wins over `tone`.
 const look = recipe({
   parts: {
     root: 'kui-sparkline flex h-[var(--spark-height,1.5rem)] w-full items-end gap-px',
-    item: 'flex h-full min-w-0 flex-1 items-end',
+    item: 'flex h-full min-w-0 flex-1 items-end border-0 bg-transparent p-0 no-underline outline-none data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer focus-visible:outline-2 focus-visible:outline-foreground data-active:bg-surface',
     bar: 'min-h-px w-full rounded-t-[1px] bg-accent data-[tone=muted]:bg-muted data-[tone=accent]:bg-accent data-[tone=success]:bg-success data-[tone=warning]:bg-warning data-[tone=danger]:bg-danger data-[tone=info]:bg-info',
   },
 })
 
-const { values, tone = 'accent', tones, hints, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { values, tone = 'accent', tones, hints, onSelect, href, onActive, active, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
   // One bar per value, the largest filling the height; a `null`, a zero or a negative value leaves a hairline.
   values: readonly (number | null)[]
   // Colours every bar; `accent` by default.
@@ -21,6 +24,14 @@ const { values, tone = 'accent', tones, hints, label, ...rest } = props<Omit<JSX
   tones?: readonly (SparkTone | undefined)[] | undefined
   // One note per bar, shown under the pointer by TooltipHost; the keyboard and screen readers have `label` alone.
   hints?: readonly (string | undefined)[] | undefined
+  // Makes every bar a button handing back its index and value; with `href` too, a bar that has an address stays a link and a plain click goes to this.
+  onSelect?: ((mark: SparkMark) => unknown) | undefined
+  // The address a bar links to, or `undefined` for none.
+  href?: ((mark: SparkMark) => string | undefined) | undefined
+  // Hears the index of the bar the pointer or the focus is on, `null` when it leaves.
+  onActive?: ((index: number | null) => unknown) | undefined
+  // The bar to draw as active, `null` for none; the app controls it when it gives it.
+  active?: number | null | undefined
   // Says what the whole chart shows, in one sentence, such as "Requests per hour, 1,204 in all, busiest at 14:00".
   label: string
 }>()
@@ -28,10 +39,69 @@ const { values, tone = 'accent', tones, hints, label, ...rest } = props<Omit<JSX
 const finite = (value: number | null): value is number => value !== null && Number.isFinite(value)
 const largest = memo(() => Math.max(0, ...values.filter(finite)))
 
+const mark = (at: number): SparkMark => ({ index: at, value: values[at] ?? null })
+const marks = activeMarks({ active: () => active, onActive: () => onActive })
+const interactive = () => onSelect !== undefined || href !== undefined
+const name = (at: number) => hints?.[at] ?? String(values[at] ?? '-')
+
+function link(at: number) {
+  const to = href?.(mark(at))
+
+  return to === undefined || to === '' ? undefined : { href: to }
+}
+
+// The bar the keyboard stands at, one tab stop in all: the first until it moves.
+const stop = signal(0)
+const current = () => Math.min(stop(), Math.max(0, values.length - 1))
+
+function keyDown(event: KeyboardEvent) {
+  if (event.altKey || event.ctrlKey || event.metaKey)
+    return
+
+  const next = steppedPoint(event.key, current(), values.length)
+
+  if (next === undefined)
+    return
+
+  event.preventDefault()
+  stop = next
+
+  const target = (event.currentTarget as HTMLElement).parentElement?.children[next]
+
+  if (target instanceof HTMLElement)
+    target.focus()
+}
+
+function focused(event: FocusEvent, at: number) {
+  stop = at
+  marks.enter(at, event.currentTarget as Element)
+}
+
+// A plain click on a link goes to `onSelect` when the app gave one; a modified or middle click is left to the browser.
+function pressed(event: MouseEvent, at: number) {
+  if (!onSelect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+    return
+
+  event.preventDefault()
+  void onSelect(mark(at))
+}
+
 // Each bar's height against the largest value; a reading that is not a finite number leaves a hairline.
 const percent = (value: number | null) => largest() > 0 && finite(value) ? Math.max(0, value) / largest() * 100 : 0
 ---
-div(part="root" {...rest} role="img" aria-label={label})
-  for value, at of values key={at}
-    span(part="item" aria-hidden="true" data-hint={hints?.[at]})
-      span(part="bar" data-tone={tones?.[at] ?? tone} style={`height: ${percent(value)}%`})
+snippet bar(value: number | null, at: number)
+  span(part="bar" data-tone={tones?.[at] ?? tone} style={`height: ${percent(value)}%`})
+if interactive()
+  div(part="root" {...rest} role="group" aria-label={label})
+    for value, at of values key={at}
+      if markKind(link(at)?.href, onSelect !== undefined) === 'link'
+        a(part="item" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-active={marks.current() === at ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+          {bar(value, at)}
+      else
+        button(part="item" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-active={marks.current() === at ? '' : undefined} onClick={() => void onSelect?.(mark(at))} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+          {bar(value, at)}
+else
+  div(part="root" {...rest} role="img" aria-label={label})
+    for value, at of values key={at}
+      span(part="item" aria-hidden="true" data-hint={hints?.[at]} data-active={marks.current() === at ? '' : undefined})
+        {bar(value, at)}

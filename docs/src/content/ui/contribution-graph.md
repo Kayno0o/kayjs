@@ -23,3 +23,7 @@ The filled cells shade towards `color`, any CSS colour: a theme token keeps it i
 ## Keyboard
 
 The grid is one tab stop, on today's cell. The up and down arrows step a day, left and right a week, and Home and End reach the first and last day. Each focused cell shows its details like a hovered one.
+
+## Pressing and linking
+
+`onSelect` makes every cell a button handing back its mark, and `href` returns an address for a mark (or `undefined`) that makes it a link, so a middle click or a crawler finds it; a plain click on a link still goes to `onSelect` when given. `onActive` hears the index the pointer or focus is on, `null` when it leaves, and `active` draws one as active, taking over from the pointer.

@@ -1,0 +1,20 @@
+--- client
+import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
+import Sparkline from '@kaynooo/kayjs-ui/sparkline.kay'
+import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
+import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
+
+const { heard, steered = null } = props<{ heard: unknown[], steered?: number | null }>()
+---
+div
+  BarChart#pressable(labels={['a', 'b', 'c']} series={[{ name: 'Runs', values: [1, 2, 3] }]} label="Pressable" onSelect={mark => heard.push(mark)} onActive={index => heard.push(index)})
+  BarChart#steered(labels={['a', 'b']} series={[{ name: 'Runs', values: [1, 2] }]} label="Steered" active={steered})
+  BarChart#links(labels={['a', 'b']} series={[{ name: 'Runs', values: [1, 2] }]} label="Links" href={mark => mark.index === 0 ? '#first' : undefined} onSelect={mark => heard.push(mark.label)})
+  BarChart#tipped(labels={['a', 'b']} series={[{ name: 'Runs', values: [1, 2] }]} label="Tipped")
+    @tooltip(mark)
+      p.own {mark.label}!
+  Sparkline#spark(values={[1, 3, 2]} label="Spark" hints={['one', 'three', 'two']} onSelect={mark => heard.push(mark)} href={mark => mark.index === 2 ? '#two' : undefined} onActive={index => heard.push(`spark:${index}`)})
+  ContributionGraph#grid(days={[{ day: '2026-01-05', intensity: 0.5 }, { day: '2026-01-06', intensity: 1 }]} color="#2a9d8f" today="2026-01-06" onSelect={day => heard.push(day.day)} href={day => day.intensity === 1 ? '#full' : undefined})
+  ScatterChart#dots(points={[{ key: 'p', label: 'P', x: 1, y: 1 }, { key: 'q', label: 'Q', x: 2, y: 2 }]} label="Dots" href={point => point.key === 'q' ? '#q' : undefined} onSelect={point => heard.push(point.key)} onActive={index => heard.push(`dot:${index}`)})
+    @tooltip(point)
+      p.dot {point.label}?

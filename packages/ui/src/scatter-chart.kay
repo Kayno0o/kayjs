@@ -1,7 +1,8 @@
 --- <Point extends ScatterPoint>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { ScatterAxis, ScatterPoint } from './plot'
 import { memo, recipe, signal } from 'kay'
+import { activeMarks, chartTooltip, markKind, TOOLTIP_LOOK } from './chart-marks'
 import { axisExtent, axisPercent, dotSize, steppedPoint } from './plot'
 import { wording } from 'kay/words'
 
@@ -15,11 +16,12 @@ const look = recipe({
     tick: 'absolute text-2xs whitespace-nowrap text-[var(--color-muted)] tabular-nums data-[axis=x]:top-full data-[axis=x]:mt-1 data-[axis=x]:-translate-x-1/2 data-[axis=y]:right-full data-[axis=y]:mr-2 data-[axis=y]:-translate-y-1/2',
     guide: 'absolute bg-border-strong data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',
     corner: 'pointer-events-none absolute text-2xs text-[var(--color-muted)] data-[corner=bottomLeft]:bottom-1.5 data-[corner=bottomLeft]:left-2 data-[corner=bottomRight]:right-2 data-[corner=bottomRight]:bottom-1.5 data-[corner=topLeft]:top-1.5 data-[corner=topLeft]:left-2 data-[corner=topRight]:top-1.5 data-[corner=topRight]:right-2',
-    dot: 'absolute h-(--_dot-size) w-(--_dot-size) -translate-x-1/2 translate-y-1/2 rounded-full bg-accent opacity-70 transition-opacity hover:z-10 hover:opacity-100 data-interactive:cursor-pointer data-interactive:focus-visible:opacity-100 data-interactive:focus-visible:outline-2 data-interactive:focus-visible:outline-foreground',
+    tooltip: TOOLTIP_LOOK,
+    dot: 'absolute h-(--_dot-size) w-(--_dot-size) -translate-x-1/2 translate-y-1/2 rounded-full bg-accent opacity-70 transition-opacity hover:z-10 hover:opacity-100 data-active:z-10 data-active:opacity-100 data-interactive:cursor-pointer data-interactive:focus-visible:opacity-100 data-interactive:focus-visible:outline-2 data-interactive:focus-visible:outline-foreground',
   },
 })
 
-const { points, x = {}, y = {}, quadrant, corners, onSelect, emptyLabel, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const { points, x = {}, y = {}, quadrant, corners, onSelect, href, onActive, active, tooltip, emptyLabel, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   points: Point[]
   x?: ScatterAxis | undefined
   y?: ScatterAxis | undefined
@@ -28,6 +30,14 @@ const { points, x = {}, y = {}, quadrant, corners, onSelect, emptyLabel, label, 
   corners?: { topLeft?: string, topRight?: string, bottomLeft?: string, bottomRight?: string } | undefined
   // Makes every dot a button handing back its point.
   onSelect?: ((point: Point) => unknown) | undefined
+  // The address a dot links to, or `undefined` for none: a dot that has one is a link, and a plain click goes to `onSelect` when the app gave one.
+  href?: ((point: Point) => string | undefined) | undefined
+  // Hears the index of the dot the pointer or the focus is on, `null` when it leaves.
+  onActive?: ((index: number | null) => unknown) | undefined
+  // The dot to draw as active, `null` for none; the app controls it when it gives it.
+  active?: number | null | undefined
+  // Replaces the tooltip under the pointer or focus with the app's own content for that point.
+  tooltip?: Snippet<[point: Point]> | undefined
   // What the chart reads with no points.
   emptyLabel?: string | undefined
   // Describes the chart for screen readers.
@@ -58,9 +68,32 @@ function keyDown(event: KeyboardEvent) {
   event.preventDefault()
   stop = next
 
-  const target = (event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>('[role="img"]')[next]
+  const target = (event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>('[data-part="dot"]')[next]
 
   target?.focus()
+}
+
+const marks = activeMarks({ active: () => active, onActive: () => onActive })
+const tip = chartTooltip()
+
+function link(point: Point) {
+  const to = href?.(point)
+
+  return to === undefined || to === '' ? undefined : { href: to }
+}
+
+// A plain click on a link goes to `onSelect` when the app gave one; a modified or middle click is left to the browser.
+function pressed(event: MouseEvent, point: Point) {
+  if (!onSelect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+    return
+
+  event.preventDefault()
+  void onSelect(point)
+}
+
+function focused(event: FocusEvent, at: number) {
+  stop = at
+  marks.enter(at, event.currentTarget as Element)
 }
 
 const cornerEntries = () => Object.entries(corners ?? {}).filter(([, text]) => text)
@@ -85,9 +118,14 @@ else
       for entry of cornerEntries() key={entry[0]}
         span(part="corner" data-corner={entry[0]}) {entry[1]}
       for point, at of points key={point.key}
-        if onSelect
-          button(part="dot" type="button" data-interactive aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)} onClick={() => onSelect?.(point)})
+        if markKind(link(point)?.href, onSelect !== undefined) === 'link'
+          a(part="dot" {...link(point)} data-interactive data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-active={marks.current() === at ? '' : undefined} style={place(point)} onClick={event => pressed(event, point)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+        else if onSelect
+          button(part="dot" type="button" data-interactive data-kind="button" aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-active={marks.current() === at ? '' : undefined} style={place(point)} onClick={() => onSelect?.(point)} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
         else
-          span(part="dot" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)} onKeyDown={keyDown} onFocus={() => stop = at})
+          span(part="dot" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-active={marks.current() === at ? '' : undefined} style={place(point)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+      if tooltip && marks.current() !== null && marks.anchor() && points[marks.current()!]
+        div(part="tooltip" ref={tip.watch} style={tip.place(marks.anchor()!)} aria-hidden="true")
+          {tooltip(points[marks.current()!]!)}
     if x.label
       span(part="axisLabel" data-axis="x") {x.label}
