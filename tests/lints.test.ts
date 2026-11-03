@@ -1090,3 +1090,37 @@ describe('an extension satisfying missing-alt', () => {
     expect(lints(`${imported}iframe(src="/map")\n`, satisfied).map(d => d.code)).toEqual(['missing-title'])
   })
 })
+
+describe('deprecated-ui-tone', () => {
+  const imports = 'import Sparkline from \'@kaynooo/kayjs-ui/sparkline.kay\'\nimport StatusStrip from \'@kaynooo/kayjs-ui/status-strip.kay\'\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\nimport TextInput from \'@kaynooo/kayjs-ui/text-input.kay\'\nimport Select from \'@kaynooo/kayjs-ui/select.kay\'\n'
+  const found = (template: string) => {
+    const source = `---\n${imports}---\n${template}\n`
+    const result = compileKay(source, 'tone.kay', { check: true })
+
+    return result.diagnostics.filter(d => d.code === 'deprecated-ui-tone').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
+  }
+
+  it('fixes a muted tone written as a literal', () => {
+    expect(found('Sparkline(label="x" values={[1]} tone="muted")')).toEqual([{ at: 'muted', fix: ['muted->neutral'] }])
+    expect(found('Sparkline(label="x" values={[1]} tones={[\'muted\', \'danger\']})')).toEqual([{ at: '\'muted\'', fix: ['\'muted\'->\'neutral\''] }])
+    expect(found('StatusStrip(label="x" cells={[\'success\', \'muted\', undefined]})')).toEqual([{ at: '\'muted\'', fix: ['\'muted\'->\'neutral\''] }])
+    expect(found('Timeline(label="x" entries={[{ key: \'a\', time: \'1\', text: \'a\', tone: \'muted\' }]})')).toEqual([{ at: 'tone: \'muted\'', fix: ['tone: \'muted\'->tone: \'neutral\''] }])
+  })
+
+  it('reports a native size on a field with no fix', () => {
+    expect(found('TextInput(size={20})')).toEqual([{ at: 'size', fix: undefined }])
+    expect(found('Select(size="4" options={[]} value="")')).toEqual([{ at: 'size', fix: undefined }])
+  })
+
+  it('leaves the new forms and other tags alone', () => {
+    expect(found('TextInput(size="lg")')).toEqual([])
+    expect(found('Sparkline(label="x" values={[1]} tone="neutral")')).toEqual([])
+    expect(found('Sparkline(label="x" values={[1]} tone={kind})')).toEqual([])
+    expect(found('input(size={20})')).toEqual([])
+    expect(found('Other(tone="muted")')).toEqual([])
+  })
+
+  it('is silenced by kay-allow', () => {
+    expect(found('// kay-allow deprecated-ui-tone\nSparkline(label="x" values={[1]} tone="muted")')).toEqual([])
+  })
+})

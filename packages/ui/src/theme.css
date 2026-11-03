@@ -26,6 +26,21 @@
   inherits: false;
 }
 
+@property --_field-pad {
+  syntax: '*';
+  inherits: false;
+}
+
+@property --_field-text {
+  syntax: '*';
+  inherits: false;
+}
+
+@property --_field-line {
+  syntax: '*';
+  inherits: false;
+}
+
 @property --_notice-ground {
   syntax: '*';
   inherits: false;
@@ -180,6 +195,25 @@
     outline-offset: 2px;
   }
 
+  /* A framed icon button's line on hover follows its tone, as a Button's does; danger has its own rule below, with its fill. */
+  .kui-icon-btn:where(.kui-shell):hover {
+    &:where([data-tone='accent']) {
+      --shell-line: var(--color-accent);
+    }
+
+    &:where([data-tone='success']) {
+      --shell-line: var(--color-success);
+    }
+
+    &:where([data-tone='warning']) {
+      --shell-line: var(--color-warning);
+    }
+
+    &:where([data-tone='info']) {
+      --shell-line: var(--color-info);
+    }
+  }
+
   .kui-shell-danger:hover {
     --shell-line: var(--color-danger);
     --shell-fill: color-mix(in oklab, var(--color-danger) 10%, transparent);
@@ -318,7 +352,7 @@
   .kui-field-input,
   .kui-form-field select,
   .kui-btn {
-    --_field-height: calc(2 * var(--border-width) + 2 * var(--spacing) * var(--density) + var(--text-sm) * var(--text-sm--line-height));
+    --_field-height: calc(2 * var(--border-width) + 2 * var(--_field-pad, var(--spacing) * var(--density)) + var(--_field-text, var(--text-sm)) * var(--_field-line, var(--text-sm--line-height)));
   }
 
   /* A medium button in a row of compact fields or bare single-line field controls (a Textarea not), an island's slot wrapper between the row and the field included is as tall as they are at any density; a rule here rather than a utility, so no other button carries the selector. */
@@ -358,17 +392,23 @@
     }
   }
 
-  /* The sizes of a field drawn by its class alone, as a Combobox, a MultiSelect and a RangeInput: medium is the base above, the others change the padding and the type. A TextInput, a Textarea and a Select carry the same numbers as utilities (FIELD_SIZES in the field look module), which this layer would lose to. */
+  /* The sizes of a field drawn by its class alone, as a Combobox, a MultiSelect and a RangeInput: medium is the base above, the others change the padding, the type and the variables the field height is built from. A TextInput, a Textarea and a Select carry the same numbers as utilities (FIELD_SIZES in the field look module), which this layer would lose to. */
   .kui-field-input:where([data-size='sm']) {
     @apply px-[calc(var(--spacing)*1.75*var(--density))] py-[calc(var(--spacing)*0.5*var(--density))] text-xs;
+    --_field-pad: calc(var(--spacing) * 0.5 * var(--density));
+    --_field-text: var(--text-xs);
+    --_field-line: var(--text-xs--line-height);
   }
 
   .kui-field-input:where([data-size='lg']) {
     @apply px-[calc(var(--spacing)*3*var(--density))] py-[calc(var(--spacing)*1.5*var(--density))] text-base;
+    --_field-pad: calc(var(--spacing) * 1.5 * var(--density));
+    --_field-text: var(--text-base);
+    --_field-line: var(--text-base--line-height);
   }
 
   /* A refused field: the line and the focus ring in the danger colour, on a control marked by its `invalid` prop or by a FormField showing a message. */
-  .kui-field-input[aria-invalid='true'],
+  .kui-field-input:is([aria-invalid='true'], [data-refused='true']),
   .kui-form-field :where(input, select, textarea)[aria-invalid='true'] {
     border-color: var(--color-danger);
 

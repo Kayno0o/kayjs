@@ -2,7 +2,7 @@
 const CHECKBOX: { root: string; input: string; label: string; hint: string; }
 
 [./field-look] FIELD_BOX
-const FIELD_BOX: "px-[calc(var(--spacing)*2.25*var(--density))] py-[calc(var(--spacing)*var(--density))] text-sm data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-height:calc(2*var(--border-width)_+_var(--spacing)*var(--density)_+_var(--text-xs)*var(--text-xs--line-height))] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-height:calc(2*var(--border-width)_+_3*var(--spacing)*var(--density)_+_var(--text-base)*var(--text-base--line-height))]"
+const FIELD_BOX: "px-[calc(var(--spacing)*2.25*var(--density))] py-[calc(var(--spacing)*var(--density))] text-sm data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-pad:calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:[--_field-text:var(--text-xs)] data-[size=sm]:[--_field-line:var(--text-xs--line-height)] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-pad:calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:[--_field-text:var(--text-base)] data-[size=lg]:[--_field-line:var(--text-base--line-height)]"
 
 [./field-look] FIELD_LOOK
 const FIELD_LOOK: "kui-field-input rounded-md bg-surface text-foreground outline-none [font-family:inherit] [border:var(--border-width)_solid_var(--color-input)] placeholder:text-[var(--color-muted)] focus:border-ring focus:[outline:1px_solid_var(--color-ring)] focus:[box-shadow:none] disabled:cursor-default disabled:opacity-50 aria-invalid:border-danger aria-invalid:focus:border-danger aria-invalid:focus:[outline-color:var(--color-danger)]"
@@ -11,13 +11,22 @@ const FIELD_LOOK: "kui-field-input rounded-md bg-surface text-foreground outline
 const FIELD_MESSAGE: { hint: string; issues: string; issue: string; }
 
 [./field-look] FIELD_SELECT_BOX
-const FIELD_SELECT_BOX: string
+const FIELD_SELECT_BOX: "pl-[calc(var(--spacing)*2.25*var(--density))] py-[calc(var(--spacing)*var(--density))] text-sm data-[size=sm]:pl-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-pad:calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:[--_field-text:var(--text-xs)] data-[size=sm]:[--_field-line:var(--text-xs--line-height)] data-[size=lg]:pl-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-pad:calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:[--_field-text:var(--text-base)] data-[size=lg]:[--_field-line:var(--text-base--line-height)]"
 
 [./field-look] FIELD_SIZES
-const FIELD_SIZES: "data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-height:calc(2*var(--border-width)_+_var(--spacing)*var(--density)_+_var(--text-xs)*var(--text-xs--line-height))] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-height:calc(2*var(--border-width)_+_3*var(--spacing)*var(--density)_+_var(--text-base)*var(--text-base--line-height))]"
+const FIELD_SIZES: "data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-pad:calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:[--_field-text:var(--text-xs)] data-[size=sm]:[--_field-line:var(--text-xs--line-height)] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-pad:calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:[--_field-text:var(--text-base)] data-[size=lg]:[--_field-line:var(--text-base--line-height)]"
+
+[./field-look] fieldInvalid
+function fieldInvalid(invalid: () => boolean | undefined): "true" | undefined
+
+[./field-look] fieldSize
+function fieldSize(size: FieldSize | undefined): FieldSize | undefined
 
 [./field-look] FieldSize
 type FieldSize = 'sm' | 'md' | 'lg'
+
+[./field-look] keepInvalid
+function keepInvalid(box: Element, invalid: () => boolean | undefined): void
 
 [./field-look] LABEL_TEXT
 const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]"
@@ -950,7 +959,7 @@ function ui(): KayExtension<AnyElysia>
 const CHECKBOX: { root: string; input: string; label: string; hint: string; }
 
 [./lib/field-look] FIELD_BOX
-const FIELD_BOX: "px-[calc(var(--spacing)*2.25*var(--density))] py-[calc(var(--spacing)*var(--density))] text-sm data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-height:calc(2*var(--border-width)_+_var(--spacing)*var(--density)_+_var(--text-xs)*var(--text-xs--line-height))] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-height:calc(2*var(--border-width)_+_3*var(--spacing)*var(--density)_+_var(--text-base)*var(--text-base--line-height))]"
+const FIELD_BOX: "px-[calc(var(--spacing)*2.25*var(--density))] py-[calc(var(--spacing)*var(--density))] text-sm data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-pad:calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:[--_field-text:var(--text-xs)] data-[size=sm]:[--_field-line:var(--text-xs--line-height)] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-pad:calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:[--_field-text:var(--text-base)] data-[size=lg]:[--_field-line:var(--text-base--line-height)]"
 
 [./lib/field-look] FIELD_LOOK
 const FIELD_LOOK: "kui-field-input rounded-md bg-surface text-foreground outline-none [font-family:inherit] [border:var(--border-width)_solid_var(--color-input)] placeholder:text-[var(--color-muted)] focus:border-ring focus:[outline:1px_solid_var(--color-ring)] focus:[box-shadow:none] disabled:cursor-default disabled:opacity-50 aria-invalid:border-danger aria-invalid:focus:border-danger aria-invalid:focus:[outline-color:var(--color-danger)]"
@@ -959,13 +968,22 @@ const FIELD_LOOK: "kui-field-input rounded-md bg-surface text-foreground outline
 const FIELD_MESSAGE: { hint: string; issues: string; issue: string; }
 
 [./lib/field-look] FIELD_SELECT_BOX
-const FIELD_SELECT_BOX: string
+const FIELD_SELECT_BOX: "pl-[calc(var(--spacing)*2.25*var(--density))] py-[calc(var(--spacing)*var(--density))] text-sm data-[size=sm]:pl-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-pad:calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:[--_field-text:var(--text-xs)] data-[size=sm]:[--_field-line:var(--text-xs--line-height)] data-[size=lg]:pl-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-pad:calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:[--_field-text:var(--text-base)] data-[size=lg]:[--_field-line:var(--text-base--line-height)]"
 
 [./lib/field-look] FIELD_SIZES
-const FIELD_SIZES: "data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-height:calc(2*var(--border-width)_+_var(--spacing)*var(--density)_+_var(--text-xs)*var(--text-xs--line-height))] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-height:calc(2*var(--border-width)_+_3*var(--spacing)*var(--density)_+_var(--text-base)*var(--text-base--line-height))]"
+const FIELD_SIZES: "data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-pad:calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:[--_field-text:var(--text-xs)] data-[size=sm]:[--_field-line:var(--text-xs--line-height)] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-pad:calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:[--_field-text:var(--text-base)] data-[size=lg]:[--_field-line:var(--text-base--line-height)]"
+
+[./lib/field-look] fieldInvalid
+function fieldInvalid(invalid: () => boolean | undefined): "true" | undefined
+
+[./lib/field-look] fieldSize
+function fieldSize(size: FieldSize | undefined): FieldSize | undefined
 
 [./lib/field-look] FieldSize
 type FieldSize = 'sm' | 'md' | 'lg'
+
+[./lib/field-look] keepInvalid
+function keepInvalid(box: Element, invalid: () => boolean | undefined): void
 
 [./lib/field-look] LABEL_TEXT
 const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]"
@@ -1147,6 +1165,9 @@ interface Editing<Row, Draft = void>
   edit: (row: Row) => void
   open: () => boolean
   row: () => Row | undefined
+
+[./lib/index] FieldSize
+type FieldSize = 'sm' | 'md' | 'lg'
 
 [./lib/index] FilterField
 interface FilterField
@@ -1436,6 +1457,7 @@ const toast: {
   error: (message: string, options?: ToastOptions) => number;
   success: (message: string, options?: ToastOptions) => number;
   info: (message: string, options?: ToastOptions) => number;
+  warning: (message: string, options?: ToastOptions) => number;
 }
 
 [./lib/index] Toast
@@ -1458,6 +1480,7 @@ type ToastHold = 'pointer' | 'focus'
 interface ToastOptions
   action?: ToastAction | undefined
   duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  tone?: Tone | undefined
 
 [./lib/index] toasts
 function toasts(): Toast[]
@@ -2256,6 +2279,7 @@ const toast: {
   error: (message: string, options?: ToastOptions) => number;
   success: (message: string, options?: ToastOptions) => number;
   info: (message: string, options?: ToastOptions) => number;
+  warning: (message: string, options?: ToastOptions) => number;
 }
 
 [./lib/toast] Toast
@@ -2278,6 +2302,7 @@ type ToastHold = 'pointer' | 'focus'
 interface ToastOptions
   action?: ToastAction | undefined
   duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  tone?: Tone | undefined
 
 [./lib/toast] toasts
 function toasts(): Toast[]

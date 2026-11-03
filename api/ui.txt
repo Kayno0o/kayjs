@@ -126,6 +126,9 @@ interface Editing<Row, Draft = void>
   open: () => boolean
   row: () => Row | undefined
 
+[.] FieldSize
+type FieldSize = 'sm' | 'md' | 'lg'
+
 [.] FilterField
 interface FilterField
   key: string
@@ -414,6 +417,7 @@ const toast: {
   error: (message: string, options?: ToastOptions) => number;
   success: (message: string, options?: ToastOptions) => number;
   info: (message: string, options?: ToastOptions) => number;
+  warning: (message: string, options?: ToastOptions) => number;
 }
 
 [.] Toast
@@ -436,6 +440,7 @@ type ToastHold = 'pointer' | 'focus'
 interface ToastOptions
   action?: ToastAction | undefined
   duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  tone?: Tone | undefined
 
 [.] toasts
 function toasts(): Toast[]

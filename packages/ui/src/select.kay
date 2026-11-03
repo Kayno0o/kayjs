@@ -4,7 +4,7 @@ import type { JSX } from 'kay'
 import type { ComboboxQuery } from './combobox'
 import { effect, recipe, signal, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
-import { FIELD_LOOK, FIELD_SELECT_BOX } from './field-look'
+import { FIELD_LOOK, FIELD_SELECT_BOX, fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import { changeAccepted } from './change'
 import { paramChange } from './param-change'
 import { startRef } from './form-reset'
@@ -168,10 +168,13 @@ function left(event: FocusEvent & { currentTarget: HTMLSelectElement }) {
     submitNow(event.currentTarget)
 }
 
-const ref = startRef<HTMLSelectElement>(element => box = element, rest.ref)
+const ref = startRef<HTMLSelectElement>((element) => {
+  box = element
+  keepInvalid(element, () => invalid)
+}, rest.ref)
 ---
 // Each option says whether it is selected, so the right one stays chosen when the options arrive after the value.
-select(aria-busy={busy || asking() || moving() ? 'true' : undefined} {...rest} data-size={size === 'md' ? undefined : size} aria-invalid={invalid ? 'true' : rest['aria-invalid']} name={name ?? param} ref={ref} onChange={event => picked(event.currentTarget)} onKeyDown={submit ? pressed : onKeyDown} onPointerDown={submit ? grabbed : onPointerDown} onBlur={submit ? left : onBlur})
+select(aria-busy={busy || asking() || moving() ? 'true' : undefined} {...rest} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} name={name ?? param} ref={ref} onChange={event => picked(event.currentTarget)} onKeyDown={submit ? pressed : onKeyDown} onPointerDown={submit ? grabbed : onPointerDown} onBlur={submit ? left : onBlur})
   if emptyOption !== undefined && emptyOption !== false
     option(value="") {typeof emptyOption === 'string' ? emptyOption : ''}
   if busy || asking()

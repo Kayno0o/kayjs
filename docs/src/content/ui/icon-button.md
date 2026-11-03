@@ -8,7 +8,7 @@ description: A button showing only an icon, named by a label that doubles as its
 
 ## Variants
 
-`variant` is the form, `solid` (the default), `ghost` or `inline`, and `tone` the meaning, `neutral` (the default), `accent` or `danger`.
+`variant` is the form, `solid` (the default), `ghost` or `inline`, and `tone` the meaning, `neutral` (the default), `accent`, `success`, `warning`, `danger` or `info`.
 
 `href` renders a link with the same look, parts and tooltip instead of a button, for an action that navigates. `BareIconButton` takes it too.
 

@@ -30,6 +30,8 @@ export interface ToastOptions {
   duration?: Duration | false | undefined
   // One button before the close button, such as Retry or Undo. An error already open with the same words is shown once, whatever action the second asks.
   action?: ToastAction | undefined
+  // The colour and icon, one of every `Tone`; the method's own when left out. A `danger` toast has the clock and the repeat guard of an error.
+  tone?: Tone | undefined
 }
 
 // Long enough to read a sentence; an error has no clock, as a reader who needs longer than any limit must not lose it.
@@ -101,7 +103,13 @@ function askedMs(duration: Duration | false | undefined): number | undefined {
 }
 
 // Untracked: an effect toasting a settled task would otherwise read the list, and toast again on every toast it adds.
-function push(message: string, type: ToastType, { duration, action }: ToastOptions): number {
+const TYPE_OF_TONE: Partial<Record<Tone, ToastType>> = { danger: 'error', success: 'success' }
+
+function push(message: string, method: ToastType, { duration, action, tone: chosen }: ToastOptions): number {
+  const tone: Tone = chosen ?? (method === 'error' ? 'danger' : method)
+  // The deprecated `type` follows the tone: a danger is an error, a success a success and every other tone an info.
+  const type: ToastType = TYPE_OF_TONE[tone] ?? 'info'
+
   // An error already open with the same words is not stacked again, so a failing poll cannot cover the page.
   const open = type === 'error' ? untrack(toasts).find(shown => shown.type === 'error' && shown.message === message) : undefined
 
@@ -113,7 +121,7 @@ function push(message: string, type: ToastType, { duration, action }: ToastOptio
   const wanted = asked === undefined || Number.isNaN(asked) || asked < 0 ? undefined : asked
   const timer: Timer = { remaining: wanted ?? (type === 'error' ? Number.POSITIVE_INFINITY : DURATION_MS), started: Date.now() }
 
-  untrack(() => toasts.set(list => [...list, { id, message, action, tone: type === 'error' ? 'danger' : type, type }]))
+  untrack(() => toasts.set(list => [...list, { id, message, action, tone, type }]))
   timers.set(id, timer)
 
   if (holds.size === 0)
@@ -127,6 +135,7 @@ export const toast = {
   error: (message: string, options: ToastOptions = {}) => push(message, 'error', options),
   success: (message: string, options: ToastOptions = {}) => push(message, 'success', options),
   info: (message: string, options: ToastOptions = {}) => push(message, 'info', options),
+  warning: (message: string, options: ToastOptions = {}) => push(message, 'info', { tone: 'warning', ...options }),
 }
 
 export interface AttemptOptions<Data = unknown> {

@@ -682,6 +682,14 @@ export const LINTS = {
     wrong: 'export const posts = collection(\'content/posts\', { schema, route: \'/blog/:slug\', feed: { path: \'/blog/rss.xml\', title: \'Blog\', item: post => ({ title: post.data.title, date: post.data.date, path: `/blog/${post.slug}` }) } })',
     right: 'export const posts = collection(\'content/posts\', { schema, route: \'/blog/:slug\', feed: { path: \'/blog/rss.xml\', title: \'Blog\', item: post => ({ title: post.data.title, date: post.data.date }) } })',
   },
+  'deprecated-ui-tone': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.87',
+    summary: 'A kayjs-ui form the 1.87 `Tone` and field `size` replaced: the `muted` tone of a Sparkline (`tone`, `tones`), a StatusStrip (`cells`) or a Timeline (`entries`), now `neutral`, and a native `size` such as `size={20}` or `size="20"` on a TextInput, Select, Combobox, DateInput, TimeInput or DateTimeInput, which is `sm`, `md` or `lg` now. The old tone still draws until 2.0.0. The fix writes `neutral` where `muted` is a literal; a native `size` is reported with no fix, as its width is a class now.',
+    wrong: '---\nimport Sparkline from \'@kaynooo/kayjs-ui/sparkline.kay\'\n---\nSparkline(label="Load" values={[1, 2]} tone="muted")',
+    right: '---\nimport Sparkline from \'@kaynooo/kayjs-ui/sparkline.kay\'\n---\nSparkline(label="Load" values={[1, 2]} tone="neutral")',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

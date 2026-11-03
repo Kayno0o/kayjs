@@ -614,8 +614,8 @@ describe('theme.css', () => {
     const toast = (await Bun.file(`${ROOT}src/toaster.kay`).text()).match(/\n\s+toast: '([^']+)'/)![1]!.split(WHITESPACE)
     const css = await utilitiesOf(toast)
 
-    for (const tone of ['danger', 'success', 'info'])
-      expect(css, tone).toMatch(new RegExp(String.raw`\[data-tone[=~]?"?${tone}"?\][^{]*\{[^}]*--_toast-tone: var\(--color-${tone}\)`))
+    for (const [tone, color] of [['danger', 'danger'], ['success', 'success'], ['info', 'info'], ['warning', 'warning'], ['neutral', 'muted']])
+      expect(css, tone).toMatch(new RegExp(String.raw`\[data-tone[=~]?"?${tone}"?\][^{]*\{[^}]*--_toast-tone: var\(--color-${color}\)`))
 
     expect(css).toMatch(/--_toast-tone: var\(--color-accent\)/)
   })
@@ -856,6 +856,8 @@ describe('theme.css', () => {
     expect(toast).toContain('data-[tone=info]:[--_toast-tone:var(--color-info)]')
     expect(toast).toContain('data-[tone=danger]:[--_toast-tone:var(--color-danger)]')
     expect(toast).toContain('data-[tone=success]:[--_toast-tone:var(--color-success)]')
+    expect(toast).toContain('data-[tone=warning]:[--_toast-tone:var(--color-warning)]')
+    expect(toast).toContain('data-[tone=neutral]:[--_toast-tone:var(--color-muted)]')
   })
 
   // The recipes read these as a tone of their own element: inherited, a Badge or a Notice inside a toned one would take its colours, and a theme rule setting one would hide the recipe's neutral fallback.

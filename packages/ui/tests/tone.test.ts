@@ -3,11 +3,14 @@ import { Glob } from 'bun'
 import { expect, test } from 'bun:test'
 
 const SRC = join(import.meta.dir, '..', 'src')
-const TONES = ['neutral', 'accent', 'success', 'warning', 'danger', 'info']
+const TONES = new Set(['neutral', 'accent', 'success', 'warning', 'danger', 'info'])
 const TONE_LITERAL = /'(?:neutral|accent|success|warning|danger|info|muted)'/
-// A prop or field declared as `tone?: ...` or `tones?: ...`.
-const TONE_FIELD = /^\s*tones?\??:(.*)$/
+// A prop or field declared as `tone?: ...`, `tones?: ...` or `cells: ...`, whose type may run over several lines.
+const TONE_FIELD = /^\s*(?:tones?|cells)\??:(.*)$/
+const STRING = /'[^']*'|"[^"]*"|`[^`]*`/g
 const RECIPE_TONE = /\btone: \{/
+// The part names of a tone group that colours several parts, as Stat's `{ value: 'text-accent' }`.
+const SPELLED_ELSEWHERE = new Set(['value', 'delta', 'root', 'icon', 'label'])
 
 // tone.ts holds the union itself and sparkline.ts its deprecated alias.
 const files = [...new Glob('*.{kay,ts}').scanSync(SRC)].filter(file => file !== 'tone.ts' && file !== 'sparkline.ts').toSorted()
@@ -21,7 +24,16 @@ test('a component takes the exported Tone, not a union of its own', async () => 
     for (const [at, line] of lines.entries()) {
       const field = TONE_FIELD.exec(line)
 
-      if (field && TONE_LITERAL.test(field[1]!))
+      if (!field)
+        continue
+
+      // The type goes on while a line ends in, or the next one starts with, a union bar.
+      let type = field[1]!
+
+      for (let next = at + 1; (/[|&]\s*$/).test(lines[next - 1]!) || (/^\s*[|&]/).test(lines[next] ?? ''); next++)
+        type += lines[next]
+
+      if (TONE_LITERAL.test(type))
         own.push(`${file}:${at + 1}`)
     }
   }
@@ -59,6 +71,13 @@ test('every recipe tone variant lists all of the tones', async () => {
 
     seen++
     const group = text.slice(start, end)
+    // The keys of the group are its tones, none more: a string value could hold a colon, so the strings go first.
+    const keys = [...group.slice(group.indexOf('{') + 1).replace(STRING, '\'\'').matchAll(/(\w+)\s*:/g)].map(match => match[1]!)
+
+    for (const key of keys) {
+      if (!TONES.has(key) && !SPELLED_ELSEWHERE.has(key))
+        missing.push(`${file}: extra ${key}`)
+    }
 
     for (const tone of TONES) {
       if (!new RegExp(String.raw`\b${tone}:`).test(group))

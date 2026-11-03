@@ -1,0 +1,23 @@
+---
+// kay-island
+import type { Tone } from '@kaynooo/kayjs-ui'
+import Menu from '@kaynooo/kayjs-ui/menu.kay'
+import Sparkline from '@kaynooo/kayjs-ui/sparkline.kay'
+import Stat from '@kaynooo/kayjs-ui/stat.kay'
+import StatusStrip from '@kaynooo/kayjs-ui/status-strip.kay'
+import Timeline from '@kaynooo/kayjs-ui/timeline.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import { toast } from '@kaynooo/kayjs-ui'
+
+// Every tone once on each component that colours by one.
+const tones: Tone[] = ['neutral', 'accent', 'success', 'warning', 'danger', 'info']
+---
+Menu(id="menu" items={tones.map(tone => ({ label: tone, tone, onSelect: () => undefined }))} label="Tones" icon="plus")
+Sparkline#spark(values={[1, 2, 3, 4, 5, 6]} tones={tones} label="Bars")
+StatusStrip#strip(cells={tones} label="Cells")
+Timeline#timeline(entries={tones.map(tone => ({ key: tone, time: '08:00', text: tone, tone, icon: 'info' as const }))} label="Day")
+div#stats
+  for tone of tones key={tone}
+    Stat(value="1" label={tone} tone={tone})
+button#warn(onClick={() => toast.warning('Careful')}) Warn
+Toaster

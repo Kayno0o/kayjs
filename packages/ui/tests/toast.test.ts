@@ -33,6 +33,16 @@ describe('toast', () => {
     expect(toasts().map(({ tone, type }) => [tone, type])).toEqual([['danger', 'error'], ['success', 'success'], ['info', 'info']])
   })
 
+  test('takes any tone, the method giving its own by default, and a danger one keeps an error\'s guard', () => {
+    toast.warning('Careful')
+    toast.info('Quiet', { tone: 'neutral' })
+    toast.success('Marked', { tone: 'accent' })
+    toast.info('Failed', { tone: 'danger' })
+    toast.info('Failed', { tone: 'danger' })
+
+    expect(toasts().map(({ tone, type }) => [tone, type])).toEqual([['warning', 'info'], ['neutral', 'info'], ['accent', 'info'], ['danger', 'error']])
+  })
+
   test('dismisses one toast by its id', () => {
     toast.info('first')
     toast.info('second')

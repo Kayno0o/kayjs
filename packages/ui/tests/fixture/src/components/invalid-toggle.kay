@@ -1,0 +1,13 @@
+---
+import { signal } from 'kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+
+// A TextInput whose `invalid` one button flips, inside a FormField another gives a message.
+const invalid = signal(true)
+const issue = signal<string>()
+---
+button#flip(type="button" onClick={() => invalid = !invalid()}) Flip
+button#say(type="button" onClick={() => issue = issue() === undefined ? 'Taken' : undefined}) Say
+FormField(label="Name" issue={issue()})
+  TextInput#box(invalid={invalid()})

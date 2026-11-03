@@ -4887,3 +4887,19 @@ describe('kay check --watch, stopped by a signal', () => {
     }
   })
 })
+
+describe('kay check, deprecated-ui-tone', () => {
+  it('reports a muted tone and --fix writes neutral', async () => {
+    const head = '---\nimport StatusStrip from \'@kaynooo/kayjs-ui/status-strip.kay\'\n---\n'
+    const root = await scratchProject({ 'src/a.kay': `${head}StatusStrip(label="Up" cells={['success', 'muted']})\n` })
+
+    try {
+      expect((await runCheck(root)).output.match(/deprecated-ui-tone/g)).toHaveLength(1)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/a.kay')).text()).toBe(`${head}StatusStrip(label="Up" cells={['success', 'neutral']})\n`)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})

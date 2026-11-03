@@ -1,7 +1,7 @@
 ---
 import type { FieldSize } from './field-look'
 import type { JSX } from 'kay'
-import { FIELD_BOX, FIELD_LOOK } from './field-look'
+import { FIELD_BOX, FIELD_LOOK, fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import { recipe, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
@@ -48,6 +48,7 @@ const ref = startRef<HTMLInputElement>((input) => {
   const start = untrack(() => value)
 
   box = input
+  keepInvalid(input, () => invalid)
 
   if (start !== undefined)
     input.defaultValue = spelled(start)
@@ -85,4 +86,4 @@ function left(event: FocusEvent & { currentTarget: HTMLInputElement, target: Ele
   onBlur?.(event)
 }
 ---
-input({...rest} data-size={size === 'md' ? undefined : size} aria-invalid={invalid ? 'true' : rest['aria-invalid']} ref={ref} type={type} value={untrack(() => value === undefined ? undefined : spelled(value))} onInput={event => report(onInput, event.currentTarget)} onChange={event => report(onChange, event.currentTarget)} onBlur={left})
+input({...rest} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} type={type} value={untrack(() => value === undefined ? undefined : spelled(value))} onInput={event => report(onInput, event.currentTarget)} onChange={event => report(onChange, event.currentTarget)} onBlur={left})

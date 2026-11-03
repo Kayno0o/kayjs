@@ -7,6 +7,13 @@ import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, EVENT_MODIFIERS, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, serverIslandOf, templateFacts, visitNodes } from './ast'
 
+const UI_SOURCE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
+const MUTED = /(['"])muted\1/g
+const MUTED_TONE = /(\btone['"]?\s*:\s*)(['"])muted\2/g
+// The kayjs-ui field tags that took the native `size` before 1.87, when `size` became `sm`, `md` or `lg`.
+const FIELD_TAGS = new Set(['text-input', 'select', 'combobox', 'date-input', 'time-input', 'date-time-input'])
+const NUMBER = /^\s*\d+\s*$/
+
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile' | 'layoutFile' | 'outerSlots' | 'component'>
 
 // The elements each property of an element can be bound to; `group` and `files` also need an input of a type, `radio` or `checkbox` and `file`.
@@ -180,6 +187,8 @@ class Validator {
   private foreign = false
   // The names bound to an imported PNG, JPEG, WebP, GIF or AVIF, whose size kay writes on the `img` showing them.
   private sizedImports = new Set<string>()
+  // The names bound to a kayjs-ui component, by the component's file, for `deprecated-ui-tone`.
+  private uiComponents = new Map<string, string>()
   // The name of the props the script left out of its destructuring: a plain object, whose members are values.
   private restName: string | undefined
 
@@ -189,6 +198,15 @@ class Validator {
   }
 
   run(script: ScriptAnalysis, server: ServerAnalysis | undefined): Diagnostic[] {
+    this.uiComponents = new Map()
+
+    for (const binding of [...script.imports, ...(server?.imports ?? [])]) {
+      const match = binding.imported === 'default' && !binding.typeOnly ? UI_SOURCE.exec(binding.source) : null
+
+      if (match)
+        this.uiComponents.set(binding.local, match[1]!)
+    }
+
     this.restName = script.props?.rest && this.text(script.props.rest)
     this.sizedImports = new Set([...script.imports, ...(server?.imports ?? [])].filter(binding => binding.imported === 'default' && !binding.typeOnly && RESIZABLE.test(binding.source)).map(binding => binding.local))
 
@@ -439,6 +457,9 @@ class Validator {
   private elementIn(element: ElementNode, foreign: boolean): void {
     if (this.options.check && !element.component)
       this.accessibility(element)
+
+    if (this.options.check && element.component)
+      this.deprecatedUiTone(element)
 
     if (foreign && !element.component && RAW_TEXT.has(element.name) && this.dynamicContent(element))
       this.error(element.tag, `A \`${element.name}\` inside \`svg\` or \`math\` takes static text only`, { note: `HTML reads its content as markup there, so a value could add elements`, help: `write its text as it is, or move the \`${element.name}\` out of the \`svg\`` })
@@ -797,6 +818,43 @@ class Validator {
     const type = element.attributes.find(candidate => candidate.kind === 'static' && this.text(candidate.name) === 'type')
 
     return type?.kind === 'static' ? type.text : undefined
+  }
+
+  // Type checking only. kayjs-ui 1.87 named the quiet grey `neutral` and made `size` a field size: `muted` is fixed where it is written as a literal, a native `size` is reported alone.
+  private deprecatedUiTone(element: ElementNode): void {
+    const file = this.uiComponents.get(element.name)
+
+    if (file === undefined)
+      return
+
+    for (const attribute of element.attributes) {
+      if (attribute.kind === 'spread' || attribute.kind === 'boolean')
+        continue
+
+      const name = this.text(attribute.name)
+
+      if (FIELD_TAGS.has(file) && name === 'size') {
+        const value = attribute.kind === 'static' ? attribute.text : this.text(attribute.expression)
+
+        if (NUMBER.test(value))
+          this.lint(attribute.name, 'deprecated-ui-tone', `\`size\` on \`${element.name}\` is a field size since kayjs-ui 1.87, \`sm\`, \`md\` or \`lg\`, not the native character width`, { help: 'width the field with a class, such as `w-[20ch]`' })
+
+        continue
+      }
+
+      const span = attribute.kind === 'static' ? attribute.value : attribute.expression
+      const wanted = (file === 'sparkline' && (name === 'tone' || name === 'tones')) || (file === 'status-strip' && name === 'cells') || (file === 'timeline' && name === 'entries')
+
+      if (!wanted)
+        continue
+
+      const text = this.text(span)
+      const staticFound = text === 'muted' ? [{ start: span.start, end: span.end, text: 'neutral' }] : []
+      const found = attribute.kind === 'static' ? staticFound : [...text.matchAll(file === 'timeline' ? MUTED_TONE : MUTED)].map(match => ({ start: span.start + match.index, end: span.start + match.index + match[0].length, text: file === 'timeline' ? `${match[1]}${match[2]}neutral${match[2]}` : `${match[1]}neutral${match[1]}` }))
+
+      for (const edit of found)
+        this.lint(edit, 'deprecated-ui-tone', `the \`muted\` tone of \`${element.name}\` is \`neutral\` since kayjs-ui 1.87`, { help: 'Write `neutral`', fixes: [{ title: 'Write `neutral`', edits: [edit], safe: true }] })
+    }
   }
 
   private text(span: Span): string {
