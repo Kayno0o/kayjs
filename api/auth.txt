@@ -334,7 +334,7 @@ interface AuthFeatures
   magicLink: boolean
   oauthServer: boolean
   organizations: { roles: string[]; owner: string; manage: string; grants: Record<string, string[]>; } | null
-  pages: { prefix: string; home: string; remember: RememberMode; } | null
+  pages: { prefix: string; home: string; remember: RememberMode; main: boolean; } | null
   passkeys: boolean
   password: boolean
   prefix: string
@@ -450,6 +450,7 @@ interface AuthPages<Server extends AnyElysia = AnyElysia> extends KayExtension<S
 [.] AuthPagesConfig
 interface AuthPagesConfig extends AuthPagesOptions
   home?: string | undefined
+  main?: boolean | undefined
   prefix?: string | undefined
   profile?: ProfileOptions<string> | undefined
   remember?: RememberMode | undefined
@@ -1534,7 +1535,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   onDelete?: ((event: { user: User<Record<string, unknown>>; }) => void | Promise<void>) | undefined
   onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; }) => void | Promise<void>) | undefined
   organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
-  pages?: boolean | Pick<AuthPagesConfig, "remember" | "profile"> | undefined
+  pages?: boolean | Pick<AuthPagesConfig, "remember" | "profile" | "main"> | undefined
   passkeys?: false | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "required" | "preferred" | "discouraged"; } | undefined
   password?: boolean | undefined
   plugin?: undefined
@@ -2104,7 +2105,7 @@ function confirm(input: { token: string; }, options?: CallOptions | undefined): 
 component default
 
 [./pages/confirm-email.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ token: string | undefined; error: any; }>
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ token: string | undefined; error: any; landmark: boolean; }>
 
 [./pages/confirm-email.kay] page
 const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
@@ -2130,6 +2131,7 @@ function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, u
   unverified: boolean;
   back: string;
   refused: any;
+  landmark: boolean;
 }>
 
 [./pages/invitation.kay] page
@@ -2147,7 +2149,7 @@ function switchAccount(input: { id: string; }, options?: CallOptions | undefined
 component default
 
 [./pages/magic-link.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ token: string | undefined; error: any; }>
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ token: string | undefined; error: any; landmark: boolean; }>
 
 [./pages/magic-link.kay] page
 const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
@@ -2186,6 +2188,7 @@ function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, u
   fields: any;
   error: string | undefined;
   verify: boolean;
+  landmark: boolean;
 }>
 
 [./pages/register.kay] page
@@ -2226,6 +2229,7 @@ function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, u
     readonly password?: never;
   } | undefined;
   sent: boolean;
+  landmark: boolean;
 }>
 
 [./pages/reset-password.kay] page
@@ -2280,6 +2284,7 @@ function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, u
     href: string;
   }[];
   codes: any;
+  landmark: boolean;
 }>
 
 [./pages/sign-in.kay] magicLink
@@ -2331,6 +2336,7 @@ function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, u
   pending: any;
   redirect: string;
   error: any;
+  landmark: boolean;
 }>
 
 [./pages/two-factor.kay] page
@@ -2370,6 +2376,7 @@ function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, u
   codeError: any;
   resendError: any;
   resent: boolean;
+  landmark: boolean;
 }>
 
 [./pages/verify-email.kay] page

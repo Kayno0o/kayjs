@@ -1,52 +1,42 @@
 import { join } from 'node:path'
-import { afterEach, describe, expect, test } from 'bun:test'
-import { testSite } from 'kay/test'
+import { describe, expect, test } from 'bun:test'
+import { auth } from '../../../src/pages'
 
-const ROOT = join(import.meta.dir, '..')
-const PAGES = ['sign-in', 'register', 'reset-password', 'two-factor', 'verify-email', 'confirm-email', 'oauth/authorize', 'account', 'account/security']
-const MAIN = /<main[\s>]/g
-
-afterEach(() => {
-  delete process.env.FIXTURE_MAIN
-})
-
-async function mains(wrapped: boolean) {
-  if (wrapped)
-    process.env.FIXTURE_MAIN = '1'
-
-  const site = await testSite({ root: ROOT })
+// One process per run: the fixture's auth reads FIXTURE_MAIN, which gives its layout a main of its own and the pages `main: false`.
+async function mains(env: Record<string, string>): Promise<Record<string, number>> {
+  const run = Bun.spawn([process.execPath, join(import.meta.dir, 'landmark.ts')], { env: { ...process.env, ...env }, stdout: 'pipe', stderr: 'pipe' })
 
   try {
-    const found: Record<string, number> = {}
+    const printed = await new Response(run.stdout).text()
 
-    for (const locale of ['', '/fr']) {
-      for (const page of PAGES) {
-        const response = await site.fetch(`${locale}/auth/${page}`)
+    expect(await run.exited).toBe(0)
 
-        if (response.status === 200)
-          found[`${locale}/auth/${page}`] = [...(await response.text()).matchAll(MAIN)].length
-      }
-    }
-
-    return found
+    return JSON.parse(printed.split('\n').findLast(line => line.startsWith('{'))!) as Record<string, number>
   }
   finally {
-    await site.close()
+    run.kill()
   }
 }
 
 describe('the prebuilt pages carry one main landmark', () => {
   test('on their own, in both locales', async () => {
-    const found = await mains(false)
+    const found = await mains({})
 
     expect(Object.keys(found).length).toBeGreaterThanOrEqual(6)
     expect(Object.values(found).every(count => count === 1)).toBe(true)
-  })
+  }, 60_000)
 
-  test('beneath an app layout that already writes a main, they add none', async () => {
-    const found = await mains(true)
+  test('with `pages.main` false, under an app layout that writes a main, they add none', async () => {
+    const found = await mains({ FIXTURE_MAIN: '1' })
 
     expect(Object.keys(found).length).toBeGreaterThanOrEqual(6)
     expect(Object.values(found).every(count => count === 1)).toBe(true)
+  }, 60_000)
+
+  test('the extension hooks no page, so a page of the app is neither buffered nor transformed', () => {
+    for (const extension of [auth({ module: './src/auth' }), auth()]) {
+      expect(extension.transformPage).toBeUndefined()
+      expect(extension.transformServedPage).toBeUndefined()
+    }
   })
 })

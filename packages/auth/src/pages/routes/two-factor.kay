@@ -41,10 +41,11 @@ const features = auth.features()
 const pending = await auth.twoFactor.pending()
 const redirect = localPath(ctx.url.searchParams.get('redirect'), localize(features.pages?.home ?? '/'))
 const error = verify.failed()?.data?.error
+const landmark = ctx.locals.auth.features().pages?.main !== false
 ---
 head
   title {wording('auth.twoFactor.title', 'Two-step verification')}
-Panel(title={wording('auth.twoFactor.title', 'Two-step verification')})
+Panel(landmark={landmark} title={wording('auth.twoFactor.title', 'Two-step verification')})
   if pending
     form.flex.flex-col.gap-3(action={verify})
       p {wording('auth.twoFactor.intro', 'Type the code your authenticator app shows, or one of your recovery codes.')}

@@ -1,10 +1,11 @@
 ---
 import Card from '@kaynooo/kayjs-ui/card.kay'
+import Frame from './frame.kay'
 
-const { title } = props<{ title: string }>()
+const { title, landmark = true } = props<{ title: string, landmark?: boolean }>()
 ---
 // A sign-in page's frame: one card, its title the page's heading.
-main.kayjs-auth.mx-auto.flex.w-full.max-w-md.flex-col.gap-4.px-4.py-8(data-kayjs-main)
+Frame(size="max-w-md" gap="gap-4" landmark={landmark})
   h1.kui-heading-section {title}
   Card
     .flex.flex-col.gap-4

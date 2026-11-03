@@ -5,6 +5,7 @@ import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
 import ImpersonationBanner from '../../../components/impersonation-banner.kay'
 import UserMenu from '../../../components/user-menu.kay'
+import Frame from '../../components/frame.kay'
 import { loadViewer } from '../../../viewer'
 
 const features = ctx.locals.auth.features()
@@ -30,7 +31,7 @@ const title = `${here?.label ?? wording('auth.admin.nav.users', 'Users')} - ${wo
 ---
 head
   title {title}
-main.kayjs-auth.mx-auto.flex.w-full.max-w-4xl.flex-col.gap-6.px-4.py-8(data-kayjs-main)
+Frame(size="max-w-4xl" gap="gap-6" landmark={features.pages?.main !== false})
   .flex.flex-wrap.items-center.justify-between.gap-4
     h1.kui-heading-section {wording('auth.admin.title', 'Administration')}
     UserMenu

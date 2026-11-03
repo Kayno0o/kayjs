@@ -22,10 +22,11 @@ export const confirm = action(schemas.token, async ({ token }, ctx) => {
 
 const token = ctx.url.searchParams.get('token') ?? confirm.failed()?.values.token
 const error = confirm.failed()?.data?.error
+const landmark = ctx.locals.auth.features().pages?.main !== false
 ---
 head
   title {wording('auth.confirmEmail.title', 'Confirm your new address')}
-Panel(title={wording('auth.confirmEmail.title', 'Confirm your new address')})
+Panel(landmark={landmark} title={wording('auth.confirmEmail.title', 'Confirm your new address')})
   if token
     form.flex.flex-col.gap-3(action={confirm})
       input(type="hidden" name="token" value={token})

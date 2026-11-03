@@ -48,11 +48,12 @@ const words = {
   'redirect_uri': ['redirectUri', 'This app asked to come back to an address it did not register, so nothing was shared with it.'],
   'signed-out': ['signedOut', 'You are signed out: start again from the app.'],
 } as const
+const landmark = ctx.locals.auth.features().pages?.main !== false
 ---
 head
   title {wording('auth.consent.title', 'Allow access')}
   meta(name="robots" content="noindex")
-Panel(title={wording('auth.consent.title', 'Allow access')})
+Panel(landmark={landmark} title={wording('auth.consent.title', 'Allow access')})
   if problem
     Message(text={wording(`auth.consent.${words[problem][0]}`, words[problem][1])})
   else if outcome?.kind === 'consent'

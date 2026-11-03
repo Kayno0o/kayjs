@@ -126,7 +126,7 @@ describe('the pages option remember', () => {
 describe('what the pages make of the box', () => {
   test('the checkbox decides, always keeps and never drops, whatever was posted', async () => {
     const { remembered } = await import('../src/pages/forms')
-    const features = (remember: RememberMode) => ({ pages: { prefix: '/auth', home: '/', remember } })
+    const features = (remember: RememberMode) => ({ pages: { prefix: '/auth', home: '/', remember, main: true } })
 
     expect([true, false, undefined].map(chosen => remembered(features('checkbox'), chosen))).toEqual([true, false, false])
     expect([true, false, undefined].map(chosen => remembered(features('always'), chosen))).toEqual([true, true, true])

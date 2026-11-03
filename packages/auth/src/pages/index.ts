@@ -11,7 +11,6 @@ import { resolve } from 'node:path'
 import { appModules, configError } from 'kay/library'
 import { pickLocale } from '../locale'
 import { buildOwn, MAIL_EXTENSION, ownEnv } from '../own'
-import { dropNestedMain } from './main'
 
 export interface AuthPagesOptions {
   // Where the pages are served, `/auth` by default, beside kayjs-auth's own routes: `/auth/sign-in`. `createAuth` reads it when `auth()` loads it with `module`.
@@ -60,6 +59,8 @@ export interface ProfileOptions<Field extends string = string> {
 export interface AuthPagesConfig extends AuthPagesOptions {
   // The "keep me signed in" choice of the sign-in and register pages: `'checkbox'` shows a box that decides (unchecked is the same short session by every way of signing in, OAuth and passkeys included), `'always'` hides it and keeps every sign-in `remember.maxAge`, `'never'` hides it and ends every session with the browser. `'checkbox'` by default.
   remember?: RememberMode | undefined
+  // Whether the prebuilt pages write their content in a `main` landmark, `true` by default. `false` for an app whose layout already wraps its pages in one, so a page holds a single `main`.
+  main?: boolean | undefined
   // Extra fields on the account page's profile form, with where they are read and stored.
   profile?: ProfileOptions | undefined
 }
@@ -106,7 +107,7 @@ export interface AuthFeatures {
   // Where a sign-in that failed goes, and where a guard sends an anonymous visitor once the prebuilt pages are on.
   signInPage: string
   // The prebuilt pages' prefix and home; null without them.
-  pages: { prefix: string, home: string, remember: RememberMode } | null
+  pages: { prefix: string, home: string, remember: RememberMode, main: boolean } | null
   // The password and username limits, for a page or an island to show and check with: `passwordProblem(value, features.rules)`. The password rule's `check` stays on the server and in the app's own `rules`.
   rules: { password: { min: number, max: number }, username: { min: number, max: number } }
 }
@@ -115,9 +116,6 @@ export const DEFAULT_PREFIX = '/auth'
 
 // The files an `auth()` with no module reads by convention: kay imports, bakes and reloads them.
 const APP_FILES = { hooks: 'src/auth.ts', mail: 'src/mail.ts' }
-
-// The prebuilt pages' `main` yields to the one an app's layout writes.
-const MAIN_HOOKS = { transformPage: dropNestedMain, transformServedPage: dropNestedMain }
 
 // The dev tool's Auth tab, which kay loads on dev pages.
 const DEV_TOOL = { module: `${import.meta.dir}/../devTool.ts` }
@@ -153,7 +151,7 @@ export function featuresOf(core: Core): AuthFeatures {
     organizations: core.organizations ? { roles: [...core.organizations.roles], owner: core.organizations.owner, manage: core.organizations.manage, grants: grantsOf(core.organizations) } : null,
     audit: core.audit !== undefined,
     rules: { password: { min: core.rules.password.min, max: core.rules.password.max }, username: { ...core.rules.username } },
-    pages: core.pages ? { prefix: core.pages.prefix, home: core.pages.home, remember: core.pages.remember } : null,
+    pages: core.pages ? { prefix: core.pages.prefix, home: core.pages.home, remember: core.pages.remember, main: core.pages.main } : null,
   }
 }
 
@@ -288,7 +286,7 @@ function ownAuth(options: OwnOptions): AuthPages {
     name: '@kaynooo/kayjs-auth',
     appFiles: APP_FILES,
     server: async app => (await build(app)).plugin,
-    ...options.pages !== false && { routes: { dir: `${import.meta.dir}/routes`, prefix }, ...MAIN_HOOKS },
+    ...options.pages !== false && { routes: { dir: `${import.meta.dir}/routes`, prefix } },
     ...viewerExtension(options.viewer),
     env: ownEnv(options),
     devTool: DEV_TOOL,
@@ -311,7 +309,7 @@ function moduleAuth(options: AuthExtensionOptions): AuthPages {
     name: '@kaynooo/kayjs-auth',
     ...module !== undefined && { serverModule: { path: module, export: 'auth', prepare: (exported: unknown) => pages ? authOfExport(exported, module)[PAGES_OF]?.adopt(given) : undefined } },
     ...module === undefined && server !== undefined && { server },
-    ...pages && { routes: { dir: `${import.meta.dir}/routes`, prefix }, ...MAIN_HOOKS },
+    ...pages && { routes: { dir: `${import.meta.dir}/routes`, prefix } },
     ...viewerExtension(viewer),
     devTool: DEV_TOOL,
     commands: COMMANDS,
@@ -325,13 +323,13 @@ function moduleAuth(options: AuthExtensionOptions): AuthPages {
 }
 
 // The prefix and home `createAuth` reads off its `pages` option.
-export function pagesOf(pages: boolean | AuthPagesConfig | undefined): { prefix: string, home: string, remember: RememberMode, profile?: ProfileOptions } | undefined {
+export function pagesOf(pages: boolean | AuthPagesConfig | undefined): { prefix: string, home: string, remember: RememberMode, main: boolean, profile?: ProfileOptions } | undefined {
   if (pages == null || pages === false)
     return undefined
 
   const options = pages === true ? {} : pages
 
-  return { prefix: options.prefix ?? DEFAULT_PREFIX, home: options.home ?? '/', remember: options.remember ?? 'checkbox', ...options.profile && { profile: options.profile } }
+  return { prefix: options.prefix ?? DEFAULT_PREFIX, home: options.home ?? '/', remember: options.remember ?? 'checkbox', main: options.main ?? true, ...options.profile && { profile: options.profile } }
 }
 
 // The label of a profile field in `locale`: a plain string as it is, a map by locale tag the entry matching `locale` exactly or by language, else the first.

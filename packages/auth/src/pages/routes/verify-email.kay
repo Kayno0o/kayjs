@@ -44,10 +44,11 @@ const refused = verify.failed()?.data?.error
 const codeError = code.failed()?.data?.error
 const resendError = resend.failed()?.data?.error
 const resent = resend.succeeded() !== undefined
+const landmark = ctx.locals.auth.features().pages?.main !== false
 ---
 head
   title {wording('auth.verify.title', 'Verify your address')}
-Panel(title={wording('auth.verify.title', 'Verify your address')})
+Panel(landmark={landmark} title={wording('auth.verify.title', 'Verify your address')})
   if token
     form.flex.flex-col.gap-3(action={verify})
       input(type="hidden" name="token" value={token})

@@ -25,10 +25,11 @@ if (!ctx.locals.auth.features().magicLink)
 
 const token = ctx.url.searchParams.get('token') ?? spend.failed()?.values.token
 const error = spend.failed()?.data?.error
+const landmark = ctx.locals.auth.features().pages?.main !== false
 ---
 head
   title {wording('auth.magic.title', 'Sign in')}
-Panel(title={wording('auth.magic.title', 'Sign in')})
+Panel(landmark={landmark} title={wording('auth.magic.title', 'Sign in')})
   if token
     form.flex.flex-col.gap-3(action={spend})
       input(type="hidden" name="token" value={token})

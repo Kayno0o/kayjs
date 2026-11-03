@@ -66,10 +66,11 @@ const codeError = emailCode.failed()?.data?.error
 const mailedTo = magicLink.succeeded()?.data
 const { askRemember, providerLinks } = rememberOf(features, redirect, provider => wording('auth.signIn.provider', 'Continue with {provider}', { provider }), features.providers)
 const codes = features.codes?.['magic-link'] ?? 'link'
+const landmark = ctx.locals.auth.features().pages?.main !== false
 ---
 head
   title {wording('auth.signIn.title', 'Sign in')}
-Panel(title={wording('auth.signIn.title', 'Sign in')})
+Panel(landmark={landmark} title={wording('auth.signIn.title', 'Sign in')})
   if oauthError
     Message(text={oauthError})
   if features.providers.length > 0

@@ -101,7 +101,7 @@ A plain Elysia app, or one mounting the plugin by hand, gives `auth({ plugin: fa
 - A provider's button reads its `label`, set on each preset (`GitHub`, `Google`) and overridden by `oauth.<name>.label`.
 - The pages render with the app's own kayjs-ui, which with Tailwind and `@iconify-json/tabler` the app keeps; kayjs-auth and kayjs-ui are released with kay at its version and peer on kay's minor, so the app moves them together.
 
-Each prebuilt page writes its content in a `main` landmark; under a layout that already writes a `main`, the page's becomes a `div`, so a page never holds two.
+Each prebuilt page writes its content in a `main` landmark; `pages: { main: false }` (`auth({ pages: { main: false } })`) writes a `div` instead, for an app whose layout already writes a `main`.
 
 `auth.features()` tells any page, prebuilt or the app's own, what the config enables: `{ providers: [{ name, label }], email, codes, signUp, requireVerified, passkeys, password, magicLink, twoFactor, captcha, scopes, prefix, oauthServer, signInPage, pages }`, `captcha` being the widget, `'proof-of-work'` or null.
 

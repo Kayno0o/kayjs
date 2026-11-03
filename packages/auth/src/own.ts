@@ -57,7 +57,7 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
   // Where the OAuth and page routes live, `/auth` by default.
   prefix?: Prefix | undefined
   // The prebuilt pages are served by default; `false` leaves them out, an object tunes them (`remember`, `profile`).
-  pages?: boolean | Pick<AuthPagesConfig, 'profile' | 'remember'> | undefined
+  pages?: boolean | Pick<AuthPagesConfig, 'profile' | 'remember' | 'main'> | undefined
   // The session cookie's name, `kay_session` by default; kay names it `__Host-` first over https unless `forwardAuth` shares it under a domain.
   cookie?: string | undefined
   // Providers by the name their routes take: `{ github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (a preset: github, discord, google, microsoft or gitlab), an object adds options to a preset, and a full `OAuthApp` is an app of any provider.

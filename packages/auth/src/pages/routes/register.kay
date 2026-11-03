@@ -45,10 +45,11 @@ const refused = register.failed()?.data
 const fields = refused && 'fields' in refused ? refused.fields : {}
 const error = refusal(register.failed(), features.captcha)
 const verify = register.succeeded() !== undefined
+const landmark = ctx.locals.auth.features().pages?.main !== false
 ---
 head
   title {wording('auth.register.title', 'Create an account')}
-Panel(title={wording('auth.register.title', 'Create an account')})
+Panel(landmark={landmark} title={wording('auth.register.title', 'Create an account')})
   if verify
     Message(tone="success" text={wording('auth.register.checkMail', 'Check your mail to continue.')})
   else

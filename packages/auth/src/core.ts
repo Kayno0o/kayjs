@@ -123,7 +123,7 @@ export interface Core {
   ownSignInPage?: string | undefined
   twoFactorPage: string
   // The prebuilt pages' prefix and home, with the `pages` option.
-  pages?: { prefix: string, home: string, remember: RememberMode, profile?: ProfileOptions | undefined } | undefined
+  pages?: { prefix: string, home: string, remember: RememberMode, main: boolean, profile?: ProfileOptions | undefined } | undefined
   // The site's name, as mails and authenticators show it.
   name: string
   limits: Limits

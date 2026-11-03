@@ -1,0 +1,11 @@
+---
+const { size, gap, landmark = true } = props<{ size: string, gap: string, landmark?: boolean }>()
+const classes = `kayjs-auth mx-auto flex w-full ${size} flex-col ${gap} px-4 py-8`
+---
+// A prebuilt page's frame: a `main` landmark unless `pages.main` is false, for an app whose layout writes one.
+if landmark
+  main(class={classes})
+    slot
+else
+  div(class={classes})
+    slot
