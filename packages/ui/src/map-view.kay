@@ -199,7 +199,7 @@ onMount(() => {
 
     const now = ready.view.getCenter()
 
-    if (Math.abs(now.lat - next.center[0]) < 1e-6 && Math.abs(now.lng - next.center[1]) < 1e-6 && ready.view.getZoom() === next.zoom)
+    if (Math.abs(now.lat - (next.center[0] ?? Number.NaN)) < 1e-6 && Math.abs(now.lng - (next.center[1] ?? Number.NaN)) < 1e-6 && ready.view.getZoom() === next.zoom)
       return
 
     moved = true
