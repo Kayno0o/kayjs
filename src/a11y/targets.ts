@@ -1,5 +1,6 @@
 import type { KayConfig } from '../config'
 import { relative } from 'node:path'
+import { projectCollections } from '../content/server'
 import { projectPaths } from '../project'
 import { localeCopies, localeSettings, routedSettings } from '../server/i18n'
 import { registerLoader } from '../server/loader'
@@ -36,6 +37,8 @@ export async function pagesToAudit(root: string, config: KayConfig): Promise<{ t
   const skipped: Skipped[] = []
 
   await registerLoader(root, config.librarySettings ?? {})
+  // Sets where the collections' folders are read from, as the server does.
+  await projectCollections(root, config.contentConfig)
 
   for (const route of pages) {
     const file = relative(root, route.file)
