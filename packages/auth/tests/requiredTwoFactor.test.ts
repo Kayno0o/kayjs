@@ -1,21 +1,34 @@
 import type { GuardContext } from 'kay'
+import { createHash } from 'node:crypto'
 import { describe, expect, spyOn, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
 import { log } from '../src/log'
 import { memoryAuthStore } from '../src/memoryStore'
+import { auth as authPages } from '../src/pages'
 import { totpCode, totpStep } from '../src/totp'
 import { SECRET, testApp } from './helpers/app'
+import { authenticator } from './helpers/authenticator'
 
 const PASSWORD = 'correct horse battery'
 const HTML = { accept: 'text/html' }
+const JSON_ACCEPT = { accept: 'application/json' }
+const SECURITY = '/auth/account/security'
+const REDIRECT = 'http://127.0.0.1:33418/callback'
+const VERIFIER = 'v'.repeat(64)
+const CHALLENGE = createHash('sha256').update(VERIFIER).digest('base64url')
+
+interface Member {
+  browser: ReturnType<ReturnType<typeof testApp>['browser']>
+  id: string
+}
 
 function setup(options: Parameters<typeof testApp>[0] = {}) {
   const app = testApp({ site: 'https://app.example.test', pages: true, admin: 'admin', twoFactor: { require: ['admin'] }, ...options })
 
-  // A guard's verdict on the route asked, `x-options` its options as JSON: what it passed, redirected to or denied with.
-  app.app.get('/guarded', async ({ auth, request }) => {
+  // A guard cascade's verdict on the route asked, `x-guards` the options of each guard from the outermost: what it passed, redirected to or denied with.
+  const verdict = async ({ auth, request }: { auth: never, request: Request }) => {
     const url = new URL(request.url)
     const context = {
       request,
@@ -31,15 +44,34 @@ function setup(options: Parameters<typeof testApp>[0] = {}) {
     } as unknown as GuardContext
 
     try {
-      await auth.guarded(context, JSON.parse(request.headers.get('x-options') ?? '{}'))
+      for (const guard of JSON.parse(request.headers.get('x-guards') ?? '[{}]') as object[])
+        await (auth as { guarded: (ctx: GuardContext, options: object) => Promise<void> }).guarded(context, guard)
 
       return 'passed'
     }
     catch (outcome) {
       return (outcome as Error).message
     }
-  })
-  app.app.use(new Elysia().use(app.auth.gate()).get('/gated', () => 'in').get('/gated-editor', () => 'in', { auth: 'editor' }))
+  }
+
+  for (const path of ['/g/page', '/g/auth/account/security', '/g/auth/two-factor', '/fr/g/auth/account/security', '/g/own/security'])
+    app.app.get(path, verdict as never).post(path, verdict as never)
+
+  app.app.use(new Elysia().use(app.auth.gate()).get('/gated', () => 'in').get('/gated-editor', () => 'in', { auth: 'editor' }).get('/gated/auth/account/security', () => 'in').get('/gated/auth/two-factor', () => 'in'))
+  const adminPage = async ({ auth }: { auth: { requireAdmin: () => Promise<unknown> } }) => {
+    try {
+      await auth.requireAdmin()
+    }
+    catch (outcome) {
+      const stopped = outcome as { location?: string, status?: number }
+
+      return stopped.location ?? `deny ${stopped.status}`
+    }
+
+    return 'admin'
+  }
+
+  app.app.get('/admin-page', adminPage as never).post('/admin-page', adminPage as never)
 
   async function member(roles: ('admin' | 'editor')[], enrolled: 'none' | 'pending' | 'done' = 'none') {
     const made = await app.auth.admin.createUser({ password: PASSWORD, emailVerified: true, email: `${roles.join('-') || 'plain'}-${Math.random().toString(36).slice(2)}@example.com`, roles })
@@ -61,54 +93,128 @@ function setup(options: Parameters<typeof testApp>[0] = {}) {
     return { browser, id: made.user.id }
   }
 
-  const guarded = async (who: Awaited<ReturnType<typeof member>>, options: object = {}, headers: Record<string, string> = HTML) => (await who.browser.fetch('/guarded', { headers: { ...headers, 'x-options': JSON.stringify(options) } })).text()
+  const guarded = async (who: Member, guards: object[] = [{}], path = '/g/page', headers: Record<string, string> = HTML) => (await who.browser.fetch(path, { headers: { ...headers, 'x-guards': JSON.stringify(guards) } })).text()
 
   return { ...app, member, guarded }
 }
 
-describe('twoFactor.require', () => {
-  test('a guard sends a user lacking it to the security page when opening a page, and denies any other request', async () => {
+describe('twoFactor.require in guards', () => {
+  test('sends a page opening to the security page and back, and denies any other request', async () => {
     const { member, guarded } = setup()
     const admin = await member(['admin'])
 
-    expect(await guarded(admin)).toBe('redirect /auth/account/security?redirect=%2Fguarded')
-    expect(await guarded(admin, {}, { accept: 'application/json' })).toBe('deny 403')
-    expect(await guarded(admin, { require: 'admin' })).toBe('redirect /auth/account/security?redirect=%2Fguarded')
+    expect(await guarded(admin)).toBe(`redirect ${SECURITY}?redirect=%2Fg%2Fpage`)
+    expect(await guarded(admin, [{ require: 'admin' }])).toBe(`redirect ${SECURITY}?redirect=%2Fg%2Fpage`)
+    expect(await guarded(admin, [{}], '/g/page', JSON_ACCEPT)).toBe('deny 403')
+    expect((await admin.browser.fetch('/g/page', { method: 'POST', headers: { 'x-guards': '[{}]' } })).status).toBe(200)
+    expect(await (await admin.browser.fetch('/g/page', { method: 'POST', headers: { 'x-guards': '[{}]' } })).text()).toBe('deny 403')
+  })
+
+  test('keeps the query of the page asked for', async () => {
+    const { member } = setup()
+    const admin = await member(['admin'])
+    const answer = await (await admin.browser.fetch('/g/page?tab=2', { headers: { ...HTML, 'x-guards': '[{}]' } })).text()
+
+    expect(answer).toBe(`redirect ${SECURITY}?redirect=%2Fg%2Fpage%3Ftab%3D2`)
   })
 
   test('a user mid-enrolment still lacks it, one who finished passes', async () => {
     const { member, guarded } = setup()
-    const pending = await member(['admin'], 'pending')
-    const done = await member(['admin'], 'done')
 
-    expect(await guarded(pending)).toContain('redirect /auth/account/security')
-    expect(await guarded(done)).toBe('passed')
+    expect(await guarded(await member(['admin'], 'pending'))).toContain(`redirect ${SECURITY}`)
+    expect(await guarded(await member(['admin'], 'done'))).toBe('passed')
   })
 
-  test('a user the requirement does not name is not asked', async () => {
-    const { member, guarded } = setup()
+  test('a user the requirement does not name is not asked, a list names any of its entries', async () => {
+    const { member, guarded } = setup({ twoFactor: { require: ['editor', 'admin'] } })
 
-    expect(await guarded(await member(['editor']))).toBe('passed')
+    expect(await guarded(await member(['editor']))).toContain('redirect')
     expect(await guarded(await member([]))).toBe('passed')
   })
 
-  test('the guard decides for itself: true asks everyone, false no one', async () => {
+  test('a guard can ask everyone with twoFactor: true', async () => {
     const { member, guarded } = setup()
-    const editor = await member(['editor'])
-    const admin = await member(['admin'])
 
-    expect(await guarded(editor, { twoFactor: true })).toContain('redirect /auth/account/security')
-    expect(await guarded(admin, { twoFactor: false })).toBe('passed')
+    expect(await guarded(await member(['editor']), [{ twoFactor: true }])).toContain(`redirect ${SECURITY}`)
+    expect(await guarded(await member(['editor']))).toBe('passed')
   })
 
-  test('a predicate names who is asked, an organization role included', async () => {
-    const { member, guarded } = setup({ twoFactor: { require: user => user !== null && user.email?.startsWith('editor') === true } })
+  test('the security page and the second-factor page pass whatever guards run, nested ones included', async () => {
+    const { member, guarded } = setup()
+    const admin = await member(['admin'])
+
+    for (const path of ['/g/auth/account/security', '/g/auth/two-factor', '/fr/g/auth/account/security'])
+      expect(await guarded(admin, [{ redirect: '/login' }, { require: 'admin', twoFactor: true }], path)).toBe('passed')
+
+    expect(await guarded(admin, [{}, { require: 'admin' }], '/g/page')).toContain('redirect')
+  })
+
+  test('an app with its own security page is sent there, and reaches it', async () => {
+    const { member, guarded } = setup({ pages: false, securityPage: '/own/security' })
+    const admin = await member(['admin'])
+
+    expect(await guarded(admin)).toBe('redirect /own/security?redirect=%2Fg%2Fpage')
+    expect(await guarded(admin, [{ twoFactor: true }], '/g/own/security')).toBe('passed')
+  })
+
+  test('an app with no security page gets the 403', async () => {
+    const { member, guarded } = setup({ pages: false })
+
+    expect(await guarded(await member(['admin']))).toBe('deny 403')
+  })
+
+  test('a predicate names who is asked, a throwing one fails the request closed', async () => {
+    const { member, guarded } = setup({ twoFactor: { require: user => user?.email?.startsWith('editor') === true } })
 
     expect(await guarded(await member(['editor']))).toContain('redirect')
     expect(await guarded(await member(['admin']))).toBe('passed')
+
+    const broken = setup({ twoFactor: { require: () => {
+      throw new Error('boom')
+    } } })
+
+    expect(await broken.guarded(await broken.member([]))).toBe('boom')
   })
 
-  test('a gate denies it with a 403, a bearer token as the user it holds', async () => {
+  test('without it every guard stays as it was, and twoFactor: false switches it off', async () => {
+    expect(await setup({ twoFactor: undefined }).guarded(await setup({ twoFactor: undefined }).member(['admin']))).toBe('passed')
+
+    const off = setup({ twoFactor: false })
+
+    expect(await off.guarded(await off.member(['admin']))).toBe('passed')
+  })
+
+  test('a passkey sign-in counts as two factors, a password session does not', async () => {
+    const { auth, app, browser, guarded } = setup({ site: 'https://site.test' })
+    const made = await auth.admin.createUser({ password: PASSWORD, emailVerified: true, email: 'pk@example.com', roles: ['admin'] })
+
+    if (!made.ok)
+      throw new Error('no user')
+
+    const device = authenticator()
+    const owner = browser()
+
+    await owner.post(`/sign-in/${made.user.id}`, {})
+
+    const { options } = await owner.callOk('passkeys.registrationOptions', { password: PASSWORD })
+
+    await owner.callOk('passkeys.register', await device.create(options), 'key')
+
+    const viaPassword = { browser: owner, id: made.user.id }
+    const viaPasskey = { browser: browser(), id: made.user.id }
+
+    expect(await guarded(viaPassword)).toContain('redirect')
+
+    const challenge = await viaPasskey.browser.call('passkeys.signInOptions')
+
+    expect(await viaPasskey.browser.call('passkeys.signIn', await device.get(challenge))).toMatchObject({ ok: true })
+    expect(await guarded(viaPasskey)).toBe('passed')
+    expect(app).toBeDefined()
+  })
+})
+
+describe('twoFactor.require in gates', () => {
+  test('denies with a 403, a bearer token as the user it holds, and never the enrolment pages', async () => {
     const { auth, member, browser } = setup()
     const admin = await member(['admin'])
     const done = await member(['admin'], 'done')
@@ -116,6 +222,8 @@ describe('twoFactor.require', () => {
     expect((await admin.browser.fetch('/gated')).status).toBe(403)
     expect((await done.browser.fetch('/gated')).status).toBe(200)
     expect((await admin.browser.fetch('/gated-editor')).status).toBe(403)
+    expect((await admin.browser.fetch('/gated/auth/account/security')).status).toBe(200)
+    expect((await admin.browser.fetch('/gated/auth/two-factor')).status).toBe(200)
 
     const issued = await auth.issueToken(admin.id, 'device')
 
@@ -124,69 +232,108 @@ describe('twoFactor.require', () => {
 
     expect((await browser().fetch('/gated', { headers: { authorization: `Bearer ${issued.token}` } })).status).toBe(403)
   })
+})
 
-  test('a user signed in by a passkey alone lacks it, as the passkey is no authenticator app', async () => {
-    const { member, guarded, store } = setup()
-    const admin = await member(['admin'])
-    const record = await store.users.get(admin.id)
-
-    expect(record?.totpEnabledAt).toBeNull()
-    expect(await guarded(admin)).toContain('redirect')
-  })
-
-  test('admin methods answer two-factor-required, every one of them', async () => {
+describe('twoFactor.require in the admin pages', () => {
+  test('every admin method answers two-factor-required', async () => {
     const { member } = setup()
     const admin = await member(['admin'])
     const other = await member([])
+    const call = admin.browser.call.bind(admin.browser) as (path: string, ...args: unknown[]) => Promise<unknown>
 
     for (const [method, args] of [['listUsers', []], ['getUser', [other.id]], ['grantRole', [other.id, 'editor']], ['revokeRole', [other.id, 'editor']], ['ban', [other.id]], ['unban', [other.id]], ['deleteUser', [other.id]], ['impersonate', [other.id]], ['auditLog', []]] as const)
-      expect(await (admin.browser.call as (path: string, ...args: unknown[]) => Promise<unknown>)(`admin.${method}`, ...args)).toEqual({ ok: false, error: 'two-factor-required' })
+      expect(await call(`admin.${method}`, ...args)).toEqual({ ok: false, error: 'two-factor-required' })
   })
 
-  test('admin methods work once it is on', async () => {
+  test('the admin methods work once it is on', async () => {
     const { member } = setup()
     const admin = await member(['admin'], 'done')
 
     expect((await admin.browser.call('admin.listUsers') as { ok: boolean }).ok).toBe(true)
   })
 
-  test('requireAdmin sends a page opening to the security page', async () => {
-    const { app, member } = setup()
-
-    app.get('/admin-page', async ({ auth }) => {
-      try {
-        await auth.requireAdmin()
-      }
-      catch (outcome) {
-        return (outcome as { location?: string }).location ?? 'denied'
-      }
-
-      return 'admin'
-    })
-
+  test('requireAdmin sends a page opening to the security page, and answers anything else with a 403', async () => {
+    const { member } = setup()
     const admin = await member(['admin'])
-    const response = await admin.browser.fetch('/admin-page', { headers: HTML })
 
-    expect(await response.text()).toBe('/auth/account/security?redirect=%2Fadmin-page')
+    expect(await (await admin.browser.fetch('/admin-page', { headers: HTML })).text()).toBe(`${SECURITY}?redirect=%2Fadmin-page`)
+    expect(await (await admin.browser.fetch('/admin-page', { headers: JSON_ACCEPT })).text()).toBe('deny 403')
+    expect(await (await admin.browser.fetch('/admin-page', { method: 'POST', headers: HTML })).text()).toBe('deny 403')
   })
 
-  test('without it every guard, gate and admin stays as it was', async () => {
-    const { member, guarded } = setup({ twoFactor: undefined })
-    const admin = await member(['admin'])
+  test('an admin acting as another user is not asked, the user alone is', async () => {
+    const { member, guarded, browser, auth } = setup({ twoFactor: { require: () => true } })
+    const admin = await member(['admin'], 'done')
+    const target = await auth.admin.createUser({ password: PASSWORD, emailVerified: true, email: 'target@example.com' })
 
+    if (!target.ok)
+      throw new Error('no user')
+
+    expect(await admin.browser.call('admin.impersonate', target.user.id)).toEqual({ ok: true })
     expect(await guarded(admin)).toBe('passed')
-    expect((await admin.browser.call('admin.listUsers') as { ok: boolean }).ok).toBe(true)
+    expect(await admin.browser.call('admin.stopImpersonating')).toBe(true)
+
+    const alone = browser()
+
+    await alone.post(`/sign-in/${target.user.id}`, {})
+    expect(await guarded({ browser: alone, id: target.user.id })).toContain('redirect')
+  })
+})
+
+describe('twoFactor.require in OAuth consent', () => {
+  function server() {
+    return testApp({ site: 'http://localhost', pages: authPages({ plugin: false }), scopes: ['posts:read'], admin: 'admin', twoFactor: { require: ['admin'] }, oauthServer: { fetch: async () => new Response('missing', { status: 404 }) } })
+  }
+
+  async function consent(roles: ('admin' | 'editor')[], enrolled: boolean) {
+    const app = server()
+    const registered = await (await app.browser().fetch('/auth/oauth/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'Client', redirect_uris: [REDIRECT] }) })).json() as { client_id: string }
+    const made = await app.auth.admin.createUser({ password: PASSWORD, emailVerified: true, email: 'oauth@example.com', roles })
+
+    if (!made.ok)
+      throw new Error('no user')
+
+    const ada = app.browser()
+
+    await ada.post(`/sign-in/${made.user.id}`, {})
+
+    if (enrolled) {
+      const set = await ada.callOk('twoFactor.setUp', { password: PASSWORD })
+
+      await ada.callOk('twoFactor.enable', await totpCode(set.setup.secret, totpStep()))
+    }
+
+    const request = { client_id: registered.client_id, redirect_uri: REDIRECT, response_type: 'code', code_challenge: CHALLENGE, code_challenge_method: 'S256', scope: 'posts:read', state: 'abc' }
+
+    return { ada, request }
+  }
+
+  test('refuses an admin lacking it with access_denied, at the endpoint and at the decision', async () => {
+    const { ada, request } = await consent(['admin'], false)
+    const outcome = await ada.post('/call/oauthServer.authorize', [request]) as { kind: string, url: string }
+
+    expect(outcome.kind).toBe('redirect')
+    expect(new URL(outcome.url).searchParams.get('error')).toBe('access_denied')
+
+    const decided = await ada.post('/call/oauthServer.decide', [request, true]) as { ok: true, redirect: string }
+
+    expect(new URL(decided.redirect).searchParams.get('error')).toBe('access_denied')
+    expect(new URL(decided.redirect).searchParams.get('code')).toBeNull()
   })
 
-  test('twoFactor: false switches the requirement off with the feature', async () => {
-    const { member, guarded } = setup({ twoFactor: false })
+  test('lets through one it does not name, or who has it', async () => {
+    for (const [roles, enrolled] of [[['editor'], false], [['admin'], true]] as const) {
+      const { ada, request } = await consent([...roles], enrolled)
+      const decided = await ada.post('/call/oauthServer.decide', [request, true]) as { redirect: string }
 
-    expect(await guarded(await member(['admin']))).toBe('passed')
+      expect(new URL(decided.redirect).searchParams.get('code')).not.toBeNull()
+    }
   })
 })
 
 describe('the boot warning', () => {
   const make = (twoFactor?: boolean | { require: 'admin'[] }) => createAuth({ sessions: session({ secret: SECRET }), secret: SECRET, store: memoryAuthStore(), roles: { admin: [] }, admin: 'admin', ...twoFactor === undefined ? {} : { twoFactor } })
+  const told = (warned: { mock: { calls: unknown[][] } }) => warned.mock.calls.filter(([message]) => String(message).includes('twoFactor.require')).length
 
   test('warns in production when admin is on and no requirement names it', () => {
     const was = process.env.NODE_ENV
@@ -195,14 +342,12 @@ describe('the boot warning', () => {
     process.env.NODE_ENV = 'production'
 
     try {
-      const told = () => warned.mock.calls.filter(([message]) => String(message).includes('twoFactor.require')).length
-
       make()
-      expect(told()).toBe(1)
+      expect(told(warned)).toBe(1)
 
       make({ require: ['admin'] })
       make(false)
-      expect(told()).toBe(1)
+      expect(told(warned)).toBe(1)
     }
     finally {
       if (was === undefined)
@@ -218,7 +363,7 @@ describe('the boot warning', () => {
     const warned = spyOn(log, 'warn').mockImplementation(() => undefined)
 
     make()
-    expect(warned.mock.calls.filter(([message]) => String(message).includes('twoFactor.require'))).toEqual([])
+    expect(told(warned)).toBe(0)
     warned.mockRestore()
   })
 })

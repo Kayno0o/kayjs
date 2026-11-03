@@ -38,6 +38,7 @@ import { noteSignIn, notify } from './notify'
 import { featuresOf } from './pages'
 import { completeSignIn, provedLately, reprove } from './proof'
 import { pruneWhenDue } from './prune'
+import { sendToEnrolment } from './requiredTwoFactor'
 import { createRoleHierarchy } from './roles'
 import { applyLifetime, chooseRemember, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { registerViewer } from './viewer'
@@ -330,19 +331,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (acting.ok)
       return user
 
-    return acting.error === 'two-factor-required' ? this.twoFactorRequired() : stoppers(this.request).deny(403)
-  }
-
-  // A page opening goes to the security page to turn two-factor on, coming back after; anything else, and an app with no such page, gets the 403.
-  private twoFactorRequired(): never {
-    const { redirect, deny } = stoppers(this.request)
-    const { securityPage } = this.core
-
-    if (securityPage !== undefined && isNavigation(this.request))
-      // kay-allow external-redirect: the app's own security page, the visited path rides in its query
-      redirect(withBack(securityPage, new URL(this.request.url).pathname))
-
-    return deny(403, 'Two-factor authentication is required')
+    return acting.error === 'two-factor-required' ? sendToEnrolment(this.core, this.request, stoppers(this.request)) : stoppers(this.request).deny(403)
   }
 
   // The `guard()` of kayjs-auth, for a `_guard.ts` that cannot import the `createAuth` result: the guard of the one behind this request.
@@ -575,7 +564,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
     const session = await openSession(this.core, record, this[STATE].address, this[STATE].userAgent, await applyLifetime(this[STATE], remember))
 
-    await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: Date.now(), session })
+    await this.session.set('auth', { user: record.id, version: record.sessionVersion, at: Date.now(), session, ...method === 'passkey' && { passkey: true } })
     this.source = 'session'
     this.resolving = Promise.resolve(record)
     // Browser-only (`remember: false`) leaves it a session cookie like the session's; else it lasts as long as the session can, since the session's own cookie is renewed with use.

@@ -2,20 +2,20 @@ import type { Guard } from 'kay'
 import type { BareUser, Core } from './core'
 import type { ScopeRequirement } from './gate'
 import type { AuthRequirement } from './request'
-import type { Predicate } from './types'
+import type { PolicyContext, Predicate } from './types'
 import { READ_METHODS } from 'kay/library'
 import { guardPageOf, isNavigation, withBack } from './core'
 import { createGate, scopeAllows } from './gate'
 import { load } from './load'
-import { authOf } from './request'
-import { lacksTwoFactor } from './requiredTwoFactor'
+import { authOf, STATE } from './request'
+import { lacksTwoFactor, sendToEnrolment } from './requiredTwoFactor'
 
 export interface RouteGuardOptions<Role extends string, Scope extends string> {
   redirect?: string | undefined
   require?: AuthRequirement<Role> | undefined
   scope?: ScopeRequirement<Scope> | undefined
-  // true asks every user this guard lets through for two-factor, false asks none (for the app's own security page), and left out `twoFactor.require` of the app decides.
-  twoFactor?: boolean | undefined
+  // true asks every user this guard lets through for two-factor; left out, `twoFactor.require` of the app decides. The security page and the second-factor page are never held back, whatever guard runs.
+  twoFactor?: true | undefined
 }
 
 const signedIn: Predicate<BareUser> = user => user !== null
@@ -44,13 +44,8 @@ export function guardOf<Role extends string, Scope extends string>(core: Core, o
     if (!scopeAllows(await authOf(ctx.locals).scopes(), options.scope))
       ctx.deny(403)
 
-    if (user !== null && await lacksTwoFactor(core, user, options.twoFactor, { params: ctx.params })) {
-      if (core.securityPage !== undefined && isNavigation(ctx.request))
-        // kay-allow external-redirect: the app's own security page, the visited path rides in its query
-        ctx.redirect(withBack(core.securityPage, ctx.url.pathname + ctx.url.search))
-
-      ctx.deny(403, 'Two-factor authentication is required')
-    }
+    if (user !== null && await lacksTwoFactor(authOf(ctx.locals)[STATE], user, { wanted: options.twoFactor, path: ctx.url.pathname, ctx: { params: ctx.params } }))
+      sendToEnrolment(core, ctx.request, ctx)
   }
 }
 
@@ -58,8 +53,9 @@ export function guardOf<Role extends string, Scope extends string>(core: Core, o
 export function gateOf<Role extends string, Scope extends string>(core: Core, options: { require?: AuthRequirement<Role>, scope?: ScopeRequirement<Scope> }) {
   return createGate<BareUser, Role, Scope>({
     principal: async ctx => authOf(ctx).bareUser(),
-    // A user lacking the two-factor the app asks of them is denied like one missing a role.
-    authorize: async (user, requirement, level, ctx) => await core.access.authorize(user, requirement, level, ctx) && !(user !== null && await lacksTwoFactor(core, user, undefined, ctx)),
+    authorize: core.access.authorize,
+    // A user lacking the two-factor the app asks of them is denied like one missing a role, bar the library's own enrolment pages.
+    refuse: async (ctx, user) => lacksTwoFactor(authOf(ctx)[STATE], user, { path: new URL((ctx as { request: Request }).request.url).pathname, ctx: { params: (ctx as PolicyContext).params, body: (ctx as PolicyContext).body, query: (ctx as PolicyContext).query } }),
     defaultRequirement: options.require ?? signedIn,
     scopes: async ctx => authOf(ctx).scopes(),
     defaultScope: options.scope,

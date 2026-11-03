@@ -421,7 +421,11 @@ Turning `twoFactor` off only stops new users from setting it up. A user who alre
 
 To make it a must, give `twoFactor: { require: ['admin'] }`, which takes what a guard's `require` takes.
 
-A user it names who has not turned it on is sent to the security page by `guard()`, `auth.gate()` and `requireAdmin()`, gets a 403 from anything that is not a page, and every `auth.admin` method answers `{ ok: false, error: 'two-factor-required' }`. `guard({ twoFactor: false })` leaves your own security page open to them. In production kayjs-auth warns at boot when `admin` is on and nothing requires it.
+A user it names who has not turned it on is sent to the security page by `guard()` and `requireAdmin()`, and comes back once it is on. Anything that is not a page gets a 403, and a gate only ever answers 403.
+
+Every `auth.admin` method answers `{ ok: false, error: 'two-factor-required' }`, and OAuth consent answers `access_denied`. The security page and the second-factor page are never held back, and `securityPage` names your own.
+
+A passkey sign-in counts as two factors, a password or OAuth session does not. An admin acting as a user is not asked. A predicate that throws fails the request with a 500. In production kayjs-auth warns at boot when `admin` is on and nothing requires it.
 
 A way in that is switched off no longer counts as one when kayjs-auth checks that a user keeps another: with `password: false`, a user cannot unlink their last provider because they have a password.
 
@@ -525,7 +529,7 @@ A deleted user's entries stay, but nothing in them leads back to the person.
 
 ## Admin
 
-`admin: 'admin'` names who may manage users. It takes any requirement a guard takes. Without it, every method below answers `{ ok: false, error: 'forbidden' }`.
+`admin: 'admin'` names who may manage users. It takes any requirement a guard takes. Without it, every method below answers `{ ok: false, error: 'forbidden' }`. An admin whom `twoFactor.require` names and who has none answers `two-factor-required`.
 
 ```ts
 const found = await auth.admin.listUsers({ search: 'ada', limit: 20 })

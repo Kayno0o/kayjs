@@ -11,6 +11,8 @@ export type ScopeRequirement<S extends string> = S | S[] | false
 export interface GateDeps<P, G extends string, S extends string = string> {
   principal: (ctx: object) => Promise<P | null>
   authorize: (principal: P | null, requirement: Requirement<P, G>, level: Level, ctx: PolicyContext) => Promise<boolean>
+  // Whether a principal who met the requirement is refused all the same, with a 403: for a condition of the principal rather than of the route, such as a missing second factor.
+  refuse?: ((ctx: object, principal: P) => Promise<boolean>) | undefined
   // Applied to routes with no `auth:`, so a route that forgets one stays closed.
   defaultRequirement: Requirement<P, G>
   // The scopes of the bearer token a request came with; null for a session, or a token with every scope.
@@ -77,6 +79,12 @@ export function createGate<P, G extends string, S extends string = string>(deps:
           ctx.set.status = user === null ? 401 : 403
 
           return user === null ? 'Unauthorized' : 'Forbidden'
+        }
+
+        if (user !== null && await deps.refuse?.(ctx, user)) {
+          ctx.set.status = 403
+
+          return 'Forbidden'
         }
 
         (ctx[DECIDED] ??= new Set()).add(requirement)

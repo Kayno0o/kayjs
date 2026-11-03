@@ -1,4 +1,5 @@
 --- server
+import { localPath } from 'kay'
 import { formatDate } from 'kay/i18n'
 import { wording } from 'kay/words'
 import Message from '../../components/message.kay'
@@ -80,6 +81,12 @@ const setupUri = setUp.succeeded()?.data ?? enable.failed()?.values.uri
 const setupKey = setupUri && new URL(setupUri).searchParams.get('secret')
 const twoFactorError = setUp.failed()?.data?.error ?? enable.failed()?.data?.error ?? regenerate.failed()?.data?.error ?? disable.failed()?.data?.error
 const recoveryCodes = enable.succeeded()?.data ?? regenerate.succeeded()?.data
+// Where a guard sent the user from to turn two-factor on: back there once it is on and its recovery codes were seen.
+const back = localPath(ctx.url.searchParams.get('redirect'), '')
+
+if (back !== '' && user.twoFactor && !recoveryCodes)
+  ctx.redirect(back)
+
 const codesLeft = user.twoFactor ? await auth.twoFactor.recoveryCodesLeft() : 0
 const passkeys = features.passkeys ? await auth.passkeys.list() : []
 const removeRefused = removePasskey.failed()?.data
@@ -105,6 +112,8 @@ if features.twoFactor || user.twoFactor
     .flex.flex-col.gap-3
       if recoveryCodes
         RecoveryCodes(codes={recoveryCodes})
+        if back !== ''
+          a(href={back}) {wording('auth.account.twoFactor.continue', 'Continue')}
       if twoFactorError
         Message(text={failure(twoFactorError)})
       if user.twoFactor

@@ -69,7 +69,7 @@ export async function askingAdmin(state: RequestState): Promise<{ ok: true, acto
   if (!actor)
     return { ok: false, error: 'forbidden' }
 
-  return await lacksTwoFactor(state.core, publicUser(actor)) ? { ok: false, error: 'two-factor-required' } : { ok: true, actor }
+  return await lacksTwoFactor(state, publicUser(actor)) ? { ok: false, error: 'two-factor-required' } : { ok: true, actor }
 }
 
 export async function isAdmin(state: RequestState, record: UserRecord): Promise<boolean> {

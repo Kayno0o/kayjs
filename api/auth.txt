@@ -185,7 +185,7 @@ class Auth
   redirect?: string | undefined;
   require?: Requirement<BareUser<Record<string, unknown>>, string> | undefined;
   scope?: string | false | string[] | undefined;
-  twoFactor?: boolean | undefined;
+  twoFactor?: true | undefined;
 }) => Promise<void>
   hasScope: (scope: Scope) => Promise<boolean>
   impersonator: () => Promise<User<Record<string, unknown>> | null>
@@ -238,7 +238,6 @@ class Auth
   tokenScopes: string[] | null
   tokens: TokenMethods<Scope>
   twoFactor: TwoFactorMethods
-  twoFactorRequired: () => never
   unlink: (provider: string, proof: Proof) => Promise<UnlinkResult>
   updateLocale: (locale: string) => Promise<UpdateLocaleResult>
   user: () => Promise<User<UserData> | null>
@@ -351,6 +350,7 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   rules?: CredentialRules | undefined
   scopes?: readonly Scope[] | undefined
   secret?: string | string[] | undefined
+  securityPage?: string | undefined
   sessions: SessionPlugin<Data>
   sessionsPage?: string | undefined
   signInPage?: string | undefined
@@ -1067,6 +1067,7 @@ interface GateDeps<P, G extends string, S extends string = string>
   defaultRequirement: Requirement<P, G>
   defaultScope?: ScopeRequirement<S> | undefined
   principal: (ctx: object) => Promise<P | null>
+  refuse?: ((ctx: object, principal: P) => Promise<boolean>) | undefined
   scopes?: ((ctx: object) => Promise<readonly string[] | null>) | undefined
 
 [.] GetUserResult
@@ -1095,7 +1096,7 @@ interface GuardOptions
   redirect?: string | undefined
   require?: AuthRequirement<string> | undefined
   scope?: string | false | string[] | undefined
-  twoFactor?: boolean | undefined
+  twoFactor?: true | undefined
 
 [.] GuestSignInResult
 type GuestSignInResult = { ok: true, user: BareUser } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' | 'closed' }
@@ -1493,6 +1494,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   rules?: CredentialRules | undefined
   scopes?: readonly Scope[] | undefined
   secret?: string | string[] | undefined
+  securityPage?: string | undefined
   server?: undefined
   sessionsPage?: string | undefined
   signInPage?: string | undefined

@@ -1,13 +1,57 @@
-import type { BareUser, Core } from './core'
+import type { BareUser, Core, SignedIn } from './core'
+import type { RequestState } from './state'
 import type { PolicyContext } from './types'
+import { localPath } from 'kay'
+import { isNavigation, withBack } from './core'
 
-// Whether `user` must have two-factor on and has not: `wanted` is a guard's own say (true asks of everyone it lets through, false asks of no one), else the `twoFactor.require` of the app decides by the user's roles. A guest, a user mid-enrolment (the secret set up, the code not yet given) and one signed in by a passkey all lack it, as `forwardAuth.requireTwoFactor` reads it. Switched off with `twoFactor: false`, it asks of no one.
-export async function lacksTwoFactor(core: Core, user: BareUser, wanted?: boolean, ctx: PolicyContext = {}): Promise<boolean> {
-  if (user.twoFactor || wanted === false || !core.switches.twoFactor)
+export interface TwoFactorAsk {
+  // true asks every user, as a guard's own `twoFactor: true`; else the `twoFactor.require` of the app decides by the user's roles.
+  wanted?: true | undefined
+  // The path asked for: the security page, the second-factor page and the sign-out route are never held back, so a user lacking two-factor can always turn it on.
+  path?: string | undefined
+  ctx?: PolicyContext | undefined
+}
+
+// The pages and routes a user lacking two-factor must still reach, with the locale prefix a page may carry.
+function exempt(core: Core, path: string): boolean {
+  return [core.securityPage, core.twoFactorPage, `${core.prefix}/sign-out`].some(page => page !== undefined && (path.endsWith(page) || path.endsWith(`${page}/`)))
+}
+
+// Whether the second factor is satisfied: it is on, or the sign-in was a passkey (user verification makes it two factors), or an admin acting as the user, who proved theirs to start.
+function satisfied(user: BareUser, signedIn: SignedIn | undefined): boolean {
+  return user.twoFactor || signedIn?.passkey === true || signedIn?.impersonator !== undefined
+}
+
+// Whether `user` must have two-factor and does not. A guest and a session or OAuth sign-in with no authenticator app lack it; a throwing predicate in `twoFactor.require` throws, so the request fails closed. Off with `twoFactor: false`.
+export async function lacksTwoFactor(state: RequestState, user: BareUser, ask: TwoFactorAsk = {}): Promise<boolean> {
+  const { core } = state
+
+  if (!core.switches.twoFactor || user.twoFactor || (ask.path !== undefined && exempt(core, ask.path)))
     return false
 
-  if (wanted === true)
+  if (satisfied(user, await state.session.get('auth')))
+    return false
+
+  if (ask.wanted === true)
     return true
 
-  return core.twoFactorRequire !== undefined && core.access.authorize(user, core.twoFactorRequire, 'write', ctx)
+  return core.twoFactorRequire !== undefined && core.access.authorize(user, core.twoFactorRequire, 'write', ask.ctx ?? {})
+}
+
+// What `ctx.redirect` and `ctx.deny` are in a guard, a page or an action.
+export interface Stoppers {
+  redirect: (location: string) => never
+  deny: (status?: number, message?: string) => never
+}
+
+// A page opening goes to the security page to turn two-factor on, coming back after; anything else, and an app with no such page, gets the 403.
+export function sendToEnrolment(core: Core, request: Request, { redirect, deny }: Stoppers): never {
+  if (core.securityPage !== undefined && isNavigation(request)) {
+    const here = new URL(request.url)
+
+    // kay-allow external-redirect: the app's own security page, the visited path rides in its query
+    redirect(withBack(core.securityPage, localPath(here.pathname + here.search, '/')))
+  }
+
+  return deny(403, 'Two-factor authentication is required')
 }

@@ -50,6 +50,8 @@ export interface SignedIn {
   at: number
   // The sign-in's id in the store's sessions; missing from one signed in before kayjs-auth kept them, which gets one on its next request.
   session?: string
+  // Set when a passkey signed in, which counts as two factors for `twoFactor.require`.
+  passkey?: boolean
   // The admin's own sign-in while they act as this user, put back when they stop.
   impersonator?: Omit<SignedIn, 'impersonator'>
 }
@@ -167,7 +169,7 @@ export interface Core {
   // Whether a user meets a requirement, through the app's `authorize` when it has one, as `guard()` and `requireUser({ require })` ask.
   access: Access<string>
   // `auth.guard()` of this `createAuth`, which the `guard()` of a module-less `auth()` asks for through the request's `auth`.
-  guard: (options: { redirect?: string | undefined, require?: Requirement<BareUser, string> | undefined, scope?: string | string[] | false | undefined, twoFactor?: boolean | undefined }) => Guard
+  guard: (options: { redirect?: string | undefined, require?: Requirement<BareUser, string> | undefined, scope?: string | string[] | false | undefined, twoFactor?: true | undefined }) => Guard
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   // The data to keep on the user, laid over what they hold; nothing keeps it as is.
   onProviderProfile?: ((user: User, profile: Profile) => unknown) | undefined

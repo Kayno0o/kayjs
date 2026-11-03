@@ -105,6 +105,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   rules?: CredentialRules | undefined
   // The app's page listing where the user is signed in, linked from new sign-in mails: `/account/sessions`.
   sessionsPage?: string | undefined
+  // The app's page for turning two-factor on, where `twoFactor.require` sends a user lacking it and which it never holds back: the prebuilt account security page by default.
+  securityPage?: string | undefined
   // Where an address is, shown beside each session, from a geolocation database of the app's: `ip => cityOf(ip)`.
   locate?: ((ip: string) => string | null | undefined | Promise<string | null | undefined>) | undefined
   // Attempts allowed per client address and per account, over `DEFAULT_LIMITS`: `rateLimit: { signIn: { max: 10, window: '15m' } }`.

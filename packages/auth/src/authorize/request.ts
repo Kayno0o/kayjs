@@ -208,7 +208,7 @@ export async function authorize(state: RequestState, params: AuthorizeParams, ro
     return prompt.includes('none') ? failure(checked, root, 'login_required', 'The user is signed out') : { kind: 'sign-in' }
   }
 
-  if (await lacksTwoFactor(state.core, publicUser(record)))
+  if (await lacksTwoFactor(state, publicUser(record)))
     return failure(checked, root, 'access_denied', 'Two-factor authentication is required')
 
   const held = await state.core.store.oauth!.grants.get(record.id, checked.client.id)
@@ -242,7 +242,7 @@ export async function decide(state: RequestState, fields: AuthorizeParams, allow
   if (!record)
     return { ok: false, error: 'signed-out' }
 
-  if (!allow || await lacksTwoFactor(state.core, publicUser(record)))
+  if (!allow || await lacksTwoFactor(state, publicUser(record)))
     return { ok: true, redirect: withParams(checked.redirectUri, { error: 'access_denied', error_description: allow ? 'Two-factor authentication is required' : 'The user denied the request', state: oneOf(checked.params.state), iss: root }) }
 
   return { ok: true, redirect: await approve(state, record, checked, root) }

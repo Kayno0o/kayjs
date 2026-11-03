@@ -89,7 +89,7 @@ function auditMaxAge(audit: true | { maxAge?: Duration, ip?: 'full' | 'truncated
 }
 
 // Lets `auth()` hand a `createAuth({ pages: true })` its prefix and home, the paths derived from the prefix following, whichever of the two ran first.
-export function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | undefined, signInPage?: string | undefined, twoFactorPage?: string | undefined, sessionsPage?: string | undefined, email?: { links?: Partial<Record<LinkType, string>> | undefined } | undefined }): PagesHandle {
+export function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | undefined, signInPage?: string | undefined, twoFactorPage?: string | undefined, sessionsPage?: string | undefined, securityPage?: string | undefined, email?: { links?: Partial<Record<LinkType, string>> | undefined } | undefined }): PagesHandle {
   const own = typeof options.pages === 'object' ? options.pages : {}
 
   return {
@@ -116,7 +116,7 @@ export function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesCo
       core.signInPage = options.signInPage ?? paths.signIn
       core.twoFactorPage = options.twoFactorPage ?? paths.twoFactor
       core.sessionsPage = options.sessionsPage ?? paths.sessions
-      core.securityPage = paths.security
+      core.securityPage = options.securityPage ?? paths.security
 
       if (core.email)
         core.email.links = emailLinks(options.email?.links, paths.links)
@@ -164,7 +164,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
   const admin = options.admin
 
   if (process.env.NODE_ENV === 'production' && admin !== undefined && options.twoFactor !== false && !(typeof options.twoFactor === 'object' && options.twoFactor.require !== undefined))
-    log.warn('`admin` is on and no `twoFactor.require` names it, so an admin signs in with a password alone: set `twoFactor: { require: [\'admin\'] }`')
+    log.warn('`admin` is on and no `twoFactor.require` names it, so an admin can sign in without two-factor: set `twoFactor: { require: [\'admin\'] }`')
 
   const needsUrl = oauthApps.length > 0 || options.email !== undefined
   let bound: SiteBound | undefined
@@ -235,7 +235,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     limits: resolveLimits(options.rateLimit),
     rules: asConfigError(() => resolveRules(options.rules)),
     sessionsPage: options.sessionsPage ?? paths?.sessions,
-    securityPage: paths?.security,
+    securityPage: options.securityPage ?? paths?.security,
     locate: options.locate,
     scopes: new Set(options.scopes),
     get passkeys() {

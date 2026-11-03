@@ -6,7 +6,7 @@ export interface GuardOptions {
   redirect?: string | undefined
   require?: AuthRequirement<string> | undefined
   scope?: string | string[] | false | undefined
-  twoFactor?: boolean | undefined
+  twoFactor?: true | undefined
 }
 
 // The `auth.guard()` of the app's `auth()`, for a `_guard.ts` with no module to import it from: `export default guard()`. It asks the `auth` of the request, so it works with a `createAuth` of the app's own too.
