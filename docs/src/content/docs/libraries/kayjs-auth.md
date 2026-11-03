@@ -419,6 +419,10 @@ A feature that is off is gone from the prebuilt pages: no password form, no mail
 
 Turning `twoFactor` off only stops new users from setting it up. A user who already turned it on is still asked for the code when they sign in, and can renew their recovery codes or turn it off, so switching it off never weakens an account. The `forwardAuth` option `requireTwoFactor` needs it on.
 
+To make it a must, give `twoFactor: { require: ['admin'] }`, which takes what a guard's `require` takes.
+
+A user it names who has not turned it on is sent to the security page by `guard()`, `auth.gate()` and `requireAdmin()`, gets a 403 from anything that is not a page, and every `auth.admin` method answers `{ ok: false, error: 'two-factor-required' }`. `guard({ twoFactor: false })` leaves your own security page open to them. In production kayjs-auth warns at boot when `admin` is on and nothing requires it.
+
 A way in that is switched off no longer counts as one when kayjs-auth checks that a user keeps another: with `password: false`, a user cannot unlink their last provider because they have a password.
 
 ## Passkeys in `createAuth`

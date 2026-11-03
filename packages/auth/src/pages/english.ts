@@ -35,6 +35,7 @@ export const ERRORS = {
   'invalid': 'That did not work.',
   'none': 'No passkey to use.',
   'forbidden': 'You may not do this.',
+  'two-factor-required': 'Turn on two-step verification in your account first.',
   'unknown-role': 'This role does not exist.',
   'admin': 'An admin cannot be changed this way: take the admin role away first.',
   'until': 'Choose a date in the future.',

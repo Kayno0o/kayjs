@@ -321,6 +321,7 @@ export default defineMessages({
       'invalid': 'Cela n’a pas fonctionné.',
       'none': 'Aucune clé d’accès à utiliser.',
       'forbidden': 'Vous n’avez pas le droit de faire cela.',
+      'two-factor-required': 'Activez d’abord la validation en deux étapes dans votre compte.',
       'unknown-role': 'Ce rôle n’existe pas.',
       'admin': 'Un administrateur ne peut pas être modifié ainsi : retirez-lui d’abord le rôle d’administrateur.',
       'until': 'Choisissez une date à venir.',

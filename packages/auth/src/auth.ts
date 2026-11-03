@@ -116,7 +116,8 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   // Sign-in links and codes mailed to the address (they need `email`); false answers `off` from their methods and the pages show none. On by default.
   magicLink?: boolean | undefined
   // Authenticator-app two-step verification: false answers `off` from setting it up, turning it on and new recovery codes, and the account page offers none. A user who turned it on before is still asked for the code at sign-in. On by default.
-  twoFactor?: boolean | undefined
+  // `{ require }` makes two-factor a must for the users it names (a role, a predicate or a list, as a guard's `require`): their guards and gates, the admin pages and `auth.admin`, and OAuth consent send them to the security page, or answer 403 (`two-factor-required` from `auth.admin`) when they cannot be sent. An app's own security page sits behind `guard({ twoFactor: false })`.
+  twoFactor?: boolean | { require?: AuthRequirement<Role> | undefined } | undefined
   // A CAPTCHA asked of registering, password sign-in, password resets and magic links: kay's proof of work by default, `proofOfWork({ difficulty })` to tune it, `{ verify: turnstile(secret) }` for a third party's, false for none.
   captcha?: CaptchaOptions | false | undefined
   // Refuses a new password Have I Been Pwned lists, with `true`, or that a check of the app's own finds. On by default in production, `false` turns it off; a check that fails lets the password through.

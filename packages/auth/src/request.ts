@@ -325,8 +325,24 @@ export class Auth<Scope extends string = string, Role extends string = string, O
       return stoppers(this.request).deny(404)
 
     const user = await this.requireUser()
+    const acting = await (await load.admin()).askingAdmin(this[STATE])
 
-    return await (await load.admin()).actingAdmin(this[STATE]) ? user : stoppers(this.request).deny(403)
+    if (acting.ok)
+      return user
+
+    return acting.error === 'two-factor-required' ? this.twoFactorRequired() : stoppers(this.request).deny(403)
+  }
+
+  // A page opening goes to the security page to turn two-factor on, coming back after; anything else, and an app with no such page, gets the 403.
+  private twoFactorRequired(): never {
+    const { redirect, deny } = stoppers(this.request)
+    const { securityPage } = this.core
+
+    if (securityPage !== undefined && isNavigation(this.request))
+      // kay-allow external-redirect: the app's own security page, the visited path rides in its query
+      redirect(withBack(securityPage, new URL(this.request.url).pathname))
+
+    return deny(403, 'Two-factor authentication is required')
   }
 
   // The `guard()` of kayjs-auth, for a `_guard.ts` that cannot import the `createAuth` result: the guard of the one behind this request.

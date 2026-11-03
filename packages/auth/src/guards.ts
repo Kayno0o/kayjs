@@ -8,17 +8,20 @@ import { guardPageOf, isNavigation, withBack } from './core'
 import { createGate, scopeAllows } from './gate'
 import { load } from './load'
 import { authOf } from './request'
+import { lacksTwoFactor } from './requiredTwoFactor'
 
 export interface RouteGuardOptions<Role extends string, Scope extends string> {
   redirect?: string | undefined
   require?: AuthRequirement<Role> | undefined
   scope?: ScopeRequirement<Scope> | undefined
+  // true asks every user this guard lets through for two-factor, false asks none (for the app's own security page), and left out `twoFactor.require` of the app decides.
+  twoFactor?: boolean | undefined
 }
 
 const signedIn: Predicate<BareUser> = user => user !== null
 
 // A `_guard.ts` default export. An anonymous GET or HEAD that may be a page opening (not a browser fetch, nor a request for JSON) goes to `redirect`, the prebuilt sign-in page with `pages`, else `signInPage`, with where they were going as `?redirect=`, or gets a 401 without any, as does any post; a user who does not meet `require` gets a 403.
-// A scoped bearer token passes only with one of `scope`.
+// A scoped bearer token passes only with one of `scope`. A user lacking a two-factor the app asks of them (`twoFactor`) goes to the security page when opening a page, else gets a 403.
 export function guardOf<Role extends string, Scope extends string>(core: Core, options: RouteGuardOptions<Role, Scope> = {}): Guard {
   const redirect = options.redirect === undefined || options.redirect === '' ? guardPageOf(core) : options.redirect
 
@@ -40,6 +43,14 @@ export function guardOf<Role extends string, Scope extends string>(core: Core, o
 
     if (!scopeAllows(await authOf(ctx.locals).scopes(), options.scope))
       ctx.deny(403)
+
+    if (user !== null && await lacksTwoFactor(core, user, options.twoFactor, { params: ctx.params })) {
+      if (core.securityPage !== undefined && isNavigation(ctx.request))
+        // kay-allow external-redirect: the app's own security page, the visited path rides in its query
+        ctx.redirect(withBack(core.securityPage, ctx.url.pathname + ctx.url.search))
+
+      ctx.deny(403, 'Two-factor authentication is required')
+    }
   }
 }
 
@@ -47,7 +58,8 @@ export function guardOf<Role extends string, Scope extends string>(core: Core, o
 export function gateOf<Role extends string, Scope extends string>(core: Core, options: { require?: AuthRequirement<Role>, scope?: ScopeRequirement<Scope> }) {
   return createGate<BareUser, Role, Scope>({
     principal: async ctx => authOf(ctx).bareUser(),
-    authorize: core.access.authorize,
+    // A user lacking the two-factor the app asks of them is denied like one missing a role.
+    authorize: async (user, requirement, level, ctx) => await core.access.authorize(user, requirement, level, ctx) && !(user !== null && await lacksTwoFactor(core, user, undefined, ctx)),
     defaultRequirement: options.require ?? signedIn,
     scopes: async ctx => authOf(ctx).scopes(),
     defaultScope: options.scope,

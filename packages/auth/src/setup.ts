@@ -163,6 +163,9 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
   const access = accessOf<Role>(options)
   const admin = options.admin
 
+  if (process.env.NODE_ENV === 'production' && admin !== undefined && options.twoFactor !== false && !(typeof options.twoFactor === 'object' && options.twoFactor.require !== undefined))
+    log.warn('`admin` is on and no `twoFactor.require` names it, so an admin signs in with a password alone: set `twoFactor: { require: [\'admin\'] }`')
+
   const needsUrl = oauthApps.length > 0 || options.email !== undefined
   let bound: SiteBound | undefined
   // What a core with no origin yet builds: with nothing to build on it is the same each time, so it is kept until an origin turns up.
@@ -239,6 +242,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
       return bind().passkeys
     },
     switches: { password: options.password !== false, passkeys: options.passkeys !== false, magicLink: options.magicLink !== false, twoFactor: options.twoFactor !== false },
+    ...typeof options.twoFactor === 'object' && options.twoFactor.require !== undefined && { twoFactorRequire: options.twoFactor.require },
     captcha: options.captcha === false ? undefined : options.captcha ?? proofOfWork(),
     breached: breachedCheck(options.breachedPasswords),
     email: options.email && {

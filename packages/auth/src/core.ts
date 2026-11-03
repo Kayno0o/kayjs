@@ -160,12 +160,14 @@ export interface Core {
   roles?: Set<string> | undefined
   // The same roles with the ones each includes, for `userIdsHolding`.
   hierarchy?: Record<string, string[]> | undefined
+  // Who must have two-factor on, the `twoFactor.require` option: guards, gates, the admin and the OAuth consent send or refuse a user it names who lacks it.
+  twoFactorRequire?: Requirement<BareUser, string> | undefined
   // Whether a user meets the `admin` option; nobody does without it.
   admin?: ((user: User) => Promise<boolean>) | undefined
   // Whether a user meets a requirement, through the app's `authorize` when it has one, as `guard()` and `requireUser({ require })` ask.
   access: Access<string>
   // `auth.guard()` of this `createAuth`, which the `guard()` of a module-less `auth()` asks for through the request's `auth`.
-  guard: (options: { redirect?: string | undefined, require?: Requirement<BareUser, string> | undefined, scope?: string | string[] | false | undefined }) => Guard
+  guard: (options: { redirect?: string | undefined, require?: Requirement<BareUser, string> | undefined, scope?: string | string[] | false | undefined, twoFactor?: boolean | undefined }) => Guard
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   // The data to keep on the user, laid over what they hold; nothing keeps it as is.
   onProviderProfile?: ((user: User, profile: Profile) => unknown) | undefined

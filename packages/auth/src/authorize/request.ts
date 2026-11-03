@@ -2,9 +2,10 @@ import type { Core } from '../core'
 import type { RequestState } from '../state'
 import type { OAuthGrantRecord, UserRecord } from '../store'
 import type { OAuthClient } from './clients'
-import { banned } from '../core'
+import { banned, publicUser } from '../core'
 import { impersonatorOf, report } from '../events'
 import { digest, randomToken } from '../keys'
+import { lacksTwoFactor } from '../requiredTwoFactor'
 import { resolveClient } from './clients'
 import { redirectUriRegistered, withParams } from './uris'
 
@@ -207,6 +208,9 @@ export async function authorize(state: RequestState, params: AuthorizeParams, ro
     return prompt.includes('none') ? failure(checked, root, 'login_required', 'The user is signed out') : { kind: 'sign-in' }
   }
 
+  if (await lacksTwoFactor(state.core, publicUser(record)))
+    return failure(checked, root, 'access_denied', 'Two-factor authentication is required')
+
   const held = await state.core.store.oauth!.grants.get(record.id, checked.client.id)
 
   if (held && approves(held.scopes, checked.scopes) && !prompt.includes('consent'))
@@ -238,8 +242,8 @@ export async function decide(state: RequestState, fields: AuthorizeParams, allow
   if (!record)
     return { ok: false, error: 'signed-out' }
 
-  if (!allow)
-    return { ok: true, redirect: withParams(checked.redirectUri, { error: 'access_denied', error_description: 'The user denied the request', state: oneOf(checked.params.state), iss: root }) }
+  if (!allow || await lacksTwoFactor(state.core, publicUser(record)))
+    return { ok: true, redirect: withParams(checked.redirectUri, { error: 'access_denied', error_description: allow ? 'Two-factor authentication is required' : 'The user denied the request', state: oneOf(checked.params.state), iss: root }) }
 
   return { ok: true, redirect: await approve(state, record, checked, root) }
 }

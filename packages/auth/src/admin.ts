@@ -7,6 +7,7 @@ import { banned, linkedUser, publicUser } from './core'
 import { eraseLeavingUser } from './erase'
 import { auditEntries, report } from './events'
 import { provedLately } from './proof'
+import { lacksTwoFactor } from './requiredTwoFactor'
 import { openSession, revokeBearerTokens } from './sessions'
 
 const USER_PAGE_MAX = 200
@@ -19,8 +20,8 @@ export interface ManagedUser extends BareUser {
   ban: { at: Date, until: Date | null, reason: string | null } | null
 }
 
-// `forbidden` when the user asking does not meet the `admin` option, acts as someone else or came with a bearer token.
-export type AdminFailure = 'forbidden' | 'not-found'
+// `forbidden` when the user asking does not meet the `admin` option, acts as someone else or came with a bearer token, `two-factor-required` when `twoFactor.require` names them and they have not turned it on.
+export type AdminFailure = 'forbidden' | 'not-found' | 'two-factor-required'
 
 // `stale` when the admin's session neither signed in nor re-proved in the last ten minutes.
 export type AdminChangeFailure = AdminFailure | 'stale'
@@ -52,13 +53,23 @@ export async function actingAdmin(state: RequestState): Promise<UserRecord | nul
 }
 
 // The admin changing a user, who must have signed in or re-proved lately, so a session left open or stolen grants, bans and deletes no one.
-export async function changingAdmin(state: RequestState): Promise<{ ok: true, actor: UserRecord } | { ok: false, error: 'forbidden' | 'stale' }> {
+export async function changingAdmin(state: RequestState): Promise<{ ok: true, actor: UserRecord } | { ok: false, error: 'forbidden' | 'two-factor-required' | 'stale' }> {
+  const acting = await askingAdmin(state)
+
+  if (!acting.ok)
+    return acting
+
+  return await provedLately(state) ? acting : { ok: false, error: 'stale' }
+}
+
+// The admin as `actingAdmin` finds them, or why not: an admin whom `twoFactor.require` names and who lacks it is held back until they turn it on.
+export async function askingAdmin(state: RequestState): Promise<{ ok: true, actor: UserRecord } | { ok: false, error: 'forbidden' | 'two-factor-required' }> {
   const actor = await actingAdmin(state)
 
   if (!actor)
     return { ok: false, error: 'forbidden' }
 
-  return await provedLately(state) ? { ok: true, actor } : { ok: false, error: 'stale' }
+  return await lacksTwoFactor(state.core, publicUser(actor)) ? { ok: false, error: 'two-factor-required' } : { ok: true, actor }
 }
 
 export async function isAdmin(state: RequestState, record: UserRecord): Promise<boolean> {
@@ -114,12 +125,14 @@ async function anotherAdmin(state: RequestState, exceptId: string): Promise<bool
   }
 }
 
-export type ListUsersResult = { ok: true, users: ManagedUser[], total: number } | { ok: false, error: 'forbidden' }
+export type ListUsersResult = { ok: true, users: ManagedUser[], total: number } | { ok: false, error: 'forbidden' | 'two-factor-required' }
 
 // Newest first, a page of `limit` (50 by default) from `offset`.
 export async function listUsers(state: RequestState, query: { search?: string | undefined, offset?: number | undefined, limit?: number | undefined }): Promise<ListUsersResult> {
-  if (!(await actingAdmin(state)))
-    return { ok: false, error: 'forbidden' }
+  const acting = await askingAdmin(state)
+
+  if (!acting.ok)
+    return acting
 
   const search = query.search?.trim()
   const found = await state.core.store.users.list({
@@ -134,8 +147,10 @@ export async function listUsers(state: RequestState, query: { search?: string | 
 export type GetUserResult = { ok: true, user: ManagedUser, admin: boolean } | { ok: false, error: AdminFailure }
 
 export async function getUser(state: RequestState, userId: string): Promise<GetUserResult> {
-  if (!(await actingAdmin(state)))
-    return { ok: false, error: 'forbidden' }
+  const acting = await askingAdmin(state)
+
+  if (!acting.ok)
+    return acting
 
   const record = await state.core.store.users.get(userId)
 
@@ -259,14 +274,13 @@ export async function deleteUser(state: RequestState, userId: string): Promise<D
   return await isAdmin(state, record) ? { ok: false, error: 'admin' } : eraseLeavingUser(state, record, { actor, handOver: true })
 }
 
-export type AdminAuditLogResult = { ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }
+export type AdminAuditLogResult = { ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' | 'two-factor-required' }
 
 // Everyone's audit log, or one user's, newest first.
 export async function adminAuditLog(state: RequestState, query: { userId?: string | undefined, before?: AuditCursorInput | undefined, limit?: number | undefined }): Promise<AdminAuditLogResult> {
-  if (!(await actingAdmin(state)))
-    return { ok: false, error: 'forbidden' }
+  const acting = await askingAdmin(state)
 
-  return { ok: true, entries: await auditEntries(state.core, query) }
+  return !acting.ok ? acting : { ok: true, entries: await auditEntries(state.core, query) }
 }
 
 export type ImpersonateResult = { ok: true } | { ok: false, error: AdminFailure | 'stale' | 'self' | 'admin' | 'banned' }
