@@ -11,6 +11,7 @@ import { check } from '../src/check'
 import * as shadowModule from '../src/check/shadow'
 import { typedProps } from '../src/lsp/completions'
 import { remembered } from '../src/lsp/host'
+import { revealCommand } from '../src/lsp/island-lens'
 import { Connection } from '../src/lsp/rpc'
 import { DEPENDENTS_DELAY, DIAGNOSTICS_DELAY, KayLanguageServer } from '../src/lsp/server'
 import { eventually } from './helpers/eventually'
@@ -2188,7 +2189,9 @@ describe('the island lens command', () => {
       const { commands } = (editor.advertised as { executeCommandProvider?: { commands: string[] } }).executeCommandProvider!
       const command = await lensOf(editor)
 
-      expect(commands).toEqual([`kay.revealIslandCause:${dir}`])
+      expect(commands).toEqual([revealCommand(dir)])
+      expect(commands[0]).toMatch(/^kay\.revealIslandCause:[0-9a-z]+$/)
+      expect(revealCommand(`${dir}/other`)).not.toBe(commands[0])
       expect(command).toEqual({ title: 'Island: `onClick`, line 2', command: commands[0]!, arguments: [editor.uri(component), { start: { line: 1, character: 7 }, end: { line: 1, character: 14 } }] })
       expect(await editor.connection.request('workspace/executeCommand', { command: command.command, arguments: command.arguments })).toBeNull()
       expect(shown).toEqual([{ uri: editor.uri(component), takeFocus: true, selection: command.arguments![1] }])

@@ -5,9 +5,9 @@ import { compileKay, ROUTE_FILES } from '../compiler'
 import { describeCause } from '../compiler/island-cause'
 import { toPosition } from './positions'
 
-// Run by a click on the lens: the editor shows the line that makes the component an island. Each server registers it under its own root, as an editor with several servers registers every command a server lists and refuses one twice.
+// Run by a click on the lens: the editor shows the line that makes the component an island. Each server registers it under a hash of its own root, short enough for an editor limiting the characters of a command id, as an editor with several servers registers every command a server lists and refuses one twice.
 export function revealCommand(root: string): string {
-  return `kay.revealIslandCause:${root}`
+  return `kay.revealIslandCause:${Bun.hash(root).toString(36)}`
 }
 
 export interface LensContext {

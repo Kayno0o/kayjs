@@ -258,6 +258,10 @@ async function collect(tree: string, only: string[]): Promise<Collected> {
       collected[name] = document.failed === undefined ? rolesOf(document) : { error: `the build failed at ${document.failed.stage}` }
     }
     catch (error) {
+      // A build killed by an interrupt fails for that reason alone, which is no result of the target.
+      if (stopped)
+        break
+
       collected[name] = { error: firstLine(error instanceof Error ? error.message : String(error)) }
     }
     finally {
