@@ -49,6 +49,11 @@ export function startNavigation(given: NavigationHooks): void {
   // The swap would never use what the browser prefetches for a full load, so a page shipping it carries no speculation rules and it prefetches the same links itself, from code loaded once a link is first pointed at.
   rules = document.querySelector<HTMLMetaElement>(PREFETCH)?.content
 
+  if (rules !== undefined) {
+    wakeEager()
+    document.addEventListener('kay:navigate', wakeEager)
+  }
+
   for (const element of document.head.children as HTMLCollectionOf<HeadElement>)
     element._$s = element.outerHTML
 
@@ -135,12 +140,22 @@ async function preloadSwap(): Promise<void> {
 }
 
 // Loads the prefetch code on the first touch of a link, which it then handles as it would have listening, as it does each touch that came while it loaded: one that fails to load leaves the links unprefetched, each click still swapping.
-async function wakePrefetch(event: Event): Promise<void> {
+async function wakePrefetch(event?: Event): Promise<void> {
   try {
     prefetchModule ??= loadPrefetch()
-    ;(await prefetchModule).replay(event)
+
+    const module = await prefetchModule
+
+    if (event)
+      module.replay(event)
   }
   catch {}
+}
+
+// An `eager` page, or one with a link asking for it, prefetches from the start, not from the first touch of a link; the loaded code follows the pages after.
+function wakeEager(): void {
+  if (!prefetchModule && (rules === 'eager' || document.querySelector('[data-prefetch=eager]')))
+    void wakePrefetch()
 }
 
 async function loadPrefetch(): Promise<typeof import('./prefetch')> {

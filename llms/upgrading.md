@@ -13,6 +13,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - In production with `site` (or `SITE_URL`) set, a request whose `Host` is neither the site's, a locale host of `i18n.domains` nor listed in `security.hosts` is now refused with 421, as `security: { hosts: true }` did, so `ctx.url` and `request.url` can no longer be poisoned by the header. Localhost and IP addresses still pass, so a health check by address works. An app reached by other names (`www`, a tunnel, a CDN host) lists them, `security: { hosts: ['www.example.com'] }`, or turns the check off with `security: { hosts: false }`. `kay check` cannot see which names a deployment is reached by, so no lint ships with this.
 
+### `prefetch: 'eager'` fetches the links in view
+
+- On a page running kay's script, `prefetch: 'eager'` fetched on hover with no delay and never on load; it now fetches the links scrolled into view, three at a time, as the setting says elsewhere. An app that wants the old timing sets `'moderate'`. `kay check` cannot see which timing an app meant, so no lint ships with this.
+
 ## 1.87.0
 
 ### `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `publicEnv` and `defineUi` no longer make a component an island

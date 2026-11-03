@@ -233,7 +233,7 @@ export interface ClientConfig {
   typography?: boolean | undefined
   // How far ahead of the viewport islands start to load, as CSS root margins: `visible` for an island marked `hydrate="visible"` (`'200px'` by default), `serverIslands` for a deferred server island (`'100% 0px'`, a screen ahead, by default).
   hydration?: { visible?: string | undefined, serverIslands?: string | undefined } | undefined
-  // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
+  // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover, `conservative` on press, `eager` as soon as it can (every link on a page without kay's script, the links scrolled into view, a few at a time, on one shipping it), `false` never. A link with `data-no-prefetch` or `data-prefetch="false"` never is, and `data-prefetch="eager|moderate|conservative"` on a link or a container sets its own level where kay's script runs.
   prefetch?: Prefetch | undefined
   // Whether a visitor sending `Save-Data: on` gets a lighter site by itself: image variants one width narrower, no font preloads, fonts shown only when cached, no speculation rules; `Save-Data` or `prefers-reduced-data` in the browser also stops the prefetch and has an island with no `hydrate` wait until it scrolls near. On by default, `false` serves everyone alike.
   saveData?: boolean | undefined

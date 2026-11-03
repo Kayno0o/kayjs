@@ -1,4 +1,4 @@
-// How eagerly Chromium prefetches a link's page: `conservative` on press, `moderate` on hover, `eager` as soon as it can.
+// How eagerly a link's page is prefetched: `conservative` on press, `moderate` on hover, `eager` as soon as it can, which a page running kay's script reads as the links scrolled into view.
 export type Prefetch = 'conservative' | 'moderate' | 'eager' | false
 
 // Under a mount point or a moved API, one script per setting, base and API path, made once.
@@ -27,7 +27,7 @@ export function prefetchMeta(prefetch: Prefetch = 'moderate'): string {
 
 // Never kay's own routes or the API, as the page swap leaves them too, nor a download or a link search engines are told not to follow, as a sign-out link often is.
 function rules(eagerness: Exclude<Prefetch, false>, base = '', apiPath = '/api'): string {
-  const where = { and: [{ href_matches: `${base}/*` }, { not: { href_matches: `${base}/_kay/*` } }, { not: { href_matches: `${base}${apiPath}/*` } }, { not: { href_matches: `${base}${apiPath}` } }, { not: { selector_matches: '[data-no-prefetch], [download], [rel~=nofollow]' } }] }
+  const where = { and: [{ href_matches: `${base}/*` }, { not: { href_matches: `${base}/_kay/*` } }, { not: { href_matches: `${base}${apiPath}/*` } }, { not: { href_matches: `${base}${apiPath}` } }, { not: { selector_matches: '[data-no-prefetch], [data-prefetch=false], [data-prefetch=false] a, [download], [rel~=nofollow]' } }] }
 
   return `<script type="speculationrules">${JSON.stringify({ prefetch: [{ source: 'document', where, eagerness }] })}</script>`
 }
