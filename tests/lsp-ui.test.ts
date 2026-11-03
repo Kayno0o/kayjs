@@ -108,7 +108,7 @@ describe('what a component offers src/ui.ts', () => {
 
     expect(parts?.find(part => part.name === 'list')?.classes).toBe('flex flex-col gap-px p-1 outline-none')
     expect(parts?.find(part => part.name === 'item')?.classes).toStartWith('flex w-full cursor-pointer')
-    expect(parts?.find(part => part.name === 'item')?.classes).toEndWith('data-danger:text-danger disabled:cursor-default disabled:opacity-50')
+    expect(parts?.find(part => part.name === 'item')?.classes).toEndWith('data-[tone=accent]:text-accent data-[tone=success]:text-success data-[tone=warning]:text-warning data-danger:text-danger data-[tone=info]:text-info disabled:cursor-default disabled:opacity-50')
   })
 
   it('reads the theme tokens from the library and ties a component\'s classes to them', () => {
