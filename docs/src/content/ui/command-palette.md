@@ -52,4 +52,4 @@ Other attributes, such as a `data-testid`, go on the `dialog` element.
 
 ## Size
 
-`size` takes the names of every overlay: `sm`, `md` (the default), `lg` or `full`.
+`size` takes the names of every overlay: `sm`, `md` (the default), `lg` or `full`. Its `md` is 36rem, narrower than the 42rem of a Dialog.

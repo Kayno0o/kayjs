@@ -1591,6 +1591,9 @@ type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
 [./lib/locked-button] lockedButton
 function lockedButton<T extends object>(attributes: T): T & { "type": "button"; "aria-disabled": "true"; }
 
+[./lib/locked-button] lockedLink
+function lockedLink<T extends object>(attributes: T): T
+
 [./lib/map-view] drawnPoints
 function drawnPoints(lines: readonly (readonly MapPoint[])[], markers: readonly MapMarker[]): MapPoint[]
 
@@ -1834,8 +1837,20 @@ interface CloseWatcherState
   footer: boolean
   modal: boolean
 
+[./lib/overlay] followsHref
+function followsHref(closeHref: string | undefined, onOpenChange: unknown): closeHref is string
+
+[./lib/overlay] leave
+function leave(closeHref: string | undefined, onOpenChange: ((open: boolean) => unknown) | undefined): void
+
 [./lib/overlay] OverlaySize
 type OverlaySize = 'sm' | 'md' | 'lg' | 'full'
+
+[./lib/overlay] renderedOpen
+function renderedOpen(open: boolean, modal: boolean, closeHref: string | undefined): boolean
+
+[./lib/overlay] syncOpen
+function syncOpen(dialog: HTMLDialogElement, shown: boolean, modal: boolean, focus?: boolean): void
 
 [./lib/pagination] currentPage
 function currentPage(page: number, pages: number): number

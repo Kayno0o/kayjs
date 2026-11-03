@@ -109,10 +109,10 @@ test('Stop editing with unsaved edits asks first, and Keep editing leaves the ed
   const confirm = confirmation(root)
 
   expect(confirm?.textContent).toContain('not saved')
-  expect(labels(confirm!)).toEqual(['Keep editing', 'Drop them and stop'])
+  expect(labels(confirm!).filter(Boolean)).toEqual(['Keep editing', 'Drop them and stop'])
   expect(left(fetched)).toBe(false)
 
-  confirm!.querySelectorAll('button')[0]!.click()
+  confirm!.querySelectorAll<HTMLButtonElement>('[data-part=footer] button')[0]!.click()
   await settle()
 
   expect(confirmation(root)).toBeNull()
@@ -146,7 +146,7 @@ test('Drop them and stop leaves the edit mode', async () => {
 
   stop(root).click()
   await settle()
-  confirmation(root)!.querySelectorAll<HTMLButtonElement>('button')[1]!.click()
+  confirmation(root)!.querySelectorAll<HTMLButtonElement>('[data-part=footer] button')[1]!.click()
   await until(() => left(fetched) && kept() === 0)
 
   expect(left(fetched)).toBe(true)
@@ -160,7 +160,7 @@ test('a leave that fails keeps the edits', async () => {
 
   stop(root).click()
   await settle()
-  confirmation(root)!.querySelectorAll<HTMLButtonElement>('button')[1]!.click()
+  confirmation(root)!.querySelectorAll<HTMLButtonElement>('[data-part=footer] button')[1]!.click()
   await until(() => left(fetched))
   await settle()
 

@@ -1,7 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import { recipe } from 'kay'
-import { lockedButton } from './locked-button'
+import { lockedButton, lockedLink } from './locked-button'
 import type { Tone } from './tone'
 
 const look = recipe({ parts: { root: 'kui-icon-btn' } })
@@ -25,7 +25,10 @@ const handedOn = rest as Record<string, never>
 // Only the solid form is framed by the shell's hairline.
 const framed = () => variant === 'solid'
 ---
-if href !== undefined
+if href !== undefined && rest.disabled
+  a(part="root" {...lockedLink(handedOn)} role="link" tabindex="0" aria-disabled="true" aria-label={label} data-tooltip={label} data-size={size} data-variant={variant} data-tone={tone} class={{ 'kui-shell': framed(), 'kui-shell-danger': framed() && tone === 'danger' }})
+    slot
+else if href !== undefined
   a(part="root" {...handedOn} href={href} aria-label={label} data-tooltip={label} data-size={size} data-variant={variant} data-tone={tone} class={{ 'kui-shell': framed(), 'kui-shell-danger': framed() && tone === 'danger' }})
     slot
 else

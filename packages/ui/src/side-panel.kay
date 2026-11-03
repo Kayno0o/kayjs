@@ -1,9 +1,9 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { effect, listen, navigate, onCleanup, persisted, recipe, signal, untrack } from 'kay'
+import { effect, listen, onCleanup, persisted, recipe, signal, untrack } from 'kay'
 import IconButton from './icon-button.kay'
 import type { OverlaySize } from './overlay'
-import { closeWatcher } from './overlay'
+import { closeWatcher, followsHref, leave, renderedOpen, syncOpen } from './overlay'
 import { wording } from 'kay/words'
 
 // 'kui-side-panel' stays as the component's name for an app's CSS and the always-hidden guard; theme.css keeps the docked panel's shadow.
@@ -11,7 +11,7 @@ import { wording } from 'kay/words'
 const look = recipe({
   parts: {
     // The width of a panel not docked comes by name, the one vocabulary of every overlay: `md` is the default 42rem.
-    root: 'kui-side-panel inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-[length:var(--border-width)] border-border-strong bg-surface p-0 text-foreground [transition:translate_0.2s_ease-out,overlay_0.2s_allow-discrete,display_0.2s_allow-discrete] open:starting:[translate:100%_0] [&:not([open])]:[translate:100%_0] data-[size=sm]:max-w-[min(28rem,100vw)] data-[size=lg]:max-w-[min(72rem,100vw)] data-[size=full]:max-w-full backdrop:bg-black/50 data-[modal=false]:fixed data-[modal=false]:z-30 data-dock:overflow-visible data-dock:[transition:none] data-dock:open:starting:[translate:none] data-dock:[&:not([open])]:[translate:none]',
+    root: 'kui-side-panel inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-[length:var(--border-width)] border-border-strong bg-surface p-0 text-foreground [transition:translate_0.2s_ease-out,overlay_0.2s_allow-discrete,display_0.2s_allow-discrete] open:starting:[translate:100%_0] [&:not([open])]:[translate:100%_0] data-[size=sm]:max-w-[min(28rem,100vw)] data-[size=lg]:max-w-[min(72rem,100vw)] data-[size=full]:max-w-full backdrop:bg-black/50 [&[open]:not(:modal)]:fixed [&[open]:not(:modal)]:z-30 [&[open]:not(:modal):not([data-modal=false])]:shadow-[0_0_0_100vmax_rgb(0_0_0/0.5)] data-dock:overflow-visible data-dock:[transition:none] data-dock:open:starting:[translate:none] data-dock:[&:not([open])]:[translate:none]',
     grip: 'group/grip absolute z-[2] touch-none focus-visible:outline-2 focus-visible:outline-accent data-[dock=right]:inset-y-0 data-[dock=right]:-left-3 data-[dock=right]:w-6 data-[dock=right]:cursor-ew-resize data-[dock=bottom]:inset-x-0 data-[dock=bottom]:-top-3 data-[dock=bottom]:h-6 data-[dock=bottom]:cursor-ns-resize',
     line: 'pointer-events-none absolute bg-accent opacity-0 shadow-[0_0_0_1px_var(--color-popover)] group-[&:hover]/grip:opacity-100 group-focus-visible/grip:opacity-100 data-[dock=right]:inset-y-0 data-[dock=right]:left-[calc(50%-1px)] data-[dock=right]:w-0.5 data-[dock=bottom]:inset-x-0 data-[dock=bottom]:top-[calc(50%-1px)] data-[dock=bottom]:h-0.5',
     head: 'flex shrink-0 items-center gap-2 border-b border-border px-5 py-3',
@@ -75,18 +75,14 @@ const DOCKS = { right: { min: 280, page: 352, step: 24, fallback: 384 }, bottom:
 // The launcher's distance from the window's right edge, which what keeps off it counts too.
 const LAUNCHER_GAP = 16
 
-// A panel with a `closeHref` and no handler closes by going there: its link on a click, and Escape, which only closes the dialog, through `navigate`.
-const follows = () => closeHref !== undefined && onOpenChange === undefined
-// Set by any typing inside, and cleared however the panel closes.
+// Read once: the open attribute is what the server renders, and the client opens and closes the panel by its methods.
+const serverOpen = renderedOpen(open, modal, closeHref)
+// Set by any typing inside, and cleared however the panel closes or opens.
 const edited = signal(false)
 
 function closed() {
   edited = false
-
-  if (follows() && closeHref !== undefined)
-    navigate(closeHref)
-  else
-    onOpenChange?.(false)
+  leave(closeHref, onOpenChange)
 }
 
 const docked = () => !modal && dock !== undefined
@@ -308,19 +304,11 @@ effect(() => {
   if (!panel)
     return
 
-  if (shown && !panel.open) {
-    if (modal)
-      panel.showModal()
-    else
-      panel.show()
-  }
-  else if (!shown && panel.open) {
-    panel.close()
-  }
-})
+  if (shown)
+    edited = false
 
-// What the server renders, so a page driven by the URL shows the panel open before any script runs; the client opens and closes it with `show()` and `close()`.
-const renderedOpen = !modal && open
+  syncOpen(panel, shown, modal, !docked())
+})
 
 // A browser with `closedby` closes a non-modal panel on Escape, stacked with the layers above it. Without it the panel listens itself, and leaves an Escape that belongs to a modal dialog or an open popover.
 listen(document, 'keydown', event => {
@@ -332,7 +320,7 @@ listen(document, 'keydown', event => {
 })
 ---
 // Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onOpenChange` is the one place the parent learns of it.
-dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={modal ? undefined : 'false'} data-size={typeof size === 'string' && size !== 'md' ? size : undefined} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={closeWatcher({ modal, docked: docked(), dirty, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
+dialog(part="root" aria-label={title} {...rest} open={serverOpen} data-modal={modal ? undefined : 'false'} data-size={typeof size === 'string' && size !== 'md' && !docked() ? size : undefined} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={closeWatcher({ modal, docked: docked(), dirty, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
   if open
     if docked() && dock as edge
       div(part="grip" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation={edge === 'right' ? 'vertical' : 'horizontal'} aria-valuenow={shownSize()} aria-valuemin={limits(edge).min} aria-valuemax={Number.isFinite(limits(edge).max) ? limits(edge).max : undefined} data-dock={edge} onPointerDown={startResize} onKeyDown={resizeByKey})
@@ -355,7 +343,7 @@ dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={
         if close
           | {close}
         else
-          IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} disabled={dirty} onClick={() => follows() || panel?.close()})
+          IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} disabled={dirty} onClick={() => followsHref(closeHref, onOpenChange) || panel?.close()})
     div(part="body" ref={element => body = element})
       slot
     if footer

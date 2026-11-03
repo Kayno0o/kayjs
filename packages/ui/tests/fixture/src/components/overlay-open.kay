@@ -1,0 +1,53 @@
+---
+import type { Action } from 'kay'
+import { signal } from 'kay'
+import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+
+// Overlays opened from a button, to read focus, the typing guard, the close link and what FormDialog and CommandPalette pass on.
+const { onClosed } = props<{ onClosed: (name: string) => void }>()
+const names = ['fields', 'bare', 'auto', 'esc', 'both', 'ddirty', 'pdirty', 'dtype', 'dfooter', 'ptype', 'pfooter', 'form'] as const
+const shown = signal<Record<string, boolean>>({})
+const shut = (name: string) => () => { shown = { ...shown(), [name]: false }; onClosed(name) }
+const save = Object.assign(async () => 'ok', { pending: () => false, url: '/_kay/action/form/rename' }) as unknown as Action<never, string>
+---
+for name of names key={name}
+  button(id={`open-${name}`} onClick={() => shown = { ...shown(), [name]: true }}) {name}
+Dialog#fields(open={shown().fields === true} title="Fields" onOpenChange={shut('fields')})
+  input#first
+  input#second
+Dialog#bare(open={shown().bare === true} title="Bare" onOpenChange={shut('bare')})
+  p Nothing to focus
+Dialog#auto(open={shown().auto === true} title="Auto" onOpenChange={shut('auto')})
+  input#one
+  // kay-allow autofocus
+  input#two(autofocus)
+Dialog#esc(open={shown().esc === true} closeHref="/dialog-esc" title="Esc")
+  p Body
+Dialog#both(open={shown().both === true} closeHref="/dialog-both" title="Both" onOpenChange={shut('both')})
+  p Body
+Dialog#ddirty(open={shown().ddirty === true} dirty closeHref="/dialog-dirty" title="Dirty" onOpenChange={shut('ddirty')})
+  p Body
+SidePanel#pdirty(open={shown().pdirty === true} dirty closeHref="/panel-dirty" title="Dirty" onOpenChange={shut('pdirty')})
+  p Body
+Dialog#dtype(open={shown().dtype === true} title="Type" onOpenChange={shut('dtype')})
+  input#dtype-input
+Dialog#dfooter(open={shown().dfooter === true} title="Footer" onOpenChange={shut('dfooter')})
+  input#dfooter-input
+  @footer
+    button Save
+SidePanel#ptype(open={shown().ptype === true} title="Type" onOpenChange={shut('ptype')})
+  input#ptype-input
+SidePanel#pfooter(open={shown().pfooter === true} title="Footer" onOpenChange={shut('pfooter')})
+  input#pfooter-input
+  @footer
+    button Save
+CommandPalette#palette(entries={[]} size="sm")
+FormDialog#form(open={shown().form === true} title="Form" action={save} submitLabel="Save" failure="Failed" size="lg" closeLabel="Shut" level={3} onOpenChange={shut('form')})
+  @actions
+    button#form-actions Extra
+  input(name="name")
+Dialog#hydrated(open title="Hydrated" closeHref="/hydrated")
+  input#hydrated-input

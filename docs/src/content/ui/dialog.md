@@ -32,7 +32,7 @@ The head line holds the title, the `@actions` block and a close button, named `C
 
 `closeHref` makes the close button a link, so a dialog open on the server closes with no JavaScript. With it `onOpenChange` is optional: leave it out and Escape follows the link too. `modal={false}` shows the dialog over the page without blocking it, open on the server, as SidePanel does.
 
-SidePanel, FormDialog and CommandPalette take the same `size` names, and FormDialog passes `size`, `level`, `actions` and `closeLabel` to its Dialog.
+SidePanel, FormDialog and CommandPalette take the same `size` names (a palette's `md` is the narrower 36rem), and FormDialog passes `size`, `level`, `actions`, `header`, `close`, `closeHref`, `modal` and `closeLabel` to its Dialog.
 
 ## Heading level
 

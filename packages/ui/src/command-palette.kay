@@ -6,7 +6,6 @@ import { stepIndex } from './cycle'
 import { startRef } from './form-reset'
 import Icon from './icon.kay'
 import { OUTSIDE } from './outside'
-
 import { isPaletteLink, paletteHits, paletteMatches, paletteSections, splitMatches, withRecent } from './palette'
 import { wording } from 'kay/words'
 

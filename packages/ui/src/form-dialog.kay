@@ -10,7 +10,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: '', footer: 'flex w-full flex-wrap items-center gap-2', actions: 'ml-auto flex flex-wrap justify-end gap-2', form: 'kui-form-grid' } })
 
-const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failure, refused, onSaved, onError, onOpenChange, extra, id, size, level, actions, closeLabel } = props<{
+const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failure, refused, onSaved, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel } = props<{
   // Shows the dialog; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -38,6 +38,12 @@ const { open, title, heading, action, submitLabel, savingLabel = wording('ui.for
   size?: OverlaySize | undefined
   level?: 2 | 3 | 4 | 5 | 6 | undefined
   actions?: Snippet
+  // The head line and the close button in place of the Dialog's own, as its `@header` and `@close`.
+  header?: Snippet
+  close?: Snippet
+  // The close button as a link, and the dialog beside the page instead of over it, as the Dialog takes them.
+  closeHref?: string | undefined
+  modal?: boolean | undefined
   closeLabel?: string | undefined
   // Called with `false` however the dialog closes, saved or not.
   onOpenChange: (open: boolean) => unknown
@@ -81,7 +87,7 @@ function submitOnCtrlEnter(event: KeyboardEvent) {
 }
 ---
 // Only a click outside or Escape closes the dialog while `open` is still true; every other way has already closed it.
-Dialog(open={open} title={title} heading={heading} size={size} level={level} actions={actions} closeLabel={closeLabel} dirty={action.pending()} part="root" onOpenChange={shown => !shown && open && onOpenChange(false)})
+Dialog(open={open} title={title} heading={heading} size={size} level={level} actions={actions} header={header} close={close} closeHref={closeHref} modal={modal} closeLabel={closeLabel} dirty={action.pending()} part="root" onOpenChange={shown => !shown && open && onOpenChange(false)})
   @footer
     div(part="footer")
       | {extra}

@@ -116,3 +116,5 @@ FormDialog(
 ## Labels
 
 `savingLabel` is what the submit button says while the action runs, `Saving…` by default. `cancelLabel` words the cancel button, `Cancel` by default.
+
+The footer's Cancel and the head line's close button both close the dialog. The head, the close button and the dialog's own options pass through: `size`, `level`, `actions`, `@header`, `@close`, `closeLabel`, `closeHref` and `modal`, as [Dialog](/ui/dialog) takes them.

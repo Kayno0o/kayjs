@@ -1303,12 +1303,16 @@ component default
   actions?: string | undefined;
   form?: string | undefined;
 } | undefined
+  close?: Element
+  closeHref?: string | undefined
   closeLabel?: string | undefined
   extra?: Element
   failure: string
+  header?: Element
   heading?: Element
   id?: string | undefined
   level?: 2 | 3 | 4 | 5 | 6 | undefined
+  modal?: boolean | undefined
   onError?: ((error: unknown) => unknown) | undefined
   onOpenChange: (open: boolean) => unknown
   onSaved?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined

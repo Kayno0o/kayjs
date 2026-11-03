@@ -7,3 +7,8 @@ export function lockedButton<T extends object>(attributes: T) {
 
   return { ...kept, 'type': 'button', 'aria-disabled': 'true' } as T & { 'type': 'button', 'aria-disabled': 'true' }
 }
+
+// A link written `aria-disabled`: no `href` to follow and deaf to its press, still a tab stop like a locked button.
+export function lockedLink<T extends object>(attributes: T) {
+  return Object.fromEntries(Object.entries(attributes).filter(([name]) => !pressAttributes.has(name) && name !== 'disabled' && name !== 'href')) as T
+}

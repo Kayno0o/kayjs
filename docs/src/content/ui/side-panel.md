@@ -51,3 +51,7 @@ With `closeHref`, `onOpenChange` is optional. Leave it out and a server page ren
 ## Replacing the head
 
 `@header` draws the whole head line in place of the title, the actions and the close button, and `@close` replaces the close button alone. `dirty` keeps work in flight: a click outside and Escape leave the panel open and the close button is disabled. `level` sets the title's heading level.
+
+## Typed work is kept
+
+As in a Dialog, typing inside marks the panel as edited: a click outside no longer closes it, and Escape closes it only when it has no footer. `dirty` locks it for other work, the close button included. Opening it again starts clean.

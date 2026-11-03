@@ -400,6 +400,32 @@ describe('a SidePanel with modal={false}', () => {
   })
 })
 
+describe('a Dialog and a SidePanel open on the server', () => {
+  const tagOf = (id: string) => html.match(new RegExp(`<dialog[^>]*id="${id}"[^>]*>`))![0]
+
+  test('one with a closeHref renders open and linked, and still looks like a modal: fixed, centered, over a backdrop', () => {
+    for (const id of ['linked', 'linked-side']) {
+      expect(tagOf(id)).toMatch(/ open(?=[ >])/)
+      expect(tagOf(id)).toContain('[&amp;[open]:not(:modal)]:fixed')
+      expect(tagOf(id)).toContain('shadow-[0_0_0_100vmax_rgb(0_0_0/0.5)]')
+      expect(tagOf(id)).not.toContain(' data-modal="false"')
+    }
+
+    expect(html).toMatch(/<a [^>]*href="\/list"[^>]*aria-label="Close"/)
+    expect(tagOf('linked')).toContain('[&amp;[open]:not(:modal)]:inset-0')
+  })
+
+  test('a Dialog with modal={false} renders open beside the page, with no backdrop and Escape alone closing it', () => {
+    expect(tagOf('linked-beside')).toMatch(/ open(?=[ >])/)
+    expect(tagOf('linked-beside')).toContain('data-modal="false"')
+    expect(tagOf('linked-beside')).toContain('closedby="closerequest"')
+  })
+
+  test('a modal Dialog with no closeHref is not rendered open', () => {
+    expect(tagOf('dialog')).not.toMatch(/ open[ >=]/)
+  })
+})
+
 describe('the display components whose recipe holds their look', () => {
   // The classes of the element an id or a data-part selects, in the order they are written.
   const classesOfPart = (id: string, part?: string) => {
