@@ -10,7 +10,7 @@ import { steppedPoint } from './plot'
 const look = recipe({
   parts: {
     root: 'kui-sparkline flex h-[var(--spark-height,1.5rem)] w-full items-end gap-px',
-    item: 'flex h-full min-w-0 flex-1 items-end border-0 bg-transparent p-0 no-underline outline-none data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer focus-visible:outline-2 focus-visible:outline-foreground data-active:bg-surface',
+    item: 'flex h-full min-w-0 flex-1 items-end border-0 bg-transparent p-0 no-underline outline-none data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer focus-visible:outline-2 focus-visible:outline-foreground data-lit:bg-surface',
     bar: 'min-h-px w-full rounded-t-[1px] bg-accent data-[tone=muted]:bg-muted data-[tone=accent]:bg-accent data-[tone=success]:bg-success data-[tone=warning]:bg-warning data-[tone=danger]:bg-danger data-[tone=info]:bg-info',
   },
 })
@@ -95,16 +95,16 @@ if interactive()
   div(part="root" {...rest} role="group" aria-label={label})
     for value, at of values key={at}
       if markKind(link(at)?.href, onSelect !== undefined) === 'link'
-        a(part="item" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-active={marks.current() === at ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+        a(part="item" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
           {bar(value, at)}
       else if onSelect
-        button(part="item" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-active={marks.current() === at ? '' : undefined} onClick={() => void onSelect?.(mark(at))} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+        button(part="item" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined} onClick={() => void onSelect?.(mark(at))} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
           {bar(value, at)}
       else
-        span(part="item" aria-hidden="true" data-hint={hints?.[at]} data-active={marks.current() === at ? '' : undefined})
+        span(part="item" aria-hidden="true" data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined})
           {bar(value, at)}
 else
   div(part="root" {...rest} role="img" aria-label={label})
     for value, at of values key={at}
-      span(part="item" aria-hidden="true" data-hint={hints?.[at]} data-active={marks.current() === at ? '' : undefined})
+      span(part="item" aria-hidden="true" data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined})
         {bar(value, at)}

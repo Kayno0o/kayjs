@@ -17,7 +17,7 @@ const look = recipe({
     grid: 'absolute inset-x-0 h-px bg-border',
     tick: 'absolute right-full mr-2 -translate-y-1/2 text-2xs whitespace-nowrap text-[var(--color-muted)] tabular-nums',
     columns: 'absolute inset-0 flex gap-1',
-    column: 'flex min-w-0 flex-1 items-end gap-px outline-none hover:bg-surface data-active:bg-surface data-[kind=link]:no-underline data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer focus-visible:outline-2 focus-visible:outline-foreground data-stacked:flex-col-reverse data-stacked:items-stretch data-stacked:justify-start data-stacked:gap-0',
+    column: 'flex min-w-0 flex-1 items-end gap-px outline-none hover:bg-surface data-lit:bg-surface data-[kind=link]:no-underline data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer focus-visible:outline-2 focus-visible:outline-foreground data-stacked:flex-col-reverse data-stacked:items-stretch data-stacked:justify-start data-stacked:gap-0',
     // A stub is the mark a column keeps where its series gives it a colour or a note but no height; a stacked bar is squared and sized by its height alone.
     bar: 'min-h-px min-w-px flex-1 rounded-t-sm data-stub:h-1 data-stacked:flex-none data-stacked:rounded-none',
     axis: 'ml-10 flex gap-1',
@@ -152,13 +152,13 @@ else
       div(part="columns")
         for _, at of labels key={at}
           if markKind(link(at)?.href, onSelect !== undefined) === 'link'
-            a(part="column" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-active={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+            a(part="column" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
               {bars(at)}
           else if onSelect
-            button(part="column" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-active={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onClick={() => void onSelect?.(mark(at))} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+            button(part="column" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onClick={() => void onSelect?.(mark(at))} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
               {bars(at)}
           else
-            span(part="column" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-active={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+            span(part="column" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={tooltip ? undefined : summaries()[at]} data-lit={marks.current() === at ? '' : undefined} data-stacked={stacked ? '' : undefined} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
               {bars(at)}
     if tooltip && marks.current() !== null && marks.anchor()
       div(part="tooltip" ref={tip.watch} style={tip.place(marks.anchor()!)} aria-hidden="true")

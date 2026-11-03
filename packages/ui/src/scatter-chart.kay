@@ -17,7 +17,7 @@ const look = recipe({
     guide: 'absolute bg-border-strong data-[axis=x]:inset-y-0 data-[axis=x]:w-px data-[axis=y]:inset-x-0 data-[axis=y]:h-px',
     corner: 'pointer-events-none absolute text-2xs text-[var(--color-muted)] data-[corner=bottomLeft]:bottom-1.5 data-[corner=bottomLeft]:left-2 data-[corner=bottomRight]:right-2 data-[corner=bottomRight]:bottom-1.5 data-[corner=topLeft]:top-1.5 data-[corner=topLeft]:left-2 data-[corner=topRight]:top-1.5 data-[corner=topRight]:right-2',
     tooltip: TOOLTIP_LOOK,
-    dot: 'absolute h-(--_dot-size) w-(--_dot-size) -translate-x-1/2 translate-y-1/2 rounded-full bg-accent opacity-70 transition-opacity hover:z-10 hover:opacity-100 data-active:z-10 data-active:opacity-100 data-interactive:cursor-pointer data-interactive:focus-visible:opacity-100 data-interactive:focus-visible:outline-2 data-interactive:focus-visible:outline-foreground',
+    dot: 'absolute h-(--_dot-size) w-(--_dot-size) -translate-x-1/2 translate-y-1/2 rounded-full bg-accent opacity-70 transition-opacity hover:z-10 hover:opacity-100 data-lit:z-10 data-lit:opacity-100 data-interactive:cursor-pointer data-interactive:focus-visible:opacity-100 data-interactive:focus-visible:outline-2 data-interactive:focus-visible:outline-foreground',
   },
 })
 
@@ -119,11 +119,11 @@ else
         span(part="corner" data-corner={entry[0]}) {entry[1]}
       for point, at of points key={point.key}
         if markKind(link(point)?.href, onSelect !== undefined) === 'link'
-          a(part="dot" {...link(point)} data-interactive data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-active={marks.current() === at ? '' : undefined} style={place(point)} onClick={event => pressed(event, point)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+          a(part="dot" {...link(point)} data-interactive data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-lit={marks.current() === at ? '' : undefined} style={place(point)} onClick={event => pressed(event, point)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
         else if onSelect
-          button(part="dot" type="button" data-interactive data-kind="button" tabindex={at === current() ? '0' : '-1'} onKeyDown={keyDown} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-active={marks.current() === at ? '' : undefined} style={place(point)} onClick={() => onSelect?.(point)} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+          button(part="dot" type="button" data-interactive data-kind="button" tabindex={at === current() ? '0' : '-1'} onKeyDown={keyDown} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-lit={marks.current() === at ? '' : undefined} style={place(point)} onClick={() => onSelect?.(point)} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
         else
-          span(part="dot" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-active={marks.current() === at ? '' : undefined} style={place(point)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+          span(part="dot" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-lit={marks.current() === at ? '' : undefined} style={place(point)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
       if tooltip && marks.current() !== null && marks.anchor() && points[marks.current()!]
         div(part="tooltip" ref={tip.watch} style={tip.place(marks.anchor()!)} aria-hidden="true")
           {tooltip(points[marks.current()!]!)}

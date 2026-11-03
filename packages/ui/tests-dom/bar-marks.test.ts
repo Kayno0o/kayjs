@@ -48,8 +48,8 @@ describe('BarChart marks', () => {
 
     const controlled = await marks({ steered: 0 })
 
-    expect(controlled.root.querySelectorAll('#steered [data-part="column"]')[0]!.hasAttribute('data-active')).toBe(true)
-    expect(controlled.root.querySelectorAll('#steered [data-part="column"]')[1]!.hasAttribute('data-active')).toBe(false)
+    expect(controlled.root.querySelectorAll('#steered [data-part="column"]')[0]!.hasAttribute('data-lit')).toBe(true)
+    expect(controlled.root.querySelectorAll('#steered [data-part="column"]')[1]!.hasAttribute('data-lit')).toBe(false)
   })
 
   test('draws the tooltip block for the column the focus is on', async () => {
