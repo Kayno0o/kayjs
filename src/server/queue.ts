@@ -742,7 +742,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
           arm()
 
         timer = setTimeout(() => {
-          const error = new Error(`it ran past lostAfter, ${Math.round(lostAfter / 1000)} s`)
+          const error = new Error(`it ran past lostAfter, ${lostAfter < 1000 ? `${Math.round(lostAfter)} ms` : `${Math.round(lostAfter / 1000)} s`}`)
 
           ended.abort(error)
           reject(error)

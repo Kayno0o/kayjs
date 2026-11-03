@@ -128,7 +128,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     while ((await first.status(id))?.error === undefined)
       await Bun.sleep(20)
 
-    expect(await first.status(id)).toMatchObject({ status: 'sleeping', steps: 1, error: 'it ran past lostAfter, 0 s' })
+    expect(await first.status(id)).toMatchObject({ status: 'sleeping', steps: 1, error: 'it ran past lostAfter, 300 ms' })
     later(MINUTE)
 
     const second = workflow<undefined>(name, async ({ step }) => {
