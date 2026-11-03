@@ -165,6 +165,11 @@ export function markedText(value: string | number, markup: string, part = false)
   return ref === undefined ? markup : fenced(fieldMarks.marking!, 'field', ref, markup)
 }
 
+// The HTML `markdownHtml` made of a field's Markdown, fenced when a field gave that text, so the element holding it alone is marked and typed in a block at a time.
+export function markedMarkdown(markdown: string, markup: string): string {
+  return fieldMarks.marking === undefined ? markup : markedText(markdown, markup)
+}
+
 // ` data-kay-field-<name>="..."` beside an attribute whose value a field gave; `literal` is a number the template wrote, never a field's and no loop's.
 export function markedAttribute(name: string, value: unknown, literal = false): string {
   const ref = typeof value === 'string' || typeof value === 'number' ? fieldOf(value, true, literal) : undefined

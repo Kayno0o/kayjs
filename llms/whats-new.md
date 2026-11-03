@@ -38,6 +38,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `secret-prop` skips a field named like a secret that holds a list of objects, such as a syntax highlighter's `tokens`: [lints](lints.md).
 - `kay a11y` lists a folder collection's entries from the folder the server reads, so the pages of a route filled by a collection are audited rather than reported as not audited.
 - `kay add` installs a dev package kay's own manifest does not name at its latest version, rather than crashing when kay is installed from a tarball.
+- A Markdown field rendered with `markdownHtml(entry.data.body)` is marked in edit mode and typed a block at a time, as the body is: [kayjs-cms editor](../packages/cms/llms/editor.md).
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
 

@@ -20,9 +20,10 @@ import { cached } from '../src/runtime/cache'
 import { sqliteCache } from '../src/runtime/cache.server'
 import { showDraft } from '../src/runtime/edit'
 import { editableEntry, editMarks, placeFieldMarks, unclickableFields, withFieldMarks } from '../src/runtime/fields'
-import { attribute, child, element, loop, spreadAttributes } from '../src/runtime/html'
+import { attribute, child, element, innerMarkup, loop, spreadAttributes } from '../src/runtime/html'
 import { island } from '../src/runtime/island.server'
 import { logSink, setLogSink } from '../src/runtime/log'
+import { markdownHtml } from '../src/runtime/markdown.server'
 import { navigation } from '../src/runtime/navigation'
 import { editing, previewing } from '../src/runtime/preview'
 import { html as renderedHtml } from '../src/runtime/rendered'
@@ -1581,6 +1582,20 @@ describe('preview mode', () => {
       expect(entry.data.at).toBeInstanceOf(Date)
       expect(placeFieldMarks(html, marks)).toBe('<div data-kay-field="news:a:title">T</div><div><!--kay-field news:a:count-->3<!--/kay-field--> 3</div><a title="T">T</a><section data-kay-body="news:a"><p>x</p></section>')
     }, true)
+  })
+
+  it('marks a Markdown field rendered with markdownHtml, and leaves other Markdown and a page outside edit mode alone', () => {
+    const data = { sections: [{ body: '**Hi**' }], note: '*other*' }
+    const page = (entry: { data: typeof data }) => `<div>${innerMarkup(markdownHtml(entry.data.sections[0]!.body))}</div><section>${innerMarkup(markdownHtml('literal *text*'))}</section>`
+
+    inPreview(() => {
+      const marks = editMarks()!
+      const entry = editableEntry(marks, 'news', { slug: 'a', data, Content: () => renderedHtml('') })
+
+      expect(placeFieldMarks(withFieldMarks(marks, () => page(entry)), marks)).toBe('<div data-kay-field="news:a:sections.0.body"><p><strong>Hi</strong></p>\n</div><section><p>literal <em>text</em></p>\n</section>')
+    }, true)
+
+    expect(page({ data })).toBe('<div><p><strong>Hi</strong></p>\n</div><section><p>literal <em>text</em></p>\n</section>')
   })
 
   it('marks a number only rendered right after its field is read, nothing else read or rendered between', () => {

@@ -21,6 +21,8 @@ h1 {post.data.title}
 img(src={post.data.photo} alt={post.data.title})
 ```
 
+A Markdown field rendered through `markdownHtml` from `kay/markdown` is marked the same way, on the element holding it alone, and typed a block at a time: `div(innerHTML={markdownHtml(section.body)})`. Markdown that no field gave, a literal say, stays unmarked.
+
 ### Keep a fixed header clear of the panel
 
 The panel pads the page's `body` by its width or height, and `html.kcms-editing` carries `--kcms-width` and `--kcms-height` for a site that wants to line up with the panel.
