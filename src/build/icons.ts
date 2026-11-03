@@ -1,6 +1,6 @@
 import type { IconProps, IconSet } from '../runtime/icons'
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { KayError } from '../compiler/errors'
 import * as iconSet from '../runtime/icons'
@@ -11,8 +11,13 @@ export const ICON_IMPORT = /^~icons\/([a-z0-9-]+)\/([a-z0-9-]+)$/
 const ICONIFY_PACKAGE = '@iconify-json/'
 const sets = new Map<string, IconSet | undefined>()
 
-// The nearest package.json at or above the root: a folder without one, as a fixture inside a workspace, draws its sets from the workspace's.
+// The nearest package.json at or above the root: a folder without one, as a fixture inside a workspace, draws its sets from the workspace's. A folder under node_modules is no project of the workspace's.
 function manifestOf(root: string): string | undefined {
+  const own = join(root, 'package.json')
+
+  if (root.includes(`${sep}node_modules${sep}`))
+    return existsSync(own) ? own : undefined
+
   for (let dir = root; ; dir = dirname(dir)) {
     const manifest = join(dir, 'package.json')
 
