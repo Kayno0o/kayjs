@@ -15,7 +15,7 @@ const look = recipe({
     // The label comes before the change for a screen reader, and `order` puts the change back beside the figure.
     value: 'order-1 font-semibold text-foreground',
     label: 'order-3 text-muted',
-    delta: 'order-2 inline-flex items-center gap-1 font-normal text-muted data-[tone=success]:text-success data-[tone=warning]:text-warning data-[tone=danger]:text-danger data-[tone=info]:text-info',
+    delta: 'order-2 inline-flex items-center gap-1 font-normal text-muted data-[tone=accent]:text-accent data-[tone=success]:text-success data-[tone=warning]:text-warning data-[tone=danger]:text-danger data-[tone=info]:text-info',
     deltaIcon: 'size-3.5 shrink-0',
     deltaValue: '',
     deltaLabel: 'text-muted',

@@ -10,7 +10,7 @@ description: Small bars with no axes, for a trend inside a row or a card.
 
 ## Tone
 
-`tone` colours every bar, `accent` by default. `tones` gives one tone per bar and wins over it, so a slow check can stand out. `muted`, `accent`, `success`, `warning`, `danger` and `info` are the tones. A colour is not a cue for everyone, so say what the tone means in `label`.
+`tone` colours every bar, `accent` by default. `tones` gives one tone per bar and wins over it, so a slow check can stand out. `neutral` (a quiet grey), `accent`, `success`, `warning`, `danger` and `info` are the tones. A colour is not a cue for everyone, so say what the tone means in `label`.
 
 <Demo name="sparkline/tones" />
 

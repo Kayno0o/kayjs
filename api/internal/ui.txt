@@ -469,7 +469,7 @@ interface Look
   label?: string | undefined
   size?: "xs" | "sm" | "md" | "lg" | undefined
   spinner?: boolean | undefined
-  tone?: "success" | "neutral" | "danger" | "accent" | undefined
+  tone?: Tone | undefined
   variant?: "solid" | "ghost" | "inline" | undefined
 
 [./lib/button-props] TagAttributes
@@ -1198,7 +1198,7 @@ interface MenuAction
   icon?: IconProps | IconSlot
   label: string
   onSelect?: (() => unknown) | undefined
-  tone?: "neutral" | "danger" | undefined
+  tone?: Tone | undefined
 
 [./lib/index] MenuEntry
 type MenuEntry = MenuAction | 'separator'
@@ -1324,13 +1324,13 @@ interface SparkMark
   value: number | null
 
 [./lib/index] SparkTone
-type SparkTone = 'muted' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
+type SparkTone = Tone
 
 [./lib/index] StatDelta
 interface StatDelta
   direction?: "up" | "down" | "flat" | undefined
   label?: string | undefined
-  tone?: "info" | "success" | "neutral" | "danger" | "warning" | undefined
+  tone?: Tone | undefined
   value: string
 
 [./lib/index] StepCookies
@@ -1393,7 +1393,7 @@ interface TimelineEntry<Key extends string | number = string>
   pickable?: boolean | undefined
   text: string
   time: string
-  tone?: "info" | "success" | "danger" | "warning" | "muted" | "accent" | undefined
+  tone?: Tone | undefined
 
 [./lib/index] toast
 const toast: {
@@ -1407,7 +1407,7 @@ interface Toast
   action?: ToastAction | undefined
   id: number
   message: string
-  tone?: ToastTone | undefined
+  tone?: Tone | undefined
   type: ToastType
 
 [./lib/index] ToastAction
@@ -1427,13 +1427,16 @@ interface ToastOptions
 function toasts(): Toast[]
 
 [./lib/index] ToastTone
-type ToastTone = 'danger' | 'success' | 'info'
+type ToastTone = Tone
 
 [./lib/index] ToastType
 type ToastType = 'error' | 'success' | 'info'
 
 [./lib/index] toCsv
 function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string
+
+[./lib/index] Tone
+type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
 
 [./lib/index] TOOLBAR_ACTIONS
 const TOOLBAR_ACTIONS: readonly ["bold", "italic", "heading", "bulletList", "numberedList", "link", "image"]
@@ -1699,7 +1702,7 @@ interface MenuAction
   icon?: IconProps | IconSlot
   label: string
   onSelect?: (() => unknown) | undefined
-  tone?: "neutral" | "danger" | undefined
+  tone?: Tone | undefined
 
 [./lib/menu] MenuEntry
 type MenuEntry = MenuAction | 'separator'
@@ -2020,7 +2023,7 @@ const default: UiSettings
 function shade(color: string, value: number): string | undefined
 
 [./lib/sparkline] SparkTone
-type SparkTone = 'muted' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
+type SparkTone = Tone
 
 [./lib/stat] deltaIcon
 function deltaIcon({ value, direction }: StatDelta): IconSlot
@@ -2029,7 +2032,7 @@ function deltaIcon({ value, direction }: StatDelta): IconSlot
 interface StatDelta
   direction?: "up" | "down" | "flat" | undefined
   label?: string | undefined
-  tone?: "info" | "success" | "neutral" | "danger" | "warning" | undefined
+  tone?: Tone | undefined
   value: string
 
 [./lib/steps] currentStep
@@ -2187,7 +2190,7 @@ interface TimelineEntry<Key extends string | number = string>
   pickable?: boolean | undefined
   text: string
   time: string
-  tone?: "info" | "success" | "danger" | "warning" | "muted" | "accent" | undefined
+  tone?: Tone | undefined
 
 [./lib/toast] attempt
 function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
@@ -2224,7 +2227,7 @@ interface Toast
   action?: ToastAction | undefined
   id: number
   message: string
-  tone?: ToastTone | undefined
+  tone?: Tone | undefined
   type: ToastType
 
 [./lib/toast] ToastAction
@@ -2244,10 +2247,13 @@ interface ToastOptions
 function toasts(): Toast[]
 
 [./lib/toast] ToastTone
-type ToastTone = 'danger' | 'success' | 'info'
+type ToastTone = Tone
 
 [./lib/toast] ToastType
 type ToastType = 'error' | 'success' | 'info'
+
+[./lib/tone] Tone
+type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
 
 [./lib/tree] TreeChildren
 type TreeChildren<Id extends TreeId = string> = readonly TreeNode<Id>[] | (() => readonly TreeNode<Id>[] | Promise<readonly TreeNode<Id>[]>)

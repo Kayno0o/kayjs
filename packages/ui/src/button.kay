@@ -17,8 +17,8 @@ const look = recipe({
   variants: {
     // The form: `solid` is the framed button, `ghost` has no frame until hovered and `inline` reads as a link.
     variant: { solid: '', ghost: '', inline: 'p-0 underline underline-offset-4' },
-    // What the button means: `accent` for the main action, `success` for a confirming one, `danger` for a destructive one.
-    tone: { neutral: '', accent: 'kui-btn-accent', success: 'kui-btn-success', danger: 'kui-btn-danger' },
+    // What the button means: `accent` for the main action, `success` for a confirming one, `danger` for a destructive one, `warning` and `info` for a cautious or an informing one.
+    tone: { neutral: '', accent: 'kui-btn-accent', success: 'kui-btn-success', warning: 'kui-btn-warning', danger: 'kui-btn-danger', info: 'kui-btn-info' },
     size: { xs: '', sm: '', md: '', lg: '' },
   },
   defaults: { variant: 'solid', tone: 'neutral', size: 'md' },

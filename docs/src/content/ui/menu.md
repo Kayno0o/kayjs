@@ -24,7 +24,7 @@ An entry with an `href` is drawn as a link, so a middle-click, Ctrl+click or "co
 
 ## Trigger and placement
 
-`size` is `xs` to `lg`, `md` by default, and `variant` is `solid`, `ghost` or `inline`, `ghost` by default, with a `tone` of `neutral`, `accent` or `danger` for the trigger. An entry is destructive with `tone: 'danger'`; an entry's `danger: true` is deprecated for it. `placement` is where the menu opens from the trigger, `bottom-end` by default. `id` is the menu's id, unique on the page, and kay draws one when you give none.
+`size` is `xs` to `lg`, `md` by default, and `variant` is `solid`, `ghost` or `inline`, `ghost` by default, with a `tone` for the trigger. An entry takes a `tone` too, `danger` for a destructive one; an entry's `danger: true` is deprecated for it. `placement` is where the menu opens from the trigger, `bottom-end` by default. `id` is the menu's id, unique on the page, and kay draws one when you give none.
 
 ## Your own trigger
 

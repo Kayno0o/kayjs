@@ -9,7 +9,7 @@ const picked = signal<string | undefined>('b')
 const entries = [
   { key: 'a', time: '08:00', text: 'Home', icon: 'info' as const },
   { key: 'b', time: '09:00', text: 'Walk' },
-  { key: 'c', time: '10:00', text: 'Gap', tone: 'muted' as const, pickable: false },
+  { key: 'c', time: '10:00', text: 'Gap', tone: 'neutral' as const, pickable: false },
 ]
 
 function select(key: string | undefined, entry: { text: string }) {

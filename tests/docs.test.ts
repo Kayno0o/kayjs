@@ -114,7 +114,7 @@ describe('the documentation site', () => {
     expect(components.filter(component => !component.body.includes('<Demo name=')).map(component => component.slug)).toEqual(['bell-inbox', 'bell', 'form-dialog'])
     expect(props.get('href')).toMatchObject({ type: 'string', optional: true })
     expect(props.get('variant')).toMatchObject({ type: '"solid" | "ghost" | "inline"', default: '\'solid\'' })
-    expect(props.get('tone')).toMatchObject({ type: '"neutral" | "accent" | "success" | "danger"', optional: true, default: '\'neutral\'' })
+    expect(props.get('tone')).toMatchObject({ type: '"neutral" | "accent" | "success" | "warning" | "danger" | "info"', optional: true, default: '\'neutral\'' })
     expect(props.get('tone')!.comment).toContain('main action')
     expect(components.find(component => component.slug === 'copy-button')!.data.props.find(prop => prop.name === 'tone')!.type).toContain('"success"')
     expect(components.find(component => component.slug === 'form-field')!.data.props.find(prop => prop.name === 'size')).toMatchObject({ default: '\'md\'' })

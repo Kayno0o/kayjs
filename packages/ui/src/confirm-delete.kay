@@ -6,6 +6,7 @@ import Dialog from './dialog.kay'
 import IconButton from './icon-button.kay'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
+import type { Tone } from './tone'
 
 // 'kui-confirm-delete-link' stays on the link trigger as its name for an app's CSS and the always-hidden guard.
 const frame = recipe({
@@ -39,7 +40,7 @@ const { message, details, onConfirm, open, onOpenChange, failure, success, refus
   // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: toasted in place of `failure`, which stays for an answer of undefined or another error.
   refused?: ((data: Data) => string | undefined) | undefined
   // `neutral` for a confirm that is not a deletion, such as a save with a consequence: accent buttons, a check icon, and every word taken from `label` unless given.
-  tone?: 'danger' | 'neutral' | undefined
+  tone?: Tone | undefined
   // Disables the trigger and the confirm button while the caller is busy; an open dialog stays open, its confirm button disabled until this is false again.
   disabled?: boolean | undefined
   // `inline` asks in place of the trigger instead of in a dialog: a click arms it into a danger button that deletes and one that cancels, for a row of a list.
@@ -63,7 +64,7 @@ const triggerLabel = () => label ?? (danger() ? wording('ui.confirmDelete.delete
 const dialogTitle = () => title ?? (danger() ? wording('ui.confirmDelete.title', 'Confirm Deletion') : triggerLabel())
 const confirmText = () => confirmLabel ?? (danger() ? wording('ui.confirmDelete.delete', 'Delete') : triggerLabel())
 const pendingText = () => pendingLabel ?? (danger() ? wording('ui.confirmDelete.pending', 'Deleting…') : confirmText())
-const look = () => danger() ? 'danger' : 'accent'
+const look = (): Tone => tone === 'neutral' ? 'accent' : tone
 
 const inner = signal(false)
 const isOpen = () => open ?? inner()

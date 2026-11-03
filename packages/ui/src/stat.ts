@@ -1,4 +1,5 @@
 import type { IconSlot } from './defaults'
+import type { Tone } from './tone'
 
 // How a figure moved since the period before it, shown beside the figure.
 export interface StatDelta {
@@ -7,7 +8,7 @@ export interface StatDelta {
   // What it is measured against, such as `vs previous`.
   label?: string | undefined
   // Colours the change; `neutral` keeps the muted text. Whether up is good is the app's to say: `tone="danger"` on a rise in errors.
-  tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'info' | undefined
+  tone?: Tone | undefined
   // Picks the arrow; it follows the sign of `value` by default, a `+` up, a `-` down and anything else flat.
   direction?: 'up' | 'down' | 'flat' | undefined
 }

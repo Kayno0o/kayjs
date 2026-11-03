@@ -8,7 +8,7 @@ Each entry has a `key`, a `time` (a time or a range, worded as you like), a `tex
 
 ## Tones
 
-`tone="muted"` greys an entry, such as a gap nothing reported. `accent`, `success`, `warning`, `danger` and `info` colour its icon.
+`tone: 'neutral'` greys an entry, such as a gap nothing reported. `accent`, `success`, `warning`, `danger` and `info` colour its icon.
 
 ## Picking an entry
 

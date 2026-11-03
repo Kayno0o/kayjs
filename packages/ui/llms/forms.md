@@ -44,6 +44,7 @@
   - `zone.dragging()` reads whether files hover the zone, which also carries `data-dragging`.
   - `size="sm"` (`md` by default) draws it as a slim row, its content from the left, to sit inline in a form rather than as a large target.
 - `Menu(label="Actions" icon="plus" items={[{ label: 'Rename', onSelect: rename }, 'separator', { label: 'Delete', icon: 'delete', tone: 'danger', onSelect: remove }]})`:
+  - An item's `tone` is any `Tone`.
   - An item's old `danger: true` flag is deprecated for `tone: 'danger'`, which wins when both are given, and goes in 2.0.0.
   - `data-*`, `aria-*` and `style` go on the icon button, `open` and `onOpenChange` are Popover's.
   - `@trigger(attributes)` replaces the icon button, for a labelled Button or a user name with an avatar: `Menu(label="Actions" items={items})` then `@trigger(attributes)` and `Button({...attributes} label="Actions")`. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup="menu"` and the anchor style (`MenuTriggerProps`), and `icon`, `size`, `variant` and `tone` then style nothing. AppSwitcher takes the same block.

@@ -83,10 +83,10 @@ TreeView(nodes={[{ id: 'work', label: 'Work', children: [{ id: 'specs', label: '
 ### Timeline
 
 ```kay
-Timeline(entries={[{ key: 'home', time: '08:00 - 09:10', text: 'At home', icon: 'info' }, { key: 'gap', time: '09:10 - 09:40', text: 'No data', tone: 'muted', pickable: false }]} label="Today" selected={picked()} onSelect={picked.set})
+Timeline(entries={[{ key: 'home', time: '08:00 - 09:10', text: 'At home', icon: 'info' }, { key: 'gap', time: '09:10 - 09:40', text: 'No data', tone: 'neutral', pickable: false }]} label="Today" selected={picked()} onSelect={picked.set})
 ```
 
-- Entries in time order, as given (the timeline never sorts): a `TimelineEntry` (from the package) has a `key`, a `time` (the time or range as the app words it), a `text`, an optional `icon` and `tone`, and `pickable`. `tone="muted"` greys a gap; `accent`, `success`, `warning`, `danger` and `info` colour the icon. `label` names the list for screen readers.
+- Entries in time order, as given (the timeline never sorts): a `TimelineEntry` (from the package) has a `key`, a `time` (the time or range as the app words it), a `text`, an optional `icon` and `tone`, and `pickable`. `tone: 'neutral'` greys a gap; the other `Tone`s colour the icon. `label` names the list for screen readers.
 - With `onSelect` or `selected` every entry is a button marked `aria-pressed`, one picked at a time, reachable with Tab; pressing the picked one again clears it. `selected` is the bindable key, a new one from the parent is followed, and `onSelect(key, entry)` gets the key as `selected` takes it (`undefined` when cleared), so `onSelect={picked.set}` round-trips. `pickable: false` keeps an entry plain text. Hover, picked and muted looks follow the theme and every skin; the parts are `root`, `item`, `entry`, `time`, `icon` and `text` ([Restyle a component](restyle.md)).
 
 ### DescriptionList

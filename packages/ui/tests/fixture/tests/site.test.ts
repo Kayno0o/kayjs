@@ -442,7 +442,7 @@ describe('content', () => {
 
   test('Notice is a status, or an alert for a danger, drawn as a box or as a bare line', async () => {
     expect(await attributes('/content', '#notice [role], #notice-error [role]', ['role', 'data-tone', 'data-compact'])).toEqual([
-      { 'role': 'status', 'data-tone': 'info', 'data-compact': null },
+      { 'role': 'status', 'data-tone': 'neutral', 'data-compact': null },
       { 'role': 'alert', 'data-tone': 'danger', 'data-compact': '' },
     ])
     expect((await one('/content', '#notice-error a')).attributes.href).toBe('/data')
@@ -1238,7 +1238,7 @@ describe('variant names the form and tone the meaning', () => {
     }
 
     expect(await roles('notice-danger')).toEqual(['danger', 'alert'])
-    expect(await roles('notice-default')).toEqual(['info', 'status'])
+    expect(await roles('notice-default')).toEqual(['neutral', 'status'])
   })
 })
 

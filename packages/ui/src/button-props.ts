@@ -1,14 +1,15 @@
 import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
+import type { Tone } from './tone'
 import { lockedButton } from './locked-button'
 
 // What BusyButton takes, which has no recipe: `variant`, `tone` and `size` are Button's recipe variants, repeated here for it.
 export interface Look {
   // The form: `solid` is the framed button, `ghost` has no frame until hovered and `inline` reads as a link.
   variant?: 'solid' | 'ghost' | 'inline' | undefined
-  // What the button means: `accent` for the main action, `success` for a confirming one, `danger` for a destructive one.
-  tone?: 'neutral' | 'accent' | 'success' | 'danger' | undefined
+  // What the button means: `accent` for the main action, `success` for a confirming one, `danger` for a destructive one, `warning` and `info` for a cautious or an informing one.
+  tone?: Tone | undefined
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   // Drawn before the label.
   icon?: IconSlot | IconProps | undefined

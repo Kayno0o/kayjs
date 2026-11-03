@@ -20,7 +20,7 @@ const look = recipe({
     // As a Button's: `solid` is the framed button, `ghost` has no frame until hovered and `inline` reads as a link.
     variant: { solid: '', ghost: '', inline: '' },
     // As a Button's: `accent` for the main action.
-    tone: { neutral: '', accent: '', success: '', danger: '' },
+    tone: { neutral: '', accent: '', success: '', warning: '', danger: '', info: '' },
     size: { xs: '', sm: '', md: '', lg: '' },
   },
   defaults: { variant: 'solid', tone: 'neutral', size: 'md' },

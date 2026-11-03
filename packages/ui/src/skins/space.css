@@ -65,12 +65,12 @@
   }
 
   /* A key, on a Button and a framed IconButton: a hairline on the canvas, lit in the accent while hovered. The tones, the ghost and inline forms, a pressed toggle and a disabled button keep their own look from the theme. */
-  :is(.kui-btn, .kui-shell:where(.kui-icon-btn)):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'], :disabled, [aria-disabled='true'])) {
+  :is(.kui-btn, .kui-shell:where(.kui-icon-btn)):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-warning, .kui-btn-danger, .kui-btn-info, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'], :disabled, [aria-disabled='true'])) {
     --shell-line: var(--color-input);
     --shell-fill: transparent;
   }
 
-  :is(.kui-btn, .kui-shell:where(.kui-icon-btn)):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'], :disabled, [aria-disabled='true'])):hover {
+  :is(.kui-btn, .kui-shell:where(.kui-icon-btn)):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-warning, .kui-btn-danger, .kui-btn-info, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'], :disabled, [aria-disabled='true'])):hover {
     --shell-line: var(--color-accent);
     --shell-fill: transparent;
     color: var(--color-accent);

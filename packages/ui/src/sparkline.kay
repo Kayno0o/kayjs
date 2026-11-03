@@ -1,6 +1,6 @@
 ---
 import type { JSX } from 'kay'
-import type { SparkTone } from './sparkline'
+import type { Tone } from './tone'
 import type { SparkMark } from './chart-marks'
 import { memo, recipe, signal } from 'kay'
 import { activeMarks, markKind } from './chart-marks'
@@ -11,7 +11,7 @@ const look = recipe({
   parts: {
     root: 'kui-sparkline flex h-[var(--spark-height,1.5rem)] w-full items-end gap-px',
     item: 'flex h-full min-w-0 flex-1 items-end border-0 bg-transparent p-0 no-underline outline-none data-[kind=button]:cursor-pointer data-[kind=link]:cursor-pointer focus-visible:outline-2 focus-visible:outline-foreground data-lit:bg-surface',
-    bar: 'min-h-px w-full rounded-t-[1px] bg-accent data-[tone=muted]:bg-muted data-[tone=accent]:bg-accent data-[tone=success]:bg-success data-[tone=warning]:bg-warning data-[tone=danger]:bg-danger data-[tone=info]:bg-info',
+    bar: 'min-h-px w-full rounded-t-[1px] bg-accent data-[tone=neutral]:bg-muted data-[tone=muted]:bg-muted data-[tone=accent]:bg-accent data-[tone=success]:bg-success data-[tone=warning]:bg-warning data-[tone=danger]:bg-danger data-[tone=info]:bg-info',
   },
 })
 
@@ -19,9 +19,9 @@ const { values, tone = 'accent', tones, hints, onSelect, href, onActive, active,
   // One bar per value, the largest filling the height; a `null`, a zero or a negative value leaves a hairline.
   values: readonly (number | null)[]
   // Colours every bar; `accent` by default.
-  tone?: SparkTone | undefined
+  tone?: Tone | undefined
   // One tone per bar, which wins over `tone`.
-  tones?: readonly (SparkTone | undefined)[] | undefined
+  tones?: readonly (Tone | undefined)[] | undefined
   // One note per bar, shown under the pointer by TooltipHost; the keyboard and screen readers have `label` alone.
   hints?: readonly (string | undefined)[] | undefined
   // Makes every bar a button handing back its index and value; with `href` too, a bar that has an address stays a link and a plain click goes to this.

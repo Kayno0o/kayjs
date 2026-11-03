@@ -12,7 +12,7 @@ const look = recipe({
     text: 'inline-flex flex-col items-center after:invisible after:h-0 after:overflow-hidden after:content-[attr(data-other)]',
     live: 'sr-only',
   },
-  variants: { tone: { neutral: '', accent: 'kui-btn-accent', success: 'kui-btn-success', danger: 'kui-btn-danger' } },
+  variants: { tone: { neutral: '', accent: 'kui-btn-accent', success: 'kui-btn-success', warning: 'kui-btn-warning', danger: 'kui-btn-danger', info: 'kui-btn-info' } },
 })
 
 const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', copiedLabel = wording('ui.copyButton.copied', 'Copied!'), failure = wording('ui.copyButton.failure', 'Could not copy to the clipboard'), onCopy, onFail, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type' | 'onCopy'> & {

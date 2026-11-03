@@ -1,9 +1,10 @@
 import type { Duration } from 'kay'
+import type { Tone } from './tone'
 import { ActionError, ApiError, durationMs, signal, untrack } from 'kay'
 import { answerMessage } from './internal/answer-message'
 
 // What a toast means, in the vocabulary of every tone: a failed call is a `danger`.
-export type ToastTone = 'danger' | 'success' | 'info'
+export type ToastTone = Tone
 
 /** @deprecated The old name of a toast's tone, `error` for `danger`: read `Toast.tone`. Removed in 2.0.0. */
 export type ToastType = 'error' | 'success' | 'info'

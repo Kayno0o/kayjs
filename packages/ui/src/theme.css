@@ -251,12 +251,28 @@
     }
   }
 
+  .kui-btn-warning {
+    @apply text-warning;
+
+    &:hover {
+      --shell-line: var(--color-warning);
+    }
+  }
+
   .kui-btn-danger {
     @apply text-danger;
 
     &:hover {
       --shell-line: var(--color-danger);
       --shell-fill: color-mix(in oklab, var(--color-danger) 10%, transparent);
+    }
+  }
+
+  .kui-btn-info {
+    @apply text-info;
+
+    &:hover {
+      --shell-line: var(--color-info);
     }
   }
 
@@ -386,8 +402,20 @@
       @apply text-accent;
     }
 
+    &:where([data-tone='success']) {
+      @apply text-success;
+    }
+
+    &:where([data-tone='warning']) {
+      @apply text-warning;
+    }
+
     &:where([data-tone='danger']) {
       @apply text-danger;
+    }
+
+    &:where([data-tone='info']) {
+      @apply text-info;
     }
   }
 

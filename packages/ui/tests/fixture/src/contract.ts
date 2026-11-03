@@ -287,7 +287,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'textarea': { 'aria-label': 'Bio' },
   'time-input': { 'aria-label': 'Start', 'value': '09:30' },
   'toaster': {},
-  'timeline': { entries: [{ key: 'a', time: '08:00', text: 'Home', icon }, { key: 'b', time: '09:00', text: 'Gap', tone: 'muted' }], label: 'Day', selected: 'a', onSelect: noop },
+  'timeline': { entries: [{ key: 'a', time: '08:00', text: 'Home', icon }, { key: 'b', time: '09:00', text: 'Gap', tone: 'neutral' }], label: 'Day', selected: 'a', onSelect: noop },
   'toggle': { label: 'Digest' },
   'toolbar': { label: 'Actions', caption: 'Mars', children: 'Move' },
   'tooltip': { text: 'Published on Monday', children: 'Published' },

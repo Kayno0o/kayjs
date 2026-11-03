@@ -1,12 +1,13 @@
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import type { PopoverTriggerProps } from './popover'
+import type { Tone } from './tone'
 
 export interface MenuAction {
   label: string
   icon?: IconSlot | IconProps
-  // `danger` paints the entry as destructive.
-  tone?: 'neutral' | 'danger' | undefined
+  // Colours the entry, such as `danger` for a destructive one.
+  tone?: Tone | undefined
   /** @deprecated Use `tone: 'danger'`, which wins when both are given. Removed in 2.0.0. */
   danger?: boolean
   disabled?: boolean

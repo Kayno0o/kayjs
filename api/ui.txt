@@ -212,7 +212,7 @@ interface MenuAction
   icon?: IconProps | IconSlot
   label: string
   onSelect?: (() => unknown) | undefined
-  tone?: "neutral" | "danger" | undefined
+  tone?: Tone | undefined
 
 [.] MenuEntry
 type MenuEntry = MenuAction | 'separator'
@@ -338,13 +338,13 @@ interface SparkMark
   value: number | null
 
 [.] SparkTone
-type SparkTone = 'muted' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
+type SparkTone = Tone
 
 [.] StatDelta
 interface StatDelta
   direction?: "up" | "down" | "flat" | undefined
   label?: string | undefined
-  tone?: "info" | "success" | "neutral" | "danger" | "warning" | undefined
+  tone?: Tone | undefined
   value: string
 
 [.] StepCookies
@@ -407,7 +407,7 @@ interface TimelineEntry<Key extends string | number = string>
   pickable?: boolean | undefined
   text: string
   time: string
-  tone?: "info" | "success" | "danger" | "warning" | "muted" | "accent" | undefined
+  tone?: Tone | undefined
 
 [.] toast
 const toast: {
@@ -421,7 +421,7 @@ interface Toast
   action?: ToastAction | undefined
   id: number
   message: string
-  tone?: ToastTone | undefined
+  tone?: Tone | undefined
   type: ToastType
 
 [.] ToastAction
@@ -441,13 +441,16 @@ interface ToastOptions
 function toasts(): Toast[]
 
 [.] ToastTone
-type ToastTone = 'danger' | 'success' | 'info'
+type ToastTone = Tone
 
 [.] ToastType
 type ToastType = 'error' | 'success' | 'info'
 
 [.] toCsv
 function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string
+
+[.] Tone
+type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
 
 [.] TOOLBAR_ACTIONS
 const TOOLBAR_ACTIONS: readonly ["bold", "italic", "heading", "bulletList", "numberedList", "link", "image"]
@@ -655,7 +658,7 @@ component default
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   label?: string | number | undefined
-  tone?: "info" | "success" | "neutral" | "danger" | "warning" | "accent" | undefined
+  tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined
   variant?: "outline" | "solid" | "stamp" | undefined
 
 [./bar-chart.kay] default
@@ -713,7 +716,7 @@ component default
   href?: string | undefined
   label: string
   size?: "xs" | "sm" | "md" | "lg" | undefined
-  tone?: "neutral" | "danger" | "accent" | undefined
+  tone?: Tone | undefined
   type?: "reset" | "submit" | "button" | undefined
   variant?: "solid" | "ghost" | "inline" | undefined
 
@@ -772,8 +775,8 @@ component default
 
 [./button.kay] default
 component default
-  | { busy?: boolean | undefined; children?: Element; class?: string | { root?: any; spinner?: any; } | undefined; expanded?: boolean | undefined; href?: undefined; icon?: IconProps | IconSlot | undefined; label?: string | undefined; pressed?: boolean | undefined; size?: "xs" | "sm" | "md" | "lg" | undefined; spinner?: boolean | undefined; tone?: "success" | "neutral" | "danger" | "accent" | undefined; type?: "reset" | "submit" | "button" | undefined; variant?: "solid" | "ghost" | "inline" | undefined }
-  | { busy?: boolean | undefined; children?: Element; class?: string | { root?: any; spinner?: any; } | undefined; href: string; icon?: IconProps | IconSlot | undefined; label?: string | undefined; size?: "xs" | "sm" | "md" | "lg" | undefined; spinner?: boolean | undefined; tone?: "success" | "neutral" | "danger" | "accent" | undefined; variant?: "solid" | "ghost" | "inline" | undefined }
+  | { busy?: boolean | undefined; children?: Element; class?: string | { root?: any; spinner?: any; } | undefined; expanded?: boolean | undefined; href?: undefined; icon?: IconProps | IconSlot | undefined; label?: string | undefined; pressed?: boolean | undefined; size?: "xs" | "sm" | "md" | "lg" | undefined; spinner?: boolean | undefined; tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined; type?: "reset" | "submit" | "button" | undefined; variant?: "solid" | "ghost" | "inline" | undefined }
+  | { busy?: boolean | undefined; children?: Element; class?: string | { root?: any; spinner?: any; } | undefined; href: string; icon?: IconProps | IconSlot | undefined; label?: string | undefined; size?: "xs" | "sm" | "md" | "lg" | undefined; spinner?: boolean | undefined; tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined; variant?: "solid" | "ghost" | "inline" | undefined }
 
 [./card-row.kay] default
 component default
@@ -994,7 +997,7 @@ component default
   size?: "xs" | "sm" | "md" | "lg" | undefined
   success?: string | undefined
   title?: string | undefined
-  tone?: "neutral" | "danger" | undefined
+  tone?: Tone | undefined
   trigger?: "none" | "link" | "button" | "icon" | undefined
   variant?: "solid" | "ghost" | "inline" | undefined
 
@@ -1049,7 +1052,7 @@ component default
   onFail?: ((error: unknown) => unknown) | undefined
   size?: "xs" | "sm" | "md" | "lg" | undefined
   text: string | (() => string | Promise<string>)
-  tone?: "success" | "neutral" | "danger" | "accent" | undefined
+  tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined
   variant?: "solid" | "ghost" | "inline" | undefined
 
 [./date-input.kay] default
@@ -1331,7 +1334,7 @@ component default
   icon: string | number | bigint | boolean | IconProps | Node | Range | Html | readonly Element[] | (() => Element) | null | undefined
   label: string
   size?: "xs" | "sm" | "md" | "lg" | undefined
-  tone?: "neutral" | "danger" | "accent" | undefined
+  tone?: Tone | undefined
   type?: "reset" | "submit" | "button" | undefined
   variant?: "solid" | "ghost" | "inline" | undefined
 
@@ -1606,7 +1609,7 @@ component default
   retryLabel?: string | undefined
   size?: "xs" | "sm" | "md" | "lg" | undefined
   style?: string | undefined
-  tone?: "neutral" | "danger" | "accent" | undefined
+  tone?: Tone | undefined
   trigger?: ((attributes: MenuTriggerProps) => Element) | undefined
   variant?: "solid" | "ghost" | "inline" | undefined
 
@@ -1688,7 +1691,7 @@ component default
   onDismiss?: (() => unknown) | undefined
   open?: boolean | undefined
   size?: "sm" | "md" | undefined
-  tone?: "info" | "success" | "danger" | "warning" | undefined
+  tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined
 
 [./page-header.kay] default
 component default
@@ -1841,7 +1844,7 @@ component default
   onStop?: ((reason: RecordStop) => unknown) | undefined
   recording?: boolean | undefined
   size?: "xs" | "sm" | "md" | "lg" | undefined
-  tone?: "success" | "neutral" | "danger" | "accent" | undefined
+  tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined
   variant?: "solid" | "ghost" | "inline" | undefined
 
 [./relative-time.kay] default
@@ -2113,8 +2116,8 @@ component default
   label: string
   onActive?: ((index: number | null) => unknown) | undefined
   onSelect?: ((mark: SparkMark) => unknown) | undefined
-  tone?: SparkTone | undefined
-  tones?: readonly (SparkTone | undefined)[] | undefined
+  tone?: Tone | undefined
+  tones?: readonly (Tone | undefined)[] | undefined
   values: readonly (number | null)[]
 
 [./split-layout.kay] default
@@ -2166,13 +2169,13 @@ component default
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   label?: string | undefined
-  tone?: "info" | "success" | "neutral" | "danger" | "warning" | "accent" | undefined
+  tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined
   value: string | number
   variant?: "tile" | "inline" | undefined
 
 [./status-strip.kay] default
 component default
-  cells: readonly (SparkTone | undefined)[]
+  cells: readonly (Tone | undefined)[]
   class?: string | { root?: string | undefined; cell?: string | undefined; } | undefined
   hints?: readonly (string | undefined)[] | undefined
   label: string

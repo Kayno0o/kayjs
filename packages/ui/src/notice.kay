@@ -17,15 +17,15 @@ const look = recipe({
   },
   variants: {
     // A danger is an alert, read out at once; the other tones are a status, read once the reader is idle.
-    tone: { info: '', success: '[--_notice-tone:var(--color-success)]', warning: '[--_notice-tone:var(--color-warning)]', danger: '[--_notice-ground:var(--color-background)] [--_notice-tone:var(--color-danger)]' },
+    tone: { neutral: '', accent: '[--_notice-tone:var(--color-accent)]', info: '[--_notice-tone:var(--color-info)]', success: '[--_notice-tone:var(--color-success)]', warning: '[--_notice-tone:var(--color-warning)]', danger: '[--_notice-ground:var(--color-background)] [--_notice-tone:var(--color-danger)]' },
   },
-  defaults: { tone: 'info' },
+  defaults: { tone: 'neutral' },
 })
 
 // What `icon` set to `true` draws for each tone.
-const TONE_ICON = { info: 'info', success: 'success', warning: 'alert', danger: 'alert' } as const
+const TONE_ICON = { neutral: 'info', accent: 'info', info: 'info', success: 'success', warning: 'alert', danger: 'alert' } as const
 
-const { tone = 'info', label, size = 'md', icon, actions, dismissible = false, open, onDismiss, dismissLabel = wording('ui.notice.dismiss', 'Dismiss'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
+const { tone = 'neutral', label, size = 'md', icon, actions, dismissible = false, open, onDismiss, dismissLabel = wording('ui.notice.dismiss', 'Dismiss'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
   label?: string | undefined
   // `sm` is a line of text without the box, such as under a form's fields.
   size?: 'sm' | 'md' | undefined
@@ -43,7 +43,7 @@ const { tone = 'info', label, size = 'md', icon, actions, dismissible = false, o
   dismissLabel?: string | undefined
 }>()
 
-const drawn = (): IconSlot | IconProps | undefined => icon === true ? TONE_ICON[tone] ?? TONE_ICON.info : icon || undefined
+const drawn = (): IconSlot | IconProps | undefined => icon === true ? TONE_ICON[tone] ?? TONE_ICON.neutral : icon || undefined
 const closable = () => dismissible || open !== undefined
 const framed = () => drawn() !== undefined || actions !== undefined || closable()
 ---

@@ -2,6 +2,7 @@
 import type { JSX } from 'kay'
 import { recipe } from 'kay'
 import { lockedButton } from './locked-button'
+import type { Tone } from './tone'
 
 const look = recipe({ parts: { root: 'kui-icon-btn' } })
 
@@ -11,7 +12,7 @@ const { label, href, size = 'md', variant = 'solid', tone = 'neutral', type = 'b
   label: string
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   variant?: 'solid' | 'ghost' | 'inline' | undefined
-  tone?: 'neutral' | 'accent' | 'danger' | undefined
+  tone?: Tone | undefined
   type?: 'button' | 'submit' | 'reset' | undefined
   // Renders a link with the same look, parts and tooltip instead of a button, for an action that is a navigation; `type` then has no meaning.
   href?: string | undefined

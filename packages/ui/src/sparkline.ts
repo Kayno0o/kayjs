@@ -1,2 +1,4 @@
-// What a Sparkline bar or a StatusStrip cell is coloured for: `muted` is a quiet grey, such as a period nothing reported.
-export type SparkTone = 'muted' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
+import type { Tone } from './tone'
+
+/** @deprecated Use `Tone`, where `neutral` is the quiet grey `muted` was. Removed in 2.0.0. */
+export type SparkTone = Tone

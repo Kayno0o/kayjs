@@ -8,10 +8,10 @@ import Icon from './icon.kay'
 const look = recipe({
   parts: {
     root: 'kui-timeline m-0 flex list-none flex-col gap-1 p-0',
-    item: 'group/entry text-sm data-[tone=muted]:text-muted',
+    item: 'group/entry text-sm data-[tone=neutral]:text-muted data-[tone=muted]:text-muted',
     entry: 'flex w-full items-baseline gap-3 rounded-md px-3 py-2 text-start [&:is(button,a)]:cursor-pointer [&:is(button,a)]:hover:bg-surface-strong [&:is(button)]:aria-pressed:bg-accent/15 [&:is(a)]:text-inherit [&:is(a)]:no-underline [&:is(a)]:aria-current:bg-accent/15',
     time: 'w-28 shrink-0 tabular-nums text-muted',
-    icon: 'size-4 shrink-0 self-center group-data-[tone=accent]/entry:text-accent group-data-[tone=success]/entry:text-success group-data-[tone=warning]/entry:text-warning group-data-[tone=danger]/entry:text-danger group-data-[tone=info]/entry:text-info',
+    icon: 'size-4 shrink-0 self-center group-data-[tone=neutral]/entry:text-muted group-data-[tone=accent]/entry:text-accent group-data-[tone=success]/entry:text-success group-data-[tone=warning]/entry:text-warning group-data-[tone=danger]/entry:text-danger group-data-[tone=info]/entry:text-info',
     text: 'min-w-0',
   },
 })

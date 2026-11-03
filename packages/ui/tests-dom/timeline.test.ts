@@ -26,7 +26,7 @@ test('a selectable timeline makes its entries buttons, the picked one aria-press
 
   expect(pressed(root)).toEqual(['false', 'true'])
   expect(root.querySelectorAll('#bound li')[2]!.querySelector('button')).toBeNull()
-  expect(root.querySelectorAll('#bound li')[2]!.getAttribute('data-tone')).toBe('muted')
+  expect(root.querySelectorAll('#bound li')[2]!.getAttribute('data-tone')).toBe('neutral')
 })
 
 test('a timeline with neither onSelect nor selected draws no button', async () => {

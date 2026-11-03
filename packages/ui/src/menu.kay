@@ -14,6 +14,7 @@ import { MENU_ITEM, MENU_LIST } from './menu-look'
 import { opensOutside, withPopup } from './menu'
 import { OUTSIDE } from './outside'
 import Popover from './popover.kay'
+import type { Tone } from './tone'
 
 // The class given to a Menu goes to its trigger, as it always did: `root` is the trigger and the popover is `menu`.
 // 'kui-menu' stays on the popover as the component's name for an app's CSS.
@@ -25,7 +26,7 @@ const look = recipe({
     separator: 'my-1 border-0 border-t border-border',
     status: 'm-0 px-3 py-2 text-sm text-muted',
     icon: 'size-4 shrink-0',
-    item: `${MENU_ITEM} no-underline pointer-coarse:min-h-11 data-danger:text-danger disabled:cursor-default disabled:opacity-50`,
+    item: `${MENU_ITEM} no-underline pointer-coarse:min-h-11 data-[tone=accent]:text-accent data-[tone=success]:text-success data-[tone=warning]:text-warning data-danger:text-danger data-[tone=info]:text-info disabled:cursor-default disabled:opacity-50`,
   },
 })
 
@@ -51,7 +52,7 @@ const { id, items, label, icon, size = 'md', variant = 'ghost', tone, placement,
   size?: 'xs' | 'sm' | 'md' | 'lg' | undefined
   // The trigger's form, as an IconButton's.
   variant?: 'solid' | 'ghost' | 'inline' | undefined
-  tone?: 'neutral' | 'accent' | 'danger' | undefined
+  tone?: Tone | undefined
   // `bottom-end` from a trigger, `bottom-start` from a point.
   placement?: PopoverPlacement | undefined
   // Opens the menu at this point of the window with no trigger of its own, such as the click of a context menu; the page shows it with `open` and learns of its closing in `onOpenChange`. The browser flips it to stay inside the window, and focus goes back to where it was when it closes. A button still held when `open` is set, the right one on Linux where `contextmenu` fires on the press, delays the opening to its release.
@@ -138,8 +139,12 @@ function keyDown(event: KeyboardEvent) {
 }
 
 // A `tone` has the last word over the `danger` flag it replaces.
+function toneOf(action: MenuAction): Tone | undefined {
+  return action.tone ?? (action.danger === true ? 'danger' : undefined)
+}
+
 function isDanger(action: MenuAction) {
-  return action.tone === undefined ? action.danger === true : action.tone === 'danger'
+  return toneOf(action) === 'danger'
 }
 
 function select(action: MenuAction) {
@@ -171,7 +176,7 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
         hr(part="separator")
       else
         if entry.href !== undefined && !entry.disabled
-          a(part="item" href={entry.href} {...opensOutside(entry.href) ? OUTSIDE : {}} role="menuitem" tabindex="-1" data-danger={isDanger(entry) || undefined} onClick={() => select(entry)})
+          a(part="item" href={entry.href} {...opensOutside(entry.href) ? OUTSIDE : {}} role="menuitem" tabindex="-1" data-danger={isDanger(entry) || undefined} data-tone={toneOf(entry)} onClick={() => select(entry)})
             if item
               | {item(entry)}
             else
@@ -179,7 +184,7 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
                 Icon(icon={entry.icon} part="icon")
               | {entry.label}
         else
-          button(part="item" type="button" role="menuitem" tabindex="-1" disabled={entry.disabled} data-danger={isDanger(entry) || undefined} onClick={() => select(entry)})
+          button(part="item" type="button" role="menuitem" tabindex="-1" disabled={entry.disabled} data-danger={isDanger(entry) || undefined} data-tone={toneOf(entry)} onClick={() => select(entry)})
             if item
               | {item(entry)}
             else

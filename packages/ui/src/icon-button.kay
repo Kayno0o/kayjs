@@ -5,6 +5,7 @@ import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import BareIconButton from './bare-icon-button.kay'
 import Icon from './icon.kay'
+import type { Tone } from './tone'
 
 const look = recipe({ parts: { root: '' } })
 
@@ -17,7 +18,7 @@ const { icon, label, href, size = 'md', variant = 'solid', tone = 'neutral', typ
   // The form: `solid` is the framed button, `ghost` has no frame until hovered and `inline` is the icon alone.
   variant?: 'solid' | 'ghost' | 'inline' | undefined
   // What the button means: `accent` for the main action, `danger` for a destructive one.
-  tone?: 'neutral' | 'accent' | 'danger' | undefined
+  tone?: Tone | undefined
   type?: 'button' | 'submit' | 'reset' | undefined
   // Renders a link with the same look and tooltip instead of a button.
   href?: string | undefined
