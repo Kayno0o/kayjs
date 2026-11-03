@@ -2,13 +2,19 @@
 
 `store` in kay.config.ts is where the app keeps what outlives one process: `sqliteData('data/app.sqlite')` for one machine, `pgData(db)` for replicas, or an object of stores of your own, each key optional (Redis, say). A feature naming no store of its own uses the one under its key.
 
+## Common tasks
+
+- Keep everything on one machine: `store: sqliteData('data/app.sqlite')`; files stay in `data/files`.
+- Share it between replicas: `store: { ...pgData(db), files: s3Files() }`, the bucket for files every replica reads.
+- Plug in a store of your own: give the key an object with the interface's methods below, plus `ping` and `close` when it holds a connection.
+
 ## Reference
 
 ### The store contracts
 
 | Key | Interface | Required | Optional | Factories |
 | --- | --- | --- | --- | --- |
-| `sessions` | `SessionStore` | `get`, `set(id, data, maxAge)`, `delete` | `deleteWhere` | `memorySessions`, `sqliteSessions`, `pgSessions` |
+| `sessions` | `SessionStore` | `get`, `set(id, data, maxAge)` (`maxAge` in ms), `delete` | `deleteWhere` | `memorySessions`, `sqliteSessions`, `pgSessions` |
 | `cache` | `CacheStore` | `get`, `set`, `delete`, `keys` | `dependencies`, `publish`, `subscribe` | `sqliteCache`, `pgCache` |
 | `live` | `LiveStore` | `entries`, `set`, `delete`, `subscribe` | `end`, `endAll`, `stop`, `hold` | `sqliteLive`, `pgLive` |
 | `jobs` | `JobStore` | `add`, `claim`, `complete`, `retry`, `fail`, `failed`, `nextRunAt`, `lock` | `release`, `progress`, `state`, `live`, `update`, `purge`, `revive` | `memoryJobs`, `sqliteJobs`, `pgJobs` |
