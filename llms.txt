@@ -90,6 +90,7 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Language server, screenshot and MCP](llms/editor-and-agent-commands.md): `kay lsp`, `screenshot`, `mcp`, `docs`
 - [Running in production](llms/production.md): logs, tracing, health checks, shutdown, cron, jobs
 - [Several workers](llms/workers.md): `--workers`, what the processes share
+- [Hooks](llms/hooks.md): `onX` and `beforeX`, `refuse()`, how a library builds them
 - [Queues](llms/queues.md): jobs and workflows that survive a restart
 - [Proxies and security headers](llms/proxy-and-security.md): headers, CSP, compression
 - [Upgrading](llms/upgrading.md): what each recent minor breaks, and what an app changes

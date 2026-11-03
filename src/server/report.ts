@@ -44,9 +44,9 @@ export function reportServerError(error: unknown, request: Request, onError: Kay
     void deliver(error, request, onError)
 }
 
-async function deliver(error: unknown, request: Request | undefined, onError: NonNullable<KayConfig['onError']>): Promise<void> {
+async function deliver(error: unknown, request: Request | undefined, onError: NonNullable<KayConfig['onError']>, source?: string): Promise<void> {
   try {
-    await onError({ error, request })
+    await onError({ error, request, ...source !== undefined && { source } })
   }
   // A failing reporter is logged, never left to crash the process as an unhandled rejection.
   catch (failure) {
@@ -67,12 +67,11 @@ export function useAppOnError(onError: KayConfig['onError']): void {
 // How long a caller waits for the app's `onError` when it holds a queue worker or delays an exit: a tracker that hangs must not.
 const ON_ERROR_TIMEOUT_MS = 10_000
 
-// Logs an error met outside any request, a scheduled, background or queued job or an `onStop` hook, and hands it to the app's `onError` with no request.
-// Resolves once `onError` returned, or after `timeout` ms with a log saying it did not, and never rejects, for a caller about to exit or to take its next job to await.
-export async function reportBackgroundError(message: string, error: unknown, timeout = ON_ERROR_TIMEOUT_MS): Promise<void> {
-  kayLog('error', message, error)
+// Hands an error to the app's `onError`, and resolves once it returned or after `timeout` ms with a log saying it did not; never rejects.
+async function deliverCapped(error: unknown, request: Request | undefined, timeout: number, source?: string): Promise<void> {
+  const onError = appOnError
 
-  if (!appOnError)
+  if (!onError)
     return
 
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -85,9 +84,26 @@ export async function reportBackgroundError(message: string, error: unknown, tim
   })
 
   try {
-    await Promise.race([deliver(error, undefined, appOnError), late])
+    await Promise.race([deliver(error, request, onError, source), late])
   }
   finally {
     clearTimeout(timer)
   }
+}
+
+// Logs an error met outside any request, a scheduled, background or queued job or an `onStop` hook, and hands it to the app's `onError` with no request.
+// Resolves once `onError` returned, or after `timeout` ms with a log saying it did not, and never rejects, for a caller about to exit or to take its next job to await.
+export async function reportBackgroundError(message: string, error: unknown, timeout = ON_ERROR_TIMEOUT_MS): Promise<void> {
+  kayLog('error', message, error)
+  await deliverCapped(error, undefined, timeout)
+}
+
+// Logs an error a hook threw or left running, as `notify` and `decide` meet it, and hands it to the app's `onError` with the hook's `source` (`'cms.onSave'`), under its request when it has one.
+export async function reportHookError(source: string, error: unknown, request: Request | undefined): Promise<void> {
+  if (request === undefined)
+    kayLog('error', `${source} failed`, error)
+  else
+    logMessage('error', `${source} failed`, error, request)
+
+  await deliverCapped(error, request, ON_ERROR_TIMEOUT_MS, source)
 }

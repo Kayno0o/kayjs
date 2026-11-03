@@ -51,6 +51,7 @@ export const KAY_VALUES: readonly string[] = [
   'reducedMotion',
   'refresh',
   'refusalMessage',
+  'refuse',
   'resource',
   'root',
   'route',

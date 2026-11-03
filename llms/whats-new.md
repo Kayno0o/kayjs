@@ -14,6 +14,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-auth checks new passwords against Have I Been Pwned by default in production (`breachedPasswords: false` opts out), and warns at boot in production when password sign-up is open with no `email`: [hardening and testing](../packages/auth/llms/hardening-and-testing.md).
 - Every command takes `--quiet`, `--format json` and `--dry-run` or refuses it for a listed reason (`tests/command-options.test.ts`); `kay render --format json` prints `{ status, headers, body, ms }` and `kay upgrade --format json` `{ steps, changed }`: [project commands](project.md#reference), [check and tools](check-and-tools.md).
 - `kay mcp` serves `fmt`, `generate` and `add` (dry run), `test`, `env`, `i18n_missing` and `a11y` as tools, and the llms.txt and guides of each installed kayjs-* library as resources: [MCP](editor-and-agent-commands.md).
+- One hook convention for kay and its libraries: `onX` observes after X, `beforeX` alone changes or refuses (returning fields, `false`, or throwing `refuse()` from `kay`), runs use `onStart`/`onSuccess`/`onError`; `kay/library` gets `HookContext`, `hookContext()`, `notify()` and `decide()`, and `onError` in `kay.config.ts` receives the `source` of a hook that threw: [hooks](hooks.md).
 
 ## 1.86.0
 

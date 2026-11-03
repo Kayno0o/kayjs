@@ -148,6 +148,15 @@ describe('action protection', () => {
     expect((await site.submit(enquire, { message: 'fail' }, { from: '/enquiry' })).html).toContain('<p id="enquire-error" class="error">Not sent; try again later</p>')
   })
 
+  it('answers a thrown refuse() as it answers ctx.fail, with its message, field errors and data', async () => {
+    const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
+    const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
+    const refused = await app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.31' }, body: stringify({ message: 'refuse' }) }))
+
+    expect(refused.status).toBe(422)
+    expect(parse(await refused.text())).toEqual({ errors: { '': 'Needs a summary', 'message': 'required' }, data: 7 })
+  })
+
   it('answers a bot the honeypot caught as if its post went through, when the action says so', async () => {
     const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
     const site = await testSite({ root: FIXTURE, security: false })

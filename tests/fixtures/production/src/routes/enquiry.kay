@@ -1,11 +1,14 @@
 --- server
 import { t } from 'elysia'
-import { action } from 'kay'
+import { action, refuse } from 'kay'
 
-// Every attempt counts up to 4, the messages that went through up to 1; "fail" fails as a mail server down would, "throw" throws, "away" goes on to another page.
+// Every attempt counts up to 4, the messages that went through up to 1; "fail" fails as a mail server down would, "throw" throws, "refuse" is refused as a `before` hook would, "away" goes on to another page.
 export const enquire = action(t.Object({ message: t.String({ maxLength: 200 }) }), ({ message }, ctx) => {
   if (message === 'throw')
     throw new Error('the mail server is down')
+
+  if (message === 'refuse')
+    refuse('Needs a summary', { errors: { message: 'required' }, data: 7 })
 
   if (message === 'away')
     ctx.redirect('/contact')

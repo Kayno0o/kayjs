@@ -18,6 +18,7 @@ import { joinBase } from '../runtime/base'
 import { escapeAttribute } from '../runtime/escape'
 import { formInput } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/locale-state'
+import { thrownRefusal } from '../runtime/refuse'
 import { withDefaultBounds } from '../runtime/schema-bounds'
 import { configuredSite } from '../runtime/site'
 import { sizeText } from '../runtime/size-text'
@@ -782,6 +783,12 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     // The handler read `ctx.params` of a post from no page of its route.
     if (error instanceof Refusal)
       return error.response
+
+    // A hook of the app or a library stopped the action with `refuse()`, answered as `ctx.fail` answers.
+    const hookRefusal = thrownRefusal(error)
+
+    if (hookRefusal !== undefined)
+      return failed(request, headers, jar.cookies, { action: action.url, status: hookRefusal.status, values: submittedValues(context.body), errors: { '': hookRefusal.message, ...hookRefusal.errors }, data: hookRefusal.data }, context.server, back)
 
     const refused = refusalOf(error)
 

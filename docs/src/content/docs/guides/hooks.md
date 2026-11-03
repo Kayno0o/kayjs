@@ -1,0 +1,63 @@
+---
+title: Hooks
+order: 8.6
+description: How kay and its libraries name their hooks, what a hook may change, and what happens when one throws.
+---
+
+Kay and its libraries let you react to what they do with callbacks called hooks. They all follow one convention, so a hook you have written for one feature reads the same for the next.
+
+## Names
+
+- `onX` runs after X happened. It only watches: whatever it returns is ignored. X is the verb in its base form, as in the browser: `onSave`, `onSend`, `onDelete`. Never `onSaved` or `onSent`.
+- `beforeX` runs before X. It is the only kind of hook that can change X or stop it.
+- Something that starts and then succeeds or fails, such as a job, a schedule run, a workflow run or a question to an AI model, has `onStart`, `onSuccess` and `onError`. Some add steps of their own, such as `onRetry` or `onToolCall`. The failure hook is always `onError`, never `onFail` or `onFailed`.
+- A library that has many audit-style events may also offer one `onEvent` that gets them all, with the event's name in kebab case.
+
+Options that work out a value the library needs, such as `allow`, `authorize` or `locate`, are not hooks. They are awaited, and an error they throw is not swallowed. A pair like `open` and `onOpenChange` is the state of a component, not a hook.
+
+## What a hook gets
+
+A hook gets one object: the fields of what happened, and a `context`.
+
+```ts
+auth({ onEvent: ({ event, user, context }) => audit(event, user?.id, context.ip) })
+```
+
+The `context` tells where the hook runs: the `request` (missing in a job or a schedule), the `ip`, the `userAgent`, the `userId` and the `locale`. Libraries add what they know, such as the signed-in user.
+
+Hooks are plain keys in the options of the feature that owns them, such as `auth({ onEvent })` or `cms({ beforeSave })`. Hooks that apply to the whole app go in `kay.config.ts`. A hook given for one call, such as one question to an AI model, runs after the ones in the options and never replaces them.
+
+## Changing or refusing
+
+A `beforeX` hook can return nothing, and X goes on. It can return an object with the fields to change, and they are laid over the input before it is checked. It can return `false` to stop X in the way that feature stops things, such as a 403 answer.
+
+To stop X with a message, throw `refuse()`.
+
+```ts
+import { refuse } from 'kay'
+
+cms({
+  beforeSave: ({ data, context }) =>
+    data.summary
+      ? { data: { ...data, updatedBy: context.userId } }
+      : refuse('A summary is needed', { errors: { summary: 'required' } }),
+})
+```
+
+The status is 403 unless you pass `errors`, which makes it 422, or a `status`. In an action, the visitor gets it as they get `ctx.fail`: the message at the top of the form, the errors beside their fields, and `data` for your code. When several `beforeX` hooks are set, each sees what the one before changed, and the first to refuse ends the chain.
+
+If a `beforeX` hook throws anything else, X is refused with a 500 error and the error is reported. A broken check never lets something through.
+
+## When an `onX` hook throws
+
+The transition has already happened, so the error never undoes it. The error is logged and handed to the `onError` of `kay.config.ts` with a `source` naming the hook, such as `cms.onSave`. Kay waits up to 10 seconds for a hook, then leaves it running, reports that it was late, and goes on. All the `onX` hooks of one transition run in order, even when one throws.
+
+Hooks that must not slow an answer, such as the ones of a streamed reply, run detached: kay does not wait for them at all.
+
+## Browser hooks
+
+The same names work in the browser. A hook that throws there is logged and the page goes on. A browser hook is never a security check, because anyone can skip it. The server checks again.
+
+## Writing a library
+
+A library builds its hooks with `notify()` and `decide()` from `kay/library`, which give every hook the same order, timeout and error handling. `notify(source, hooks, event)` runs the `onX` hooks, and `decide(source, hooks, event)` runs the `beforeX` hooks and answers the change or the refusal.

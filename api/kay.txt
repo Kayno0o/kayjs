@@ -761,8 +761,24 @@ function reducedMotion(fallback?: boolean): () => boolean
 [.] refresh
 function refresh(): Promise<void>
 
+[.] Refusal
+interface Refusal
+  data: unknown
+  errors: Record<string, string>
+  message: string
+  status: number
+
 [.] refusalMessage
 function refusalMessage(error: unknown, fallback: string): string
+
+[.] refuse
+function refuse(message?: string, { status, errors, data }?: RefuseOptions): never
+
+[.] RefuseOptions
+interface RefuseOptions
+  data?: unknown
+  errors?: Record<string, string> | undefined
+  status?: number | undefined
 
 [.] Register
 interface Register
@@ -2302,6 +2318,9 @@ interface BasicAuthOptions
   realm?: string | undefined
   user: string | undefined
 
+[./server] BeforeHook
+type BeforeHook<E, Change> = (event: E & { context: HookContext }) => void | false | Partial<Change> | Promise<void | false | Partial<Change>>
+
 [./server] BrowserError
 class BrowserError
   new (kind: string, message: string, url: string, stack: string | undefined, island?: string | undefined): BrowserError
@@ -2450,6 +2469,17 @@ function forgetPushDevice(request: Request, user: string): Promise<void>
 [./server] holdsType
 function holdsType(bytes: Uint8Array<ArrayBufferLike>, type: string): boolean
 
+[./server] Hook
+type Hook<E> = (event: E & { context: HookContext }) => unknown
+
+[./server] HookContext
+interface HookContext
+  ip: string | undefined
+  locale: string | undefined
+  request: Request | undefined
+  userAgent: string | undefined
+  userId: string | undefined
+
 [./server] imageSize
 function imageSize(input: Blob | ArrayBuffer | Uint8Array<ArrayBufferLike>, options?: {
   maxPixels?: number | undefined;
@@ -2554,7 +2584,7 @@ interface KayConfig
   minify?: boolean | undefined
   navigation?: boolean | undefined
   offline?: boolean | OfflineConfig | undefined
-  onError?: ((event: { error: unknown; request: Request | undefined; }) => void | Promise<void>) | undefined
+  onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => void | Promise<void>) | undefined
   openapi?: boolean | OpenApiConfig | undefined
   plugins?: BunPlugin[] | undefined
   prefetch?: Prefetch | undefined
@@ -2786,7 +2816,7 @@ interface PagesOptions extends KayConfig
   minify?: boolean | undefined
   navigation?: boolean | undefined
   offline?: boolean | OfflineConfig | undefined
-  onError?: ((event: { error: unknown; request: Request | undefined; }) => void | Promise<void>) | undefined
+  onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => void | Promise<void>) | undefined
   openapi?: boolean | OpenApiConfig | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
@@ -3769,7 +3799,7 @@ interface TestOptions extends PagesOptions
   minify?: boolean | undefined
   navigation?: boolean | undefined
   offline?: boolean | OfflineConfig | undefined
-  onError?: ((event: { error: unknown; request: Request | undefined; }) => void | Promise<void>) | undefined
+  onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => void | Promise<void>) | undefined
   openapi?: boolean | OpenApiConfig | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
