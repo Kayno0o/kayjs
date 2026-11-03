@@ -4,7 +4,7 @@ import type { LintLevels } from '../compiler/lints'
 import type { ImportedSignals } from '../compiler/module-signals'
 import type { Route, RouteMount } from '../server/routes'
 import type { ServerFacts } from './layout-facts'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { KAY_FILE, TS_FILE } from '../build/files'
 import { packageContextModule } from '../build/manifests'
@@ -262,11 +262,18 @@ function wordEnd(source: string, offset: number): number {
   return end === offset ? Math.min(offset + 1, source.length) : end
 }
 
-// The route of `file` when it is a page, its path read from the routes directory holding it: the app's, or an extension's. Its matchers are the app's either way.
+// The route of `file` when it is a page, its path read from the routes directory holding it: the app's, or an extension's, which an app reaching it through a link in node_modules names by its real folder. Its matchers are the app's either way.
 export function pageRoute(file: string, routesDir: string, mounts: RouteMount[]): ReturnType<typeof routeOf> {
   const pagesDir = mounts.find(({ dir }) => file.startsWith(dir + sep))?.dir ?? routesDir
 
-  return file.startsWith(pagesDir + sep) ? routeOf(pagesDir, file) : undefined
+  if (file.startsWith(pagesDir + sep))
+    return routeOf(pagesDir, file)
+
+  // Only a mounted extension's file can be reached through a link, so the real path is looked up when a mount exists.
+  const real = mounts.length > 0 && existsSync(file) ? realpathSync(file) : file
+  const mount = real === file ? undefined : mounts.find(({ dir }) => real.startsWith(dir + sep))
+
+  return mount ? routeOf(mount.dir, real) : undefined
 }
 
 function matcherType(routesDir: string, shadowDir: string, matcher: string): string {

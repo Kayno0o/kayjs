@@ -110,6 +110,18 @@ describe('compile errors', () => {
     expect(codes('--- client\nconst n = 1\n---\np {n}\n', 'src/routes/_layout.kay')).toContain('client-route-fence')
   })
 
+  it('refuse a --- server fence in a component, not in a page or a special file', () => {
+    const source = '--- server\nconst a = 1\n---\np {a}\n'
+    const component = (filename: string, page: boolean | undefined) => compileKay(source, filename, { page }).diagnostics.filter(diagnostic => diagnostic.message.includes('no `--- server` fence'))
+
+    expect(component('src/components/c.kay', false)).toHaveLength(1)
+    expect(component('src/components/c.kay', false)[0]?.code).toBe('fence-invalid')
+    expect(component('src/routes/index.kay', true)).toEqual([])
+    expect(component('src/components/c.kay', undefined)).toEqual([])
+    expect(component('src/routes/_layout.kay', false)).toEqual([])
+    expect(component('src/routes/_actions.kay', false)).toEqual([])
+  })
+
   it('name --- script for a bare fence after a named one, and fix it by naming the closing line', () => {
     const source = '--- server\nconst a = 1\n---\nimport { route } from \'kay\'\n---\nh1 x\n'
     const [found] = compileKay(source, 'src/a.kay').diagnostics
