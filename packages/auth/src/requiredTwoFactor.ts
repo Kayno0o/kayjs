@@ -9,12 +9,16 @@ export interface TwoFactorAsk {
   wanted?: true | undefined
   // The path asked for: the security page, the second-factor page and the sign-out route are never held back, so a user lacking two-factor can always turn it on.
   path?: string | undefined
+  // The locale the page is served in, whose prefix the path may carry.
+  locale?: string | undefined
   ctx?: PolicyContext | undefined
 }
 
-// The pages and routes a user lacking two-factor must still reach, with the locale prefix a page may carry.
-function exempt(core: Core, path: string): boolean {
-  return [core.securityPage, core.twoFactorPage, `${core.prefix}/sign-out`].some(page => page !== undefined && (path.endsWith(page) || path.endsWith(`${page}/`)))
+// The pages and routes a user lacking two-factor must still reach: exactly those paths, bare or under the prefix of the locale being served, never a route that merely ends like one.
+function exempt(core: Core, path: string, locale?: string): boolean {
+  const bare = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
+
+  return [core.securityPage, core.twoFactorPage, `${core.prefix}/sign-out`].some(page => page !== undefined && (bare === page || (locale !== undefined && bare === `/${locale}${page}`)))
 }
 
 // Whether the second factor is satisfied: it is on, or the sign-in was a passkey (user verification makes it two factors), or an admin acting as the user, who proved theirs to start.
@@ -26,7 +30,7 @@ function satisfied(user: BareUser, signedIn: SignedIn | undefined): boolean {
 export async function lacksTwoFactor(state: RequestState, user: BareUser, ask: TwoFactorAsk = {}): Promise<boolean> {
   const { core } = state
 
-  if (!core.switches.twoFactor || user.twoFactor || (ask.path !== undefined && exempt(core, ask.path)))
+  if (!core.switches.twoFactor || user.twoFactor || (ask.path !== undefined && exempt(core, ask.path, ask.locale)))
     return false
 
   if (satisfied(user, await state.session.get('auth')))

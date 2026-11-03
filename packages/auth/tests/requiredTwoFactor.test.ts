@@ -33,6 +33,7 @@ function setup(options: Parameters<typeof testApp>[0] = {}) {
     const context = {
       request,
       url,
+      locale: request.headers.get('x-locale') ?? 'en',
       locals: { auth },
       params: {},
       redirect: (to: string) => {
@@ -54,10 +55,10 @@ function setup(options: Parameters<typeof testApp>[0] = {}) {
     }
   }
 
-  for (const path of ['/g/page', '/g/auth/account/security', '/g/auth/two-factor', '/fr/g/auth/account/security', '/g/own/security'])
+  for (const path of ['/g/page', '/auth/account/security', '/fr/auth/account/security', '/own/security', '/admin/account/security', '/admin/auth/two-factor', '/g/auth/sign-out', '/sec/auth/account/security'])
     app.app.get(path, verdict as never).post(path, verdict as never)
 
-  app.app.use(new Elysia().use(app.auth.gate()).get('/gated', () => 'in').get('/gated-editor', () => 'in', { auth: 'editor' }).get('/gated/auth/account/security', () => 'in').get('/gated/auth/two-factor', () => 'in'))
+  app.app.use(new Elysia().use(app.auth.gate()).get('/gated', () => 'in').get('/gated-editor', () => 'in', { auth: 'editor' }).get('/gated/auth/account/security', () => 'in').get('/auth/two-factor', () => 'in'))
   const adminPage = async ({ auth }: { auth: { requireAdmin: () => Promise<unknown> } }) => {
     try {
       await auth.requireAdmin()
@@ -143,8 +144,13 @@ describe('twoFactor.require in guards', () => {
     const { member, guarded } = setup()
     const admin = await member(['admin'])
 
-    for (const path of ['/g/auth/account/security', '/g/auth/two-factor', '/fr/g/auth/account/security'])
+    for (const path of ['/auth/account/security', '/auth/account/security/'])
       expect(await guarded(admin, [{ redirect: '/login' }, { require: 'admin', twoFactor: true }], path)).toBe('passed')
+
+    expect(await guarded(admin, [{ twoFactor: true }], '/fr/auth/account/security', { ...HTML, 'x-locale': 'fr' })).toBe('passed')
+    // A route that merely ends like one of those pages, or carries a prefix that is not the served locale, is held back.
+    for (const path of ['/admin/account/security', '/admin/auth/two-factor', '/g/auth/sign-out', '/sec/auth/account/security', '/fr/auth/account/security'])
+      expect(await guarded(admin, [{ twoFactor: true }], path)).toContain('redirect')
 
     expect(await guarded(admin, [{}, { require: 'admin' }], '/g/page')).toContain('redirect')
   })
@@ -154,7 +160,7 @@ describe('twoFactor.require in guards', () => {
     const admin = await member(['admin'])
 
     expect(await guarded(admin)).toBe('redirect /own/security?redirect=%2Fg%2Fpage')
-    expect(await guarded(admin, [{ twoFactor: true }], '/g/own/security')).toBe('passed')
+    expect(await guarded(admin, [{ twoFactor: true }], '/own/security')).toBe('passed')
   })
 
   test('an app with no security page gets the 403', async () => {
@@ -222,8 +228,8 @@ describe('twoFactor.require in gates', () => {
     expect((await admin.browser.fetch('/gated')).status).toBe(403)
     expect((await done.browser.fetch('/gated')).status).toBe(200)
     expect((await admin.browser.fetch('/gated-editor')).status).toBe(403)
-    expect((await admin.browser.fetch('/gated/auth/account/security')).status).toBe(200)
-    expect((await admin.browser.fetch('/gated/auth/two-factor')).status).toBe(200)
+    expect((await admin.browser.fetch('/gated/auth/account/security')).status).toBe(403)
+    expect((await admin.browser.fetch('/auth/two-factor')).status).toBe(200)
 
     const issued = await auth.issueToken(admin.id, 'device')
 

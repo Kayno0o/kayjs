@@ -44,7 +44,7 @@ export function guardOf<Role extends string, Scope extends string>(core: Core, o
     if (!scopeAllows(await authOf(ctx.locals).scopes(), options.scope))
       ctx.deny(403)
 
-    if (user !== null && await lacksTwoFactor(authOf(ctx.locals)[STATE], user, { wanted: options.twoFactor, path: ctx.url.pathname, ctx: { params: ctx.params } }))
+    if (user !== null && await lacksTwoFactor(authOf(ctx.locals)[STATE], user, { wanted: options.twoFactor, path: ctx.url.pathname, locale: ctx.locale, ctx: { params: ctx.params } }))
       sendToEnrolment(core, ctx.request, ctx)
   }
 }
