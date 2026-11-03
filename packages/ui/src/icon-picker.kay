@@ -13,9 +13,11 @@ const DEBOUNCE_MS = 200
 
 const look = recipe({ parts: { root: 'kui-icon-picker', search: '', grid: 'kui-icon-grid', option: 'kui-icon-grid-option', empty: 'kui-icon-grid-empty', bar: 'kui-icon-grid-bar', selection: 'kui-icon-grid-selection', clear: 'kui-icon-grid-clear', error: 'kui-icon-grid-error', more: 'kui-icon-grid-more' } })
 
-const { search, value = '', name, onChange, onSearch, onError, searchLabel = wording('ui.iconPicker.search', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.grid', 'Icons'), searchingLabel = wording('ui.iconPicker.searching', 'Searching…'), emptyLabel = wording('ui.iconPicker.empty', 'No icons found.'), errorLabel = wording('ui.iconPicker.error', 'The icons could not be loaded.'), clearLabel = wording('ui.iconPicker.clear', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.more', 'Show more'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onError'> & {
+const { search, icons: given, value = '', name, onChange, onSearch, onError, searchLabel = wording('ui.iconPicker.search', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.grid', 'Icons'), searchingLabel = wording('ui.iconPicker.searching', 'Searching…'), emptyLabel = wording('ui.iconPicker.empty', 'No icons found.'), errorLabel = wording('ui.iconPicker.error', 'The icons could not be loaded.'), clearLabel = wording('ui.iconPicker.clear', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.more', 'Show more'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onError'> & {
   // The icons matching `query` from the `offset`th on, at most `limit` of them: typically an action, since a whole icon set is too large to ship. A page of fewer than `limit` is the last. A rejection is logged and leaves the last grid on screen under `errorLabel`.
-  search: (query: string, limit: number, offset: number) => Promise<IconChoice[]>
+  search?: ((query: string, limit: number, offset: number) => Promise<IconChoice[]>) | undefined
+  // A fixed set of icons instead of `search`, filtered by the text typed and paged like its answers: no action is needed for a small set. Give one of the two.
+  icons?: readonly IconChoice[] | undefined
   // The chosen icon's name, or an empty string for none; a picker whose parent passes another follows it.
   value?: string | undefined
   // Submits the chosen icon's name under this name, for a picker inside a form.
@@ -41,6 +43,13 @@ const picked = signal(value)
 const typed = signal('')
 const query = signal('')
 const icons = signal<IconChoice[]>([])
+
+// The icons of a given set whose name holds the text, any case.
+async function listed(needle: string, limit: number, offset: number): Promise<IconChoice[]> {
+  const text = needle.trim().toLowerCase()
+
+  return (given ?? []).filter(choice => choice.name.toLowerCase().includes(text)).slice(offset, offset + limit)
+}
 // Whether the last page came back full, so another may follow.
 const more = signal(false)
 const pending = signal(true)
@@ -77,7 +86,7 @@ async function load(needle: string, offset: number) {
     onSearch?.(needle)
 
   try {
-    const found = await search(needle, PAGE_SIZE, offset)
+    const found = await (search ?? listed)(needle, PAGE_SIZE, offset)
 
     if (mine !== request)
       return

@@ -1,8 +1,9 @@
 --- <Value extends string>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
+import type { ComboboxQuery } from './combobox'
 import type { MultiSelectOption } from './multi-select'
 import type { PopoverPlacement } from './popover'
-import { effect, recipe, signal } from 'kay'
+import { effect, onCleanup, recipe, signal, untrack } from 'kay'
 import { stepIndex } from './cycle'
 import { defaultKept, onFormReset, startRef } from './form-reset'
 import Icon from './icon.kay'
@@ -30,6 +31,9 @@ const look = recipe({
   },
 })
 
+// A remote search waits for a pause in typing.
+const DEBOUNCE_MS = 200
+
 // Past this many options the panel opens on a search box.
 const SEARCH_FROM = 8
 
@@ -41,10 +45,11 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
   End: (_, count) => count - 1,
 }
 
-const { id, options, value = [], label, placeholder = wording('ui.multiSelect.placeholder', 'Any'), searchLabel = wording('ui.multiSelect.search', 'Search'), allLabel = wording('ui.multiSelect.all', 'All'), noneLabel = wording('ui.multiSelect.none', 'None'), emptyLabel = wording('ui.multiSelect.empty', 'No match'), selectedLabel, name, search, disabled = false, placement = 'bottom-start', open, onOpenChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children' | 'onChange'> & {
+const { id, options, value = [], label, placeholder = wording('ui.multiSelect.placeholder', 'Any'), searchLabel = wording('ui.multiSelect.search', 'Search'), allLabel = wording('ui.multiSelect.all', 'All'), noneLabel = wording('ui.multiSelect.none', 'None'), emptyLabel = wording('ui.multiSelect.empty', 'No match'), loadingLabel = wording('ui.multiSelect.loading', 'Loading…'), failureLabel = wording('ui.multiSelect.failure', 'Could not load the options'), minLength = 0, valueLabels, onLoad, onError, option: drawRow, selectedLabel, name, search, disabled = false, placement = 'bottom-start', open, onOpenChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children' | 'onChange' | 'onLoad' | 'onError'> & {
   // The panel's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
-  options: readonly MultiSelectOption<Value>[]
+  // A list, filtered by the search box, or a function answering the options for the text typed, such as an action or a wrapped API call: it is asked when the panel opens and after each pause in typing, and only the latest answer lands.
+  options: readonly MultiSelectOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly MultiSelectOption<Value>[]>)
   // The values picked to start with; a control whose parent passes others follows them.
   value?: readonly Value[] | undefined
   // Names the control for screen readers.
@@ -57,10 +62,22 @@ const { id, options, value = [], label, placeholder = wording('ui.multiSelect.pl
   allLabel?: string | undefined
   noneLabel?: string | undefined
   emptyLabel?: string | undefined
+  // What the status line says while a function `options` is answering, and once it rejected.
+  loadingLabel?: string | undefined
+  failureLabel?: string | undefined
+  // The fewest characters a function `options` is asked for; shorter text shows no options.
+  minLength?: number | undefined
+  // The labels of values picked before any answer lists them, for a function `options`; a value no answer or label names reads as itself.
+  valueLabels?: Readonly<Record<string, string>> | undefined
+  // Called with each answer of a function `options` and the text it was asked for, and with what it rejected with.
+  onLoad?: ((options: readonly MultiSelectOption<Value>[], query: string) => unknown) | undefined
+  onError?: ((error: unknown, query: string) => unknown) | undefined
   // What the trigger reads once several are picked, `3 selected` by default.
   selectedLabel?: ((count: number) => string) | undefined
   // Submits each picked value under this name, for a control inside a form.
   name?: string | undefined
+  // Draws each option in place of its label (and icon): `@option(option)`. The input stays named by the option's `label`, and keeps its checked and disabled state.
+  option?: Snippet<[option: MultiSelectOption<Value>]> | undefined
   // Opens on a search box; on by default past eight options.
   search?: boolean | undefined
   disabled?: boolean | undefined
@@ -77,14 +94,109 @@ let root: HTMLElement | undefined
 
 effect(() => picked = value)
 
-const searchable = () => search ?? options.length > SEARCH_FROM
-const summary = () => selectionSummary(options, picked(), placeholder, selectedLabel ?? (count => wording('ui.multiSelect.selected', '{count} selected', { count })))
+const remote = typeof options === 'function'
+const found = signal<readonly MultiSelectOption<Value>[]>([])
+// The text the answer held in `found` is for, and whether the last ask was rejected.
+const answered = signal<string | undefined>(undefined)
+const failed = signal(false)
+// Every option an answer listed, so a value picked from one answer keeps its label once a later search no longer lists it.
+const seen = signal<readonly MultiSelectOption<Value>[]>([])
+let request = 0
+
+const listed = (): readonly MultiSelectOption<Value>[] => typeof options === 'function' ? found() : options
+
+// The options the labels and the order of the picked values come from.
+const pool = (): readonly MultiSelectOption<Value>[] => {
+  if (!remote)
+    return listed()
+
+  const named = Object.entries(valueLabels ?? {}).map(([entry, text]) => ({ value: entry as Value, label: text }))
+  const byValue = new Map([...named, ...seen(), ...found()].map(option => [option.value, option]))
+
+  return [...byValue.values()]
+}
+
+const waiting = () => remote && query().trim().length >= minLength && answered() !== query()
+const searchable = () => remote || (search ?? listed().length > SEARCH_FROM)
+const summary = () => selectionSummary(pool(), picked(), placeholder, selectedLabel ?? (count => wording('ui.multiSelect.selected', '{count} selected', { count })))
 
 const shown = () => {
   const needle = query().trim().toLowerCase()
 
-  return needle ? options.filter(option => option.label.toLowerCase().includes(needle)) : options
+  // A function answers for the text itself.
+  return needle && !remote ? listed().filter(option => option.label.toLowerCase().includes(needle)) : listed()
 }
+
+const status = () => {
+  if (remote && query().trim().length < minLength)
+    return ''
+
+  if (waiting())
+    return loadingLabel
+
+  if (failed())
+    return failureLabel
+
+  return shown().length === 0 ? emptyLabel : ''
+}
+
+// An app's callback that throws is logged, not taken for a failed load.
+function notify(call: () => unknown) {
+  try {
+    call()
+  }
+  catch (error) {
+    console.error('kayjs-ui: a MultiSelect callback threw', error)
+  }
+}
+
+// Only the latest question lands: an answer arriving after a newer key press is dropped.
+async function load(text: string) {
+  const mine = ++request
+
+  if (typeof options !== 'function' || text.trim().length < minLength) {
+    found = []
+    answered = text
+
+    return
+  }
+
+  try {
+    const answer = await options({ q: text })
+
+    if (mine !== request)
+      return
+
+    found = answer
+    seen = [...seen().filter(option => !answer.some(entry => entry.value === option.value)), ...answer]
+    answered = text
+    failed = false
+    notify(() => onLoad?.(answer, text))
+  }
+  catch (error) {
+    if (mine === request) {
+      console.error('kayjs-ui: a MultiSelect could not load its options', error)
+      found = []
+      answered = text
+      failed = true
+      notify(() => onError?.(error, text))
+    }
+  }
+}
+
+const opened = signal(false)
+
+// The search waits for a pause in typing; the first ask is at once, when the panel opens.
+effect(() => {
+  const text = query()
+
+  if (!remote || !opened())
+    return
+
+  const timer = setTimeout(() => void load(text), untrack(() => answered() === undefined) ? 0 : DEBOUNCE_MS)
+
+  onCleanup(() => clearTimeout(timer))
+})
 
 function set(next: Value[]) {
   picked = next
@@ -115,10 +227,16 @@ const ref = startRef<HTMLElement>(element => root = element, rest.ref)
 
 // The panel only shows once the browser has opened the popover, so focus moves on its toggle rather than on the click; closing clears the search.
 function toggled(isOpen: boolean) {
-  if (isOpen)
+  opened = isOpen
+
+  if (isOpen) {
     root?.querySelector<HTMLInputElement>('[data-part=search], [data-part=checkbox]:not(:disabled)')?.focus()
-  else
+  }
+  else {
     query = ''
+    request++
+    answered = undefined
+  }
 
   onOpenChange?.(isOpen)
 }
@@ -152,24 +270,28 @@ div(part="root" {...rest} ref={ref})
   Popover(id={id} placement={placement} open={open} part="panel" role="group" aria-label={label} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft})
     @trigger(attributes)
       // Named by its label and what is picked, which a name of the label alone would hide; a count is described by the labels it stands for.
-      button.kui-field-input({...attributes} part="trigger" type="button" aria-label={`${label}: ${summary()}`} aria-description={picked().length > 1 ? pickedLabels(options, picked()).join(', ') : undefined} disabled={disabled} data-empty={picked().length === 0 || undefined})
+      button.kui-field-input({...attributes} part="trigger" type="button" aria-label={`${label}: ${summary()}`} aria-description={picked().length > 1 ? pickedLabels(pool(), picked()).join(', ') : undefined} disabled={disabled} data-empty={picked().length === 0 || undefined})
         span(part="summary") {summary()}
         Icon(icon="chevron" part="chevron")
     if searchable()
       input.kui-field-input(part="search" type="search" data-kui-search placeholder={searchLabel} aria-label={`${searchLabel} ${label}`} value={query()} onInput={event => query = event.currentTarget.value})
     div(part="bar")
       // Under a search, All and None pick and drop only the options it shows.
-      button(part="action" type="button" disabled={shown().every(option => option.disabled || picked().includes(option.value))} onClick={() => set(pickedShown(options, picked(), shown(), true))}) {allLabel}
-      button(part="action" type="button" disabled={!shown().some(option => !option.disabled && picked().includes(option.value))} onClick={() => set(pickedShown(options, picked(), shown(), false))}) {noneLabel}
+      button(part="action" type="button" disabled={shown().every(option => option.disabled || picked().includes(option.value))} onClick={() => set(pickedShown(pool(), picked(), shown(), true))}) {allLabel}
+      button(part="action" type="button" disabled={!shown().some(option => !option.disabled && picked().includes(option.value))} onClick={() => set(pickedShown(pool(), picked(), shown(), false))}) {noneLabel}
     div(part="options")
       for option of shown() key={option.value}
         label(part="option")
-          input(part="checkbox" type="checkbox" checked={picked().includes(option.value)} disabled={option.disabled} onChange={() => set(toggledValue(options, picked(), option.value))})
-          if option.icon
-            Icon(icon={option.icon} part="icon")
-          span(part="label") {option.label}
+          input(part="checkbox" type="checkbox" checked={picked().includes(option.value)} disabled={option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => set(toggledValue(pool(), picked(), option.value))})
+          if drawRow
+            span(part="label")
+              | {drawRow(option)}
+          else
+            if option.icon
+              Icon(icon={option.icon} part="icon")
+            span(part="label") {option.label}
     // Read out as a search empties the list, which otherwise changes in silence.
-    p(part="empty" role="status") {shown().length === 0 ? emptyLabel : ''}
+    p(part="empty" role={failed() && !waiting() ? 'alert' : 'status'}) {status()}
   if name
     for entry of picked() key={entry}
       input(type="hidden" name={name} value={entry} disabled={disabled})

@@ -120,6 +120,8 @@ export default defineMessages({
     multiSelect: {
       all: 'Tout',
       empty: 'Aucune correspondance',
+      failure: 'Impossible de charger les options',
+      loading: 'Chargement…',
       none: 'Aucun',
       placeholder: 'Tous',
       search: 'Rechercher',
@@ -153,7 +155,7 @@ export default defineMessages({
       saving: 'Enregistrement…',
     },
     scatterChart: { empty: 'Aucune donnée pour le moment.' },
-    select: { loading: 'Chargement…' },
+    select: { failure: 'Impossible de charger les options', loading: 'Chargement…' },
     sidePanel: { close: 'Fermer', resize: 'Redimensionner' },
     siteNav: { menu: 'Menu' },
     splitLayout: { back: 'Retour', resize: 'Redimensionner la liste' },

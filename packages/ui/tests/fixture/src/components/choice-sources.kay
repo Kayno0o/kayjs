@@ -1,0 +1,47 @@
+---
+// kay-island
+import type { MultiSelectOption } from '@kaynooo/kayjs-ui'
+import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import { signal, trustHtml } from 'kay'
+
+const { calls } = props<{ calls: string[] }>()
+const opened = signal(false)
+const waiting: { text: string, resolve: (answer: MultiSelectOption[] | Error) => void }[] = []
+
+async function people({ q }: { q: string }): Promise<MultiSelectOption[]> {
+  calls.push(`ask ${q}`)
+
+  const answer = await new Promise<MultiSelectOption[] | Error>((resolve) => { waiting.push({ text: q, resolve }) })
+
+  if (answer instanceof Error)
+    throw answer
+
+  return answer
+}
+
+function answer(entries: MultiSelectOption[] | Error) {
+  waiting.shift()?.resolve(entries)
+}
+
+async function sizes() {
+  return [{ value: 's', label: 'Small' }, { value: 'l', label: 'Large' }]
+}
+
+const drawn = (name: string) => ({ name, icon: { 'viewBox': '0 0 24 24', 'width': '1em', 'height': '1em', 'aria-hidden': 'true' as const, 'innerHTML': trustHtml(`<path data-icon="${name}"/>`) } })
+const icons = ['tabler:home', 'tabler:search', 'tabler:user'].map(drawn)
+---
+div#box
+  MultiSelect(options={people} label="People" open={opened()} onOpenChange={now => opened = now} valueLabels={{ ada: 'Ada' }} value={['ada']} onChange={value => calls.push(`picked ${value.join(',')}`)})
+button#show(type="button" onClick={() => opened = true}) Show
+button#hide(type="button" onClick={() => opened = false}) Hide
+button#answer(type="button" onClick={() => answer([{ value: 'bob', label: 'Bob' }, { value: 'cy', label: 'Cy' }])}) Answer
+button#refuse(type="button" onClick={() => answer(new Error('down'))}) Refuse
+Select#sizes(options={sizes} value="l" aria-label="Size" onChange={value => calls.push(`size ${value}`)})
+RadioGroup#plans(options={[{ value: 'free', label: 'Free' }, { value: 'pro', label: 'Pro' }]} value="free" label="Plan" onChange={value => calls.push(`plan ${value}`)})
+  @option(plan)
+    b.title {plan.label}
+    i.price 9
+IconPicker#icons(icons={icons} onChange={name => calls.push(`icon ${name}`)})
