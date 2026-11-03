@@ -9,7 +9,7 @@
 `kay new` takes a directory, a preset and the features to add or drop:
 
 ```sh
-kay new my-site --template site --with search
+kay new my-app --template server --with auth
 ```
 
 ### Add a feature to a project

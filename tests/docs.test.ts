@@ -56,6 +56,45 @@ describe('llms.txt', () => {
   })
 })
 
+// A `kay new` or `kay add` line a doc shows to run, as `kay add auth,ui`.
+const SCAFFOLD_COMMAND = /^kay (?:new|add) .+$/gm
+const docFiles = [...docs.map(name => join('llms', name)), ...[...new Bun.Glob('**/*.md').scanSync(pagesDir)].toSorted().map(file => join('docs/src/content/docs', file))]
+const scaffoldCommands = (await Promise.all(docFiles.map(async file => [...(await Bun.file(join(root, file)).text()).matchAll(SCAFFOLD_COMMAND)].map(match => [`${file}: ${match[0]}`, match[0]] as const)))).flat()
+
+describe('the scaffold commands the docs show', () => {
+  it('find the commands', () => {
+    expect(scaffoldCommands.length).toBeGreaterThan(5)
+  })
+
+  it.each(scaffoldCommands)('%s is accepted by --dry-run', async (_name, command) => {
+    const base = await scratchDir('scaffold-docs-')
+
+    try {
+      const cli = ['bun', join(root, 'src/cli.ts')]
+      const run = async (args: string[], cwd: string) => {
+        const child = Bun.spawn([...cli, ...args], { cwd, stdout: 'pipe', stderr: 'pipe' })
+        const [out, error, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+        return { output: out + error, code }
+      }
+
+      const [, verb, ...rest] = command.split(' ')
+
+      // `kay add` works on a project that holds none of the features, so a server one is made first; `kay new` writes its own folder.
+      if (verb === 'add')
+        await run(['new', 'app', '--template', 'server', '-y', '--quiet'], base)
+
+      const args = verb === 'add' ? ['add', ...rest, join(base, 'app'), '--dry-run'] : ['new', join(base, 'app'), ...rest.slice(1), '--dry-run']
+      const { output, code } = await run(args, base)
+
+      expect(code === 0 ? '' : output).toBe('')
+    }
+    finally {
+      await rm(base, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('the documentation site\'s pages', () => {
   it.each(pageBlocks)('%s compiles cleanly and is formatted', (_name, source) => {
     // A server fence left open is a file with no template, an `_actions.kay`.
