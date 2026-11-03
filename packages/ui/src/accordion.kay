@@ -38,13 +38,25 @@ const asked = () => value === undefined ? undefined : new Set(typeof value === '
 let root: HTMLElement | undefined
 
 // The sections open: the app's `value` when given, else the flagged items, and the reader's clicks from then on.
-const opened = signal<ReadonlySet<string>>(asked() ?? new Set(items.filter((item, index) => multiple ? item.open === true : index === firstOpen()).map(item => item.value)))
+const flagged = () => new Set(items.filter((item, index) => multiple ? item.open === true : index === firstOpen()).map(item => item.value))
+const opened = signal<ReadonlySet<string>>(asked() ?? flagged())
+// Whether the reader has toggled a section, after which the flags no longer decide.
+let touched = false
 
 effect(() => {
   const wanted = asked()
 
-  if (wanted)
+  if (wanted) {
     opened = multiple ? wanted : new Set([...wanted].slice(0, 1))
+
+    return
+  }
+
+  // Items that arrive or change after mount open by their flags until the reader decides.
+  const flags = flagged()
+
+  if (!untrack(() => touched))
+    opened = flags
 })
 
 // Without `multiple`, a section closing as another opens reports only the opening, so the value is never briefly empty.
@@ -61,8 +73,15 @@ function toggled(item: string, now: boolean) {
   else
     next.delete(item)
 
+  touched = true
   opened = next
   onChange?.([...next])
+}
+
+// A click, or Enter and Space which the browser turns into one, on a disabled header folds nothing.
+function refuseDisabled(event: MouseEvent) {
+  if (event.target instanceof Element && event.target.closest('summary[aria-disabled=true]'))
+    event.preventDefault()
 }
 
 // Arrow, Home and End keys move between the headers, which are the summaries of the sections.
@@ -72,7 +91,7 @@ function keyDown(event: KeyboardEvent) {
   if (!move || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !(event.target instanceof Element) || !event.target.matches('summary'))
     return
 
-  const summaries = [...root?.querySelectorAll<HTMLElement>(':scope > details > summary') ?? []]
+  const summaries = [...root?.querySelectorAll<HTMLElement>(':scope > details > summary:not([aria-disabled=true])') ?? []]
   const index = summaries.indexOf(event.target as HTMLElement)
 
   if (index === -1)
@@ -83,7 +102,7 @@ function keyDown(event: KeyboardEvent) {
 }
 ---
 // Native details sharing a `name` close one another without script; the keys need an island.
-div(part="root" {...rest} ref={element => root = element} onKeyDown={keyDown})
+div(part="root" {...rest} ref={element => root = element} onKeyDown={keyDown} onClick={refuseDisabled})
   for item of items key={item.value}
     CollapsibleSection(title={untrack(() => title?.(item.value)) ?? item.title} meta={untrack(() => meta?.(item.value)) ?? item.meta} name={multiple ? undefined : group} open={opened().has(item.value)} boxed={boxed} disabled={item.disabled} onOpenChange={now => toggled(item.value, now)})
       | {untrack(() => panel(item.value))}

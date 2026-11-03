@@ -50,6 +50,10 @@ async function write(): Promise<string> {
     const blob = (async () => {
       resolved = await pending
 
+      // An empty blob would wipe the clipboard, so an empty answer fails the write instead.
+      if (!resolved)
+        throw new Error('kayjs-ui: nothing to copy')
+
       return new Blob([resolved], { type: 'text/plain' })
     })()
 

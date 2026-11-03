@@ -4,13 +4,14 @@ import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
 
-const { calls, source = 'plain' } = props<{ calls: string[], source?: 'plain' | 'built' | 'fetched' | 'broken' }>()
+const { calls, source = 'plain' } = props<{ calls: string[], source?: 'plain' | 'built' | 'fetched' | 'broken' | 'empty' }>()
 
 const sources = {
   plain: 'plain',
   built: () => 'built',
   fetched: async () => 'fetched',
   broken: async () => { throw new Error('no link') },
+  empty: async () => '',
 }
 ---
 Avatar#avatar(src="/ada.png" name="Ada" onLoad={() => calls.push('avatar load')} onError={() => calls.push('avatar error')})

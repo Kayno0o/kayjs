@@ -77,4 +77,10 @@ test('Accordion draws a title block and an item meta, and a disabled item cannot
   expect(earth.querySelector('summary')?.getAttribute('aria-disabled')).toBe('true')
 
   expect(earth.querySelector('summary')?.getAttribute('tabindex')).toBe('-1')
+
+  const venus = sections()[1]!.querySelector('summary')!
+
+  venus.focus()
+  venus.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+  expect(document.activeElement).toBe(mars.querySelector('summary'))
 })

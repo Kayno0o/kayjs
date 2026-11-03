@@ -99,4 +99,14 @@ describe('CopyButton', () => {
     await settle()
     expect(broken.calls).toEqual(['failed'])
   })
+
+  test('writes nothing and tells onFail for a text that resolves to nothing', async () => {
+    const written = clipboardWith()
+    const { root, calls } = await mount('empty')
+
+    click(root.querySelector('#copy'))
+    await settle()
+    expect(written).toEqual([])
+    expect(calls).toEqual(['failed'])
+  })
 })
