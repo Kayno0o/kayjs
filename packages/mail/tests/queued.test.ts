@@ -79,6 +79,53 @@ describe('a mail queued by one mailer and claimed by another', () => {
     }
   })
 
+  it('tells every run hook to the mailer that queued the mail when a mailer without hooks claims it', async () => {
+    silenced()
+
+    const queue = { ...shared(), attempts: 2, backoff: '10s' as const }
+    const told: string[] = []
+    let sent = 0
+    const failing = async () => {
+      sent++
+
+      throw new Error('451 try later')
+    }
+    const queuing = mailer({ from: 'a@example.com', transport: { send: failing }, queue: {
+      ...queue,
+      onStart: ({ attempts }) => void told.push(`start ${attempts}`),
+      onRetry: ({ attempts }) => void told.push(`retry ${attempts}`),
+      onSuccess: () => void told.push('success'),
+      onError: ({ attempts }) => void told.push(`error ${attempts}`),
+    } })
+    const claiming = mailer({ from: 'b@example.com', transport: { send: failing }, queue })
+
+    try {
+      await queuing.enqueue({ to: 'ada@example.com', subject: 'Hi', text: 'Hello' })
+      await claiming.drain()
+      setSystemTime(Date.now() + 11_000)
+      await claiming.drain()
+      expect(sent).toBe(2)
+      expect(told).toEqual(['start 1', 'retry 1', 'start 2', 'error 2'])
+    }
+    finally {
+      setSystemTime()
+    }
+  })
+
+  it('tells onSuccess to the owner when a mailer without hooks sends the mail', async () => {
+    silenced()
+
+    const queue = shared()
+    const told: string[] = []
+    const ok = async () => ({ messageId: 'x', accepted: ['ada@example.com'], rejected: [], response: 'ok' })
+    const queuing = mailer({ from: 'a@example.com', transport: { send: ok }, queue: { ...queue, onSuccess: () => void told.push('success') } })
+    const claiming = mailer({ from: 'b@example.com', transport: { send: ok }, queue })
+
+    await queuing.enqueue({ to: 'ada@example.com', subject: 'Hi', text: 'Hello' })
+    await claiming.drain()
+    expect(told).toEqual(['success'])
+  })
+
   it('is kept as failed by the redact of the mailer that queued it', async () => {
     silenced()
 

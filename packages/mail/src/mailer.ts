@@ -675,10 +675,11 @@ export function mailer(options: MailerOptions = {}): Mailer {
     ...queueOptions,
     keepFailed: queueOptions.keepFailed ?? FAILED_KEPT,
     redact: queued => ownerOf(queued.via).redact(queued),
-    ...onStart && { onStart: told('onStart') },
-    ...onSuccess && { onSuccess: told('onSuccess') },
-    ...onRetry && { onRetry: told('onRetry') },
-    ...onError && { onError: told('onError') },
+    // Always set: any mailer of the queue may claim a mail, and its owner is the one to hear of it.
+    onStart: told('onStart'),
+    onSuccess: told('onSuccess'),
+    onRetry: told('onRetry'),
+    onError: told('onError'),
     onFailed: async ({ payload: { via: queuedBy, ...mail }, error }) => ownerOf(queuedBy).failed(mail, error),
   })
   // The mails of a list are sent by a job of their own, a batch at a time, so a broadcast to a long list resumes after a restart where it stopped. Its worker starts with the first `mail.list()`, so a mailer with no list runs no more queue than before lists.
