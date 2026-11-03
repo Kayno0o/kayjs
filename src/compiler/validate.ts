@@ -8,7 +8,8 @@ import { WIDGET_ROLES } from './aria'
 import { childBlocks, EVENT_MODIFIERS, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, serverIslandOf, templateFacts, visitNodes } from './ast'
 
 const UI_SOURCE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
-const MUTED = /(['"])muted\1/g
+// A `muted` string standing as a value, alone or as an array element or ternary branch: never one compared against, passed to a call or inside a longer string.
+const MUTED = /(^\s*|[[,?:]\s*)(['"])muted\2(?=\s*([\]),:}]|$))/g
 const MUTED_TONE = /(\btone['"]?\s*:\s*)(['"])muted\2/g
 // The kayjs-ui field tags that took the native `size` before 1.87, when `size` became `sm`, `md` or `lg`.
 const FIELD_TAGS = new Set(['text-input', 'select', 'combobox', 'date-input', 'time-input', 'date-time-input'])
@@ -850,7 +851,7 @@ class Validator {
 
       const text = this.text(span)
       const staticFound = text === 'muted' ? [{ start: span.start, end: span.end, text: 'neutral' }] : []
-      const found = attribute.kind === 'static' ? staticFound : [...text.matchAll(file === 'timeline' ? MUTED_TONE : MUTED)].map(match => ({ start: span.start + match.index, end: span.start + match.index + match[0].length, text: file === 'timeline' ? `${match[1]}${match[2]}neutral${match[2]}` : `${match[1]}neutral${match[1]}` }))
+      const found = attribute.kind === 'static' ? staticFound : [...text.matchAll(file === 'timeline' ? MUTED_TONE : MUTED)].filter(match => file === 'timeline' || !(match[1]!.trim() === ',' && match[3] === ')')).map(match => ({ start: span.start + match.index + (file === 'timeline' ? 0 : match[1]!.length), end: span.start + match.index + match[0].length, text: file === 'timeline' ? `${match[1]}${match[2]}neutral${match[2]}` : `${match[2]}neutral${match[2]}` }))
 
       for (const edit of found)
         this.lint(edit, 'deprecated-ui-tone', `the \`muted\` tone of \`${element.name}\` is \`neutral\` since kayjs-ui 1.87`, { help: 'Write `neutral`', fixes: [{ title: 'Write `neutral`', edits: [edit], safe: true }] })

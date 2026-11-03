@@ -1120,6 +1120,14 @@ describe('deprecated-ui-tone', () => {
     expect(found('Other(tone="muted")')).toEqual([])
   })
 
+  it('fixes a muted value but never a comparison or a longer string', () => {
+    expect(found('StatusStrip(label="x" cells={rows.filter(row => row.kind === \'muted\')})')).toEqual([])
+    expect(found('Sparkline(label="x" values={[1]} tones={[\'say "muted"\']})')).toEqual([])
+    expect(found('Sparkline(label="x" values={[1]} tones={pick(row, \'muted\')})')).toEqual([])
+    expect(found('Sparkline(label="x" values={[1]} tones={xs.map(x => x === \'muted\' ? \'danger\' : \'muted\')})')).toEqual([{ at: '\'muted\'', fix: ['\'muted\'->\'neutral\''] }])
+    expect(found('Sparkline(label="x" values={[1]} tones={[\'muted\', \'muted\']})')).toHaveLength(2)
+  })
+
   it('is silenced by kay-allow', () => {
     expect(found('// kay-allow deprecated-ui-tone\nSparkline(label="x" values={[1]} tone="muted")')).toEqual([])
   })
