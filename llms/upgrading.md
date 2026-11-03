@@ -11,6 +11,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `url` as a function and a feed item's `path` beside a `route`
 
 - A collection with a literal `route` writes no `url` function, as its entries' `url` comes from the route, and a feed's `item` leaves out `path` when it is that route with the slug. Both forms keep working until 1.90, reported by the `deprecated-collection-links` lint, which `kay upgrade` fixes.
+
 ### kayjs-ui: `size` on a field is its own
 
 - TextInput, Select, Combobox, DateInput and the other field controls take `size` as `sm`, `md` or `lg`, so the native `size` attribute (an input's character width, a select's row count) is no longer passed through: set the width with CSS (`w-48`).
@@ -19,6 +20,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `SparkTone`, and the `tone` of a `TimelineEntry`, a Sparkline bar and a StatusStrip cell, name the quiet grey `neutral` instead of `muted`: change `tone: 'muted'` to `'neutral'`. `SparkTone` is deprecated for `Tone` and goes in 2.0.0.
 - A Notice's `info` tone is now drawn in `--color-info` and its default tone is `neutral`, which keeps the look `info` had: pass `tone="info"` only for the coloured one. It writes `data-tone="neutral"` where it wrote `info`, so a `defineUi` restyle or a `[data-tone=info]` rule of an app no longer reaches a default Notice: target `neutral`, or pass `tone="info"`.
+
 ### kayjs-auth: the account, provider and audit methods are grouped
 
 - `auth.deleteAccount(proof)`, `auth.listAuditLog()` and the other flat account, provider and audit methods are `auth.account.delete(proof)`, `auth.audit.list()` and so on, and `createUser` on the `createAuth` result is `admin.createUser` ([the table](../packages/auth/llms/grouped-methods.md)). The flat names work until 1.90; `kay upgrade` renames the calls (`deprecated-auth-account-methods`).
@@ -106,6 +108,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### A session sealed before kay 1.72.0 signs its visitor out once
 
 - `session()` opens a cookie with the key derived for it only, no longer with the bare SHA-256 of the secret that kay sealed under before v1.72.0. A visitor whose cookie was last written by such a kay, and never since by a later one, is signed out once. Nothing changes in the app, and no lint can carry it as it is cookie data.
+
 ### A misspelled config key is refused
 
 - A key kay does not know in `kay.config.ts` (or in an extension's `config`), at its top level or in `security`, `i18n`, `seo`, `offline`, `health` and `proxy`, now stops every command with the nearest known name, where it used to leave kay's default in place. An app whose config already carries a typo starts failing: correct the key, or drop it.
