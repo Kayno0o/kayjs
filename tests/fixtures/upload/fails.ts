@@ -31,7 +31,7 @@ async function settled(promise: Promise<unknown>): Promise<unknown> {
     return 'resolved'
   }
   catch (error) {
-    return { name: (error as Error).name, message: (error as Error).message, status: (error as { status?: number }).status }
+    return { name: (error as Error).name, message: (error as Error).message, status: (error as { status?: number }).status, cause: ((error as Error).cause as Error | undefined)?.message }
   }
 }
 

@@ -674,7 +674,7 @@ describe('the upload\'s chunk', () => {
       filed: { name: 'Error', message: 'stale chunk' },
       pending: false,
       count: 0,
-      called: { name: 'ApiError', message: 'stale chunk', status: 0 },
+      called: { name: 'ApiError', message: 'The server could not be reached', status: 0, cause: 'stale chunk' },
       progress: [],
       loaded: true,
     })
