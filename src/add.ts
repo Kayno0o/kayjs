@@ -509,9 +509,12 @@ const DEV_PACKAGES = new Set(['@iconify-json/tabler'])
 
 // The range a kayjs package is installed at (kay's own minor), any other at the range kay uses.
 async function packageRange(name: string): Promise<string> {
-  const own = JSON.parse(await readFile(join(import.meta.dir, '../package.json'), 'utf8')) as { version: string, devDependencies: Record<string, string> }
+  return rangeIn(JSON.parse(await readFile(join(import.meta.dir, '../package.json'), 'utf8')) as { version: string, devDependencies?: Record<string, string> }, name)
+}
 
-  return name.startsWith('@kaynooo/kayjs-') ? `~${own.version}` : own.devDependencies[name]!
+// A kay installed from a tarball may carry no `devDependencies`, so a package it does not name is installed at its latest version.
+export function rangeIn(own: { version: string, devDependencies?: Record<string, string> }, name: string): string {
+  return name.startsWith('@kaynooo/kayjs-') ? `~${own.version}` : own.devDependencies?.[name] ?? 'latest'
 }
 
 // Installs what the libraries need and the project lacks: a kayjs package at kay's own minor, any other at the range kay uses, the dev ones in a call of their own.

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { expect, it } from 'bun:test'
-import { addExtension, addFeatures, detectFeatures, handEdit, restore, runnerOf, snapshot as snapshotManifest } from '../src/add'
+import { addExtension, addFeatures, detectFeatures, handEdit, rangeIn, restore, runnerOf, snapshot as snapshotManifest } from '../src/add'
 import { createProject, PRESETS } from '../src/new'
 
 const repo = join(import.meta.dir, '..')
@@ -864,4 +864,10 @@ it('writes the server beside kayjs-auth and postgres, and leaves a kayjs-auth pr
   finally {
     await rm(join(dir, '..'), { recursive: true, force: true })
   }
+})
+
+it('installs a package at its latest version when kay carries no devDependencies', () => {
+  expect(rangeIn({ version: '1.2.3' }, '@iconify-json/tabler')).toBe('latest')
+  expect(rangeIn({ version: '1.2.3' }, '@kaynooo/kayjs-ui')).toBe('~1.2.3')
+  expect(rangeIn({ version: '1.2.3', devDependencies: { '@iconify-json/tabler': '^1.0.0' } }, '@iconify-json/tabler')).toBe('^1.0.0')
 })

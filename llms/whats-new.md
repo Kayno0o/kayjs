@@ -36,6 +36,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui's Menu entries take `href`, drawing the entry as a link with middle-click, Ctrl+click and "copy link", opening in a new tab with `rel="noopener noreferrer"` when the address is of another origin, and `onSelect` is then optional: [forms](../packages/ui/llms/forms.md).
 - kayjs-ui's Menu entries take `href`, drawing the entry as a link with middle-click, Ctrl+click and "copy link", opening in a new tab with `rel="noopener noreferrer"` when the address is absolute, and `onSelect` is then optional: [forms](../packages/ui/llms/forms.md).
 - `secret-prop` skips a field named like a secret that holds a list of objects, such as a syntax highlighter's `tokens`: [lints](lints.md).
+- `kay a11y` lists a folder collection's entries from the folder the server reads, so the pages of a route filled by a collection are audited rather than reported as not audited.
+- `kay add` installs a dev package kay's own manifest does not name at its latest version, rather than crashing when kay is installed from a tarball.
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
 
