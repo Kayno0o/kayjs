@@ -1,4 +1,6 @@
-import type { Collection } from '../src/content'
+import type { TrailingSlash } from '../src/config'
+import type { Collection, Entry } from '../src/content'
+import type { ResolvedFeed } from '../src/content/feed'
 import { mkdtemp, readdir, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -8,7 +10,7 @@ import { Elysia, t } from 'elysia'
 import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
 import { bodyHtml, collection, highlightCode, renderMarkdown } from '../src/content'
-import { feedXml } from '../src/content/feed'
+import { feedDocument, feedPaths } from '../src/content/feed'
 import { contentMode, contentPlace, loadedBodies, loadEntries, manifestFile, setContentMode, setContentPlace } from '../src/content/load'
 import { compileMarkdown, MarkdownError } from '../src/content/markdown'
 import { serveFeeds, writeContentManifests } from '../src/content/server'
@@ -19,6 +21,11 @@ import { ServedPaths } from '../src/server/served-paths'
 import { scratchBuild } from './prerendered'
 import { fixtureCopy } from './scratch'
 import { pages } from './shared-pages'
+
+// The feed's first format, for the tests that read one document.
+function feedXml<Data>(entries: Entry<Data>[], options: ResolvedFeed<Data>, origin: string, home = '/', trailingSlash?: TrailingSlash): string {
+  return feedDocument(feedPaths(options)[0]!.format, entries, options, origin, home, trailingSlash)
+}
 
 const FIXTURE = 'tests/fixtures/content'
 const content = 'src/content.config.ts'
@@ -382,7 +389,7 @@ describe('feeds', () => {
 
     expect(xml).toContain('<feed xmlns="http://www.w3.org/2005/Atom">')
     expect(xml).toContain('<title>Fish &amp; chips</title>')
-    expect(xml).toContain('<entry><title>A &lt;b>bold&lt;/b> move</title><link href="https://x.example/a"/><id>https://x.example/a</id><updated>2026-01-02T00:00:00.000Z</updated></entry>')
+    expect(xml).toContain('<entry><title>A &lt;b&gt;bold&lt;/b&gt; move</title><link href="https://x.example/a"/><id>https://x.example/a</id><updated>2026-01-02T00:00:00.000Z</updated></entry>')
   })
 
   describe('write links as trailingSlash writes the canonical URL', () => {

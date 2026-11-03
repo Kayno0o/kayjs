@@ -58,6 +58,8 @@ article
   Content
 ```
 
+A page at the route that reads the request (`ctx.cookies`, `ctx.query`, a session, preview mode) cannot be built once: set `export const page = { prerender: false }` and it renders per request, as any page without `prerender` does, and the sitemap lists none of its entries.
+
 ### Give each entry its page's path
 
 `route: '/blog/:slug'` on the collection gives each entry a typed `url`, the path of its page, so links and feeds write no path; `'/docs/*slug'` keeps the folders of a slug:

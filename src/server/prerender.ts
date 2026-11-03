@@ -195,6 +195,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
       return skip('sets `revalidate`, which has a stale copy render again for every visitor')
 
     const prerender = pagePrerender(module, route)
+    // The collection's route lists it, which no `prerender` export says, so there is none to drop.
+    const inferred = pageSetting(module, 'prerender') === undefined && prerender !== undefined
 
     if (options.exportAll)
       refuseServerOnly(route, module, config.requireGuards)
@@ -319,9 +321,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
             return skip(`${readAt}, which only a request holds`)
 
           const inLayout = refused.file !== undefined && route.layouts.includes(refused.file)
-          const instead = inLayout
-            ? 'every page under that layout renders it, so read it in the pages that are not prerendered, or drop `prerender` from this one'
-            : 'drop `prerender` from `export const page` to render it per request'
+          const own = inferred ? 'set `prerender: false` in `export const page` to render it per request, as this page is at a collection\'s route' : 'drop `prerender` from `export const page` to render it per request'
+          const instead = inLayout ? 'every page under that layout renders it, so read it in the pages that are not prerendered, or drop `prerender` from this one' : own
           const advice = options.exportAll ? 'a static export renders every page at build time, so the read has to go, or the site needs a server' : instead
 
           throw new KayError('export-server-render', `kay: prerendering ${copy.path} from ${file} failed: it ${readAt}, which only a request holds, and a prerendered page renders once, at build time; ${advice}`)

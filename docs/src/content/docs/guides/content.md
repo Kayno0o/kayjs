@@ -127,6 +127,8 @@ article
 
 A collection without a `route` lists its entries in the page's `page` export instead, `export const page = { prerender: posts }`, which also wins over the route.
 
+A page at the route that reads the cookies, the query, a session or preview mode cannot be built once. Set `export const page = { prerender: false }` and it renders for each request, and the sitemap leaves its entries out.
+
 The page's head comes from the entry too: its `title` and `description` fields become the title and the description meta, and a `date`, `publishedAt` or `published` field (or the field named by `publishAt`, which must be a `Date` field: a text date gets nothing) makes `og:type` an `article` with an `article:published_time`.
 
 A `modified` option naming another `Date` field adds `article:modified_time` and gives the sitemap a `lastmod` for each entry's URL.

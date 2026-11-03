@@ -32,6 +32,7 @@ const CATCH_ALL = /\*[^/]+/
 export interface CollectionRoute {
   collection: string
   route: string
+  single?: true
 }
 
 // The routes no page's pattern serves, `/blog/:slug` by the page `blog/[slug].kay` and `/docs/*slug` by `docs/[...slug].kay`.

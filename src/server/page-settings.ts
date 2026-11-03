@@ -25,12 +25,27 @@ interface PageRoute {
   params: readonly string[]
 }
 
+// The answers for the collections registered last, by pattern, so a request does not match every collection's route again.
+let known: { registered: object, byPattern: Map<string, Collection<unknown>[]> } | undefined
+
 // The collections whose `route` is this page's pattern, in the content config's order: the page of one param is where their entries are shown.
 export function routedCollections(route: PageRoute): Collection<unknown>[] {
   if (route.params.length !== 1 || route.pattern.includes('?'))
     return []
 
-  return registeredCollections().flatMap(([, collection]) => collection.options.route !== undefined && collection.options.single !== true && isRouteOf(collection.options.route, route.pattern) ? [collection] : [])
+  const registered = registeredCollections()
+
+  if (known?.registered !== registered)
+    known = { registered, byPattern: new Map() }
+
+  let found = known.byPattern.get(route.pattern)
+
+  if (found === undefined) {
+    found = registered.flatMap(([, collection]) => collection.options.route !== undefined && collection.options.single !== true && isRouteOf(collection.options.route, route.pattern) ? [collection] : [])
+    known.byPattern.set(route.pattern, found)
+  }
+
+  return found
 }
 
 // A page's `prerender`: what it sets, else the collection whose `route` is the page's pattern, so a page needs no export to list its entries.

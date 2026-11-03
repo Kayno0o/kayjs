@@ -1438,18 +1438,19 @@ function blocks<const Types extends Record<string, AnyObject>>(types: Types, opt
 function bodyHtml(body: string): Promise<string>
 
 [./content] collection
-function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never>(source: string | ContentLoader<Stored<(Schema & {
+function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never, const Formats extends FeedFormat | readonly FeedFormat[] = "rss">(source: string | ContentLoader<Stored<(Schema & {
   params: [];
 })["static"]>>, options: CollectionOptions<Schema, [Route] extends [never] ? false : true> & {
   components?: Components;
   feed?: {
     path: FeedPath;
+    format?: Formats;
   } | undefined;
   seed?: Seed;
   route?: Route | undefined;
 }): Collection<(Schema & {
   params: [];
-})["static"], Components, FeedPath, undefined extends Seed ? false : true, [Route] extends [never] ? false : true>
+})["static"], Components, FeedPathsOfFormats<FeedPath, Formats>, undefined extends Seed ? false : true, [Route] extends [never] ? false : true>
 
 [./content] Collection
 interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string, Seeded extends boolean = boolean, Routed extends boolean = boolean>
@@ -1627,6 +1628,9 @@ function entrySource(name: string, slug: string, data: unknown, options?: {
   issues: DraftIssue[];
 }>
 
+[./content] FeedFormat
+type FeedFormat = 'rss' | 'atom' | 'json'
+
 [./content] FeedItem
 interface FeedItem
   author?: string | undefined
@@ -1640,15 +1644,11 @@ interface FeedItem
   updated?: Date | undefined
 
 [./content] FeedOptions
-interface FeedOptions<Data, Routed extends boolean = boolean>
-  author?: string | undefined
-  content?: boolean | undefined
-  description?: string | undefined
-  format?: FeedFormat | readonly FeedFormat[] | undefined
-  item?: ((entry: Entry<Data>) => FeedItemOf<Routed> | undefined) | undefined
-  limit?: number | undefined
-  path: string
-  title?: string | undefined
+type FeedOptions<Data, Routed extends boolean = boolean> = FeedBase & (Routed extends false ? {
+  item: FeedItemFunction<Data, Routed>
+} : {
+  item?: FeedItemFunction<Data, Routed> | undefined
+})
 
 [./content] FeedPathsOf
 type FeedPathsOf<Module> = {

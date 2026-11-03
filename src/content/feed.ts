@@ -29,7 +29,7 @@ export type FeedFormat = 'rss' | 'atom' | 'json'
 // A collection with no `route` must say where each item links.
 export type FeedItemOf<Routed extends boolean> = Routed extends false ? FeedItem & { path: string } : FeedItem
 
-export interface FeedOptions<Data, Routed extends boolean = boolean> {
+interface FeedBase {
   // Where the feed is served, such as `/blog/rss.xml`; with several formats, the first one is served here and each other at this path with its extension replaced by the format's, `/blog/rss.json`.
   path: string
   // The collection's `title`, else its name humanized, when left out.
@@ -43,9 +43,15 @@ export interface FeedOptions<Data, Routed extends boolean = boolean> {
   limit?: number | undefined
   // Carries each item's whole body as HTML, `content:encoded` in RSS, `content` in Atom and `content_html` in JSON.
   content?: boolean | undefined
-  // What an entry shows as, or undefined to leave it out, such as a draft; by default its `title`, `description`, `author`, `tags` and `image` fields, dated by the collection's `publishAt` else `date`, `publishedAt` or `published`, and linked to its `url`.
-  item?: ((entry: Entry<Data>) => FeedItemOf<Routed> | undefined) | undefined
 }
+
+type FeedItemFunction<Data, Routed extends boolean> = (entry: Entry<Data>) => FeedItemOf<Routed> | undefined
+
+// `item` is what an entry shows as, or undefined to leave it out, such as a draft; by default its `title`, `description`, `author`, `tags` and `image` fields, dated by the collection's `publishAt` else `date`, `publishedAt` or `published`, and linked to its `url`, so a collection with no `route` must give it.
+export type FeedOptions<Data, Routed extends boolean = boolean> = FeedBase & (Routed extends false ? { item: FeedItemFunction<Data, Routed> } : { item?: FeedItemFunction<Data, Routed> | undefined })
+
+// A feed with its title and item filled in.
+export type ResolvedFeed<Data = unknown> = FeedBase & { title: string, item: FeedItemFunction<Data, boolean> }
 
 const DEFAULT_LIMIT = 20
 // Characters XML 1.0 refuses anywhere, which a title may still carry.
@@ -53,7 +59,12 @@ const DEFAULT_LIMIT = 20
 const INVALID_XML = /[\u0000-\u0008\v\f\u000E-\u001F\uFFFE\uFFFF]/g
 const EXTENSION = /\.[^./]*$/
 const QUERY_OR_FRAGMENT = /[?#]/
-const ROOT_PATH_ATTRIBUTE = /(\s(?:href|src)=")\/(?!\/)/g
+// A start tag, its quoted values read whole so a `>` in one does not end it; escaped code samples hold no `<`.
+const START_TAG = /<[a-z](?:"[^"]*"|'[^']*'|[^>"'])*>/gi
+const ROOT_URL_ATTRIBUTE = /(\s(?:href|src|poster)=)("[^"]*"|'[^']*')/gi
+const SRCSET_ATTRIBUTE = /(\ssrcset=)("[^"]*"|'[^']*')/gi
+const ROOT_URL = /^\/(?!\/)/
+const SRCSET_URL = /(^|,\s+)\/(?!\/)/g
 const IMAGE_TYPES: Record<string, string> = { avif: 'image/avif', gif: 'image/gif', jpeg: 'image/jpeg', jpg: 'image/jpeg', png: 'image/png', svg: 'image/svg+xml', webp: 'image/webp' }
 
 export const FEED_TYPES: Record<FeedFormat, string> = { rss: 'application/rss+xml', atom: 'application/atom+xml', json: 'application/feed+json' }
@@ -66,16 +77,14 @@ export function feedPaths(feed: Pick<FeedOptions<unknown>, 'path' | 'format'>): 
 }
 
 // The collection's feed with what it implies filled in: its title, and the items of the common fields of the data.
-export function resolvedFeed(collection: Collection<unknown>): FeedOptions<unknown> & { title: string } {
+export function resolvedFeed(collection: Collection<unknown>): ResolvedFeed {
   const feed = collection.options.feed!
 
   return { ...feed, title: feed.title ?? collection.options.title ?? humanize(exportNameOf(collection.name)), item: feed.item ?? defaultFeedItem(collection) }
 }
 
 // What the feed shows an entry as when the collection's `item` is left out: the common fields of its data.
-export function defaultFeedItem(collection?: { options: { publishAt?: string | undefined, modified?: string | undefined } }): (entry: Entry<unknown>) => FeedItem {
-  const dates = collection ?? { options: {} }
-
+export function defaultFeedItem(dates: { options: { publishAt?: string | undefined, modified?: string | undefined } }): (entry: Entry<unknown>) => FeedItem {
   return (entry) => {
     const data = dataOf(entry)
     const title = text(data.title)
@@ -84,16 +93,17 @@ export function defaultFeedItem(collection?: { options: { publishAt?: string | u
     if (title === undefined || date === undefined)
       throw new KayError('content-invalid', `kay: the feed gives ${entry.file} no ${title === undefined ? '`title`' : 'date'}; give its data a ${title === undefined ? '`title`' : '`date`'} field, or set \`item\` in the feed`)
 
+    const updated = entryModified(dates, entry)
     const tags = [data.tags, data.categories].find(Array.isArray)
     const categories = tags?.filter((tag): tag is string => typeof tag === 'string')
 
-    return { title, date, ...entryModified(dates, entry) && { updated: entryModified(dates, entry) }, description: text(data.description), author: text(data.author), ...categories && categories.length > 0 && { categories }, image: text(data.image) ?? text(data.cover) }
+    return { title, date, ...updated && { updated }, description: text(data.description), author: text(data.author), ...categories && categories.length > 0 && { categories }, image: text(data.image) ?? text(data.cover) }
   }
 }
 
 // What the feed shows an entry as, its page the `item`'s `path` or else the entry's `url`.
-export function feedItem<Data>(options: FeedOptions<Data, boolean>, entry: Entry<Data>): (FeedItem & { path: string }) | undefined {
-  const item = options.item ? options.item(entry) : defaultFeedItem()(entry)
+export function feedItem<Data>(options: ResolvedFeed<Data>, entry: Entry<Data>): (FeedItem & { path: string }) | undefined {
+  const item = options.item(entry)
 
   if (!item)
     return undefined
@@ -106,14 +116,22 @@ export function feedItem<Data>(options: FeedOptions<Data, boolean>, entry: Entry
   return { ...item, path }
 }
 
-// The body of an entry as HTML, the links and images that start at the site's root written out in full on the origin, its mount point included, as the page adds the base on its way out.
-function bodyOf(entry: Entry<unknown>, origin: string): string {
+// The HTML of an entry's body, or undefined for one whose content does not render at once, which the feed leaves to its summary.
+export function renderedBody(entry: Entry<unknown>): string | undefined {
   const rendered = (entry.Content as () => Html)()
 
-  if (typeof (rendered as Partial<Html>).t !== 'string')
-    throw new KayError('content-invalid', `kay: the feed cannot carry ${entry.file}'s body, whose content does not render at once`)
+  return typeof (rendered as Partial<Html>).t === 'string' ? rendered.t : undefined
+}
 
-  return rendered.t.replace(ROOT_PATH_ATTRIBUTE, `$1${origin}/`)
+// The links and images of a body that start at the site's root written out in full on the origin, its mount point included, as the page adds the base on its way out; only inside tags, so a code sample showing `href="/"` stays as written.
+function bodyOf(entry: Entry<unknown>, origin: string): string | undefined {
+  const html = renderedBody(entry)
+  const absolute = (value: string) => value.replace(ROOT_URL, `${origin}/`)
+  const quoted = (value: string, change: (inner: string) => string) => `${value[0]}${change(value.slice(1, -1))}${value[0]}`
+
+  return html?.replace(START_TAG, tag => tag
+    .replace(ROOT_URL_ATTRIBUTE, (_, name: string, value: string) => name + quoted(value, absolute))
+    .replace(SRCSET_ATTRIBUTE, (_, name: string, value: string) => name + quoted(value, inner => inner.replace(SRCSET_URL, `$1${origin}/`))))
 }
 
 interface Shown {
@@ -124,8 +142,8 @@ interface Shown {
 }
 
 // The feed's document in one format: its items newest first, every link absolute on the site's origin and written as `trailingSlash` writes a page's canonical URL, the site's own at `home`, its locale's home page for a localized feed.
-export function feedDocument<Data>(format: FeedFormat, entries: Entry<Data>[], options: FeedOptions<Data>, origin: string, home = '/', trailingSlash?: TrailingSlash, path = options.path): string {
-  const title = options.title ?? options.path
+export function feedDocument<Data>(format: FeedFormat, entries: Entry<Data>[], options: ResolvedFeed<Data>, origin: string, home = '/', trailingSlash?: TrailingSlash, path = options.path): string {
+  const { title } = options
 
   const shown: Shown[] = entries.flatMap((entry) => {
     const item = feedItem(options, entry)
@@ -158,7 +176,7 @@ export function feedDocument<Data>(format: FeedFormat, entries: Entry<Data>[], o
 <id>${escape(self)}</id>
 <updated>${updated.toISOString()}</updated>
 <author><name>${escape(options.author ?? title)}</name></author>
-${shown.map(({ item, link, image, content }) => `<entry><title>${escape(item.title)}</title><link href="${escapeAttribute(link)}"/><id>${escape(link)}</id><updated>${(item.updated ?? item.date).toISOString()}</updated>${item.updated === undefined ? '' : `<published>${item.date.toISOString()}</published>`}${item.description === undefined ? '' : `<summary>${escape(item.description)}</summary>`}${content === undefined ? '' : `<content type="html">${escape(content)}</content>`}${item.author === undefined ? '' : `<author><name>${escape(item.author)}</name></author>`}${(item.categories ?? []).map(category => `<category term="${escapeAttribute(category)}"/>`).join('')}${image === undefined ? '' : `<link rel="enclosure" type="${imageType(image)}" href="${escapeAttribute(image)}"/>`}</entry>`).join('\n')}
+${shown.map(({ item, link, image, content }) => `<entry><title>${escape(item.title)}</title><link href="${escapeAttribute(link)}"/><id>${escape(link)}</id><updated>${(item.updated ?? item.date).toISOString()}</updated>${item.updated === undefined ? '' : `<published>${item.date.toISOString()}</published>`}${item.description === undefined ? '' : `<summary>${escape(item.description)}</summary>`}${content === undefined ? '' : `<content type="html">${escape(content)}</content>`}${item.author === undefined ? '' : `<author><name>${escape(item.author)}</name></author>`}${(item.categories ?? []).map(category => `<category term="${escapeAttribute(category)}"/>`).join('')}${image === undefined ? '' : `<link rel="enclosure"${typeAttribute(image)} href="${escapeAttribute(image)}"/>`}</entry>`).join('\n')}
 </feed>
 `
   }
@@ -171,15 +189,10 @@ ${shown.map(({ item, link, image, content }) => `<entry><title>${escape(item.tit
 <description>${escape(options.description ?? title)}</description>
 <atom:link href="${escapeAttribute(self)}" rel="self" type="application/rss+xml"/>
 <lastBuildDate>${updated.toUTCString()}</lastBuildDate>
-${shown.map(({ item, link, image, content }) => `<item><title>${escape(item.title)}</title><link>${escape(link)}</link><guid>${escape(link)}</guid><pubDate>${item.date.toUTCString()}</pubDate>${item.description === undefined ? '' : `<description>${escape(item.description)}</description>`}${content === undefined ? '' : `<content:encoded>${cdata(content)}</content:encoded>`}${item.author === undefined ? '' : `<dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/">${escape(item.author)}</dc:creator>`}${(item.categories ?? []).map(category => `<category>${escape(category)}</category>`).join('')}${image === undefined ? '' : `<enclosure url="${escapeAttribute(image)}" length="0" type="${imageType(image)}"/>`}</item>`).join('\n')}
+${shown.map(({ item, link, image, content }) => `<item><title>${escape(item.title)}</title><link>${escape(link)}</link><guid>${escape(link)}</guid><pubDate>${item.date.toUTCString()}</pubDate>${item.description === undefined ? '' : `<description>${escape(item.description)}</description>`}${content === undefined ? '' : `<content:encoded>${cdata(content)}</content:encoded>`}${item.author === undefined ? '' : `<dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/">${escape(item.author)}</dc:creator>`}${(item.categories ?? []).map(category => `<category>${escape(category)}</category>`).join('')}${image === undefined ? '' : `<enclosure url="${escapeAttribute(image)}" length="0"${typeAttribute(image)}/>`}</item>`).join('\n')}
 </channel>
 </rss>
 `
-}
-
-// The feed's XML in the first format its `format` names, RSS 2.0 by default.
-export function feedXml<Data>(entries: Entry<Data>[], options: FeedOptions<Data>, origin: string, home = '/', trailingSlash?: TrailingSlash): string {
-  return feedDocument(feedPaths(options)[0]!.format, entries, options, origin, home, trailingSlash)
 }
 
 // JSON Feed 1.1.
@@ -206,8 +219,11 @@ function jsonFeed(shown: Shown[], feed: { title: string, description: string | u
   }, undefined, 2)}\n`
 }
 
-function imageType(url: string): string {
-  return IMAGE_TYPES[url.split(QUERY_OR_FRAGMENT)[0]!.split('.').pop()!.toLowerCase()] ?? 'image/jpeg'
+// The `type` of an image's link, left out for an extension kay does not know rather than claiming one.
+function typeAttribute(url: string): string {
+  const type = IMAGE_TYPES[url.split(QUERY_OR_FRAGMENT)[0]!.split('.').pop()!.toLowerCase()]
+
+  return type === undefined ? '' : ` type="${type}"`
 }
 
 // Character data, a `]]>` inside it split across two sections.
@@ -215,10 +231,11 @@ function cdata(text: string): string {
   return `<![CDATA[${text.replace(INVALID_XML, '').replaceAll(']]>', ']]]]><![CDATA[>')}]]>`
 }
 
+// `>` too, as a `]]>` in text is no well-formed XML.
 function escape(text: string): string {
-  return escapeHtml(text.replace(INVALID_XML, ''))
+  return escapeHtml(text.replace(INVALID_XML, '')).replaceAll('>', '&gt;')
 }
 
 function escapeAttribute(text: string): string {
-  return escapeHtmlAttribute(text.replace(INVALID_XML, ''))
+  return escapeHtmlAttribute(text.replace(INVALID_XML, '')).replaceAll('>', '&gt;')
 }

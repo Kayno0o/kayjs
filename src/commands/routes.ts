@@ -1,4 +1,5 @@
 import type { ExtensionApp, KayConfig, LoadedConfig } from '../config'
+import type { CollectionFeed, CollectionRoute } from '../content/claims'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { GuardFile, Route } from '../server/routes'
 import type { Command } from './command'
@@ -12,6 +13,7 @@ import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { extensionApps, PLUGINS_DIR, serverExtensions } from '../config-extensions'
 import { loadConfig } from '../config-loader'
+import { isRouteOf } from '../content/claims'
 import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
 import { CARD_ROUTE, FILES_ROUTE, IMAGE_ROUTE } from '../runtime/image'
@@ -98,12 +100,13 @@ export const routes: Command = {
 
 export async function listRoutes(root: string): Promise<{ routes: Listed[], unlisted: string[] }> {
   const config = await loadConfig(root)
-  const routes = [...await appRoutes(root, config), ...await apiRoutes(root, config), ...pluginRoutes(config), ...redirectRoutes(config), ...await feedRoutes(root, config), ...kayRoutes(root, config)]
+  const content = await checkContent(root, config.contentConfig, config.site !== undefined)
+  const routes = [...await appRoutes(root, config, content.routes), ...await apiRoutes(root, config), ...pluginRoutes(config), ...redirectRoutes(config), ...feedRoutes(content.feeds), ...kayRoutes(root, config)]
 
   return { routes, unlisted: unlistedServers(root, config) }
 }
 
-async function appRoutes(root: string, config: KayConfig): Promise<Listed[]> {
+async function appRoutes(root: string, config: KayConfig, collections: CollectionRoute[]): Promise<Listed[]> {
   const { routes: routesDir } = projectPaths(root, config)
   const mounts = routeMounts(root, config.extensions)
   const [pages, endpoints] = await Promise.all([scanRoutes(routesDir, mounts), scanEndpoints(routesDir, mounts)])
@@ -112,7 +115,7 @@ async function appRoutes(root: string, config: KayConfig): Promise<Listed[]> {
   const settings = config.i18n && routedSettings(localeSettings(config.i18n), pages)
 
   for (const route of pages) {
-    const prerendered = await prerenderNote(route)
+    const prerendered = await prerenderNote(route, collections)
     const guards = guardNotes(route.guards, route.open, config)
 
     // Each locale's copy, the layouts and guards under the first alone, as every copy shares them.
@@ -191,10 +194,8 @@ function redirectRoutes(config: KayConfig): Listed[] {
   })
 }
 
-async function feedRoutes(root: string, config: KayConfig): Promise<Listed[]> {
-  const { feeds } = await checkContent(root, config.contentConfig, config.site !== undefined)
-
-  return feeds.map(feed => ({ methods: 'GET', path: feed.path, kind: 'feed', by: `the collection ${feed.collection}`, notes: feed.localized ? ['under each locale\'s prefix'] : [] }))
+function feedRoutes(feeds: CollectionFeed[]): Listed[] {
+  return feeds.flatMap(feed => [feed.path, ...feed.also ?? []].map(path => ({ methods: 'GET', path, kind: 'feed', by: `the collection ${feed.collection}`, notes: feed.localized ? ['under each locale\'s prefix'] : [] })))
 }
 
 // What kay serves itself in production, as the config turns each on.
@@ -228,13 +229,16 @@ function kayRoutes(root: string, config: LoadedConfig): Listed[] {
 }
 
 // Prerendered with `prerender: true`, or holding a server island; a list or a function names which of its paths are.
-async function prerenderNote(route: Route): Promise<string[]> {
+async function prerenderNote(route: Route, collections: CollectionRoute[]): Promise<string[]> {
   const server = await serverOf(route.file)
   const prerender = server?.analysis.page?.settings.get('prerender')
   const value = prerender && server!.source.slice(prerender.value.start, prerender.value.end)
 
   if (value === 'false')
     return []
+
+  if (value === undefined && route.params.length === 1 && !route.pattern.includes('?') && collections.some(({ route: path, single }) => single !== true && isRouteOf(path, route.pattern)))
+    return ['prerendered, as the page of a collection\'s route']
 
   if (value === 'true' || (route.params.length === 0 && await reachesServerIsland(route.file)))
     return ['prerendered']

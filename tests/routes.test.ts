@@ -4,6 +4,7 @@ import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
+import { listRoutes } from '../src/commands/routes'
 import { DEV_REQUEST, DEV_ROUTES } from '../src/server/dev'
 import { redirectedBy } from '../src/server/dev-notes'
 import { scratchDir } from './scratch'
@@ -449,5 +450,32 @@ describe('the dev tool\'s i18n tab data', () => {
     expect((await request({ i18n: { ...i18n, domains: { en: 'example.com', fr: 'example.fr' } } }, '/')).locales).toEqual([{ locale: 'en', href: '//example.com/' }, { locale: 'fr', href: '//example.fr/' }])
     expect((await request({}, '/')).locales).toBeUndefined()
     expect((await request({ i18n: { locales: ['en'], defaultLocale: 'en', messages: MESSAGES } }, '/')).locales).toBeUndefined()
+  })
+})
+
+describe('kay routes for a collection\'s page', () => {
+  it('marks the page at a collection\'s route as prerendered, the one saying prerender: false not, and lists each feed format', async () => {
+    const root = await scratchDir('routes-collection-')
+
+    await Promise.all([
+      Bun.write(join(root, 'kay.config.ts'), 'export default { site: \'https://x.example\' }\n'),
+      Bun.write(join(root, 'src/content.config.ts'), 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const posts = collection(\'content/posts\', { schema: s.Object({ title: s.String(), date: s.Date() }), route: \'/blog/:slug\', feed: { path: \'/blog/rss.xml\', format: [\'rss\', \'json\'] } })\n\nexport const docs = collection(\'content/docs\', { schema: s.Object({ title: s.String() }), route: \'/docs/:slug\' })\n'),
+      Bun.write(join(root, 'src/content/posts/a.md'), '---\ntitle: A\ndate: 2026-01-01\n---\nbody\n'),
+      Bun.write(join(root, 'src/content/docs/a.md'), '---\ntitle: A\n---\nbody\n'),
+      Bun.write(join(root, 'src/routes/blog/[slug].kay'), 'h1 Post\n'),
+      Bun.write(join(root, 'src/routes/docs/[slug].kay'), '--- server\nexport const page = { prerender: false }\n---\nh1 Doc\n'),
+    ])
+
+    try {
+      const { routes } = await listRoutes(root)
+      const notes = (path: string) => routes.find(route => route.path === path)?.notes
+
+      expect(notes('/blog/:slug')).toContain('prerendered, as the page of a collection\'s route')
+      expect(notes('/docs/:slug')).not.toContain('prerendered, as the page of a collection\'s route')
+      expect(routes.filter(route => route.kind === 'feed').map(route => route.path)).toEqual(['/blog/rss.xml', '/blog/rss.json'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

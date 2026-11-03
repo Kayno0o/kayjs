@@ -25,7 +25,7 @@ import { revalidated } from '../server/public'
 import { projectSource } from '../server/source'
 import { claimFeed } from './claims'
 import { entries, registerCollections } from './edit'
-import { FEED_TYPES, feedDocument, feedItem, feedPaths, resolvedFeed } from './feed'
+import { defaultFeedItem, FEED_TYPES, feedDocument, feedItem, feedPaths, renderedBody, resolvedFeed } from './feed'
 import { isCollection } from './index'
 import { contentMode, contentOutput, draftCommentLine, loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
 import { migrateEntries, withMigrationHint } from './migrate'
@@ -160,10 +160,13 @@ export async function contentProblems(root: string, config?: string, site = true
       feeds.push(collectionFeed(collection))
 
     if (collection.options.route !== undefined)
-      routes.push({ collection: name, route: collection.options.route })
+      routes.push({ collection: name, route: collection.options.route, ...collection.options.single === true && { single: true as const } })
 
     if (collection.options.feed && !site)
       problems.push({ file: relative(root, projectPaths(root, { contentConfig: config }).content), line: 1, message: feedNeedsSite(collection).message })
+
+    if (collection.options.feed && collection.options.route === undefined && !collection.options.feed.item)
+      problems.push({ file: relative(root, projectPaths(root, { contentConfig: config }).content), line: 1, message: `the feed of the collection ${collection.name} has no \`item\` and the collection no \`route\`, so its items link nowhere; set \`item\` in the feed, or a \`route\` on the collection` })
 
     if (collection.options.trusted !== undefined && collection.loader === undefined)
       problems.push({ file: relative(root, projectPaths(root, { contentConfig: config }).content), line: 1, message: `the collection ${collection.name} sets \`trusted\`, which only a loader's collection reads: a folder's files always keep their raw HTML`, code: 'trusted-folder' })
@@ -179,7 +182,10 @@ export async function contentProblems(root: string, config?: string, site = true
       for (const entry of entries)
         uses.push(...componentUses(name, collection.components, entry.file, entry.segments ?? []))
 
-      await decodedIn(root, () => decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized))
+      const decoded = await decodedIn(root, () => decodeEntries(entries, collection.options.schema, collection.options.components ?? {}, collection.options.localized))
+
+      if (collection.options.feed)
+        problems.push(...await feedProblems(collection, decoded))
 
       if (collection.options.localized === true)
         problems.push(...await draftEntryProblems(root, entries))
@@ -196,6 +202,44 @@ export async function contentProblems(root: string, config?: string, site = true
   }
 
   return { problems, uses, feeds, routes, read }
+}
+
+const KAY_PREFIX = /^kay: /
+
+// What a feed shows of an entry that the entry lacks: a title or a date the default item reads, or a body that does not render at once.
+async function feedProblems(collection: Collection<unknown>, decoded: { entry: RawEntry, data: unknown }[]): Promise<ContentProblem[]> {
+  const found: ContentProblem[] = []
+  const { feed } = collection.options
+
+  if (!feed?.item) {
+    const item = defaultFeedItem(collection)
+
+    for (const { entry, data } of decoded) {
+      try {
+        item({ file: entry.file, data } as Entry<unknown>)
+      }
+      catch (error) {
+        if (!(error instanceof KayError))
+          throw error
+
+        found.push({ file: entry.file, line: 1, message: error.message.replace(KAY_PREFIX, '') })
+      }
+    }
+  }
+
+  if (feed?.content === true) {
+    let all: Entry<unknown>[] = []
+
+    try {
+      all = await collection.all()
+    }
+    catch {}
+
+    for (const entry of all.filter(each => renderedBody(each) === undefined))
+      found.push({ file: entry.file, line: 1, message: `the feed of the collection ${collection.name} cannot carry the body of this entry, whose content does not render at once, so it shows its summary alone` })
+  }
+
+  return found
 }
 
 // The entries of a localized collection marked with `# draft`, as `writeDraftEntry` marks a machine translation without a draft field.

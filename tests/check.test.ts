@@ -4011,6 +4011,24 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('lints the head of a page at a collection\'s route as one that prerenders, unless it says prerender: false', async () => {
+    const root = await scratchProject({
+      'src/content.config.ts': 'import { s } from \'kay\'\nimport { collection } from \'kay/content\'\n\nexport const posts = collection(\'content/posts\', { schema: s.Object({ title: s.String() }), route: \'/blog/:slug\' })\n',
+      'src/content/posts/a.md': '---\ntitle: A\n---\nbody\n',
+      'src/routes/blog/[slug].kay': 'h1 Post\n',
+      'src/routes/quiet/[slug].kay': '--- server\nexport const page = { prerender: false }\n---\nh1 Quiet\n',
+    })
+
+    try {
+      const found = await check(root, { site: 'https://example.com', favicon: false })
+
+      expect(found.filter(d => d.code === 'untitled-page').map(d => d.message)).toEqual(['`/blog/:slug` has no title'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reads a seo default of an empty per-locale record as none, and a per-locale name as the title of every untitled page', async () => {
     const head = (lines: string[]) => `--- server\nexport const page = { prerender: true }\n---\nhead\n${lines.map(line => `  ${line}`).join('\n')}\nh1 Hi\n`
     const root = await scratchProject({

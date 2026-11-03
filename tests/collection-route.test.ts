@@ -1,3 +1,6 @@
+import type { TrailingSlash } from '../src/config'
+import type { Entry } from '../src/content'
+import type { ResolvedFeed } from '../src/content/feed'
 import type { ServedRoute } from '../src/server/guards'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -9,7 +12,7 @@ import { contentChecks, projectProblems } from '../src/check/project'
 import { collection, entries, entryPage, paginate } from '../src/content'
 import { unservedRoutes } from '../src/content/claims'
 import { registerCollections, registerEditSite } from '../src/content/edit'
-import { feedXml } from '../src/content/feed'
+import { feedDocument, feedPaths } from '../src/content/feed'
 import { contentKey } from '../src/content/key'
 import { invalidateLocally } from '../src/runtime/cache'
 import { localizedLink, matchLinksWith } from '../src/runtime/i18n'
@@ -19,6 +22,11 @@ import { entryUrls } from '../src/server/entry-urls'
 import { entryFilePaths, followEntryFiles, linkedSettings } from '../src/server/i18n'
 import { compiledLinks } from '../src/server/links'
 import { scratchDir } from './scratch'
+
+// The feed's first format, for the tests that read one document.
+function feedXml<Data>(entries: Entry<Data>[], options: ResolvedFeed<Data>, origin: string, home = '/', trailingSlash?: TrailingSlash): string {
+  return feedDocument(feedPaths(options)[0]!.format, entries, options, origin, home, trailingSlash)
+}
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
 const config = (trailingSlash: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ log: false, site: 'https://x.example', base: '/site', trailingSlash: '${trailingSlash}', i18n: { locales: ['en', 'fr'], defaultLocale: 'en', paths: { '/notes/:slug': { fr: '/remarques/:slug' } } } })\n`

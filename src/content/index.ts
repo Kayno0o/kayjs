@@ -4,7 +4,7 @@ import type { Duration } from '../runtime/duration'
 import type { Component } from '../runtime/jsx'
 import type { PreviewScope } from '../runtime/preview'
 import type { Html } from '../runtime/rendered'
-import type { FeedOptions } from './feed'
+import type { FeedFormat, FeedOptions } from './feed'
 import type { RawEntry } from './load'
 import type { Heading, Highlighter, Segment } from './markdown'
 import type { Carried, Migration } from './migrate'
@@ -29,7 +29,7 @@ import { ContentError, decodeEntries, isBlockItem, validEntries } from './valida
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldHint, FieldInputOptions, FieldKind, ImageFieldOptions, JsonSchema, SourceEntry, TranslationIndex, UploadFieldOptions, WrittenEntry } from './edit'
 export { blocks, collectionInfo, collectionLoader, collections, colorField, customField, entries, entryFile, entryPage, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, markdownField, moneyField, reference, removeEntry, repositoryRoot, saveEntries, saveEntry, tagsField, translations, unique, untranslated } from './edit'
-export type { FeedItem, FeedOptions } from './feed'
+export type { FeedFormat, FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, RenderedMarkdown } from './markdown'
 export { bodyHtml, highlightCode, LOADED_HTML, MarkdownError, renderMarkdown } from './markdown'
 export type { Migration } from './migrate'
@@ -212,7 +212,7 @@ interface Entries<Data> {
 // A folder of Markdown files, or of JSON and YAML data files, read against a schema: `collection('src/content/posts', { schema })`; or the entries a loader gives, `collection({ name: 'posts', load }, { schema })`.
 // File entries compile once, each cached by its content, so a change recompiles only that entry; `kay build` compiles them all ahead for production. Loaded entries are read when first asked for, and kept as `cached` keeps a value.
 // kept: folder, a collection over a folder is compiled by `kay build` and the same for every visitor until the next one, while one over a loader may read a database or refresh on a `ttl` that no invalidation tells the page of. A page reading it is refreshed by `invalidate()`, and one in preview mode is never served a kept copy.
-export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never>(source: string | ContentLoader<Stored<Static<Schema>>>, options: CollectionOptions<Schema, [Route] extends [never] ? false : true> & { components?: Components, feed?: { path: FeedPath } | undefined, seed?: Seed, route?: Route | undefined }): Collection<Static<Schema>, Components, FeedPath, undefined extends Seed ? false : true, [Route] extends [never] ? false : true> {
+export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never, const Formats extends FeedFormat | readonly FeedFormat[] = 'rss'>(source: string | ContentLoader<Stored<Static<Schema>>>, options: CollectionOptions<Schema, [Route] extends [never] ? false : true> & { components?: Components, feed?: { path: FeedPath, format?: Formats } | undefined, seed?: Seed, route?: Route | undefined }): Collection<Static<Schema>, Components, FeedPathsOfFormats<FeedPath, Formats>, undefined extends Seed ? false : true, [Route] extends [never] ? false : true> {
   type Data = Static<Schema>
   let loading: Promise<Entries<Data>> | undefined
   const components = options.components ?? {}
@@ -235,6 +235,9 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
   if (options.modified !== undefined)
     checkPublishField(name, options.schema, options.modified, 'modified')
+
+  if (options.feed && [options.feed.format ?? 'rss'].flat().length === 0)
+    throw new KayError('config-invalid', `kay: the feed of the collection ${name} lists no \`format\`; name \`'rss'\`, \`'atom'\` or \`'json'\`, or leave \`format\` out for RSS`)
 
   if (options.single && localized)
     throw new KayError('config-invalid', `kay: the collection ${name} is both \`single\` and \`localized\`; a single entry has no translations, so leave one out`)
@@ -569,6 +572,12 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: 
 
   return { raw: entries, carried: migrated.carried }
 }
+
+// A feed's path without its extension, as the other formats' paths replace it.
+type WithoutExtension<Path extends string> = Path extends `${infer Head}.${infer Tail}` ? Tail extends `${string}.${string}` ? `${Head}.${WithoutExtension<Tail>}` : Tail extends `${string}/${string}` ? Path : Head : Path
+
+// The path a feed is served at and, for each format after its first, that path with the format's extension.
+type FeedPathsOfFormats<Path extends string, Formats extends FeedFormat | readonly FeedFormat[]> = string extends Path ? Path : Formats extends readonly [FeedFormat, ...infer Rest extends FeedFormat[]] ? Path | `${WithoutExtension<Path>}.${Rest[number]}` : Path
 
 // The paths the module's collections serve their feeds at, the ones written as literals.
 export type FeedPathsOf<Module> = { [Name in keyof Module]: Module[Name] extends Collection<unknown, Record<string, Component<never>>, infer Path> ? string extends Path ? never : Path : never }[keyof Module]

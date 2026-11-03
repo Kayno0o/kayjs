@@ -1,10 +1,12 @@
 import type { ElementNode, KayFile, Node } from '../compiler/ast'
+import type { CollectionRoute } from '../content/claims'
 import type { Route } from '../server/routes'
 import type { CheckDiagnostic, CheckOptions } from './index'
 import { sep } from 'node:path'
 import { childBlocks, isHead } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
+import { isRouteOf } from '../content/claims'
 import { localizedText, localizedTexts } from '../runtime/localized'
 import { cardImageSizes } from '../server/seo'
 import { decode, DESCRIPTION_LENGTH, isPublicSite, lintReporter, NOINDEX, TITLE_LENGTH } from './seo'
@@ -33,7 +35,7 @@ interface Chain {
 
 // The prerendered pages' head lints, read off the templates instead of the HTML `kay build` renders: a tag whose value is an expression counts as given and is judged by nothing but its presence.
 // Only the pages whose server fence says `prerender` are read, as the build renders those alone, or every page of an export.
-export async function pageHeadLints(options: CheckOptions, routes: Route[], routesDir: string, publicDir: string): Promise<CheckDiagnostic[]> {
+export async function pageHeadLints(options: CheckOptions, routes: Route[], routesDir: string, publicDir: string, routed: CollectionRoute[] = []): Promise<CheckDiagnostic[]> {
   const exported = options.exported === true
 
   // `kay build` sets `launch` and reads the rendered heads itself.
@@ -77,7 +79,10 @@ export async function pageHeadLints(options: CheckOptions, routes: Route[], rout
     const page = await read(route.file)
 
     // A static export renders every page without params that does not opt out, `kay build` those that say `prerender`.
-    if (page.prerender === 'false' || (page.prerender === undefined && !(exported && route.params.length === 0)))
+    // A page at a collection's route lists its entries with no `prerender` of its own.
+    const inferred = page.prerender === undefined && route.params.length === 1 && !route.pattern.includes('?') && routed.some(({ route: path }) => isRouteOf(path, route.pattern))
+
+    if (page.prerender === 'false' || (page.prerender === undefined && !inferred && !(exported && route.params.length === 0)))
       continue
 
     const chain: Chain[] = []

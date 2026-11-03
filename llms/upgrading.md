@@ -2,6 +2,16 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.87.0
+
+### A page at a collection's route prerenders
+
+- A page whose pattern is a collection's `route` (`src/routes/blog/[slug].kay` for `/blog/:slug`) is prerendered and listed in the sitemap for each of the collection's entries, as `prerender: posts` did, with no `page` export. One that was rendered per request and reads the cookies, the query, a session or preview mode now fails `kay build`: set `export const page = { prerender: false }` in it. A page that sets `prerender` keeps what it says. `kay check` cannot tell a page reading the request from one that does not, so no lint ships with this.
+
+### `url` as a function and a feed item's `path` beside a `route`
+
+- A collection with a literal `route` writes no `url` function, as its entries' `url` comes from the route, and a feed's `item` leaves out `path` when it is that route with the slug. Both forms keep working until 1.90, reported by the `deprecated-collection-links` lint, which `kay upgrade` fixes.
+
 ## 1.86.0
 
 ### kayjs-auth: the flat methods are gone
