@@ -1,4 +1,5 @@
 import type { Duration } from '../runtime/duration'
+import type { StoreBase } from '../runtime/store-base'
 import { statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
@@ -27,7 +28,7 @@ export type SessionMatch = ((data: SessionData) => boolean) | Readonly<Record<st
 export type DeletableSessionStore = SessionStore & { deleteWhere: (match: SessionMatch) => number | Promise<number> }
 
 // Where sessions live when the cookie only carries their id; each method may answer synchronously or with a promise.
-export interface SessionStore {
+export interface SessionStore extends StoreBase {
   get: (id: string) => SessionData | undefined | Promise<SessionData | undefined>
   // Past `maxAge`, such as `'90d'`, the store may forget the session.
   set: (id: string, data: SessionData, maxAge: Duration) => void | Promise<void>

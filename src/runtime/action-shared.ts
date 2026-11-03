@@ -6,6 +6,7 @@ import type { ErrorStatus, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { RequestContext } from './index'
 import type { EventReader } from './live'
+import type { StoreBase } from './store-base'
 
 export type { CallResult }
 
@@ -19,7 +20,7 @@ declare const FAILED: unique symbol
 declare const HONEYPOT: unique symbol
 
 // Where rate limits count, shared by every process opening it: `sqliteRates` from `kay/server`, or one of an app's own.
-export interface RateStore {
+export interface RateStore extends StoreBase {
   // Counts `weight` more under `key`, one attempt unless given, opening a window of `window`, such as `'60000ms'`, when none is open: the count in it so far, this hit included, and when it closes, in ms since the epoch.
   // A store of its own adds `weight` to the count, or a weighted limit, tokens say, refuses it.
   hit: (key: string, window: Duration, weight?: number) => RateWindow | Promise<RateWindow>

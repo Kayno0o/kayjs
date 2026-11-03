@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite'
 import type { Duration } from '../runtime/duration'
+import type { StoreBase } from '../runtime/store-base'
 import type { LiveJob } from './queue-live'
 import type { WorkflowAdmin } from './workflow'
 import { existsSync } from 'node:fs'
@@ -49,7 +50,7 @@ export interface StoredJobState extends StoredJob {
 type Maybe<T> = T | Promise<T>
 
 // Where queued jobs wait, shared by every process opening it: `sqliteJobs` by default, or one of an app's own, Redis or Postgres say.
-export interface JobStore {
+export interface JobStore extends StoreBase {
   // Keeps a job, unless it has a `key` that a waiting or running job of its queue holds already: then it keeps nothing and resolves with that job's id, atomically, whichever process added it. A store without `state` ignores keys.
   add: (job: StoredJob) => Maybe<string | void>
   // Takes the queue's next job whose time has come and that no process holds, holding it until `until`, past which a process that died running it is taken as gone; one process at a time gets a job.

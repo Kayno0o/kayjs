@@ -64,6 +64,7 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Protecting actions and limiting requests](llms/action-protection.md): cross-site posts, honeypot, proof of work
 - [Rate limits](llms/rate-limits.md): `rateLimit` on actions, guards and API routes, keys, stores
 - [Stored files](llms/files.md): uploads on disk or in S3, links, resizing, progress
+- [Stores](llms/stores.md): the store contracts, ping, close, factories
 - [Locals, sessions and guards](llms/server.md): `ctx.locals`, cookie sessions, `_guard.ts` guards
 - [Environment variables](llms/environment.md): a typed `defineEnv`, variables read by islands
 - [API routes](llms/api-routes.md): Elysia modules under `src/api/`, CORS, OpenAPI, MCP

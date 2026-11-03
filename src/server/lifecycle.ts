@@ -1,9 +1,10 @@
 import type { AnyElysia, Elysia } from 'elysia'
 import type { HealthConfig } from '../config'
 import type { Duration } from '../runtime/duration'
+import type { StoreBase } from '../runtime/store-base'
 import process from 'node:process'
 import { kayLog } from '../runtime/log'
-import { appStore } from './app-store'
+import { appStore, storesOf } from './app-store'
 import { wholeResponse } from './compress'
 import { healthTimeoutMs, shutdownSeconds } from './config-limits'
 import { beginDrain } from './drain'
@@ -49,8 +50,11 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
     return (requested === path || requested === `${path}/`) && holds()
   }
 
+  // The stores of `store` that can be pinged, known once the app is built: a route with nothing to check and none to ping answers with no promise.
+  const stores = storesOf(appStore()).filter(({ ping }) => ping !== undefined)
+
   // Elysia awaits only a hook that is async, so with nothing to check the hook is not, and a request for another path costs no promise.
-  if (!config.check) {
+  if (!config.check && stores.length === 0) {
     app.onRequest(({ request }) => {
       if (!asked(request))
         return undefined
@@ -74,15 +78,18 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
 
     // Probes from a balancer and a container check may arrive many a second: the check runs once per window, and probes meanwhile share its answer.
     if (checked === undefined || now - checked.at >= HEALTH_CACHE_MS)
-      checked = { at: now, healthy: runCheck(check, timeoutMs, request) }
+      checked = { at: now, healthy: runCheck(check, stores, timeoutMs, request) }
 
     return await checked.healthy ? wholeResponse('ok', { headers }) : wholeResponse('unhealthy', { status: 503, headers })
   })
 }
 
-async function runCheck(check: NonNullable<HealthConfig['check']>, timeoutMs: number, request: Request): Promise<boolean> {
+// Runs the app's `check` and the `ping` of each store together, under one timeout: healthy when none throws or times out and `check` does not return false.
+async function runCheck(check: HealthConfig['check'], stores: StoreBase[], timeoutMs: number, request: Request): Promise<boolean> {
   try {
-    return await withTimeout(check(), timeoutMs) !== false
+    const [answer] = await withTimeout(Promise.all([check?.(), ...stores.map(async ({ ping }) => ping?.())]), timeoutMs) as unknown[]
+
+    return answer !== false
   }
   catch (error) {
     logMessage('error', 'the health check failed', error, request)
@@ -132,7 +139,7 @@ export function stopOnSignal(app: Elysia, lifecycle: Lifecycle, wait: Duration =
         endDrain()
       }
 
-      await closeRooms()
+      await closeStores()
       clearTimeout(forced)
       process.exit()
     }
@@ -199,17 +206,16 @@ async function withTimeout(check: unknown, ms: number): Promise<unknown> {
   }
 }
 
-// Lets go of the rooms store of `store.rooms`, so a replica that stops leaves no member behind for the others to list until it is dropped as quiet.
-async function closeRooms(): Promise<void> {
-  try {
-    const closing: unknown = appStore()?.rooms?.close()
-
-    if (closing instanceof Promise)
-      await closing
-  }
-  catch (error) {
-    await reportBackgroundError('closing the rooms store failed', error)
-    process.exitCode = 1
+// Closes each store of `store` once, so a replica that stops leaves no member behind in the rooms for the others to list until it is dropped as quiet, and no connection open: one store failing to close leaves the others closing.
+export async function closeStores(): Promise<void> {
+  for (const store of storesOf(appStore())) {
+    try {
+      await store.close?.()
+    }
+    catch (error) {
+      await reportBackgroundError('closing a store failed', error)
+      process.exitCode = 1
+    }
   }
 }
 

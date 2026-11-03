@@ -1,5 +1,6 @@
 import type { FSWatcher } from 'node:fs'
 import type { Duration } from '../runtime/duration'
+import type { StoreBase } from '../runtime/store-base'
 import { watch } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import { t } from 'elysia'
@@ -23,7 +24,7 @@ export interface RoomRecipients {
 type RoomListener = (room: string, text: string, recipients: RoomRecipients) => void
 
 // Where members and messages are kept, for one process or every process of the machine; `RoomStore` keeps a room's state at once, `AsyncRoomStore` through promises.
-export interface RoomStoreBase {
+export interface RoomStoreBase extends StoreBase {
   // Records a connection of this process in a room, with its member as JSON, or drops it.
   add: (room: string, connection: string, member: string) => void
   remove: (room: string, connection: string) => void
@@ -34,7 +35,7 @@ export interface RoomStoreBase {
   // Called with each message published from then on; returns what stops it.
   subscribe: (listener: RoomListener) => () => void
   // Stops what the store runs in the background and lets go of its file; a store keeping members elsewhere drops this process's first, and may return a promise a stop waits for.
-  close: () => unknown
+  close: () => void | Promise<void>
 }
 
 export interface RoomStore extends RoomStoreBase {
@@ -357,7 +358,7 @@ export function sqliteRooms(path: string, { poll }: { poll?: Duration } = {}): R
   }
 
   // A reload closes the file for the module that named the store, whichever module first used it; the module running again names a store of its own.
-  onReload(() => opened?.close())
+  onReload(async () => opened?.close())
 
   return {
     add: (room, connection, member) => open().add(room, connection, member),
@@ -367,9 +368,10 @@ export function sqliteRooms(path: string, { poll }: { poll?: Duration } = {}): R
     update: (room, change) => open().update!(room, change),
     publish: (room, text, recipients) => open().publish(room, text, recipients),
     subscribe: listener => open().subscribe(listener),
-    close: () => {
+    close: async () => {
       closed = true
-      opened?.close()
+
+      return opened?.close()
     },
   }
 }

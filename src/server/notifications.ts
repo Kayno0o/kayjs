@@ -1,4 +1,5 @@
 import type { Duration } from '../runtime/duration'
+import type { StoreBase } from '../runtime/store-base'
 import { cached, invalidate } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
@@ -30,7 +31,7 @@ export interface StoredNotification {
 }
 
 // What the app keeps of its people's notifications, `store.notifications` of kay.config.ts: one row each, so replicas share them. A method may answer with a promise.
-export interface NotificationStore {
+export interface NotificationStore extends StoreBase {
   // Keeps one for a person, and drops the person's oldest beyond `most`.
   add: (user: string, note: StoredNotification, most: number) => void | Promise<void>
   // A person's notifications that have not expired, newest first.
@@ -45,8 +46,6 @@ export interface NotificationStore {
   erase: (user: string) => number | Promise<number>
   // Deletes every expired one, answering how many went.
   prune: (now: number) => number | Promise<number>
-  // Stops what the store runs in the background and lets go of its file.
-  close?: () => void
 }
 
 export interface NotifyOptions {
@@ -186,7 +185,7 @@ export function sqliteNotifications(path: string): NotificationStore {
     return opened ??= openNotifications(path)
   }
 
-  onReload(() => opened?.close?.())
+  onReload(async () => opened?.close?.())
 
   return {
     add: async (user, note, most) => open().add(user, note, most),
@@ -196,9 +195,10 @@ export function sqliteNotifications(path: string): NotificationStore {
     markAllRead: async (user, now) => open().markAllRead(user, now),
     erase: async user => open().erase(user),
     prune: async now => open().prune(now),
-    close: () => {
+    close: async () => {
       closed = true
-      opened?.close?.()
+
+      return opened?.close?.()
     },
   }
 }

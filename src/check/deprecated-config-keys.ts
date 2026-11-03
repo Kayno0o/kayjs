@@ -11,7 +11,7 @@ import { RENAMED_KEYS } from '../config-shape'
 import { importsOf, walk } from './ast'
 
 const SOURCE_FILE = /(?<!\.d)\.tsx?$/
-const OLD_KEY = new RegExp(`\\b(?:${Object.keys(RENAMED_KEYS).join('|')})\\b`)
+const OLD_KEY = new RegExp(`\\b(?:${[...Object.keys(RENAMED_KEYS), 'fileStore'].join('|')})\\b`)
 // The options of `pages()` and `testSite()` are the config's own, so they carry the same keys, as the `config` of an extension does.
 // A file that can hold options of the config or an extension's: it imports kay or one of its libraries.
 const CONFIG_HOLDER = /\bfrom\s+['"](?:kay|kayjs-[\w-]+)(?:\/[^'"]*)?['"]/
@@ -48,8 +48,9 @@ const renamed = (name: string): string | undefined => Object.hasOwn(RENAMED_KEYS
 
 // A key of the config under the name it had before 1.84, in `kay.config.ts` or in the options handed to `pages()` and `testSite()`: the fix writes the new name.
 // A property written beside the new name is reported with no fix, as the old one is ignored there.
+// `fileStore`, which 1.87 moved under `store` as `files`, is reported as `deprecated-file-store` by the same walk: the fix writes `store: { files: <value> }`, unless the object has a `store` of its own to merge into.
 export async function deprecatedConfigKeys(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  if (lintLevel('deprecated-config-keys', options.lints) === 'allow')
+  if (lintLevel('deprecated-config-keys', options.lints) === 'allow' && lintLevel('deprecated-file-store', options.lints) === 'allow')
     return []
 
   const found: CheckDiagnostic[] = []
@@ -104,9 +105,37 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
           continue
 
         const old = keyName(property)
+
+        if (old === 'fileStore') {
+          const level = levelAt('deprecated-file-store', property.key.start)
+
+          if (level === 'allow')
+            continue
+
+          const start = property.key.start
+          const end = property.value.end
+          const held = names.has('store')
+
+          found.push({
+            file,
+            ...positionAt(source, start),
+            end: property.key.end,
+            message: '`fileStore` is `store.files` in the config since 1.87, so every kind of store is named in one place; the old key works until 1.90',
+            help: held ? 'move it into the `files` of the `store` beside it' : 'write `store: { files: ... }`',
+            code: 'deprecated-file-store',
+            severity: level === 'warn' ? 'warning' : 'error',
+            ...!held && { fixes: [{ title: 'Move fileStore under store.files', edits: [{ start, end, text: `store: { files: ${property.shorthand ? 'fileStore' : source.slice(property.value.start, property.value.end)} }` }], safe: true }] },
+          })
+
+          continue
+        }
+
         const name = old === undefined ? undefined : renamed(old)
 
         if (old === undefined || name === undefined)
+          continue
+
+        if (lintLevel('deprecated-config-keys', options.lints) === 'allow')
           continue
 
         const level = levelAt('deprecated-config-keys', property.key.start)

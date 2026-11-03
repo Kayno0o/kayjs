@@ -1,5 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { Duration } from '../runtime/duration'
+import type { StoreBase } from '../runtime/store-base'
+import type { AppStore } from './app-store'
 import { chmod, lstat, mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { writeAtomically } from '../build/files'
@@ -18,7 +20,7 @@ import { headerCopies, ownedHeaders, ownHeaders, setSecurityHeaders } from './se
 import { setupStampSecret, signedText, signText } from './stamp'
 
 // Where files are kept: `diskFiles`, `s3Files` and `memoryFiles` make one, an app may write its own. Keys are never written twice, unless `files.put` is given an `id` for bytes it names (a hash), so a store needs no locking.
-export interface FileStore {
+export interface FileStore extends StoreBase {
   write: (key: string, data: Blob) => Promise<void>
   // The file, or undefined when none is stored under the key.
   read: (key: string) => Promise<Blob | undefined>
@@ -205,7 +207,12 @@ export function defaultFileStore(): FileStore {
   return defaultStore ??= process.env.NODE_ENV === 'test' ? memoryFiles() : diskFiles()
 }
 
-// `fileStore` from kay.config.ts, which the server's `files` reads, and the directory where the image route copies a file from a store not on this disk.
+// The file store a config names: `store.files`, or the `fileStore` of before 1.87, which `deprecated-file-store` moves there.
+export function configuredFiles(config: { store?: AppStore | undefined, fileStore?: FileStore | undefined } | undefined): FileStore | undefined {
+  return config?.store?.files ?? config?.fileStore
+}
+
+// `store.files` from kay.config.ts, which the server's `files` reads, and the directory where the image route copies a file from a store not on this disk.
 export function setupStorage(store: FileStore | undefined, cacheDir: string, variantsDir?: string): void {
   current = { store: store ?? defaultFileStore(), cacheDir, variantsDir, exported: false }
 }
@@ -215,7 +222,7 @@ export function linkStoredFiles(store: FileStore | undefined): void {
   current = { store: store ?? defaultFileStore(), cacheDir: undefined, exported: true }
 }
 
-// A script or a test that started no server reads `fileStore` from the kay.config.ts where it runs; `bun test` keeps files in memory.
+// A script or a test that started no server reads `store.files` from the kay.config.ts where it runs; `bun test` keeps files in memory.
 async function activeStore(): Promise<FileStore> {
   if (current.store)
     return current.store
@@ -226,7 +233,7 @@ async function activeStore(): Promise<FileStore> {
   if (config !== undefined)
     setupStampSecret(config.secret)
 
-  return current.store ??= config?.fileStore ?? defaultFileStore()
+  return current.store ??= configuredFiles(config) ?? defaultFileStore()
 }
 
 // A script that signs a link before it read the config still has `KAY_SECRET`; `secret` in the config is read with the store.
@@ -239,7 +246,7 @@ function readScriptSecret(): void {
   }
 }
 
-// Stores, reads and links the files of the store `fileStore` in kay.config.ts names: `const key = await files.put(input.avatar)` in an action, then `img(src={files.url(key)})` in a page.
+// Stores, reads and links the files of the store `store.files` in kay.config.ts names: `const key = await files.put(input.avatar)` in an action, then `img(src={files.url(key)})` in a page.
 export const files = {
   // Stores a file under a new key and gives it back, for the app to save; an image's key holds its size.
   async put(data: Blob, options: PutOptions = {}): Promise<string> {

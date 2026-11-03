@@ -39,7 +39,7 @@ import { assetFiles, hookPrerendered } from '../server/page-hook'
 import { prerenderPages } from '../server/prerender'
 import { remoteImages, remotePatterns } from '../server/remote'
 import { contextReadsOf, routeMounts, slashedPath } from '../server/routes'
-import { linkStoredFiles } from '../server/storage'
+import { configuredFiles, linkStoredFiles } from '../server/storage'
 import { budgetLints, checkBudget, footprintLints } from './budget'
 import { cacheCounts, clearCache, resetCacheCounts } from './cache'
 import { buildClient } from './client'
@@ -433,7 +433,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   // A static host has no image route, so pages link the variant files the build writes, and no file route, so stored files where their store serves them.
   if (exported) {
     linkVariantFiles()
-    linkStoredFiles(config.fileStore)
+    linkStoredFiles(configuredFiles(config))
   }
 
   const rendered: RenderedPage[] = []

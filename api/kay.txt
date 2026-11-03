@@ -735,9 +735,11 @@ interface RateLimit
   window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
 
 [.] RateStore
-interface RateStore
+interface RateStore extends StoreBase
+  close?: (() => void | Promise<void>) | undefined
   hit: (key: string, window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, weight?: number | undefined) => RateWindow | Promise<RateWindow>
   peek?: (key: string) => RateWindow | Promise<RateWindow | undefined> | undefined
+  ping?: (() => void | Promise<void>) | undefined
   refund?: (key: string, resetAt: number) => void | Promise<void>
   reset?: (key: string) => void | Promise<void>
 
@@ -1303,10 +1305,11 @@ interface VitalsOptions
 function vitalsReport(now?: number): Promise<RouteVitals[]>
 
 [./analytics] VitalsStore
-interface VitalsStore
+interface VitalsStore extends StoreBase
   add: (route: string, readings: VitalReading[], day: number) => void | Promise<void>
-  close?: () => void
+  close?: (() => void | Promise<void>) | undefined
   counts: (since: number) => VitalCount[] | Promise<VitalCount[]>
+  ping?: (() => void | Promise<void>) | undefined
 
 [./analytics] VitalSummary
 interface VitalSummary
@@ -1352,11 +1355,13 @@ interface CacheOptions<T = unknown>
   store?: false | CacheStore | undefined
 
 [./cache] CacheStore
-interface CacheStore
+interface CacheStore extends StoreBase
+  close?: (() => void | Promise<void>) | undefined
   delete: (key: string) => void | Promise<void>
   dependencies?: () => Map<string, string[]> | Promise<Map<string, string[]>>
   get: (key: string) => StoredValue | Promise<StoredValue | undefined> | undefined
   keys: () => string[] | Promise<string[]>
+  ping?: (() => void | Promise<void>) | undefined
   publish?: (message: string) => void | Promise<void>
   set: (key: string, text: string, freshUntil: number) => void | Promise<void>
   subscribe?: (listener: (message: string) => void) => void
@@ -1384,10 +1389,12 @@ interface StoredValue
 
 [./cache] SyncCacheStore
 interface SyncCacheStore extends CacheStore
+  close?: (() => void | Promise<void>) | undefined
   delete: (key: string) => void
   dependencies: () => Map<string, string[]>
   get: (key: string) => StoredValue | undefined
   keys: () => string[]
+  ping?: (() => void | Promise<void>) | undefined
   publish: (message: string) => void
   set: (key: string, text: string, freshUntil: number) => void
   subscribe?: (listener: (message: string) => void) => void
@@ -2244,12 +2251,15 @@ interface ApiRateLimit extends RateLimit
   window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
 
 [./server] AppStore
-interface AppStore
+interface AppStore extends StoreBase
   cache?: CacheStore | undefined
+  close?: (() => void | Promise<void>) | undefined
   database?: string | undefined
+  files?: FileStore | undefined
   jobs?: JobStore | undefined
   live?: LiveStore | undefined
   notifications?: NotificationStore | undefined
+  ping?: (() => void | Promise<void>) | undefined
   push?: PushStore | undefined
   rates?: RateStore | undefined
   rooms?: RoomStore | AsyncRoomStore | undefined
@@ -2272,8 +2282,9 @@ interface AsyncRooms<Message, Member = undefined, State = undefined> extends Roo
 [./server] AsyncRoomStore
 interface AsyncRoomStore extends RoomStoreBase
   add: (room: string, connection: string, member: string) => void
-  close: () => unknown
+  close: () => void | Promise<void>
   members: (room: string) => string[]
+  ping?: (() => void | Promise<void>) | undefined
   publish: (room: string, text: string, recipients: RoomRecipients) => void
   remove: (room: string, connection: string) => void
   state?: (room: string) => Promise<string | undefined>
@@ -2457,10 +2468,12 @@ const files: {
 }
 
 [./server] FileStore
-interface FileStore
+interface FileStore extends StoreBase
+  close?: (() => void | Promise<void>) | undefined
   delete: (key: string) => Promise<void>
   list?: ((prefix?: string | undefined) => Promise<StoredFile[]>) | undefined
   path?: ((key: string) => string) | undefined
+  ping?: (() => void | Promise<void>) | undefined
   publicUrl?: string | undefined
   read: (key: string) => Promise<Blob | undefined>
   write: (key: string, data: Blob) => Promise<void>
@@ -2517,9 +2530,10 @@ interface JobState<Progress>
   status: "failed" | "waiting" | "running"
 
 [./server] JobStore
-interface JobStore
+interface JobStore extends StoreBase
   add: (job: StoredJob) => Maybe<string | void>
   claim: (queue: string, now: number, until: number) => Maybe<StoredJob | undefined>
+  close?: (() => void | Promise<void>) | undefined
   complete: (id: string, until?: number | undefined) => Maybe<void>
   fail: (id: string, error: string, payload?: string | undefined, until?: number | undefined) => Maybe<boolean | void>
   failed: (queue: string, limit?: number | undefined) => Maybe<StoredJob[]>
@@ -2527,6 +2541,7 @@ interface JobStore
   live?: ((queue: string, now: number, limit?: number | undefined) => Maybe<StoredJobState[]>) | undefined
   lock: (name: string, slot: number) => Maybe<boolean>
   nextRunAt: (queue: string) => Maybe<number | undefined>
+  ping?: (() => void | Promise<void>) | undefined
   progress?: ((id: string, until: number, progress: string) => Maybe<void>) | undefined
   purge?: ((queue: string, before: number) => Maybe<number>) | undefined
   release?: ((id: string, until: number, runAt?: number | undefined) => Maybe<void>) | undefined
@@ -2651,12 +2666,14 @@ interface KayExtension<Server extends AnyElysia = AnyElysia>
 type LiveEntry = [id: string, key: string, text: string] | [id: string, key: string, text: string, expiresAt: number]
 
 [./server] LiveStore
-interface LiveStore
+interface LiveStore extends StoreBase
+  close?: (() => void | Promise<void>) | undefined
   delete: (id: string, key: string) => void | Promise<void>
   end?: (id: string, key: string, expiresAt: number) => void | Promise<void>
   endAll?: (id: string, ttl: number) => void | Promise<void>
   entries: () => Entries | Promise<Entries>
   hold?: (held: boolean) => void
+  ping?: (() => void | Promise<void>) | undefined
   set: (id: string, key: string, text: string, expiresAt?: number | undefined) => void | Promise<void>
   stop?: () => void
   subscribe: (listener: (id: string, key: string, text: string | undefined, expiresAt?: number | undefined) => void) => void
@@ -2724,13 +2741,14 @@ const notifications: {
 }
 
 [./server] NotificationStore
-interface NotificationStore
+interface NotificationStore extends StoreBase
   add: (user: string, note: StoredNotification, most: number) => void | Promise<void>
-  close?: () => void
+  close?: (() => void | Promise<void>) | undefined
   erase: (user: string) => number | Promise<number>
   list: (user: string, limit: number, now: number) => Notification[] | Promise<Notification[]>
   markAllRead: (user: string, now: number) => number | Promise<number>
   markRead: (user: string, id: string, now: number) => boolean | Promise<boolean>
+  ping?: (() => void | Promise<void>) | undefined
   prune: (now: number) => number | Promise<number>
   unread: (user: string, now: number) => number | Promise<number>
 
@@ -2857,6 +2875,7 @@ interface PagesOptions extends KayConfig
 
 [./server] pgData
 function pgData(source: PgJobsSource): {
+  ping: () => Promise<void>;
   close: () => Promise<void>;
   [Symbol.asyncDispose]: () => Promise<void>;
   notifications: NotificationStore;
@@ -2940,11 +2959,12 @@ interface PushSendOptions
   urgency?: "very-low" | "low" | "normal" | "high" | undefined
 
 [./server] PushStore
-interface PushStore
+interface PushStore extends StoreBase
   add: (user: string, subscription: PushSubscriptionRecord, most: number) => void | Promise<void>
-  close?: () => void
+  close?: (() => void | Promise<void>) | undefined
   erase: (user: string) => number | Promise<number>
   list: (user: string) => PushSubscriptionRecord[] | Promise<PushSubscriptionRecord[]>
+  ping?: (() => void | Promise<void>) | undefined
   remove: (endpoint: string, user?: string | undefined) => boolean | Promise<boolean>
 
 [./server] PushSubscriptionRecord
@@ -3082,8 +3102,9 @@ interface RoomsOptions<Message = never, State = undefined, Store = RoomStore>
 [./server] RoomStore
 interface RoomStore extends RoomStoreBase
   add: (room: string, connection: string, member: string) => void
-  close: () => unknown
+  close: () => void | Promise<void>
   members: (room: string) => string[]
+  ping?: (() => void | Promise<void>) | undefined
   publish: (room: string, text: string, recipients: RoomRecipients) => void
   remove: (room: string, connection: string) => void
   state?: (room: string) => string | undefined
@@ -3329,10 +3350,12 @@ interface SessionSettings
   maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
 
 [./server] SessionStore
-interface SessionStore
+interface SessionStore extends StoreBase
+  close?: (() => void | Promise<void>) | undefined
   delete: (id: string) => void | Promise<void>
   deleteWhere?: ((match: (data: SessionData) => boolean) => number | Promise<number>) | undefined
   get: (id: string) => SessionData | Promise<SessionData | undefined> | undefined
+  ping?: (() => void | Promise<void>) | undefined
   set: (id: string, data: SessionData, maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`) => void | Promise<void>
 
 [./server] shutdown
@@ -3352,6 +3375,7 @@ const SNIFFED_BYTES: 4096
 function sqliteData(path: string): {
   notifications: NotificationStore;
   push: PushStore;
+  files: FileStore;
   database?: string;
   sessions: DeletableSessionStore;
   cache: SyncCacheStore;
@@ -3390,6 +3414,11 @@ function sqliteStore(path: string): DeletableSessionStore
 interface StartOptions
   delay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   id?: string | undefined
+
+[./server] StoreBase
+interface StoreBase
+  close?: (() => void | Promise<void>) | undefined
+  ping?: (() => void | Promise<void>) | undefined
 
 [./server] StoredFile
 interface StoredFile

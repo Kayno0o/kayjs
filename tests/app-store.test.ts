@@ -1,16 +1,19 @@
 import type { Action, Duration } from '../src/runtime'
 import { existsSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Database } from 'bun:sqlite'
-import { afterEach, describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { extensionServers } from '../src/config-extensions'
 import { cached } from '../src/runtime/cache'
 import { memoryJobs, memoryRates, rateLimit } from '../src/server'
-import { appStore, setupStore } from '../src/server/app-store'
+import { appStore, setupStore, storesOf } from '../src/server/app-store'
+import { closeStores } from '../src/server/lifecycle'
 import { pgData } from '../src/server/pg-data'
 import { defaultJobStore } from '../src/server/queue'
 import { sqliteData } from '../src/server/sqlite-data'
+import { configuredFiles } from '../src/server/storage'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -168,5 +171,82 @@ describe('an app store without peek', () => {
 
     setupStore({ rates })
     await expect(protectionRefusal(action as never, new Request('http://localhost/_kay/a', { method: 'POST' }), { body: {}, form: false, server: null })).rejects.toThrow('peek')
+  })
+})
+
+describe('the store contract', () => {
+  it('lists each store once, the store object last', () => {
+    const shared = { get: () => undefined, set: () => undefined, delete: () => undefined }
+    const files = { write: async () => undefined, read: async () => undefined, delete: async () => undefined }
+    const store = { sessions: shared, files }
+
+    const listed = storesOf(store)
+
+    expect(listed).toHaveLength(3)
+    expect(listed[0] === shared && listed[1] === files && listed[2] === store).toBe(true)
+    expect(storesOf({ sessions: shared, jobs: undefined })).toHaveLength(2)
+    expect(storesOf(undefined)).toEqual([])
+  })
+
+  it('closes each store once, the others still closing when one fails', async () => {
+    const closed: string[] = []
+    const failing = { get: () => undefined, set: () => undefined, delete: () => undefined, close: async () => {
+      throw new Error('refused')
+    } }
+    const files = { write: async () => undefined, read: async () => undefined, delete: async () => undefined, close: () => {
+      closed.push('files')
+    } }
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const exitCode = process.exitCode
+
+    try {
+      setupStore({ sessions: failing, files, close: () => {
+        closed.push('store')
+      } })
+      await closeStores()
+      expect(closed).toEqual(['files', 'store'])
+      expect(logged).toHaveBeenCalled()
+    }
+    finally {
+      logged.mockRestore()
+      process.exitCode = exitCode
+    }
+  })
+
+  it('reads the files from store.files, or the fileStore of before 1.87', () => {
+    const files = { write: async () => undefined, read: async () => undefined, delete: async () => undefined }
+    const old = { ...files }
+
+    expect(configuredFiles({ store: { files }, fileStore: old })).toBe(files)
+    expect(configuredFiles({ store: {}, fileStore: old })).toBe(old)
+    expect(configuredFiles({})).toBeUndefined()
+  })
+
+  it('keeps the files of sqliteData beside the database, where they go by default', async () => {
+    const root = await scratchDir('sqlite-files-')
+
+    try {
+      const { files } = sqliteData(join(root, 'data/app.sqlite'))
+
+      await files.write('a.txt', new Blob(['hi']))
+      expect(await Bun.file(join(root, 'data/files/a.txt')).text()).toBe('hi')
+      expect(await sqliteData(':memory:').files.read('a.txt')).toBeUndefined()
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves the files of pgData to the app, as Postgres is no file server', () => {
+    expect(pgData('postgres://localhost/none')).not.toHaveProperty('files')
+  })
+
+  it('names each factory after its backend and the key of the store it makes', async () => {
+    const server = await import('../src/server')
+    const factories = Object.keys(server).filter(name => (/^(?:memory|sqlite|pg|disk|s3)[A-Z]/).test(name))
+    // `Data` is a store of every kind, `Store` and `StoreAt` the session stores kept under their old names until 1.90.
+    const things = new Set(['Sessions', 'Cache', 'Live', 'Jobs', 'Rates', 'Rooms', 'Vitals', 'Notifications', 'Push', 'Files', 'Data', 'Store', 'StoreAt'])
+
+    expect(factories.filter(name => !things.has(name.replace(/^(?:memory|sqlite|pg|disk|s3)/, '')))).toEqual([])
   })
 })

@@ -1,6 +1,7 @@
 import type { PositiveDuration } from './checks'
 import type { Duration } from './duration'
 import type { Setter } from './index'
+import type { StoreBase } from './store-base'
 
 // What both halves of `live()` read: its types, the route and script of the connection, and how a key reads.
 
@@ -48,7 +49,7 @@ export interface LiveOptions<Ttl extends Duration = Duration> {
 
 // Where live values are kept beyond one process, `store.live` of kay.config.ts: `sqliteLive(path)` for the processes of a machine, `pgData(db).live` for replicas on Postgres. A value is its text, as `encodeValue` writes it.
 // A store over a network answers with promises: `entries` is awaited before the server serves, and `set` and `delete` are written behind, `live.set` staying synchronous, so a promise must not reject and the store keeps its writes in order. A store answering synchronously may throw to refuse a write, which leaves the value as it was.
-export interface LiveStore {
+export interface LiveStore extends StoreBase {
   // Every value held and not past its end, read when the server starts.
   entries: () => Entries | Promise<Entries>
   // Keeps a value and tells the other processes sharing the store, which hear it through `subscribe`. `expiresAt` is when a value declared with a `ttl` is forgotten: the store gives it back with the rows, leaves it out of them once past and drops it.

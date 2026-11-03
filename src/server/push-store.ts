@@ -1,3 +1,4 @@
+import type { StoreBase } from '../runtime/store-base'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { inMemory } from './memory-mark'
@@ -14,7 +15,7 @@ export interface PushSubscriptionRecord {
 }
 
 // What the app keeps of its people's push subscriptions, `store.push` of kay.config.ts: one row each, so replicas share them. A method may answer with a promise.
-export interface PushStore {
+export interface PushStore extends StoreBase {
   // Keeps a subscription for a person, replacing the one at the same endpoint (whoever it was kept for), and drops the person's oldest beyond `most`.
   add: (user: string, subscription: PushSubscriptionRecord, most: number) => void | Promise<void>
   // A person's subscriptions, newest first.
@@ -23,7 +24,7 @@ export interface PushStore {
   remove: (endpoint: string, user?: string) => boolean | Promise<boolean>
   // Deletes every subscription of a person, answering how many went.
   erase: (user: string) => number | Promise<number>
-  close?: () => void
+
 }
 
 // Subscriptions kept in this process's memory, gone when it stops.
@@ -84,16 +85,17 @@ export function sqlitePush(path: string): PushStore {
     return opened ??= openPush(path)
   }
 
-  onReload(() => opened?.close?.())
+  onReload(async () => opened?.close?.())
 
   return {
     add: async (user, subscription, most) => open().add(user, subscription, most),
     list: async user => open().list(user),
     remove: async (endpoint, user) => open().remove(endpoint, user),
     erase: async user => open().erase(user),
-    close: () => {
+    close: async () => {
       closed = true
-      opened?.close?.()
+
+      return opened?.close?.()
     },
   }
 }

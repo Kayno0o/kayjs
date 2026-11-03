@@ -1,3 +1,4 @@
+import type { StoreBase } from '../runtime/store-base'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { inMemory } from './memory-mark'
@@ -25,13 +26,12 @@ export interface VitalCount {
 }
 
 // What the app keeps of the vitals visitors reported: a count per route, metric, bucket and day, so a replica adds its views to the others' with one increment and the store holds a fixed number of rows however many views come.
-export interface VitalsStore {
+export interface VitalsStore extends StoreBase {
   // Counts one view's readings for a route on a UTC day, the days since 1970.
   add: (route: string, readings: VitalReading[], day: number) => void | Promise<void>
   // The counts of every day from `since` on, summed over the days, in every process sharing the store.
   counts: (since: number) => VitalCount[] | Promise<VitalCount[]>
-  // Stops what the store runs in the background and lets go of its file.
-  close?: () => void
+
 }
 
 // A bucket is a tenth of a natural-log step wide, about 10 %: a percentile read from buckets is within 5 % of the true value, and a metric takes at most 112 of them.
@@ -126,14 +126,15 @@ export function sqliteVitals(path: string): VitalsStore {
   }
 
   // A reload closes the file for the module that named the store, whichever module first used it; the module running again names a store of its own.
-  onReload(() => opened?.close?.())
+  onReload(async () => opened?.close?.())
 
   return {
     add: async (route, readings, day) => open().add(route, readings, day),
     counts: async since => open().counts(since),
-    close: () => {
+    close: async () => {
       closed = true
-      opened?.close?.()
+
+      return opened?.close?.()
     },
   }
 }

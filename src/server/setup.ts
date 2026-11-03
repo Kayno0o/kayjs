@@ -41,7 +41,7 @@ import { allowsStyleAttributes } from './security'
 import { configHead, siteWithBase } from './seo'
 import { projectSource } from './source'
 import { setupStampSecret, warnOnStampKey } from './stamp'
-import { setupStorage } from './storage'
+import { configuredFiles, setupStorage } from './storage'
 import { setTracer } from './trace'
 import { reportUnsafeUrls } from './unsafe-urls'
 import { sharedStores } from './workers'
@@ -163,7 +163,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
     setupStampSecret(config.secret)
     setupPreview(config.preview, base)
     setTracer(config.tracer)
-    setupStorage(config.fileStore, join(imageCache, 'stored'), imageCache)
+    setupStorage(configuredFiles(config), join(imageCache, 'stored'), imageCache)
     setAppRoot(root)
     // An export serves nobody, so it keeps only the database url libraries read and none of the stores: a pgData store would otherwise poll, open its connection and create its tables while the build runs, and a build with no database reachable still ends.
     setupStore(await sharedStores(exporting && config.store ? { database: config.store.database } : config.store))

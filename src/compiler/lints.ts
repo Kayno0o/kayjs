@@ -653,6 +653,15 @@ export const LINTS = {
     wrong: 'export default defineConfig({ api: \'src/endpoints\', storage: diskFiles(\'data/files\') })',
     right: 'export default defineConfig({ apiDir: \'src/endpoints\', fileStore: diskFiles(\'data/files\') })',
   },
+  'deprecated-file-store': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.87',
+    site: true,
+    summary: 'The `fileStore` config key, which 1.87 moved under `store` as `files`, so the stores of every kind (sessions, jobs, files and the rest) are named in one place and `sqliteData` fills the files too. The old key keeps working until 1.90. Found in the object `kay.config.ts` exports, in the object literal handed to `pages()` or `testSite()` (imported under any name) and in the `config` of an extension written out in a file importing kay; the fix writes `store: { files: <value> }`. A `store` already written in the same object is reported with no fix, as the files go into it by hand.',
+    wrong: 'export default defineConfig({ fileStore: s3Files() })',
+    right: 'export default defineConfig({ store: { files: s3Files() } })',
+  },
   'deprecated-auth-account-methods': {
     level: 'warn',
     group: 'deprecated',

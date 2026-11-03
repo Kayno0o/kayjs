@@ -62,8 +62,39 @@ describe('deprecated-config-keys', () => {
       expect(await Bun.file(join(root, 'src/server.ts')).text()).toBe(server.replace('{ content, maxSizes: {', '{ contentConfig: content, maxSizeByPath: {').replace('settings: {}', 'librarySettings: {}'))
       expect(await Bun.file(join(root, 'src/site.ts')).text()).toBe(test)
       expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe(other)
-      expect((await deprecatedConfigKeys(root, {})).map(diagnostic => diagnostic.file.slice(root.length + 1))).toEqual(['src/site.ts'])
-      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-config-keys': 'allow' } })).toEqual([])
+      expect((await deprecatedConfigKeys(root, {})).filter(diagnostic => diagnostic.code === 'deprecated-config-keys').map(diagnostic => diagnostic.file.slice(root.length + 1))).toEqual(['src/site.ts'])
+      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-config-keys': 'allow', 'deprecated-file-store': 'allow' } })).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('deprecated-file-store', () => {
+  it('reports fileStore in the config, pages() and testSite(), and --fix moves its value under store.files unless a store is written beside it', async () => {
+    const config = 'import { defineConfig, diskFiles } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'en\',\n  fileStore: diskFiles(\'data/files\'),\n})\n'
+    const shorthand = 'import { testSite } from \'kay/test\'\n\nconst fileStore = undefined\nexport const site = testSite({ fileStore })\n'
+    const beside = 'import { pages, sqliteData } from \'kay/server\'\n\nexport const app = pages({ store: sqliteData(\'data/app.sqlite\'), fileStore: undefined })\n'
+    const other = 'import { pages } from \'./mine\'\n\nexport const x = pages({ fileStore: 1 })\nexport const files = { fileStore: 1 }\n'
+    const root = await project({ 'kay.config.ts': config, 'src/site.ts': shorthand, 'src/server.ts': beside, 'src/other.ts': other })
+
+    try {
+      const found = await deprecatedConfigKeys(root, {})
+
+      expect(found.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.code, diagnostic.fixes === undefined]).sort()).toEqual([
+        ['kay.config.ts', 'deprecated-file-store', false],
+        ['src/server.ts', 'deprecated-file-store', true],
+        ['src/site.ts', 'deprecated-file-store', false],
+      ])
+
+      await applySafeFixes(root, found)
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe(config.replace('fileStore: diskFiles(\'data/files\')', 'store: { files: diskFiles(\'data/files\') }'))
+      expect(await Bun.file(join(root, 'src/site.ts')).text()).toBe(shorthand.replace('{ fileStore }', '{ store: { files: fileStore } }'))
+      expect(await Bun.file(join(root, 'src/server.ts')).text()).toBe(beside)
+      expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe(other)
+      expect((await deprecatedConfigKeys(root, {})).map(diagnostic => diagnostic.file.slice(root.length + 1))).toEqual(['src/server.ts'])
+      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-file-store': 'allow' } })).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })

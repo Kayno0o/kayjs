@@ -1,18 +1,21 @@
 import type { RateStore } from '../runtime/action'
 import type { CacheStore } from '../runtime/cache'
 import type { LiveStore } from '../runtime/live-value'
+import type { StoreBase } from '../runtime/store-base'
 import type { NotificationStore } from './notifications'
 import type { PushStore } from './push-store'
 import type { JobStore } from './queue'
 import type { AsyncRoomStore, RoomStore } from './rooms'
 import type { SessionStore } from './session'
+import type { FileStore } from './storage'
 import type { VitalsStore } from './vitals-store'
 import { setAppCache } from '../runtime/cache'
 import { setLiveStore } from '../runtime/live-value'
 
-// What the app keeps beyond one process: the data of each `session()` in `sessions`, the values of each `cached` in `cache`, the values of `live()` in `live`, queued jobs and schedule locks in `jobs`, rate limit counts in `rates`, the tabs a page's `presence()` lists in `rooms`, the Web Vitals visitors reported in `vitals`, the notifications `notify()` stores in `notifications`, the push subscriptions of `push()` in `push`.
+// What the app keeps beyond one process: the data of each `session()` in `sessions`, the values of each `cached` in `cache`, the values of `live()` in `live`, queued jobs and schedule locks in `jobs`, rate limit counts in `rates`, the tabs a page's `presence()` lists in `rooms`, the Web Vitals visitors reported in `vitals`, the notifications `notify()` stores in `notifications`, the push subscriptions of `push()` in `push`, the files `files` stores in `files`.
 // Each is used by every session, cached value, queue, locked schedule, rate limit and presence room that names no store of its own.
-export interface AppStore {
+// The object may have `ping` and `close` of its own, for a store keeping several kinds over one connection: `pgData` has them, and each store is pinged and closed once however many keys name it.
+export interface AppStore extends StoreBase {
   sessions?: SessionStore | undefined
   cache?: CacheStore | undefined
   live?: LiveStore | undefined
@@ -24,6 +27,29 @@ export interface AppStore {
   database?: string | undefined
   notifications?: NotificationStore | undefined
   push?: PushStore | undefined
+  files?: FileStore | undefined
+}
+
+// Every kind of store an `AppStore` holds, by its key.
+const KINDS = ['sessions', 'cache', 'live', 'jobs', 'rates', 'rooms', 'vitals', 'notifications', 'push', 'files'] as const
+
+// Each store an `AppStore` holds, then the object itself, each once however many keys name it: what `health` pings and a stop closes, the object last so a `pgData` closes its connection after the rooms dropped this process's members through it.
+export function storesOf(store: AppStore | undefined): StoreBase[] {
+  if (store === undefined)
+    return []
+
+  const found = new Set<StoreBase>()
+
+  for (const kind of KINDS) {
+    const held = store[kind]
+
+    if (held !== undefined)
+      found.add(held)
+  }
+
+  found.add(store)
+
+  return [...found]
 }
 
 let current: AppStore | undefined

@@ -18,6 +18,7 @@ import { logSink, setLogSink } from '../src/runtime/log'
 import { solveWork } from '../src/runtime/work'
 import { inlineScriptHashes, requestId, shutdown, sqliteJobs } from '../src/server'
 import { servePages } from '../src/server/app'
+import { setupStore } from '../src/server/app-store'
 import { readClient, readManifest } from '../src/server/client'
 import { compressTextStrongest } from '../src/server/compress'
 import { probeHealth } from '../src/server/lifecycle'
@@ -1645,6 +1646,32 @@ describe('lifecycle', () => {
 
     expect((await unhealthy.handle(new Request('http://localhost/up'))).status).toBe(503)
     expect((await (await pages({ root: PRODUCTION, prebuilt: false, health: false })).handle(new Request('http://localhost/_kay/health'))).status).toBe(404)
+  })
+
+  it('pings each store beside the check, once per store however many keys name it', async () => {
+    const pings: string[] = []
+    const shared = { ping: () => {
+      pings.push('shared')
+    } }
+    const healthy = await pages({ root: PRODUCTION, prebuilt: false, store: { sessions: { ...shared, get: () => undefined, set: () => undefined, delete: () => undefined }, files: { ping: () => {
+      pings.push('files')
+    }, write: async () => undefined, read: async () => undefined, delete: async () => undefined } } })
+    const down = await pages({ root: PRODUCTION, prebuilt: false, store: { ping: async () => {
+      throw new Error('store down')
+    } } })
+    const slow = await pages({ root: PRODUCTION, prebuilt: false, health: { timeout: '50ms' }, store: { ping: async () => Bun.sleep(500) } })
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      expect((await healthy.handle(new Request('http://localhost/_kay/health'))).status).toBe(200)
+      expect(pings).toEqual(['shared', 'files'])
+      expect((await down.handle(new Request('http://localhost/_kay/health'))).status).toBe(503)
+      expect((await slow.handle(new Request('http://localhost/_kay/health'))).status).toBe(503)
+    }
+    finally {
+      logged.mockRestore()
+      setupStore(undefined)
+    }
   })
 
   it('logs a health check that throws with its path, never its query', async () => {

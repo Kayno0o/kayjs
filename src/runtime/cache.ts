@@ -1,5 +1,6 @@
 import type { PositiveDuration } from './checks'
 import type { Duration } from './duration'
+import type { StoreBase } from './store-base'
 import { parse, stringify } from 'devalue'
 import { cacheReads } from './counters'
 import { durationSeconds } from './duration'
@@ -8,7 +9,7 @@ import { previewing, renderingForVisitor } from './preview'
 
 // Where `cached` also keeps a value, so it outlives the process: read when a key is missing from memory, written on each load. A store reading a file answers at once, so `invalidate` is done when it returns; one reached over a network may answer with promises, and `invalidate` then drops the rows in the background, a read waiting for it.
 // A key belongs to one store: once in memory, its value is read and written there, whatever store a later call names.
-export interface CacheStore {
+export interface CacheStore extends StoreBase {
   get: (key: string) => StoredValue | undefined | Promise<StoredValue | undefined>
   set: (key: string, text: string, freshUntil: number) => void | Promise<void>
   delete: (key: string) => void | Promise<void>

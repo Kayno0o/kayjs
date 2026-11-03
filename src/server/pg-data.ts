@@ -1,4 +1,5 @@
 import type { SQL } from 'bun'
+import type { StoreBase } from '../runtime/store-base'
 import type { AppStore } from './app-store'
 import type { PgIndex, PgJobsSource } from './pg-jobs'
 import type { DeletableSessionStore } from './session'
@@ -217,7 +218,12 @@ export function pgData(source: PgJobsSource) {
   // A `kay dev` reload closes the store of the module that opened it, which then runs again and opens its own.
   forget = onReload(close)
 
-  const stores = { sessions: pgSessions(handle), cache: pgCache(handle), jobs: jobsAfter(db, async () => handle.db()), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle), push: pgPush(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database'>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
+  // `health` runs it: a round trip to the database, which rejects while it is unreachable or the pool is closed.
+  const ping = async () => {
+    await query(db, 'SELECT 1')
+  }
 
-  return { ...stores, close, [Symbol.asyncDispose]: close }
+  const stores = { sessions: pgSessions(handle), cache: pgCache(handle), jobs: jobsAfter(db, async () => handle.db()), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle), push: pgPush(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database' | 'files' | keyof StoreBase>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
+
+  return { ...stores, ping, close, [Symbol.asyncDispose]: close }
 }

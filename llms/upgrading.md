@@ -35,6 +35,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - `ApiError.answer` is `data`, and `ApiError` gains `errors`; an `ActionError`'s `answer` stays its response body text, now named `body`. Both old names work until 1.90. `kay upgrade` renames a read inside `if (x instanceof ActionError)` (or the right side of an `&&`) to `.body`; a read narrowed to `ApiError` gets a `.data` fix that `kay upgrade` does not apply, as the receiver may be an `ActionError`; a receiver only a `catch` or a cast says is an error is reported with no fix (`deprecated-api-error-answer`).
 - `refusalMessage(error, fallback)` is deprecated: an `ApiError`'s `message` is always safe to show, a status 0 one reading `The server could not be reached` with the browser's error as `cause`. `kay check` offers `error instanceof ApiError && error.status !== 0 ? error.message : fallback` but `kay upgrade` does not apply it, as an `ActionError`'s message now also reads its field messages and `data.message` where `refusalMessage` gave the fallback (`deprecated-refusal-message`).
 - The failed branch of a `track()` result, `FormFailure` and `LocalIssue` gain `message`; an object built by hand to satisfy one of these types needs the field. A route's refusal now reads its `message` as `errors['']`, else the field messages, else `data.message`, else the text it answered.
+### `fileStore` is `store.files`
+
+- `fileStore: x` in `kay.config.ts` (and in `pages()`, `testSite()` and an extension's `config`) is `store: { files: x }`: it works until 1.90, `kay check` reports it as `deprecated-file-store` and `kay upgrade` moves it, unless the object has a `store` already, where `files` goes into it by hand. `sqliteData(path)` now keeps files in a `files` folder beside its database (`data/files` for `data/app.sqlite`, the default place); `pgData` leaves them to the app.
 
 ## 1.86.0
 

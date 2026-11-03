@@ -152,11 +152,11 @@ export interface KayConfig {
   secret?: string | string[] | undefined
   // Lets an editor see drafts on the live site, `false` for none: a visitor in preview mode sees every draft, and pages render for them alone, past prerendered and cached copies.
   preview?: PreviewConfig | false | undefined
-  // Where `files` from `kay/server` keeps what it stores: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`.
+  /** @deprecated Moved under `store` in 1.87 as `store: { files }`; the old key works until 1.90, and `kay upgrade` moves it. */
   fileStore?: FileStore | undefined
   /** @deprecated Renamed `fileStore` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
   storage?: FileStore | undefined
-  // Where the app keeps what outlives one process, for every feature naming no store of its own: `session()`'s data, `cached` values, `live()` values, queued jobs and schedule locks, rate limit counts, the tabs a page's `presence()` lists and the Web Vitals `vitals()` counts and the notifications `notify()` stores. `sqliteData('data/app.sqlite')` keeps them all in one file; `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications }` takes stores of your own, each optional, Redis say. Without it sessions travel in their cookie, jobs stay in `data/jobs.sqlite` and the others in memory.
+  // Where the app keeps what outlives one process, for every feature naming no store of its own: `session()`'s data, `cached` values, `live()` values, queued jobs and schedule locks, rate limit counts, the tabs a page's `presence()` lists and the Web Vitals `vitals()` counts and the notifications `notify()` stores, and the files `files` from `kay/server` keeps in `files`: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`. `sqliteData('data/app.sqlite')` keeps them all in one file, the files in the `data/files` folder beside it; `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications, files }` takes stores of your own, each optional, Redis say, and each may have `ping` for `health` and `close` for a stop. Without it sessions travel in their cookie, jobs stay in `data/jobs.sqlite` and the others in memory.
   store?: AppStore | undefined
   // Receives every error a load, a render, a guard or an action throws, as it is logged, and the ones islands report from the browser: the place to send them to an error tracker.
   // An error met outside any request, in a scheduled or background job or an `onStop` hook, comes with `undefined` for the request.
