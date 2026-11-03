@@ -4,16 +4,28 @@ const HSTS = 'strict-transport-security'
 // A header name as HTTP spells it, each dash-separated word capitalised.
 const WORDS = /(^|-)([a-z])/g
 const LINE_BREAK = /[\r\n]/
+const PATTERN = /[*:\s]/
+const TRAILING_SLASH = /\/+$/
 
 function titled(name: string): string {
   return name.replace(WORDS, (_, dash: string, letter: string) => `${dash}${letter.toUpperCase()}`)
 }
 
-// The headers as a `_headers` file, which Netlify and Cloudflare Pages read, every path getting them.
-export function headersFile(headers: Record<string, string>): string {
-  const lines = Object.entries(headers).filter(([, value]) => !LINE_BREAK.test(value)).map(([name, value]) => `  ${titled(name)}: ${value}`)
+// The headers as a `_headers` file, which Netlify and Cloudflare Pages read, every path getting them, and then each page that answers a `cache-control` of its own at its path, with and without the trailing slash.
+// A path holding a `*` or a `:` is a pattern to those hosts, so it is left out.
+export function headersFile(headers: Record<string, string> | undefined, caches: ReadonlyMap<string, string> = new Map()): string {
+  const lines = Object.entries(headers ?? {}).filter(([, value]) => !LINE_BREAK.test(value)).map(([name, value]) => `  ${titled(name)}: ${value}`)
+  const blocks = lines.length > 0 ? [`/*\n${lines.join('\n')}\n`] : []
 
-  return `/*\n${lines.join('\n')}\n`
+  for (const [path, control] of caches) {
+    if (PATTERN.test(path) || LINE_BREAK.test(control))
+      continue
+
+    for (const rule of path === '/' ? ['/'] : [path.replace(TRAILING_SLASH, ''), `${path.replace(TRAILING_SLASH, '')}/`])
+      blocks.push(`${rule}\n  Cache-Control: ${control}\n`)
+  }
+
+  return blocks.join('\n')
 }
 
 // The headers as `add_header` lines for an nginx `include`, repeated by the config in every location with an `add_header` of its own, as nginx drops the inherited ones there.

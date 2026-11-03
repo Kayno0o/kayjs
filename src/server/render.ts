@@ -592,6 +592,10 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
   if (encodings.length > 0 || page.dcz !== undefined)
     headers.append('vary', page.dcz === undefined ? 'accept-encoding' : 'accept-encoding, available-dictionary')
 
+  // The same copy for everyone, which a shared cache may keep: not one rendered for this visitor (a guard, a context, a flash cookie, the dev tool), nor the lighter copy of a visitor saving data.
+  if (page.cacheControl !== undefined && !rendering && !lighter)
+    headers.set('cache-control', page.cacheControl)
+
   // Behind a guard the page is for whoever passed it, so no shared cache may keep it, whatever the page set.
   if (route.guards.length > 0)
     headers.set('cache-control', 'private, no-cache')

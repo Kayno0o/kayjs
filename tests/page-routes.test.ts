@@ -84,6 +84,25 @@ describe('pageResponder', () => {
     expect(await visit('/elsewhere')).toMatchObject({ html: expect.stringContaining('<h1>About</h1>'), cache: null })
   })
 
+  it('answers a page with a shared cache-control to everyone, and keeps it from a guarded page, a visitor with a flash cookie and one saving data', async () => {
+    await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false })
+    const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
+    const shared = 'public, max-age=0, s-maxage=3600, stale-while-revalidate=3600'
+    const timed = new Map([['/about', new Map([['/about', { ...built('/about').get('/about')!, cacheControl: shared }]])]])
+    const client = (await readClient(root))!
+    const visit = async (route: typeof about, headers: Record<string, string> = {}) => {
+      const respond = pageResponder({ client, renderOptions: {}, prerendered: timed, settings: undefined, transforms: [], served: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
+      const response = await respond(route, {}, { request: new Request('http://localhost/about', { headers }) }, new URL('http://localhost/about'))
+
+      return response.headers.get('cache-control')
+    }
+
+    expect(await visit(about)).toBe(shared)
+    expect(await visit(about, { cookie: 'kay_flash=x' })).toBe('private, no-store')
+    expect(await visit({ ...about, guards: [{ file: '/g/_guard.ts', check: async () => undefined }] as never })).toBe('private, no-cache')
+    expect(await visit(about, { 'save-data': 'on' })).toBe('public, max-age=0, must-revalidate')
+  })
+
   it('runs the served-page hooks on a page rendered per request alone, HTML only, and leaves the prerendered copy to transformPage', async () => {
     await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false })
     const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }

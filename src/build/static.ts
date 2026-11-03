@@ -167,7 +167,7 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
   const base = basePath(config.base)
   const origin = config.site === undefined ? '' : siteOrigin(config.site)
 
-  written.push(...await writeHeaders(out, config, pages))
+  written.push(...await writeHeaders(out, config, pages, new Map(built.flatMap(([path, page]) => page.cacheControl === undefined ? [] : [[joinBase(base, path), page.cacheControl] as const]))))
 
   written.push(...await writeRedirects(out, config.redirects ?? {}, base, origin, pages.locale))
 
@@ -264,7 +264,8 @@ function pageFiles(path: string): string[] {
 
 // The headers a server would send every response, for a host to send: `_headers` for those reading one, and an nginx include.
 // A page's own `security` is not part of them, and neither is the CSP report endpoint, which a static site lacks.
-async function writeHeaders(out: string, config: KayConfig, pages: Awaited<ReturnType<typeof pagesApp>>): Promise<string[]> {
+// A page with a `ttl` or a `cacheControl` gets its `cache-control` in `_headers` too, by its path under the base; nginx cannot say it per path, so the include leaves it out.
+async function writeHeaders(out: string, config: KayConfig, pages: Awaited<ReturnType<typeof pagesApp>>, caches: ReadonlyMap<string, string>): Promise<string[]> {
   const security = config.security === false || config.security?.reports !== true ? config.security : { ...config.security, reports: undefined }
   const headers = securityHeaders({ ...pages.securityOptions, security })
   const nginx = join(out, 'headers.nginx.conf')
@@ -272,13 +273,13 @@ async function writeHeaders(out: string, config: KayConfig, pages: Awaited<Retur
 
   await Bun.write(nginx, nginxHeaders(headers ?? {}))
 
-  if (!headers)
+  if (!headers && caches.size === 0)
     return written
 
-  if (config.security !== false && config.security?.reports === true)
+  if (headers && config.security !== false && config.security?.reports === true)
     kayLog('warn', 'security.reports: true sends CSP reports to an endpoint a static site lacks, so the exported headers leave it out; name a URL in reports to receive them')
 
-  const own = await routesWithSecurity(pages.routes)
+  const own = headers ? await routesWithSecurity(pages.routes) : []
 
   if (own.length > 0)
     kayLog('warn', `${own.join(', ')} set${own.length === 1 ? 's' : ''} security on the page or a layout, which the exported headers do not carry: the site-wide policy applies to ${own.length === 1 ? 'it' : 'them'} unless the host sends other headers for the path`)
@@ -286,12 +287,12 @@ async function writeHeaders(out: string, config: KayConfig, pages: Awaited<Retur
   const file = join(out, '_headers')
 
   if (existsSync(file)) {
-    kayLog('warn', 'public/_headers is kept as it is, so the security headers kay computed are not in it; they are in headers.nginx.conf')
+    kayLog('warn', `public/_headers is kept as it is, so the ${headers ? 'security headers kay computed are not in it; they are in headers.nginx.conf' : 'cache-control of the pages with a `ttl` is not in it'}`)
 
     return written
   }
 
-  await Bun.write(file, headersFile(headers))
+  await Bun.write(file, headersFile(headers, caches))
 
   return [...written, file]
 }

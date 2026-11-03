@@ -20,6 +20,18 @@ export function chainSetting(modules: object[], name: keyof PageSettings): unkno
   return undefined
 }
 
+// A page's lifetime along its route: `ttl`, else the name it had before 1.87, `revalidate`; the innermost module that sets either wins.
+export function chainTtl(modules: object[]): unknown {
+  for (let index = modules.length - 1; index >= 0; index--) {
+    const value = pageSetting(modules[index]!, 'ttl') ?? pageSetting(modules[index]!, 'revalidate')
+
+    if (value !== undefined)
+      return value
+  }
+
+  return undefined
+}
+
 interface PageRoute {
   pattern: string
   params: readonly string[]

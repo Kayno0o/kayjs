@@ -87,6 +87,8 @@ export interface PrerenderedPage {
   renderedAt: number
   // Seconds after which the server renders it again in the background, from the page's `revalidate` export.
   revalidate?: number | undefined
+  // The `cache-control` it answers everyone with, from the page's `ttl` or `cacheControl`; absent for the default, which has a shared cache ask again each time.
+  cacheControl?: string | undefined
   // How each of its server islands renders per request, in page order.
   islands?: ServerIslandMode[] | undefined
   // It holds the stamp of a form posting to an action with `minTime`, which the server signs each time it serves the page.

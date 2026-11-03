@@ -29,7 +29,7 @@ import { localeCopies, stateFor } from './i18n'
 import { LIVE_MARK, withoutCacheScripts } from './live'
 import { pageFlags } from './page-flags'
 import { readsOf } from './page-reads'
-import { chainSetting, pagePrerender, pageSetting, routedCollections } from './page-settings'
+import { chainSetting, chainTtl, pagePrerender, pageSetting, routedCollections } from './page-settings'
 import { matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pageToken, pathOf, storedHeaders } from './prerendered'
 import { keptScan } from './pure-page'
@@ -41,6 +41,7 @@ import { setupPages } from './setup'
 import { STAMP_HOLE } from './stamp'
 
 const PARTS = new Intl.ListFormat('en-GB')
+const LINE_BREAK = /[\r\n]/
 const KAY_IMPORT = /\bfrom\s+['"]([^'"]+\.kay)['"]/g
 // The pages of a route rendering at once: a render waiting on a database, a CMS or a file lets the next ones run, while each page is still judged and written in turn, as one at a time would. Bounded, so the build holds no more pages than this.
 const RENDERS_AT_ONCE = 8
@@ -186,13 +187,14 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const reserved = new Map<string, string>()
 
     const module = await import(route.file) as Record<string, unknown>
-    // A layout's `revalidate`, `noindex` and `search` apply to every page under it, the innermost setting winning.
+    // A layout's `ttl`, `cacheControl`, `noindex` and `search` apply to every page under it, the innermost setting winning.
     const chain = [...await Promise.all(route.layouts.map(async layout => import(layout) as Promise<object>)), module]
-    const revalidate = revalidatePeriod(file, chainSetting(chain, 'revalidate'))
+    const revalidate = revalidatePeriod(file, chainTtl(chain))
+    const cacheControl = sharedCacheControl(file, revalidate, chainSetting(chain, 'cacheControl'))
 
     // A copy that goes stale is rendered again for every visitor with the request a page reads, which an unmarked page was never asked to.
     if (auto && revalidate !== undefined)
-      return skip('sets `revalidate`, which has a stale copy render again for every visitor')
+      return skip('sets `ttl`, which has a stale copy render again for every visitor')
 
     const prerender = pagePrerender(module, route)
     // The collection's route lists it, which no `prerender` export says, so there is none to drop.
@@ -434,7 +436,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           options.others?.push({ file: route.file, html, path: copy.path, host: copy.host, status: response.status, location: response.headers.get('location') ?? undefined })
         }
 
-        const stored: PrerenderedPage = { pattern: route.pattern, locale: copy.locale ?? locales.settings.defaultLocale, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt, revalidate, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...auto && readsPathname ? { pathname: new URL(request.url).pathname } : {}, ...dataRead.length > 0 ? { reads: dataRead } : {}, ...token === pageToken(copy.key) ? {} : { token } }
+        const stored: PrerenderedPage = { pattern: route.pattern, locale: copy.locale ?? locales.settings.defaultLocale, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt, revalidate, ...cacheControl !== undefined && !response.headers.has('cache-control') ? { cacheControl } : {}, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...auto && readsPathname ? { pathname: new URL(request.url).pathname } : {}, ...dataRead.length > 0 ? { reads: dataRead } : {}, ...token === pageToken(copy.key) ? {} : { token } }
 
         pending.push(() => {
           pages[copy.key] = stored
@@ -642,9 +644,26 @@ async function searchWeight(setting: unknown, params: ListedParams, file: string
   return weight
 }
 
-// A page's `revalidate` export in seconds, or undefined when it has none.
+// A page's `ttl` in seconds, or undefined when it has none.
 function revalidatePeriod(file: string, value: unknown): number | undefined {
-  return value === undefined ? undefined : durationSeconds(value, `${file}'s revalidate`)
+  return value === undefined ? undefined : durationSeconds(value, `${file}'s ttl`)
+}
+
+// What a public prerendered page answers everyone with: its `cacheControl` as written, else for a `ttl` of T seconds a shared cache keeps it T, and serves it up to T more while the server renders it again, as the server itself does; `false`, or neither setting, leaves the default that has a shared cache ask each time.
+function sharedCacheControl(file: string, period: number | undefined, value: unknown): string | undefined {
+  if (value === false || (value === undefined && period === undefined))
+    return undefined
+
+  if (value === undefined) {
+    const seconds = Math.ceil(period!)
+
+    return `public, max-age=0, s-maxage=${seconds}, stale-while-revalidate=${seconds}`
+  }
+
+  if (typeof value !== 'string' || value.trim() === '' || LINE_BREAK.test(value))
+    throw new KayError('page-settings-invalid', `kay: the \`cacheControl\` of ${file} is ${JSON.stringify(value)}, which is no header value: it takes a \`cache-control\` text on one line, or \`false\``)
+
+  return value
 }
 
 // Whether the file's template, or that of a component it imports, however deep, marks a server island; `reach` keeps what each file holds, read and parsed once for every route of a build.

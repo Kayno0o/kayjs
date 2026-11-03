@@ -505,6 +505,37 @@ describe('kay build --static', () => {
     }
   })
 
+  it('writes the cache-control of a page with a ttl or a cacheControl to _headers under the base, with and without the slash, and none for a page that opts out', async () => {
+    const fixture = await fixtureCopy('static')
+    const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
+
+    try {
+      await Bun.write(join(fixture, 'src/routes/news.kay'), '--- server\nexport const page = { prerender: true, ttl: \'1h\' }\n---\nh1 News\n')
+      await Bun.write(join(fixture, 'src/routes/legacy.kay'), '--- server\nexport const page = { prerender: true, revalidate: \'2m\' }\n---\nh1 Legacy\n')
+      await Bun.write(join(fixture, 'src/routes/plain.kay'), '--- server\nexport const page = { prerender: true, ttl: \'1h\', cacheControl: false }\n---\nh1 Plain\n')
+      await Bun.write(join(fixture, 'src/routes/long.kay'), '--- server\nexport const page = { prerender: true, cacheControl: \'public, max-age=300\' }\n---\nh1 Long\n')
+
+      const exported = await exportSite(elsewhere, fixture)
+
+      expect(exported.errors).toBe('')
+      expect(exported.code).toBe(0)
+
+      const headers = await Bun.file(join(elsewhere, '_headers')).text()
+
+      expect(headers).toContain('\n/repo/news\n  Cache-Control: public, max-age=0, s-maxage=3600, stale-while-revalidate=3600\n\n/repo/news/\n  Cache-Control: public, max-age=0, s-maxage=3600, stale-while-revalidate=3600\n')
+      expect(headers).toContain('\n/repo/legacy\n  Cache-Control: public, max-age=0, s-maxage=120, stale-while-revalidate=120\n')
+      expect(headers).toContain('\n/repo/long\n  Cache-Control: public, max-age=300\n')
+      expect(headers).not.toContain('/repo/plain')
+      expect(headers).not.toContain('/repo/about')
+      // The security headers keep their block for every path, first.
+      expect(headers).toStartWith('/*\n  ')
+    }
+    finally {
+      await rm(fixture, { recursive: true, force: true })
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  })
+
   it('names every page only a server could answer, and fails', async () => {
     const fixture = await fixtureCopy('static')
     const guarded = join(fixture, 'src/routes/members')

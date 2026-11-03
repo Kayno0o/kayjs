@@ -221,7 +221,7 @@ The sitemap is rebuilt when something it read changes, such as a collection a CM
 
 A sitemap may hold 50,000 URLs and 50 MB. Past that, `/sitemap.xml` becomes an index and kay writes the URLs into `/sitemap-1.xml`, `/sitemap-2.xml` and so on, each within the limits. `robots.txt` still points at `/sitemap.xml`, and a static export writes every part. You change nothing.
 
-`noindex: true` in a page's `page` object keeps a page out of search engines and the sitemap. In a layout it does the same for every page under it, and a page's own `noindex: false` takes it back. A layout takes `search` and `revalidate` the same way.
+`noindex: true` in a page's `page` object keeps a page out of search engines and the sitemap. In a layout it does the same for every page under it, and a page's own `noindex: false` takes it back. A layout takes `search` and `ttl` the same way.
 
 Add rules to the robots file with `robots` in `kay.config.ts`:
 

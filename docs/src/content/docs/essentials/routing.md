@@ -124,11 +124,11 @@ A page's settings are the keys of one object that its server fence exports.
 
 ```kay
 --- server
-export const page = { prerender: true, revalidate: '1h' }
+export const page = { prerender: true, ttl: '1h' }
 ---
 ```
 
-`prerender`, `keep` and `revalidate` are covered under [Prerendering](#prerendering). `layouts: false` drops the layouts above the page. `query` is covered in [Data loading](/essentials/data-loading), and `sitemap` and `noindex` in [Head and SEO](/essentials/head-and-seo). `kay check` types the object, so an unknown key is an error.
+`prerender`, `keep`, `ttl` and `cacheControl` are covered under [Prerendering](#prerendering). `layouts: false` drops the layouts above the page. `query` is covered in [Data loading](/essentials/data-loading), and `sitemap` and `noindex` in [Head and SEO](/essentials/head-and-seo). `kay check` types the object, so an unknown key is an error.
 
 ## Loading data
 
@@ -216,7 +216,7 @@ The build renders up to 8 of them at once, so a page waiting on a database does 
 
 <Callout type="note">
 
-Add `revalidate: '1h'` to `page` to rebuild a prerendered page in the background once it is older than that.
+Add `ttl: '1h'` to `page` to rebuild a prerendered page in the background once it is older than that. The same time is how long a CDN in front keeps a public page (`s-maxage` and `stale-while-revalidate`); see [Caching](/guides/caching-and-streaming#page-cache).
 
 </Callout>
 

@@ -152,7 +152,7 @@ export const theme = persisted('theme', 'light')
 | `redirect('/login')` | `ctx.redirect('/login')` |
 | `notFound()` | `ctx.notFound()` |
 | `generateStaticParams` | `prerender: [{ slug: 'a' }]` in `page`, or a content collection |
-| `export const revalidate = 3600` | `revalidate: '1h'` in `page` |
+| `export const revalidate = 3600` | `ttl: '1h'` in `page` |
 | `unstable_cache`, `fetch` with `next.revalidate` | `cached(key, ttl, load)` from `kay/cache` |
 | `revalidateTag`, `revalidatePath` | `invalidate(key)`, or `invalidatePage(path => ...)` from `kay/cache` |
 | `generateMetadata` and `metadata` | A `head` block, see [Head and SEO](/essentials/head-and-seo) |

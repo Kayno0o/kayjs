@@ -899,6 +899,8 @@ describe('revalidation', () => {
       const etag = built.headers.get('etag')!
 
       expect(await built.text()).toContain('<h1>Edition 1</h1>')
+      // Its ttl is what a shared cache keeps it for, except for a visitor it renders for alone.
+      expect(built.headers.get('cache-control')).toBe('public, max-age=0, s-maxage=60, stale-while-revalidate=60')
 
       const posted = await app.handle(new Request(`http://localhost${publish.url}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'referer': 'http://localhost/news' }, body: new URLSearchParams({ edition: '4' }) }))
 
@@ -953,13 +955,13 @@ describe('revalidation', () => {
     }
   })
 
-  it('refuses a revalidate that is no positive duration', async () => {
+  it('reads the ttl of a page as its revalidate period, and refuses one that is no positive duration', async () => {
     const copy = await fixtureCopy('production')
 
     try {
-      await Bun.write(join(copy, 'src/routes/broken.kay'), '--- server\nexport const page = { prerender: true, revalidate: \'hourly\' }\n---\np Broken\n')
+      await Bun.write(join(copy, 'src/routes/broken.kay'), '--- server\nexport const page = { prerender: true, ttl: \'hourly\' }\n---\np Broken\n')
 
-      await expect(refusedPrerender({ routes: resolve(copy, 'src/routes') }, await build.client(), undefined, resolve(PRODUCTION))).rejects.toThrow('broken.kay\'s revalidate is \'hourly\'; it takes a positive duration')
+      await expect(refusedPrerender({ routes: resolve(copy, 'src/routes') }, await build.client(), undefined, resolve(PRODUCTION))).rejects.toThrow('broken.kay\'s ttl is \'hourly\'; it takes a positive duration')
     }
     finally {
       await rm(copy, { recursive: true, force: true })

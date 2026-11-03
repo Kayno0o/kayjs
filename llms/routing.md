@@ -215,10 +215,10 @@ export default (value: string) =>
 
 #### Page settings
 
-- A page's settings are the keys of one object its server fence exports, `export const page = { prerender: true, revalidate: '1h' }`.
+- A page's settings are the keys of one object its server fence exports, `export const page = { prerender: true, ttl: '1h' }`.
 - `kay` exports the type `PageSettings`, which `kay check` types the object by (`satisfies PageSettings`): the editor completes the keys and an unknown one is a type error.
 - kay reads the object as written, a literal with no spread, computed key or method, and `guards` and `layouts` as a literal `true` or `false`: a variable or an expression there is reported by `kay check` and `kay dev`, not ignored.
-- A layout takes `layouts`, `query`, `security`, `reload`, `noindex`, `revalidate` and `search`, all but `layouts` and `query` applying to every page under it (for `noindex`, `revalidate` and `search` the innermost layout or page that sets one wins, so a page's `noindex: false` undoes its layout's), and `guards: false`, which opens its own actions alone, the pages under it keeping their guards.
+- A layout takes `layouts`, `query`, `security`, `reload`, `noindex`, `ttl`, `cacheControl` and `search`, all but `layouts` and `query` applying to every page under it (for `noindex`, `ttl`, `cacheControl` and `search` the innermost layout or page that sets one wins, so a page's `noindex: false` undoes its layout's), and `guards: false`, which opens its own actions alone, the pages under it keeping their guards.
 - `query` on a special page is reported; a layout sets it like a page does (see `ctx.query`).
 - A setting exported under its own name, `export const prerender = true` or `export async function prerender()`, is a compile error.
 - `kay check --fix` moves it into `page`, a function as an arrow, unless the fence names a value `page` itself or reads the setting.
@@ -227,7 +227,8 @@ export default (value: string) =>
 | --- | --- | --- |
 | `prerender` | `true`, `false`, a list of params, a function returning one, a content collection or `paginate()` | [Prerendering](prerendering.md#prerendering) |
 | `keep` | `true` to say the build is to keep the page prerendered on its own, `unkept-page` naming what stops it | [Prerendering](prerendering.md#prerendering) |
-| `revalidate` | a `Duration`, how old a prerendered page gets before it is rendered again | [Prerendering](prerendering.md#prerendering) |
+| `ttl` | a `Duration`, how old a prerendered page gets before it is rendered again, and how long a CDN keeps it (`revalidate` is its name before 1.87) | [Prerendering](prerendering.md#prerendering) |
+| `cacheControl` | the `cache-control` text a prerendered page sends everyone, `false` for the default | [Prerendering](prerendering.md#prerendering) |
 | `layouts` | `false` only, to drop the layouts above | this section |
 | `query` | a schema `ctx.query` is read against | `ctx.query`, below |
 | `sitemap` | what `prerender` takes, or `false` | [Head and SEO](head.md) |

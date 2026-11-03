@@ -370,7 +370,11 @@ export interface PageSettings {
   prerender?: boolean | object
   // `true` says the page is to be kept prerendered by `kay build` on its own, as a page reading nothing from a request is: when the build cannot show it does, the `unkept-page` lint names what stops it.
   keep?: true
-  // How long a prerendered page is served before it renders again.
+  // How long a prerendered page is served before it renders again, `'1h'`: the server renders it again in the background once it is older, and a public page answers `cache-control: public, max-age=0, s-maxage=3600, stale-while-revalidate=3600` so a CDN keeps it that long (never one behind a guard, or rendered for one visitor).
+  ttl?: Duration
+  // What the prerendered page sends as `cache-control` to everyone, in place of the one `ttl` derives or `public, max-age=0, must-revalidate`; `false` sends the default whatever the `ttl`. A page behind a guard, or rendered for one visitor, is `private` whatever this says.
+  cacheControl?: string | false
+  // The name `ttl` had before 1.87, still read; `kay upgrade` renames it.
   revalidate?: Duration
   // `false` renders the page, or the layouts below this one, without the layouts above.
   layouts?: false
