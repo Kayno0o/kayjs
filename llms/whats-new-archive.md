@@ -22,6 +22,11 @@ What each release before 1.84 added, and the end of a newest release that was cu
 - `infiniteList` starts over when what it follows changes, as the props a `persist` island gets from the next page: the props an action source's function `input` reads, or first rows given as a function (`infiniteList(() => rows, ...)`): [kayjs-ui infinite lists](../packages/ui/llms/infinite-list.md).
 - kayjs-ui's `SplitLayout` keeps the list's width under `listWidthKey` in a cookie the server reads, not in `localStorage`, so the saved width is drawn from the first paint; a width kept in `localStorage` moves to the cookie once: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
 
+- `infiniteList` starts over when what it follows changes, as the props a `persist` island gets from the next page: the props an action source's function `input` reads, or first rows given as a function (`infiniteList(() => rows, ...)`): [kayjs-ui infinite lists](../packages/ui/llms/infinite-list.md).
+- kayjs-ui's `SplitLayout` keeps the list's width under `listWidthKey` in a cookie the server reads, not in `localStorage`, so the saved width is drawn from the first paint; a width kept in `localStorage` moves to the cookie once: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
+- kayjs-ui's `SidePanel` takes `scrollKey`, whose change brings its body back to the top, so a panel kept in a `persist` island needs no ref into its parts: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
+- A form posting to an action keeps its honeypot and time stamp inside an island, so kayjs-ui's ContactForm and SubscribeForm given `onSent` or `onError` no longer drop them from the server HTML: [forms](../packages/ui/llms/forms-and-steps.md).
+
 ## 1.83.0
 
 - kayjs-ai: `ground(found, read)` turns the rows pg-orm 8's `nearest()` found into the `system` and `sources` of an `ask`, so a chat answers from the app's own documents and cites them, and the fake answers it all under `bun test`: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).
