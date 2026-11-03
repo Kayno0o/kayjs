@@ -1,6 +1,7 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import * as parser from 'oxc-parser'
 import { compileKay, componentName } from '../src/compiler'
+import { KAY_EXPORTS, KAY_VALUES } from '../src/compiler/kay-exports'
 import { jsonKinds, moduleData, moduleKinds, moduleSignals } from '../src/compiler/module-signals'
 import { CURRENT, defaultName, GENERATED_NAME, PROPS } from '../src/compiler/names'
 
@@ -50,6 +51,55 @@ describe('component shell', () => {
     expect(islandOf('---\nimport type { JSX } from \'kay\'\n---\np x')).toBe(false)
     // Pure helpers, the same on both sides.
     expect(islandOf('---\nimport { sanitizeHtml, trustHtml, uid } from \'kay\'\nconst { a, b } = props<{ a: string, b: string }>()\n---\ndiv(id={uid()} innerHTML={trustHtml(a)})\ndiv(innerHTML={sanitizeHtml(b)})')).toBe(false)
+  })
+
+  describe('which values of kay need the browser', () => {
+    const islandOf = (source: string, name = 'test.kay') => compileKay(source, name).island !== undefined
+    const SHARED = Object.entries(KAY_EXPORTS).filter(([, role]) => role === 'shared').map(([name]) => name)
+    const BROWSER = Object.entries(KAY_EXPORTS).filter(([, role]) => role === 'browser').map(([name]) => name)
+
+    it('keeps a component static for each shared value, imported, implicit or read by the template alone', () => {
+      for (const name of SHARED) {
+        expect(islandOf(`---\nimport { ${name} } from 'kay'\nconst x = ${name}\n---\np {x}`)).toBe(false)
+        expect(islandOf(`---\nconst x = ${name}\n---\np {x}`)).toBe(false)
+        expect(islandOf(`p {${name}}`)).toBe(false)
+      }
+    })
+
+    it('makes a component an island for each browser value, imported, implicit or read by the template alone', () => {
+      for (const name of BROWSER) {
+        expect(islandOf(`---\nimport { ${name} } from 'kay'\nconst x = ${name}\n---\np {x}`)).toBe(true)
+        expect(islandOf(`---\nconst x = ${name}\n---\np {x}`)).toBe(true)
+        expect(islandOf(`p {${name}}`)).toBe(true)
+      }
+    })
+
+    it('reads a `--- module` fence by the same table', () => {
+      expect(islandOf('--- module\nimport { apiUrl } from \'kay\'\nexport const feed = apiUrl\n---\np x')).toBe(false)
+      expect(islandOf('--- module\nimport { persisted } from \'kay\'\nexport const feed = persisted\n---\np x')).toBe(true)
+    })
+
+    it('counts a default or namespace import of kay, an alias and a later declaration of the name', () => {
+      expect(islandOf('---\nimport * as kay from \'kay\'\nconst x = kay.uid\n---\np {x}')).toBe(true)
+      expect(islandOf('---\nimport { apiUrl as url } from \'kay\'\nconst x = url\n---\np {x}')).toBe(false)
+      expect(islandOf('---\nimport { signal as sig } from \'kay\'\nconst x = sig\n---\np {x}')).toBe(true)
+      expect(islandOf('---\nconst apiUrl = 1\n---\np {apiUrl}')).toBe(false)
+    })
+
+    it('treats only relativeTime of kay/i18n as a browser value, and a value of another entry as none', () => {
+      expect(islandOf('---\nimport { relativeTime } from \'kay/i18n\'\nconst x = relativeTime\n---\np {x}')).toBe(true)
+      expect(islandOf('---\nimport { formatDate } from \'kay/i18n\'\nconst x = formatDate\n---\np {x}')).toBe(false)
+      expect(islandOf('---\nimport { signal } from \'kay/server\'\nconst x = signal\n---\np {x}')).toBe(false)
+    })
+
+    it('names the shared values the audit moved, ApiError and apiUrl among them', () => {
+      expect(SHARED).toEqual(expect.arrayContaining(['ActionError', 'ActionRedirectError', 'ApiError', 'apiUrl', 'publicEnv', 'defineUi']))
+      expect(BROWSER).toEqual(expect.arrayContaining(['navigate', 'refresh', 'call', 'logFrom']))
+    })
+
+    it('derives KAY_VALUES from the table', () => {
+      expect(KAY_VALUES).toEqual(Object.keys(KAY_EXPORTS))
+    })
   })
 
   it('names the component after its file', () => {

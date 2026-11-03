@@ -4,18 +4,12 @@ import type { NodeOfType } from './estree'
 import type { ImportedSignals } from './module-signals'
 import type { ImportBinding, ScriptAnalysis } from './script-shared'
 import { isGlobalFunctionMember, SENDABLE_CLASSES } from './expression'
+import { KAY_EXPORTS, needsBrowser } from './kay-exports'
 import { iconImport } from './module-signals'
 import { propsDeclaration, reportMisplacedProps } from './script-props'
 import { isExport } from './script-server'
 import { plainNames } from './script-shared'
 import { splitFence } from './script-split'
-
-// What `kay` exports that a static component may use and stay static.
-
-// What `kay` exports that reads nothing reactive: a script using only these stays a static component.
-const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer', 'route', 'localPath', 'withBase', 'withQuery', 's', 'durationMs', 'refusalMessage', 'recipe', 'ctx'])
-// What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
-const REACTIVE_I18N = new Set(['relativeTime'])
 
 // Splits a component script into module-level code (imports, types) and the component body, and finds the props macro.
 // `serverNames` are the names the `--- server` fence hands the script, which a type may take the type of, and `templateReads` the values of `kay` the template reads, which the compiler imports like the script's own.
@@ -57,7 +51,7 @@ function analyzeModule(source: string, module: Span, iconSets: ReadonlySet<strin
 
   importedFunctions(analysis, scope, iconSets, imported)
 
-  analysis.reactive = analysis.implicit.some(name => !STATIC_EXPORTS.has(name)) || analysis.imports.some(importsReactiveValue)
+  analysis.reactive = analysis.implicit.some(name => KAY_EXPORTS[name] !== 'shared') || analysis.imports.some(importsReactiveValue)
 
   for (const { statement, span } of split.statements) {
     if (propsDeclaration(statement, split.ast.body, split.shift, [])) {
@@ -96,7 +90,7 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
 
   if (!script) {
     analysis.implicit = templateReads.filter(name => !serverNames.includes(name))
-    analysis.reactive = analysis.implicit.some(name => !STATIC_EXPORTS.has(name))
+    analysis.reactive = analysis.implicit.some(name => KAY_EXPORTS[name] !== 'shared')
 
     return analysis
   }
@@ -110,7 +104,7 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
 
   importedFunctions(analysis, scope, iconSets, imported)
 
-  analysis.reactive = analysis.implicit.some(name => !STATIC_EXPORTS.has(name)) || analysis.imports.some(importsReactiveValue)
+  analysis.reactive = analysis.implicit.some(name => KAY_EXPORTS[name] !== 'shared') || analysis.imports.some(importsReactiveValue)
 
   for (const { statement, span, gap } of split.statements) {
     analysis.body.push(...gap)
@@ -349,7 +343,7 @@ function holdsFunction(value: Node, scope: FunctionScope): boolean {
 
 // The first value that makes the script reactive, as the script names it and where it comes from: an implicit global such as `signal` comes from `kay`.
 export function reactiveValue(script: ScriptAnalysis): { name: string, source: string } | undefined {
-  const implicit = script.implicit.find(name => !STATIC_EXPORTS.has(name))
+  const implicit = script.implicit.find(name => KAY_EXPORTS[name] !== 'shared')
 
   if (implicit !== undefined)
     return { name: implicit, source: 'kay' }
@@ -366,7 +360,7 @@ function importsReactiveValue(binding: ImportBinding): boolean {
   if (binding.imported === 'default' || binding.imported === '*')
     return binding.source === 'kay'
 
-  return binding.source === 'kay' ? !STATIC_EXPORTS.has(binding.imported) : binding.source === 'kay/i18n' && REACTIVE_I18N.has(binding.imported)
+  return needsBrowser(binding.source, binding.imported)
 }
 
 export { codeOf, parseFence } from './script-fence'

@@ -192,7 +192,7 @@ The server and the island's first render read the fallback, `false` unless given
 ### Islands
 
 - A component is interactive when any element in it has an `on*` handler, a `bind:` (on an element or a component) or a `ref`, or when its script uses a value from `kay`, such as `signal`, imported or not.
-- `uid`, `describeField`, `sanitizeHtml`, `trustHtml` and `defer` from `kay` keep a component static.
+- `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `ctx`, `defer`, `defineUi`, `describeField`, `durationMs`, `localPath`, `publicEnv`, `recipe`, `refusalMessage`, `route`, `s`, `sanitizeHtml`, `trustHtml`, `uid`, `withBase` and `withQuery` from `kay` compute the same on both sides and keep a component static; every other value of `kay` needs the browser (state, effects, lifecycle, browser readings, navigation: `navigate`, `refresh`, `call` and `logFrom` among them), and so does `relativeTime` of `kay/i18n`.
 - An interactive component renders on the server and hydrates in the browser as an island.
 - Everything else ships no JavaScript, except the small script swapping pages in on a page posting a form to an action, and elsewhere one line keeping Back right after a reload (see [Navigation](navigation.md#navigation)).
 - Interactive components rendered inside an island are part of it.
