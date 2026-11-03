@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, describe, expect, it, jest } from 'bun:test'
 import { refuse } from '../src/runtime'
 import { RefusedError } from '../src/runtime/refuse'
 import { decide, hookContext, notify } from '../src/server/library'
@@ -6,31 +6,69 @@ import { answeringRequest } from '../src/server/log'
 import { useAppOnError } from '../src/server/report'
 import { nameUser } from '../src/server/request-user'
 
-const reported: { error: unknown, source: string | undefined, request: Request | undefined }[] = []
+interface Report { error: unknown, source: string | undefined, request: Request | undefined }
+
+const reported: Report[] = []
+let waiting: ((report: Report) => void)[] = []
 
 useAppOnError(({ error, source, request }) => {
-  reported.push({ error, source, request })
+  const report = { error, source, request }
+
+  reported.push(report)
+
+  for (const wake of waiting)
+    wake(report)
+
+  waiting = []
 })
 
 afterEach(() => {
   reported.length = 0
+  jest.useRealTimers()
 })
+
+afterAll(() => {
+  useAppOnError(undefined)
+})
+
+// Resolves with the next error handed to the app's `onError`.
+async function nextReport(): Promise<Report> {
+  return new Promise((resolve) => {
+    waiting.push(resolve)
+  })
+}
+
+function deferred(): { promise: Promise<void>, resolve: () => void, reject: (error: unknown) => void } {
+  let resolve!: () => void
+  let reject!: (error: unknown) => void
+
+  const promise = new Promise<void>((done, fail) => {
+    resolve = done
+    reject = fail
+  })
+
+  return { promise, resolve, reject }
+}
 
 describe('refuse', () => {
   it('throws a refusal with a default status of 403, or 422 for fields', async () => {
     expect(() => refuse()).toThrow(RefusedError)
 
-    const plain = decide('t.plain', [() => refuse()], {})
-    const fields = decide('t.fields', [() => refuse('Fix it', { errors: { name: 'required' }, data: 1 })], {})
-
-    return Promise.all([
-      expect(plain).resolves.toEqual({ refused: { status: 403, message: 'Refused', errors: {}, data: undefined } }),
-      expect(fields).resolves.toEqual({ refused: { status: 422, message: 'Fix it', errors: { name: 'required' }, data: 1 } }),
-    ])
+    expect(await decide('t.plain', [() => refuse()], {})).toEqual({ refused: { status: 403, message: 'Refused', errors: {}, data: undefined } })
+    expect(await decide('t.fields', [() => refuse('Fix it', { errors: { name: 'required' }, data: 1 })], {})).toEqual({ refused: { status: 422, message: 'Fix it', errors: { name: 'required' }, data: 1 } })
   })
 
-  it('refuses an status outside 400 to 599', () => {
+  it('refuses a status outside 400 to 599', () => {
     expect(() => refuse('x', { status: 200 })).toThrow(RangeError)
+  })
+
+  it('carries its refusal under Symbol.for(kay.refused)', () => {
+    try {
+      refuse('x', { status: 409, data: 3 })
+    }
+    catch (error) {
+      expect((error as Record<symbol, unknown>)[Symbol.for('kay.refused')]).toEqual({ status: 409, message: 'x', errors: {}, data: 3 })
+    }
   })
 })
 
@@ -50,19 +88,30 @@ describe('hookContext', () => {
     expect(context.userAgent).toBe('tester')
     expect(context.userId).toBe('user-1')
   })
+
+  it('goes on without the user when a library naming it throws', async () => {
+    const request = new Request('http://localhost/')
+
+    nameUser(request, () => {
+      throw new Error('namer')
+    })
+
+    expect((await answeringRequest(request, async () => hookContext())).userId).toBeUndefined()
+  })
 })
 
 describe('notify', () => {
   it('runs the hooks in order with the event and a context, skipping undefined ones', async () => {
     const seen: string[] = []
+    const gate = deferred()
 
-    await notify('t.order', [
+    const run = notify('t.order', [
       ({ id, context }) => {
         seen.push(`a${id}${context.request === undefined}`)
       },
       undefined,
       async ({ id }) => {
-        await Bun.sleep(5)
+        await gate.promise
         seen.push(`b${id}`)
       },
       ({ id }) => {
@@ -70,7 +119,23 @@ describe('notify', () => {
       },
     ], { id: 1 })
 
+    await Promise.resolve()
+    expect(seen).toEqual(['a1true'])
+    gate.resolve()
+    await run
     expect(seen).toEqual(['a1true', 'b1', 'c1'])
+  })
+
+  it('tells the request and its user to the hooks', async () => {
+    const request = new Request('http://localhost/', { headers: { 'user-agent': 'tester' } })
+    const told: unknown[] = []
+
+    nameUser(request, () => 'user-2')
+    await answeringRequest(request, async () => notify('t.context', [({ context }) => {
+      told.push(context.request, context.userId, context.userAgent)
+    }], {}))
+
+    expect(told).toEqual([request, 'user-2', 'tester'])
   })
 
   it('logs a throw, reports it with its source and still runs the next hook', async () => {
@@ -92,64 +157,85 @@ describe('notify', () => {
     expect(reported[0]?.source).toBe('t.throw')
   })
 
-  it('waits for a slow hook up to the cap, reports it late and goes on', async () => {
-    const seen: string[] = []
-    const started = performance.now()
+  it('leaves a hook running after 10 s, reports it late and goes on', async () => {
+    jest.useFakeTimers()
 
-    await notify('t.slow', [
+    const seen: string[] = []
+    const gate = deferred()
+
+    const run = notify('t.slow', [
       async () => {
-        await Bun.sleep(60)
+        await gate.promise
         seen.push('slow')
       },
       () => {
         seen.push('next')
       },
-    ], {}, { timeout: 10 })
+    ], {})
 
-    expect(performance.now() - started).toBeLessThan(55)
+    await Promise.resolve()
+    jest.advanceTimersByTime(9_999)
+    await Promise.resolve()
+    expect(seen).toEqual([])
+    jest.advanceTimersByTime(1)
+    await run
+
     expect(seen).toEqual(['next'])
     expect(reported).toHaveLength(1)
-    expect(String(reported[0]?.error)).toContain('did not finish in 10 ms')
+    expect(String(reported[0]?.error)).toContain('did not finish in 10000 ms')
 
-    await Bun.sleep(80)
-    expect(seen).toEqual(['next', 'slow'])
+    gate.resolve()
+    await Promise.resolve()
+    expect(seen).toContain('slow')
   })
 
   it('reports a hook failing after its cap', async () => {
-    await notify('t.late-throw', [
-      async () => {
-        await Bun.sleep(30)
+    jest.useFakeTimers()
 
-        throw new Error('late')
-      },
-    ], {}, { timeout: 5 })
-    await Bun.sleep(60)
+    const gate = deferred()
+    const run = notify('t.late-throw', [async () => {
+      await gate.promise
 
-    expect(reported.map(({ error }) => String(error))).toEqual(['Error: t.late-throw did not finish in 5 ms, left running', 'Error: late'])
+      throw new Error('late')
+    }], {})
+
+    await Promise.resolve()
+    jest.advanceTimersByTime(10_000)
+    await run
+
+    const next = nextReport()
+
+    gate.resolve()
+
+    expect(String((await next).error)).toBe('Error: late')
+    expect(reported.map(({ error }) => String(error))).toEqual(['Error: t.late-throw did not finish in 10000 ms, left running', 'Error: late'])
   })
 
   it('does not wait for a detached hook', async () => {
     const seen: string[] = []
+    const gate = deferred()
+    const done = deferred()
 
-    await notify('t.detached', [
-      async () => {
-        await Bun.sleep(30)
-        seen.push('done')
-      },
-    ], {}, { detached: true })
+    await notify('t.detached', [async () => {
+      await gate.promise
+      seen.push('done')
+      done.resolve()
+    }], {}, { detached: true })
 
     expect(seen).toEqual([])
-    await Bun.sleep(60)
+    gate.resolve()
+    await done.promise
     expect(seen).toEqual(['done'])
   })
 
   it('reports a detached hook that throws', async () => {
+    const next = nextReport()
+
     await notify('t.detached-throw', [() => {
       throw new Error('x')
     }], {}, { detached: true })
-    await Bun.sleep(10)
 
-    expect(reported.map(({ source }) => source)).toEqual(['t.detached-throw'])
+    expect((await next).source).toBe('t.detached-throw')
   })
 
   it('reports under the request being answered', async () => {
@@ -191,6 +277,18 @@ describe('decide', () => {
     expect(answer).toEqual({ change: { name: 'abc', tags: ['x'] } })
   })
 
+  it('tells the request and its user to the hooks', async () => {
+    const request = new Request('http://localhost/', { headers: { 'user-agent': 'tester' } })
+    const told: unknown[] = []
+
+    nameUser(request, () => 'user-3')
+    await answeringRequest(request, async () => decide('t.context', [({ context }) => {
+      told.push(context.request, context.userId, context.userAgent)
+    }], {}))
+
+    expect(told).toEqual([request, 'user-3', 'tester'])
+  })
+
   it('stops at the first refusal, by false or refuse()', async () => {
     const ran: number[] = []
 
@@ -205,6 +303,23 @@ describe('decide', () => {
     expect(byFalse).toEqual({ refused: { status: 403, message: 'Refused', errors: {}, data: undefined } })
     expect(byRefuse).toEqual({ refused: { status: 409, message: 'No', errors: {}, data: undefined } })
     expect(ran).toEqual([])
+    expect(reported).toEqual([])
+  })
+
+  it('returns a fresh refusal each time', async () => {
+    const first = await decide('t.fresh', [() => false], {})
+    const second = await decide('t.fresh', [() => false], {})
+
+    expect(first).toEqual(second)
+    expect(first).not.toBe(second)
+  })
+
+  it('honours any error carrying kay.refused, such as a library\'s', async () => {
+    const answer = await decide('t.library', [() => {
+      throw Object.assign(new Error('limit'), { [Symbol.for('kay.refused')]: { status: 429, retryAfter: 5, message: 'Slow down' } })
+    }], {})
+
+    expect(answer).toEqual({ refused: { status: 429, message: 'Slow down', errors: {}, data: undefined } })
     expect(reported).toEqual([])
   })
 

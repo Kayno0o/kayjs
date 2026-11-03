@@ -341,7 +341,7 @@ Store a photo of a person that only some visitors may see with `private: true`. 
 
 ## Error trackers
 
-`onError` gets `{ error, request }`, the whole request, or none for an error met outside one. Send a tracker its path rather than `request.url`, whose query may hold an address or a token.
+`onError` gets `{ error, request, source }`, the whole request, or none for an error met outside one; `source` names the hook when a hook threw. Send a tracker its path rather than `request.url`, whose query may hold an address or a token.
 
 ```ts
 import { defineConfig, requestId } from 'kay/server'

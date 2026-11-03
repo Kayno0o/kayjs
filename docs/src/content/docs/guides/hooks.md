@@ -1,10 +1,14 @@
 ---
 title: Hooks
 order: 8.6
-description: How kay and its libraries name their hooks, what a hook may change, and what happens when one throws.
+description: The rule kay and its libraries follow to name their hooks, what a hook may change, and what happens when one throws.
 ---
 
-Kay and its libraries let you react to what they do with callbacks called hooks. They all follow one convention, so a hook you have written for one feature reads the same for the next.
+Kay and its libraries let you react to what they do with callbacks called hooks. This page is the rule they follow, so a hook you have written for one feature reads the same for the next.
+
+## What this release ships
+
+This release ships the helpers libraries build hooks with, `refuse()`, and the `source` that `onError` receives. The hooks that exist today keep their names, such as `onAuthEvent` in kayjs-auth or `onRequest` in kayjs-ai. Later releases rename them to this rule, each with a `kay upgrade` fix. New hooks follow it from the start.
 
 ## Names
 
@@ -17,36 +21,31 @@ Options that work out a value the library needs, such as `allow`, `authorize` or
 
 ## What a hook gets
 
-A hook gets one object: the fields of what happened, and a `context`.
+A hook gets one object: the fields of what happened, and a `context`. The `context` tells where the hook runs: the `request` (missing in a job or a schedule), the `ip`, the `userAgent`, the `userId` and the `locale`. Libraries add what they know, such as the signed-in user.
 
-```ts
-auth({ onEvent: ({ event, user, context }) => audit(event, user?.id, context.ip) })
-```
-
-The `context` tells where the hook runs: the `request` (missing in a job or a schedule), the `ip`, the `userAgent`, the `userId` and the `locale`. Libraries add what they know, such as the signed-in user.
-
-Hooks are plain keys in the options of the feature that owns them, such as `auth({ onEvent })` or `cms({ beforeSave })`. Hooks that apply to the whole app go in `kay.config.ts`. A hook given for one call, such as one question to an AI model, runs after the ones in the options and never replaces them.
+Hooks are plain keys in the options of the feature that owns them. Hooks that apply to the whole app go in `kay.config.ts`. A hook given for one call runs after the ones in the options and never replaces them.
 
 ## Changing or refusing
 
-A `beforeX` hook can return nothing, and X goes on. It can return an object with the fields to change, and they are laid over the input before it is checked. It can return `false` to stop X in the way that feature stops things, such as a 403 answer.
+A `beforeX` hook can return nothing, and X goes on. It can return an object with the fields to change, and they are laid over the input before it is checked. It can return `false` to stop X in the way that feature stops things.
 
-To stop X with a message, throw `refuse()`.
+To stop X with a message, throw `refuse()`. It works in an action as well:
 
 ```ts
-import { refuse } from 'kay'
+import { action, refuse } from 'kay'
 
-cms({
-  beforeSave: ({ data, context }) =>
-    data.summary
-      ? { data: { ...data, updatedBy: context.userId } }
-      : refuse('A summary is needed', { errors: { summary: 'required' } }),
+export const publish = action(schema, ({ summary }) => {
+  if (summary === '')
+    refuse('A summary is needed', { errors: { summary: 'required' } })
+  // ...
 })
 ```
 
-The status is 403 unless you pass `errors`, which makes it 422, or a `status`. In an action, the visitor gets it as they get `ctx.fail`: the message at the top of the form, the errors beside their fields, and `data` for your code. When several `beforeX` hooks are set, each sees what the one before changed, and the first to refuse ends the chain.
+The status is 403 unless you pass `errors`, which makes it 422, or a `status`. The visitor gets it as they get `ctx.fail`: the message at the top of the form, the errors beside their fields, and `data` for your code.
 
-If a `beforeX` hook throws anything else, X is refused with a 500 error and the error is reported. A broken check never lets something through.
+A thrown `refuse()` is answered this way in actions, in the `beforeX` hooks of libraries that use `decide()`, and wherever else kay answers `Symbol.for('kay.refused')`, as kayjs-ai does for its limits. Thrown anywhere else, it is an ordinary error and answers 500.
+
+When several `beforeX` hooks are set, each sees what the one before changed, and the first to refuse ends the chain. If a `beforeX` hook throws anything else, X is refused with a 500 error and the error is reported. A broken check never lets something through.
 
 ## When an `onX` hook throws
 

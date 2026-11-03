@@ -54,6 +54,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   reducedMotion: 'free',
   refresh: 'free',
   refusalMessage: 'free',
+  refuse: 'free',
   resource: 'request',
   root: 'free',
   route: 'free',

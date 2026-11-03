@@ -1,5 +1,6 @@
-import type { Refusal } from '../runtime/refuse'
+import type { ErrorShape } from '../runtime/refuse'
 import { localeState } from '../runtime/locale-state'
+import { kayLog } from '../runtime/log'
 import { thrownRefusal } from '../runtime/refuse'
 import { requestOfContext } from './log'
 import { knownAddress } from './protection'
@@ -27,11 +28,7 @@ export type BeforeHook<E, Change> = (event: E & { context: HookContext }) => voi
 export interface NotifyOptions {
   // Runs the hooks off the caller's path: not awaited, for a streaming answer or a timing-sensitive one.
   detached?: boolean | undefined
-  // How long an awaited hook is waited for before it is left running, in ms; 10 s by default.
-  timeout?: number | undefined
 }
-
-export type { Refusal }
 
 // How long a hook is waited for: it is left running after, and the late finish is reported.
 const HOOK_TIMEOUT_MS = 10_000
@@ -45,16 +42,24 @@ export async function hookContext(): Promise<HookContext> {
     return { request, ip: undefined, userAgent: undefined, userId: undefined, locale }
 
   let userId: string | undefined
+  let ip: string | undefined
 
+  // A library naming the user badly, or an address that cannot be read, must not stop a hook from running.
   try {
     userId = await userOf(request)
   }
-  // A library naming the user badly must not stop a hook from running.
-  catch {
-    userId = undefined
+  catch (error) {
+    kayLog('warn', 'a library naming the request\'s user failed, the hook runs without it', error)
   }
 
-  return { request, ip: knownAddress(request, undefined), userAgent: request.headers.get('user-agent') ?? undefined, userId, locale }
+  try {
+    ip = knownAddress(request, undefined)
+  }
+  catch (error) {
+    kayLog('warn', 'the request\'s address could not be read, the hook runs without it', error)
+  }
+
+  return { request, ip, userAgent: request.headers.get('user-agent') ?? undefined, userId, locale }
 }
 
 type Outcome = { failed: false } | { failed: true, error: unknown }
@@ -78,7 +83,7 @@ async function reportLate(source: string, outcome: Promise<Outcome>, context: Ho
     await reportHookError(source, done.error, context.request)
 }
 
-async function runHooks<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E, timeout: number): Promise<void> {
+async function runHooks<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E): Promise<void> {
   const context = await hookContext()
   const told = { ...event, context }
 
@@ -89,14 +94,14 @@ async function runHooks<E extends object>(source: string, hooks: readonly (Hook<
     const outcome = attempt(() => hook(told))
     let timer: ReturnType<typeof setTimeout> | undefined
     const late = new Promise<'late'>((resolve) => {
-      timer = setTimeout(resolve, timeout, 'late')
+      timer = setTimeout(resolve, HOOK_TIMEOUT_MS, 'late')
     })
 
     try {
       const done = await Promise.race([outcome, late])
 
       if (done === 'late') {
-        await reportHookError(source, new Error(`${source} did not finish in ${timeout} ms, left running`), context.request)
+        await reportHookError(source, new Error(`${source} did not finish in ${HOOK_TIMEOUT_MS} ms, left running`), context.request)
         trackDetached(reportLate(source, outcome, context))
       }
       else if (done.failed) {
@@ -111,11 +116,11 @@ async function runHooks<E extends object>(source: string, hooks: readonly (Hook<
 
 // Tells the `onX` hooks of one transition, in order: each is awaited for up to 10 s, a throw or a late finish is logged and handed to the app's `onError` with `source`, and the next hook still runs.
 // Never rejects.
-export async function notify<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E, { detached = false, timeout = HOOK_TIMEOUT_MS }: NotifyOptions = {}): Promise<void> {
+export async function notify<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E, { detached = false }: NotifyOptions = {}): Promise<void> {
   if (!hooks.some(hook => hook !== undefined))
     return
 
-  const run = runHooks(source, hooks, event, timeout)
+  const run = runHooks(source, hooks, event)
 
   if (detached)
     trackDetached(run)
@@ -123,10 +128,11 @@ export async function notify<E extends object>(source: string, hooks: readonly (
     await run
 }
 
-const DEFAULT_REFUSAL: Refusal = { status: 403, message: 'Refused', errors: {}, data: undefined }
-
 // Runs the `beforeX` hooks of one transition in order: each sees the event with what the ones before changed, the first refusal stops the chain, and a throw other than `refuse()` refuses as a server error after it is reported.
-export async function decide<E extends object, C extends object>(source: string, hooks: readonly (BeforeHook<E, C> | undefined)[], event: E): Promise<{ change: Partial<C> } | { refused: Refusal }> {
+export async function decide<E extends object, C extends object>(source: string, hooks: readonly (BeforeHook<E, C> | undefined)[], event: E): Promise<{ change: Partial<C> } | { refused: ErrorShape }> {
+  if (!hooks.some(hook => hook !== undefined))
+    return { change: {} }
+
   const context = await hookContext()
   let change: Partial<C> = {}
 
@@ -143,7 +149,7 @@ export async function decide<E extends object, C extends object>(source: string,
       const refusal = thrownRefusal(error)
 
       if (refusal !== undefined)
-        return { refused: refusal }
+        return { refused: { status: refusal.status, message: refusal.message, errors: refusal.errors, data: refusal.data } }
 
       await reportHookError(source, error, context.request)
 
@@ -151,7 +157,7 @@ export async function decide<E extends object, C extends object>(source: string,
     }
 
     if (answer === false)
-      return { refused: DEFAULT_REFUSAL }
+      return { refused: { status: 403, message: 'Refused', errors: {}, data: undefined } }
 
     if (typeof answer === 'object' && answer !== null && !Array.isArray(answer))
       change = { ...change, ...answer }

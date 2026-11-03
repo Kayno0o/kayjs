@@ -50,7 +50,7 @@ In a `.ts` file nothing is added. `kay/server` also exports `s`, so a server mod
 | `apiUrl` | Where a route of an API module is served, under `base` and `apiPath`, for code that needs the URL rather than a call. See [API routes](/guides/api-routes) |
 | `publicEnv` | The variables marked `s.Public` in `defineEnv`, exposed to islands |
 | `route` | The path of a page from its pattern and params, typed from your pages and encoded. See [Routing](/essentials/routing#linking-to-a-page-with-params) |
-| `refuse`, `Refusal` | Thrown from a `beforeX` hook to stop what it guards with a message, field errors and data, answered as `ctx.fail` is. See [Hooks](/guides/hooks#changing-or-refusing) |
+| `refuse` | Thrown in an action or a `beforeX` hook to stop it with a message, field errors and data, answered as `ctx.fail` is; elsewhere it is a 500. See [Hooks](/guides/hooks#changing-or-refusing) |
 | `localPath`, `withBase` | A path with the locale prefix or the `base` applied |
 | `sanitizeHtml`, `trustHtml` | Clean untrusted HTML, its options typed `SanitizeOptions`, or mark HTML as safe to render, which a spread's `innerHTML` requires |
 | `uid` | A unique id that matches between server and browser |

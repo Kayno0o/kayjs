@@ -104,6 +104,14 @@ describe('values of kay without an import', () => {
     expect(tsx('--- server\nconst Row = s.Object({ id: s.String() })\nconst path = localPath(\'/x\')\n---\np {path}')).toMatch(/import \{ (?:s, localPath|localPath, s) \} from 'kay'/)
   })
 
+  it('imports refuse from kay for a server fence throwing it, and makes no island of it', () => {
+    const source = '--- server\nexport const save = action(s.Object({}), () => refuse(\'No\'))\n---\np x'
+    const compiled = compileKay(source, 'test.kay')
+
+    expect(compiled.tsx).toMatch(/import \{ [^}]*\brefuse\b[^}]*\} from 'kay'/)
+    expect(compiled.tsx.includes('Island')).toBe(false)
+  })
+
   it('leaves a name the file declares, imports, destructures or takes from the server fence alone', () => {
     expect(tsx('---\nconst route = 1\nconst { stream } = props<{ stream: string }>()\nimport { watch } from \'./watch\'\nwatch()\nconst x = route + stream\n---\np {x}')).not.toMatch(/import \{[^}]*\} from 'kay'/)
     expect(tsx('--- server\nconst root = 1\n---\n---\nconst x = root\n---\np {x}')).not.toMatch(/import \{[^}]*\} from 'kay'/)

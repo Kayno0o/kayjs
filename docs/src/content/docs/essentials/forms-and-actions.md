@@ -370,7 +370,7 @@ export const reply = action(s.Object({ prompt: s.String({ maxLength: 2000 }) }),
 ---
 ```
 
-If the handler throws an error carrying `Symbol.for('kay.refused')` as `{ status, retryAfter, message }`, the action answers that status with a `Retry-After` header and the message, in place of a 500. kayjs-ai refuses a visitor over its limit this way, and the action's `messages.rateLimit` can word it.
+If the handler throws an error carrying `Symbol.for('kay.refused')` as `{ status, retryAfter?, message, errors?, data? }`, the action answers that status with a `Retry-After` header and the message, with `errors` beside the fields and `data` as `ctx.fail` gives them, in place of a 500. `refuse()` from `kay` throws one. kayjs-ai refuses a visitor over its limit this way, and the action's `messages.rateLimit` can word it.
 
 An island calling it gets a stream once the first value is there. `last()` reads the latest value, `status()` tells whether it is still open, and `close()` stops it.
 

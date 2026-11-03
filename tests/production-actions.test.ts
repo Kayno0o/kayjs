@@ -157,6 +157,22 @@ describe('action protection', () => {
     expect(parse(await refused.text())).toEqual({ errors: { '': 'Needs a summary', 'message': 'required' }, data: 7 })
   })
 
+  it('answers a plain refuse() as 403, to a call and to a form post', async () => {
+    const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
+    const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
+    const call = await app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.32' }, body: stringify({ message: 'refuse-plain' }) }))
+    const form = new FormData()
+
+    form.set('message', 'refuse-plain')
+
+    const post = await app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'x-kay-action': 'form', 'x-forwarded-for': '203.0.113.33' }, body: form }))
+
+    expect(call.status).toBe(403)
+    expect(parse(await call.text())).toEqual({ errors: { '': 'Nope' }, data: undefined })
+    expect(post.status).toBe(403)
+    expect(await post.text()).toContain('Nope')
+  })
+
   it('answers a bot the honeypot caught as if its post went through, when the action says so', async () => {
     const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
     const site = await testSite({ root: FIXTURE, security: false })

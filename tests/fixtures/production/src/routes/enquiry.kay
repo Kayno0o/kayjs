@@ -7,6 +7,9 @@ export const enquire = action(t.Object({ message: t.String({ maxLength: 200 }) }
   if (message === 'throw')
     throw new Error('the mail server is down')
 
+  if (message === 'refuse-plain')
+    refuse('Nope')
+
   if (message === 'refuse')
     refuse('Needs a summary', { errors: { message: 'required' }, data: 7 })
 
