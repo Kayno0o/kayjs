@@ -219,12 +219,17 @@ async function registeredMailer(app: ExtensionApp): Promise<unknown> {
   if (!app.extensions.includes(MAIL_EXTENSION))
     return undefined
 
+  let mail: typeof import('@kaynooo/kayjs-mail')
+
   try {
-    return await (await import('@kaynooo/kayjs-mail')).registeredMailer()
+    mail = await import('@kaynooo/kayjs-mail')
   }
   catch {
     return undefined
   }
+
+  // A failure of the registered loader is the app's to see.
+  return mail.registeredMailer()
 }
 
 export async function emailOf(email: OwnOptions['email'], app: ExtensionApp): Promise<EmailOptions | undefined> {

@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Database } from 'bun:sqlite'
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { appModules, setSite } from 'kay/library'
 import { memoryAuthStore } from '../src/memoryStore'
@@ -463,16 +463,41 @@ describe('the mailer auth() picks', () => {
   })
 
   test('sends through the mailer mail() of kay.config.ts registered when the app has no src/mail.ts', async () => {
-    const { mail: register } = await import('@kaynooo/kayjs-mail')
-    const registered = register({ from: 'site@site.test' })
+    const { mail: register, outbox } = await import('@kaynooo/kayjs-mail')
+    const built = await (register({ from: 'site@site.test' }).server as unknown as () => Promise<Elysia & { stop: () => Promise<unknown> }>)()
     const bare = (extensions: string[]) => ({ root, extensions, modules: {} })
 
-    expect(await emailOf(undefined, bare([]))).toBeUndefined()
+    built.listen(0)
+    outbox.clear()
 
-    const picked = await emailOf(undefined, bare([MAIL_EXTENSION]))
+    try {
+      expect(await emailOf(undefined, bare([]))).toBeUndefined()
 
-    expect(picked?.mailer?.send).toBeFunction()
-    expect(registered.server).toBeFunction()
+      const picked = await emailOf(undefined, bare([MAIL_EXTENSION]))
+
+      await picked?.mailer?.send({ to: 'ada@example.com', subject: 'Hi', text: 'Hello' } as never)
+      expect(outbox.last()?.from).toBe('site@site.test')
+    }
+    finally {
+      await built.stop()
+      outbox.clear()
+    }
+  })
+
+  test('takes no running mail() for no mailer, and lets a failing registered mailer through', async () => {
+    const real = await import('@kaynooo/kayjs-mail')
+    const site = { root, extensions: [MAIL_EXTENSION], modules: {} }
+
+    expect(await emailOf(undefined, site)).toBeUndefined()
+
+    void mock.module('@kaynooo/kayjs-mail', () => ({ ...real, registeredMailer: async () => Promise.reject(new Error('loader failed')) }))
+
+    try {
+      await expect(emailOf(undefined, site)).rejects.toThrow('loader failed')
+    }
+    finally {
+      void mock.module('@kaynooo/kayjs-mail', () => real)
+    }
   })
 
   test('leaves a mailer alone when the mail module has nothing to erase with', async () => {

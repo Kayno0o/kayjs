@@ -756,16 +756,22 @@ it('names a non-ASCII package whole, and says nothing of a mailer the project ha
 
   try {
     await linkedProject(dir, PRESETS.server.features, ['auth', 'ui', 'mail'])
-    await writeFile(join(dir, 'src/mail.ts'), 'export const mail = {}\n')
 
-    const manifest = await Bun.file(join(dir, 'package.json')).json() as { name: string }
+    const manifest = await Bun.file(join(dir, 'package.json')).json() as { name: string, dependencies: Record<string, string> }
 
     manifest.name = 'café-du-coin'
-    await writeFile(join(dir, 'package.json'), JSON.stringify(manifest))
+    await writeFile(join(dir, 'package.json'), JSON.stringify({ ...manifest, dependencies: { ...manifest.dependencies, '@kaynooo/kayjs-mail': '^1.0.0' } }))
+
+    const bare = await addFeatures(dir, ['auth'], { install: false })
+
+    expect(bare.notes.join('\n')).toContain('add mail() to the extensions of kay.config.ts')
+    expect(bare.notes.join('\n')).not.toContain('kay add mail')
+
+    await writeFile(join(dir, 'kay.config.ts'), 'import { defineConfig } from \'kay/config\'\nimport { mail } from \'@kaynooo/kayjs-mail\'\n\nexport default defineConfig({ extensions: [mail()] })\n')
     const result = await addFeatures(dir, ['auth'], { install: false })
 
     expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('auth({ name: \'Café Du Coin\' })')
-    expect(result.notes.join('\n')).not.toContain('kay add mail')
+    expect(result.notes.join('\n')).not.toContain('add mail')
   }
   finally {
     await rm(join(dir, '..'), { recursive: true, force: true })
