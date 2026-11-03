@@ -291,7 +291,7 @@ describe('breached passwords', () => {
       return asked
     }
 
-    test('in production a listed password is refused, signUp open or not', async () => {
+    test('in production a listed password is refused, by registering and by createUser', async () => {
       process.env.NODE_ENV = 'production'
       const asked = listing()
       const { browser, auth } = setup()

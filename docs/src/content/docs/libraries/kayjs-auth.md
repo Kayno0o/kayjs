@@ -335,9 +335,9 @@ It is `Secure` when the session cookie is. It lasts as long as a session can, an
 
 ## Account changes
 
-Changing what protects the account takes a `proof`. That covers `password.change`, `email.change`, `deleteAccount`, the second factor, passkeys, linked providers and tokens. A proof is `{ password }`, `{ code }` from the authenticator or a recovery code, or `{ passkey }`.
+Changing what protects the account takes a `proof`. That covers `password.change`, `email.change`, `account.delete`, the second factor, passkeys, linked providers and tokens. A proof is `{ password }`, `{ code }` from the authenticator or a recovery code, or `{ passkey }`.
 
-With two-factor on, `email.change`, `twoFactor.disable`, `twoFactor.regenerateRecoveryCodes`, `passkeys.registrationOptions` and `linkProvider` refuse the password alone. They take the code or a passkey.
+With two-factor on, `email.change`, `twoFactor.disable`, `twoFactor.regenerateRecoveryCodes`, `passkeys.registrationOptions` and `oauth.link` refuse the password alone. They take the code or a passkey.
 
 ## Two-factor
 
@@ -535,7 +535,7 @@ if (found.ok) {
 - `admin.listUsers({ search, offset, limit })` gives the users newest first, with `total`. `admin.getUser(id)` gives one, with `admin` telling whether they meet the `admin` option. `admin.roles()` lists the roles an admin may give.
 - `admin.grantRole(id, role)` and `admin.revokeRole(id, role)` take a role your `roles` option declares. If two admins revoke each other's role at the same moment, at least one stays an admin, and a revoke that would have left none is undone and answers `last-admin`. Two admins deleting their own accounts at the same moment are held to the same rule, which needs an `admin` option that reads the user's roles.
 - `admin.ban(id, { reason, until })` bars the user from signing in and signs them out everywhere. `until` leaves it for good when left out. `admin.unban(id)` lifts it. An admin cannot ban themselves or another admin.
-- `admin.deleteUser(id)` deletes the user as `deleteAccount` does, notifications and mailing lists included (for a verified address). An organization the user solely owns with other members passes to its longest-standing member, who is told by mail and by an `organization-handed-over` event, so an abandoned account can always be removed.
+- `admin.deleteUser(id)` deletes the user as `account.delete` does, notifications and mailing lists included (for a verified address). An organization the user solely owns with other members passes to its longest-standing member, who is told by mail and by an `organization-handed-over` event, so an abandoned account can always be removed.
 - `admin.impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `admin.stopImpersonating()` signs back in as themselves.
 - `admin.auditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
 
@@ -570,7 +570,7 @@ createAuth({
 })
 ```
 
-Whoever creates an organization holds `owner`. The last owner cannot leave, lose the role or delete their account: `deleteAccount` answers `last-owner` until another member is made an owner. An admin's `admin.deleteUser` does not: the organization passes to its longest-standing member, who is told. Requests that race for the last owner, or for a user's last way in, cannot both win: a write that would leave none is undone and answers `last-owner` (or `last-way-in`), so at least one stays.
+Whoever creates an organization holds `owner`. The last owner cannot leave, lose the role or delete their account: `account.delete` answers `last-owner` until another member is made an owner. An admin's `admin.deleteUser` does not: the organization passes to its longest-standing member, who is told. Requests that race for the last owner, or for a user's last way in, cannot both win: a write that would leave none is undone and answers `last-owner` (or `last-way-in`), so at least one stays.
 
 An owner who is the only member deletes the organization along with the account. `account.deletionImpact()` lists both kinds of organization by name, and the account page shows them before the user confirms.
 

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { testApp } from './helpers/app'
 
 const PASSWORD = 'correct horse battery'
+const LINKS = { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }
 
 function setup(options: Parameters<typeof testApp>[0] = {}) {
   const signUps: User[] = []
@@ -105,20 +106,26 @@ describe('open password sign-up without a mailer', () => {
     }
   }
 
-  test('answers taken for a held address, so a guest learns it, and production warns at boot', async () => {
+  test.each([
+    ['no email', {}],
+    ['a mailer that does not require verified addresses', { site: 'https://site.test', email: { mailer: () => undefined, requireVerified: false, links: LINKS } }],
+  ] as const)('production warns at boot with %s', (_name, options) => {
+    expect(warnings('production', options as never)).toContain('answers `taken` for an address that has an account')
+  })
+
+  test('answers taken for a held address, so a guest learns it', async () => {
     const { browser } = setup()
 
     await browser().post('/register', { email: 'ada@example.com', password: PASSWORD })
 
     expect(await browser().post('/register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
-    expect(warnings('production', {})).toContain('answers `taken` for an address that has an account')
   })
 
   test.each([
     ['in development', 'development', {}],
     ['with signUp closed', 'production', { signUp: false }],
     ['with passwords off', 'production', { password: false }],
-    ['with a mailer', 'production', { site: 'https://site.test', email: { mailer: () => undefined, links: { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' } } }],
+    ['with a mailer', 'production', { site: 'https://site.test', email: { mailer: () => undefined, links: LINKS } }],
   ] as const)('stays quiet %s', (_name, env, options) => {
     expect(warnings(env, options as never)).not.toContain('answers `taken`')
   })

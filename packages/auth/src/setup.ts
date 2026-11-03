@@ -207,8 +207,8 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
   }
 
   // Without a mailer registering signs the new user in, so it cannot answer alike for a held address and a free one.
-  if (process.env.NODE_ENV === 'production' && (options.signUp ?? true) && options.password !== false && !options.email)
-    log.warn('password sign-up is open with no `email` option, so `password.register` answers `taken` for an address that has an account and tells a guest which addresses exist: set `email` with a mailer, or `signUp: false`')
+  if (process.env.NODE_ENV === 'production' && (options.signUp ?? true) && options.password !== false && !(options.email?.requireVerified ?? options.email !== undefined))
+    log.warn('password sign-up is open with no `email` option, so `password.register` answers `taken` for an address that has an account and tells a guest which addresses exist: set `email` with a mailer (and `requireVerified` on), or `signUp: false`')
 
   const core: Core = {
     store: options.store,
