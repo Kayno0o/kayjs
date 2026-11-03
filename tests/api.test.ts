@@ -118,3 +118,27 @@ it('prints the members of a union in one order whichever way it was written', ()
   expect(sortUnions('{ x: "b" | "a"; y: T extends 1 ? 2 | 1 : 0 }')).toBe('{ x: "a" | "b"; y: T extends 1 ? 2 | 1 : 0 }')
   expect(sortUnions('{ "a | b": 1; c: (() => void) | null }')).toBe('{ "a | b": 1; c: (() => void) | null }')
 })
+
+const ANY = /(?<![\w$])any(?![\w$])/
+
+// A component's props are read from its shadow with kay's JSX options; a part class type resolving to `any` means a part's component was not resolved, so a wrong part name or class value would go unseen by `kay check`.
+it('types no prop of a component as any', () => {
+  const found: string[] = []
+
+  for (const name of readdirSync('api').filter(file => file.endsWith('.txt'))) {
+    let block = ''
+    let component = false
+
+    for (const line of readFileSync(`api/${name}`, 'utf8').split('\n')) {
+      if (line === '' || !line.startsWith(' ')) {
+        component = line.startsWith('component ')
+        block = line.startsWith('[') ? line : block
+      }
+      else if (component && ANY.test(line)) {
+        found.push(`${name} ${block}: ${line.trim().slice(0, 80)}`)
+      }
+    }
+  }
+
+  expect(found).toEqual([])
+})

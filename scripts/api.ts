@@ -114,7 +114,7 @@ async function snapshotOf(dir: string, root: string, packageName: string): Promi
 
   const shadowed = (file: string) => KAY_FILE.test(file) ? join(types, `${relative(dir, file)}.tsx`) : file
   // rootDirs merges the shadow tree with the package at the same relative paths, as `kay check` has it.
-  const placed: ts.CompilerOptions = hasKay ? { rootDirs: [dir, types] } : {}
+  const placed: ts.CompilerOptions = hasKay ? { rootDirs: [dir, types], jsx: ts.JsxEmit.Preserve, jsxImportSource: 'kay' } : {}
   const configPath = join(dir, 'tsconfig.json')
   const config = ts.getParsedCommandLineOfConfigFile(configPath, { noEmit: true, ...placed }, { ...ts.sys, onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
     throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
