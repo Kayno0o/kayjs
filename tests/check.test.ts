@@ -4839,7 +4839,7 @@ describe('kay check, deprecated-api-error-answer and deprecated-refusal-message'
     try {
       const found = await check(root)
 
-      expect(found.filter(d => d.code === 'deprecated-api-error-answer').map(d => [d.fixes?.[0]?.title, d.fixes?.[0]?.safe])).toEqual([['Read `data`', true]])
+      expect(found.filter(d => d.code === 'deprecated-api-error-answer').map(d => [d.fixes?.[0]?.title, d.fixes?.[0]?.safe])).toEqual([['Read `data`', false]])
       expect(found.filter(d => d.code === 'deprecated-refusal-message').map(d => d.fixes?.[0]?.safe)).toEqual([false])
     }
     finally {

@@ -35,7 +35,7 @@ interface ActionContext<Params extends Readonly<Record<string, unknown>> = Route
 [.] ActionError
 class ActionError
   new <Data = unknown>(status: number, body: string, errors?: Record<string, string>, data?: Data | undefined, message?: string): ActionError<Data>
-  answer: Data | undefined
+  answer: unknown
   body: string
   data: Data | undefined
   errors: Record<string, string>
@@ -102,7 +102,7 @@ type ApiCallOptions<Module, Path, M> = ApiRequest<Module, Path, M> & {
 [.] ApiError
 class ApiError
   new <Data = unknown>(status: number, message: string, data?: Data | undefined, errors?: Record<string, string>, options?: ErrorOptions | undefined): ApiError<Data>
-  answer: Data | undefined
+  answer: unknown
   data: Data | undefined
   errors: Record<string, string>
   name: string

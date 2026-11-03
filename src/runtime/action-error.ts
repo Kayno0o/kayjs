@@ -1,5 +1,5 @@
 import type { Failure } from './action-shared'
-import { ApiError, messageOf } from './api-error'
+import { actionFailed, ApiError, messageOf } from './api-error'
 
 export const FAILURE = Symbol.for('kay.failure')
 
@@ -8,8 +8,13 @@ export class ActionError<Data = unknown> extends ApiError<Data> {
   override name = 'ActionError'
 
   // `errors` holds a message per field the schema refused, `data` what the handler passed to `ctx.fail`, undefined when the call was refused before it ran; `message` reads them, else the status and body.
-  constructor(status: number, readonly body: string, errors: Record<string, string> = {}, data?: Data, message = messageOf({ status, errors, data }, `Action failed with ${status}: ${body}`)) {
+  constructor(status: number, readonly body: string, errors: Record<string, string> = {}, data?: Data, message = messageOf({ status, errors, data }, actionFailed(status))) {
     super(status, message, data, errors)
+  }
+
+  /** @deprecated Renamed `body` in 1.87 for an `ActionError`, whose `data` is what `ctx.fail` passed; the old name works until 1.90, and `kay upgrade` renames it where an `instanceof ActionError` narrows the receiver. */
+  override get answer(): unknown {
+    return this.body
   }
 }
 

@@ -1,6 +1,6 @@
 import type { Action } from './action'
 import { encodeCall } from './action'
-import { messageOf } from './api-error'
+import { actionFailed, messageOf } from './api-error'
 import { withBase } from './base'
 import { MOST_FAULTS, MOST_WAIT_MS, RETRY_LATER } from './local-status'
 import { createSignal, getOwner, onCleanup } from './reactive'
@@ -9,6 +9,17 @@ import { decodeServerValue } from './wire'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
 declare const KAY_BROWSER: true | undefined
+
+// What a conflict issue says, a row having no message of its own to read.
+const CONFLICT = 'The row changed on the server'
+
+// The text of a stored issue, which a record written before issues had a message reads from its status, errors and data.
+export function issueMessage(issue: Pick<LocalIssue<unknown>, 'kind' | 'status' | 'errors' | 'data'> & { message?: string | undefined }): string {
+  if (issue.message !== undefined)
+    return issue.message
+
+  return issue.kind === 'conflict' ? CONFLICT : messageOf({ status: issue.status ?? 0, errors: issue.errors ?? {}, data: issue.data }, actionFailed(issue.status ?? 0))
+}
 
 export type LocalStatus = 'loading' | 'synced' | 'pending' | 'offline' | 'signed-out' | 'unavailable'
 
@@ -439,7 +450,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
     this.view[1]({ list: live.map(record => record.row as Row), byKey: new Map(live.map(record => [record.k, record.row as Row])) })
     this.count[1](queued)
-    this.problems[1](issues.map(({ c: _, ...issue }) => ({ ...issue, message: issue.message ?? messageOf({ status: issue.status ?? 0, errors: issue.errors ?? {}, data: issue.data }, 'Not saved') })))
+    this.problems[1](issues.map(({ c: _, ...issue }) => ({ ...issue, message: issueMessage(issue) })))
     this.show(queued)
   }
 
@@ -696,7 +707,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     else
       rows.delete([this.c, entry.k])
 
-    issues.add({ c: this.c, kind: 'rejected', key: entry.k, op: entry.op, status: answer.status, message: messageOf({ status: answer.status, errors: failed.errors ?? {}, data: failed.data }, 'Not saved'), errors: failed.errors, data: failed.data, mine: entry.op === 'put' ? entry.row : undefined, at: Date.now() })
+    issues.add({ c: this.c, kind: 'rejected', key: entry.k, op: entry.op, status: answer.status, message: messageOf({ status: answer.status, errors: failed.errors ?? {}, data: failed.data }, actionFailed(answer.status)), errors: failed.errors, data: failed.data, mine: entry.op === 'put' ? entry.row : undefined, at: Date.now() })
     await this.trim(issues)
     await finished(tx)
 
@@ -709,7 +720,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     const base = current?.base as Row | undefined
     const detail = { key: entry.k, base, mine, theirs }
     const kept = this.options.conflict === undefined ? merged(base, mine, theirs) : this.options.conflict(detail)
-    const issue = { c: this.c, kind: 'conflict', key: entry.k, op: entry.op, status: 409, message: 'The row changed on the server', data: theirs, mine, theirs, kept: kept === undefined || same(kept, theirs) ? undefined : kept, at: Date.now() }
+    const issue = { c: this.c, kind: 'conflict', key: entry.k, op: entry.op, status: 409, message: CONFLICT, data: theirs, mine, theirs, kept: kept === undefined || same(kept, theirs) ? undefined : kept, at: Date.now() }
 
     tx.objectStore('issues').add(issue)
 

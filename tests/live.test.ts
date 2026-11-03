@@ -716,12 +716,12 @@ describe('resource()', () => {
     expect(refused.error()?.message).toContain('empty')
   })
 
-  it('fails with status 0 when no answer came', async () => {
+  it('fails with status 0 and kay\'s own wording when the fetch rejects', async () => {
     served.mockImplementationOnce((async () => Promise.reject(new TypeError('offline'))) as unknown as typeof fetch)
     const rooms = root(() => resource(chat, '/rooms'))
 
     await until(() => rooms.status() !== 'loading')
-    expect(rooms.error()).toEqual({ status: 0, message: 'offline' })
+    expect(rooms.error()).toEqual({ status: 0, message: 'The server could not be reached' })
   })
 
   it('aborts what it asked once its component is gone', () => {
@@ -919,13 +919,13 @@ describe('call()', () => {
     await expect(save({ signal: controller.signal })).rejects.toThrow('stop')
   })
 
-  it('gives a refusal\'s message to show, and a fallback when no answer came or the error is no ApiError', async () => {
+  it('gives a refusal\'s message to show, and kay\'s own wording when no answer came', async () => {
     const shown = async (promise: Promise<unknown>) => {
       try {
         await promise
       }
       catch (error) {
-        return refusalMessage(error, 'Try again')
+        return error instanceof ApiError ? error.message : undefined
       }
 
       return undefined
@@ -934,10 +934,18 @@ describe('call()', () => {
     expect(await shown(call(notes, '/:id', { method: 'patch', params: { id: 404 }, body: { title: 'x' } }))).toBe('No such note')
 
     served.mockImplementationOnce((async () => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch)
-    expect(await shown(call(notes, '/'))).toBe('Try again')
+    expect(await shown(call(notes, '/'))).toBe('The server could not be reached')
+  })
+
+  it('keeps the deprecated refusalMessage and the answer alias working', () => {
     expect(refusalMessage(new Error('boom'), 'Try again')).toBe('Try again')
     expect(refusalMessage(undefined, 'Try again')).toBe('Try again')
     expect(refusalMessage(new ApiError(503, 'HTTP 503'), 'Try again')).toBe('HTTP 503')
+    expect(refusalMessage(new ApiError(0, 'The server could not be reached'), 'Try again')).toBe('Try again')
+    expect(refusalMessage(new ActionError(409, 'x', { '': 'Taken' }), 'Try again')).toBe('Taken')
+    expect(refusalMessage(new ActionRedirectError(302, '/'), 'Try again')).toBe('Try again')
+    expect(new ApiError(409, 'Taken', { reason: 'locked' }).answer).toEqual({ reason: 'locked' })
+    expect(new ActionError(422, 'raw body', {}, { reason: 'x' }).answer).toBe('raw body')
   })
 
   it('words an ActionError with what a visitor can read, not the serialized body', () => {
@@ -947,10 +955,10 @@ describe('call()', () => {
     expect(new ActionError(422, '[...]', { title: 'Write a title', body: 'Too short' }).message).toBe('Write a title, Too short')
     expect(new ActionError(429, '[...]', { '': 'Too many tries', 'title': 'Write a title' }).message).toBe('Too many tries')
     expect(new ActionError(409, '[...]', {}, { message: 'Already on the list' }).message).toBe('Already on the list')
-    expect(new ActionError(422, '[...]', {}, { message: 7 }).message).toBe('Action failed with 422: [...]')
-    expect(new ActionError(422, '[...]', {}, { error: 'x' }).message).toBe('Action failed with 422: [...]')
-    expect(new ActionError(422, '[...]', { '': '' }, '').message).toBe('Action failed with 422: [...]')
-    expect(new ActionError(413, 'too large').message).toBe('Action failed with 413: too large')
+    expect(new ActionError(422, '[...]', {}, { message: 7 }).message).toBe('Action failed with 422')
+    expect(new ActionError(422, '[...]', {}, { error: 'x' }).message).toBe('Action failed with 422')
+    expect(new ActionError(422, '[...]', { '': '' }, '').message).toBe('Action failed with 422')
+    expect(new ActionError(413, 'too large').message).toBe('Action failed with 413')
   })
 
   it('catches an ActionError as an ApiError, and shows its form-wide message or the fallback', () => {
@@ -958,9 +966,9 @@ describe('call()', () => {
 
     expect(refused).toBeInstanceOf(ApiError)
     expect(refused).toMatchObject({ status: 422, body: 'bad', errors: { title: 'Too short' } })
-    expect(refusalMessage(refused, 'Try again')).toBe('Try again')
-    expect(refusalMessage(new ActionError(409, 'x', { '': 'Taken' }), 'Try again')).toBe('Taken')
-    expect(refusalMessage(new ActionRedirectError(302, '/'), 'Try again')).toBe('Try again')
+    expect(refused.message).toBe('Too short')
+    expect(new ActionError(409, 'x', { '': 'Taken' }).message).toBe('Taken')
+    expect(new ActionRedirectError(302, '/').message).toBe('Action redirected with 302 to /')
   })
 
   it('aborts a call with its signal, which rejects with the signal\'s reason', async () => {

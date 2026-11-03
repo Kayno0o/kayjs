@@ -45,7 +45,7 @@ In a `.ts` file nothing is added. `kay/server` also exports `s`, so a server mod
 | `shortcut` | Binds a keyboard shortcut such as `mod+s` for as long as the island lives, on the page or one element. See [Islands](/essentials/islands#keyboard-shortcuts) |
 | `guardLeave` | Warns before leaving a page with unsaved changes |
 | `navigation`, `onBeforeNavigate`, `onNavigate` | Where an in-place navigation stands (`status()`, `pending()`, `to()`, `error()`), a hook that may cancel one, and a hook after each shown page. See [Islands](/essentials/islands#page-navigation) |
-| `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`, which has the route's `status`, 0 when no answer came, and its `answer`. See [API routes](/guides/api-routes) |
+| `resource`, `call`, `socket`, `stream`, `dispatch` | Typed reads and calls of API routes, websockets and event streams from islands; `call` throws `ApiError`, which has the route's `status` (0 when no answer came), a `message` safe to show, `errors` per field and the route's `data`. See [API routes](/guides/api-routes) |
 | `refusalMessage` | Deprecated since 1.87, an `ApiError`'s `message` is always the text to show. See [API routes](/guides/api-routes) |
 | `apiUrl` | Where a route of an API module is served, under `base` and `apiPath`, for code that needs the URL rather than a call. See [API routes](/guides/api-routes) |
 | `publicEnv` | The variables marked `s.Public` in `defineEnv`, exposed to islands |

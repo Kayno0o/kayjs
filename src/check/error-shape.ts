@@ -15,8 +15,8 @@ const SCOPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunct
 const BARE_PARENTS = new Set(['VariableDeclarator', 'AssignmentExpression', 'ReturnStatement', 'ExpressionStatement', 'ArrowFunctionExpression', 'CallExpression', 'TemplateLiteral', 'Property'])
 
 // The local names the project's ApiError and ActionError go by, from the imports of `kay`, types included.
-function errorClasses(ast: Program, kay: boolean): Set<string> {
-  const names = new Set<string>()
+function errorClasses(ast: Program, kay: boolean): Map<string, string> {
+  const names = new Map<string, string>()
 
   for (const statement of ast.body) {
     if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'kay')
@@ -24,24 +24,20 @@ function errorClasses(ast: Program, kay: boolean): Set<string> {
 
     for (const specifier of statement.specifiers) {
       if (specifier.type === 'ImportSpecifier' && ERROR_CLASSES.has(importedName(specifier)))
-        names.add(specifier.local.name)
+        names.set(specifier.local.name, importedName(specifier))
     }
   }
 
   // A `.kay` fence reads every kay export without an import.
-  return names.size === 0 && kay ? new Set(ERROR_CLASSES) : names
+  return names.size === 0 && kay ? new Map([...ERROR_CLASSES].map(name => [name, name])) : names
 }
 
-// What a scope tells of its names, nested functions left out: the ones an `instanceof` of an error class narrows and the ones a `catch` binds.
-function narrowed(scope: Node, classes: Set<string>): { checked: Set<string>, caught: Set<string> } {
-  const checked = new Set<string>()
-  const caught = new Set<string>()
+// The `catch` bindings of a scope, nested functions left out.
+function caught(scope: Node): Set<string> {
+  const names = new Set<string>()
   const visit = (node: Node) => {
-    if (node.type === 'BinaryExpression' && node.operator === 'instanceof' && node.left.type === 'Identifier' && node.right.type === 'Identifier' && classes.has(node.right.name))
-      checked.add(node.left.name)
-
     if (node.type === 'CatchClause' && node.param?.type === 'Identifier')
-      caught.add(node.param.name)
+      names.add(node.param.name)
 
     for (const child of childrenOf(node)) {
       if (!SCOPES.has(child.type))
@@ -52,10 +48,18 @@ function narrowed(scope: Node, classes: Set<string>): { checked: Set<string>, ca
   for (const child of childrenOf(scope))
     visit(child)
 
-  return { checked, caught }
+  return names
 }
 
-// `.answer` of an `ApiError`, `data` since 1.87: the fix is safe where an `instanceof` of `ApiError` or `ActionError` narrows the receiver in the same function, and a receiver only a `catch` or a cast says is an error is reported with no fix. Any other `.answer` is none of this lint's.
+// What a test tells of the names it narrows: `x instanceof ApiError`, alone or as a term of an `&&`, by the class's own name.
+function narrows(test: Node, classes: Map<string, string>): [string, string][] {
+  if (test.type === 'BinaryExpression' && test.operator === 'instanceof' && test.left.type === 'Identifier' && test.right.type === 'Identifier' && classes.has(test.right.name))
+    return [[test.left.name, classes.get(test.right.name)!]]
+
+  return test.type === 'LogicalExpression' && test.operator === '&&' ? [...narrows(test.left, classes), ...narrows(test.right, classes)] : []
+}
+
+// `.answer` of an `ApiError`, `data` since 1.87, and of an `ActionError`, whose `answer` was its `body`. Only a read inside the consequent of an `if` or a conditional, or the right side of an `&&`, whose test is `x instanceof C` for the same `x` is narrowed: an `ActionError` read is fixed to `body` (safe), an `ApiError` one to `data` (not safe, as it may be an `ActionError`). A receiver only a `catch` or a cast says is an error is reported with no fix. Any other `.answer` is none of this lint's.
 export async function apiErrorAnswers(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   if (lintLevel('deprecated-api-error-answer', options.lints) === 'allow')
     return []
@@ -67,25 +71,35 @@ export async function apiErrorAnswers(root: string, options: CheckOptions): Prom
       if (classes.size === 0)
         continue
 
-      const visit = (node: Node, scope: Node, facts: ReturnType<typeof narrowed>) => {
+      const visit = (node: Node, catches: Set<string>, narrowed: Map<string, string>) => {
         if (node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier' && node.property.name === 'answer') {
           const receiver = node.object
-          const known = receiver.type === 'Identifier' && facts.checked.has(receiver.name)
+          const kind = receiver.type === 'Identifier' ? narrowed.get(receiver.name) : undefined
           const cast = receiver.type === 'TSAsExpression' && receiver.typeAnnotation.type === 'TSTypeReference' && receiver.typeAnnotation.typeName.type === 'Identifier' && classes.has(receiver.typeAnnotation.typeName.name)
+          const edit = (text: string) => [{ start: base + node.property.start, end: base + node.property.end, text }]
 
-          if (known || cast || (receiver.type === 'Identifier' && facts.caught.has(receiver.name)))
-            report(base + node.property.start, base + node.property.end, '`answer` is `data` on an `ApiError` since 1.87, and the old name works until 1.90', 'read `data`', known ? [{ start: base + node.property.start, end: base + node.property.end, text: 'data' }] : null)
+          if (kind !== undefined || cast || (receiver.type === 'Identifier' && catches.has(receiver.name)))
+            report(base + node.property.start, base + node.property.end, '`answer` is deprecated since 1.87, `data` on an `ApiError` and `body` on an `ActionError`, and the old name works until 1.90', kind === 'ActionError' ? 'read `body`' : 'read `data`', kind === undefined ? null : edit(kind === 'ActionError' ? 'body' : 'data'), kind === 'ActionError')
+        }
+
+        const within = (child: Node, add: [string, string][]) => {
+          const next = add.length === 0 ? narrowed : new Map<string, string>([...narrowed, ...add.filter(([name, kind]) => kind === 'ActionError' || narrowed.get(name) !== 'ActionError')])
+
+          visit(child, SCOPES.has(child.type) ? caught(child) : catches, SCOPES.has(child.type) ? new Map<string, string>() : next)
         }
 
         for (const child of childrenOf(node)) {
-          if (SCOPES.has(child.type))
-            visit(child, child, narrowed(child, classes))
+          const consequent = (node.type === 'IfStatement' || node.type === 'ConditionalExpression') && child === node.consequent
+          const right = node.type === 'LogicalExpression' && node.operator === '&&' && child === node.right
+
+          if (consequent)
+            within(child, narrows(node.test, classes))
           else
-            visit(child, scope, facts)
+            within(child, right ? narrows(node.left, classes) : [])
         }
       }
 
-      visit(ast, ast, narrowed(ast, classes))
+      visit(ast, caught(ast), new Map<string, string>())
     }
   })
 }
@@ -105,7 +119,7 @@ export async function refusalMessages(root: string, options: CheckOptions): Prom
       if (local === undefined)
         continue
 
-      const present = imports.flatMap(statement => statement.specifiers).find((one): one is ImportSpecifier => one.type === 'ImportSpecifier' && importedName(one) === 'ApiError')
+      const present = imports.flatMap(statement => statement.specifiers).find((one): one is ImportSpecifier => one.type === 'ImportSpecifier' && one.importKind !== 'type' && importedName(one) === 'ApiError')
       const calls: { call: CallExpression, parent: Node }[] = []
       let reads = 0
 

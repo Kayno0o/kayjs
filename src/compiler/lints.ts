@@ -704,7 +704,7 @@ export const LINTS = {
     group: 'deprecated',
     since: '1.87',
     site: true,
-    summary: 'A read of `.answer` on an `ApiError` or `ActionError`, `data` since 1.87, when every failure came to carry `status`, `message`, `errors` and `data`. The old name works until 1.90. Found in the TypeScript files and `.kay` fences importing either class from `kay`; the fix reads `data` where an `instanceof` of the class narrows the receiver in the same function, and a receiver only a `catch` or a cast says is an error is reported with no fix. An `ActionError`\'s `answer` was its response body text, and its `data` is what `ctx.fail` passed.',
+    summary: 'A read of `.answer` on an `ApiError` or `ActionError`, `data` since 1.87, when every failure came to carry `status`, `message`, `errors` and `data`. The old name works until 1.90. Found in the TypeScript files and `.kay` fences importing either class from `kay`; a read inside the consequent of an `if`, a conditional or the right of an `&&` testing `x instanceof C` is fixed to `.body` for an `ActionError`, whose `answer` was its response body text (safe), and to `.data` for an `ApiError`, which may be an `ActionError` (not safe). A receiver only a `catch` or a cast says is an error is reported with no fix.',
     wrong: '--- server\nconst read = (error: unknown) => error instanceof ApiError ? error.answer : undefined\n---\np x',
     right: '--- server\nconst read = (error: unknown) => error instanceof ApiError ? error.data : undefined\n---\np x',
   },

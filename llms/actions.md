@@ -205,7 +205,7 @@ form(action={add})
 ### Refused posts
 
 - A post the schema refuses, or whose handler returns `ctx.fail(status, data)`, is answered with the page it came from, rendered with the failure's status, rather than with a redirect.
-- There `add.failed()` returns `{ status, values, errors, data }`, typed from the action, or `undefined`.
+- There `add.failed()` returns `{ status, message, values, errors, data }`, typed from the action, or `undefined`.
 - `values` is what the form posted (fields named like a password left out).
 - `errors` is a message per refused field, the schema's `error` option when set.
 - `data` is what `ctx.fail` received.

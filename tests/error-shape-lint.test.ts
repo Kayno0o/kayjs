@@ -16,40 +16,67 @@ async function project(files: Record<string, string>): Promise<string> {
 const read = async (root: string, path: string) => Bun.file(join(root, path)).text()
 
 describe('deprecated-api-error-answer', () => {
-  it('reads data where an instanceof narrows the receiver, and reports a catch or a cast with no fix', async () => {
-    const narrowed = 'import { ApiError } from \'kay\'\n\nexport const a = (error: unknown) => error instanceof ApiError ? error.answer : undefined\n'
-    const caught = 'import { ApiError } from \'kay\'\n\nexport async function b(run: () => Promise<void>) {\n  try {\n    await run()\n  }\n  catch (error) {\n    return (error as ApiError).answer ?? error\n  }\n}\n'
-    const root = await project({ 'src/narrowed.ts': narrowed, 'src/caught.ts': caught })
+  const head = 'import { ActionError, ApiError } from \'kay\'\n\n'
+  const found = async (files: Record<string, string>) => {
+    const root = await project(files)
 
     try {
-      const found = await apiErrorAnswers(root, {})
+      const diagnostics = await apiErrorAnswers(root, {})
 
-      expect(found.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.fixes === undefined]).sort()).toEqual([['src/caught.ts', true], ['src/narrowed.ts', false]])
-      await applySafeFixes(root, found)
-      expect(await read(root, 'src/narrowed.ts')).toBe(narrowed.replace('.answer', '.data'))
-      expect(await read(root, 'src/caught.ts')).toBe(caught)
+      await applySafeFixes(root, diagnostics)
+
+      return { diagnostics: diagnostics.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.fixes?.[0]?.safe, diagnostic.fixes?.[0]?.edits[0]?.text]), after: Object.fromEntries(await Promise.all(Object.keys(files).map(async path => [path, await read(root, path)]))) as Record<string, string> }
     }
     finally {
       await rm(root, { recursive: true, force: true })
     }
+  }
+
+  it('fixes an ActionError read to body as a safe fix', async () => {
+    const source = `${head}export const a = (error: unknown) => error instanceof ActionError ? error.answer : undefined\n`
+    const { diagnostics, after } = await found({ 'src/a.ts': source })
+
+    expect(diagnostics).toEqual([['src/a.ts', true, 'body']])
+    expect(after['src/a.ts']).toBe(source.replace('.answer', '.body'))
   })
 
-  it('does not trust a check made in another function, and leaves files without the classes alone', async () => {
-    const other = 'import { ApiError } from \'kay\'\n\nexport const a = (error: unknown) => {\n  if (!(error instanceof ApiError))\n    return undefined\n\n  return [1].map(() => (error as { answer?: unknown }).answer)\n}\n'
-    const unrelated = 'export const b = (reply: { answer: string }) => reply.answer\n'
-    const fence = '--- server\nconst show = (error: unknown) => error instanceof ApiError ? error.answer : undefined\n---\np x\n'
-    const root = await project({ 'src/other.ts': other, 'src/unrelated.ts': unrelated, 'src/routes/index.kay': fence })
+  it('offers data for an ApiError read, never as a safe fix, since it may be an ActionError', async () => {
+    const source = `${head}export const a = (error: unknown) => error instanceof ApiError && error.status > 0 ? error.answer : undefined\n`
+    const { diagnostics, after } = await found({ 'src/a.ts': source })
 
-    try {
-      const found = await apiErrorAnswers(root, {})
+    expect(diagnostics).toEqual([['src/a.ts', false, 'data']])
+    expect(after['src/a.ts']).toBe(source)
+  })
 
-      expect(found.map(diagnostic => diagnostic.file.slice(root.length + 1))).toEqual(['src/routes/index.kay'])
-      await applySafeFixes(root, found)
-      expect(await read(root, 'src/routes/index.kay')).toBe(fence.replace('.answer', '.data'))
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+  it('counts a narrowing only inside the consequent of the test, not the alternate, a negation or an unrelated branch', async () => {
+    const source = head + [
+      'export function a(error: unknown, other: { answer: string }) {',
+      '  if (!(error instanceof ActionError))',
+      '    return (error as ApiError).answer',
+      '',
+      '  if (error instanceof ApiError)',
+      '    return other.answer',
+      '',
+      '  return error instanceof ActionError ? 1 : error.answer',
+      '}',
+      '',
+    ].join('\n')
+    const { diagnostics, after } = await found({ 'src/a.ts': source })
+
+    expect(diagnostics).toEqual([['src/a.ts', undefined, undefined]])
+    expect(after['src/a.ts']).toBe(source)
+  })
+
+  it('reports a catch or a cast with no fix, a function made inside a narrowing without its narrowing, and leaves other files alone', async () => {
+    const caught = `${head}export async function b(run: () => Promise<void>) {\n  try {\n    await run()\n  }\n  catch (error) {\n    return (error as ApiError).answer ?? error\n  }\n}\n`
+    const nested = `${head}export const c = (error: unknown) => error instanceof ActionError ? [1].map(() => (error as { answer?: unknown }).answer) : 0\n`
+    const unrelated = 'export const d = (reply: { answer: string }) => reply.answer\n'
+    const fence = '--- server\nconst show = (error: unknown) => error instanceof ActionError ? error.answer : undefined\n---\np x\n'
+    const { diagnostics, after } = await found({ 'src/caught.ts': caught, 'src/nested.ts': nested, 'src/unrelated.ts': unrelated, 'src/routes/index.kay': fence })
+
+    expect(diagnostics.toSorted()).toEqual([['src/caught.ts', undefined, undefined], ['src/routes/index.kay', true, 'body']])
+    expect(after['src/routes/index.kay']).toBe(fence.replace('.answer', '.body'))
+    expect(after['src/caught.ts']).toBe(caught)
   })
 })
 
@@ -69,6 +96,18 @@ describe('deprecated-refusal-message', () => {
       expect(edits).toContain('error instanceof ApiError && error.status !== 0 ? error.message : \'Try again\'')
       await applySafeFixes(root, found)
       expect(await read(root, 'src/messages.ts')).toBe(source)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('does not use a type-only ApiError import as a value', async () => {
+    const source = 'import { type ApiError, refusalMessage } from \'kay\'\n\nexport const a = (error: unknown): ApiError | string => refusalMessage(error, \'x\')\n'
+    const root = await project({ 'src/a.ts': source })
+
+    try {
+      expect((await refusalMessages(root, {})).map(diagnostic => diagnostic.fixes)).toEqual([undefined])
     }
     finally {
       await rm(root, { recursive: true, force: true })

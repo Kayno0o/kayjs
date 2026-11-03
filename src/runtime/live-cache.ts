@@ -6,7 +6,7 @@ import { decodeServerValue } from './wire'
 
 // The cached values a page follows (`cached(..., { live: true })`) are kept up to date by the route live values use, `POST /_kay/live`, through a reader of its own: this module stays out of the code every page loads, so it imports nothing of the runtime that code does not already reach.
 // A `resource()` reading a route the same way follows the keys the route's handler read, through the proof its answer carries.
-// The twin of `readEvents` in live.ts and `parseEvents` in sse.ts, which every page loads: its backoff starts at a second rather than half of one, and waits for the tab to show but not for the network to come back.
+// It keeps its own reconnect rather than `retryLater` of connection.ts, because Bun hoists a module two lazy chunks import into the entry chunk, which costs every page +260 to +360 B (kaynooo/kayjs#2875). Its backoff starts at a second rather than half of one, and waits for the tab to show but not for the network to come back.
 
 const ROUTE = '/_kay/live'
 // A deferred island's script is told from the page's by its attribute, so a page's renewal of its proofs leaves it alone.

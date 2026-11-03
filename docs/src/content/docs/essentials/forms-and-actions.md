@@ -449,7 +449,7 @@ if problem() !== ''
   p.error {problem()}
 ```
 
-Any answer other than success gives `{ ok: false, status, errors, data }`. `errors` is per field, and `data` is typed as the handler passes it to `ctx.fail`. Here `data.message` is what the handler passed to `ctx.fail(409, { message })`.
+Any answer other than success gives `{ ok: false, status, message, errors, data }`. `message` is the text to show, `errors` is per field, and `data` is typed as the handler passes it to `ctx.fail`. Here `data.message` is what the handler passed to `ctx.fail(409, { message })`.
 
 A success gives `{ ok: true, data }`. A failure with no answer from the server, such as a lost connection, still throws.
 

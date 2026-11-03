@@ -28,6 +28,11 @@ export function messageOf({ status, errors, data }: Pick<ErrorShape, 'status' | 
   return fallback === undefined || fallback === '' ? `HTTP ${status}` : fallback
 }
 
+// What an action's refusal says when it carries nothing readable, for a thrown `ActionError`, a `FormFailure` and a rejected `local` write alike; the response text stays in an `ActionError`'s `body`.
+export function actionFailed(status: number): string {
+  return `Action failed with ${status}`
+}
+
 // The fields of an Elysia validation failure (all of them where it lists them, else the one it names); none for any other answer.
 export function fieldsOf(data: unknown): Record<string, string> {
   const answer = data as { type?: unknown, property?: unknown, message?: unknown, errors?: unknown } | null
@@ -61,7 +66,7 @@ export class ApiError<Data = unknown> extends Error implements ErrorShape<Data> 
   }
 
   /** @deprecated Renamed `data` in 1.87; the old name works until 1.90, and `kay upgrade` renames it where it can tell the receiver is an `ApiError`. */
-  get answer(): Data | undefined {
+  get answer(): unknown {
     return this.data
   }
 }

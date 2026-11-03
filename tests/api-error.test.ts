@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { ActionError, ApiError } from 'kay'
 import { fieldsOf, messageOf } from '../src/runtime/api-error'
+import { issueMessage } from '../src/runtime/local'
 
 describe('messageOf', () => {
   it('reads the form-wide message, the field messages, data.message, the text answered, then the fallback or the status', () => {
@@ -31,6 +32,15 @@ describe('ApiError', () => {
 
     expect(error).toBeInstanceOf(ApiError)
     expect([error.message, error.errors, error.data]).toEqual(['Required', { title: 'Required' }, undefined])
-    expect(new ActionError(500, 'boom').message).toBe('Action failed with 500: boom')
+    expect(new ActionError(500, 'boom').message).toBe('Action failed with 500')
+  })
+})
+
+describe('issueMessage', () => {
+  it('reads the message of a record written before issues had one, by its kind', () => {
+    expect(issueMessage({ kind: 'conflict' })).toBe('The row changed on the server')
+    expect(issueMessage({ kind: 'rejected', status: 422, errors: { title: 'Required' } })).toBe('Required')
+    expect(issueMessage({ kind: 'rejected', status: 500 })).toBe('Action failed with 500')
+    expect(issueMessage({ kind: 'rejected', status: 422, message: 'Kept' })).toBe('Kept')
   })
 })

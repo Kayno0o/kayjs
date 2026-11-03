@@ -290,8 +290,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
       link.stop()
       run?.abort()
       run = new AbortController()
-      link.reset()
-      link.set('connecting')
+      link.restart()
       void read(run)
     },
     last: link.last,
@@ -653,7 +652,16 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
       const given = typeof options === 'function' ? options() : options
 
       return void load(async (signal, fresh) => {
-        const response = await fetch(withBase(routeUrl(module, path ?? '', given)), { headers: { accept: 'application/json' }, signal, ...fresh && { cache: 'reload' } })
+        const url = withBase(routeUrl(module, path ?? '', given))
+        let response: Response
+
+        try {
+          response = await fetch(url, { headers: { accept: 'application/json' }, signal, ...fresh && { cache: 'reload' } })
+        }
+        catch (failure) {
+          throw signal.aborted ? failure : unreachable(failure)
+        }
+
         const answer = await readAnswer(response, signal)
 
         if (!response.ok && !signal.aborted)

@@ -6,12 +6,12 @@ const sleep = async (ms: number) => new Promise(resolve => setTimeout(resolve, m
 describe('retryLater', () => {
   it('runs after the backoff, and not once cancelled', async () => {
     let runs = 0
-    const cancel = retryLater(0, () => runs++, { firstMs: 5, waitOnline: true })
+    const cancel = retryLater(0, () => runs++)
 
-    await sleep(30)
+    await sleep(600)
     expect(runs).toBe(1)
 
-    retryLater(0, () => runs++, { firstMs: 5, waitOnline: true })()
+    retryLater(0, () => runs++)()
     await sleep(30)
     expect(runs).toBe(1)
     cancel()

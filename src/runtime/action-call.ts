@@ -5,7 +5,7 @@ import { ActionError, ActionRedirectError } from './action-error'
 import { withFields } from './action-form'
 import { closeWithCaller, onStreamEnd, SETTLED } from './action-owner'
 import { ACTION } from './action-shared'
-import { messageOf } from './api-error'
+import { actionFailed, messageOf } from './api-error'
 import { withBase } from './base'
 import { skew } from './build'
 import { trackCalls, whenIdle } from './call-result'
@@ -92,7 +92,7 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
   const failed = () => {
     const found = outcome()
 
-    return found && !found.succeeded ? { status: found.status, message: messageOf({ status: found.status, errors: found.errors, data: found.data }), values: found.values, errors: found.errors, data: found.data } : undefined
+    return found && !found.succeeded ? { status: found.status, message: messageOf({ status: found.status, errors: found.errors, data: found.data }, actionFailed(found.status)), values: found.values, errors: found.errors, data: found.data } : undefined
   }
   const read = (value: unknown) => ({ value, enumerable: true })
 

@@ -1,23 +1,18 @@
+import type { StreamStatus } from './live'
 import { ownSignal } from './reactive'
 
 // The one place a connection is retried and its state kept: the reconnect, the backoff, the listeners and the status of `socket()`, `stream()`, the cached values a page follows and the live values.
 // A leaf: only modules that open a connection import it, never the call result or the action call, which every page loads.
 
+const RECONNECT_MS = 500
 const MAX_RECONNECT_MS = 30_000
 // How often a visible tab the browser says is offline tries anyway, as `navigator.onLine` can be wrong, behind some VPNs for one.
 const OFFLINE_RETRY_MS = 60_000
 
-export interface RetryOptions {
-  // The backoff of the first attempt, doubled by each after it up to 30 seconds.
-  firstMs: number
-  // Whether a tab the browser says is offline waits for the network too, and not only for a hidden tab to show.
-  waitOnline: boolean
-}
-
-// Runs `run` after the attempt's backoff, shortened by up to half at random so the clients a restart dropped together come back apart, and not before the tab is visible (and online, with `waitOnline`) again; gives what cancels it.
-export function retryLater(attempt: number, run: () => void, { firstMs, waitOnline }: RetryOptions): () => void {
-  const delay = Math.min(firstMs * 2 ** attempt, MAX_RECONNECT_MS)
-  const asleep = () => typeof document !== 'undefined' && (document.hidden || (waitOnline && navigator.onLine === false))
+// Runs `run` after the attempt's backoff, shortened by up to half at random so the clients a restart dropped together come back apart, and not before the tab is visible and online again; gives what cancels it.
+export function retryLater(attempt: number, run: () => void): () => void {
+  const delay = Math.min(RECONNECT_MS * 2 ** attempt, MAX_RECONNECT_MS)
+  const asleep = () => typeof document !== 'undefined' && (document.hidden || navigator.onLine === false)
   // Read only once asleep, which a browser alone can be.
   const wakers = () => [[globalThis, 'online'], [document, 'visibilitychange']] as const
   let waiting = false
@@ -56,7 +51,7 @@ export function retryLater(attempt: number, run: () => void, { firstMs, waitOnli
 
     stopWaiting()
     // The clients a network coming back, or a tab shown, wake together come back apart too.
-    timer = setTimeout(run, Math.random() * firstMs)
+    timer = setTimeout(run, Math.random() * RECONNECT_MS)
   }
 
   timer = setTimeout(() => {
@@ -103,13 +98,11 @@ export function listenerSet<T>(): { on: (listener: (value: T) => void) => () => 
   }
 }
 
-export type ConnectionState = 'idle' | 'connecting' | 'open' | 'done' | 'failed' | 'closed'
-
 // The state a source that opens, delivers values and drops keeps: the listener set and the last value, the status as a signal and the backoff of a reconnect.
 // `open` makes one attempt, and `lost()` says it dropped: it retries after the backoff while `reconnect` is set, else fails the connection.
 export function connection<T>(open: () => void, reconnect: boolean, idle = false) {
   const [last, setLast] = ownSignal<T | undefined>(undefined, { equals: false })
-  const [status, setStatus] = ownSignal<ConnectionState>(idle ? 'idle' : 'connecting')
+  const [status, setStatus] = ownSignal<StreamStatus>(idle ? 'idle' : 'connecting')
   const listeners = listenerSet<T>()
   let attempt = 0
   let cancel: (() => void) | undefined
@@ -125,10 +118,18 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
     },
     forget: () => setLast(undefined),
     // Leaves the state to `next` unless `close()` came first.
-    set: setStatus,
+    set: (next: StreamStatus) => {
+      if (status() !== 'closed' || next === 'closed')
+        setStatus(next)
+    },
     // The connection is back: the next drop starts the backoff over.
     reset: () => {
       attempt = 0
+    },
+    // A start by the app, which a `close()` before it does not hold back.
+    restart: () => {
+      attempt = 0
+      setStatus('connecting')
     },
     // The attempt dropped: tried again after the backoff, else failed.
     lost: () => {
@@ -139,7 +140,7 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
       }
 
       setStatus('connecting')
-      cancel = retryLater(attempt++, open, { firstMs: 500, waitOnline: true })
+      cancel = retryLater(attempt++, open)
     },
     // Cancels the retry waiting.
     stop: () => cancel?.(),
