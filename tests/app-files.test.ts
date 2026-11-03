@@ -285,7 +285,7 @@ export default defineConfig({
     auth({ viewer: false, captcha: false }),
     ${withMail ? 'mail({ module: \'./src/mail\' }),' : ''}
     { name: 'probe', server: () => new Elysia().post('/probe', async (ctx) => {
-      await (ctx as unknown as { auth: { register: (input: unknown) => Promise<unknown> } }).auth.register({ email: 'ada@example.com', password: 'correct horse battery' })
+      await (ctx as unknown as { auth: { password: { register: (input: unknown) => Promise<unknown> } } }).auth.password.register({ email: 'ada@example.com', password: 'correct horse battery' })
       for (let wait = 0; wait < 100 && outbox.mails.length === 0; wait++) {
         await mailer.drain()
         await Bun.sleep(50)
