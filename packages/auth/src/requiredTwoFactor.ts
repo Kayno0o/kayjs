@@ -16,9 +16,19 @@ export interface TwoFactorAsk {
 
 // The pages and routes a user lacking two-factor must still reach: exactly those paths, bare or under the prefix of the locale being served, never a route that merely ends like one.
 function exempt(core: Core, path: string, locale?: string): boolean {
-  const bare = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
+  const bare = withoutSlash(path)
 
-  return [core.securityPage, core.twoFactorPage, `${core.prefix}/sign-out`].some(page => page !== undefined && (bare === page || (locale !== undefined && bare === `/${locale}${page}`)))
+  // The locale is matched as kay's routing matches it, the segment equal to the tag.
+  return [core.securityPage, core.twoFactorPage, `${core.prefix}/sign-out`].some((given) => {
+    const page = given === undefined ? undefined : withoutSlash(given)
+
+    return page !== undefined && (bare === page || (locale !== undefined && bare === `/${locale}${page}`))
+  })
+}
+
+// A path with no trailing slash, whether the site serves its pages with one or not.
+function withoutSlash(path: string): string {
+  return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
 }
 
 // Whether the second factor is satisfied: it is on, or the sign-in was a passkey (user verification makes it two factors), or an admin acting as the user, who proved theirs to start.

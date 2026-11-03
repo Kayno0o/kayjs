@@ -55,7 +55,7 @@ function setup(options: Parameters<typeof testApp>[0] = {}) {
     }
   }
 
-  for (const path of ['/g/page', '/auth/account/security', '/fr/auth/account/security', '/own/security', '/admin/account/security', '/admin/auth/two-factor', '/g/auth/sign-out', '/sec/auth/account/security'])
+  for (const path of ['/g/page', '/auth/account/security', '/fr/auth/account/security', '/own/security', '/admin/account/security', '/admin/auth/two-factor', '/g/auth/sign-out', '/sec/auth/account/security', '/pt-BR/auth/account/security', '/pt-br/auth/account/security', '/own/2fa', '/auth/sign-out'])
     app.app.get(path, verdict as never).post(path, verdict as never)
 
   app.app.use(new Elysia().use(app.auth.gate()).get('/gated', () => 'in').get('/gated-editor', () => 'in', { auth: 'editor' }).get('/gated/auth/account/security', () => 'in').get('/auth/two-factor', () => 'in'))
@@ -161,6 +161,24 @@ describe('twoFactor.require in guards', () => {
 
     expect(await guarded(admin)).toBe('redirect /own/security?redirect=%2Fg%2Fpage')
     expect(await guarded(admin, [{ twoFactor: true }], '/own/security')).toBe('passed')
+  })
+
+  test('a security page or second-factor page written with a trailing slash is reached with or without it', async () => {
+    const { member, guarded } = setup({ pages: false, securityPage: '/own/security/', twoFactorPage: '/own/2fa/' })
+    const admin = await member(['admin'])
+
+    expect(await guarded(admin, [{ twoFactor: true }], '/own/security')).toBe('passed')
+    expect(await guarded(admin, [{ twoFactor: true }], '/own/2fa')).toBe('passed')
+    expect(await guarded(admin)).toContain('redirect')
+  })
+
+  test('the sign-out route is reached, and a locale prefix counts as kay matches it, case included', async () => {
+    const { member, guarded } = setup()
+    const admin = await member(['admin'])
+
+    expect(await guarded(admin, [{ twoFactor: true }], '/auth/sign-out')).toBe('passed')
+    expect(await guarded(admin, [{ twoFactor: true }], '/pt-BR/auth/account/security', { ...HTML, 'x-locale': 'pt-BR' })).toBe('passed')
+    expect(await guarded(admin, [{ twoFactor: true }], '/pt-br/auth/account/security', { ...HTML, 'x-locale': 'pt-BR' })).toContain('redirect')
   })
 
   test('an app with no security page gets the 403', async () => {
