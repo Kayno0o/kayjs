@@ -56,7 +56,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### kayjs-ui: `onSelectedChange` on Table, TreeView and Timeline
 
-- `onSelect` on a `Table`, `TreeView` or `Timeline` is `onSelectedChange`, the `on<Prop>Change` of their `selected`; `onSelect` stays the press of an item on BarList, the charts, Steps and Menu. The old name still works until 1.90: `kay check` reports it as `deprecated-ui-callbacks` and `kay upgrade` renames it in `.kay` files.
+- `onSelect` on a `Table`, `TreeView` or `Timeline` is `onSelectedChange`, the `on<Prop>Change` of their `selected`; `onSelect` stays the press of an item on BarList, the charts, Steps and Menu. The old name still works until 1.90, heard only when `onSelectedChange` is not given: `kay check` reports it as `deprecated-ui-callbacks` and `kay upgrade` renames it in `.kay` files.
 
 ### kayjs-ui: Dialog and SidePanel share a head line
 

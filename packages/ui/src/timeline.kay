@@ -24,7 +24,7 @@ const { entries, selected, onSelectedChange, onSelect, label, ...rest } = props<
   // Makes the entries buttons, one picked at a time; with `selected` alone they stay buttons too. Gets the picked key, or undefined when the picked entry is pressed again, and the entry pressed.
   // The shape `selected` takes first, so `onSelectedChange={picked.set}` round-trips.
   onSelectedChange?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
-  // The name before 1.87, called beside `onSelectedChange` until 1.90; `kay check` reports it as `deprecated-ui-callbacks`.
+  // The name before 1.87, called until 1.90 only when `onSelectedChange` is not given; `kay check` reports it as `deprecated-ui-callbacks`.
   onSelect?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
   // Names the list for screen readers.
   label: string
@@ -41,8 +41,9 @@ function pick(entry: TimelineEntry<Key>) {
   const next = picked() === entry.key ? undefined : entry.key
 
   picked = next
-  onSelectedChange?.(next, entry)
-  onSelect?.(next, entry)
+  const heard = onSelectedChange ?? onSelect
+
+  heard?.(next, entry)
 }
 ---
 ol(part="root" {...rest} aria-label={label})

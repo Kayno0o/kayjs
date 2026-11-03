@@ -37,6 +37,20 @@ test('opening a Dialog focuses the first control of its body, not the close butt
   expect(dialog('fields').querySelector('[data-part=head] [aria-label=Close]')).not.toBeNull()
 })
 
+test('a body drawn by the same signal that opens the overlay still takes the focus, on every reopen', async () => {
+  const { dialog, open } = await page()
+
+  for (const [id, input] of [['lazy', 'lazy-input'], ['plazy', 'plazy-input']] as const) {
+    for (let round = 0; round < 2; round++) {
+      await open(id)
+      expect(dialog(id).open, `${id} ${round}`).toBe(true)
+      expect(document.activeElement?.id, `${id} ${round}`).toBe(input)
+      dialog(id).close()
+      await settle()
+    }
+  }
+})
+
 test('an autofocus control keeps the focus, and a body with no control leaves it on the dialog', async () => {
   const { dialog, open } = await page()
 

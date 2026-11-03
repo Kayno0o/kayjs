@@ -10,7 +10,7 @@ afterEach(() => {
   mounted?.unmount()
 })
 
-test('onSelect still fires on a Timeline and a Table until 1.90, beside onSelectedChange when both are given', async () => {
+test('onSelect still fires on a Timeline and a Table until 1.90, and is left unheard when onSelectedChange is given', async () => {
   const old: string[] = []
   const fresh: string[] = []
 
@@ -21,6 +21,6 @@ test('onSelect still fires on a Timeline and a Table until 1.90, beside onSelect
   click(mounted.root.querySelector('#table tbody input[type=checkbox]'))
   await settle()
 
-  expect(old).toEqual(['timeline:a', 'both:b', 'table:1'])
+  expect(old).toEqual(['timeline:a', 'table:1'])
   expect(fresh).toEqual(['both:b'])
 })

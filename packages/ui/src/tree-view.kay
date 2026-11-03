@@ -26,7 +26,7 @@ const { nodes, label, selected, expanded = [], onSelectedChange, onSelect, onTog
   retryLabel?: string | undefined
   // Runs on a click on a row, or Enter or Space on the focused one, with the id `selected` takes and the node picked.
   onSelectedChange?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
-  // The name before 1.87, called beside `onSelectedChange` until 1.90; `kay check` reports it as `deprecated-ui-callbacks`.
+  // The name before 1.87, called until 1.90 only when `onSelectedChange` is not given; `kay check` reports it as `deprecated-ui-callbacks`.
   onSelect?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
   // Controls at the end of a row, such as a star or a count, dimmed away until the row is hovered or holds focus: `@trailing(node)`.
   trailing?: Snippet<[TreeNode<Id>]> | undefined
@@ -157,8 +157,9 @@ function toggle(id: TreeId) {
 function pick(row: TreeRow<Id>) {
   current = row.node.id
   focused = row.node.id
-  onSelectedChange?.(row.node.id, row.node)
-  onSelect?.(row.node.id, row.node)
+  const heard = onSelectedChange ?? onSelect
+
+  heard?.(row.node.id, row.node)
 }
 
 // A branch's chevron opens or closes it, the rest of the row selects it, the row's own controls excepted; the keyboard does both through the row itself.

@@ -99,7 +99,7 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   selected?: RowKeyValue<Row, Key>[] | undefined
   // Called with the keys picked, as `selected` takes them, and the rows they stand for, both in the rows' order, each time the selection changes, a row leaving `rows` included.
   onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined
-  // The name before 1.87, called beside `onSelectedChange` until 1.90; `kay check` reports it as `deprecated-ui-callbacks`.
+  // The name before 1.87, called until 1.90 only when `onSelectedChange` is not given; `kay check` reports it as `deprecated-ui-callbacks`.
   onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined
   // Drawn beside the count while something is picked, with the keys and a function emptying the selection: the page's bulk actions.
   bulk?: Snippet<[keys: RowKeyValue<Row, Key>[], clear: () => void]> | undefined
@@ -250,8 +250,9 @@ function commit(keys: RowKeyValue<Row, Key>[]) {
   const wanted = new Set(keys)
   const chosen = rows().filter(row => wanted.has(rowKeyOf(row, rowKey)))
 
-  onSelectedChange?.(keys, chosen)
-  onSelect?.(keys, chosen)
+  const heard = onSelectedChange ?? onSelect
+
+  heard?.(keys, chosen)
 }
 
 function toggleRow(key: RowKeyValue<Row, Key>) {
