@@ -219,6 +219,37 @@ describe('a sitemap built without a lastmod', () => {
   })
 })
 
+describe('the sitemap ttl', () => {
+  it('keeps the sitemap an hour with none, and builds it again past the time the config gives, a bad one refused', async () => {
+    const copy = await fixtureCopy('site-output')
+    const counted = globalThis as { sitemapBuilds?: number }
+
+    await Bun.write(join(copy, 'src/routes/posts/[slug].kay'), '--- server\nexport const page = { sitemap: [{ slug: \'a\' }], lastmod: () => { const state = globalThis as { sitemapBuilds?: number }; state.sitemapBuilds = (state.sitemapBuilds ?? 0) + 1; return \'2026-05-06\' } }\n---\nh1 Post\n')
+
+    try {
+      const builds = async (sitemap?: { ttl: `${number}${'s' | 'm'}` }) => {
+        const served = await pages({ root: copy, prebuilt: false, security: false, site: 'https://x.example', ...sitemap && { sitemap } })
+
+        counted.sitemapBuilds = 0
+        await (await served.handle(new Request('http://localhost/sitemap.xml'))).text()
+        setSystemTime(Date.now() + 5 * 60_000)
+        await (await served.handle(new Request('http://localhost/sitemap.xml'))).text()
+        setSystemTime()
+
+        return counted.sitemapBuilds
+      }
+
+      expect(await builds()).toBe(1)
+      expect(await builds({ ttl: '2m' })).toBe(2)
+      await expect(builds({ ttl: '0s' })).rejects.toThrow('sitemap.ttl is \'0s\'')
+    }
+    finally {
+      setSystemTime()
+      delete counted.sitemapBuilds
+    }
+  })
+})
+
 describe('a sitemap with a lastmod that is no date', () => {
   it('keeps the one-hour cache, as the next build would find the same', async () => {
     const copy = await fixtureCopy('site-output')

@@ -34,6 +34,7 @@ import { readRuntimeRedirects } from '../server/runtime-redirects'
 import { authMethods } from './auth-methods'
 import { deprecatedCollectionLinks } from './deprecated-collection-links'
 import { deprecatedConfigKeys } from './deprecated-config-keys'
+import { deprecatedLifetimes } from './deprecated-lifetimes'
 import { ownFile } from './diagnose'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { apiErrorAnswers, refusalMessages } from './error-shape'
@@ -150,6 +151,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => deprecatedConfigKeys(root, options),
   async ({ root, options }) => deprecatedCollectionLinks(root, options),
   async ({ root, options }) => hookNames(root, options),
+  async ({ root, options }) => deprecatedLifetimes(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

@@ -1324,8 +1324,8 @@ describe('queue', () => {
     }
   })
 
-  it.each(['memory', 'sqlite', 'without purge'])('drops a failed job once keepFailed has passed since its last attempt, and keeps it for good on false, in a %s store', async (kind) => {
-    const failing = async (keepFailed?: false) => {
+  it.each(['memory', 'sqlite', 'without purge'])('drops a failed job once failedTtl has passed since its last attempt, and keeps it for good on false, in a %s store', async (kind) => {
+    const failing = async (failedTtl?: false) => {
       const store = kind === 'sqlite' ? sqliteJobs(await jobsPath()) : memoryJobs()
 
       if (kind === 'without purge')
@@ -1333,7 +1333,7 @@ describe('queue', () => {
 
       return queue('failing', () => {
         throw new Error('no such mailbox')
-      }, { store, attempts: 1, keepFailed, onFailed: () => undefined })
+      }, { store, attempts: 1, failedTtl, onFailed: () => undefined })
     }
     const kept = await failing()
     const forever = await failing(false)
@@ -1447,7 +1447,7 @@ describe('queue', () => {
 
   it('logs a purge whose store throws instead of throwing it from enqueue, failed or remove', async () => {
     const store = memoryJobs()
-    const jobs = queue('purging', () => undefined, { store, keepFailed: '1d' })
+    const jobs = queue('purging', () => undefined, { store, failedTtl: '1d' })
 
     store.purge = () => {
       throw new Error('store locked')

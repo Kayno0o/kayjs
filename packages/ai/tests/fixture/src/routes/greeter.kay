@@ -7,4 +7,4 @@ const earlier: ChatTurn[] = [{ role: 'assistant', content: 'Welcome, ask me anyt
 import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
 h1 Greeter
-Chat(action={reply} label="Greeter" keep={2} initial={earlier})
+Chat(action={reply} label="Greeter" history={2} initial={earlier})

@@ -1,7 +1,8 @@
-import type { SyncCacheStore } from './cache'
+import type { Invalidatable, SyncCacheStore } from './cache'
 import { existsSync } from 'node:fs'
 import { onReload } from '../server/reload'
-import { PURGE_STALE_MS, readsOf, STALE_KEPT_MS, trackStore, untrackStore } from './cache'
+import { invalidatePage } from '../server/stale-pages'
+import { invalidate as invalidateKey, PURGE_STALE_MS, readsOf, STALE_KEPT_MS, trackStore, untrackStore } from './cache'
 import { kayLog } from './log'
 import { pollLoop } from './poll-backoff'
 import { openSqlite } from './sqlite.server'
@@ -12,9 +13,17 @@ const EVENT_TTL_MS = 60_000
 // Tells this process's own messages apart from the others', whatever store instance wrote them.
 const PROCESS = crypto.randomUUID()
 
-export { invalidatePage } from '../server/stale-pages'
-export type { CachedFunction, CacheFunctionOptions, CacheOptions, CacheStore, CacheTag, StoredValue, SyncCacheStore } from './cache'
-export { cache, cached, cacheTag, invalidate } from './cache'
+export { invalidatePage }
+export type { CachedFunction, CacheFunctionOptions, CacheOptions, CacheStore, CacheTag, Invalidatable, StoredValue, SyncCacheStore } from './cache'
+export { cache, cached, cacheTag } from './cache'
+
+// Drops a cached key, every key a function matches, a `cache()` function, a `cacheTag()` or a collection, or marks prerendered pages stale with `{ page }`, a path or a function of the paths, as `invalidatePage` does: the one call for whatever changed.
+export function invalidate(target: Invalidatable | { page: string | ((path: string) => boolean) }): void {
+  if (typeof target === 'object' && 'page' in target)
+    invalidatePage(target.page)
+  else
+    invalidateKey(target)
+}
 
 // The file with its tables, triggers and statements ready.
 function openCache(path: string) {

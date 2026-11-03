@@ -1,6 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { KayConfig, RobotsConfig, TrailingSlash } from '../config'
 import type { Collection } from '../content'
+import type { Duration } from '../runtime/duration'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ServedRoute } from './guards'
 import type { LocaleCopy } from './i18n'
@@ -13,6 +14,7 @@ import { KayError } from '../compiler/errors'
 import { isCollection } from '../content'
 import { entryModified } from '../content/entry-head'
 import { ALL_READS, onKeysInvalidated } from '../runtime/cache'
+import { optionMs } from '../runtime/duration'
 import { escape } from '../runtime/escape'
 import { kayLog } from '../runtime/log'
 import { importModule } from './bundle'
@@ -44,7 +46,7 @@ export function setSitemapLimits(limits = SITEMAP_LIMITS): void {
 }
 // How many parts a sitemap served in several files may have, 5 million URLs.
 const MAX_PARTS = 100
-// Long enough for crawlers, short enough that a new post shows up the same hour without a restart.
+// Long enough for crawlers, short enough that a new post shows up the same hour without a restart; `sitemap.ttl` sets another.
 const CACHE_MS = 60 * 60 * 1000
 // How long a sitemap built without some of its lastmods is kept, so the next crawl finds them back once the database answers.
 const DEGRADED_MS = 60 * 1000
@@ -57,6 +59,8 @@ export interface SitemapOptions {
   robots?: RobotsConfig | false | undefined
   // The mount point, which the paths of `robots` go under.
   base?: string | undefined
+  // `sitemap.ttl`: how long a built sitemap is served, an hour when left out.
+  ttl?: Duration | undefined
 }
 
 // `/sitemap.xml` and `/robots.txt` for a project with a `site`, unless something the app serves already takes that path.
@@ -66,6 +70,7 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
   // `reads` are the cache keys and collections the build read, once it has finished: an invalidation drops the sitemap only when it names one of them.
   const cached = new Map<string | undefined, { files: Promise<string[]>, replies: Map<number, { etag: string, reply: (request: Request) => Promise<Response> }>, at: number, degraded: boolean, reads?: string[] }>()
   const settings = options.locales
+  const keepMs = options.ttl === undefined ? CACHE_MS : optionMs(options.ttl, 'sitemap.ttl')
 
   // An entry published at its time, or saved by a CMS, shows in the sitemap then, not up to an hour later: an invalidation of a key the build read, or while it is still reading, builds it afresh on its next request.
   const hear = () => {
@@ -98,7 +103,7 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
   const reading = (locale: string | undefined, report: (error: unknown) => void) => {
     let sitemap = cached.get(locale)
 
-    if (options.dev || !sitemap || Date.now() - sitemap.at > (sitemap.degraded ? DEGRADED_MS : CACHE_MS)) {
+    if (options.dev || !sitemap || Date.now() - sitemap.at > (sitemap.degraded ? Math.min(DEGRADED_MS, keepMs) : keepMs)) {
       const publicOrigin = settings?.hosts && locale !== undefined ? `https://${settings.hosts[locale]}${options.base ?? ''}` : origin
 
       const built: typeof sitemap = { files: Promise.resolve([]), replies: new Map(), at: Date.now(), degraded: false }

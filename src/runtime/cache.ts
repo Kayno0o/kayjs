@@ -441,9 +441,19 @@ export function untrackStore(store: CacheStore): void {
   stores.delete(store)
 }
 
+// What `invalidate` drops: a string key, a function matching keys, or what holds its own: a `cache()` function, a `cacheTag()` or a collection, each through its `invalidate()`.
+export type Invalidatable = string | ((key: string) => boolean) | { invalidate: () => void }
+
 // Drops `key`, or every key the function matches, so the next call loads afresh: for an action that changed what they hold.
+// A `cache()` function, a tag or a collection drops all it holds, as its own `invalidate()` does.
 // Every process sharing a store that broadcasts, a `sqliteCache`, drops the same keys: a string key always, a function's keys as far as this process and the store know them.
-export function invalidate(key: string | ((key: string) => boolean)): void {
+export function invalidate(key: Invalidatable): void {
+  if (typeof key !== 'string' && 'invalidate' in key) {
+    key.invalidate()
+
+    return
+  }
+
   const matches = typeof key === 'string' ? (name: string) => name === key : key
   const dropped = new Set<string>(typeof key === 'string' ? [key] : [])
 

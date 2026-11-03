@@ -46,6 +46,8 @@ export interface KayConfig {
   seo?: SeoConfig | undefined
   // What `/robots.txt` says besides pointing at the sitemap, or `false` to serve none: `{ disallow: ['/admin'] }`. Needs `site`, as the sitemap does.
   robots?: RobotsConfig | false | undefined
+  // How `/sitemap.xml` is kept.
+  sitemap?: SitemapConfig | undefined
   // Tags every page's head carries, written as a `head` block compiles them: `[{ tag: 'script', props: { src: '/stats.js', defer: true } }]`, a tag's text as `children`. A layout or the page setting a tag of the same identity wins, and the content security policy lets their inline scripts and styles through.
   head?: HeadTag[] | undefined
   images?: ImagesConfig | undefined
@@ -363,7 +365,14 @@ export interface MarkdownConfig {
   imageSizes?: string | undefined
 }
 
+export interface SitemapConfig {
+  // How long the sitemap is served before the next request builds it again, a string such as `'15m'`; an hour by default, a minute when a `lastmod` was left out. An `invalidate` of a key or collection it read, or a `publishAt` date passing, drops it sooner.
+  ttl?: Duration | undefined
+}
+
 export interface ImagesConfig {
+  // How long a variant the image route made on request is kept once nothing wrote it, a string such as `'7d'`; 30 days by default. Past it the server removes the file as it starts and once a day, and the next request draws it again.
+  ttl?: Duration | undefined
   // Directories of images added at runtime, such as uploads, by the URL path the app serves them at: `{ '/uploads/': 'data/uploads' }`. The image route resizes those as well as imported images, reading them on each request; a directory is relative to the root, or where an executable runs.
   dirs?: Record<string, string> | undefined
   // Hosts whose images are resized too, each an origin and maybe a path, its host maybe starting with `*.` for any subdomain: `['https://cms.example.com/uploads/', 'https://*.cdn.example.com']`. The image route downloads them, keeping a copy it revalidates; a host not listed is refused, so the route is no open proxy.

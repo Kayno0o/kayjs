@@ -54,6 +54,8 @@ export interface NotifyOptions {
   // Where a click goes: a path of the site such as `/orders/12`, or an http(s) URL. Any other is dropped, the notification kept.
   url?: string | undefined
   // How long it is kept, `'90d'` by default.
+  ttl?: Duration | undefined
+  // The name `ttl` had before 1.87, still read; `kay upgrade` renames it.
   keep?: Duration | undefined
   // `false` keeps the notification in the inbox alone, without the push a person who opted in would get with `push()` listed.
   push?: boolean | undefined
@@ -270,8 +272,8 @@ function changed(user: string): void {
 }
 
 // Puts a notification in a person's inbox, which the `Bell` of kayjs-ui shows with its unread count and updates in every open tab. `user` is the id kayjs-auth, or whatever names the request's user, gives.
-// The store is the app's `store.notifications`, which `sqliteData` and `pgData` fill; with none it is this process's memory. A notification is dropped after `keep`, 90 days by default.
-export async function notify(user: string, { title, url, keep = DEFAULT_KEEP, push }: NotifyOptions): Promise<Notification> {
+// The store is the app's `store.notifications`, which `sqliteData` and `pgData` fill; with none it is this process's memory. A notification is dropped after `ttl`, 90 days by default.
+export async function notify(user: string, { title, url, ttl, keep, push }: NotifyOptions): Promise<Notification> {
   const id = checkedUser(user)
   const text = typeof title === 'string' ? title.replaceAll('\0', '').trim() : ''
 
@@ -284,7 +286,7 @@ export async function notify(user: string, { title, url, keep = DEFAULT_KEEP, pu
     kayLog('warn', `notify() dropped the url of a notification for ${id}: only a path of the site or an http(s) URL is linked`)
 
   const at = Date.now()
-  const note: StoredNotification = { id: crypto.randomUUID(), title: text, ...link === undefined ? {} : { url: link }, at, expires: at + Math.round(durationSeconds(keep, 'notify\'s keep') * 1000) }
+  const note: StoredNotification = { id: crypto.randomUUID(), title: text, ...link === undefined ? {} : { url: link }, at, expires: at + Math.round(durationSeconds(ttl ?? keep ?? DEFAULT_KEEP, 'notify\'s ttl') * 1000) }
 
   await notificationStore().add(id, note, MOST_PER_USER)
   changed(id)

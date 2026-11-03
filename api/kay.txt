@@ -597,6 +597,7 @@ interface PageSecurity
 
 [.] PageSettings
 interface PageSettings
+  cacheControl?: string | false
   feed?: false | object | readonly object[]
   guards?: false
   keep?: true
@@ -610,6 +611,7 @@ interface PageSettings
   search?: PageSearch | ((params: Record<string, string>) => PageSearch | Promise<PageSearch | undefined> | undefined)
   security?: PageSecurity
   sitemap?: boolean | object
+  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
 
 [.] PartClass
 type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Props['class' & keyof Props] : never : never
@@ -1403,8 +1405,11 @@ function cacheTag(): CacheTag
 interface CacheTag
   invalidate: () => void
 
+[./cache] Invalidatable
+type Invalidatable = string | ((key: string) => boolean) | { invalidate: () => void }
+
 [./cache] invalidate
-function invalidate(key: string | ((key: string) => boolean)): void
+function invalidate(target: Invalidatable | { page: string | ((path: string) => boolean); }): void
 
 [./cache] invalidatePage
 function invalidatePage(path: string | ((path: string) => boolean)): void
@@ -2659,6 +2664,7 @@ interface KayConfig
   settings?: Record<string, string> | undefined
   shutdownTimeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   site?: string | undefined
+  sitemap?: SitemapConfig | undefined
   storage?: FileStore | undefined
   store?: AppStore | undefined
   timeZone?: string | undefined
@@ -2783,13 +2789,14 @@ interface NotificationStore extends StoreBase
   unread: (user: string, now: number) => number | Promise<number>
 
 [./server] notify
-function notify(user: string, { title, url, keep, push }: NotifyOptions): Promise<Notification>
+function notify(user: string, { title, url, ttl, keep, push }: NotifyOptions): Promise<Notification>
 
 [./server] NotifyOptions
 interface NotifyOptions
   keep?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   push?: boolean | undefined
   title: string
+  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   url?: string | undefined
 
 [./server] PageHook
@@ -2896,6 +2903,7 @@ interface PagesOptions extends KayConfig
   settings?: Record<string, string> | undefined
   shutdownTimeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   site?: string | undefined
+  sitemap?: SitemapConfig | undefined
   storage?: FileStore | undefined
   store?: AppStore | undefined
   timeZone?: string | undefined
@@ -3032,6 +3040,7 @@ interface QueueOptions<Payload>
   attempts?: number | undefined
   backoff?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   concurrency?: number | undefined
+  failedTtl?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   idlePoll?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   keepFailed?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   lazy?: boolean | undefined
@@ -3550,10 +3559,11 @@ type Workflow<Input, Known extends Events> = Elysia & {
   // Starts a run, which the server's workers carry out, surviving restarts; resolves with its id once stored. start: (...args: undefined extends Input ? [input?: Input, options?: StartOptions] : [input: Input, options?: StartOptions]) => Promise<string> // Hands the event to the run, waking it now when it waits for it, else keeping it for the wait that names it; resolves with whether the run took it. An event sent while a step runs, or once a worker took the run after its timeout, is dropped. send: <Event extends keyof Known & string>(id: string, event: Event, ...data: undefined extends Known[Event] ? [data?: Known[Event]] : [data: Known[Event]]) => Promise<boolean> // Where the run stands; undefined once it completed, was cancelled or never started. status: (id: string) => Promise<WorkflowStatus | undefined> // Ends a run: one not running goes at once, one running stops at its next step. Resolves with whether there was one. cancel: (id: string) => Promise<boolean> // Runs every run whose time has come, here and now, as `drain` of a queue does. drain: () => Promise<number> }
 
 [./server] WorkflowOptions
-interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'lostAfter' | 'idlePoll' | 'keepFailed'>
+interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'lostAfter' | 'idlePoll' | 'failedTtl' | 'keepFailed'>
   attempts?: number | undefined
   backoff?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   concurrency?: number | undefined
+  failedTtl?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   idlePoll?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   keepFailed?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   lostAfter?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
@@ -3901,6 +3911,7 @@ interface TestOptions extends PagesOptions
   settings?: Record<string, string> | undefined
   shutdownTimeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   site?: string | undefined
+  sitemap?: SitemapConfig | undefined
   storage?: FileStore | undefined
   store?: AppStore | undefined
   styles?: boolean | undefined

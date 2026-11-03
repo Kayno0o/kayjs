@@ -126,7 +126,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
     await using page = await main.open('/')
 
     // The notification is added once the page is open, so a slow load cannot spend its time to live before the page shows it.
-    const short = await notify('ada', { title: 'Short lived', keep: '2s' })
+    const short = await notify('ada', { title: 'Short lived', ttl: '2s' })
 
     await page.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications, 1 unread')
     // The server reads the clock for the time to live, so it is waited out.

@@ -380,3 +380,28 @@ describe('a store answering with promises', () => {
     await Bun.sleep(50)
   })
 })
+
+describe('invalidate of kay/cache given a page', () => {
+  it('marks the page at a path, or those a function matches, stale as invalidatePage does, and a key as before', async () => {
+    const { invalidate: invalidateAny } = await import('../src/runtime/cache.server')
+    const page = fakePage(undefined)
+    const other = fakePage(undefined)
+
+    trackPrerendered(new Map([['/blog/a', page], ['/news', other]]))
+
+    const before = invalidationCount()
+
+    invalidateAny({ page: '/blog/a' })
+    expect(revalidationOf(page).invalidatedAt).toBeGreaterThan(before)
+    expect(revalidationOf(other).invalidatedAt).toBe(0)
+    invalidateAny({ page: path => path.startsWith('/ne') })
+    expect(revalidationOf(other).invalidatedAt).toBeGreaterThan(before)
+
+    const key = fakePage(['k'])
+
+    trackPrerendered(new Map([['/k', key]]))
+    await cached('k', '600s', () => 1)
+    invalidateAny('k')
+    expect(revalidationOf(key).invalidatedAt).toBeGreaterThan(0)
+  })
+})

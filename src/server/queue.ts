@@ -107,6 +107,8 @@ export interface QueueOptions<Payload> {
   // `'1s'` is the poll every second the queue made before.
   idlePoll?: Duration | undefined
   // How long a failed job is kept, its payload included, from when its last attempt was due: 30 days by default, `false` until removed.
+  failedTtl?: Duration | false | undefined
+  // The name `failedTtl` had before 1.87, still read; `kay upgrade` renames it.
   keepFailed?: Duration | false | undefined
   // What a failed job keeps in place of its payload, such as a mail without its body: applied once it is given up, so a failed job holds no more than the app needs to see what went wrong. The payload is kept whole when it throws.
   redact?: ((payload: Payload) => Payload) | undefined
@@ -181,7 +183,7 @@ const DEFAULT_ATTEMPTS = 5
 const DEFAULT_BACKOFF = '10s'
 const DEFAULT_LOST_AFTER = '10m'
 const DEFAULT_KEEP_FAILED = '30d'
-// How often a process's workers drop the failed jobs past `keepFailed`.
+// How often a process's workers drop the failed jobs past `failedTtl`.
 const PURGE_MS = 60 * 60 * 1000
 // A store that fails marking a finished job is asked this many times, waiting a little longer between each, before the job is left to be taken again.
 const COMPLETE_TRIES = 3
@@ -591,7 +593,8 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
   const lostAfter = durationSeconds(options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s lostAfter`) * 1000
   const concurrency = options.concurrency ?? 1
   const idlePoll = durationSeconds(options.idlePoll ?? DEFAULT_IDLE_POLL, `queue('${name}')'s idlePoll`) * 1000
-  const keepFailed = options.keepFailed === false ? undefined : durationSeconds(options.keepFailed ?? DEFAULT_KEEP_FAILED, `queue('${name}')'s keepFailed`) * 1000
+  const failedTtl = options.failedTtl ?? options.keepFailed
+  const keepFailed = failedTtl === false ? undefined : durationSeconds(failedTtl ?? DEFAULT_KEEP_FAILED, `queue('${name}')'s failedTtl`) * 1000
 
   if (!Number.isInteger(attempts) || attempts < 1)
     throw new KayError('config-invalid', `kay: queue('${name}')'s attempts is ${attempts}; it takes a whole number of at least 1`)
@@ -905,7 +908,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
 
   let purged = 0
 
-  // Drops the failed jobs whose last attempt is older than `keepFailed`, once an hour at most, whichever worker, drain, enqueue or read of the failed jobs gets there first, so a process with no worker of the queue purges it too.
+  // Drops the failed jobs whose last attempt is older than `failedTtl`, once an hour at most, whichever worker, drain, enqueue or read of the failed jobs gets there first, so a process with no worker of the queue purges it too.
   const purgeFailed = async () => {
     const now = Date.now()
 

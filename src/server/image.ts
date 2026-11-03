@@ -1,5 +1,6 @@
 import type { Context, Elysia } from 'elysia'
 import type { Guard, GuardContext } from '../runtime'
+import type { Duration } from '../runtime/duration'
 import type { Aspect, ImageVariant } from '../runtime/image'
 import type { ActionOptions, GuardedRequest } from './actions'
 import type { LoadedGuard } from './guards'
@@ -12,6 +13,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
 import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
+import { optionMs } from '../runtime/duration'
 import { aspectKey, CARD, croppedSize, cutOrBelow, DEFAULT_ASPECTS, DEFAULT_MAX_DENSITY, defaultLadder, FILES_ROUTE, IMAGE_ROUTE, imageWidths, ladderFor, parseAspect, QUALITY_STEP, recordVariants, requestedRemoteVariants, requestedVariants, RESIZABLE, setAspects, setImageWidths, setMaxDensity, setPlaceholders, setRemoteImages, setResolvedImages, SMALL_STEP, validQuality, variantHeight, variantSuffix } from '../runtime/image'
 import { kayLog } from '../runtime/log'
 import { learnedVersion, learnPlaceholder, placeholderColor } from '../runtime/placeholder'
@@ -44,6 +46,8 @@ export interface ImageRouteOptions {
   aspects?: readonly string[] | undefined
   // Downloads an image from a host `images.remote` lists.
   remote?: RemoteImages | undefined
+  // `images.ttl`: how long a variant nothing wrote is kept, `VARIANT_KEEP_MS` when left out.
+  ttl?: Duration | undefined
   // `false` answers a visitor saving data the width asked for, as any other, instead of the next one down.
   saveData?: boolean | undefined
   // The security headers, which the route's answers carry themselves.
@@ -244,12 +248,13 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   const immutable = immutables(false, false)
   const revalidatedAs = revalidatedCopies(false, false)
 
+  const keepMs = options.ttl === undefined ? VARIANT_KEEP_MS : optionMs(options.ttl, 'images.ttl')
   let pruning: ReturnType<typeof setInterval> | undefined
 
   const prune = async () => {
     try {
       // The files the maps point at may be among those gone.
-      if (await pruneVariants(options.cacheDir, VARIANT_KEEP_MS) > 0) {
+      if (await pruneVariants(options.cacheDir, keepMs) > 0) {
         answered.clear()
         importedVariants.clear()
       }

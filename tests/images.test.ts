@@ -1226,6 +1226,15 @@ describe('pruneVariants', () => {
     return dir
   }
 
+  it('keeps a variant for images.ttl, 30 days by default, and refuses a ttl that is no positive duration', async () => {
+    const dir = await cacheWith()
+    const route = (ttl?: '1d' | '0s') => serveImages(new Elysia(), { clientDir: dir, cacheDir: dir, ...ttl && { ttl } })
+
+    expect(() => route('0s')).toThrow('images.ttl is \'0s\'')
+    expect(() => route('1d')).not.toThrow()
+    expect(() => route()).not.toThrow()
+  })
+
   it('removes the files nothing wrote for the time given, and leaves younger ones and folders alone', async () => {
     const dir = await cacheWith()
 

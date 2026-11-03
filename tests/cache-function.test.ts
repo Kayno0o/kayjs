@@ -49,6 +49,24 @@ describe('cache', () => {
     expect(await feed()).toBe(2)
   })
 
+  it('is dropped by invalidate() given the function, its tag or a collection-like object, as by their own invalidate', async () => {
+    const group = cacheTag()
+    let loads = 0
+    const posts = cache(() => ++loads, { ttl: '5m', tags: [group] })
+    const tagged = cache(() => ++loads, { ttl: '5m', tags: [group] })
+    let dropped = 0
+
+    expect(await posts()).toBe(1)
+    invalidate(posts)
+    expect(await posts()).toBe(2)
+    expect(await tagged()).toBe(3)
+    invalidate(group)
+    expect(await posts()).toBe(4)
+    expect(await tagged()).toBe(5)
+    invalidate({ invalidate: () => void dropped++ })
+    expect(dropped).toBe(1)
+  })
+
   it('keeps a value per call site and drops it with its own invalidate', async () => {
     let loads = 0
     const posts = cache(() => ++loads, { ttl: '5m' })

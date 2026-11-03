@@ -32,7 +32,7 @@ export interface WorkflowRun<Input, Known extends Events> {
   step: WorkflowStep<Known>
 }
 
-export interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'lostAfter' | 'idlePoll' | 'keepFailed'> {
+export interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'lostAfter' | 'idlePoll' | 'failedTtl' | 'keepFailed'> {
   // Told once, when a worker first takes the run: not for the runs after a sleep, a wait or a retry.
   onStart?: Hook<{ id: string, input: Input }> | undefined
   // Told once the flow function ended, after its last step.

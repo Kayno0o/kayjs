@@ -111,7 +111,7 @@ export const reply = action(schema, async ({ messages }) => {
 ### Props
 
 - `action`: the streaming action, typed `Action<{ messages: ChatMessage[] }, AsyncIterable<string | Progress> | Failure<unknown>>`, so `kay check` refuses one whose schema wants more or whose handler answers anything but a stream.
-- `keep`: how many of the latest messages each send posts (20), so a long chat stays under the schema's `maxItems`. The history posted opens on a user message, so an assistant one at its start, such as a greeting in `initial`, is left out; turns with neither text nor files are not counted.
+- `history`: how many of the latest messages each send posts (20), so a long chat stays under the schema's `maxItems`. The history posted opens on a user message, so an assistant one at its start, such as a greeting in `initial`, is left out; turns with neither text nor files are not counted.
 - `maxChars`: the most characters each send posts (40,000), the oldest messages leaving first and the last staying; the chat lowers it by itself: a 413 from the action (`ask`'s `too-long` past its `maxInputChars`) makes it post half as much, oldest messages first, and ask again (5 times at most) until the action takes it or only the last message is left, remembering the size for the next sends. Each refusal counts against the action's rate limit, so set `maxChars` to the action's `maxInputChars` to avoid the first one.
 - `initial`: `ChatTurn[]` shown to start with and sent with the first message, a `ChatTurn` being `{ role, content, sources? }` (`import type { ChatTurn } from '@kaynooo/kayjs-ai'`): `kay check` refuses a `Message` with `attachments`, as an island prop carries no `Blob`.
 - `label`: names the message list and the field for screen readers (`Chat`).

@@ -15,6 +15,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `StreamStatus`, `ResourceStatus` and `ResourceFailure` from `kay` are `ConnectionStatus`, `LoadStatus` and `ApiError` (`kay upgrade` renames them, the old names work until 1.90). A socket the server closes with a code from 4000 to 4999 is now `failed` (its `error().status` the code minus 4000) instead of reconnecting: an app that closes with such a code and expects the client to retry must close with another code. An exhaustive `switch` over `SocketStatus` needs a `failed` case, and `resource().error()` is an `ApiError`, so `toEqual({ status, message })` on it becomes `toMatchObject`, and `JSON.stringify` of it no longer carries `message` (an `Error`'s own property is not enumerable).
 - `Socket`, `EventReader`, `StreamRun`, `Resource`, `TrackedCall`, `TrackedApi` and `ActionStream` gain `pending()` and `error()` (and all but `ActionStream` `retry()`), so a hand-built mock of one in a test needs them: `pending: () => false, error: () => undefined`. An `ActionStream` is no longer assignable to an `EventReader`, which has `retry()` and `ActionStream` does not yet. `ResourceStatus` gains `idle` as `LoadStatus` and `ResourceFailure` is a class as `ApiError`, so code narrowing on either may need a case.
+### Lifetimes are `ttl`
+
+- A page's `revalidate` is `ttl`, a `notify` option `keep` is `ttl`, a `queue` or `workflow` option `keepFailed` is `failedTtl` and kayjs-ai's `Chat` prop `keep` is `history`, so `keep` only ever means a boolean. The old names work until 1.90 and `deprecated-lifetimes` writes the new ones: [deprecated lints](deprecated-lints.md).
 
 ### A page at a collection's route prerenders
 

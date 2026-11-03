@@ -587,6 +587,7 @@ async function imageRouteOf({ project: { root }, options, env, setup: { source, 
     quality: webpQuality(options.images),
     avif: env.dev ? undefined : avifQuality(options.images),
     aspects: options.images?.aspects,
+    ttl: options.images?.ttl,
     saveData: options.saveData,
     remote: remoteImages(join(imageCache, 'remote'), await remotePatterns(options.images?.remote), imageCache, undefined, remoteLimits(options.images)),
     security,
@@ -676,7 +677,7 @@ export async function siteFiles(boot: Boot) {
   const { app, env, options, served, routes, log, dictionaryUsed, project: { root, paths, mode }, setup: { source, client, site, i18n, locales, collections, appManifest } } = boot
 
   if (site !== undefined)
-    serveSitemap(app, served, routes, site, { dev: env.dev, onError: options.onError, trailingSlash: env.trailingSlash, locales: i18n?.settings, robots: options.robots, base: env.base })
+    serveSitemap(app, served, routes, site, { dev: env.dev, onError: options.onError, trailingSlash: env.trailingSlash, locales: i18n?.settings, robots: options.robots, base: env.base, ttl: options.sitemap?.ttl })
 
   const favicon = faviconSource(root, options.favicon, options.manifest)
 

@@ -115,6 +115,22 @@ const html = await renderToString(Mail, { order }, { locale: 'fr' })
 
 ## Reference
 
+### What is cached and for how long
+
+| What | Lifetime | Invalidated by |
+| --- | --- | --- |
+| `cached` and `cache` values | the `ttl` of the call, stale while it refreshes | `invalidate(target)` |
+| A collection's loader | its `ttl` | `invalidate(collection)` |
+| A prerendered page | the page's `ttl` | `invalidate({ page: path })`, `invalidatePage`, or an `invalidate` of what it read |
+| The sitemap | 1 hour, `sitemap: { ttl }` in kay.config.ts | the ttl |
+| Image variants | 30 days, `images: { ttl }` in kay.config.ts | the ttl |
+| Feeds | 1 hour, `public, max-age=3600` | the ttl |
+| Public files | `publicCache` in kay.config.ts | a new file name |
+| A CDN's copy of a public prerendered page | `s-maxage` of the page's `ttl`, `cacheControl` overrides it | the CDN's own purge |
+
+- `invalidate(target)` takes a string key, a function over keys, a `cache()` function, a `cacheTag()`, a collection, or on the server `{ page: path }` (a path or a function over paths).
+- A lifetime is always `ttl` or a word ending in `Ttl` (`failedTtl`), a string with a unit; `keep` is only ever a boolean.
+
 ### Caching
 
 `cached(key, ttl, load)` from `kay/cache` keeps what a load fetches for `ttl`, a string such as `'5m'`, shared by every request in the process:

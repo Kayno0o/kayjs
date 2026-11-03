@@ -367,7 +367,7 @@ header
 
 Without a `store` in `kay.config.ts` the notifications live in the process's memory. `sqliteData` and `pgData` keep them in a `kay_notifications` table, created on first use.
 
-A notification is deleted after 90 days. `keep: '7d'` in `notify` shortens or lengthens that for one, and a user keeps their newest 200.
+A notification is deleted after 90 days. `ttl: '7d'` in `notify` shortens or lengthens that for one, and a user keeps their newest 200.
 
 The title is text, never HTML. The link is kept only when it is a path of your site or an http or https URL, so a `javascript:` link is dropped. `notifications` from `kay/server` lists, reads and erases a user's inbox from your own code, and `notifications.erase(userId)` belongs in the function that [erases a person](/guides/privacy#erasing-a-person).
 

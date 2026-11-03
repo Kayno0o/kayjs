@@ -2,7 +2,7 @@ import type { ChatMessage } from './types'
 import { s } from 'kay'
 
 export interface ChatMessagesOptions {
-  // The most messages a send holds, 40: `Chat` posts its `keep` (20 by default) at most, and a longer history is refused with a 422.
+  // The most messages a send holds, 40: `Chat` posts its `history` (20 by default) at most, and a longer history is refused with a 422.
   maxItems?: number | undefined
   // The most characters of a message's text, 4,000.
   maxLength?: number | undefined

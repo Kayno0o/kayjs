@@ -70,7 +70,7 @@ See [Forms and actions](/essentials/forms-and-actions) and [Islands](/essentials
 | Criterion | Mark | What kay does |
 | --- | --- | --- |
 | 1.6 Responsible data collection | Met for what kay keeps | No cookie until a feature needs one. Request logs hold no address, user agent or cookie. Your own data is yours to limit. |
-| 7.2 Retention periods | Met for what kay keeps | A session expires after `maxAge` unused. A failed job is dropped after 30 days unless `keepFailed` says less. Your own rows and files keep the retention you give them. |
+| 7.2 Retention periods | Met for what kay keeps | A session expires after `maxAge` unused. A failed job is dropped after 30 days unless `failedTtl` says less. Your own rows and files keep the retention you give them. |
 | 1.7 Encryption | App | Cookies are `Secure` over https. `security.headers` adds HSTS. The TLS itself is your proxy's or host's. |
 | 2.10 Third-party services | App | `analytics()` forwards visits from the server, so the CSP needs no third-party host. Other services are your choice. |
 | 4.4 The visitor decides on a third-party service | App | `analytics()` can wait for the visitor's yes. A persisted signal keeps the answer for any other script. |

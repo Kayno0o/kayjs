@@ -35,6 +35,7 @@ Every option is optional. The tables give each option's default. The full refere
 | --- | --- |
 | `site` | The public origin, for canonical links, the sitemap and social URLs. `SITE_URL` when left out, and under `kay dev` `http://localhost:<port>` when that is unset too; a `site` written here wins over both. See [Head and SEO](/essentials/head-and-seo) |
 | `seo` | What every page's head starts from: `name`, `titleTemplate`, `description`, `image`, `imageAlt`, `locale` (`og:locale`), `themeColor`, `twitter`, `jsonLd`. See [Head and SEO](/essentials/head-and-seo) |
+| `sitemap` | `{ ttl }`, how long the sitemap is kept before it is built again, `'1h'` by default. |
 | `robots` | Paths `/robots.txt` disallows or allows, `{ disallow: ['/admin'] }`, listed for every locale; `false` serves none. See [Head and SEO](/essentials/head-and-seo#sitemap-and-robotstxt) |
 | `head` | Tags every page's head carries, written as a `head` block compiles them; the CSP lets their inline scripts through. See [Head and SEO](/essentials/head-and-seo) |
 | `favicon` | A square image of 512 px or more, or a square SVG, served as the favicon and the manifest icons. `false` serves none |
@@ -79,7 +80,7 @@ Every option is optional. The tables give each option's default. The full refere
 
 | Option | Effect |
 | --- | --- |
-| `images` | `quality`, `widths`, `webp`, `avif`, the densest screen an image loads for (`maxDensity`, 2 by default), the shapes `aspect` may cut to (`aspects`), `placeholder: false` to leave out the color an image shows until it loads, the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`, with `remoteMaxSize` and `remoteTimeout`) are resized, and the app's own lookup of private images (`resolve`, `guard`). See [Styling and assets](/essentials/styling-and-assets) |
+| `images` | `quality`, `widths`, `webp`, `avif`, the densest screen an image loads for (`maxDensity`, 2 by default), the shapes `aspect` may cut to (`aspects`), `placeholder: false` to leave out the color an image shows until it loads, how long a cut variant is kept on disk (`ttl`, 30 days), the share cards' look and logo (`card`), which extra directories (`dirs`) or hosts (`remote`, with `remoteMaxSize` and `remoteTimeout`) are resized, and the app's own lookup of private images (`resolve`, `guard`). See [Styling and assets](/essentials/styling-and-assets) |
 | `fonts` | Self-hosted fonts, from files or a Fontsource package |
 | `plugins` | Bun plugins the browser build runs, such as Tailwind's |
 | `budget` | The most JavaScript (`js`), CSS (`css`) or whole page (`weight`) one page may load, compressed, as `'20kb'`, and the worst EcoIndex `grade` it may have. `kay build` warns with `over-budget` for a page over it. All are off until set. See [Set a budget](/guides/performance#set-a-budget) |

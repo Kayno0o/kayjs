@@ -129,7 +129,7 @@ The line under the chat has its own prop, `disclosure`, [explained below](#perso
 
 The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with, each a `ChatTurn` (`{ role, content, sources? }`, a type `@kaynooo/kayjs-ai` exports): a message carrying attachments cannot be passed, as an island prop holds no file.
 
-The chat posts its last 20 messages with each one; the `keep` prop changes that, and what is posted always opens on one of the visitor's, so an assistant greeting in `initial` is never the first message. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
+The chat posts its last 20 messages with each one; the `history` prop changes that, and what is posted always opens on one of the visitor's, so an assistant greeting in `initial` is never the first message. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
 
 Each send also posts at most 40,000 characters, dropping the oldest messages first. If your `ask` sets a lower `maxInputChars`, you need to tell the chat nothing: when the action refuses a conversation with a 413, the chat posts half as much (the oldest messages go first) and asks again, up to five times, and it remembers the lower size for the next sends. Each of those refusals counts against the action's rate limit. `maxChars` sets the size from the start.
 

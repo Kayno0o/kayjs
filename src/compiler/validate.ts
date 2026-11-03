@@ -8,6 +8,9 @@ import { WIDGET_ROLES } from './aria'
 import { childBlocks, EVENT_MODIFIERS, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, serverIslandOf, templateFacts, visitNodes } from './ast'
 
 const UI_SOURCE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
+const AI_CHAT_SOURCE = '@kaynooo/kayjs-ai/chat.kay'
+// The `file` key `uiComponents` holds for kayjs-ai's Chat.
+const AI_CHAT = 'ai-chat'
 // A `muted` string standing as a value, alone or as an array element or ternary branch: never one compared against, passed to a call or inside a longer string.
 const MUTED = /(^\s*|[[,?:]\s*)(['"])muted\2(?=\s*([\]),:}]|$))/g
 const MUTED_TONE = /(\btone['"]?\s*:\s*)(['"])muted\2/g
@@ -208,6 +211,8 @@ class Validator {
 
       if (match)
         this.uiComponents.set(binding.local, match[1]!)
+      else if (binding.imported === 'default' && !binding.typeOnly && binding.source === AI_CHAT_SOURCE)
+        this.uiComponents.set(binding.local, AI_CHAT)
     }
 
     this.restName = script.props?.rest && this.text(script.props.rest)
@@ -831,7 +836,7 @@ class Validator {
       return
 
     for (const attribute of element.attributes) {
-      if (attribute.kind === 'spread' || attribute.kind === 'boolean')
+      if (attribute.kind === 'spread')
         continue
 
       const name = this.text(attribute.name)
@@ -844,14 +849,25 @@ class Validator {
         continue
       }
 
-      if (FIELD_TAGS.has(file) && name === 'size') {
-        const value = attribute.kind === 'static' ? attribute.text : this.text(attribute.expression)
-
-        if (NUMBER.test(value))
-          this.lint(attribute.name, 'deprecated-ui-tone', `\`size\` on \`${element.name}\` is a field size since kayjs-ui 1.87, \`sm\`, \`md\` or \`lg\`, not the native character width`, { help: 'width the field with a class, such as `w-[20ch]`' })
+      // kayjs-ai's Chat counted the messages each send posts as `keep`, a word the config keeps for a boolean; it is `history` since 1.87.
+      if (file === AI_CHAT) {
+        if (name === 'keep')
+          this.lint(attribute.name, 'deprecated-lifetimes', '`keep` of `Chat` is `history` since 1.87: the number of messages each send posts', { help: 'Write `history`', fixes: [{ title: 'Write `history`', edits: [{ start: attribute.name.start, end: attribute.name.end, text: 'history' }], safe: true }] })
 
         continue
       }
+
+      if (attribute.kind === 'boolean')
+        continue
+
+      if (FIELD_TAGS.has(file) && name === 'size') {
+      const value = attribute.kind === 'static' ? attribute.text : this.text(attribute.expression)
+
+      if (NUMBER.test(value))
+        this.lint(attribute.name, 'deprecated-ui-tone', `\`size\` on \`${element.name}\` is a field size since kayjs-ui 1.87, \`sm\`, \`md\` or \`lg\`, not the native character width`, { help: 'width the field with a class, such as `w-[20ch]`' })
+
+      continue
+    }
 
       const span = attribute.kind === 'static' ? attribute.value : attribute.expression
       const wanted = (file === 'sparkline' && (name === 'tone' || name === 'tones')) || (file === 'status-strip' && name === 'cells') || (file === 'timeline' && name === 'entries')

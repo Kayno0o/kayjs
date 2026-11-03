@@ -700,6 +700,15 @@ export const LINTS = {
     wrong: 'export const posts = collection(\'content/posts\', { schema, route: \'/blog/:slug\', feed: { path: \'/blog/rss.xml\', title: \'Blog\', item: post => ({ title: post.data.title, date: post.data.date, path: `/blog/${post.slug}` }) } })',
     right: 'export const posts = collection(\'content/posts\', { schema, route: \'/blog/:slug\', feed: { path: \'/blog/rss.xml\', title: \'Blog\', item: post => ({ title: post.data.title, date: post.data.date }) } })',
   },
+  'deprecated-lifetimes': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.87',
+    site: true,
+    summary: 'A lifetime under the name it had before 1.87, when every lifetime came to be `ttl` or a word ending in `Ttl` and `keep` came to mean a boolean only: a page\'s `revalidate` is `ttl`, `notify(user, { keep })` is `ttl`, the `keepFailed` of a `queue()` or `workflow()` is `failedTtl`, and kayjs-ai\'s `Chat` `keep`, the number of messages each send posts, is `history`. The old names work until 1.90. Found in the TypeScript files and `.kay` fences (the `page` object, and `notify`, `queue` and `workflow` read from `kay` or `kay/server`) and in the templates calling `Chat` from `@kaynooo/kayjs-ai/chat.kay`; the fix renames the key, a shorthand `{ keep }` becoming `{ ttl: keep }`. A key written beside its new name is reported with no fix.',
+    wrong: '--- server\nexport const page = { prerender: true, revalidate: \'1h\' }\n---\nh1 Blog',
+    right: '--- server\nexport const page = { prerender: true, ttl: \'1h\' }\n---\nh1 Blog',
+  },
   'deprecated-ui-tone': {
     level: 'warn',
     group: 'deprecated',

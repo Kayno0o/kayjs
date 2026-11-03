@@ -143,7 +143,7 @@ The handler takes an `AbortSignal` as its second argument. It aborts when the ru
 
 A queue made with `lazy: true` starts no worker with the server. The first `enqueue`, or a call to `activate()`, starts it. Use it for a queue an app may never need, so it costs no idle poll.
 
-A failed job is kept 30 days, its payload included, or as long as `keepFailed` says. To erase a person's jobs, call `remove(match)`. It removes every waiting or failed job whose payload matches.
+A failed job is kept 30 days, its payload included, or as long as `failedTtl` says. To erase a person's jobs, call `remove(match)`. It removes every waiting or failed job whose payload matches.
 
 ```ts
 welcomeMails.remove(job => job.to === email)
