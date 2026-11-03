@@ -43,7 +43,7 @@ const { id, links, link, current, label, menuLabel = wording('ui.siteNav.menu', 
   menuLabel?: string | undefined
   // Names the button opening a link's children, `{label}` standing for the link's.
   expandLabel?: string | undefined
-  // Shows the menu of a narrow screen when the page sets it, such as to close it on its own navigation; the toggle, a press outside and Escape open and close it on their own. Either prop makes the SiteNav an island.
+  // Shows the menu of a narrow screen when the page sets it, such as to close it on its own navigation; the toggle, a press outside and Escape open and close it on their own. An `onOpenChange` makes the SiteNav an island.
   open?: boolean | undefined
   // Called with the menu's new state whenever it shows or hides, however it did.
   onOpenChange?: ((open: boolean) => unknown) | undefined

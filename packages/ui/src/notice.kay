@@ -43,12 +43,12 @@ const { tone = 'info', label, size = 'md', icon, actions, dismissible = false, o
   dismissLabel?: string | undefined
 }>()
 
-const drawn = (): IconSlot | IconProps | undefined => icon === true ? TONE_ICON[tone] : icon || undefined
+const drawn = (): IconSlot | IconProps | undefined => icon === true ? TONE_ICON[tone] ?? TONE_ICON.info : icon || undefined
 const closable = () => dismissible || open !== undefined
 const framed = () => drawn() !== undefined || actions !== undefined || closable()
 ---
 // A form's outcome or a refusal, in place: what a toast says in passing, said where the page stays.
-div({...rest} role={tone === 'danger' ? 'alert' : 'status'} data-tone={tone} data-compact={size === 'sm' ? '' : undefined} data-framed={framed() ? '' : undefined} hidden={open === false ? '' : undefined})
+div({...rest} role={tone === 'danger' ? 'alert' : 'status'} data-tone={tone} data-compact={size === 'sm' ? '' : undefined} data-framed={framed() ? '' : undefined} hidden={open === false ? '' : rest.hidden})
   if drawn()
     Icon(icon={drawn()!} part="icon")
   if framed()

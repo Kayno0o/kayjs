@@ -44,7 +44,7 @@ const { items: given, list, caption, index = 0, onIndexChange, open = false, onO
   onIndexChange?: ((index: number) => unknown) | undefined
   // Shows the lightbox on the current item when the page sets it; a click on the picture, Escape and a click outside open and close it on their own.
   open?: boolean | undefined
-  // Called with the lightbox's new state and the index of the item on it, whenever it opens or closes, however it did.
+  // Called with the lightbox's new state and the index of the item on it, whenever a visitor opens or closes it; a change the page set through `open` is not echoed.
   onOpenChange?: ((open: boolean, index: number) => unknown) | undefined
   // The stage's CSS `aspect-ratio`.
   ratio?: string | undefined

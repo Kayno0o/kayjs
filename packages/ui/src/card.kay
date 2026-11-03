@@ -5,7 +5,7 @@ import { recipe } from 'kay'
 // 'kui-card' stays as the component's name for an app's CSS and tests.
 const look = recipe({
   parts: {
-    root: 'kui-card flex flex-col [overflow-wrap:anywhere] rounded-lg border-[length:var(--border-width)] border-solid border-border bg-surface [box-shadow:var(--shadow-raised)] data-linked:relative data-linked:[&_:is(a,button,input,select,textarea,summary):not([data-part=link])]:relative data-linked:[&_:is(a,button,input,select,textarea,summary):not([data-part=link])]:z-10',
+    root: 'kui-card flex flex-col [overflow-wrap:anywhere] rounded-lg border-[length:var(--border-width)] border-solid border-border bg-surface [box-shadow:var(--shadow-raised)] data-linked:relative data-linked:[&_:is(a,button,select,textarea,summary,label,[role=button],input:not(label_input)):not([data-stretched])]:relative data-linked:[&_:is(a,button,select,textarea,summary,label,[role=button],input:not(label_input)):not([data-stretched])]:z-10',
     head: 'flex items-center gap-3 border-b-[length:var(--border-width)] border-solid border-border px-3 py-2',
     // mr-auto rather than ml-auto on what follows: a head that is all control and no title reads from the left, like the body under it.
     title: 'mr-auto text-2xs [font-weight:var(--font-weight-normal)] [letter-spacing:var(--tracking-label)] text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
@@ -32,7 +32,7 @@ const { title, level = 3, head, bare = false, href, ...rest } = props<Omit<JSX.I
 ---
 snippet label()
   if href !== undefined
-    a(part="link" href={href}) {title}
+    a(part="link" href={href} data-stretched) {title}
   else
     | {title}
 // The frame a page's content is written on; every part of it is optional, so a card with no title is the frame alone.

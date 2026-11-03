@@ -11,6 +11,7 @@ const shown = signal(true)
   Notice(tone="danger" label="Toned" icon={true})
 #custom
   Notice(label="Custom" icon="success")
+Notice#forced-hidden(label="Forced" hidden)
 #acting
   Notice(label="Retry?")
     @actions

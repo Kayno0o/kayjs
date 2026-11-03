@@ -72,3 +72,9 @@ test('a controlled notice follows open, hides on its button and shows again when
 
   expect(box(page, 'controlled').hidden).toBe(false)
 })
+
+test('a caller\'s hidden attribute still hides a notice that is not controlled', async () => {
+  const page = await root()
+
+  expect(page.querySelector<HTMLElement>('#forced-hidden')!.hasAttribute('hidden')).toBe(true)
+})

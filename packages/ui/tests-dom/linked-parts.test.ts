@@ -76,3 +76,10 @@ test('a timeline entry with an href is a link marked current when selected, neve
 
   expect(picks).toEqual([])
 })
+
+test('the stretched link is marked so the controls and labels inside a linked card can be lifted above it', async () => {
+  const page = await root()
+
+  expect(page.querySelector('#card-link [data-part=link]')!.hasAttribute('data-stretched')).toBe(true)
+  expect(page.querySelector('#row-link [data-part=link]')!.hasAttribute('data-stretched')).toBe(true)
+})

@@ -14,7 +14,7 @@ const look = recipe({
     item: 'max-sm:data-[middle]:hidden',
     link: 'text-muted underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
     text: 'aria-[current=page]:text-foreground',
-    icon: 'inline size-3.5 shrink-0 align-text-bottom',
+    icon: 'mr-1 inline size-3.5 shrink-0 align-text-bottom',
   },
 })
 

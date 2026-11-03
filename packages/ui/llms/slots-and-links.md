@@ -21,7 +21,7 @@
 - `Tabs` tabs, `TabNav` links and `TabNav` tabs share `{ label, icon, badge, disabled }`: `icon` before the label, `badge` (a count or short text, part `badge`) after it. A disabled `TabNav` link is a `span` with `aria-disabled="true"`, never current; a disabled `Tabs` tab is a disabled button the arrow keys skip.
 - `Breadcrumb` items take `icon`; the structured data keeps the `label`.
 - A `NavLink` of `SiteNav` and `AppHeader` takes `children`, one level of links. The link keeps its own page and is followed by a button (`expand`, named by `expandLabel`, `{label}` standing for the link's) that opens the children as a popover from `lg`; in the menu of a narrow screen they are always shown, nested under it.
-- `SiteNav` and `AppHeader` take `open` and `onOpenChange(open)` for the menu of a narrow screen: the page sets it, for instance to close it on its own navigation, and is told whenever it shows or hides. Either prop makes the nav an island.
+- `SiteNav` and `AppHeader` take `open` and `onOpenChange(open)` for the menu of a narrow screen: the page sets it, for instance to close it on its own navigation, and is told whenever it shows or hides. An `onOpenChange` makes the nav an island.
 
 ### Dismiss, icon and actions on a Notice
 
