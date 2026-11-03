@@ -3,7 +3,7 @@
 // `tests/llms.test.ts` holds this table to the exports of `kay`.
 export type KayRole = 'browser' | 'shared'
 
-export const KAY_EXPORTS: Readonly<Record<string, KayRole>> = {
+export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
   ActionError: 'shared',
   ActionRedirectError: 'shared',
   ApiError: 'shared',
@@ -79,16 +79,16 @@ export const KAY_EXPORTS: Readonly<Record<string, KayRole>> = {
 }
 
 // What `kay/i18n` exports that needs the browser; the rest of it reads the locale alike on both sides.
-export const I18N_EXPORTS: Readonly<Record<string, KayRole>> = {
+export const I18N_ROLES: Readonly<Record<string, KayRole>> = {
   relativeTime: 'browser',
 }
 
-export const KAY_VALUES: readonly string[] = Object.keys(KAY_EXPORTS)
+export const KAY_VALUES: readonly string[] = Object.keys(KAY_ROLES)
 
 // Whether an import of `source` named `imported` needs the browser: any name of `kay` the table does not mark shared, and the browser names of `kay/i18n`.
 export function needsBrowser(source: string, imported: string): boolean {
   if (source === 'kay')
-    return KAY_EXPORTS[imported] !== 'shared'
+    return KAY_ROLES[imported] !== 'shared'
 
-  return source === 'kay/i18n' && I18N_EXPORTS[imported] === 'browser'
+  return source === 'kay/i18n' && I18N_ROLES[imported] === 'browser'
 }

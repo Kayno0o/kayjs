@@ -4,7 +4,7 @@ import type { NodeOfType } from './estree'
 import type { ImportedSignals } from './module-signals'
 import type { ImportBinding, ScriptAnalysis } from './script-shared'
 import { isGlobalFunctionMember, SENDABLE_CLASSES } from './expression'
-import { KAY_EXPORTS, needsBrowser } from './kay-exports'
+import { needsBrowser } from './kay-exports'
 import { iconImport } from './module-signals'
 import { propsDeclaration, reportMisplacedProps } from './script-props'
 import { isExport } from './script-server'
@@ -51,7 +51,7 @@ function analyzeModule(source: string, module: Span, iconSets: ReadonlySet<strin
 
   importedFunctions(analysis, scope, iconSets, imported)
 
-  analysis.reactive = analysis.implicit.some(name => KAY_EXPORTS[name] !== 'shared') || analysis.imports.some(importsReactiveValue)
+  analysis.reactive = analysis.implicit.some(name => needsBrowser('kay', name)) || analysis.imports.some(importsReactiveValue)
 
   for (const { statement, span } of split.statements) {
     if (propsDeclaration(statement, split.ast.body, split.shift, [])) {
@@ -90,7 +90,7 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
 
   if (!script) {
     analysis.implicit = templateReads.filter(name => !serverNames.includes(name))
-    analysis.reactive = analysis.implicit.some(name => KAY_EXPORTS[name] !== 'shared')
+    analysis.reactive = analysis.implicit.some(name => needsBrowser('kay', name))
 
     return analysis
   }
@@ -104,7 +104,7 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
 
   importedFunctions(analysis, scope, iconSets, imported)
 
-  analysis.reactive = analysis.implicit.some(name => KAY_EXPORTS[name] !== 'shared') || analysis.imports.some(importsReactiveValue)
+  analysis.reactive = analysis.implicit.some(name => needsBrowser('kay', name)) || analysis.imports.some(importsReactiveValue)
 
   for (const { statement, span, gap } of split.statements) {
     analysis.body.push(...gap)
@@ -343,7 +343,7 @@ function holdsFunction(value: Node, scope: FunctionScope): boolean {
 
 // The first value that makes the script reactive, as the script names it and where it comes from: an implicit global such as `signal` comes from `kay`.
 export function reactiveValue(script: ScriptAnalysis): { name: string, source: string } | undefined {
-  const implicit = script.implicit.find(name => KAY_EXPORTS[name] !== 'shared')
+  const implicit = script.implicit.find(name => needsBrowser('kay', name))
 
   if (implicit !== undefined)
     return { name: implicit, source: 'kay' }
@@ -358,7 +358,7 @@ function importsReactiveValue(binding: ImportBinding): boolean {
     return false
 
   if (binding.imported === 'default' || binding.imported === '*')
-    return binding.source === 'kay'
+    return binding.source === 'kay' || binding.source === 'kay/i18n'
 
   return needsBrowser(binding.source, binding.imported)
 }

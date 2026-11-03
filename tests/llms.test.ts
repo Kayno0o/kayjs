@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { ARCHIVES } from '../scripts/whats-new'
 import { compileKay, formatDiagnostic } from '../src/compiler'
-import { KAY_EXPORTS, KAY_VALUES } from '../src/compiler/kay-exports'
+import { KAY_ROLES, KAY_VALUES } from '../src/compiler/kay-exports'
 import { LINTS } from '../src/compiler/lints'
 import { nativeExe } from '../src/compiler/native-typescript'
 import { formatKay } from '../src/format'
@@ -135,13 +135,15 @@ describe('llms.txt and its docs', () => {
     expect([...exported].filter(name => named.has(name) && !placed.has(name) && !implicit.has(name)).sort()).toEqual([])
   })
 
-  it('names every shared value of kay in the islands reference, which the compiler table decides', async () => {
-    const islands = await Bun.file(join(root, 'llms/islands.md')).text()
+  it.each(['llms/islands.md', 'docs/src/content/docs/essentials/islands.md'])('names every shared value of kay in %s, which the compiler table decides', async (file) => {
+    const islands = await Bun.file(join(root, file)).text()
     const line = islands.split('\n').find(row => row.includes('compute the same on both sides'))!
-    const named = [...line.matchAll(/`(\w+)`/g)].map(match => match[1]!).filter(name => name in KAY_EXPORTS)
+    const named = [...line.matchAll(/`(\w+)`/g)].map(match => match[1]!).filter(name => name in KAY_ROLES)
 
-    expect(named.filter(name => KAY_EXPORTS[name] === 'browser').sort()).toEqual(['call', 'logFrom', 'navigate', 'refresh'])
-    expect(named.filter(name => KAY_EXPORTS[name] === 'shared').sort()).toEqual(Object.keys(KAY_EXPORTS).filter(name => KAY_EXPORTS[name] === 'shared').sort())
+    expect(named.filter(name => KAY_ROLES[name] === 'shared').sort()).toEqual(Object.keys(KAY_ROLES).filter(name => KAY_ROLES[name] === 'shared').sort())
+
+    if (file.startsWith('llms/'))
+      expect(named.filter(name => KAY_ROLES[name] === 'browser').sort()).toEqual(['call', 'logFrom', 'navigate', 'refresh'])
   })
 
   it('lists every value of kay for the compiler to import where a file reads it unimported', async () => {

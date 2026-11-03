@@ -2582,6 +2582,24 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('refuses `hydrate` and `persist` on a component that is static, as a value of kay that became shared leaves it (#2808)', async () => {
+    const root = await scratchProject({
+      'src/components/feed.kay': '---\nimport { apiUrl } from \'kay\'\n\nconst { label } = props<{ label: string }>()\n---\na(href={apiUrl(\'/rss\')}) {label}\n',
+      'src/routes/index.kay': '---\nimport Feed from \'../components/feed.kay\'\n---\nFeed(label="RSS" hydrate="visible")\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(d => d.code?.startsWith('TS')).map(d => [d.file.slice(root.length + 1), d.message])
+
+      expect(found).toHaveLength(1)
+      expect(found[0]![0]).toBe('src/routes/index.kay')
+      expect(found[0]![1]).toContain('hydrate')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('hands an island a spread of props that hold markup, as the launcher of kayjs-ai spreads its chat\'s (#2472)', async () => {
     const root = await scratchProject({
       'src/components/island.kay': '---\nimport type { Snippet } from \'kay\'\nimport { signal } from \'kay\'\n\nconst { name, icon, extra } = props<{ name: string, icon?: Snippet, extra?: Snippet }>()\nconst open = signal(0)\n---\nbutton(onClick={() => open = open() + 1}) {name} {open()}\n  slot icon\n  slot extra\n',

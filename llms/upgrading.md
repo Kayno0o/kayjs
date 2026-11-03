@@ -6,7 +6,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `publicEnv` and `defineUi` no longer make a component an island
 
-- A component whose only value from `kay` is one of these is static now, with the same markup, and ships no JavaScript. Nothing fails and no lint reports it: the component loses its island chunk.
+- A component whose only value from `kay` is one of these is static now and ships no JavaScript: it loses its island chunk.
+- It renders without the `<slot data-component ...>` an island sits in, so a selector relying on that element (`>`, `+`, `:first-child`, `:nth-child`) sees one element fewer: re-check them.
+- `hydrate` and `persist` are island options: a parent passing them to such a component drops them, and `kay check` reports a leftover one as a type error on a component that declares props (one that declares none takes any attribute).
+- No lint can recognise it: the change is in what the compiler decides for a component, not in a form an app writes, so there is no old syntax for a `deprecated` lint to find and fix.
 - `kay explain island` and `kay build --format json` show the role of each component.
 
 ### A page at a collection's route prerenders
