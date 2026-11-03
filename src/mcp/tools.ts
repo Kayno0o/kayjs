@@ -6,6 +6,7 @@ import process from 'node:process'
 import { KAY_DIR } from '../build/assets'
 import { isLintGroup, LINT_GROUPS } from '../compiler/lints'
 import { MAX_HEIGHT, MAX_WIDTH, MIN_SIZE } from '../dev/screenshot-limits'
+import { docFiles } from '../docs-search'
 import { DEV_ERRORS_FILE } from '../server/dev-errors'
 
 const CLI = join(import.meta.dir, '..', 'cli.ts')
@@ -23,6 +24,7 @@ const CONTENT_TYPE = /^content-type:\s*([^;\s]+)/im
 // A body read as text: a `text/` type, or one of the structured formats that are text, `+json` and `+xml` suffixes included.
 const TEXT_TYPE = /^(?:text\/|application\/(?:json|xml|javascript|ecmascript|x-www-form-urlencoded|graphql|yaml|.+\+(?:json|xml)))/i
 const HEADING = /^(#{1,2}) (.+)$/gm
+const GENERATED_KINDS = ['page', 'component', 'island', 'action', 'api', 'guard', 'resource']
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
 
 // The commands running for a call.
@@ -44,7 +46,7 @@ interface Run {
 
 // The tools and resources of the project at `root`, which is where each tool's `kay` command runs.
 export async function projectCapabilities(root: string): Promise<{ tools: Tool[], resources: Resource[] }> {
-  return { tools: tools(root), resources: await resources() }
+  return { tools: tools(root), resources: await resources(root) }
 }
 
 function tools(root: string): Tool[] {
@@ -220,6 +222,118 @@ function tools(root: string): Tool[] {
       },
     },
     {
+      name: 'fmt',
+      title: 'Check the formatting',
+      description: 'Checks that .kay files are formatted, writing nothing: `kay fmt --check --format json`. Answers `{ errors, warnings, problems, written, changed }`, `changed` listing the files that are not formatted and `problems` the files that do not compile; it is an error result when either is not empty, the document still carried. Run `kay fmt` in a shell to format them.',
+      inputSchema: { type: 'object', properties: { paths: { type: 'array', items: { type: 'string' }, description: 'Files or directories in the project to check, relative to the project root; the whole project by default.' } }, additionalProperties: false },
+      annotations: READ_ONLY,
+      run: async (args) => {
+        const paths = stringList(args.paths, 'paths').map(path => insideProject(root, path))
+
+        return document(['fmt', '--check', '--format', 'json', ...paths.length === 0 ? [] : ['--', ...paths]])
+      },
+    },
+    {
+      name: 'generate',
+      title: 'Preview a generated file',
+      description: 'Lists the files `kay generate` would write for a page, component, island, action, api, guard or resource, writing none: `kay generate --dry-run --format json`. Answers `{ kind, name, written, dryRun }`, `written` being the files it would create. Run `kay generate` in a shell to write them.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          kind: { type: 'string', enum: GENERATED_KINDS, description: 'What to generate.' },
+          name: { type: 'string', description: 'The name, such as `about` or `post-card`.' },
+          fields: { type: 'array', items: { type: 'string' }, description: 'For a resource, its fields each as `name:type`.' },
+          plural: { type: 'string', description: 'For a resource, the plural of its name.' },
+        },
+        required: ['kind', 'name'],
+        additionalProperties: false,
+      },
+      annotations: READ_ONLY,
+      run: async (args) => {
+        const { kind, name } = args
+        const plural = optionalString(args.plural, 'plural')
+
+        if (typeof kind !== 'string' || !GENERATED_KINDS.includes(kind))
+          throw new Error(`kind takes one of ${GENERATED_KINDS.join(', ')}`)
+
+        if (typeof name !== 'string' || name === '')
+          throw new Error('name takes a name')
+
+        return document(['generate', '--dry-run', '--format', 'json', ...plural === undefined ? [] : [`--plural=${plural}`], '--', kind, name, ...stringList(args.fields, 'fields')])
+      },
+    },
+    {
+      name: 'add',
+      title: 'Preview adding features',
+      description: 'Lists what `kay add` would write to add features such as `tailwind`, `auth` or `mail` to the app, writing and installing nothing: `kay add --dry-run --format json`. Run `kay add` in a shell to apply it.',
+      inputSchema: { type: 'object', properties: { features: { type: 'array', items: { type: 'string' }, minItems: 1, description: 'The features to add.' } }, required: ['features'], additionalProperties: false },
+      annotations: READ_ONLY,
+      run: async (args) => {
+        const features = stringList(args.features, 'features')
+
+        if (features.length === 0)
+          throw new Error('features takes at least one feature')
+
+        return document(['add', '--dry-run', '--no-install', '--format', 'json', '--', features.join(',')])
+      },
+    },
+    {
+      name: 'test',
+      title: 'Run the tests',
+      description: 'Runs the project\'s tests as `kay test` does (`bun test` with kay\'s preload), and answers what it printed: the report on stderr, then stdout, as an error result when a test fails. A test may write to the database it is given, so this is not a read-only call.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          files: { type: 'array', items: { type: 'string' }, description: 'Test files or directories in the project to run, relative to the project root; every test by default.' },
+          name: { type: 'string', description: 'Only run the tests whose name matches this pattern.' },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      run: async (args) => {
+        const files = stringList(args.files, 'files').map(path => insideProject(root, path))
+        const name = optionalString(args.name, 'name')
+        const result = await kay(['test', ...name === undefined ? [] : [`--test-name-pattern=${name}`], ...files.map(file => `./${file}`)])
+
+        return { content: [{ type: 'text', text: `kay test exited ${result.code}\n${[result.stderr.trim(), result.stdout.trim()].filter(Boolean).join('\n')}`.trim() }], isError: result.code !== 0 }
+      },
+    },
+    {
+      name: 'env',
+      title: 'Check the environment variables',
+      description: 'Checks the environment variables the app declares against the compose files and the example file, writing nothing: `kay env --format json`. Answers its document, a problem found being a result.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      annotations: READ_ONLY,
+      run: async () => document(['env', '--format', 'json']),
+    },
+    {
+      name: 'i18n_missing',
+      title: 'List missing translations',
+      description: 'Lists the messages and localized entries a locale lacks against the default one: `kay i18n missing --format json`. Without a locale, every non-default locale.',
+      inputSchema: { type: 'object', properties: { locale: { type: 'string', description: 'A locale of the app, such as `fr`.' } }, additionalProperties: false },
+      annotations: READ_ONLY,
+      run: async (args) => {
+        const locale = optionalString(args.locale, 'locale')
+
+        return document(['i18n', 'missing', '--format', 'json', ...locale === undefined ? [] : ['--', locale]])
+      },
+    },
+    {
+      name: 'a11y',
+      title: 'Audit accessibility',
+      description: 'Opens the pages of the app in Chromium and audits them with axe-core, writing no declaration: `kay a11y --dry-run --format json`. A call takes as long as the audit; needs Chrome or Chromium (`BUN_CHROME_PATH`). Answers its document, a violation found being a result.',
+      inputSchema: { type: 'object', properties: { standard: { type: 'string', enum: ['rgaa', 'wcag'], description: 'The criteria the pages are marked against.' } }, additionalProperties: false },
+      annotations: READ_ONLY,
+      run: async (args) => {
+        const standard = optionalString(args.standard, 'standard')
+
+        if (standard !== undefined && standard !== 'rgaa' && standard !== 'wcag')
+          throw new Error('standard takes rgaa or wcag')
+
+        return document(['a11y', '--dry-run', '--format', 'json', ...standard === undefined ? [] : [`--standard=${standard}`]])
+      },
+    },
+    {
       name: 'dev_errors',
       title: 'Read the dev server\'s errors',
       description: 'Reads the errors a running `kay dev` met, from `.kay/dev/errors.json`: why the server failed to boot, type errors the check beside it found, requests that threw and errors islands met in the browser, each with its message, report and where the project\'s own code threw. An error leaves the list once the file compiles or the request answers again. Answers an empty list when `kay dev` has met none or has not run.',
@@ -247,8 +361,8 @@ function tools(root: string): Tool[] {
   ]
 }
 
-// The llms/ files, which hold the guide to each part of kay, and the index that links them.
-async function resources(): Promise<Resource[]> {
+// The llms/ files, which hold the guide to each part of kay, and the index that links them, then the llms.txt and guides of each kay library the project installed.
+async function resources(root: string): Promise<Resource[]> {
   const files = (await readdir(LLMS_DIR)).filter(name => name.endsWith('.md')).toSorted()
   const index: Resource = {
     uri: 'kay://llms.txt',
@@ -258,6 +372,15 @@ async function resources(): Promise<Resource[]> {
     mimeType: 'text/markdown',
     read: async () => Bun.file(join(KAY_ROOT, 'llms.txt')).text(),
   }
+
+  const libraries = docFiles(root).filter(file => !file.label.startsWith('kay/')).map((file): Resource => ({
+    uri: `kay://${file.label}`,
+    name: file.label,
+    title: file.sections.find(section => section.level === 1)?.heading ?? file.label,
+    description: `The ${file.title === 'llms.txt' ? 'index' : 'guide'} of ${file.label.slice(0, file.label.indexOf('/'))} at its installed version`,
+    mimeType: 'text/markdown',
+    read: async () => Bun.file(file.path).text(),
+  }))
 
   return [index, ...await Promise.all(files.map(async (name) => {
     const path = join(LLMS_DIR, name)
@@ -273,7 +396,7 @@ async function resources(): Promise<Resource[]> {
       mimeType: 'text/markdown',
       read: async () => Bun.file(path).text(),
     } satisfies Resource
-  }))]
+  })), ...libraries]
 }
 
 // Runs `kay` with `args` in `root`, as a child so that what a command prints, exits with or throws cannot reach the protocol on this process's stdout.

@@ -724,9 +724,16 @@ Another client takes the same command in its MCP config, such as `.mcp.json` at 
 | `render` | `kay render` on `url`, with `method`, `body`, `headers` and `cookies` |
 | `screenshot` | `kay screenshot` on `path`, with `width`, `height`, `scheme`, `fullPage` and `cookies` (as `name=value`). Answers the document, then an image per shot; `diff: true` adds the diff image against the shot before |
 | `doctor` | `kay doctor --format json`. `port` is the port to check |
+| `fmt` | `kay fmt --check --format json`: the files not formatted, writing none. `paths` narrows it |
+| `generate` | `kay generate --dry-run --format json` on `kind` and `name`, with `fields` and `plural`: the files it would write |
+| `add` | `kay add --dry-run --format json` on `features`: what it would write, installing nothing |
+| `test` | `kay test`, with `files` and a `name` pattern: the report, as an error when a test fails |
+| `env` | `kay env --format json` |
+| `i18n_missing` | `kay i18n missing --format json`, for one `locale` or all |
+| `a11y` | `kay a11y --dry-run --format json`, with `standard`. Needs Chrome |
 | `dev_errors` | The errors a running `kay dev` met, from [`.kay/dev/errors.json`](#errors-without-a-browser) |
 
-The resources are `kay://llms.txt`, the index to start from, and one `kay://llms/<file>.md` for each guide of kay's `llms/`.
+The resources are `kay://llms.txt`, the index to start from, one `kay://llms/<file>.md` for each guide of kay's `llms/`, and `kay://<library>/llms.txt` with `kay://<library>/<file>.md` for each `@kaynooo/kayjs-*` library the project installed, at its installed version.
 
 Each tool runs its command in a child process, so a call costs what the command does. Calls run one at a time, in the order they came.
 

@@ -349,7 +349,7 @@ describe.concurrent('kay mcp', () => {
     const { result } = await agent.request('tools/list')
     const tools = result?.tools as { name: string, inputSchema: { type: string }, annotations: object }[]
 
-    expect(tools.map(tool => tool.name)).toEqual(['check', 'routes', 'explain', 'docs', 'render', 'screenshot', 'doctor', 'dev_errors'])
+    expect(tools.map(tool => tool.name)).toEqual(['check', 'routes', 'explain', 'docs', 'render', 'screenshot', 'doctor', 'fmt', 'generate', 'add', 'test', 'env', 'i18n_missing', 'a11y', 'dev_errors'])
     expect(tools.every(tool => tool.inputSchema.type === 'object' && 'readOnlyHint' in tool.annotations)).toBe(true)
   })
 
@@ -512,6 +512,46 @@ describe.concurrent('kay mcp', () => {
     expect(content?.uri).toBe('kay://llms/checks.md')
     expect(content?.text).toStartWith('# Checks and lints')
     expect(((await agent.request('resources/read', { uri: 'kay://llms.txt' })).result?.contents as { text: string }[])[0]?.text).toStartWith('# kay')
+  })
+
+  it('serves the llms.txt of each installed library as a resource', async () => {
+    const { result } = await agent.request('resources/list')
+    const resources = result?.resources as { uri: string }[]
+
+    expect(resources.map(resource => resource.uri)).toContain('kay://kayjs-ui/llms.txt')
+
+    const read = await agent.request('resources/read', { uri: 'kay://kayjs-ui/llms.txt' })
+
+    expect(((read.result?.contents as { text: string }[])[0])?.text).toStartWith('# kayjs-ui')
+  })
+
+  it('checks the formatting and previews a generated file without writing', async () => {
+    const formatted = (await agent.request('tools/call', { name: 'fmt', arguments: { paths: ['src/routes/about.kay'] } })).result
+
+    await Bun.write(join(root, 'package.json'), '{ "name": "mcp-app", "type": "module", "dependencies": { "kay": "*" } }\n')
+
+    const generated = (await agent.request('tools/call', { name: 'generate', arguments: { kind: 'page', name: 'contact' } })).result
+
+    expect(formatted?.structuredContent).toMatchObject({ written: false, changed: [] })
+    expect(generated?.structuredContent).toMatchObject({ kind: 'page', name: 'contact', dryRun: true })
+    expect(await Bun.file(join(root, 'src/routes/contact.kay')).exists()).toBe(false)
+    expect((await agent.request('tools/call', { name: 'generate', arguments: { kind: '--help', name: 'x' } })).result?.isError).toBe(true)
+  })
+
+  it('previews adding a feature, checks the environment and the translations, and runs a test file', async () => {
+    await Bun.write(join(root, 'tests/about.test.ts'), 'import { expect, it } from \'bun:test\'\n\nit(\'adds\', () => expect(1 + 1).toBe(2))\n')
+
+    const added = (await agent.request('tools/call', { name: 'add', arguments: { features: ['tailwind'] } })).result
+    const env = (await agent.request('tools/call', { name: 'env', arguments: {} })).result
+    const missing = (await agent.request('tools/call', { name: 'i18n_missing', arguments: {} })).result
+    const tested = (await agent.request('tools/call', { name: 'test', arguments: { files: ['tests/about.test.ts'] } })).result
+
+    // The fixture's home page is not what `kay new` wrote, so the preview answers why nothing could be added, still as a document.
+    expect(added?.structuredContent).toMatchObject({ errors: 1, problems: [{ message: expect.stringContaining('nothing was written') }] })
+    expect(env?.structuredContent).toBeDefined()
+    expect(missing?.content).toBeDefined()
+    expect(tested?.isError).toBe(false)
+    expect(JSON.stringify(tested?.content)).toContain('1 pass')
   })
 
   it('refuses a resource it does not list, whatever the path says', async () => {

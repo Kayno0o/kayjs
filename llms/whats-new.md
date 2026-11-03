@@ -13,6 +13,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-auth groups its account, provider and audit methods (`auth.account.delete(proof)`, `auth.oauth.link(...)`, `auth.audit.list()`, `auth.admin.createUser(input)`), and the `deprecated-auth-account-methods` lint renames the flat names: [grouped methods](../packages/auth/llms/grouped-methods.md).
 - kayjs-auth checks new passwords against Have I Been Pwned by default in production (`breachedPasswords: false` opts out), and warns at boot in production when password sign-up is open with no `email`: [hardening and testing](../packages/auth/llms/hardening-and-testing.md).
 - Every command takes `--quiet`, `--format json` and `--dry-run` or refuses it for a listed reason (`tests/command-options.test.ts`); `kay render --format json` prints `{ status, headers, body, ms }` and `kay upgrade --format json` `{ steps, changed }`: [project commands](project.md#reference), [check and tools](check-and-tools.md).
+- `kay mcp` serves `fmt`, `generate` and `add` (dry run), `test`, `env`, `i18n_missing` and `a11y` as tools, and the llms.txt and guides of each installed kayjs-* library as resources: [MCP](editor-and-agent-commands.md).
 
 ## 1.86.0
 
