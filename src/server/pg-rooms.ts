@@ -1,7 +1,7 @@
 import type { SQL } from 'bun'
 import type { Duration } from '../runtime/duration'
 import type { PgHandle } from './pg-data'
-import type { AsyncRoomStore } from './rooms'
+import type { RoomStore } from './rooms'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { outsideRequest } from './clean-context'
@@ -28,7 +28,7 @@ interface Own {
   at: number
 }
 
-type Listener = Parameters<AsyncRoomStore['subscribe']>[0]
+type Listener = Parameters<RoomStore['subscribe']>[0]
 
 // Awaits work nobody else holds, its failure logged.
 async function logged(what: string, work: Promise<unknown>): Promise<void> {
@@ -51,8 +51,8 @@ const LOCK_NOT_AVAILABLE = '55P03'
 
 // Presence rooms in Postgres: a message published in one replica reaches the members connected to the others within `poll`, `'250ms'` by default; a bare number throws.
 // A replica reads the members of the rooms it holds a connection in or asked `members` about, so one it asks about for the first time lists the others' members from its next poll. A replica that stops without leaving has its members dropped once it has not been heard from for 10 seconds.
-// A room's state is a row of `kay_room_state`, changed under a lock per room so replicas updating one room take turns, and goes with the room's last member; `state` and `update` answer with promises, so `rooms({ store })` over it gives `AsyncRooms`.
-export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): AsyncRoomStore {
+// A room's state is a row of `kay_room_state`, changed under a lock per room so replicas updating one room take turns, and goes with the room's last member; `state` and `update` answer with promises, so `rooms({ store })` over it gives `Rooms`.
+export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): RoomStore {
   const pollMs = poll === undefined ? DEFAULT_POLL : optionMs(poll, '`pgRooms` poll')
   const self = crypto.randomUUID()
   const own = new Map<string, Own>()
@@ -343,7 +343,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
     }
   }
 
-  const store: AsyncRoomStore = {
+  const store: RoomStore = {
     add(room, connection, member) {
       const key = `${room}\n${connection}`
       const at = own.get(key)?.at ?? Date.now()

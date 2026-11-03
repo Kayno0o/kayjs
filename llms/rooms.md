@@ -42,8 +42,8 @@ const live = rooms<{ round: number }, string, { round: number }>({
   snapshot: ({ round }) => ({ round }),
 })
 
-live.update(room, ({ round }) => ({ round: round + 1 }))
-live.publish(room, live.state(room))
+await live.update(room, ({ round }) => ({ round: round + 1 }))
+live.publish(room, await live.state(room))
 ```
 
 ## Reference
@@ -64,9 +64,9 @@ const games = rooms<Sent, string, { cells: string[] }>({
   state: () => ({ cells: [] }),
   snapshot: ({ cells }) => ({ type: 'board', cells }),
 })
-const sendBoard = games.coalesce(room => ({
+const sendBoard = games.coalesce(async room => ({
   type: 'board',
-  cells: games.state(room).cells,
+  cells: (await games.state(room)).cells,
 }))
 
 export default api()
@@ -88,8 +88,8 @@ export default api()
           { type: 'said', from: ws.data.user.name, text },
           { except: ws },
         ),
-        play: ({ cell }) => {
-          games.update(room, ({ cells }) => ({ cells: [...cells, ws.data.user.name + cell] }))
+        play: async ({ cell }) => {
+          await games.update(room, ({ cells }) => ({ cells: [...cells, ws.data.user.name + cell] }))
           sendBoard(room)
         },
       })
@@ -105,15 +105,15 @@ export default api()
 - `leave(ws, room)` takes it out, and `leave(ws)` out of every room, as `close` does.
 - `members(room)` lists the members, `roomsOf(ws)` the rooms a connection is in, and `memberOf(ws, room)` the member it joined `room` as, `undefined` for a room it is not in or a join with no member: who sent the message a handler is acting on.
 - A room no one is in is gone.
-- A room name is at most 256 characters: `join`, `members`, `publish`, `state` and `update` throw past it, a name any visitor can make up being otherwise a row and a poll each. A name may hold NUL in every store; the Postgres one reads at most 1,000 rooms nobody here holds, forgetting the ones asked about longest ago.
-- `rooms({ state: () => initial, snapshot: (state, room) => message })` keeps a state per room, `State` required once it is typed: `state(room)` reads it, `initial()` while no `update` made another, passed through JSON as a stored state is, and `update(room, state => next)` replaces it with what the function returns, resolving with the new state.
+- A room name is at most 256 characters: `join`, `members` and `publish` throw past it, `state` and `update` reject, a name any visitor can make up being otherwise a row and a poll each. A name may hold NUL in every store; the Postgres one reads at most 1,000 rooms nobody here holds, forgetting the ones asked about longest ago.
+- `rooms({ state: () => initial, snapshot: (state, room) => message })` keeps a state per room, `State` required once it is typed: `state(room)` reads it, `initial()` while no `update` made another, passed through JSON as a stored state is, and `update(room, state => next)` replaces it with what the function returns; both resolve, whatever the store, so `await` them.
 - Each `update` reads the latest state, one at a time, with `sqliteRooms` across every process sharing the file, so two updates never overwrite each other; its function runs in that turn, so it is quick and reads only its argument. Nothing is sent: publish the change, or `snapshot`'s message, as `publish(room, message)`.
 - `snapshot` sends a connection joining the message it makes from the state as it then stands, to that connection alone and after it is listed, again each time it joins (a reconnect says `join` again): an update made while it joins reaches it in the snapshot or as what is published after, never neither, so publish whole states or changes that are safe to apply twice.
-- The state is JSON, kept whole: a `Date` comes back as text, an `update` returning no JSON throws and keeps the old state, and a big state costs every `update` its size.
+- The state is JSON, kept whole: a `Date` comes back as text, an `update` returning no JSON rejects and keeps the old state, and a big state costs every `update` its size.
 - Only the app's own code writes it, never a client's message, which `update` may read.
 - A room's state goes with its last member, any process's, as the dropped members of a crashed process count; an `update` to a room no one is in resolves with the state it computed and stores nothing, so a room a client names costs no state.
 - Without `state` and `snapshot`, nothing changes: no state is kept and nothing is sent on a join.
-- A custom `RoomStore` gives `state(room)` and `update(room, change)` to keep states, both on JSON text, else `rooms({ state })` throws. An `AsyncRoomStore` answers them with promises, as `pgData(db).rooms` does: `rooms({ store })` over it gives `AsyncRooms`, whose `state(room)` and `update(room, change)` resolve and whose `join` sends the snapshot once the state is read, so `coalesce`'s `read` may be async; `members` stays synchronous, over Postgres from a mirror polled every 250 ms, and the store must return thenables. `rooms({ store: appStore().rooms })` takes the app store as it is, typed `StoreRooms`: its `state` and `update` give the state or a promise of it, so `await` them without narrowing. Over Postgres, updates of one room take turns across replicas through a lock per room, and the state goes with the room's last member.
+- A custom `RoomStore` gives `state(room)` and `update(room, change)` to keep states, both on JSON text and both answering with a promise (the store must return thenables), else `rooms({ state })` throws. `rooms()` over it gives `state` and `update` that resolve, and its `join` sends the snapshot once the state is read, so `coalesce`'s `read` may be async; `members` stays synchronous, over Postgres from a mirror polled every 250 ms. `rooms({ store: appStore().rooms })` takes the app store as it is. Over Postgres, updates of one room take turns across replicas through a lock per room, and the state goes with the room's last member.
 - `publish(room, message, { except, to })` sends a message to everyone in the room, but the connection `except` names, such as the sender, or only to the connections joined as the member `to` names, such as a game's host, compared as JSON.
 - It goes out as Elysia sends one, a string as it is and anything else as JSON, not checked against the route's `response`.
 - `response: chats.response` on the ws route types the messages an island's `socket()` receives (`last()`, `on()`) as the rooms' `Message`, so the union is written once, in `rooms<Message>()`; it accepts any message and checks nothing. A ws route with a `body` and no `response` types them `unknown`, which a cast then papers over, and `kay check` warns about it (`untyped-socket`).

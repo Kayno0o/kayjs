@@ -5,7 +5,7 @@ import type { StoreBase } from '../runtime/store-base'
 import type { NotificationStore } from './notifications'
 import type { PushStore } from './push-store'
 import type { JobStore } from './queue'
-import type { AsyncRoomStore, RoomStore } from './rooms'
+import type { RoomStore } from './rooms'
 import type { SessionStore } from './session'
 import type { FileStore } from './storage'
 import type { VitalsStore } from './vitals-store'
@@ -21,7 +21,7 @@ export interface AppStore extends StoreBase {
   live?: LiveStore | undefined
   jobs?: JobStore | undefined
   rates?: RateStore | undefined
-  rooms?: RoomStore | AsyncRoomStore | undefined
+  rooms?: RoomStore | undefined
   vitals?: VitalsStore | undefined
   // The url of the database these stores keep their data in, `sqlite:///abs/path` for `sqliteData` and the url `pgData` was given, for a library keeping tables of its own there: kayjs-auth keeps its users in it. Left out for a store built by hand, and for `pgData` given a connection.
   database?: string | undefined

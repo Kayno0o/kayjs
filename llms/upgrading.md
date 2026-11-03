@@ -16,6 +16,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `prefetch: 'eager'` fetches the links in view
 
 - On a page running kay's script, `prefetch: 'eager'` fetched on hover with no delay and never on load; it now fetches the links scrolled into view, three at a time, as the setting says elsewhere. An app that wants the old timing sets `'moderate'`. `kay check` cannot see which timing an app meant, so no lint ships with this.
+### `rooms()` state and `update` always resolve
+
+- `rooms()`'s `state(room)` and `update(room, change)` return promises whatever the store, as every other store answers: `await` them (`const { cells } = await games.update(room, ...)`, a `coalesce` `read` that reads `state` is `async`). `RoomStore.state` and `update` return promises too, so a hand-written store makes them `async`. `AsyncRoomStore`, `AsyncRooms` and `StoreRooms` stay as deprecated names of `RoomStore` and `Rooms`. An error in a change, a refused room name, now rejects instead of throwing. `kay check` cannot see a call that ignores the promise, so TypeScript (and the `no-floating-promises` rule) is what finds them.
 
 ### Checkbox and Toggle with a `name` or an `issue` sit in a wrapper
 

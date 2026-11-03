@@ -25,6 +25,9 @@ function connection() {
 
 const snapshotOf = (state: State) => JSON.stringify({ type: 'state', state })
 
+// Lets the snapshot of a join, which waits on the store's state, arrive.
+const tick = async () => Bun.sleep(1)
+
 async function until(ready: () => boolean): Promise<void> {
   for (let waited = 0; !ready(); waited += 5) {
     if (waited > 2_000)
@@ -35,88 +38,94 @@ async function until(ready: () => boolean): Promise<void> {
 }
 
 describe('a room\'s state in memory', () => {
-  it('sends a joiner the state as it stands, to the joiner alone, again on a rejoin', () => {
+  it('sends a joiner the state as it stands, to the joiner alone, again on a rejoin', async () => {
     const live = rooms<Message, string, State>(options)
     const [ada, bob] = [connection(), connection()]
 
     live.join(ada, 'hall', 'ada')
+    await tick()
     expect(ada.received).toEqual([snapshotOf({ round: 0, scores: {} })])
-    expect(live.update('hall', state => ({ ...state, round: state.round + 1 }))).toEqual({ round: 1, scores: {} })
+    expect(await live.update('hall', state => ({ ...state, round: state.round + 1 }))).toEqual({ round: 1, scores: {} })
     live.join(bob, 'hall', 'bob')
+    await tick()
     expect(bob.received).toEqual([snapshotOf({ round: 1, scores: {} })])
     expect(ada.received).toHaveLength(1)
 
     live.join(bob, 'hall', 'bobby')
+    await tick()
     expect(bob.received).toHaveLength(2)
     expect(live.members('hall')).toEqual(['ada', 'bobby'])
   })
 
-  it('serves two joiners at once the same latest state, and reads each update from the one before', () => {
+  it('serves two joiners at once the same latest state, and reads each update from the one before', async () => {
     const live = rooms<Message, undefined, State>(options)
     const joiners = [connection(), connection(), connection()]
     const [first, ...later] = joiners
 
     live.join(first!, 'hall')
-    live.update('hall', state => ({ ...state, round: 1 }))
-    live.update('hall', state => ({ ...state, round: state.round + 1 }))
+    await live.update('hall', state => ({ ...state, round: 1 }))
+    await live.update('hall', state => ({ ...state, round: state.round + 1 }))
 
     for (const joiner of later)
       live.join(joiner, 'hall')
+
+    await tick()
 
     for (const joiner of later)
       expect(joiner.received).toEqual([snapshotOf({ round: 2, scores: {} })])
   })
 
-  it('drops the state with the last member, keeping it while another is left', () => {
+  it('drops the state with the last member, keeping it while another is left', async () => {
     const live = rooms<Message, undefined, State>(options)
     const [ada, bob] = [connection(), connection()]
 
     live.join(ada, 'hall')
     live.join(bob, 'hall')
-    live.update('hall', state => ({ ...state, round: 5 }))
+    await live.update('hall', state => ({ ...state, round: 5 }))
     live.leave(ada)
-    expect(live.state('hall').round).toBe(5)
+    expect((await live.state('hall')).round).toBe(5)
     live.leave(bob)
-    expect(live.state('hall')).toEqual({ round: 0, scores: {} })
+    expect(await live.state('hall')).toEqual({ round: 0, scores: {} })
 
     const late = connection()
 
     live.join(late, 'hall')
+    await tick()
     expect(late.received).toEqual([snapshotOf({ round: 0, scores: {} })])
   })
 
-  it('keeps each room\'s state apart, and leave(ws) of every room drops each', () => {
+  it('keeps each room\'s state apart, and leave(ws) of every room drops each', async () => {
     const live = rooms<Message, undefined, State>(options)
     const ada = connection()
 
     live.join(ada, 'a')
     live.join(ada, 'b')
-    live.update('a', state => ({ ...state, round: 1 }))
-    live.update('b', state => ({ ...state, round: 2 }))
-    expect([live.state('a').round, live.state('b').round]).toEqual([1, 2])
+    await live.update('a', state => ({ ...state, round: 1 }))
+    await live.update('b', state => ({ ...state, round: 2 }))
+    expect([(await live.state('a')).round, (await live.state('b')).round]).toEqual([1, 2])
     live.leave(ada)
-    expect([live.state('a').round, live.state('b').round]).toEqual([0, 0])
+    expect([(await live.state('a')).round, (await live.state('b')).round]).toEqual([0, 0])
   })
 
-  it('keeps the state as JSON: a Date comes back as text, a value with none is refused before anything is stored', () => {
+  it('keeps the state as JSON: a Date comes back as text, a value with none is refused before anything is stored', async () => {
     const live = rooms<Message, undefined, State>(options)
 
     live.join(connection(), 'hall')
-    live.update('hall', state => ({ ...state, at: new Date(Date.UTC(2026, 0, 1)) }))
-    expect(live.state('hall').at as unknown).toBe('2026-01-01T00:00:00.000Z')
-    expect(() => live.update('hall', () => undefined as never)).toThrow('must be JSON')
-    expect(live.state('hall').round).toBe(0)
-    expect(() => live.update('hall', () => ({ round: 1n }) as never)).toThrow()
-    expect(live.state('hall').at as unknown).toBe('2026-01-01T00:00:00.000Z')
+    await live.update('hall', state => ({ ...state, at: new Date(Date.UTC(2026, 0, 1)) }))
+    expect((await live.state('hall')).at as unknown).toBe('2026-01-01T00:00:00.000Z')
+    await expect(live.update('hall', () => undefined as never)).rejects.toThrow('must be JSON')
+    expect((await live.state('hall')).round).toBe(0)
+    await expect(live.update('hall', () => ({ round: 1n }) as never)).rejects.toThrow()
+    expect((await live.state('hall')).at as unknown).toBe('2026-01-01T00:00:00.000Z')
   })
 
-  it('keeps a __proto__ key of the state as data', () => {
+  it('keeps a __proto__ key of the state as data', async () => {
     const live = rooms<Message, undefined, State>(options)
 
     live.join(connection(), 'hall')
-    live.update('hall', () => JSON.parse('{"round":1,"scores":{"__proto__":{"admin":1}}}') as State)
+    await live.update('hall', () => JSON.parse('{"round":1,"scores":{"__proto__":{"admin":1}}}') as State)
     expect(({} as { admin?: number }).admin).toBeUndefined()
-    expect(Object.keys(live.state('hall').scores)).toEqual(['__proto__'])
+    expect(Object.keys((await live.state('hall')).scores)).toEqual(['__proto__'])
   })
 
   it('changes nothing for a room without a state option', () => {
@@ -130,16 +139,17 @@ describe('a room\'s state in memory', () => {
     expect(ada.received).toEqual(['{"text":"hi"}'])
   })
 
-  it('sends no snapshot without the option, though the room keeps a state', () => {
+  it('sends no snapshot without the option, though the room keeps a state', async () => {
     const live = rooms<Message, undefined, State>({ state: options.state })
     const ada = connection()
 
     live.join(ada, 'hall')
+    await tick()
     expect(ada.received).toEqual([])
-    expect(live.update('hall', state => ({ ...state, round: 3 })).round).toBe(3)
+    expect((await live.update('hall', state => ({ ...state, round: 3 }))).round).toBe(3)
   })
 
-  it('lists the joiner among the members before its snapshot is made', () => {
+  it('lists the joiner among the members before its snapshot is made', async () => {
     const seen: string[][] = []
     const live: Rooms<Message, string, State> = rooms<Message, string, State>({ ...options, snapshot: (state, room) => {
       seen.push(live.members(room))
@@ -148,23 +158,36 @@ describe('a room\'s state in memory', () => {
     } })
 
     live.join(connection(), 'hall', 'ada')
+    await tick()
     live.join(connection(), 'hall', 'bob')
+    await tick()
     expect(seen).toEqual([['ada'], ['ada', 'bob']])
   })
 
-  it('stores nothing for a room no one is in, answering the state it computed', () => {
+  it('stores nothing for a room no one is in, answering the state it computed', async () => {
     const store = memoryRooms()
     const live = rooms<Message, undefined, State>({ ...options, store })
 
-    expect(live.update('nobody', state => ({ ...state, round: 4 })).round).toBe(4)
-    expect(live.state('nobody').round).toBe(0)
-    expect(store.state?.('nobody')).toBeUndefined()
+    expect((await live.update('nobody', state => ({ ...state, round: 4 }))).round).toBe(4)
+    expect((await live.state('nobody')).round).toBe(0)
+    expect(await store.state?.('nobody')).toBeUndefined()
   })
 
-  it('has one shape before and after an update: the initial state goes through JSON too', () => {
+  it('has one shape before and after an update: the initial state goes through JSON too', async () => {
     const live = rooms<Message, undefined, State>({ ...options, state: () => ({ round: 0, scores: {}, at: new Date(Date.UTC(2026, 0, 1)) }) })
 
-    expect(live.state('hall').at as unknown).toBe('2026-01-01T00:00:00.000Z')
+    expect((await live.state('hall')).at as unknown).toBe('2026-01-01T00:00:00.000Z')
+  })
+
+  it('answers state and update with promises even over a store that does it at once', async () => {
+    const store = memoryRooms()
+    const live = rooms<Message, undefined, State>({ ...options, store })
+
+    live.join(connection(), 'hall')
+    expect(live.state('hall')).toBeInstanceOf(Promise)
+    expect(live.update('hall', state => ({ ...state, round: 1 }))).toBeInstanceOf(Promise)
+    await expect(live.update('x'.repeat(300), state => state)).rejects.toThrow('room name')
+    await expect(live.state('x'.repeat(300))).rejects.toThrow('room name')
   })
 
   it('refuses a store that cannot keep a state', () => {
@@ -181,21 +204,21 @@ describe('a room\'s state in memory', () => {
       // @ts-expect-error: the snapshot is a Message
       rooms<Message, undefined, State>({ state: options.state, snapshot: () => 'nope' })
       // @ts-expect-error: the update returns a State
-      rooms<Message, undefined, State>(options).update('a', () => ({ round: 'x' }))
+      void rooms<Message, undefined, State>(options).update('a', () => ({ round: 'x' }))
     }
 
     void typed
   })
 })
 
-describe('a room\'s state over a store of either kind', () => {
-  it('takes the app store\'s rooms, typed as either kind, and answers as the store does', async () => {
-    const store: RoomStore | AsyncRoomStore | undefined = memoryRooms()
+describe('a room\'s state over a store of your own', () => {
+  it('takes the app store\'s rooms', async () => {
+    const store: RoomStore | undefined = memoryRooms()
     const live = rooms<Message, string, State>({ ...options, store })
 
     live.join(connection(), 'hall', 'ada')
-    const updated: State | Promise<State> = live.update('hall', state => ({ ...state, round: 1 }))
-    const read: State | Promise<State> = live.state('hall')
+    const updated: Promise<State> = live.update('hall', state => ({ ...state, round: 1 }))
+    const read: Promise<State> = live.state('hall')
 
     expect(await updated).toEqual({ round: 1, scores: {} })
     expect(await read).toEqual({ round: 1, scores: {} })
@@ -205,7 +228,7 @@ describe('a room\'s state over a store of either kind', () => {
     const base = memoryRooms()
     // Plain functions returning a bare thenable: an async one would flatten it into a native Promise.
     const thenable = <T>(value: T): PromiseLike<T> => ({ then: (resolve: (value: T) => unknown) => resolve(value) }) as PromiseLike<T>
-    const store = { ...base, state: (room: string) => thenable(base.state!(room)), update: (room: string, change: (current: string | undefined) => string) => thenable(base.update!(room, change)) } as unknown as AsyncRoomStore
+    const store = { ...base, state: (room: string) => thenable(base.state!(room)), update: (room: string, change: (current: string | undefined) => string) => thenable(base.update!(room, change)) } as unknown as RoomStore
     const live = rooms<Message, string, State>({ ...options, store })
 
     live.join(connection(), 'hall', 'ada')
@@ -214,31 +237,15 @@ describe('a room\'s state over a store of either kind', () => {
   })
 })
 
-describe('the type of rooms over a store of either kind', () => {
+describe('the types kept from before 1.88', () => {
   type Same<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
 
-  it('is StoreRooms, which takes either kind of rooms where the union of the two did not name one type', () => {
-    // Over a parameter, as a declared union would be narrowed to RoomStore by what it is assigned.
-    const over = (store: RoomStore | AsyncRoomStore) => rooms<Message, string, State>({ ...options, store })
-    const either = over(memoryRooms())
-    const sync = rooms<Message, string, State>(options)
-    const asynchronous = rooms<Message, string, State>({ ...options, store: memoryRooms() as unknown as AsyncRoomStore })
-    const isStoreRooms: Same<typeof either, StoreRooms<Message, string, State>> = true
-    const syncIsRooms: Same<typeof sync, Rooms<Message, string, State>> = true
-    const asyncIsAsyncRooms: Same<typeof asynchronous, AsyncRooms<Message, string, State>> = true
-    const notUnion: Same<typeof either, Rooms<Message, string, State> | AsyncRooms<Message, string, State>> = false
-    const accepts = (given: StoreRooms<Message, string, State>) => given
+  it('keeps AsyncRoomStore, AsyncRooms and StoreRooms as other names of RoomStore and Rooms', () => {
+    const store: Same<AsyncRoomStore, RoomStore> = true
+    const asynchronous: Same<AsyncRooms<Message, string, State>, Rooms<Message, string, State>> = true
+    const either: Same<StoreRooms<Message, string, State>, Rooms<Message, string, State>> = true
 
-    // Both kinds of rooms go where a store's rooms are asked for.
-    accepts(sync)
-    accepts(asynchronous)
-
-    // @ts-expect-error: rooms over a store of either kind are not sync, so they cannot stand for Rooms
-    const refused: Rooms<Message, string, State> = either
-    // @ts-expect-error: nor can they stand for AsyncRooms, as their state may come without a promise
-    const alsoRefused: AsyncRooms<Message, string, State> = either
-
-    expect([isStoreRooms, syncIsRooms, asyncIsAsyncRooms, notUnion, refused, alsoRefused].length).toBe(6)
+    expect([store, asynchronous, either]).toEqual([true, true, true])
   })
 })
 
@@ -263,24 +270,25 @@ describe('a room\'s state in a SQLite file', () => {
     } }
   }
 
-  it('shares the state between two processes: a late joiner of the other one gets the latest', () => {
+  it('shares the state between two processes: a late joiner of the other one gets the latest', async () => {
     const { first, second, close } = processes('shared')
     const [ada, bob] = [connection(), connection()]
 
     try {
       first.join(ada, 'hall', 'ada')
-      first.update('hall', state => ({ ...state, round: 4 }))
+      await first.update('hall', state => ({ ...state, round: 4 }))
       second.join(bob, 'hall', 'bob')
+      await tick()
       expect(bob.received).toEqual([snapshotOf({ round: 4, scores: {} })])
-      expect(second.update('hall', state => ({ ...state, round: state.round + 1 })).round).toBe(5)
-      expect(first.state('hall').round).toBe(5)
+      expect((await second.update('hall', state => ({ ...state, round: state.round + 1 }))).round).toBe(5)
+      expect((await first.state('hall')).round).toBe(5)
     }
     finally {
       close()
     }
   })
 
-  it('loses no update when two processes change one room in turn', () => {
+  it('loses no update when two processes change one room in turn', async () => {
     const { first, second, close } = processes('turns')
     const [ada, bob] = [connection(), connection()]
 
@@ -289,35 +297,35 @@ describe('a room\'s state in a SQLite file', () => {
       second.join(bob, 'hall', 'x')
 
       for (let turn = 0; turn < 50; turn++)
-        (turn % 2 === 0 ? first : second).update('hall', state => ({ ...state, round: state.round + 1 }))
+        await (turn % 2 === 0 ? first : second).update('hall', state => ({ ...state, round: state.round + 1 }))
 
-      expect(first.state('hall').round).toBe(50)
-      expect(second.state('hall').round).toBe(50)
+      expect((await first.state('hall')).round).toBe(50)
+      expect((await second.state('hall')).round).toBe(50)
     }
     finally {
       close()
     }
   })
 
-  it('keeps the state while a member of any process is left, and drops it with the last', () => {
+  it('keeps the state while a member of any process is left, and drops it with the last', async () => {
     const { first, second, close } = processes('lasts')
     const [ada, bob] = [connection(), connection()]
 
     try {
       first.join(ada, 'hall', 'x')
       second.join(bob, 'hall', 'x')
-      first.update('hall', state => ({ ...state, round: 7 }))
+      await first.update('hall', state => ({ ...state, round: 7 }))
       first.leave(ada)
-      expect(second.state('hall').round).toBe(7)
+      expect((await second.state('hall')).round).toBe(7)
       second.leave(bob)
-      expect(first.state('hall').round).toBe(0)
+      expect((await first.state('hall')).round).toBe(0)
     }
     finally {
       close()
     }
   })
 
-  it('takes the members and the state of a store that closed out of the file at once, not once it is dropped as quiet', () => {
+  it('takes the members and the state of a store that closed out of the file at once, not once it is dropped as quiet', async () => {
     const path = join(dir, 'closed.sqlite')
     const store = sqliteRooms(path, { poll: '5ms' })
     const live = rooms<Message, string, State>({ ...options, store })
@@ -325,7 +333,7 @@ describe('a room\'s state in a SQLite file', () => {
 
     try {
       live.join(connection(), 'hall', 'ada')
-      live.update('hall', state => ({ ...state, round: 3 }))
+      await live.update('hall', state => ({ ...state, round: 3 }))
       expect(file.query('SELECT 1 FROM kay_room_members').all()).toHaveLength(1)
       store.close()
       expect(file.query('SELECT 1 FROM kay_room_members').all()).toEqual([])
@@ -371,7 +379,7 @@ describe('a room\'s state in a SQLite file', () => {
     const ada = connection()
 
     live.join(ada, 'hall', 'ada')
-    live.update('hall', state => ({ ...state, round: 9 }))
+    await live.update('hall', state => ({ ...state, round: 9 }))
 
     const file = new Database(path)
 
@@ -384,7 +392,7 @@ describe('a room\'s state in a SQLite file', () => {
 
       watcher.join(bob, 'other', 'bob')
       await until(() => file.query('SELECT 1 FROM kay_room_state').all().length === 0)
-      expect(watcher.state('hall').round).toBe(0)
+      expect((await watcher.state('hall')).round).toBe(0)
       survivor.close()
     }
     finally {
@@ -393,31 +401,31 @@ describe('a room\'s state in a SQLite file', () => {
     }
   })
 
-  it('keeps the JSON limits and a __proto__ key through the file', () => {
+  it('keeps the JSON limits and a __proto__ key through the file', async () => {
     const { first, second, close } = processes('json')
 
     try {
       first.join(connection(), 'hall', 'ada')
-      first.update('hall', () => JSON.parse('{"round":1,"scores":{"__proto__":{"admin":1}},"at":"x"}') as State)
-      expect(Object.keys(second.state('hall').scores)).toEqual(['__proto__'])
+      await first.update('hall', () => JSON.parse('{"round":1,"scores":{"__proto__":{"admin":1}},"at":"x"}') as State)
+      expect(Object.keys((await second.state('hall')).scores)).toEqual(['__proto__'])
       expect(({} as { admin?: number }).admin).toBeUndefined()
-      first.update('hall', state => ({ ...state, at: new Date(Date.UTC(2026, 0, 1)) }))
-      expect(second.state('hall').at as unknown).toBe('2026-01-01T00:00:00.000Z')
-      expect(() => first.update('hall', () => ({ round: 1n }) as never)).toThrow()
-      expect(() => first.update('hall', () => undefined as never)).toThrow('must be JSON')
-      expect(second.state('hall').round).toBe(1)
+      await first.update('hall', state => ({ ...state, at: new Date(Date.UTC(2026, 0, 1)) }))
+      expect((await second.state('hall')).at as unknown).toBe('2026-01-01T00:00:00.000Z')
+      await expect(first.update('hall', () => ({ round: 1n }) as never)).rejects.toThrow()
+      await expect(first.update('hall', () => undefined as never)).rejects.toThrow('must be JSON')
+      expect((await second.state('hall')).round).toBe(1)
     }
     finally {
       close()
     }
   })
 
-  it('stores nothing for a room no live process has a member in', () => {
+  it('stores nothing for a room no live process has a member in', async () => {
     const { first, close } = processes('nobody')
     const file = new Database(join(dir, 'nobody.sqlite'))
 
     try {
-      expect(first.update('ghost', state => ({ ...state, round: 3 })).round).toBe(3)
+      expect((await first.update('ghost', state => ({ ...state, round: 3 }))).round).toBe(3)
       expect(file.query('SELECT 1 FROM kay_room_state').all()).toEqual([])
     }
     finally {
@@ -426,7 +434,7 @@ describe('a room\'s state in a SQLite file', () => {
     }
   })
 
-  it('reads the state from a store opened again on the file while members remain', () => {
+  it('reads the state from a store opened again on the file while members remain', async () => {
     const path = join(dir, 'restart.sqlite')
     const [one, two] = [sqliteRooms(path), sqliteRooms(path)]
 
@@ -434,12 +442,13 @@ describe('a room\'s state in a SQLite file', () => {
       const first = rooms<Message, string, State>({ ...options, store: one })
 
       first.join(connection(), 'hall', 'ada')
-      first.update('hall', state => ({ ...state, round: 6 }))
+      await first.update('hall', state => ({ ...state, round: 6 }))
 
       const second = rooms<Message, string, State>({ ...options, store: two })
       const late = connection()
 
       second.join(late, 'hall', 'bob')
+      await tick()
       expect(late.received).toEqual([snapshotOf({ round: 6, scores: {} })])
     }
     finally {
@@ -460,7 +469,7 @@ describe('a room\'s state in a SQLite file', () => {
       live.join({ raw: { sendText() {} } }, 'hall')
       writeFileSync(${JSON.stringify(ready)}, '')
       while (!existsSync(${JSON.stringify(go)})) await Bun.sleep(1)
-      for (let turn = 0; turn < 200; turn++) live.update('hall', s => ({ round: s.round + 1 }))
+      for (let turn = 0; turn < 200; turn++) await live.update('hall', s => ({ round: s.round + 1 }))
       process.exit(0)
     `)
 
@@ -481,10 +490,10 @@ describe('a room\'s state in a SQLite file', () => {
       await Bun.write(go, '')
 
       for (let turn = 0; turn < 200; turn++)
-        live.update('hall', state => ({ round: state.round + 1 }))
+        await live.update('hall', state => ({ round: state.round + 1 }))
 
       expect(await child.exited).toBe(0)
-      expect(live.state('hall').round).toBe(400)
+      expect((await live.state('hall')).round).toBe(400)
     }
     finally {
       child.kill()
@@ -492,7 +501,7 @@ describe('a room\'s state in a SQLite file', () => {
     }
   }, 30_000)
 
-  it('opens a file from before room states, adding the table', () => {
+  it('opens a file from before room states, adding the table', async () => {
     const path = join(dir, 'old.sqlite')
     const old = new Database(path)
 
@@ -505,8 +514,8 @@ describe('a room\'s state in a SQLite file', () => {
       const live = rooms<Message, undefined, State>({ ...options, store })
 
       live.join(connection(), 'hall')
-      expect(live.update('hall', state => ({ ...state, round: 1 })).round).toBe(1)
-      expect(live.state('hall').round).toBe(1)
+      expect((await live.update('hall', state => ({ ...state, round: 1 }))).round).toBe(1)
+      expect((await live.state('hall')).round).toBe(1)
     }
     finally {
       store.close()

@@ -19,7 +19,7 @@
 | `live` | `LiveStore` | `entries`, `set`, `delete`, `subscribe` | `end`, `endAll`, `stop`, `hold` | `sqliteLive`, `pgLive` |
 | `jobs` | `JobStore` | `add`, `claim`, `complete`, `retry`, `fail`, `failed`, `nextRunAt`, `lock` | `release`, `progress`, `state`, `live`, `update`, `purge`, `revive` | `memoryJobs`, `sqliteJobs`, `pgJobs` |
 | `rates` | `RateStore` | `hit(key, window, weight)` | `peek`, `refund`, `reset` | `memoryRates`, `sqliteRates`, `pgRates` |
-| `rooms` | `RoomStore` or `AsyncRoomStore` | `add`, `remove`, `members`, `publish`, `subscribe`, `close` | | `memoryRooms`, `sqliteRooms`, `pgRooms` |
+| `rooms` | `RoomStore` | `add`, `remove`, `members`, `publish`, `subscribe`, `close` | `state`, `update` (promises) | `memoryRooms`, `sqliteRooms`, `pgRooms` |
 | `vitals` | `VitalsStore` | `add`, `counts` | | `memoryVitals`, `sqliteVitals`, `pgVitals` |
 | `notifications` | `NotificationStore` | `add`, `list`, `unread`, `markRead`, `markAllRead`, `erase`, `prune` | | `memoryNotifications`, `sqliteNotifications`, `pgNotifications` |
 | `push` | `PushStore` | `add`, `list`, `remove`, `erase` | | `memoryPush`, `sqlitePush`, `pgPush` |

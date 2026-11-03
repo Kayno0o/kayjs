@@ -441,7 +441,7 @@ To share rooms through Redis or another server, pass `store` a `RoomStore`, from
 | `add(room, connection, member)` | Records a connection of this process, with its member as JSON |
 | `remove(room, connection)` | Drops it |
 | `members(room)` | The members of a room as JSON, in every process sharing the store |
-| `state(room)`, `update(room, change)` | Optional: a room's state as JSON, and a change made to it one at a time. Without them `rooms({ state })` throws |
+| `state(room)`, `update(room, change)` | Optional, both returning promises: a room's state as JSON, and a change made to it one at a time. Without them `rooms({ state })` throws |
 | `publish(room, text, recipients)` | Hands a message to the listeners of every process, this one's included |
 | `subscribe(listener)` | Calls the listener with each message published from then on, and returns what stops it |
 | `close()` | Stops what the store runs in the background |
@@ -456,16 +456,16 @@ const games = rooms<Sent, string, { cells: string[] }>({
   snapshot: ({ cells }) => ({ type: 'board', cells }),
 })
 
-games.update(room, ({ cells }) => ({ cells: [...cells, 'x'] }))
+await games.update(room, ({ cells }) => ({ cells: [...cells, 'x'] }))
 ```
 
-`update` replaces the state with what your function returns, one change at a time, and gives the new state. `games.state(room)` reads it. Nothing is sent to the room by an `update`: publish the change yourself, or use `coalesce`.
+`update` replaces the state with what your function returns, one change at a time, and resolves with the new state. `games.state(room)` reads it, and resolves too, so `await` both. Nothing is sent to the room by an `update`: publish the change yourself, or use `coalesce`.
 
 The state is kept as JSON, so a `Date` comes back as text. An `update` to a room no one is in stores nothing. The state goes when the last member leaves, in every process that shares the rooms, so a late joiner always starts from the latest state while anyone is there.
 
-Over `store: pgData(db).rooms`, replicas on several machines share the state, and `state` and `update` give promises, so `await games.update(room, ...)`. The snapshot a joiner gets is sent once the state is read.
+Over `store: pgData(db).rooms`, replicas on several machines share the state. The snapshot a joiner gets is sent once the state is read.
 
-A room name has at most 256 characters, and `join`, `members`, `publish`, `state` and `update` throw past it, since a name any visitor can make up costs a row and a poll. A name may hold any character, NUL included.
+A room name has at most 256 characters, and `join`, `members` and `publish` throw past it, `state` and `update` reject, since a name any visitor can make up costs a row and a poll. A name may hold any character, NUL included.
 
 ### Sending a snapshot
 
