@@ -1,6 +1,10 @@
 import type { AnyElysia } from 'elysia'
 import type { Parsed } from 'kay/library'
 import type { KayConfig } from 'kay/server'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import process from 'node:process'
 import { parseArgs } from 'node:util'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { commandProject, configuredSite, libraryCommand, setSite } from 'kay/library'
@@ -366,5 +370,75 @@ describe('the kay command line', () => {
     const made = await spawn(['auth', 'create-user', 'piped@example.com', '--role', 'admin'], `${PASSWORD}\r\n`)
 
     expect(made).toMatchObject({ code: 0, out: 'Created piped@example.com (admin).\n' })
+  })
+})
+
+describe('kay auth create-user with the shared options', () => {
+  async function runWith(args: string[], ask: () => Promise<string | undefined>, config: KayConfig = CONFIG, root = FIXTURE) {
+    const command = createUserCommand(ask)
+    const { values, positionals } = parseArgs({ args, options: libraryCommand(command, 'auth create-user', root, config).options, allowPositionals: true })
+
+    return command.run({ values: values as Parsed['values'], positionals }, () => 2, commandProject('auth create-user', root, config, { quiet: values.quiet === true, dryRun: values['dry-run'] === true, format: values.format === 'json' ? 'json' : 'text' }))
+  }
+
+  test('--dry-run checks the login, asks no password and makes no user', async () => {
+    let asked = false
+    const ask = async () => {
+      asked = true
+
+      return PASSWORD
+    }
+
+    expect(await runWith(['dry-run-user', '--dry-run'], ask)).toBe(0)
+    expect(asked).toBe(false)
+    expect(logs.mock.calls.flat().join('\n')).toBe('Would create dry-run-user.')
+    expect(await store.users.findByUsername('dry-run-user')).toBeUndefined()
+    logs.mockClear()
+    expect(await runWith(['other-user', '--role', 'nobody', '--dry-run'], ask)).toBe(1)
+    expect(errors.mock.calls.flat().join('\n')).toContain('kay auth create-user: kayjs-auth: createUser was given the role')
+  })
+
+  test('--dry-run leaves the store of the app untouched', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'create-user-'))
+    const env = process.env.NODE_ENV
+    const secret = process.env.KAY_SECRET
+
+    delete process.env.NODE_ENV
+    process.env.KAY_SECRET = SECRET
+
+    try {
+      const config: KayConfig = { extensions: [authFrom({ pages: false })] }
+
+      const code = await runWith(['ada@example.com', '--dry-run'], async () => PASSWORD, config, root)
+
+      expect(errors.mock.calls.flat().join('\n')).toBe('')
+      expect(code).toBe(0)
+      expect(existsSync(join(root, 'data'))).toBe(false)
+    }
+    finally {
+      if (env !== undefined)
+        process.env.NODE_ENV = env
+
+      if (secret === undefined)
+        delete process.env.KAY_SECRET
+      else
+        process.env.KAY_SECRET = secret
+
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test('--format json prints the user made as one document, and --quiet prints nothing', async () => {
+    expect(await runWith(['json-user', '--no-password', '--role', 'admin', '--format', 'json'], async () => undefined)).toBe(0)
+    expect(JSON.parse(String(logs.mock.calls[0]?.[0]))).toMatchObject({ username: 'json-user', roles: ['admin'] })
+    logs.mockClear()
+    expect(await runWith(['quiet-user', '--no-password', '--quiet'], async () => undefined)).toBe(0)
+    expect(logs).not.toHaveBeenCalled()
+    expect(await store.users.findByUsername('quiet-user')).toBeDefined()
+  })
+
+  test('a refusal under --format json is the failure document', async () => {
+    expect(await runWith(['json-user', '--no-password', '--format', 'json'], async () => undefined)).toBe(1)
+    expect(JSON.parse(String(logs.mock.calls[0]?.[0]))).toMatchObject({ errors: 1, problems: [{ message: expect.stringContaining('refused') }] })
   })
 })

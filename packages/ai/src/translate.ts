@@ -59,7 +59,7 @@ const command: KayCommand = {
       return await translateLocale({ root, config, locale, from: i18n.defaultLocale, dryRun, quiet, fail, signal: stop.signal })
     }
     catch (error) {
-      return fail(error instanceof Error ? error.message : String(error))
+      return fail(error instanceof Error ? error.message : String(error), null)
     }
     finally {
       process.off('SIGINT', interrupt)
@@ -76,7 +76,7 @@ interface Run {
   from: string
   dryRun: boolean
   quiet: boolean
-  fail: (message: string) => number
+  fail: (message: string, code?: string | null) => number
   signal: AbortSignal
 }
 
@@ -136,7 +136,7 @@ async function translateLocale({ root, config, locale, from, dryRun, quiet, fail
     console.log(`Translated ${written} ${written === 1 ? 'message' : 'messages'} and ${writtenEntries} ${writtenEntries === 1 ? 'entry' : 'entries'} into ${locale} as drafts: \`kay check\` lists the messages, \`kay i18n accept ${locale}\` accepts them once checked, and an entry is accepted by saving it from a CMS or removing its \`# draft\` line.`)
 
   for (const failure of failures)
-    fail(failure)
+    fail(failure, null)
 
   if (signal.aborted)
     return 130
@@ -205,12 +205,12 @@ interface DryRunReport {
   units: MessageUnit[]
   failures: string[]
   quiet: boolean
-  fail: (message: string) => number
+  fail: (message: string, code?: string | null) => number
 }
 
 function report({ locale, from, keys, plans, units, failures, quiet, fail }: DryRunReport): number {
   for (const failure of failures)
-    fail(failure)
+    fail(failure, null)
 
   if (quiet)
     return failures.length === 0 ? 0 : 1

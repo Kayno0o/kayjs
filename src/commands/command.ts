@@ -51,7 +51,7 @@ const OPTION_HELP: Record<string, string> = {
   'file': 'the database file',
   'fix': 'apply the safe fixes',
   'forge': 'the Git host the CI files are written for',
-  'format': 'how to print: text, json or github where the command has it',
+  'format': 'how to print: text or json, and github where the command has it',
   'from-html': 'convert HTML to kay',
   'full-page': 'capture the whole page',
   'header': 'a header to send, repeatable',
@@ -148,8 +148,8 @@ export interface CommandProject {
   quiet: boolean
   // `--dry-run`: say what would be written and write nothing.
   dryRun: boolean
-  // Prints a failure as `kay <command>: <message>` on stderr, and as the document of a failed command under `--format json`; answers the exit code, 1.
-  fail: (message: string) => number
+  // Prints a failure as `kay <command>: <message>` on stderr, and as the document of a failed command under `--format json`; answers the exit code, 1. The document labels it `command-usage` unless `code` says otherwise, `null` for a failure that is no usage problem, such as a model or a database failing.
+  fail: (message: string, code?: string | null) => number
   // Prints the command's answer as one JSON document under `--format json`, and nothing otherwise.
   result: (document: object) => void
 }
@@ -174,12 +174,15 @@ export function libraryCommand(command: KayCommand, name: string, root: string, 
     ...command,
     options,
     run: async (parsed, refuse) => {
-      const format = parsed.values.format ?? 'text'
+      // An option the command declares is its own: it is read by the command, and the shared reading of it is left out.
+      const own = (option: SharedOption) => option in command.options
+      const given = parsed.values.format
+      const format = own('format') || given === undefined ? 'text' : given
 
       if (format !== 'text' && format !== 'json')
         return refuse(`--format takes \`text\` or \`json\`, not \`${String(format)}\``)
 
-      return command.run(parsed, refuse, commandProject(name, root, config, { format, quiet: parsed.values.quiet === true, dryRun: parsed.values['dry-run'] === true }))
+      return command.run(parsed, refuse, commandProject(name, root, config, { format, quiet: !own('quiet') && parsed.values.quiet === true, dryRun: !own('dry-run') && parsed.values['dry-run'] === true }))
     },
   }
 }
@@ -194,8 +197,8 @@ export function commandProject(name: string, root: string, config: KayConfig, sh
     format,
     quiet,
     dryRun,
-    fail: (message) => {
-      reportFailure(`kay ${name}: ${message}`, format)
+    fail: (message, code) => {
+      printFailure(name, message, format, code)
 
       return 1
     },

@@ -796,7 +796,7 @@ function commandProject(name: string, root: string, config: KayConfig, shared?: 
 interface CommandProject
   config: KayConfig
   dryRun: boolean
-  fail: (message: string) => number
+  fail: (message: string, code?: string | null | undefined) => number
   format: "text" | "json"
   quiet: boolean
   result: (document: object) => void

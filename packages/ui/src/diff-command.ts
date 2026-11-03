@@ -28,7 +28,7 @@ async function accept(project: CommandProject, file: string, manifest: Manifest,
   entry.version = installed
   writes.set(upstreamPath(root, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`)
   await writeAll(writes)
-  result({ accepted: file, version: installed })
+  result({ installed, components: [{ file, version: installed, upToDate: true }], changed: 0, accepted: file })
 
   if (!quiet && format === 'text')
     console.log(`${file}: follows kayjs-ui ${installed} from now on`)
@@ -74,7 +74,7 @@ const command: KayCommand = {
     const names = Object.keys(manifest).filter(file => only === undefined || file === only).toSorted()
 
     if (names.length === 0) {
-      result({ components: [], changed: 0 })
+      result({ installed: await libraryVersion(), components: [], changed: 0 })
 
       if (!quiet && format === 'text')
         console.log('nothing ejected: `kay ui eject <component>` copies one')

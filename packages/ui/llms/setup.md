@@ -95,13 +95,13 @@ See [Restyle a component](restyle.md): `class` as a string or an object of parts
 
 ### Copy a component into the app
 
-When a recipe cannot express the change, `kay ui eject card` copies `card.kay` into `src/components/ui/`, with the files only it uses, and points the imports of `@kaynooo/kayjs-ui/card.kay` in the app's `src/`, `tests/` and root `.ts` files (`kay.config.ts`) at the copy. Edit the copy; the theme, the `ui.*` messages and the other components stay the library's.
+When a recipe cannot express the change, `kay ui eject card` copies `card.kay` into `src/components/ui/`, with the files only it uses, and points the imports of `@kaynooo/kayjs-ui/card.kay` in the app's `src/`, `tests/` and root `.ts` files (`kay.config.ts`) at the copy. `--dry-run` lists what would be written, `--format json` prints `{ component, files, rewritten, notes, stillOnLibrary, dryRun }`, `--quiet` prints only a failure. Edit the copy; the theme, the `ui.*` messages and the other components stay the library's.
 
 - Files other components share (`icon.kay`, `defaults.ts`) stay in the library, and the copy imports them as `@kaynooo/kayjs-ui/icon.kay` and `@kaynooo/kayjs-ui/lib/defaults` (`lib/` and `field-look` are for copies and not a stable API). Another public component the copy uses stays upstream too: eject it separately.
 - kayjs-ui's own components keep the library's version of what they use (`FormDialog` uses the library's `Dialog`); the command lists them.
 - An entry of `src/ui.ts` keyed by the import path is repeated under the copy's path, so the copy and the library's own users keep the app's look; one keyed by the name (`Card`) becomes the library's path key plus the copy's, as a name names two components after the copy.
 - `src/components/ui/.upstream/` records the version and the library's text each copy came from, to commit with it. `--dry-run` writes nothing, and an ejected or existing file is refused.
-- `kay ui diff [component]` prints what the library changed in each copy since that version, with the `git merge-file` line to merge it; `--check` exits 1 when anything changed, and `--accept` records the installed text once merged. It also reports a library file the copy imports but did not take (`defaults.ts`) that changed or went, which the copy cannot show. A damaged `.upstream/` record ends with a message naming the file.
+- `kay ui diff [component]` prints what the library changed in each copy since that version, with the `git merge-file` line to merge it; `--format json` prints `{ installed, components: [{ file, version, upToDate }], changed }` (and `accepted` with `--accept`), `--quiet` leaves the up-to-date copies out, `--dry-run` is not taken as it writes only with `--accept`; `--check` exits 1 when anything changed, and `--accept` records the installed text once merged. It also reports a library file the copy imports but did not take (`defaults.ts`) that changed or went, which the copy cannot show. A damaged `.upstream/` record ends with a message naming the file.
 
 ### Testing an app's use of it
 

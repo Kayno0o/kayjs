@@ -211,7 +211,7 @@ Files other components share, such as `icon.kay`, stay in the library, and the c
 
 Components of the library that use the one you copied, such as `FormDialog` for `Dialog`, keep the library's version; the command lists them. An entry of `src/ui.ts` keyed by the import path is repeated under the copy's path, so both keep your look. One keyed by the name (`Card`) becomes the library's path key plus the copy's, as a name names two components after the copy. `--dry-run` shows what would change without writing.
 
-The command records the version and the library's text of each copy in `src/components/ui/.upstream/`, to commit with it. After a kayjs-ui update, `kay ui diff` prints what the library changed in each copy since then, with the `git merge-file` line that merges it. Once merged, `kay ui diff card --accept` records the installed text, and `--check` makes the command exit 1 when anything changed, for CI.
+Both commands take `--quiet` and `--format json`, and `kay ui eject` takes `--dry-run`. The command records the version and the library's text of each copy in `src/components/ui/.upstream/`, to commit with it. After a kayjs-ui update, `kay ui diff` prints what the library changed in each copy since then, with the `git merge-file` line that merges it. Once merged, `kay ui diff card --accept` records the installed text, and `--check` makes the command exit 1 when anything changed, for CI.
 
 A file the copy imports from the library without taking it, such as `defaults.ts`, is reported too when it changed or went, as the copy would break at build time without a word. If a file in `.upstream/` is damaged or missing, the command names it and stops.
 

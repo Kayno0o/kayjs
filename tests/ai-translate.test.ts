@@ -82,6 +82,23 @@ describe('kay i18n translate: messages', () => {
     expect((await run(root, ['fr'])).out).toBe('fr lacks nothing')
   })
 
+  it('prints nothing under --quiet, a success or a dry run, and still says what failed', async () => {
+    const root = await project({})
+    const dry = await run(root, ['fr'], [], { 'dry-run': true, 'quiet': true })
+
+    expect(dry).toMatchObject({ code: 0, out: '', err: '' })
+
+    const done = await run(root, ['fr'], [{}], { quiet: true })
+
+    expect(done).toMatchObject({ code: 0, out: '', err: '' })
+    expect((await run(root, ['fr'], [], { quiet: true })).out).toBe('')
+
+    const failing = await project({})
+    const wrong = { over: { 3: 'sans nombre', 5: '{count} articles' } }
+
+    expect(await run(failing, ['fr'], [wrong, wrong], { quiet: true })).toMatchObject({ code: 1, out: '', err: expect.stringContaining('kay i18n translate: message items drops {count}') })
+  })
+
   it('asks again, with the reason, for a text that drops a placeholder or a tag', async () => {
     const root = await project({})
     const { code, asked } = await run(root, ['fr'], [{ over: { 1: { replace: [['<b>', ''], ['</b>', '']] }, 2: 'Bonjour' } }, {}])
@@ -101,7 +118,7 @@ describe('kay i18n translate: messages', () => {
     const flat = await frMessages(root)
 
     expect(code).toBe(1)
-    expect(err).toContain('message items drops {count}')
+    expect(err).toContain('kay i18n translate: message items drops {count}')
     expect(flat.items).toBeUndefined()
     expect(flat.hello).toBe('FR Hello {name}')
     expect(draftMessages(await read(root, 'src/messages/fr.ts')).map(({ key }) => key)).toEqual(['nav.about', 'hello'])

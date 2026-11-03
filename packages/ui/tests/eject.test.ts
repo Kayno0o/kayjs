@@ -46,7 +46,7 @@ async function freshApp(): Promise<string> {
   return dir
 }
 
-async function run(command: typeof eject, args: string[], flags: Record<string, boolean> = {}): Promise<{ code: number, out: string, err: string }> {
+async function run(command: typeof eject, args: string[], flags: Record<string, boolean | string> = {}): Promise<{ code: number, out: string, err: string }> {
   const log = spyOn(console, 'log').mockImplementation(() => undefined)
   const error = spyOn(console, 'error').mockImplementation(() => undefined)
   const refused: string[] = []
@@ -56,7 +56,7 @@ async function run(command: typeof eject, args: string[], flags: Record<string, 
       refused.push(reason ?? '')
 
       return 1
-    }, commandProject(command.usage.split(' ').slice(0, 2).join(' '), root, {}, { dryRun: flags['dry-run'] === true, quiet: flags.quiet === true }))
+    }, commandProject(command.usage.split(' ').slice(0, 2).join(' '), root, {}, { dryRun: flags['dry-run'] === true, quiet: flags.quiet === true, format: flags.format === 'json' ? 'json' : 'text' }))
 
     return { code, out: log.mock.calls.flat().join('\n'), err: [...error.mock.calls.flat(), ...refused].join('\n') }
   }
@@ -141,6 +141,14 @@ describe('kay ui eject', () => {
     expect(out).toContain('would copy card.kay')
     expect(existsSync(join(root, UI_DIR))).toBe(false)
     expect(await readFile(join(root, 'src/page.kay'), 'utf8')).toBe(PAGE)
+  })
+
+  test('prints one document under --format json and nothing under --quiet', async () => {
+    const json = await run(eject, ['card'], { 'dry-run': true, 'format': 'json' })
+
+    expect(JSON.parse(json.out)).toMatchObject({ component: 'card', files: ['card.kay'], dryRun: true })
+    expect((await run(eject, ['card'], { 'dry-run': true, 'quiet': true })).out).toBe('')
+    expect((await run(eject, ['nope'], { format: 'json' })).out).toContain('"command-usage"')
   })
 
   test('refuses an unknown component, an ejected one and a file in the way', async () => {
@@ -310,6 +318,16 @@ describe('kay ui diff', () => {
 
     expect(code).toBe(0)
     expect(out).toContain('card.kay: up to date')
+  })
+
+  test('answers one shape under --format json whatever it finds, and says nothing under --quiet for a copy that is up to date', async () => {
+    expect(JSON.parse((await run(diff, [], { format: 'json' })).out)).toMatchObject({ components: [], changed: 0, installed: expect.any(String) })
+    await run(eject, ['card'])
+
+    expect(JSON.parse((await run(diff, [], { format: 'json' })).out)).toMatchObject({ components: [{ file: 'card.kay', upToDate: true }], changed: 0, installed: expect.any(String) })
+    expect((await run(diff, [], { quiet: true })).out).toBe('')
+    expect(JSON.parse((await run(diff, ['card'], { accept: true, format: 'json' })).out)).toMatchObject({ accepted: 'card.kay', changed: 0, components: [{ file: 'card.kay' }], installed: expect.any(String) })
+    expect((await run(diff, ['card'], { accept: true, quiet: true })).out).toBe('')
   })
 
   test('says nothing is ejected, and refuses a component that is not', async () => {

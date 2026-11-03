@@ -295,7 +295,7 @@ function ownAuth(options: OwnOptions): AuthPages {
     home: options.home ?? '/',
   }
 
-  return Object.assign(extension, { [LOAD_AUTH]: async (root: string, extensions: string[], database?: string) => await build({ root, modules: await appModules(root, extension), extensions, database }) as UserMaker })
+  return Object.assign(extension, { [LOAD_AUTH]: async (root: string, extensions: string[], database?: string, dryRun?: boolean) => await build({ root, modules: await appModules(root, extension), extensions, database, ...dryRun && { exporting: true } }) as UserMaker })
 }
 
 function moduleAuth(options: AuthExtensionOptions): AuthPages {

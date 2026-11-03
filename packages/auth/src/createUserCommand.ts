@@ -147,7 +147,7 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
       if (!isEmail && values.username !== undefined)
         return refuse('auth create-user was given two usernames: the one to sign in with, and --username')
 
-      const loader = (config.extensions ?? []).map(extension => (extension as { [LOAD_AUTH]?: (root: string, extensions: string[], database?: string) => Promise<UserMaker> })[LOAD_AUTH]).find(load => load !== undefined)
+      const loader = (config.extensions ?? []).map(extension => (extension as { [LOAD_AUTH]?: (root: string, extensions: string[], database?: string, dryRun?: boolean) => Promise<UserMaker> })[LOAD_AUTH]).find(load => load !== undefined)
 
       if (loader === undefined)
         return fail('kay.config.ts lists no auth() to find the app\'s auth through')
@@ -170,13 +170,13 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
 
       try {
         // The app's auth loads, and the login is checked, before a password is asked twice for a user that cannot be made.
-        const auth = await loader(root, (config.extensions ?? []).map(extension => extension.name), config.store?.database)
+        const auth = await loader(root, (config.extensions ?? []).map(extension => extension.name), config.store?.database, dryRun)
         const problems = await auth[CHECK_USER]({ ...email !== undefined && { email }, ...username !== undefined && { username }, ...roles && { roles } })
 
         if (Object.keys(problems).length > 0)
           return fail(`refused: ${Object.entries(problems).map(([field, code]) => `${field} ${code}`).join(', ')}`)
 
-        // With --dry-run the login is checked as a creation would, and no password is asked.
+        // With --dry-run auth() loads over an empty in-memory store, so no database is created: the login is checked for its form and roles, not for being taken, and no password is asked.
         if (dryRun) {
           result({ dryRun: true, email, username, roles: roles ?? [] })
 
@@ -208,7 +208,7 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
         return 0
       }
       catch (error) {
-        return fail(error instanceof Error ? error.message : String(error))
+        return fail(error instanceof Error ? error.message : String(error), null)
       }
     },
   }

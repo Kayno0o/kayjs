@@ -315,7 +315,9 @@ A guest costs nothing to make, so kayjs-auth does not name it to other libraries
 kay auth create-user ada@example.com --role admin
 ```
 
-It asks for the password twice without showing it, or reads one line from a pipe. A name without `@` is a username, `--email` adds an address, and `--no-password` makes a user who signs in another way. An address typed this way counts as verified. It runs in the project of the current directory with its `.env`, so run it with the production environment to make a user in the production database.
+It asks for the password twice without showing it, or reads one line from a pipe. A name without `@` is a username, `--email` adds an address, and `--no-password` makes a user who signs in another way. An address typed this way counts as verified.
+
+`--dry-run` checks the login without making it or a database, `--format json` prints the user made, and `--quiet` prints only a failure. It runs in the project of the current directory with its `.env`, so run it with the production environment to make a user in the production database.
 
 It needs `kay.config.ts` and the source, so it cannot run from a built or compiled app on its own: run it from a checkout. A taken name or a broken config shows before the password is asked.
 
