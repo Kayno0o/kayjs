@@ -717,6 +717,15 @@ export const LINTS = {
     wrong: '--- server\nconst read = (error: unknown) => error instanceof ApiError ? error.answer : undefined\n---\np x',
     right: '--- server\nconst read = (error: unknown) => error instanceof ApiError ? error.data : undefined\n---\np x',
   },
+  'deprecated-source-types': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.87',
+    site: true,
+    summary: 'An import of `StreamStatus`, `ResourceStatus` or `ResourceFailure` from `kay`, the types before 1.87 gave every source an island reads (`resource`, `stream`, `socket`, `track()`) one vocabulary: `ConnectionStatus`, `LoadStatus` and `ApiError`. The old names work until 1.90. Found in the TypeScript files and `.kay` fences of the project; the fix renames the import and every use of it. An aliased import is renamed without its uses, and a file where the new name is already taken, or the old one is declared again, exported or read in a template, is reported with no fix.',
+    wrong: '--- server\nimport type { StreamStatus } from \'kay\'\n\nexport const done = (status: StreamStatus) => status === \'done\'\n---\np x',
+    right: '--- server\nimport type { ConnectionStatus } from \'kay\'\n\nexport const done = (status: ConnectionStatus) => status === \'done\'\n---\np x',
+  },
   'deprecated-refusal-message': {
     level: 'warn',
     group: 'deprecated',

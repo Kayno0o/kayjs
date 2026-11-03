@@ -1,4 +1,5 @@
 import type { ActionStream, SETTLED, Settles } from './action'
+import type { ApiError } from './api-error'
 import type { StreamStatus } from './live'
 import { ownSignal } from './reactive'
 import { decodeServerValue } from './wire'
@@ -68,6 +69,8 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
   return {
     last,
     status,
+    pending: () => false,
+    error: () => status() === 'failed' ? failure() as ApiError : undefined,
     on: (listener) => {
       const missed = early ?? []
 

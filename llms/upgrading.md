@@ -11,6 +11,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - `hydrate` and `persist` are island options: a parent passing them to such a component drops them, and `kay check` reports a leftover one as a type error on a component that declares props (one that declares none takes any attribute).
 - No lint can recognise it: the change is in what the compiler decides for a component, not in a form an app writes, so there is no old syntax for a `deprecated` lint to find and fix.
 - `kay explain island` and `kay build --format json` show the role of each component.
+### One vocabulary for the sources an island reads
+
+- `StreamStatus`, `ResourceStatus` and `ResourceFailure` from `kay` are `ConnectionStatus`, `LoadStatus` and `ApiError` (`kay upgrade` renames them, the old names work until 1.90). A socket the server closes with a code from 4000 to 4999 is now `failed` (its `error().status` the code minus 4000) instead of reconnecting: an app that closes with such a code and expects the client to retry must close with another code. An exhaustive `switch` over `SocketStatus` needs a `failed` case, and `resource().error()` is an `ApiError`, so `toEqual({ status, message })` on it becomes `toMatchObject`.
 
 ### A page at a collection's route prerenders
 

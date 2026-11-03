@@ -5,7 +5,7 @@ import type { CallResult } from './call-result'
 import type { ErrorStatus, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { RequestContext } from './index'
-import type { EventReader } from './live'
+import type { EventReader, LoadStatus, Source } from './live'
 import type { StoreBase } from './store-base'
 
 export type { CallResult }
@@ -170,7 +170,7 @@ export interface Failure<Data> {
 export type Success<Output> = Exclude<Output, Failure<unknown>>
 
 // What a call to a handler returning an async iterable resolves with: its values read as they come, typed.
-export interface ActionStream<T> extends EventReader<T> {
+export interface ActionStream<T> extends Omit<EventReader<T>, 'retry'> {
   // Resolves with the last value once the stream ran to its end, undefined when it sent none; rejects with an `ActionError` when it failed, and an `AbortError` when it was closed first.
   ended: () => Promise<T | undefined>
 }
@@ -236,11 +236,11 @@ export interface CallOptions {
 }
 
 // An action seen through the calls one island makes, so a row's button reads its own `pending()`.
-export interface TrackedCall<Input, Result> {
+export interface TrackedCall<Input, Result> extends Source<LoadStatus> {
   (form: FormData, options?: CallOptions): Promise<Result>
   // Resolves with how the call went, any answer the server gave included; a failure that is no answer, such as a network error, an abort or a redirect, still throws. Last, as on `Action`, so a wrong field is named.
   (...call: object extends Input ? [input?: Input, options?: CallOptions] : [input: Input, options?: CallOptions]): Promise<Result>
-  // Whether a call made through this handle is still in flight, read reactively.
+  // `idle` before the first call, `loading` while one is in flight, then `ready` or `failed` by the last to settle; `pending()` reads whether one is in flight, `error()` the last failure as an `ApiError`, kept until a call succeeds (a refusal and a call that got no answer alike), and `retry()` repeats the call that failed with its arguments.
   readonly pending: () => boolean
   // Resolves once no call made through this handle is in flight, whichever way they went; never rejects.
   readonly settled: () => Promise<void>

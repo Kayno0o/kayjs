@@ -79,12 +79,14 @@ class ActionRedirectError
   status: number
 
 [.] ActionStream
-interface ActionStream<T> extends EventReader<T>
+interface ActionStream<T> extends Omit<EventReader<T>, 'retry'>
   close: () => void
   ended: () => Promise<T | undefined>
+  error: () => ApiError<unknown> | undefined
   last: () => T | undefined
   on: (listener: (value: T) => void) => () => void
-  status: () => StreamStatus
+  pending: () => boolean
+  status: () => ConnectionStatus
 
 [.] Answer
 type Answer<Output> = Output extends AsyncIterable<infer Value> ? ActionStream<Value> : Output
@@ -271,11 +273,14 @@ interface ErrorShape<Data = unknown>
 type EventHandler<Target, E extends Event> = (event: E & { currentTarget: Target, target: globalThis.Element }) => void
 
 [.] EventReader
-interface EventReader<T>
+interface EventReader<T> extends Source<ConnectionStatus>
   close: () => void
+  error: () => ApiError<unknown> | undefined
   last: () => T | undefined
   on: (listener: (value: T) => void) => () => void
-  status: () => StreamStatus
+  pending: () => boolean
+  retry: () => void
+  status: () => ConnectionStatus
 
 [.] EventStream
 type EventStream<T> = Response & { readonly [EVENTS]: T }
@@ -817,16 +822,16 @@ function resource<Module, const Path extends ResourcePath<Module>>(module: Modul
 function resource<T>(load: (signal: AbortSignal) => T | PromiseLike<T>): Resource<Awaited<T>>
 
 [.] Resource
-interface Resource<T>
-  error: () => ResourceFailure | undefined
+interface Resource<T> extends Source<ResourceStatus>
+  error: () => ApiError<unknown> | undefined
+  pending: () => boolean
   refresh: () => void
+  retry: () => void
   status: () => ResourceStatus
   value: () => T | undefined
 
 [.] ResourceFailure
-interface ResourceFailure
-  message: string
-  status: number
+type ResourceFailure = ApiError
 
 [.] ResourcePath
 type ResourcePath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends {
@@ -840,7 +845,7 @@ type ResourcePath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found 
 } ? Readable<Value> extends true ? Path : never : Path : never : never
 
 [.] ResourceStatus
-type ResourceStatus = 'loading' | 'ready' | 'failed'
+type ResourceStatus = Exclude<LoadStatus, 'idle'>
 
 [.] root
 function root<T>(fn: (dispose: () => void) => T): T
@@ -1004,11 +1009,14 @@ type Snippet<Args extends unknown[] = []> = Args extends [] ? JSX.Element : (...
 function socket<Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path>>): SocketOf<Module, Path>
 
 [.] Socket
-interface Socket<Send, Receive>
+interface Socket<Send, Receive> extends Source<SocketStatus>
   close: () => void
+  error: () => ApiError<unknown> | undefined
   last: () => Receive | undefined
   on: (listener: (message: Receive) => void) => () => void
   onOpen: (listener: () => void) => () => void
+  pending: () => boolean
+  retry: () => void
   send: (message: Send) => void
   status: () => SocketStatus
 
@@ -1016,7 +1024,7 @@ interface Socket<Send, Receive>
 type SocketPath<Module> = Extract<Nodes<RoutesOf<Module>>, { node: { subscribe: unknown } }>['path']
 
 [.] SocketStatus
-type SocketStatus = 'connecting' | 'open' | 'closed'
+type SocketStatus = 'connecting' | 'open' | 'failed' | 'closed'
 
 [.] Static
 type Static<Type extends TSchema, Params extends unknown[] = [], Result = (Type & {
@@ -1041,16 +1049,19 @@ type StreamPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found ex
 [.] StreamRun
 interface StreamRun<T, Options> extends EventReader<T>
   close: () => void
+  error: () => ApiError<unknown> | undefined
   last: () => T | undefined
   on: (listener: (value: T) => void) => () => void
+  pending: () => boolean
+  retry: () => void
   start: (...[options]: Optional<Options>) => void
-  status: () => StreamStatus
+  status: () => ConnectionStatus
 
 [.] StreamStartOptions
 type StreamStartOptions<Module, Path, M> = UrlOptions<MethodRoute<Module, Path, Chosen<M>>> & CallBody<MethodRoute<Module, Path, Chosen<M>>>
 
 [.] StreamStatus
-type StreamStatus = 'idle' | 'connecting' | 'open' | 'done' | 'failed' | 'closed'
+type StreamStatus = ConnectionStatus
 
 [.] Success
 type Success<Output> = Exclude<Output, Failure<unknown>>
@@ -1059,14 +1070,20 @@ type Success<Output> = Exclude<Output, Failure<unknown>>
 type SuccessOf<Target> = Target extends Action<never, unknown> ? FormSuccess<Final<Success<ResultOf<Target>>>> : never
 
 [.] TrackedApi
-interface TrackedApi<Module, Path>
+interface TrackedApi<Module, Path> extends Source<LoadStatus>
+  error: () => ApiError<unknown> | undefined
   pending: () => boolean
+  retry: () => void
   settled: () => Promise<void>
+  status: () => LoadStatus
 
 [.] TrackedCall
-interface TrackedCall<Input, Result>
+interface TrackedCall<Input, Result> extends Source<LoadStatus>
+  error: () => ApiError<unknown> | undefined
   pending: () => boolean
+  retry: () => void
   settled: () => Promise<void>
+  status: () => LoadStatus
 
 [.] TransitionClasses
 interface TransitionClasses
@@ -1899,7 +1916,7 @@ type DevIconName = keyof typeof ICONS
 
 [./dev-tool] DevTab
 interface DevTab
-  count: (count: number, tone?: "warn" | "error" | undefined, note?: string | undefined) => void
+  count: (count: number, tone?: "error" | "warn" | undefined, note?: string | undefined) => void
   panel: HTMLElement
 
 [./dev-tool] DevTabOptions

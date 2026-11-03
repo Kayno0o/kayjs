@@ -1,9 +1,9 @@
 import type { CallResult } from './call-result'
-import { ApiError, fieldsOf, messageOf } from './api-error'
+import { ApiError, apiErrorOf, fieldsOf, messageOf } from './api-error'
 import { withBase } from './base'
 import { trackCalls } from './call-result'
 import { connection, listenerSet } from './connection'
-import { effect, onCleanup, onMount, ownSignal } from './reactive'
+import { effect, onCleanup, onMount, ownSignal, untrack } from './reactive'
 import { parseEvents } from './sse'
 import { decodeServerValue } from './wire'
 
@@ -22,6 +22,8 @@ export const ERROR_EVENT = 'error'
 
 // The close code of a connection either side ended on purpose, which is not reconnected.
 const NORMAL_CLOSURE = 1000
+// Where the close codes an application chooses for a refusal start: 4000 plus an HTTP status.
+const REFUSED_CODES = 4000
 // What a socket keeps to send while it connects, the oldest dropped past it: half the 100 messages a second a route takes by default, so the flush after a reconnect stays under it.
 const MAX_QUEUED = 50
 // What Elysia's websocket parser reads as JSON, by first character: `"`, `[`, `{`.
@@ -77,13 +79,31 @@ type Body<Route> = Route extends { body: infer Input } ? unknown extends Input ?
 // Options a caller may leave out altogether when none of them is required.
 export type Optional<Options> = Record<never, never> extends Options ? [options?: Options] : [options: Options]
 
-export type SocketStatus = 'connecting' | 'open' | 'closed'
+// What a value read once is: `idle` before it was asked for, `loading` while it is, `ready` once it answered and `failed` when it could not.
+export type LoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
 
-export interface Socket<Send, Receive> {
+// What a connection is: `idle` until a lazy one starts, `connecting` while it is made or waits to be made again, `open`, `done` once it ran to its end, `failed` when it was refused or its source threw and `closed` once `close()` was called.
+export type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'done' | 'failed' | 'closed'
+
+// What every source an island reads shares, so one block shows any of them: `button(onClick={notes.retry} disabled={notes.pending()}) Retry`.
+export interface Source<S extends LoadStatus | ConnectionStatus = LoadStatus | ConnectionStatus> {
+  status: () => S
+  // Whether it is loading or connecting, a quiet reload included.
+  pending: () => boolean
+  // The last failure, kept until the next success.
+  error: () => ApiError | undefined
+  // Tries again now, skipping any backoff; does nothing unless it failed or waits to try again.
+  retry: () => void
+}
+
+export type SocketStatus = 'connecting' | 'open' | 'failed' | 'closed'
+
+export interface Socket<Send, Receive> extends Source<SocketStatus> {
   // Sent at once while open, otherwise once the connection opens.
   send: (message: Send) => void
   // The last message received, read reactively; undefined before the first.
   last: () => Receive | undefined
+  // `failed` when the server closed it with a code from 4000 to 4999, its `error().status` the code minus 4000; any other drop reconnects.
   status: () => SocketStatus
   // Called with every message received; returns what stops it.
   on: (listener: (message: Receive) => void) => () => void
@@ -93,13 +113,14 @@ export interface Socket<Send, Receive> {
   close: () => void
 }
 
-export type StreamStatus = 'idle' | 'connecting' | 'open' | 'done' | 'failed' | 'closed'
+/** @deprecated Renamed `ConnectionStatus` in 1.87; the old name works until 1.90, and `kay upgrade` renames it. */
+export type StreamStatus = ConnectionStatus
 
-export interface EventReader<T> {
+export interface EventReader<T> extends Source<ConnectionStatus> {
   // The last value received, read reactively; undefined before the first.
   last: () => T | undefined
   // `idle` until a stream opened with `start: false` starts, `done` once it ran to its end, `failed` when it was refused or its source threw, `closed` once `close()` was called.
-  status: () => StreamStatus
+  status: () => ConnectionStatus
   on: (listener: (value: T) => void) => () => void
   close: () => void
 }
@@ -177,6 +198,15 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
         return
       }
 
+      // The server refused on purpose: a code of its own, 4000 plus the status, is not worth reconnecting for.
+      if (event.code >= REFUSED_CODES && event.code < REFUSED_CODES + 1000) {
+        const reason = (event).reason
+
+        link.fail(new ApiError(event.code - REFUSED_CODES, reason === '' ? `The server closed the connection with ${event.code}` : reason))
+
+        return
+      }
+
       link.lost()
     })
   }
@@ -193,6 +223,12 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
     },
     last: link.last,
     status: link.status as () => SocketStatus,
+    pending: link.pending,
+    error: link.error,
+    retry: () => {
+      if (!closed && !current)
+        link.retry()
+    },
     on: link.on,
     onOpen: listener => opened.on(listener),
     close: () => {
@@ -203,6 +239,21 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
       current?.close(NORMAL_CLOSURE)
     },
   }
+}
+
+// A refused stream response as an `ApiError`: its JSON or text as the data, read without the route-call machinery a stream page does not otherwise load.
+async function refusalOf(response: Response): Promise<ApiError> {
+  let data: unknown
+
+  try {
+    data = await response.text()
+    data = JSON.parse(data as string)
+  }
+  catch {}
+
+  const text = (data as { message?: unknown } | null)?.message ?? data
+
+  return new ApiError(response.status, typeof text === 'string' && text !== '' ? text : response.statusText, data)
 }
 
 // An event stream read as it arrives, through `request`; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is; with `retryRefused`, a response that is not ok is tried again after the backoff too, as a stream across a restart needs.
@@ -217,8 +268,11 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
     if (event === END_EVENT)
       return 'done'
 
-    if (event === ERROR_EVENT)
+    if (event === ERROR_EVENT) {
+      link.fail(new ApiError(0, 'The stream failed on the server'))
+
       return 'failed'
+    }
 
     let value: T
 
@@ -227,6 +281,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
     }
     catch (error) {
       console.error('kay: an event stream sent a value that does not decode', error)
+      link.fail(new ApiError(0, 'The stream sent a value that does not decode', undefined, {}, { cause: error }))
 
       return 'failed'
     }
@@ -240,6 +295,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
 
   async function read(controller: AbortController) {
     let ended: StreamStatus | undefined
+    let failure: ApiError | undefined
 
     try {
       const response = await request(controller.signal)
@@ -251,29 +307,33 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
       }
 
       if (!response.ok || !response.body) {
+        const refusal = await refusalOf(response)
+
         if (!retryRefused) {
-          link.set('failed')
+          link.fail(refusal)
 
           return
         }
 
         // Refused, as a server is while it restarts or a proof is stale: tried again after the backoff.
-        void response.body?.cancel()
+        failure = refusal
       }
       else {
         link.set('open')
         ended = await parseEvents(response.body, controller.signal, onEvent)
       }
     }
-    catch {}
+    catch (thrown) {
+      failure = apiErrorOf(thrown)
+    }
 
-    if (controller.signal.aborted)
+    if (controller.signal.aborted || ended === 'failed')
       return
 
     if (ended)
       link.set(ended)
     else
-      link.lost()
+      link.lost(failure)
   }
 
   return {
@@ -295,6 +355,14 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
     },
     last: link.last,
     status: link.status,
+    pending: link.pending,
+    error: link.error,
+    retry: () => link.retry(() => {
+      link.stop()
+      run?.abort()
+      run = new AbortController()
+      void read(run)
+    }),
     on: link.on,
     close: () => {
       link.stop()
@@ -442,9 +510,9 @@ function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): Event
       if (!controller.signal.aborted)
         link.set('done')
     }
-    catch {
+    catch (thrown) {
       if (!controller.signal.aborted)
-        link.set('failed')
+        link.fail(apiErrorOf(thrown))
     }
   }
 
@@ -459,7 +527,7 @@ function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): Event
   })
   onCleanup(close)
 
-  return { last: link.last, status: link.status, on: link.on, close }
+  return { last: link.last, status: link.status, pending: link.pending, error: link.error, retry: () => link.retry(() => void read()), on: link.on, close }
 }
 
 // Reads a route of a module under `src/api` answering with `eventStream()` from an island, once it is in the page, or with `start: false` each time `start()` is called: each value typed as the route sends it, Dates, Maps and Sets included.
@@ -511,22 +579,20 @@ export function stream(module: unknown, path?: string, options?: UrlInput & { me
   return run
 }
 
-export type ResourceStatus = 'loading' | 'ready' | 'failed'
+/** @deprecated Renamed `LoadStatus` in 1.87; the old name works until 1.90, and `kay upgrade` renames it. */
+export type ResourceStatus = Exclude<LoadStatus, 'idle'>
 
-export interface ResourceFailure {
-  // The status the route answered with, 0 when no answer came.
-  status: number
-  message: string
-}
+/** @deprecated Every failure is an `ApiError` since 1.87; the old name works until 1.90, and `kay upgrade` renames it. */
+export type ResourceFailure = ApiError
 
-export interface Resource<T> {
+export interface Resource<T> extends Source<ResourceStatus> {
   // What the route last answered, kept while it is asked again; undefined before the first answer.
   value: () => T | undefined
-  // `loading` until the route answers, and again each time it is asked anew.
+  // `loading` until the route answers, and again each time it is asked anew; `pending()` also reads a quiet reload that keeps `ready`.
   status: () => ResourceStatus
-  // Why the last request failed, kept while the route is asked again until it answers.
-  error: () => ResourceFailure | undefined
-  // Asks the route again with the same options, until the component that read it is gone.
+  // Why the last request failed as an `ApiError`, kept while the route is asked again until it answers. `retry()` asks again after a failure only.
+  error: () => ApiError | undefined
+  // Asks the route again with the same options, until the component that read it is gone, even when it is ready.
   refresh: () => void
 }
 
@@ -597,7 +663,8 @@ export function resource<T>(load: (signal: AbortSignal) => T | PromiseLike<T>): 
 export function resource(module: unknown, path?: string, options?: UrlInput | (() => UrlInput)): Resource<unknown> {
   const [value, setValue] = ownSignal<unknown>(undefined, { equals: false })
   const [status, setStatus] = ownSignal<ResourceStatus>('loading')
-  const [error, setError] = ownSignal<ResourceFailure | undefined>(undefined)
+  const [error, setError] = ownSignal<ApiError | undefined>(undefined)
+  const [busy, setBusy] = ownSignal(true)
   let current: AbortController | undefined
   let asked: ((signal: AbortSignal, fresh?: boolean) => unknown) | undefined
   let gone = false
@@ -611,6 +678,8 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
     current = controller
     asked = read
 
+    setBusy(true)
+
     if (!quiet)
       setStatus('loading')
 
@@ -623,12 +692,18 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
       setValue(answer)
       setError(undefined)
       setStatus('ready')
+      setBusy(false)
     }
     catch (failure) {
-      if (controller.signal.aborted || quiet)
+      if (controller.signal.aborted)
         return
 
-      setError({ status: failure instanceof ApiError ? failure.status : 0, message: failure instanceof Error ? failure.message : String(failure) })
+      setBusy(false)
+
+      if (quiet)
+        return
+
+      setError(apiErrorOf(failure))
       setStatus('failed')
     }
   }
@@ -680,12 +755,23 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
   onCleanup(() => {
     gone = true
     current?.abort()
+    setBusy(false)
 
     if (followed)
       void follow(null)
   })
 
-  return { value, status, error, refresh: () => asked === undefined || gone ? undefined : void load(asked) }
+  return {
+    value,
+    status,
+    pending: busy,
+    error,
+    refresh: () => asked === undefined || gone ? undefined : void load(asked),
+    retry: () => {
+      if (asked !== undefined && !gone && untrack(status) === 'failed')
+        void load(asked)
+    },
+  }
 }
 
 export { ApiError }
@@ -752,7 +838,7 @@ async function callApi<Module, const Path extends CallPath<Module>, const M exte
 }
 
 // A route handle over `call` with a pending count of its own: `const save = call.track(api, '/notes')`, then `await save({ method: 'post', body })` resolves `{ ok, data }` or the route's refusal as `{ ok: false, status, errors, data }`, as an action's `track()` does, and `save.pending()` reads only its own calls. A call that got no answer (status 0) or was aborted still throws.
-export interface TrackedApi<Module, Path> {
+export interface TrackedApi<Module, Path> extends Source<LoadStatus> {
   <const M extends CallMethod<NodeAt<Module, Path>> = never>(...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<CallResult<ApiAnswer<Module, Path, M>, unknown>>
   readonly pending: () => boolean
   readonly settled: () => Promise<void>

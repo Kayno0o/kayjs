@@ -70,3 +70,8 @@ export class ApiError<Data = unknown> extends Error implements ErrorShape<Data> 
     return this.data
   }
 }
+
+// What a failure is as an `ApiError`: itself, else status 0 with its message and the failure as the cause.
+export function apiErrorOf(failure: unknown): ApiError {
+  return failure instanceof ApiError ? failure : new ApiError(0, failure instanceof Error ? failure.message : String(failure), undefined, {}, { cause: failure })
+}

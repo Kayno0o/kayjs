@@ -700,7 +700,7 @@ describe('resource()', () => {
 
     await until(() => missing.status() !== 'loading')
     expect(missing.status()).toBe('failed')
-    expect(missing.error()).toEqual({ status: 404, message: 'No such room' })
+    expect(missing.error()).toMatchObject({ status: 404, message: 'No such room' })
 
     missing.refresh()
     expect(missing.status()).toBe('loading')
@@ -721,7 +721,7 @@ describe('resource()', () => {
     const rooms = root(() => resource(chat, '/rooms'))
 
     await until(() => rooms.status() !== 'loading')
-    expect(rooms.error()).toEqual({ status: 0, message: 'The server could not be reached' })
+    expect(rooms.error()).toMatchObject({ status: 0, message: 'The server could not be reached' })
   })
 
   it('aborts what it asked once its component is gone', () => {
@@ -780,7 +780,7 @@ describe('resource()', () => {
 
     await until(() => found.status() !== 'loading')
     expect(found.status()).toBe('failed')
-    expect(found.error()).toEqual({ status: 0, message: 'down' })
+    expect(found.error()).toMatchObject({ status: 0, message: 'down' })
 
     found.refresh()
     await until(() => found.status() === 'ready')
@@ -798,7 +798,7 @@ describe('resource()', () => {
     }), done] as const)
 
     await until(() => found.status() === 'failed')
-    expect(found.error()).toEqual({ status: 503, message: 'busy' })
+    expect(found.error()).toMatchObject({ status: 503, message: 'busy' })
 
     const typed: Promise<number | undefined> = Promise.resolve(root(() => resource(async () => 1)).value())
 

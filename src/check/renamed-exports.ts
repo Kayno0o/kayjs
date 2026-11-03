@@ -236,3 +236,46 @@ function isName(parent: Node, key: string): boolean {
 
   return parent.type === 'TSQualifiedName' && key === 'right'
 }
+
+// The types of `kay` renamed when every source an island reads came to share one vocabulary, and the name each has now.
+export const SOURCE_TYPES: Readonly<Record<string, string>> = { StreamStatus: 'ConnectionStatus', ResourceStatus: 'LoadStatus', ResourceFailure: 'ApiError' }
+
+const OLD_TYPE = /StreamStatus|ResourceStatus|ResourceFailure/
+
+// `StreamStatus`, `ResourceStatus` and `ResourceFailure` imported from `kay`, as a type or a value import: the fix renames the import and every use of it.
+// A file where the new name is taken, the old one is declared again, exported or read in a template, or an aliased import, gets the report with no fix beyond the import itself.
+export async function sourceTypes(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+  if (lintLevel('deprecated-source-types', options.lints) === 'allow')
+    return []
+
+  return scan(root, options, 'deprecated-source-types', OLD_TYPE, ({ parsed, unparsed, report }) => {
+    for (const { ast, base } of parsed) {
+      for (const statement of ast.body) {
+        if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'kay')
+          continue
+
+        for (const specifier of statement.specifiers) {
+          if (specifier.type !== 'ImportSpecifier' || !Object.hasOwn(SOURCE_TYPES, importedName(specifier)))
+            continue
+
+          const old = importedName(specifier)
+          const next = SOURCE_TYPES[old]!
+          const aliased = specifier.local.name !== old || specifier.imported.start !== specifier.local.start
+          const message = `\`${old}\` is renamed \`${next}\` since 1.87, and the old name works until 1.90`
+          const help = `rename it to \`${next}\``
+          const importEdit = { start: base + specifier.imported.start, end: base + specifier.imported.start + old.length, text: next }
+
+          if (aliased) {
+            report(importEdit.start, importEdit.end, message, help, [importEdit])
+
+            continue
+          }
+
+          const edits = mentions(parsed.map(one => one.ast), next) || new RegExp(`\\b${old}\\b`).test(unparsed) ? undefined : uses(ast, old, next)
+
+          report(importEdit.start, importEdit.end, message, help, edits ? [importEdit, ...edits.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))] : null)
+        }
+      }
+    }
+  })
+}
