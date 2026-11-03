@@ -21,6 +21,8 @@ export const EXTENSIONS_MARKER = 'kay-extension-problems:'
 export interface CollectionFeed {
   collection: string
   path: string
+  // The paths of the other formats the feed serves.
+  also?: string[] | undefined
   localized: boolean
 }
 
@@ -45,12 +47,17 @@ export function servesRoute(route: string, pattern: string): boolean {
   return served === key || (served.endsWith('*') && key.startsWith(served.slice(0, -1)))
 }
 
+// Whether a page's pattern is exactly a collection's route: `blog/[slug].kay` for `/blog/:slug`, `docs/[...slug].kay` for `/docs/*slug`.
+export function isRouteOf(route: string, pattern: string): boolean {
+  return routerKey(route.replace(CATCH_ALL, '*')) === routerKey(pattern)
+}
+
 // Claims where a collection's feed is served: at its path, or a localized collection's under each locale's prefix, the locale then known; with domains, each host serves its own at the path.
 export function claimFeed(served: ServedPaths, feed: CollectionFeed, settings: LocaleSettings | undefined): { path: string, locale: string | undefined }[] {
   // A feed is no page, so no translated path names it.
-  const paths = !feed.localized || !settings || settings.hosts
-    ? [{ path: feed.path, locale: undefined }]
-    : settings.locales.map(locale => ({ path: localePath({ ...settings, paths: undefined }, feed.path, locale), locale }))
+  const paths = [feed.path, ...feed.also ?? []].flatMap((path): { path: string, locale: string | undefined }[] => !feed.localized || !settings || settings.hosts
+    ? [{ path, locale: undefined }]
+    : settings.locales.map(locale => ({ path: localePath({ ...settings, paths: undefined }, path, locale), locale })))
 
   for (const { path } of paths)
     served.claim({ path, owner: `the feed of the collection ${feed.collection}`, kind: 'kay', exported: true })

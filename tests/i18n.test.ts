@@ -476,7 +476,7 @@ describe('localized content', () => {
       const plain = new Elysia().use(await paired())
       const english = (await get('/en/news/from-prototype', plain)).html
       const french = (await get('/news/du-prototype', plain)).html
-      const alternates = (html: string) => html.match(/<link rel="alternate"[^>]*>/g)
+      const alternates = (html: string) => html.match(/<link rel="alternate" hreflang[^>]*>/g)
 
       expect(alternates(english)).toEqual(['<link rel="alternate" hreflang="fr" href="https://x.example/news/du-prototype">', '<link rel="alternate" hreflang="en" href="https://x.example/en/news/from-prototype">', '<link rel="alternate" hreflang="x-default" href="https://x.example/news/du-prototype">'])
       expect(alternates(french)).toEqual(alternates(english))

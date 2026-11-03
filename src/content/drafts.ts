@@ -24,8 +24,8 @@ function holdsDate(node: Node): boolean {
   return node.type === 'Date' || (node.anyOf?.some(holdsDate) ?? false)
 }
 
-// A `publishAt` or `unpublishAt` naming anything but an `s.Date()` field would hold nothing back, so it fails where the collection is made.
-export function checkPublishField(name: string, schema: TSchema, field: string, option: 'publishAt' | 'unpublishAt'): void {
+// A `publishAt`, `unpublishAt` or `modified` naming anything but an `s.Date()` field would hold nothing back, so it fails where the collection is made.
+export function checkPublishField(name: string, schema: TSchema, field: string, option: 'publishAt' | 'unpublishAt' | 'modified'): void {
   const node = (schema as { properties?: Record<string, Node> }).properties?.[field]
 
   if (node === undefined || !holdsDate(node))

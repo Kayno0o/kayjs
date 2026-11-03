@@ -213,6 +213,8 @@ export const page = {
 ---
 ```
 
+A page listing a collection whose `modified` option names a date field needs no `lastmod`: each entry's URL takes that field.
+
 A URL the function returns nothing or `null` for is listed without one. A value that is no date, or a function that throws, lists that URL without one as well, and the error, which names the page, is logged and handed to `onError`, once for each page, so one bad date never takes the sitemap down. Only a page's own `lastmod` counts, not a layout's. Such a sitemap is kept for a minute instead of an hour, so the next crawl finds the dates back once the database answers.
 
 The sitemap is rebuilt when something it read changes, such as a collection a CMS saved, and is built again after an hour at the latest. It carries an `ETag` and `must-revalidate`, so a CDN or a crawler asks again each time and gets a short 304 while nothing changed.

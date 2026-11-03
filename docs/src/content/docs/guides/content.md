@@ -110,14 +110,12 @@ A name that is not an `s.Date()` field is a type error in `kay check`, and the s
 
 ## A page per entry
 
-A page named after the slug reads one entry and prerenders a page for each of them.
+A page named after the slug reads one entry. When the collection has a `route` (see [Entry URLs](#entry-urls)) that is the page of that route, and it prerenders a page for each entry and lists them in the sitemap with nothing more to write.
 
 ```kay
 --- server
 // src/routes/blog/[slug].kay
 import { posts } from '../../content.config'
-
-export const page = { prerender: posts }
 
 const post = await posts.get(ctx.params.slug) ?? ctx.notFound()
 const { Content } = post
@@ -127,7 +125,13 @@ article
   Content
 ```
 
-The page's head comes from the entry too: its `title` and `description` fields become the title and the description meta, and a `date`, `publishedAt` or `published` field (or the field named by `publishAt`, which must be a `Date` field: a text date gets nothing) makes `og:type` an `article` with an `article:published_time`. Tags the page writes in a `head` block replace them, and a field the entry lacks leaves the layout's tag.
+A collection without a `route` lists its entries in the page's `page` export instead, `export const page = { prerender: posts }`, which also wins over the route.
+
+The page's head comes from the entry too: its `title` and `description` fields become the title and the description meta, and a `date`, `publishedAt` or `published` field (or the field named by `publishAt`, which must be a `Date` field: a text date gets nothing) makes `og:type` an `article` with an `article:published_time`.
+
+A `modified` option naming another `Date` field adds `article:modified_time` and gives the sitemap a `lastmod` for each entry's URL.
+
+Tags the page writes in a `head` block replace them, and a field the entry lacks leaves the layout's tag.
 
 A slug with a slash, like `guides/intro`, needs a catch-all page, `[...slug].kay`.
 
@@ -265,7 +269,7 @@ A localized entry's `url` has its own slug, so `(await posts.translation(post, '
 
 A dotted slug such as `v1.2` is a page, not a file; a link ending in a file's extension, such as `/blog/cover.png`, stays a file unless an entry has that slug, as `release.html` in a localized site, whose entries are read at startup and again when the collection is invalidated. A slug the route cannot write leaves its entry out, logged. The CMS reads the route before `url`.
 
-The route has one param, the slug, and `kay check` reports a route no page matches, such as one with `src/routes/blog/[slug].kay` missing, and a page listing the collection in `prerender` while another page serves the route. A collection with no `route` has no `url`.
+The route has one param, the slug, and `kay check` reports a route no page matches, such as one with `src/routes/blog/[slug].kay` missing, a page listing the collection in `prerender` while another page serves the route, and two collections sharing one route. A collection with no `route` has no `url`. A `url` function and a feed item's `path` next to a `route` are the old way, reported by the `deprecated-collection-links` lint, which `kay upgrade` fixes.
 
 ## Feeds
 
@@ -286,11 +290,24 @@ export const posts = collection('content/posts', {
 })
 ```
 
-With a `route` on the collection, `path` can be left out of `item`: the feed links each entry's `url`. See [Entry URLs](#entry-urls).
+With a `route` on the collection, `item`, `title` and `path` in the items can all be left out: the feed links each entry's `url`, takes the title from the collection's `title` option, and reads each item's `title`, `description`, `author`, `tags`, `image` and date from the entry's fields. See [Entry URLs](#entry-urls).
+
+```ts
+export const posts = collection('content/posts', {
+  schema,
+  route: '/blog/:slug',
+  modified: 'updatedAt',
+  feed: { path: '/blog/rss.xml', format: ['rss', 'json'], content: true },
+})
+```
+
+`content: true` puts each entry's whole body in the feed, with its links written out in full. An item can also carry `categories`, an `image` and `updated`, which `modified` sets by default. `format` takes `'rss'`, `'atom'` or `'json'` (JSON Feed), or a list to serve several from one collection: the first at `path`, the others beside it with the extension replaced, `/blog/rss.json`.
+
+Every page showing an entry of the collection links its feed in its head, one `link rel="alternate"` per format. A list page adds the same links with `export const page = { feed: posts }`, and `feed: false` leaves them out.
 
 Add `format: 'atom'` for an Atom feed. `limit` is how many of the newest items it holds, 20 by default. `description` and `author` fill the feed's header, and Atom needs an author, so it uses the title when you set none. Return `undefined` from `item` to leave an entry out. Item links and guids are written as `trailingSlash` writes the page's address, so they match its canonical URL.
 
-A link in a layout lets readers find the feed, and `kay check` accepts it when the path is written out.
+A link written by hand, in a layout for instance, passes `kay check` when the path is written out.
 
 ```kay
 head

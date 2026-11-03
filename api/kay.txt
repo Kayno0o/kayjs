@@ -575,6 +575,7 @@ interface PageSecurity
 
 [.] PageSettings
 interface PageSettings
+  feed?: false | object | readonly object[]
   guards?: false
   keep?: true
   lastmod?: Lastmod | ((params: Record<string, string>) => Lastmod | Promise<Lastmod | undefined> | undefined)
@@ -1507,6 +1508,7 @@ interface CollectionOptions<Schema extends TSchema, Routed extends boolean = boo
   live?: boolean | undefined
   localized?: boolean | undefined
   migrations?: Migration[] | undefined
+  modified?: DateField<(Schema & { params: []; })["static"]> | undefined
   order?: NumberField<(Schema & { params: []; })["static"]> | undefined
   publishAt?: DateField<(Schema & { params: []; })["static"]> | undefined
   readingSpeed?: number | undefined
@@ -1628,20 +1630,25 @@ function entrySource(name: string, slug: string, data: unknown, options?: {
 [./content] FeedItem
 interface FeedItem
   author?: string | undefined
+  categories?: string[] | undefined
+  content?: string | undefined
   date: Date
   description?: string | undefined
+  image?: string | undefined
   path?: string | undefined
   title: string
+  updated?: Date | undefined
 
 [./content] FeedOptions
 interface FeedOptions<Data, Routed extends boolean = boolean>
   author?: string | undefined
+  content?: boolean | undefined
   description?: string | undefined
-  format?: "rss" | "atom" | undefined
-  item: (entry: Entry<Data>) => FeedItemOf<Routed> | undefined
+  format?: FeedFormat | readonly FeedFormat[] | undefined
+  item?: ((entry: Entry<Data>) => FeedItemOf<Routed> | undefined) | undefined
   limit?: number | undefined
   path: string
-  title: string
+  title?: string | undefined
 
 [./content] FeedPathsOf
 type FeedPathsOf<Module> = {

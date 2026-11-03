@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import { checkBudget } from '../build/budget'
 import { islandId } from '../compiler'
 import { CONFIG_FILE } from '../config'
-import { claimFeed, servesRoute, unservedRoutes } from '../content/claims'
+import { claimFeed, isRouteOf, servesRoute, unservedRoutes } from '../content/claims'
 import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
 import { actionClash } from '../server/action-clash'
@@ -139,6 +139,14 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
 
   for (const { collection, route } of unservedRoutes(collectionRoutes, routes.map(page => page.pattern)))
     diagnostics.push({ file: projectPaths(root, options).content, line: 1, column: 1, message: `kay: the route ${route} of the collection ${collection} is served by no page; add the page that shows its entries, such as src/routes${route.replace('*slug', '[...slug]').replace(':slug', '[slug]')}.kay`, help: 'make the route the pattern of a page' })
+
+  // Two collections with the one route, so the page serving it cannot tell which it lists.
+  for (const page of routes.filter(candidate => candidate.params.length === 1 && !candidate.pattern.includes('?'))) {
+    const named = collectionRoutes.filter(({ route }) => isRouteOf(route, page.pattern))
+
+    if (named.length > 1 && await prerenderOf(page.file) === undefined)
+      diagnostics.push({ file: page.file, line: 1, column: 1, message: `kay: the collections ${named.map(({ collection }) => collection).join(' and ')} have the route ${named[0]!.route}, so this page cannot tell which one it lists`, help: 'give the collections different routes, or set `prerender` on this page to the one it lists' })
+  }
 
   // A page listing the entries of a routed collection in `prerender` while another page is the route's: the urls its entries give lead somewhere else.
   const prerenders = new Map<string, Promise<string | undefined>>()

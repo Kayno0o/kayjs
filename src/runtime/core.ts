@@ -382,6 +382,8 @@ export interface PageSettings {
   sitemap?: boolean | object
   // When the page last changed, for the sitemap's `lastmod`: a `Date`, a date string such as '2026-05-06', or a function of the params of each URL the sitemap lists, returning one or nothing.
   lastmod?: Lastmod | ((params: Record<string, string>) => Lastmod | undefined | Promise<Lastmod | undefined>)
+  // The collections whose feed the page's head links to, `link rel="alternate"`, beside the feed of the collection the page shows an entry of, which every such page links to already; `false` leaves the links out.
+  feed?: false | object | readonly object[]
   // Keeps the page out of search engines and the sitemap.
   noindex?: boolean
   // What the page's responses send over the site's security headers; a layout's applies to every page under it, the inner one merged over the outer.

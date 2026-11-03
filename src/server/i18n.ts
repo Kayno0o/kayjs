@@ -1,4 +1,5 @@
 import type { I18nConfig, KayConfig, KayExtension } from '../config'
+import type { FeedOptions } from '../content/feed'
 import type { LocaleSettings, Message, MessageTree, Translations } from '../runtime/i18n'
 import type { LocaleState } from '../runtime/locale-state'
 import type { Route } from './routes'
@@ -8,6 +9,7 @@ import process from 'node:process'
 import { throughLinks } from '../build/links'
 import { KayError } from '../compiler/errors'
 import { entryPath } from '../content/entry-route'
+import { feedPaths } from '../content/feed'
 import { contentKey } from '../content/key'
 import { onKeysInvalidated } from '../runtime/cache'
 import { FILE_EXTENSION, flattenMessages, localePath, matchLinksWith, pathSegment, splitLocale, timeZone, translatedPath } from '../runtime/i18n'
@@ -256,8 +258,8 @@ export function followEntryFiles(settings: LocaleSettings, collections: (EntryCo
 
 // The settings told of the patterns the site's pages are served under and of its localized feeds, which a link written as the default locale names them goes to in the page's locale.
 // A localized collection's feed is served once per locale, as a page is; any other's once for all of them.
-export function linkedSettings(settings: LocaleSettings, routes: Pick<Route, 'pattern'>[], collections: { options: { feed?: { path: string } | undefined, localized?: boolean | undefined, route?: string | undefined } }[]): LocaleSettings {
-  const feeds = settings.hosts ? [] : collections.flatMap(({ options }) => options.feed && options.localized === true ? [options.feed.path] : [])
+export function linkedSettings(settings: LocaleSettings, routes: Pick<Route, 'pattern'>[], collections: { options: { feed?: { path: string, format?: FeedOptions<unknown>['format'] } | undefined, localized?: boolean | undefined, route?: string | undefined } }[]): LocaleSettings {
+  const feeds = settings.hosts ? [] : collections.flatMap(({ options }) => options.feed && options.localized === true ? feedPaths(options.feed).map(({ path }) => path) : [])
 
   const entryRoutes = collections.flatMap(({ options }) => options.route === undefined ? [] : [options.route.replace(CATCH_ALL, '*')])
 

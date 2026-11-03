@@ -152,6 +152,8 @@ export interface CollectionOptions<Schema extends TSchema, Routed extends boolea
   publishAt?: DateField<Static<Schema>> | undefined
   // A date field, `'endsAt'`, taking an entry down as a draft is from that time on, by itself: out of `all()`, `get()`, the pages prerendered from it, the sitemap and the feed, the page of its URL rendering again and answering 410 Gone when its code calls `ctx.notFound()` after `get()` found nothing for the ended entry, or what the app chose otherwise (a redirect); a redirect from the path wins over the 410. An entry without one never ends; `kay dev` and preview mode keep showing it.
   unpublishAt?: DateField<Static<Schema>> | undefined
+  // A date field, `'updatedAt'`, holding when an entry last changed: the sitemap's `lastmod` of its page unless the page sets one, the entry page's `article:modified_time` and the feed's `updated`. An entry without one has no modified time.
+  modified?: DateField<Static<Schema>> | undefined
   // A number field the entries are ordered by, ascending, those without it last: `all()` lists them so unless `sort` says otherwise, and a CMS moves an entry up or down by writing it.
   order?: NumberField<Static<Schema>> | undefined
   // The order `all()` lists entries in; by `order`, else by slug.
@@ -230,6 +232,9 @@ export function collection<Schema extends TSchema, Components extends Record<str
 
   if (unpublishAt !== undefined)
     checkPublishField(name, options.schema, unpublishAt, 'unpublishAt')
+
+  if (options.modified !== undefined)
+    checkPublishField(name, options.schema, options.modified, 'modified')
 
   if (options.single && localized)
     throw new KayError('config-invalid', `kay: the collection ${name} is both \`single\` and \`localized\`; a single entry has no translations, so leave one out`)

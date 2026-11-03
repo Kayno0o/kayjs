@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { KayConfig, RobotsConfig, TrailingSlash } from '../config'
+import type { Collection } from '../content'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { ServedRoute } from './guards'
 import type { LocaleCopy } from './i18n'
@@ -9,6 +10,8 @@ import { relative } from 'node:path'
 import process from 'node:process'
 import { NotFoundError } from 'elysia'
 import { KayError } from '../compiler/errors'
+import { isCollection } from '../content'
+import { entryModified } from '../content/entry-head'
 import { ALL_READS, onKeysInvalidated } from '../runtime/cache'
 import { escape } from '../runtime/escape'
 import { kayLog } from '../runtime/log'
@@ -16,7 +19,7 @@ import { importModule } from './bundle'
 import { fixedReply } from './compress'
 import { hostLocale, localeCopies } from './i18n'
 import { readsOf } from './page-reads'
-import { chainSetting, pageSetting } from './page-settings'
+import { chainSetting, pagePrerender, pageSetting } from './page-settings'
 import { listedIn, listedParams, pageEtag, pathOf } from './prerendered'
 import { matchesEtag, REVALIDATE } from './public'
 import { onPublished } from './publishing'
@@ -214,6 +217,21 @@ function robotsTxt(rules: Rules, origin: string, settings: LocaleSettings | unde
   return `User-agent: *\n${everything}${[...lines('Allow', rules.allow), ...disallowed].map(line => `${line}\n`).join('')}\nSitemap: ${origin}${SITEMAP}\n`
 }
 
+// The `modified` time of each entry of a collection by slug, the latest of its locales' for a localized one.
+async function modifiedBySlug(collection: Collection<unknown>): Promise<Map<string, Date>> {
+  const found = new Map<string, Date>()
+
+  for (const entry of await collection.all()) {
+    const modified = entryModified(collection, entry)
+    const earlier = found.get(entry.slug)
+
+    if (modified !== undefined && (earlier === undefined || earlier < modified))
+      found.set(entry.slug, modified)
+  }
+
+  return found
+}
+
 // A page's `lastmod` for one URL as the sitemap writes it, a W3C date, or nothing when the page has none for it.
 async function lastmodOf(setting: unknown, params: ListedParams, file: string): Promise<string> {
   // The params without the symbols kay lists locales under.
@@ -306,12 +324,20 @@ async function sitemapUrls(routes: ServedRoute[], origin: string, trailingSlash:
     const modules = await Promise.all(routeChain(route).files.map(async each => importModule<object>(each)))
     const module = modules.at(-1)!
     const sitemap = pageSetting(module, 'sitemap')
-    const prerender = pageSetting(module, 'prerender')
+    const prerender = pagePrerender(module, route)
+    const listing = [sitemap, prerender].find(isCollection)
     let lastmodReported = false
+    let modifieds: Promise<Map<string, Date>> | undefined
+    // The collection's `modified` field stands for a `lastmod` the page does not set.
+    const collectionLastmod = async (params: Record<string, string>): Promise<Date | undefined> => {
+      modifieds ??= modifiedBySlug(listing!)
+
+      return (await modifieds).get(params[route.params[0]!]!)
+    }
     // A lastmod that throws or is no date leaves that URL without one, and is reported once for the page.
     const modifiedOf = async (value: ListedParams) => {
       try {
-        return await lastmodOf(pageSetting(module, 'lastmod'), value, file)
+        return await lastmodOf(pageSetting(module, 'lastmod') ?? (listing?.options.modified !== undefined && route.params.length === 1 ? collectionLastmod : undefined), value, file)
       }
       catch (error) {
         if (!lastmodReported) {

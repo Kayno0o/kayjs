@@ -64,7 +64,10 @@
 
 ### Feeds
 
-- `feed` serves an RSS 2.0 feed at its path, `format: 'atom'` for Atom, its `author` the feed's title unless set: the newest `limit` items, 20 by default, that `item` returns, links and guids absolute on the `site` kay.config.ts sets, which a feed needs, written as `trailingSlash` writes each page's canonical URL.
+- `feed` serves an RSS 2.0 feed at its path, `format: 'atom'` for Atom or `'json'` for JSON Feed 1.1, its `author` the feed's title unless set: the newest `limit` items, 20 by default, that `item` returns (by default the entry's fields, see [Serve an RSS feed](content.md#serve-an-rss-feed)), links and guids absolute on the `site` kay.config.ts sets, which a feed needs, written as `trailingSlash` writes each page's canonical URL.
+- `content: true` carries each entry's rendered body (`content:encoded`, Atom `content`, `content_html`), its links and images from the site's root written out in full; an item's own `content` wins. An item also takes `categories`, an `image` (RSS `enclosure`, Atom `link rel="enclosure"`, JSON `image`) and `updated` (the entry's `modified` field by default).
+- `format: ['rss', 'atom', 'json']` serves each from the one collection: the first at `path`, each other beside it with the extension replaced, `/blog/rss.json`, `/blog/rss.atom`.
+- Every page showing an entry of a collection with a feed carries its `link rel="alternate"` in its head, one per format, in the page's locale and under the base; `page = { feed: posts }` adds the links to any other page, such as the list, and `feed: false` leaves them out.
 - A link to its path, such as `link(rel="alternate" href="/blog/rss.xml")` in a layout, passes `kay check` when the path is written as a literal.
 
 ### Localized collections

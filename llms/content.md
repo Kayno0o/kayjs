@@ -41,13 +41,11 @@ ul
 
 ### Show one entry per page
 
-`get(slug)` gives one entry, `Content` renders its body and `headings` list its titles, and `prerender: posts` builds a page per entry, `src/blog/[slug].kay`:
+`get(slug)` gives one entry, `Content` renders its body and `headings` list its titles. The page whose pattern is the collection's `route` (`src/routes/blog/[slug].kay` for `/blog/:slug`) builds a page per entry and lists them in the sitemap with nothing declared; a collection with no `route` says it with `prerender: posts` in the page's `page` export, which also wins over the route's:
 
 ```kay
 --- server
 import { posts } from '../../content.config'
-
-export const page = { prerender: posts }
 
 const post = await posts.get(ctx.params.slug) ?? ctx.notFound()
 const { Content } = post
@@ -68,13 +66,14 @@ article
 export const posts = collection('content/posts', {
   schema: s.Object({ title: s.String(), date: s.Date() }),
   route: '/blog/:slug',
-  feed: { path: '/blog/rss.xml', title: 'Blog', item: post => ({ title: post.data.title, date: post.data.date }) },
+  feed: { path: '/blog/rss.xml', title: 'Blog' },
 })
 ```
 
 - `a(href={post.url}) ...` links it; `url` is the path as `route()` writes it, so kay puts the base and the page's locale on it as on any link.
 - A localized entry's `url` has its own slug, so `(await posts.translation(post, 'fr'))?.url` is the page of its translation, on a page that read the entry with `get()`, `alternate('fr')` gives it too. A dotted slug, `v1.2`, is a page, not a file; so is an entry's `release.html` (re-read on `invalidate()`); links ending in `.png` are files. A slug the route cannot write (`..`) leaves its entry out, logged. The CMS reads the route before `url`.
-- A feed item with no `path` links the entry's `url`, absolute on the site, in the locale's feed under its prefix, as `trailingSlash` writes a page's address.
+- A feed item with no `path` links the entry's `url`, absolute on the site, in the locale's feed under its prefix, as `trailingSlash` writes a page's address. `url` as a function and a feed item's `path` next to a `route` are `deprecated-collection-links`.
+- The page whose pattern is the route prerenders and lists its entries in the sitemap by itself, with the entry's head (title, description, dates, the feed's `link rel="alternate"`) and, with `modified: 'updatedAt'` naming an `s.Date()` field, a `lastmod` per URL and `article:modified_time`; its own `prerender`, `sitemap` and `lastmod` win. `kay check` reports two collections with one route, as the page cannot tell which it lists. An optional-param page (`blog/[[page]].kay`) is never taken for it.
 - The route has one param, the slug: `:slug`, or `*slug` for slugs with folders, and `collection()` refuses any other.
 - `kay check` reports a route no page's pattern matches (`src/routes/blog/[slug].kay`, whatever its param is named); a page listing the entries in `prerender: posts` while another page serves the route is reported too.
 - A collection with no `route` has no `url`.
@@ -119,7 +118,7 @@ export const posts = collection('content/posts', {
 
 ### Serve an RSS feed
 
-`feed` serves an RSS 2.0 feed at its `path`, built from what `item` returns for each entry:
+`feed` serves an RSS 2.0 feed at its `path`. With a `route`, `feed: { path: '/blog/rss.xml' }` is all it needs: the title is the collection's `title` (else its name humanized), and each item takes the entry's `title`, `description`, `author`, `tags` (its categories) and `image` (or `cover`), its date from `publishAt` else `date`, `publishedAt` or `published`, and its `modified` field as the update time, an entry lacking a title or a date failing the feed. `item` replaces that, and is needed without a `route` to give each item its `path`:
 
 ```ts
 import { s } from 'kay'

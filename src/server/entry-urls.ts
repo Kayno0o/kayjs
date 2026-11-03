@@ -7,7 +7,7 @@ import { servesRoute } from '../content/claims'
 import { exportNameOf } from '../runtime/fields'
 import { importModule } from './bundle'
 import { localeCopies } from './i18n'
-import { pageSetting } from './page-settings'
+import { pagePrerender, pageSetting } from './page-settings'
 import { pathOf } from './prerendered'
 import { entriesReadAt, inProbe } from './preview'
 import { slashedPath } from './routes'
@@ -134,7 +134,7 @@ async function listingRoutes(routes: ServedRoute[]): Promise<Map<string, ServedR
       return undefined
 
     const module = await importModule<object>(route.file)
-    const prerender = pageSetting(module, 'prerender')
+    const prerender = pagePrerender(module, route)
 
     return isCollection(prerender) ? prerender : pageSetting(module, 'sitemap')
   }))

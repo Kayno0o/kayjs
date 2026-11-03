@@ -61,7 +61,7 @@ import { followsCaches, inLiveReads, liveScript, noteStreams, retryForViewer } f
 import { newTabRule } from './new-tab'
 import { INSTALL_OFFER, registerScript } from './offline'
 import { errorPage } from './overlay'
-import { chainSetting, pageSetting } from './page-settings'
+import { chainSetting, pagePrerender } from './page-settings'
 import { pageToken } from './prerendered'
 import { noteEditedEntries, noteProbedEntries, withoutShareToken } from './preview'
 import { requestId } from './protection'
@@ -329,7 +329,7 @@ onForgetModules(() => {
 })
 
 async function willPrerender(route: ServedRoute, page: PageModule): Promise<DevRequest['prerender']> {
-  const setting = pageSetting(page, 'prerender')
+  const setting = pagePrerender(page, route)
 
   if (setting === false)
     return undefined

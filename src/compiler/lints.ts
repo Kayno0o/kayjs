@@ -671,6 +671,17 @@ export const LINTS = {
     wrong: '--- server\nimport { safeRedirect } from \'@kaynooo/kayjs-auth\'\n\nconst next = safeRedirect(ctx.query.next)\n---\np= next',
     right: '--- server\nimport { localPath } from \'kay\'\n\nconst next = localPath(ctx.query.next, \'/\')\n---\np= next',
   },
+  'deprecated-collection-links': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.87',
+    site: true,
+    // eslint-disable-next-line no-template-curly-in-string
+    summary: 'A collection with a `route` that also says where its entries\' pages are, which the route already is: a `url` function, which the route wins over, and a `path` in the items of its `feed`, which the feed takes from the entry\'s `url`. The old forms keep working until 1.90. Found in the TypeScript files calling `collection` from `kay/content` with a literal `route`; the fix drops the `url` function, and a `path` written as the route with the slug (`` `/blog/${post.slug}` `` for `/blog/:slug`). A `path` that differs from the route is reported with no fix.',
+    // eslint-disable-next-line no-template-curly-in-string
+    wrong: 'export const posts = collection(\'content/posts\', { schema, route: \'/blog/:slug\', feed: { path: \'/blog/rss.xml\', title: \'Blog\', item: post => ({ title: post.data.title, date: post.data.date, path: `/blog/${post.slug}` }) } })',
+    right: 'export const posts = collection(\'content/posts\', { schema, route: \'/blog/:slug\', feed: { path: \'/blog/rss.xml\', title: \'Blog\', item: post => ({ title: post.data.title, date: post.data.date }) } })',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS
@@ -718,6 +729,7 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.81', removedIn: '1.85' },
   { since: '1.82', removedIn: '1.86' },
   { since: '1.84' },
+  { since: '1.87' },
 ]
 
 // The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.

@@ -202,7 +202,7 @@ function labelOf(schema: TSchema, pointer: string, data: unknown): string {
 const WORD = /[A-Z]+(?![a-z])|[A-Z]?[a-z\d]+/g
 
 // The same words the CMS labels a field with, `packages/cms/src/fields.ts`, which runs in the browser and cannot import this; `tests/entry-refusals.test.ts` holds the two together.
-function humanize(key: string): string {
+export function humanize(key: string): string {
   const words = (key.match(WORD) ?? [key]).map(word => word === word.toUpperCase() && word.length > 1 ? word : word.toLowerCase()).join(' ')
 
   return words.charAt(0).toUpperCase() + words.slice(1)

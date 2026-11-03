@@ -235,7 +235,7 @@ See [Locals, sessions and guards](server.md#locals) and [kayjs-auth setup](../pa
 
 ### Publish a blog with tags, an RSS feed and a sitemap
 
-One collection holds the posts, with the feed on it, `src/content.config.ts`. The `site` of kay.config.ts is what the feed and the sitemap build their absolute links from:
+One collection holds the posts, with the feed on it, `src/content.config.ts`. Its `route` is the page of a post: that page prerenders and lists the posts in the sitemap with nothing to declare, and the feed links them. The `site` of kay.config.ts is what the feed and the sitemap build their absolute links from:
 
 ```ts
 import { s } from 'kay'
@@ -248,13 +248,10 @@ export const posts = collection('content/posts', {
     tags: s.Array(s.String(), { default: [] }),
     draft: s.Optional(s.Boolean()),
   }),
+  route: '/blog/:slug',
   draft: post => post.data.draft === true,
   sort: (a, b) => b.data.date.getTime() - a.data.date.getTime(),
-  feed: {
-    path: '/blog/rss.xml',
-    title: 'Blog',
-    item: post => ({ title: post.data.title, path: `/blog/${post.slug}`, date: post.data.date }),
-  },
+  feed: { path: '/blog/rss.xml', title: 'Blog' },
 })
 ```
 
@@ -279,18 +276,17 @@ import { posts } from '../../content.config'
 
 const blog = paginate(posts, 10)
 
-export const page = { prerender: blog }
+export const page = { prerender: blog, feed: posts }
 
 const list = await blog.page(ctx.params.page) ?? ctx.notFound()
 ---
 head
   title Blog
-  link(rel="alternate" type="application/rss+xml" href="/blog/rss.xml")
 h1 Blog
 for post of list.items key={post.slug}
   article
     h2
-      a(href={`/blog/${post.slug}`}) {post.data.title}
+      a(href={post.url}) {post.data.title}
     p
       for tag of post.data.tags
         a(href={`/blog/tags/${tag}`}) {tag}
@@ -300,19 +296,15 @@ if list.next
   a(href={list.next}) Older
 ```
 
-A post is its own page, listed in the sitemap by the same collection, `src/routes/blog/[slug].kay`:
+A post is its own page, `src/routes/blog/[slug].kay`; its head carries the title, the dates and the feed's `link rel="alternate"`:
 
 ```kay
 --- server
 import { posts } from '../../content.config'
 
-export const page = { prerender: posts, sitemap: posts }
-
 const post = await posts.get(ctx.params.slug) ?? ctx.notFound()
 const { Content } = post
 ---
-head
-  title {post.data.title}
 h1 {post.data.title}
 article
   Content
@@ -335,7 +327,7 @@ head
   title Posts tagged {tag}
 h1 {tag}
 for post of tagged key={post.slug}
-  a(href={`/blog/${post.slug}`}) {post.data.title}
+  a(href={post.url}) {post.data.title}
 ```
 
 The test reads the pages, the feed and the sitemap from the site, `tests/blog.test.ts`:

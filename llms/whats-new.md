@@ -5,6 +5,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `navigation` from `kay` tells an island where an in-place navigation stands (`status()`, `pending()`, `to()` and `error()`, an `ApiError`), `onBeforeNavigate(({ url, from }) => ...)` may cancel one and `onNavigate(({ url }) => ...)` follows each shown page, and `kay:navigate-start` and `kay:navigate-error` join `kay:navigate`: [navigation state and hooks](navigation-from-code.md#navigation-state-and-hooks).
+- A page whose pattern is a collection's `route` prerenders and lists its entries in the sitemap with no `page` export, a feed needs no `item` or `title` (the fields of the entry and the collection's `title` stand in), and the collection's `modified` field gives each URL its `lastmod`, the entry's head `article:modified_time` and the feed its update times; `url` as a function and a feed item's `path` next to a `route` are the `deprecated-collection-links` lint: [content](content.md#show-one-entry-per-page).
+- A feed item carries `content` (`content: true` renders each entry's body), `categories`, `image` and `updated`, `format` takes `'json'` or a list serving several formats, and the head of every page showing an entry of a collection with a feed links it, `page = { feed: posts }` adding the link to another page and `feed: false` leaving it out: [feeds](content-markdown-to-caching.md#feeds).
 
 ## 1.86.0
 

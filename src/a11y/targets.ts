@@ -4,7 +4,7 @@ import { projectCollections } from '../content/server'
 import { projectPaths } from '../project'
 import { localeCopies, localeSettings, routedSettings } from '../server/i18n'
 import { registerLoader } from '../server/loader'
-import { pageSetting } from '../server/page-settings'
+import { pagePrerender, pageSetting } from '../server/page-settings'
 import { listedIn, listedParams, pathOf } from '../server/prerendered'
 import { routeMounts, scanRoutes, slashedPath } from '../server/routes'
 
@@ -46,7 +46,7 @@ export async function pagesToAudit(root: string, config: KayConfig): Promise<{ t
 
     try {
       const module = await import(route.file) as object
-      const name = (['sitemap', 'prerender'] as const).find(each => pageSetting(module, each) !== undefined)
+      const name = (['sitemap', 'prerender'] as const).find(each => (each === 'prerender' ? pagePrerender(module, route) : pageSetting(module, each)) !== undefined)
 
       if (route.params.length > 0 && name === undefined) {
         left(`it takes ${route.params.join(', ')} and lists no values: add \`prerender\` or \`sitemap\` to its \`page\` export`, `elle prend ${route.params.join(', ')} sans en lister les valeurs : ajouter \`prerender\` ou \`sitemap\` à son export \`page\``, false)
@@ -54,7 +54,7 @@ export async function pagesToAudit(root: string, config: KayConfig): Promise<{ t
         continue
       }
 
-      const listed = route.params.length === 0 ? [{}] : await listedParams(route, file, name!, pageSetting(module, name!), settings)
+      const listed = route.params.length === 0 ? [{}] : await listedParams(route, file, name!, name === 'prerender' ? pagePrerender(module, route) : pageSetting(module, name!), settings)
 
       for (const params of listed) {
         for (const copy of localeCopies(settings, pathOf(route, params)).filter(copy => listedIn(params, copy.locale, settings))) {

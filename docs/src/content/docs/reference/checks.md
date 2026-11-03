@@ -124,6 +124,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
 | `deprecated-safe-redirect` | warn | deprecated | A call of kayjs-auth's `safeRedirect(path, fallback?)`, now kay's `localPath(path, fallback)`; the old name works until 1.87, and `kay upgrade` calls `localPath` |
 | `deprecated-session-stores` | warn | deprecated | An import of `memoryStore` or `sqliteStore` from `kay/server`, the session stores before 1.84, now `memorySessions` and `sqliteSessions`; the old names work until 1.87, and `kay upgrade` renames them |
+| `deprecated-collection-links` | warn | deprecated | A collection with a literal `route` that also says where its entries' pages are, since 1.87: a `url` function (the route wins over it) and a `path` in its feed's items (the feed links the entry's `url`). Works until 1.90. `kay upgrade` drops the `url` function and a `path` written as the route with the slug, `` `/blog/${post.slug}` `` for `/blog/:slug`; a `path` that differs from the route is reported with no fix. Found in `.ts` files calling `collection` from `kay/content`. |
 | `deprecated-config-keys` | warn | deprecated | A config key under its name before 1.84 (`routes`, `api`, `content`, `storage`, `maxSizes`, `settings`), in `kay.config.ts`, in the options of `pages()` and `testSite()` or in an extension's `config`; the old names work until 1.87, and `kay upgrade` renames them |
 
 ## Errors

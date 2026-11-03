@@ -31,6 +31,7 @@ import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
+import { deprecatedCollectionLinks } from './deprecated-collection-links'
 import { deprecatedConfigKeys } from './deprecated-config-keys'
 import { ownFile } from './diagnose'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
@@ -140,6 +141,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => sessionStores(root, options),
   async ({ root, options }) => safeRedirects(root, options),
   async ({ root, options }) => deprecatedConfigKeys(root, options),
+  async ({ root, options }) => deprecatedCollectionLinks(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

@@ -4,7 +4,8 @@ import type { LocaleState } from '../runtime/locale-state'
 import type { I18n } from '../server/i18n'
 import type { ServedPaths } from '../server/served-paths'
 import type { CollectionFeed, CollectionRoute } from './claims'
-import type { Collection } from './index'
+
+import type { Collection, Entry } from './index'
 import type { RawEntry } from './load'
 import type { Segment } from './markdown'
 import type { ContentProblem } from './validate'
@@ -24,7 +25,7 @@ import { revalidated } from '../server/public'
 import { projectSource } from '../server/source'
 import { claimFeed } from './claims'
 import { entries, registerCollections } from './edit'
-import { feedItem, feedXml } from './feed'
+import { FEED_TYPES, feedDocument, feedItem, feedPaths, resolvedFeed } from './feed'
 import { isCollection } from './index'
 import { contentMode, contentOutput, draftCommentLine, loadEntries, manifestFile, markdownOf, pruneContentCache, setContentPlace, translationKey } from './load'
 import { migrateEntries, withMigrationHint } from './migrate'
@@ -228,62 +229,66 @@ function feedNeedsSite(collection: Collection<unknown>): Error {
 }
 
 function collectionFeed(collection: Collection<unknown>): CollectionFeed {
-  return { collection: collection.name, path: collection.options.feed!.path, localized: collection.options.localized === true }
+  const [first, ...others] = feedPaths(collection.options.feed!)
+
+  return { collection: collection.name, path: first!.path, also: others.map(other => other.path), localized: collection.options.localized === true }
 }
 
 // Serves each collection's feed at its path; one stays cached for an hour in production, then revalidates by its ETag, answering 304 while unchanged.
 // A localized collection's feed lists only the entries written in its locale, linking each at its path there.
 export function serveFeeds(app: Elysia, served: ServedPaths, collections: Collection<unknown>[], origin: string, dev = false, i18n?: I18n, trailingSlash?: TrailingSlash): void {
   for (const collection of collections) {
-    const { feed } = collection.options
-
-    if (!feed)
+    if (!collection.options.feed)
       continue
 
-    const headers = { 'content-type': `${feed.format === 'atom' ? 'application/atom+xml' : 'application/rss+xml'}; charset=utf-8` }
+    const feed = resolvedFeed(collection)
     const cache = dev ? 'no-cache' : 'public, max-age=3600'
 
-    for (const { path, locale } of claimFeed(served, collectionFeed(collection), i18n?.settings)) {
-      const built = new Map<string, { entries: unknown[], xml: string, etag: string }>()
-      // The XML built from these very entries is served again, so `item` is taken to depend on the entry alone; a collection that read its entries afresh, or a request that sees others, builds it anew.
-      const once = <Entry>(request: Request, key: string, entries: Entry[], build: () => string) => {
-        const last = built.get(key)
-        let current = last
+    for (const { format, path: formatPath } of feedPaths(feed)) {
+      const headers = { 'content-type': `${FEED_TYPES[format]}; charset=utf-8` }
 
-        if (!last || last.entries.length !== entries.length || !last.entries.every((entry, index) => entry === entries[index])) {
-          const xml = build()
+      for (const { path, locale } of claimFeed(served, { ...collectionFeed(collection), path: formatPath, also: [] }, i18n?.settings)) {
+        const built = new Map<string, { entries: unknown[], xml: string, etag: string }>()
+        // The XML built from these very entries is served again, so `item` is taken to depend on the entry alone; a collection that read its entries afresh, or a request that sees others, builds it anew.
+        const once = <Entry>(request: Request, key: string, entries: Entry[], build: () => string) => {
+          const last = built.get(key)
+          let current = last
 
-          current = { entries, xml, etag: pageEtag(xml) }
-          built.set(key, current)
+          if (!last || last.entries.length !== entries.length || !last.entries.every((entry, index) => entry === entries[index])) {
+            const xml = build()
+
+            current = { entries, xml, etag: pageEtag(xml) }
+            built.set(key, current)
+          }
+
+          const { xml, etag } = current!
+
+          return revalidated(request, etag, () => xml, headers, cache)
         }
 
-        const { xml, etag } = current!
+        app.get(path, async ({ request }) => {
+          if (!i18n || collection.options.localized !== true) {
+            const entries = await collection.all()
 
-        return revalidated(request, etag, () => xml, headers, cache)
-      }
+            return once(request, '', entries, () => feedDocument(format, entries, feed, origin, '/', trailingSlash, path))
+          }
 
-      app.get(path, async ({ request }) => {
-        if (!i18n || collection.options.localized !== true) {
-          const entries = await collection.all()
+          const { settings } = i18n
+          const written = locale ?? hostLocale(settings, request)
+          const host = settings.hosts?.[written]
 
-          return once(request, '', entries, () => feedXml(entries, feed, origin, '/', trailingSlash))
-        }
+          return runInLocale(stateFor(i18n, written, feed.path, request), async () => {
+            const entries = (await collection.all(written)).filter(entry => entry.locale === written)
+            const localized = { ...feed, item: (entry: Entry<unknown>) => {
+              const item = feedItem(feed, entry)
 
-        const { settings } = i18n
-        const written = locale ?? hostLocale(settings, request)
-        const host = settings.hosts?.[written]
+              return item && { ...item, path: localePath(settings, item.path, written, host) }
+            } }
 
-        return runInLocale(stateFor(i18n, written, feed.path, request), async () => {
-          const entries = (await collection.all(written)).filter(entry => entry.locale === written)
-          const localized = { ...feed, path, item: (entry: Parameters<typeof feed.item>[0]) => {
-            const item = feedItem(feed, entry)
-
-            return item && { ...item, path: localePath(settings, item.path, written, host) }
-          } }
-
-          return once(request, written, entries, () => feedXml(entries, localized, host === undefined ? origin : onHost(origin, host), localePath(settings, '/', written, host), trailingSlash))
+            return once(request, written, entries, () => feedDocument(format, entries, localized, host === undefined ? origin : onHost(origin, host), localePath(settings, '/', written, host), trailingSlash, path))
+          })
         })
-      })
+      }
     }
   }
 }

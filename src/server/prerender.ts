@@ -29,7 +29,7 @@ import { localeCopies, stateFor } from './i18n'
 import { LIVE_MARK, withoutCacheScripts } from './live'
 import { pageFlags } from './page-flags'
 import { readsOf } from './page-reads'
-import { chainSetting, pageSetting } from './page-settings'
+import { chainSetting, pagePrerender, pageSetting, routedCollections } from './page-settings'
 import { matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pageToken, pathOf, storedHeaders } from './prerendered'
 import { keptScan } from './pure-page'
@@ -194,7 +194,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     if (auto && revalidate !== undefined)
       return skip('sets `revalidate`, which has a stale copy render again for every visitor')
 
-    const prerender = pageSetting(module, 'prerender')
+    const prerender = pagePrerender(module, route)
 
     if (options.exportAll)
       refuseServerOnly(route, module, config.requireGuards)
@@ -479,7 +479,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const marked = route.params.length === 0 && await reachesServerIsland(route.file, reach)
 
     const settings = await pageFlags(route.file)
-    const asked = marked || options.exportAll === true || settings.prerender !== undefined
+    const asked = marked || options.exportAll === true || settings.prerender !== undefined || routedCollections(route).length > 0
     const keep = !asked && settings.keep
 
     // `keep` asks the build to prerender the page, which `prerender: false` forbids.
