@@ -110,6 +110,36 @@ describe('onBeforeNavigate', () => {
     dispose()
   })
 
+  it('keeps the same function registered by two islands until both end', async () => {
+    const refuse = () => false
+    const first = island(() => {
+      state.onBeforeNavigate(refuse)
+    })
+    const second = island(() => {
+      state.onBeforeNavigate(refuse)
+    })
+
+    first()
+    expect(navigation.navigation.before).toBeDefined()
+    expect(await navigation.mayLeave(TARGETS[0]!)).toBe(false)
+    second()
+    expect(navigation.navigation.before).toBeUndefined()
+    expect(await navigation.mayLeave(TARGETS[0]!)).toBe(true)
+  })
+
+  it('is not asked for a page kay does not swap in place, where the guards still ask', async () => {
+    const asked: string[] = []
+    const dispose = island(() => {
+      state.onBeforeNavigate(() => asked.push('hook') > 0 && false)
+      navigation.leaveGuards.add({ dirty: () => true, confirm: () => asked.push('guard') > 0 })
+    })
+
+    expect(await navigation.mayLeave(TARGETS[0]!, false)).toBe(true)
+    expect(asked).toEqual(['guard'])
+    navigation.leaveGuards.clear()
+    dispose()
+  })
+
   it('answers before a leave guard, which is not asked when it refuses', async () => {
     const asked: string[] = []
     const dispose = island(() => {
@@ -170,6 +200,36 @@ describe('navigation', () => {
 })
 
 describe('onNavigate', () => {
+  it('logs a handler that throws or rejects and calls the others', async () => {
+    const logged: unknown[] = []
+    const original = console.error
+    const urls: string[] = []
+
+    console.error = (...args: unknown[]) => logged.push(...args)
+
+    const dispose = island(() => {
+      state.onNavigate(() => {
+        throw new Error('sync')
+      })
+      state.onNavigate(async () => {
+        throw new Error('async')
+      })
+      state.onNavigate(({ url }) => urls.push(url.href))
+    })
+
+    try {
+      document.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: TARGETS[0]!.href } }))
+      await Bun.sleep(5)
+    }
+    finally {
+      console.error = original
+      dispose()
+    }
+
+    expect(logged.map(error => (error as Error).message)).toEqual(['sync', 'async'])
+    expect(urls).toEqual([TARGETS[0]!.href])
+  })
+
   it('is called with the URL of each swapped page until its disposer or island ends it', () => {
     const urls: string[] = []
     let stop: () => void = () => undefined

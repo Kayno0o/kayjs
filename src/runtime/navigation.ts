@@ -108,14 +108,19 @@ let scrollTimer: ReturnType<typeof setTimeout> | undefined
 // The API's path, as the `kay-api` meta of the page first loaded names it: the app's, so the same on every page a swap brings.
 let apiPath: string | undefined
 
-// Whether the page may be left for `to`: the `onBeforeNavigate` handlers answer first, then the first guard holding unsaved changes asks, once for them all.
-export async function mayLeave(to: URL): Promise<boolean> {
-  if (navigation.before && !await navigation.before(to))
+// Whether the page may be left for `to`: the `onBeforeNavigate` handlers answer first, for a page kay swaps in place only (`hooked`), then the first guard holding unsaved changes asks, once for them all.
+export async function mayLeave(to: URL, hooked = true): Promise<boolean> {
+  if (hooked && navigation.before && !await navigation.before(to))
     return false
 
   const guard = dirtyGuard()
 
   return guard ? guard.confirm(to) : true
+}
+
+// Whether a leave may have to ask, which a traversal is bounced back to the page left for.
+export function asks(): boolean {
+  return Boolean(navigation.before || dirtyGuard())
 }
 
 export function dirtyGuard(): LeaveGuard | undefined {

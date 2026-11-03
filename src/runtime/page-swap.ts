@@ -1,7 +1,6 @@
 import type { FetchedPage, Swap } from './navigation'
 import type { Policy } from './swap-flight'
 import { reviveActionsOf } from './action-revive'
-
 import { historyState, leave, leaving, navigation, pageKey, restoreScroll, saveScroll } from './navigation'
 import { NAVIGATION_ENTRY } from './navigation-entry'
 import { forgetPageData } from './page-data'
@@ -209,7 +208,7 @@ function began(url: URL): void {
 // The swap gave up on `url` and lets the browser load it in full: `kay:navigate-error` on `document` carries the reason.
 // Kay's wording first and the browser's own error its `cause`; `error()` turns it into an `ApiError` of status 0 for an app that reads it, which this lazy chunk leaves to the code that does.
 function failed(url: URL, message: string, cause?: unknown): void {
-  const error = new Error(message, { cause })
+  const error = Object.assign(new Error(message, { cause }), { status: 0 })
 
   navigation.phase?.('idle', url, error)
   document.dispatchEvent(new CustomEvent('kay:navigate-error', { detail: { url: url.href, error } }))

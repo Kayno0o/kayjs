@@ -19,9 +19,8 @@ export interface NavigateEvent {
   url: URL
 }
 
-type Before = (event: BeforeNavigate) => boolean | void | Promise<boolean | void>
-
-const befores = new Set<Before>()
+// One entry for each call, so the same function registered by two islands is two handlers, each ending with its own island.
+const befores = new Set<{ run: (event: BeforeNavigate) => boolean | void | Promise<boolean | void> }>()
 let signals: { status: () => NavigationState, to: () => URL | undefined, error: () => ApiError | undefined } | undefined
 
 // Created on the first read and wired to the swap then, so a page that never reads `navigation` carries none of it.
@@ -64,15 +63,17 @@ export const navigation = {
 // Asks `fn` with `{ url, from }` before a link of the app, `navigate()` or going back or forward leaves the page, for as long as the island lives: returning `false` (or a promise of it) keeps the page, where a handler that throws is logged and lets the visit go on.
 // Under `guardLeave` the handlers answer first. Returns what removes it before the island ends.
 // kept: free
-export function onBeforeNavigate(fn: Before): () => void {
+export function onBeforeNavigate(fn: (event: BeforeNavigate) => boolean | void | Promise<boolean | void>): () => void {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return () => undefined
 
-  befores.add(fn)
+  const entry = { run: fn }
+
+  befores.add(entry)
   shared.before = askBefore
 
   const stop = () => {
-    befores.delete(fn)
+    befores.delete(entry)
 
     if (befores.size === 0)
       shared.before = undefined
@@ -86,9 +87,9 @@ export function onBeforeNavigate(fn: Before): () => void {
 async function askBefore(url: URL): Promise<boolean> {
   const event = { url, from: new URL(location.href) }
 
-  for (const fn of befores) {
+  for (const { run } of befores) {
     try {
-      if (await fn(event) === false)
+      if (await run(event) === false)
         return false
     }
     catch (error) {
@@ -101,18 +102,19 @@ async function askBefore(url: URL): Promise<boolean> {
 
 // Calls `fn` with `{ url }`, the address of each page a swap shows, once it is in place and its islands are hydrating, for as long as the island lives: the `kay:navigate` event, which a full load does not fire either. Returns what removes it before the island ends.
 // kept: free
-export function onNavigate(fn: (event: NavigateEvent) => void): () => void {
+export function onNavigate(fn: (event: NavigateEvent) => unknown): () => void {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return () => undefined
 
-  const listener = (event: Event) => {
+  const run = async (event: Event) => {
     try {
-      fn({ url: new URL((event as CustomEvent<{ url: string }>).detail.url) })
+      await fn({ url: new URL((event as CustomEvent<{ url: string }>).detail.url) })
     }
     catch (error) {
       console.error(error)
     }
   }
+  const listener = (event: Event) => void run(event)
   const stop = () => document.removeEventListener('kay:navigate', listener)
 
   document.addEventListener('kay:navigate', listener)

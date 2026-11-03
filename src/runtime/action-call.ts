@@ -323,14 +323,14 @@ async function goTo(target: string): Promise<boolean> {
   if (api) {
     const [before, released] = [navigation.current, navigation.released]
 
-    await api.navigate(target)
+    await api.navigateTo(target, {}, false)
 
     return navigation.current !== before || (!released && navigation.released)
   }
 
   const url = new URL(target, location.href)
 
-  if (!await mayLeave(url))
+  if (!await mayLeave(url, false))
     return false
 
   leave(url)

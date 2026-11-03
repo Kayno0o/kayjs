@@ -36,6 +36,11 @@ export async function navigate(to: { query: QueryChanges }, options?: NavigateOp
 // Last, so a path no page serves is reported against it.
 export async function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions): Promise<boolean>
 export async function navigate(to: string | { query: QueryChanges }, options: NavigateOptions = {}): Promise<boolean> {
+  return navigateTo(to, options, true)
+}
+
+// `navigate()`, with `hooked` off for a redirect an action's call asks for, which `onBeforeNavigate` cannot refuse as the action already ran: the leave guards still ask.
+export async function navigateTo(to: string | { query: QueryChanges }, options: NavigateOptions, hooked: boolean): Promise<boolean> {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return true
 
@@ -52,12 +57,15 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
     mergeQuery(url.searchParams, to.query)
   }
 
-  if (!await mayLeave(url))
+  // The handlers of `onBeforeNavigate` are asked for a page kay swaps in place only, as for a link.
+  const inPlace = Boolean(navigation.hooks) && swappable(url)
+
+  if (!await mayLeave(url, hooked && inPlace))
     return false
 
   navigation.navigations = (navigation.navigations ?? 0) + 1
 
-  if (!navigation.hooks || !swappable(url)) {
+  if (!inPlace) {
     leave(url)
 
     return true

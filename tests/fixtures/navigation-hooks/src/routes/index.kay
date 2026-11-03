@@ -1,0 +1,8 @@
+--- script
+import Watcher from '../components/watcher.kay'
+---
+head
+  title Start
+h1 Start
+Watcher
+a.second(href="/second") Second

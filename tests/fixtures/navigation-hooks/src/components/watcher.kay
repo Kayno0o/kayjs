@@ -1,0 +1,8 @@
+---
+import { navigate, onBeforeNavigate } from 'kay'
+
+onBeforeNavigate(({ url }) => {
+  sessionStorage.setItem('asked', `${sessionStorage.getItem('asked') ?? ''}${url.pathname};`)
+})
+---
+button.go(onClick={() => navigate('/second')}) Go

@@ -2,7 +2,7 @@ import type { TestPage } from '../src/test'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
-import { CHUNK_TIMEOUT_MS } from '../src/runtime/page-swap'
+import { CHUNK_TIMEOUT_MS, PAGE_TIMEOUT_MS } from '../src/runtime/page-swap'
 import { browse, browserPath } from '../src/test'
 import { listeningPort, spawnSuiteServer, stopSuiteServer } from './listening'
 import { scratchDir } from './scratch'
@@ -1364,9 +1364,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
 
           for (const name of ['kay:navigate-start', 'kay:navigate-error']) {
             document.addEventListener(name, (event) => {
-              const { url, error } = (event as CustomEvent<{ url: string, error?: { message: string } }>).detail
+              const { url, error } = (event as CustomEvent<{ url: string, error?: { message: string, status: number, cause: unknown } }>).detail
 
-              sessionStorage.setItem(name, `${new URL(url).pathname} ${error ? error.message.replace(location.origin, '') : ''}`.trim())
+              sessionStorage.setItem(name, `${new URL(url).pathname} ${error ? `${error.status} ${error.message.replace(location.origin, '')} ${error.cause instanceof TypeError}` : ''}`.trim())
             })
           }
         })
@@ -1384,8 +1384,144 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         await own.click('a.two')
         await own.waitFor('h1', { text: 'Watched two' })
         expect(await sameDocument(own)).toBe(false)
-        expect(await own.evaluate(() => [sessionStorage.getItem('kay:navigate-start'), sessionStorage.getItem('kay:navigate-error')])).toEqual(['/watched-two', '/watched-two kay: /watched-two could not be fetched'])
+        expect(await own.evaluate(() => [sessionStorage.getItem('kay:navigate-start'), sessionStorage.getItem('kay:navigate-error')])).toEqual(['/watched-two', '/watched-two 0 kay: /watched-two could not be fetched true'])
         expect(await own.text('p.state')).toBe('idle')
+      }
+      finally {
+        own.close()
+      }
+    })
+
+    it('sets error() and fires kay:navigate-error when the page does not answer in 10 seconds, then loads it in full', async () => {
+      const own = await open('/watched')
+
+      const { promise: unanswered, resolve: answer } = Promise.withResolvers<void>()
+
+      try {
+        let held = false
+
+        await own.evaluate(() => {
+          (window as { kayAlive?: boolean }).kayAlive = true
+          document.addEventListener('kay:navigate-error', (event) => {
+            const { error } = (event as CustomEvent<{ error: { message: string, status: number } }>).detail
+
+            ;(window as { kayLog?: string[] }).kayLog!.push(`event error ${error.status} ${error.message.replace(location.origin, '')}`)
+          })
+        })
+        await own.route(`${origin}/watched-two`, async (request) => {
+          // The swap's fetch never answers; the full load the page falls back to goes through.
+          if (!held) {
+            held = true
+            await unanswered
+
+            return
+          }
+
+          await request.continue()
+        })
+        await own.click('a.two')
+        await own.waitUntil(() => document.documentElement.getAttribute('aria-busy') === 'true')
+        await own.advance(`${PAGE_TIMEOUT_MS + 100}ms`)
+        await own.waitUntil(() => (window as { kayLog?: string[] }).kayLog!.some(line => line.startsWith('error ')) || !(window as { kayAlive?: boolean }).kayAlive)
+
+        // The error reached the island before the full load took the page away, or the load beat the read: either way the page ended on the next one.
+        await own.waitFor('h1', { text: 'Watched two' })
+        expect(await sameDocument(own)).toBe(false)
+      }
+      finally {
+        answer()
+        own.close()
+      }
+    })
+
+    it('resolves navigate() to false after a refusal, and asks nothing of hash-only, same-URL and full-load navigations beyond the swap\'s own rules', async () => {
+      const own = await open('/watched')
+
+      try {
+        await own.evaluate(() => {
+          (window as { kayAlive?: boolean }).kayAlive = true
+        })
+        await own.click('button.block')
+        await own.click('button.go')
+        await own.waitUntil(() => (window as { kayLog?: string[] }).kayLog!.includes('resolved false'))
+        expect(await own.path()).toBe('/watched')
+
+        await own.click('button.hash')
+        await own.waitUntil(() => (window as { kayLog?: string[] }).kayLog!.filter(line => line.startsWith('resolved')).length === 2)
+        await own.click('button.same')
+        await own.waitUntil(() => (window as { kayLog?: string[] }).kayLog!.filter(line => line.startsWith('resolved')).length === 3)
+
+        const log = await logOf(own)
+
+        // A hash-only or same-URL call is asked like any other, and refused here.
+        expect(log.filter(line => line.startsWith('before'))).toEqual(['before /watched /watched-two', 'before /watched /watched', 'before /watched /watched'])
+        expect(log.filter(line => line.startsWith('resolved'))).toEqual(['resolved false', 'resolved false', 'resolved false'])
+        expect(await sameDocument(own)).toBe(true)
+
+        // An API or kay path loads fully, so the handler is not asked.
+        await own.evaluate(() => sessionStorage.removeItem('kayBefore'))
+        await own.click('button.out')
+        await own.waitUntil(() => !(window as { kayAlive?: boolean }).kayAlive)
+        expect(await own.evaluate(() => sessionStorage.getItem('kayBefore'))).toBeNull()
+      }
+      finally {
+        own.close()
+      }
+    })
+
+    it('does not ask the handlers about the redirect of a form post or of an island\'s action call', async () => {
+      for (const trigger of ['form.away button.post', 'button.away']) {
+        const own = await open('/watched')
+
+        try {
+          await own.click('button.block')
+          await own.click(trigger)
+          await own.waitFor('h1', { text: 'Watched two' })
+          expect((await logOf(own)).filter(line => line.startsWith('before'))).toEqual([])
+          expect(await own.path()).toBe('/watched-two')
+        }
+        finally {
+          own.close()
+        }
+      }
+    })
+
+    it('leaves the status idle for a refresh, with the watcher mounted where it happens', async () => {
+      const own = await open('/watched')
+
+      try {
+        await listen(own)
+        await own.click('button.refresh')
+        await own.waitUntil(() => (window as { kayLog?: string[] }).kayLog!.includes('event kay:navigate /watched'))
+        await settled(own)
+
+        const log = await logOf(own)
+
+        expect(log.filter(line => line.startsWith('state'))).toEqual(['state idle false -'])
+        expect(log.filter(line => line.startsWith('event kay:navigate-start'))).toEqual([])
+      }
+      finally {
+        own.close()
+      }
+    })
+
+    it('restores the scroll across the bounce a registered handler makes Back take', async () => {
+      const own = await open('/watched')
+
+      try {
+        await own.evaluate(() => {
+          scrollTo(0, 400)
+        })
+        await own.waitUntil(() => scrollY === 400)
+        // The link is scrolled out of view, which a pointer click would scroll back to.
+        await own.evaluate(() => document.querySelector<HTMLAnchorElement>('a.two')!.click())
+        await own.waitFor('h1', { text: 'Watched two' })
+        await own.back()
+        await own.waitUntil(() => location.pathname === '/watched' && document.querySelector('h1')!.textContent === 'Watched')
+        await settled(own)
+
+        expect(await own.evaluate(() => scrollY)).toBe(400)
+        expect((await logOf(own)).filter(line => line.startsWith('before'))).toEqual(['before /watched /watched-two', 'before /watched-two /watched'])
       }
       finally {
         own.close()

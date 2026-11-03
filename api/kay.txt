@@ -530,7 +530,7 @@ type NavigationState = 'idle' | 'loading' | 'swapping'
 type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions) => Promise<Answer<Success<Output>>>)
 
 [.] onBeforeNavigate
-function onBeforeNavigate(fn: Before): () => void
+function onBeforeNavigate(fn: (event: BeforeNavigate) => boolean | void | Promise<boolean | void>): () => void
 
 [.] onCleanup
 function onCleanup(fn: () => void): void
@@ -539,7 +539,7 @@ function onCleanup(fn: () => void): void
 function onMount(fn: () => void): void
 
 [.] onNavigate
-function onNavigate(fn: (event: NavigateEvent) => void): () => void
+function onNavigate(fn: (event: NavigateEvent) => unknown): () => void
 
 [.] PageContext
 interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>> extends RequestContext<Params>

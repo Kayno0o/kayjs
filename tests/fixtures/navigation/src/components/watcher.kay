@@ -1,6 +1,8 @@
 ---
-import { effect, navigate, navigation, onBeforeNavigate, onNavigate, signal } from 'kay'
+import type { Action } from 'kay'
+import { effect, navigate, navigation, onBeforeNavigate, onNavigate, refresh, signal } from 'kay'
 
+const { away } = props<{ away?: Action<Record<string, never>, unknown> }>()
 const blocking = signal(false)
 const log = (globalThis as { kayLog?: string[] }).kayLog ??= []
 
@@ -15,11 +17,22 @@ effect(() => {
 })
 onBeforeNavigate(({ url, from }) => {
   log.push(`before ${from.pathname} ${url.pathname}`)
+  // Kept across a full load, which the log is not.
+  sessionStorage.setItem('kayBefore', `${sessionStorage.getItem('kayBefore') ?? ''}${url.pathname};`)
 
   return !blocking()
 })
 onNavigate(({ url }) => log.push(`navigate ${url.pathname}`))
+
+async function go(to: string) {
+  log.push(`resolved ${await navigate(to)}`)
+}
 ---
 p.state {navigation.status()}
 button.block(onClick={() => blocking.set(true)}) Block
-button.go(onClick={() => navigate('/watched-two')}) Go
+button.go(onClick={() => go('/watched-two')}) Go
+button.hash(onClick={() => go('#section')}) Hash
+button.same(onClick={() => go(location.pathname)}) Same
+button.out(onClick={() => go('/_kay/none')}) Out
+button.refresh(onClick={() => refresh()}) Refresh
+button.away(onClick={() => away?.({})}) Away

@@ -1,10 +1,17 @@
----
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const away = action(t.Object({}), (_, ctx) => ctx.redirect('/watched-two'))
+--- script
 import Watcher from '../components/watcher.kay'
 ---
 head
   title Watched
 h1 Watched
-Watcher(persist)
+Watcher(persist away={away})
 a.two(href="/watched-two") Two
 a.second(href="/second") Second
-div(style="height: 3000px")
+form.away(action={away})
+  button.post Post
+div#section(style="height: 3000px")
