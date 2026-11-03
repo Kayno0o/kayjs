@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- `navigation` from `kay` tells an island where an in-place navigation stands (`state()`, `to()`, `error()`), `onBeforeNavigate(fn)` may cancel one and `onNavigate(fn)` follows each shown page, and `kay:navigate-start` and `kay:navigate-error` join `kay:navigate`: [navigation state and hooks](navigation-from-code.md#navigation-state-and-hooks).
+- `navigation` from `kay` tells an island where an in-place navigation stands (`status()`, `pending()`, `to()` and `error()`, an `ApiError`), `onBeforeNavigate(({ url, from }) => ...)` may cancel one and `onNavigate(({ url }) => ...)` follows each shown page, and `kay:navigate-start` and `kay:navigate-error` join `kay:navigate`: [navigation state and hooks](navigation-from-code.md#navigation-state-and-hooks).
 
 ## 1.86.0
 

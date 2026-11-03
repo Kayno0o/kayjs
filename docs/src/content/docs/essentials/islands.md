@@ -289,23 +289,23 @@ The code a swap loads for a streamed page, or to keep a deferred server island a
 
 Each swap fires a `kay:navigate` event on `document`, with the page's address in `event.detail.url`, for a plain script to set itself up again. A full load fires none. `kay:navigate-start` fires when a swap begins, and `kay:navigate-error` when it gives up and the browser loads the page in full, with `event.detail.url` and, for the error, `event.detail.error`.
 
-An island can follow a navigation without listening to events. `navigation.state()` is `'loading'` while the next page is fetched, `'swapping'` while it is put in place and `'idle'` otherwise, `navigation.to()` is the address being navigated to and `navigation.error()` why the last swap gave up. That is enough for a loading bar:
+An island can follow a navigation without listening to events. `navigation.status()` is `'loading'` while the next page is fetched, `'swapping'` while it is put in place and `'idle'` otherwise, `navigation.pending()` says whether one is under way, `navigation.to()` is the address being navigated to and `navigation.error()` is an `ApiError` (status 0, since no page answered) for why the last swap gave up. That is enough for a loading bar:
 
 ```kay
 ---
 import { navigation } from 'kay'
 ---
-if navigation.state() !== 'idle'
+if navigation.pending()
   .top-bar
 ```
 
-`onBeforeNavigate` asks before a link, `navigate()`, Back or Forward leaves the page, and keeps the page when it returns `false`. `onNavigate` runs after each page is shown. Both end with the island, and return a function that removes them sooner.
+`onBeforeNavigate` asks before a link, `navigate()`, Back or Forward leaves the page, and keeps the page when it returns `false`. `onNavigate` runs after each page is shown. Both get one object, end with the island, and return a function that removes them sooner. A handler that throws is logged and the navigation goes on.
 
 ```ts
 import { onBeforeNavigate, onNavigate } from 'kay'
 
-onBeforeNavigate(to => !uploading() || to.pathname.startsWith('/uploads'))
-onNavigate(url => track(url.pathname))
+onBeforeNavigate(({ url }) => !uploading() || url.pathname.startsWith('/uploads'))
+onNavigate(({ url }) => track(url.pathname))
 ```
 
 What a script appends to `<body>` goes with the next swap, as the next page never renders it. Mark it `data-kay-keep` to keep it through every swap, the same element at the end of the body, such as a live region an announcer fills. The swap never moves it, so a live region is still read. Only a direct child of `<body>` is kept this way, and only one a script added: an element the server renders comes back with the next page.

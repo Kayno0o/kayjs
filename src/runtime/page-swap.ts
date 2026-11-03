@@ -1,6 +1,7 @@
 import type { FetchedPage, Swap } from './navigation'
 import type { Policy } from './swap-flight'
 import { reviveActionsOf } from './action-revive'
+
 import { historyState, leave, leaving, navigation, pageKey, restoreScroll, saveScroll } from './navigation'
 import { NAVIGATION_ENTRY } from './navigation-entry'
 import { forgetPageData } from './page-data'
@@ -138,7 +139,7 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
 
         if (isCurrent()) {
           if (navigating)
-            failed(url, new Error(`kay: ${url.href} did not answer in time`))
+            failed(url, `kay: ${url.href} did not answer in time`)
 
           leave(url)
         }
@@ -152,7 +153,7 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
       // A fetch a newer navigation cancelled leaves nothing to load.
       if (isCurrent()) {
         if (navigating)
-          failed(url, error)
+          failed(url, `kay: ${url.href} could not be fetched`, error)
 
         leave(url)
       }
@@ -179,7 +180,7 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
 
       if (isCurrent()) {
         if (navigating)
-          failed(url, error)
+          failed(url, `kay: ${url.href} could not be put in place`, error)
 
         leave(new URL(page.url), pageKey(new URL(location.href)) === pageKey(new URL(page.url)) || change === 'none')
       }
@@ -206,8 +207,9 @@ function began(url: URL): void {
 }
 
 // The swap gave up on `url` and lets the browser load it in full: `kay:navigate-error` on `document` carries the reason.
-function failed(url: URL, reason: unknown): void {
-  const error = reason instanceof Error ? reason : new Error(String(reason))
+// Kay's wording first and the browser's own error its `cause`; `error()` turns it into an `ApiError` of status 0 for an app that reads it, which this lazy chunk leaves to the code that does.
+function failed(url: URL, message: string, cause?: unknown): void {
+  const error = new Error(message, { cause })
 
   navigation.phase?.('idle', url, error)
   document.dispatchEvent(new CustomEvent('kay:navigate-error', { detail: { url: url.href, error } }))

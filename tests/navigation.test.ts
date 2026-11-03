@@ -1278,16 +1278,16 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         const log = (await logOf(own)).filter(line => !line.startsWith('before'))
 
         expect(log).toEqual([
-          'state idle -',
+          'state idle false -',
           'event kay:navigate-start /second',
-          'state loading /second',
+          'state loading true /second',
           'event kay:navigate-start /watched-two',
-          'state loading /watched-two',
-          'state swapping /watched-two',
+          'state loading true /watched-two',
+          'state swapping true /watched-two',
           'navigate /watched-two',
           'event kay:navigate /watched-two',
           // Effects run after the handlers, which already read the state as idle.
-          'state idle -',
+          'state idle false -',
         ])
         expect(await own.text('p.state')).toBe('idle')
       }
@@ -1314,7 +1314,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
 
         const log = await logOf(own)
 
-        expect(log.filter(line => line.startsWith('before'))).toEqual(['before /watched-two', 'before /watched', 'before /watched-two', 'before /watched'])
+        expect(log.filter(line => line.startsWith('before'))).toEqual(['before /watched /watched-two', 'before /watched-two /watched', 'before /watched-two /watched-two', 'before /watched-two /watched'])
         // Only the first, allowed visit started a swap.
         expect(log.filter(line => line.startsWith('event kay:navigate-start'))).toEqual(['event kay:navigate-start /watched-two'])
         expect(await own.path()).toBe('/watched-two')
@@ -1362,8 +1362,13 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         await own.evaluate(() => {
           (window as { kayAlive?: boolean }).kayAlive = true
 
-          for (const name of ['kay:navigate-start', 'kay:navigate-error'])
-            document.addEventListener(name, event => sessionStorage.setItem(name, new URL((event as CustomEvent<{ url: string }>).detail.url).pathname))
+          for (const name of ['kay:navigate-start', 'kay:navigate-error']) {
+            document.addEventListener(name, (event) => {
+              const { url, error } = (event as CustomEvent<{ url: string, error?: { message: string } }>).detail
+
+              sessionStorage.setItem(name, `${new URL(url).pathname} ${error ? error.message.replace(location.origin, '') : ''}`.trim())
+            })
+          }
         })
         await own.route(`${origin}/watched-two`, async (request) => {
           // The swap's fetch fails; the full load the page falls back to goes through.
@@ -1379,7 +1384,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         await own.click('a.two')
         await own.waitFor('h1', { text: 'Watched two' })
         expect(await sameDocument(own)).toBe(false)
-        expect(await own.evaluate(() => [sessionStorage.getItem('kay:navigate-start'), sessionStorage.getItem('kay:navigate-error')])).toEqual(['/watched-two', '/watched-two'])
+        expect(await own.evaluate(() => [sessionStorage.getItem('kay:navigate-start'), sessionStorage.getItem('kay:navigate-error')])).toEqual(['/watched-two', '/watched-two kay: /watched-two could not be fetched'])
         expect(await own.text('p.state')).toBe('idle')
       }
       finally {

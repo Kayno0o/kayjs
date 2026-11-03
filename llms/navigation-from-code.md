@@ -21,9 +21,9 @@ button(onClick={() => navigate('/todos')}) Todos
 ---
 import { navigation, onBeforeNavigate } from 'kay'
 
-onBeforeNavigate((to) => !dirty() || confirm(`Leave for ${to.pathname}?`))
+onBeforeNavigate(({ url }) => !dirty() || confirm(`Leave for ${url.pathname}?`))
 ---
-if navigation.state() !== 'idle'
+if navigation.pending()
   .top-bar
 if navigation.error()
   p.error The page could not be swapped in.
@@ -68,13 +68,13 @@ const dispose = mount(Panel, document.querySelector('#panel')!, { title: 'Ticket
 
 ### Navigation state and hooks
 
-- `navigation.state()` from `kay`, read in an island, a template or an effect, is `'loading'` while the next page is fetched, `'swapping'` while it is put in place and `'idle'` otherwise; `navigation.to()` is the URL being navigated to (the site's own, with `base`, `trailingSlash` and the locale prefix on, as the swap fetches it) until `'idle'`, and `navigation.error()` the `Error` of the last swap that gave up, kept until the next navigation starts. The server and a page that never navigates read `'idle'`.
+- `navigation.status()` from `kay`, read in an island, a template or an effect, is `'loading'` while the next page is fetched, `'swapping'` while it is put in place and `'idle'` otherwise; `navigation.to()` is the URL being navigated to (the site's own, with `base`, `trailingSlash` and the locale prefix on, as the swap fetches it) until `'idle'`, `navigation.pending()` whether `status()` is not `'idle'`, and `navigation.error()` the `ApiError` of the last swap that gave up, kept until the next navigation starts: `status` 0 as no answer came, kay's own message (`kay: <url> could not be fetched`, `did not answer in time`, `could not be put in place`) and the browser's error as `cause`. The server and a page that never navigates read `'idle'`.
 - It covers a link, `navigate()` (a query change too), Back and Forward and the redirect of a form post; a `refresh()` and a post staying on its page are no navigation and leave the state `'idle'`. A navigation superseded by a later one moves `to()` to the later URL without passing through `'idle'`.
 - A swap that gives up (the fetch fails, the page does not answer in 10 seconds, or it cannot be put in place) sets `error()` and fires `kay:navigate-error`, then the browser loads the page in full as before; a leave refused by a guard or a handler starts nothing.
-- `onBeforeNavigate((to) => ...)`, called in an island's script, is asked with the URL before a link of the app, `navigate()` or going back or forward leaves the page, for as long as the island lives, and returns what removes it sooner. Returning `false`, or a promise of it, keeps the page (`navigate()` resolves `false`, a refused Back or Forward is undone as under `guardLeave`); anything else lets it go. A handler that throws is logged and lets the visit go on. It answers before the `guardLeave` guards, which are not asked when it refuses.
+- `onBeforeNavigate(({ url, from }) => ...)`, called in an island's script, is asked with the URL going to and the page left before a link of the app, `navigate()` or going back or forward leaves the page, for as long as the island lives, and returns what removes it sooner. Returning `false`, or a promise of it, keeps the page (`navigate()` resolves `false`, a refused Back or Forward is undone as under `guardLeave`); anything else lets it go. A handler that throws, here and in `onNavigate`, is logged and the navigation goes on, as a browser hook is never a security boundary. It answers before the `guardLeave` guards, which are not asked when it refuses.
 - It is not asked for a post's redirect, which follows an action that already ran, nor for a refresh, a link loading fully or a reload.
-- `onNavigate((url) => ...)` runs with the URL of each page a swap shows, once it is in place, for as long as the island lives, returning what removes it sooner; it is `kay:navigate` for an island, and fires for a refresh as that does.
-- `kay:navigate-start` fires on `document` when a swap to another page begins, with `event.detail.url`; `kay:navigate-error` when it gives up, with `event.detail.url` and `event.detail.error`; `kay:navigate` (see [Navigation](navigation.md#navigation)) when the page is in place. A refresh fires `kay:navigate` alone.
+- `onNavigate(({ url }) => ...)` runs with the URL of each page a swap shows, once it is in place, for as long as the island lives, returning what removes it sooner; it is `kay:navigate` for an island, and fires for a refresh as that does.
+- `kay:navigate-start` fires on `document` when a swap to another page begins, with `event.detail.url`; `kay:navigate-error` when it gives up, with `event.detail.url` and `event.detail.error` (an `Error` with kay's message and the browser's as `cause`); `kay:navigate` (see [Navigation](navigation.md#navigation)) when the page is in place. A refresh fires `kay:navigate` alone.
 
 ### Full loads and prefetching
 

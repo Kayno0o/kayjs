@@ -5,21 +5,21 @@ const blocking = signal(false)
 const log = (globalThis as { kayLog?: string[] }).kayLog ??= []
 
 effect(() => {
-  log.push(`state ${navigation.state()} ${navigation.to()?.pathname ?? '-'}`)
+  log.push(`state ${navigation.status()} ${navigation.pending()} ${navigation.to()?.pathname ?? '-'}`)
 })
 effect(() => {
   const error = navigation.error()
 
   if (error)
-    log.push(`error ${error.message}`)
+    log.push(`error ${error.status} ${error.message}`)
 })
-onBeforeNavigate((to) => {
-  log.push(`before ${to.pathname}`)
+onBeforeNavigate(({ url, from }) => {
+  log.push(`before ${from.pathname} ${url.pathname}`)
 
   return !blocking()
 })
-onNavigate(url => log.push(`navigate ${url.pathname}`))
+onNavigate(({ url }) => log.push(`navigate ${url.pathname}`))
 ---
-p.state {navigation.state()}
+p.state {navigation.status()}
 button.block(onClick={() => blocking.set(true)}) Block
 button.go(onClick={() => navigate('/watched-two')}) Go

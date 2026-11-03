@@ -125,6 +125,11 @@ interface AwaitProps<T>
 [.] batch
 function batch<T>(fn: () => T): T
 
+[.] BeforeNavigate
+interface BeforeNavigate
+  from: URL
+  url: URL
+
 [.] Bindable
 type Bindable<T> = (T & BindableMark) | Extract<T, null | undefined>
 
@@ -505,6 +510,10 @@ type MinTimeRefusal = 'early' | 'expired'
 function navigate(to: { query: Readonly<Record<string, string | number | null | undefined>>; }, options?: NavigateOptions | undefined): Promise<boolean>
 function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions | undefined): Promise<boolean>
 
+[.] NavigateEvent
+interface NavigateEvent
+  url: URL
+
 [.] NavigateOptions
 interface NavigateOptions
   replace?: boolean | undefined
@@ -512,7 +521,7 @@ interface NavigateOptions
   transition?: boolean | undefined
 
 [.] navigation
-const navigation: { state: () => NavigationState; to: () => URL | undefined; error: () => Error | undefined; }
+const navigation: { status: () => NavigationState; pending: () => boolean; to: () => URL | undefined; error: () => ApiError | undefined; }
 
 [.] NavigationState
 type NavigationState = 'idle' | 'loading' | 'swapping'
@@ -530,7 +539,7 @@ function onCleanup(fn: () => void): void
 function onMount(fn: () => void): void
 
 [.] onNavigate
-function onNavigate(fn: (url: URL) => void): () => void
+function onNavigate(fn: (event: NavigateEvent) => void): () => void
 
 [.] PageContext
 interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>> extends RequestContext<Params>

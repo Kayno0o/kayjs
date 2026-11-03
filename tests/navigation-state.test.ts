@@ -8,12 +8,14 @@ type Reactive = typeof import('../src/runtime/reactive')
 let navigation: Navigation
 let state: State
 let reactive: Reactive
+let ApiError: typeof import('../src/runtime/api-error').ApiError
 
 beforeAll(async () => {
   GlobalRegistrator.register({ url: 'http://localhost/docs/' })
   navigation = await import('../src/runtime/navigation')
   state = await import('../src/runtime/navigation-state')
   reactive = await import('../src/runtime/reactive')
+  ;({ ApiError } = await import('../src/runtime/api-error'))
 })
 
 afterAll(async () => {
@@ -36,8 +38,8 @@ describe('onBeforeNavigate', () => {
   it.each(TARGETS)('is asked with the URL %s and keeps the page when it answers false, sync or async', async (to) => {
     const asked: string[] = []
     const dispose = island(() => {
-      state.onBeforeNavigate((target) => {
-        asked.push(target.href)
+      state.onBeforeNavigate(({ url, from }) => {
+        asked.push(`${url.href} from ${from.href}`)
 
         return false
       })
@@ -45,7 +47,7 @@ describe('onBeforeNavigate', () => {
 
     expect(await navigation.mayLeave(to)).toBe(false)
     dispose()
-    expect(asked).toEqual([to.href])
+    expect(asked).toEqual([`${to.href} from ${location.href}`])
 
     const later = island(() => {
       state.onBeforeNavigate(async () => false)
@@ -127,12 +129,12 @@ describe('navigation', () => {
     const seen: string[] = []
     const dispose = island(() => {
       reactive.effect(() => {
-        seen.push(`${state.navigation.state()} ${state.navigation.to()?.pathname ?? '-'} ${state.navigation.error()?.message ?? '-'}`)
+        seen.push(`${state.navigation.status()} ${state.navigation.pending()} ${state.navigation.to()?.pathname ?? '-'} ${state.navigation.error()?.message ?? '-'}`)
       })
     })
 
     reactive.flush()
-    expect(seen).toEqual(['idle - -'])
+    expect(seen).toEqual(['idle false - -'])
 
     const [first, second] = TARGETS as [URL, URL]
 
@@ -145,20 +147,24 @@ describe('navigation', () => {
     reactive.flush()
     navigation.navigation.phase!('idle')
     reactive.flush()
-    expect(seen.at(-1)).toBe('idle - -')
-    expect(seen.join('|')).toContain('loading /app/fr/docs/guide/ -')
-    expect(seen.join('|')).toContain('swapping /app/fr/docs/guide/ -')
+    expect(seen.at(-1)).toBe('idle false - -')
+    expect(seen.join('|')).toContain('loading true /app/fr/docs/guide/ -')
+    expect(seen.join('|')).toContain('swapping true /app/fr/docs/guide/ -')
 
     // A swap that gave up reports the reason, kept after the state is idle again, until the next navigation starts.
-    navigation.navigation.phase!('idle', first, new Error('gave up'))
+    const cause = new TypeError('Failed to fetch')
+
+    navigation.navigation.phase!('idle', first, new Error('gave up', { cause }))
     navigation.navigation.phase!('idle')
     reactive.flush()
-    expect(seen.at(-1)).toBe('idle - gave up')
+    expect(seen.at(-1)).toBe('idle false - gave up')
+    expect(state.navigation.error()).toBeInstanceOf(ApiError)
+    expect(state.navigation.error()).toMatchObject({ status: 0, message: 'gave up', cause })
     navigation.navigation.phase!('loading', first)
     reactive.flush()
     navigation.navigation.phase!('idle')
     reactive.flush()
-    expect(seen.at(-1)).toBe('idle - -')
+    expect(seen.at(-1)).toBe('idle false - -')
     dispose()
   })
 })
@@ -168,7 +174,7 @@ describe('onNavigate', () => {
     const urls: string[] = []
     let stop: () => void = () => undefined
     const dispose = island(() => {
-      stop = state.onNavigate(url => urls.push(url.href))
+      stop = state.onNavigate(({ url }) => urls.push(url.href))
     })
 
     document.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: TARGETS[1]!.href } }))
