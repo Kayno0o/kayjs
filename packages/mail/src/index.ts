@@ -13,7 +13,7 @@ export type { BroadcastStatus, ListConfirmProps, ListMessage, ListOptions, Maili
 export { createMailListTables, mailListTables, pgLists } from './list-pg'
 export type { Broadcast, BroadcastProgress, ListStore, Subscriber } from './list-store'
 export type { Mailer, MailerOptions, MailExtensionOptions } from './mailer'
-export { mail, mailer, MailNotConfiguredError } from './mailer'
+export { enqueue, mail, mailer, MailNotConfiguredError, registeredMailer, send } from './mailer'
 export type { Reply, Attachment as ReplyAttachment } from './mime'
 export type { Outbox, SentMail, WaitOptions } from './outbox'
 export { outbox } from './outbox'

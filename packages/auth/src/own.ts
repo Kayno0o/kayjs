@@ -214,11 +214,24 @@ function withPrivacy(email: EmailOptions, mail: MailModule | undefined): EmailOp
   return { ...email, mailer: Object.create(email.mailer, { ...erase && { erase: { value: erase, enumerable: true } }, ...subscriptions && { subscriptions: { value: subscriptions, enumerable: true } } }) as AuthMailer }
 }
 
+// The mailer `mail()` of kay.config.ts built with no module, which an app with no `src/mail.ts` sends through.
+async function registeredMailer(app: ExtensionApp): Promise<unknown> {
+  if (!app.extensions.includes(MAIL_EXTENSION))
+    return undefined
+
+  try {
+    return await (await import('@kaynooo/kayjs-mail')).registeredMailer()
+  }
+  catch {
+    return undefined
+  }
+}
+
 export async function emailOf(email: OwnOptions['email'], app: ExtensionApp): Promise<EmailOptions | undefined> {
   if (email === false)
     return undefined
 
-  const mail = app.modules.mail?.mail as MailModule | undefined
+  const mail = (app.modules.mail?.mail ?? await registeredMailer(app)) as MailModule | undefined
 
   if (email !== undefined)
     return withPrivacy(email, mail)

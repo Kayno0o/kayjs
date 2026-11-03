@@ -20,26 +20,21 @@ kay and Elysia are peers. It is released with kay, at kay's own version, and pee
 ## Use
 
 ```ts
-// src/mail.ts
-import { mailer } from '@kaynooo/kayjs-mail'
-
-export const mail = mailer({ from: 'Site <contact@example.com>', locale: 'fr' })
-```
-
-```ts
 // kay.config.ts: the server runs the queue, and lists the outbox at /_kay/mail under kay dev
 import { mail } from '@kaynooo/kayjs-mail'
 
-export default defineConfig({ extensions: [mail({ module: './src/mail' })] })
+export default defineConfig({ extensions: [mail({ from: 'Site <contact@example.com>', locale: 'fr' })] })
 ```
+
+`send(message)` and `enqueue(message)` from `@kaynooo/kayjs-mail` use that mailer. A transport or views of your own go in a `src/mail.ts` exporting `mailer({ ... })` as `mail`, listed with `mail({ module: './src/mail' })`.
 
 ```kay
 --- server
-import { mail } from '../mail'
+import { enqueue } from '@kaynooo/kayjs-mail'
 import Welcome from '../mails/welcome.kay'
 
 export const signUp = action(schema, async ({ name, email }) => {
-  await mail.enqueue({ to: email, subject: `Welcome, ${name}`, view: Welcome, props: { name } })
+  await enqueue({ to: email, subject: `Welcome, ${name}`, view: Welcome, props: { name } })
 })
 ---
 ```

@@ -394,29 +394,76 @@ function relay(options: MailerOptions): Relay {
   }
 }
 
-export interface MailExtensionOptions {
-  // The file exporting the app's mailer as `mail`, as a path from the project root: `'./src/mail'`. kay imports it as `pages()` builds the app and bakes it into an executable.
+export interface MailExtensionOptions extends MailerOptions {
+  // The file exporting the app's mailer as `mail`, as a path from the project root: `'./src/mail'`. kay imports it as `pages()` builds the app and bakes it into an executable. For a transport or views of the app's own; the mailer options (`from`, `locale`...) go in `mail({})` itself instead.
   module?: string | undefined
   // Any other way to load the mailer, in place of `module`.
   server?: (() => Promise<Mailer>) | undefined
 }
 
-// Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`; its `mail.auth` and `mail.contact` messages come with the package (`kay.messages`).
-// It is loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
-export function mail(options: MailExtensionOptions): KayExtension<Mailer> {
-  const { module, server } = options
+// How `send` and `enqueue` reach the mailer the app registered in `kay.config.ts`.
+let registered: (() => Promise<Mailer>) | undefined
 
-  if (module === undefined && server === undefined)
-    throw new Error('kayjs-mail: mail() takes the path of the module exporting the mailer as `mail`, such as mail({ module: \'./src/mail\' }), or a `server` loading it')
+/** The mailer `mail()` registered in `kay.config.ts`, undefined when the app registered none. */
+export async function registeredMailer(): Promise<Mailer | undefined> {
+  return registered?.()
+}
+
+async function registeredOrThrow(): Promise<Mailer> {
+  const found = await registeredMailer()
+
+  if (found === undefined)
+    throw new Error('kayjs-mail: no mailer is registered; add mail() to the extensions of kay.config.ts, or call send on the result of mailer()')
+
+  return found
+}
+
+/** Renders and sends the message now through the app's registered mailer, as its `send`. */
+export async function send<P extends object>(message: MailMessage<P>): Promise<Delivery> {
+  return (await registeredOrThrow()).send(message)
+}
+
+/** Renders the message now and leaves it to the registered mailer's queue, as its `enqueue`. */
+export async function enqueue<P extends object>(message: MailMessage<P>, options?: EnqueueOptions): Promise<string> {
+  return (await registeredOrThrow()).enqueue(message, options)
+}
+
+// Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`; its `mail.auth` and `mail.contact` messages come with the package (`kay.messages`).
+// `mail({ from, locale, ...})` takes the options of `mailer()` and builds it as `pages()` does, with no module; `module` or `server` are for a mailer written by the app, loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
+export function mail(options: MailExtensionOptions = {}): KayExtension<Mailer> {
+  const { module, server, ...mailerOptions } = options
 
   if (module !== undefined && server !== undefined)
     throw new Error('kayjs-mail: mail() takes the path of the module or a `server`, not both')
+
+  if ((module !== undefined || server !== undefined) && Object.keys(mailerOptions).length > 0)
+    throw new Error('kayjs-mail: mail() takes the options of mailer() or a `module` or `server` building the mailer, not both: put them in the mailer the module exports')
 
   const devTool = { module: `${import.meta.dir}/devTool.ts` }
 
   const env = smtpEnv({ listed: true })
 
-  return module === undefined ? { name: '@kaynooo/kayjs-mail', server: server!, devTool, env } : { name: '@kaynooo/kayjs-mail', serverModule: { path: module, export: 'mail' }, devTool, env }
+  if (module !== undefined) {
+    return { name: '@kaynooo/kayjs-mail', devTool, env, serverModule: { path: module, export: 'mail', prepare: (exported) => {
+      registered = async () => Promise.resolve(exported as Mailer)
+    } } }
+  }
+
+  if (server !== undefined) {
+    let loading: Promise<Mailer> | undefined
+
+    registered = async () => loading ??= server()
+
+    return { name: '@kaynooo/kayjs-mail', server: async () => (await registered?.())!, devTool, env }
+  }
+
+  // Built on first use, as the options read the environment and the site then.
+  let made: Mailer | undefined
+  const own = (): Mailer => made ??= mailer(mailerOptions)
+
+  registered = async () => Promise.resolve(own())
+
+  return { name: '@kaynooo/kayjs-mail', server: own, devTool, env }
 }
 
 // Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and under `kay dev` lists the outbox at `/_kay/mail`.

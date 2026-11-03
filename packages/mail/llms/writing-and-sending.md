@@ -4,26 +4,33 @@
 
 ### Setup
 
-`kay add mail` does the install, writes `src/mail.ts` with a bare `mailer()` (SMTP from the environment, outbox in development and under `bun test`) and lists `mail({ module: './src/mail' })` in `kay.config.ts`; the files below add `from` and `locale`.
+`kay add mail` does the install and lists `mail()` in `kay.config.ts` (SMTP from the environment, outbox in development and under `bun test`); `mail({ from, locale, ... })` takes the options of `mailer()` below and builds the mailer as `pages()` does, with no module. `send(message)` and `enqueue(message)` from `@kaynooo/kayjs-mail` use the mailer `mail()` registered (they throw when none is), `registeredMailer()` gives it for `list()`, `drain()` or `suppress()`; `kayjs-auth` sends through it when the app has no `src/mail.ts`.
 
 kayjs-mail is published as `@kaynooo/kayjs-mail` to `https://git.kaynooo.fr/api/packages/kaynooo/npm/`, beside kay. kay and Elysia are peer dependencies.
-
-```ts
-// src/mail.ts
-import { mailer } from '@kaynooo/kayjs-mail'
-
-export const mail = mailer({ from: 'Site <contact@example.com>', locale: 'fr' })
-```
 
 ```ts
 // kay.config.ts
 import { mail } from '@kaynooo/kayjs-mail'
 import { defineConfig } from 'kay/server'
 
+export default defineConfig({ extensions: [mail({ from: 'Site <contact@example.com>', locale: 'fr' })] })
+```
+
+A mailer with a transport, views or hooks of the app's own is written in a module instead, which takes the options in place of `mail()`:
+
+```ts
+// src/mail.ts
+import { mailer } from '@kaynooo/kayjs-mail'
+
+export const mail = mailer({ from: 'Site <contact@example.com>', transport: myTransport })
+```
+
+```ts
+// kay.config.ts
 export default defineConfig({ extensions: [mail({ module: './src/mail' })] })
 ```
 
-- `mail({ module })` hands the mailer to `pages()`, which uses it before the pages: `src/server.ts` needs no `.use(mail)`. `module` is the path of the file exporting the mailer as `mail`, relative to the project root, and kay imports it, and bakes it into an executable `kay build --compile` makes, only as `pages()` builds the app, never as `kay check`, the editor or `kay build` read the config: `mail({ server: async () => (await import('./src/mail')).mail })` in its place loads it the same way, and a `.kay` mail imported while the config loads comes before kay compiles any, so `kay.config.ts` never imports `src/mail.ts` itself. It also brings the `mail.auth` messages kayjs-auth's mails are written in and the `mail.contact` ones of `contactForm`, in English and French (see kayjs-auth below): a site in another language fills them in its own messages for `kay check`.
+- `mail()` hands the mailer to `pages()`, which uses it before the pages: `src/server.ts` needs no `.use(mail)`. `module` is the path of the file exporting the mailer as `mail`, relative to the project root, and kay imports it, and bakes it into an executable `kay build --compile` makes, only as `pages()` builds the app, never as `kay check`, the editor or `kay build` read the config: `mail({ server: async () => (await import('./src/mail')).mail })` in its place loads it the same way, and a `.kay` mail imported while the config loads comes before kay compiles any, so `kay.config.ts` never imports `src/mail.ts` itself. It also brings the `mail.auth` messages kayjs-auth's mails are written in and the `mail.contact` ones of `contactForm`, in English and French (see kayjs-auth below): a site in another language fills them in its own messages for `kay check`.
 - An Elysia app not served by `pages()` uses it as a plugin instead: `new Elysia().use(mail)`.
 
 - `mailer(options)` returns an Elysia plugin: the server using it, through `mail({ module })` or `.use(mail)`, runs the queue `enqueue` fills and, under `kay dev`, serves the outbox page. A script that only sends need not use it.

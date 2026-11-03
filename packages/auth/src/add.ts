@@ -29,7 +29,7 @@ export default function auth(project: Project) {
   const ownDatabase = project.exists('src/db/index.ts') && project.depends('@kaynooo/pg-orm') && project.read('src/db/index.ts')?.includes('export const db') === true
   // A project kay new scaffolded keeps the tables apart from `db`, so pg-orm.config.ts reads them without building `db`.
   const tablesFile = project.read('src/db/tables.ts')?.includes('export const tables') === true ? 'src/db/tables.ts' : 'src/db/index.ts'
-  const mailed = project.exists('src/mail.ts') && project.read('src/mail.ts')?.includes('export const mail') === true
+  const mailed = project.depends('@kaynooo/kayjs-mail') || (project.exists('src/mail.ts') && project.read('src/mail.ts')?.includes('export const mail') === true)
 
   return {
     description: 'sign-in, register and account pages on kay sessions, with passwords, magic links, OAuth and two-factor, and every page behind a signed-in user',

@@ -19,29 +19,31 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 
 ## Setup
 
-In a kay project, `kay add mail` does the install, writes `src/mail.ts` with a bare `mailer()` that reads SMTP from the environment, and lists `mail({ module: './src/mail' })` in `kay.config.ts`. Set `from` and `lang` there as below.
+In a kay project, `kay add mail` does the install and lists `mail()` in `kay.config.ts`. The mailer reads SMTP from the environment, and the server then runs the queue and, under `kay dev`, serves the outbox at `/_kay/mail`.
 
-`src/mail.ts` creates the mailer. `from` is your own address. A visitor's address goes in `replyTo`.
-
-```ts
-import { mailer } from '@kaynooo/kayjs-mail'
-
-export const mail = mailer({ from: 'Site <contact@example.com>', locale: 'en' })
-```
-
-List it in `kay.config.ts`. The server then runs the queue and, under `kay dev`, serves the outbox at `/_kay/mail`.
+Give `mail()` the options of `mailer()`. `from` is your own address. A visitor's address goes in `replyTo`.
 
 ```ts
 import { mail } from '@kaynooo/kayjs-mail'
 
 export default defineConfig({
   extensions: [
-    mail({ module: './src/mail' }),
+    mail({ from: 'Site <contact@example.com>', locale: 'en' }),
   ],
 })
 ```
 
-The path is the file exporting the mailer as `mail`, relative to the project root. kay imports it only as the server starts, and `kay build --compile` bakes it into the executable.
+Send from anywhere with `send`, or `enqueue` to leave the mail to the queue. Both use the mailer the config registered.
+
+```ts
+import { send } from '@kaynooo/kayjs-mail'
+
+await send({ to: 'ada@example.com', subject: 'Hello', text: 'Hi Ada' })
+```
+
+A transport or views of your own need a module. `src/mail.ts` exports `mailer({ ... })` as `mail`, and `mail({ module: './src/mail' })` lists it, with the path relative to the project root.
+
+kay imports the module only as the server starts, and `kay build --compile` bakes it into the executable. Options go in the module then, not in `mail()`.
 
 ## Production settings
 
@@ -434,7 +436,7 @@ it('welcomes a new account', async () => {
 
 ## With kayjs-auth
 
-`authMailer` sends [kayjs-auth](/libraries/kayjs-auth)'s mails through your mailer, themed by your mail settings. Those are verification, reset, magic links and security notices. It needs `mail({ module })` in `kay.config.ts`, as above.
+`authMailer` sends [kayjs-auth](/libraries/kayjs-auth)'s mails through your mailer, themed by your mail settings. Those are verification, reset, magic links and security notices. It needs `mail()` in `kay.config.ts`, as above.
 
 A view written from scratch can take its default wording from `authWords(mail)`. It throws for a `mail.kind` kayjs-auth does not send.
 

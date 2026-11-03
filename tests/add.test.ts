@@ -164,11 +164,11 @@ it('adds the extension of a library to kay.config.ts and writes its files', asyn
 
     const result = await addFeatures(dir, ['mail'], { install: false })
 
-    expect(result.written).toEqual(['kay.config.ts', 'src/mail.ts'])
+    expect(result.written).toEqual(['kay.config.ts'])
     expect(result.notes).toEqual([expect.stringContaining('MAIL_URL')])
-    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('extensions: [mail({ module: \'./src/mail\' })],')
+    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('extensions: [mail()],')
     expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('import { mail } from \'@kaynooo/kayjs-mail\'\n')
-    expect(await Bun.file(join(dir, 'src/mail.ts')).text()).toContain('export const mail = mailer()')
+    expect(await Bun.file(join(dir, 'src/mail.ts')).exists()).toBe(false)
 
     // A second run finds both done.
     expect((await addFeatures(dir, ['mail'], { install: false })).written).toEqual([])
@@ -237,18 +237,21 @@ it('leaves the project as it was when a library refuses, package.json included',
   try {
     await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
     await mkdir(join(dir, 'node_modules/@kaynooo'), { recursive: true })
-    await symlink(join(repo, 'packages/mail'), join(dir, 'node_modules/@kaynooo/kayjs-mail'))
-    await writeFile(join(dir, 'src/mail.ts'), 'export const mail = 1\n')
+    await symlink(join(repo, 'packages/auth'), join(dir, 'node_modules/@kaynooo/kayjs-auth'))
+    await symlink(join(repo, 'packages/ui'), join(dir, 'node_modules/@kaynooo/kayjs-ui'))
+    await mkdir(join(dir, 'src/routes'), { recursive: true })
+    await writeFile(join(dir, 'src/routes/_guard.ts'), 'export default 1\n')
 
     const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string> }
 
-    manifest.dependencies['@kaynooo/kayjs-mail'] = '~1.0.0'
+    manifest.dependencies['@kaynooo/kayjs-auth'] = '~1.0.0'
+    manifest.dependencies['@kaynooo/kayjs-ui'] = '~1.0.0'
     await writeFile(join(dir, 'package.json'), JSON.stringify(manifest))
 
-    const files = ['package.json', 'kay.config.ts', 'src/mail.ts', '.gitignore']
+    const files = ['package.json', 'kay.config.ts', 'src/routes/_guard.ts', '.gitignore']
     const before = await Promise.all(files.map(async file => content(dir, file)))
 
-    await expect(addFeatures(dir, ['ws', 'mail'], { install: false })).rejects.toThrow('src/mail.ts exists and is not the file mail writes')
+    await expect(addFeatures(dir, ['ws', 'auth'], { install: false })).rejects.toThrow('src/routes/_guard.ts exists and is not the file auth writes')
     expect(await Promise.all(files.map(async file => content(dir, file)))).toEqual(before)
   }
   finally {
@@ -357,18 +360,21 @@ it('restores package.json and the lockfile when a library refuses after a stubbe
 
     await writeFile(join(dir, 'bun.lock'), 'old lock')
     await mkdir(join(dir, 'node_modules/@kaynooo'), { recursive: true })
-    await symlink(join(repo, 'packages/mail'), join(dir, 'node_modules/@kaynooo/kayjs-mail'))
-    await writeFile(join(dir, 'src/mail.ts'), 'export const mail = 1\n')
+    await symlink(join(repo, 'packages/auth'), join(dir, 'node_modules/@kaynooo/kayjs-auth'))
+    await symlink(join(repo, 'packages/ui'), join(dir, 'node_modules/@kaynooo/kayjs-ui'))
+    await mkdir(join(dir, 'src/routes'), { recursive: true })
+    await writeFile(join(dir, 'src/routes/_guard.ts'), 'export default 1\n')
 
     const before = await Bun.file(join(dir, 'package.json')).text()
     const manifest = JSON.parse(before) as { dependencies: Record<string, string> }
 
-    manifest.dependencies['@kaynooo/kayjs-mail'] = '~1.0.0'
+    manifest.dependencies['@kaynooo/kayjs-auth'] = '~1.0.0'
+    manifest.dependencies['@kaynooo/kayjs-ui'] = '~1.0.0'
     await writeFile(join(root, 'after.json'), JSON.stringify(manifest))
 
     const { bun, calls } = await stubBun(root, `cp '${join(root, 'after.json')}' package.json\nprintf 'new lock' > bun.lock\nprintf 'binary' > bun.lockb`)
 
-    await expect(addFeatures(dir, ['mail'], { bun })).rejects.toThrow('src/mail.ts exists and is not the file mail writes')
+    await expect(addFeatures(dir, ['auth'], { bun })).rejects.toThrow('src/routes/_guard.ts exists and is not the file auth writes')
     expect(await calls()).toHaveLength(1)
     expect(await Bun.file(join(dir, 'package.json')).text()).toBe(before)
     expect(await Bun.file(join(dir, 'bun.lock')).text()).toBe('old lock')

@@ -462,6 +462,19 @@ describe('the mailer auth() picks', () => {
     expect(await emailOf(false, site)).toBeUndefined()
   })
 
+  test('sends through the mailer mail() of kay.config.ts registered when the app has no src/mail.ts', async () => {
+    const { mail: register } = await import('@kaynooo/kayjs-mail')
+    const registered = register({ from: 'site@site.test' })
+    const bare = (extensions: string[]) => ({ root, extensions, modules: {} })
+
+    expect(await emailOf(undefined, bare([]))).toBeUndefined()
+
+    const picked = await emailOf(undefined, bare([MAIL_EXTENSION]))
+
+    expect(picked?.mailer?.send).toBeFunction()
+    expect(registered.server).toBeFunction()
+  })
+
   test('leaves a mailer alone when the mail module has nothing to erase with', async () => {
     const own = { mailer: { send } }
 

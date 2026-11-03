@@ -127,6 +127,9 @@ interface Delivery
   rejected: string[]
   response?: string | undefined
 
+[.] enqueue
+function enqueue<P extends object>(message: MailMessage<P>, options?: EnqueueOptions | undefined): Promise<string>
+
 [.] Envelope
 interface Envelope
   attachments?: Attachment[] | undefined
@@ -207,7 +210,7 @@ interface ListStore
 interface Logo
 
 [.] mail
-function mail(options: MailExtensionOptions): KayExtension<Mailer>
+function mail(options?: MailExtensionOptions): KayExtension<Mailer>
 
 [.] Mail
 interface Mail
@@ -251,9 +254,23 @@ interface MailerOptions
   transport?: Transport | undefined
 
 [.] MailExtensionOptions
-interface MailExtensionOptions
+interface MailExtensionOptions extends MailerOptions
+  events?: EventSecrets | undefined
+  from?: Address | undefined
+  fromName?: string | undefined
+  inbound?: ((reply: Reply) => void | Promise<void>) | undefined
+  listStore?: ListStore | undefined
+  locale?: string | undefined
+  logRecipients?: boolean | undefined
+  logSubjects?: boolean | undefined
   module?: string | undefined
+  optional?: boolean | undefined
+  queue?: (QueueOptions<Mail> & { name?: string | undefined; }) | undefined
   server?: (() => Promise<Mailer>) | undefined
+  smtp?: SmtpOverrides | undefined
+  suppressionStore?: SuppressionStore | undefined
+  to?: Address | Address[] | undefined
+  transport?: Transport | undefined
 
 [.] MailField
 interface MailField
@@ -340,6 +357,9 @@ function pgLists(source: PgJobsSource): ListStore & { close: () => Promise<void>
 [.] pgSuppressions
 function pgSuppressions(source: PgJobsSource): SuppressionStore & { close: () => Promise<void>; }
 
+[.] registeredMailer
+function registeredMailer(): Promise<Mailer | undefined>
+
 [.] Reply
 interface Reply
   attachments: Attachment[]
@@ -360,6 +380,9 @@ interface ReplyAttachment
   content: Uint8Array<ArrayBufferLike>
   contentType: string
   filename: string
+
+[.] send
+function send<P extends object>(message: MailMessage<P>): Promise<Delivery>
 
 [.] SentMail
 interface SentMail extends Mail
@@ -453,7 +476,7 @@ interface WaitOptions
   timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
 
 [./add] default
-const default: { description: string; files: { 'src/mail.ts': string; }; extension: { import: string; expression: string; }; notes: string[]; }
+const default: { description: string; files: {}; extension: { import: string; expression: string; }; notes: string[]; }
 
 [./auth-link.kay] default
 component default
