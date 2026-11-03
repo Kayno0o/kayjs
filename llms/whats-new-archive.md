@@ -39,6 +39,12 @@ What each release before 1.84 added, and the end of a newest release that was cu
 - The Forgejo CI workflow `kay new` and `kay add ci` write runs on an Alpine runner image with bun and git baked in, as on `debian`: its install step adds only the missing `git` and `unzip` (with `apt-get` or `apk`) and Setup Bun is skipped when bun is already there: [project new and add](project-new-and-add.md).
 - A bare `---` after a `--- server` or `--- module` fence that was meant as the script fence is reported with the fix, `--- script` on the line closing the first fence, which `kay check --fix` applies: [checks](checks.md).
 
+- kayjs-ui's Menu entries take `href`, drawing the entry as a link with middle-click, Ctrl+click and "copy link", opening in a new tab with `rel="noopener noreferrer"` when the address is absolute, and `onSelect` is then optional: [forms](../packages/ui/llms/forms.md).
+- `secret-prop` skips a field named like a secret that holds a list of objects, such as a syntax highlighter's `tokens`: [lints](lints.md).
+- `kay a11y` lists a folder collection's entries from the folder the server reads, so the pages of a route filled by a collection are audited rather than reported as not audited.
+- `kay add` installs a dev package kay's own manifest does not name at its latest version, rather than crashing when kay is installed from a tarball.
+- A Markdown field rendered with `markdownHtml(entry.data.body)` is marked in edit mode and typed a block at a time, as the body is: [kayjs-cms editor](../packages/cms/llms/editor.md).
+
 ## 1.83.0
 
 - kayjs-ai: `ground(found, read)` turns the rows pg-orm 8's `nearest()` found into the `system` and `sources` of an `ask`, so a chat answers from the app's own documents and cites them, and the fake answers it all under `bun test`: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).

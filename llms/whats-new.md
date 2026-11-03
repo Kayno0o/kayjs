@@ -37,11 +37,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui's `infiniteList` has `reload()`, which loads again every row loaded so far and swaps them in at once, keeping the DOM of rows whose key is unchanged: [kayjs-ui infinite lists](../packages/ui/llms/infinite-list.md).
 - `kay/test`'s browser page has `drag(from, to, { steps, at, to, hold })`: a mouse drag from one element to another, or a touch drag with `hold`, so a test of a sortable list or a board needs no raw `cdp` mouse events: [browser tests](testing-browser.md).
 - kayjs-ui's Menu entries take `href`, drawing the entry as a link with middle-click, Ctrl+click and "copy link", opening in a new tab with `rel="noopener noreferrer"` when the address is of another origin, and `onSelect` is then optional: [forms](../packages/ui/llms/forms.md).
-- kayjs-ui's Menu entries take `href`, drawing the entry as a link with middle-click, Ctrl+click and "copy link", opening in a new tab with `rel="noopener noreferrer"` when the address is absolute, and `onSelect` is then optional: [forms](../packages/ui/llms/forms.md).
-- `secret-prop` skips a field named like a secret that holds a list of objects, such as a syntax highlighter's `tokens`: [lints](lints.md).
-- `kay a11y` lists a folder collection's entries from the folder the server reads, so the pages of a route filled by a collection are audited rather than reported as not audited.
-- `kay add` installs a dev package kay's own manifest does not name at its latest version, rather than crashing when kay is installed from a tarball.
-- A Markdown field rendered with `markdownHtml(entry.data.body)` is marked in edit mode and typed a block at a time, as the body is: [kayjs-cms editor](../packages/cms/llms/editor.md).
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
 
