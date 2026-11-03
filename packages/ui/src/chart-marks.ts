@@ -42,7 +42,7 @@ export function activeMarks(options: { active: () => number | null | undefined, 
     // The mark to draw as active.
     current: (): number | null => options.active() === undefined ? inside() : options.active() ?? null,
     // Where the mark the pointer or the focus is on sits, top centre, for a tooltip to hang from.
-    anchor: () => anchor(),
+    anchor: () => inside() === null ? null : anchor(),
     // The pointer or the focus came onto a mark; leaving it only clears it while it is still the one entered, as a pointer and the focus can be on two marks.
     enter: (index: number, element: Element) => {
       const box = element.getBoundingClientRect()

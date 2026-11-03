@@ -189,7 +189,7 @@ const watchTip = (element: HTMLElement) => {
 }
 
 // The point whose cursor and dots are drawn: the app's `active` when it gave one, else the pointer's or keyboard's.
-const lit = () => active === undefined ? hovered() : active === null ? null : { index: Math.min(active, labels.length - 1) }
+const lit = () => active === undefined ? hovered() : active === null || labels.length === 0 ? null : { index: Math.min(Math.max(Math.round(active), 0), labels.length - 1) }
 
 const mark = (index: number): ChartMark => ({ index, label: labels[index] ?? '', values: series.map(item => item.values[index] ?? null) })
 
@@ -580,7 +580,7 @@ div(part="root" {...rest} role="figure" aria-label={label})
           div(part="dot" style={dot(index)})
     if band() !== null
       div(part="band" style={band()})
-    div(part="overlay" role="slider" tabindex={labels.length > 0 ? '0' : '-1'} aria-label={label} aria-valuemin="0" aria-valuemax={Math.max(0, labels.length - 1)} aria-valuenow={current()} aria-valuetext={announced()} aria-describedby={onRange ? `${id}-hint` : undefined} data-range={onRange ? '' : undefined} onKeyDown={keyDown} onFocus={focused} onBlur={blurred} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishSpan} onPointerCancel={() => dragged = null} onPointerLeave={pointerLeave})
+    div(part="overlay" role="slider" tabindex={labels.length > 0 ? '0' : '-1'} aria-label={label} aria-valuemin="0" aria-valuemax={Math.max(0, labels.length - 1)} aria-valuenow={current()} aria-valuetext={announced()} aria-describedby={onRange ? `${id}-hint` : undefined} data-range={onRange ? '' : undefined} onKeyDown={keyDown} onFocus={focused} onBlur={blurred} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishSpan} onPointerCancel={() => { dragged = null; pressedAt = null }} onPointerLeave={pointerLeave})
   if hovered()
     div(part="tooltip" ref={watchTip} style={tipPlace()} aria-hidden="true")
       div(part="tooltipLabel") {heading(hovered()!.index)}

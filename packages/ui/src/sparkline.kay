@@ -97,8 +97,11 @@ if interactive()
       if markKind(link(at)?.href, onSelect !== undefined) === 'link'
         a(part="item" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-active={marks.current() === at ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
           {bar(value, at)}
-      else
+      else if onSelect
         button(part="item" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-active={marks.current() === at ? '' : undefined} onClick={() => void onSelect?.(mark(at))} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+          {bar(value, at)}
+      else
+        span(part="item" aria-hidden="true" data-hint={hints?.[at]} data-active={marks.current() === at ? '' : undefined})
           {bar(value, at)}
 else
   div(part="root" {...rest} role="img" aria-label={label})

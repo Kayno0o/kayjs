@@ -1,5 +1,6 @@
 export type { SwitcherApp } from './app-switcher'
 export type { AudioChapter, AudioCue } from './audio'
+export type { ChartMark, SparkMark } from './chart-marks'
 export type { ComboboxOption, ComboboxOptions, ComboboxQuery } from './combobox'
 export type { ContributionDay } from './contribution'
 export type { DateRange } from './date'

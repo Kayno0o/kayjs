@@ -54,6 +54,12 @@ interface BarSeries extends ChartSeries
   notes?: (string | null | undefined)[]
   values: (number | null)[]
 
+[.] ChartMark
+interface ChartMark
+  index: number
+  label: string
+  values: (number | null)[]
+
 [.] ChartSeries
 interface ChartSeries
   color?: string
@@ -325,6 +331,11 @@ type SortDirection = 'asc' | 'desc'
 interface SortState
   direction: SortDirection
   key: string
+
+[.] SparkMark
+interface SparkMark
+  index: number
+  value: number | null
 
 [.] SparkTone
 type SparkTone = 'muted' | 'accent' | 'success' | 'warning' | 'danger' | 'info'

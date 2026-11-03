@@ -101,7 +101,7 @@ snippet radios()
               Icon(icon={option.icon} part="icon")
             | {option.label}
           if param !== undefined && !disabled && !option.disabled
-            a(part="link" {...optionLink(option.value)} tabindex="-1" draggable="false" aria-current={picked() === option.value ? 'true' : undefined} onClick={event => follow(event, option.value)}) {option.label}
+            a(part="link" {...optionLink(option.value)} tabindex="-1" aria-hidden="true" draggable="false" aria-current={picked() === option.value ? 'true' : undefined} onClick={event => follow(event, option.value)}) {option.label}
 if showLabel
   div(part="field")
     span(part="heading" id={heading}) {label}

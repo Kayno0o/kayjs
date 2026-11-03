@@ -51,7 +51,7 @@ const heaviest = memo(() => Math.max(...points.map(point => point.weight ?? 1)))
 // Where a dot sits and how large it is, its area following its weight against the heaviest point.
 const place = (point: Point) => `left: ${axisPercent(point.x, xExtent(), x.scale)}%; bottom: ${axisPercent(point.y, yExtent(), y.scale)}%; --_dot-size: ${dotSize(point.weight ?? 1, heaviest())}rem`
 
-// The dot the keyboard stands at when the dots are not buttons, one tab stop in all: the first until it moves.
+// The dot the keyboard stands at, one tab stop in all, whatever the dots are: the first until it moves.
 const stop = signal(0)
 const current = () => Math.min(stop(), Math.max(0, points.length - 1))
 
@@ -121,7 +121,7 @@ else
         if markKind(link(point)?.href, onSelect !== undefined) === 'link'
           a(part="dot" {...link(point)} data-interactive data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-active={marks.current() === at ? '' : undefined} style={place(point)} onClick={event => pressed(event, point)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
         else if onSelect
-          button(part="dot" type="button" data-interactive data-kind="button" aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-active={marks.current() === at ? '' : undefined} style={place(point)} onClick={() => onSelect?.(point)} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+          button(part="dot" type="button" data-interactive data-kind="button" tabindex={at === current() ? '0' : '-1'} onKeyDown={keyDown} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-active={marks.current() === at ? '' : undefined} style={place(point)} onClick={() => onSelect?.(point)} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
         else
           span(part="dot" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={tooltip ? undefined : point.tooltip ?? point.label} data-active={marks.current() === at ? '' : undefined} style={place(point)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
       if tooltip && marks.current() !== null && marks.anchor() && points[marks.current()!]
