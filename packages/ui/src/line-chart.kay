@@ -1,8 +1,9 @@
 ---
 import type { AxisFactory, ChartPlugin, DomRenderOutput, Layer, LineChartPresetOptions, LinePresetState, PluginEntry, Renderer } from 'chartist'
 import type { JSX } from 'kay'
+import type { ChartMark } from './chart-marks'
 import type { ChartSeries } from './plot'
-import { effect, memo, onCleanup, onMount, recipe, signal, uid } from 'kay'
+import { effect, memo, onCleanup, onMount, recipe, signal, uid, untrack } from 'kay'
 import type { LabelContext } from './chart-axis'
 import { loaders } from './chartist'
 import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, totalAt, xAxisOptions } from './chart-axis'
@@ -43,7 +44,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, onSelect, onActive, active, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.
@@ -66,6 +67,12 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   options?: LineChartPresetOptions | undefined
   // Lets a drag across the plot, or Shift with the arrow keys then Enter, pick a span, handed over as the indices of its first and last points, such as to zoom in on it.
   onRange?: ((from: number, to: number) => unknown) | undefined
+  // Hears the point a click without a drag lands on, or Enter with no span being picked, as `{ index, label, values }`.
+  onSelect?: ((mark: ChartMark) => unknown) | undefined
+  // Hears the index of the point the pointer or the keyboard is on, `null` when it leaves.
+  onActive?: ((index: number | null) => unknown) | undefined
+  // The point whose cursor and dots are drawn, `null` for none; the app controls them when it gives it, the tooltip following the pointer and keyboard alone.
+  active?: number | null | undefined
   // Tells screen readers how to pick a span from the keyboard, once the chart takes `onRange`.
   rangeHint?: string | undefined
   // Names the chart for screen readers, which read its values from a table they alone see.
@@ -181,9 +188,26 @@ const watchTip = (element: HTMLElement) => {
   tipObserver?.observe(element)
 }
 
+// The point whose cursor and dots are drawn: the app's `active` when it gave one, else the pointer's or keyboard's.
+const lit = () => active === undefined ? hovered() : active === null ? null : { index: Math.min(active, labels.length - 1) }
+
+const mark = (index: number): ChartMark => ({ index, label: labels[index] ?? '', values: series.map(item => item.values[index] ?? null) })
+
+let lastActive: number | null = null
+
+effect(() => {
+  const index = hovered()?.index ?? null
+
+  if (index === lastActive)
+    return
+
+  lastActive = index
+  void untrack(() => onActive?.(index))
+})
+
 const cursor = () => {
   const drawn = plot()
-  const at = hovered()
+  const at = lit()
 
   return drawn && at ? drawn.x1 + positionOf(at.index, labels.length, times()) * drawn.width : null
 }
@@ -191,7 +215,7 @@ const cursor = () => {
 // The dot of a series at the hovered point, placed on its line, or nothing where it has no reading.
 const dot = (index: number) => {
   const drawn = plot()
-  const at = hovered()
+  const at = lit()
   const own = at ? series[index]!.values[at.index] : undefined
   const height = at ? heights()[index]![at.index] : undefined
 
@@ -451,8 +475,13 @@ function pointerMove(event: PointerEvent) {
     dragged = { from: dragged()!.from, to: index }
 }
 
+// The point a press started on, so a release on it with no span picked is a click.
+let pressedAt: number | null = null
+
 function pointerDown(event: PointerEvent) {
   const index = pointAt(event)
+
+  pressedAt = event.button === 0 ? index : null
 
   if (!onRange || event.button !== 0 || index === null)
     return
@@ -466,11 +495,15 @@ function pointerDown(event: PointerEvent) {
 
 function finishSpan() {
   const span = dragged()
+  const pressed = pressedAt
 
   dragged = null
+  pressedAt = null
 
   if (span && span.from !== span.to)
     void onRange?.(Math.min(span.from, span.to), Math.max(span.from, span.to))
+  else if (pressed !== null && (hovered() === null || hovered()!.index === pressed))
+    void onSelect?.(mark(pressed))
 }
 
 // Shows the cursor, dots and tooltip at a point the keyboard reached, the tooltip over the plot's top at that point.
@@ -497,6 +530,13 @@ function keyDown(event: KeyboardEvent) {
   if (event.key === 'Enter' && dragged()) {
     event.preventDefault()
     finishSpan()
+
+    return
+  }
+
+  if (event.key === 'Enter' && onSelect && labels.length > 0) {
+    event.preventDefault()
+    void onSelect(mark(current()))
 
     return
   }

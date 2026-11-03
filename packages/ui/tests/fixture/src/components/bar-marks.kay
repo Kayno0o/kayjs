@@ -1,5 +1,6 @@
 --- client
 import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
+import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
 import Sparkline from '@kaynooo/kayjs-ui/sparkline.kay'
 import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
 import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
@@ -18,3 +19,4 @@ div
   ScatterChart#dots(points={[{ key: 'p', label: 'P', x: 1, y: 1 }, { key: 'q', label: 'Q', x: 2, y: 2 }]} label="Dots" href={point => point.key === 'q' ? '#q' : undefined} onSelect={point => heard.push(point.key)} onActive={index => heard.push(`dot:${index}`)})
     @tooltip(point)
       p.dot {point.label}?
+  LineChart#lined(labels={['a', 'b', 'c']} series={[{ name: 'Runs', values: [1, 3, 2] }]} label="Lined" onSelect={mark => heard.push(mark)} onActive={index => heard.push(`line:${index}`)} active={steered})

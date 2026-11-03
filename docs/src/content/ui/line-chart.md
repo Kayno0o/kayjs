@@ -51,3 +51,7 @@ Give the chart a signal or a store and it updates in place on each change. The S
 ## Data and axes
 
 `labels` is the x-axis labels, one per point of every series. `xLabels` draws them under the plot, up to five, spaced by time when every label is a date. `options` is merged over the chart's defaults, for what the props do not cover.
+
+## Pressing and the active point
+
+`onSelect` hears the point a click without a drag lands on, or Enter when no span is being picked, as `{ index, label, values }`. `onActive` hears the index of the point the pointer or keyboard is on, `null` when it leaves, and `active` draws the cursor and dots at a point of the app's choice. LineChart takes no `href` or tooltip block yet.

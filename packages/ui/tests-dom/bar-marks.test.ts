@@ -91,4 +91,25 @@ describe('BarChart marks', () => {
     expect(heard).toEqual(['p', 'dot:1'])
     expect(root.querySelector('#dots [data-part="tooltip"] .dot')?.textContent).toBe('Q?')
   })
+
+  test('LineChart hears the point a click without a drag lands on, the active one and Enter, and draws a controlled one', async () => {
+    const { root, heard } = await marks()
+    const overlay = root.querySelector('#lined [data-part="overlay"]')!
+    const pointer = (type: string) => overlay.dispatchEvent(new PointerEvent(type, { clientX: 0, clientY: 0, button: 0, bubbles: true }))
+
+    pointer('pointermove')
+    pointer('pointerdown')
+    pointer('pointerup')
+    await settle()
+    expect(heard).toEqual([{ index: 0, label: 'a', values: [1] }, 'line:0'])
+    heard.length = 0
+    overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    expect(heard).toEqual([{ index: 0, label: 'a', values: [1] }])
+    mounted?.unmount()
+
+    const driven = await marks({ steered: 1 })
+
+    await settle()
+    expect(driven.root.querySelector('#lined [data-part="cursor"]')).not.toBeNull()
+  })
 })
