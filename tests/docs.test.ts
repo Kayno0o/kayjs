@@ -80,9 +80,9 @@ describe('the scaffold commands the docs show', () => {
 
       const [, verb, ...rest] = command.split(' ')
 
-      // `kay add` works on a project that holds none of the features, so a server one is made first; `kay new` writes its own folder.
+      // `kay add` works on a project that holds none of the features, so a server one is made first, its kay dependency a placeholder so the checkout is not packed; `kay new` writes its own folder.
       if (verb === 'add')
-        await run(['new', 'app', '--template', 'server', '-y', '--quiet'], base)
+        await run(['new', 'app', '--template', 'server', '--kay', 'dry-run', '-y', '--quiet'], base)
 
       const args = verb === 'add' ? ['add', ...rest, join(base, 'app'), '--dry-run'] : ['new', join(base, 'app'), ...rest.slice(1), '--dry-run']
       const { output, code } = await run(args, base)
