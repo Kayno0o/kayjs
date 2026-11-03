@@ -322,7 +322,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
           const inLayout = refused.file !== undefined && route.layouts.includes(refused.file)
           const own = inferred ? 'set `prerender: false` in `export const page` to render it per request, as this page is at a collection\'s route' : 'drop `prerender` from `export const page` to render it per request'
-          const instead = inLayout ? 'every page under that layout renders it, so read it in the pages that are not prerendered, or drop `prerender` from this one' : own
+          const instead = inLayout ? `every page under that layout renders it, so read it in the pages that are not prerendered, or ${inferred ? 'set `prerender: false` in this one' : 'drop `prerender` from this one'}` : own
           const advice = options.exportAll ? 'a static export renders every page at build time, so the read has to go, or the site needs a server' : instead
 
           throw new KayError('export-server-render', `kay: prerendering ${copy.path} from ${file} failed: it ${readAt}, which only a request holds, and a prerendered page renders once, at build time; ${advice}`)
