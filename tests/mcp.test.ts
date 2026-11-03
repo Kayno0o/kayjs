@@ -536,6 +536,65 @@ describe.concurrent('kay mcp', () => {
     expect(generated?.structuredContent).toMatchObject({ kind: 'page', name: 'contact', dryRun: true })
     expect(await Bun.file(join(root, 'src/routes/contact.kay')).exists()).toBe(false)
     expect((await agent.request('tools/call', { name: 'generate', arguments: { kind: '--help', name: 'x' } })).result?.isError).toBe(true)
+    // A page would read its first extra argument as the project folder.
+    expect((await agent.request('tools/call', { name: 'generate', arguments: { kind: 'page', name: 'x', fields: ['../..'] } })).result?.isError).toBe(true)
+    expect((await agent.request('tools/call', { name: 'generate', arguments: { kind: 'page', name: 'x', plural: 'xs' } })).result?.isError).toBe(true)
+  })
+
+  it('answers an error result with its document for a file that is not formatted, and takes the project root as a path', async () => {
+    const loose = await scratchDir('mcp-fmt-')
+
+    try {
+      await Bun.write(join(loose, 'tsconfig.json'), tsconfig)
+      await Bun.write(join(loose, 'src/routes/loose.kay'), 'p   Loose\n\n\n\np Again\n')
+
+      const own = new Agent(loose)
+
+      try {
+        const file = (await own.request('tools/call', { name: 'fmt', arguments: { paths: ['src/routes/loose.kay'] } })).result
+        const whole = (await own.request('tools/call', { name: 'fmt', arguments: { paths: ['.'] } })).result
+
+        expect(file?.isError).toBe(true)
+        expect(file?.structuredContent).toMatchObject({ written: false, changed: [expect.stringContaining('loose.kay')] })
+        expect(whole?.structuredContent).toMatchObject({ changed: [expect.stringContaining('loose.kay')] })
+        expect(await Bun.file(join(loose, 'src/routes/loose.kay')).text()).toBe('p   Loose\n\n\n\np Again\n')
+      }
+      finally {
+        await own.close()
+      }
+    }
+    finally {
+      await rm(loose, { recursive: true, force: true })
+    }
+  })
+
+  it('lists the translations a locale lacks, and refuses a feature holding a comma', async () => {
+    const site = await scratchDir('mcp-i18n-')
+
+    try {
+      await Bun.write(join(site, 'package.json'), '{ "name": "site", "type": "module", "dependencies": { "kay": "*" } }\n')
+      await Bun.write(join(site, 'kay.config.ts'), 'export default { favicon: false, i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n')
+      await Bun.write(join(site, 'src/messages/en.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ nav: { home: \'Home\', about: \'About\' } })\n')
+      await Bun.write(join(site, 'src/messages/fr.ts'), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ nav: { home: \'Accueil\' } })\n')
+
+      const own = new Agent(site)
+
+      try {
+        const missing = (await own.request('tools/call', { name: 'i18n_missing', arguments: { locale: 'fr' } })).result
+        const unknown = (await own.request('tools/call', { name: 'i18n_missing', arguments: { locale: 'xx' } })).result
+        const comma = (await own.request('tools/call', { name: 'add', arguments: { features: ['tailwind,auth'] } })).result
+
+        expect(missing?.structuredContent).toMatchObject({ locales: { fr: { messages: ['nav.about'] } } })
+        expect(unknown?.isError).toBe(true)
+        expect(comma?.isError).toBe(true)
+      }
+      finally {
+        await own.close()
+      }
+    }
+    finally {
+      await rm(site, { recursive: true, force: true })
+    }
   })
 
   it('previews adding a feature, checks the environment and the translations, and runs a test file', async () => {

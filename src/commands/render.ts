@@ -3,7 +3,7 @@ import type { Command } from './command'
 import { loadConfig } from '../config-loader'
 import { startRenderServer } from '../dev/render-server'
 import { basePath, routerPath } from '../server/base'
-import { formatOption, printDocument, projectRoot, reportFailure } from './command'
+import { formatOption, printDocument, projectRoot, reportFailure, withStdoutOnStderr } from './command'
 
 const SCHEME = /^https?:\/\//
 // An HTTP method is a token, as RFC 9110 writes it.
@@ -66,7 +66,7 @@ export const render: Command = {
     if (typeof body === 'string' && !headers.has('content-type'))
       headers.set('content-type', 'application/x-www-form-urlencoded')
 
-    const config = await configOf(root)
+    const config = await withStdoutOnStderr(async () => configOf(root))
     const started = await startRenderServer(root, 'render', config, { entry: typeof option === 'string' ? option : undefined })
 
     if (typeof started === 'string') {

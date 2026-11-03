@@ -370,7 +370,7 @@ kay render /_kay/action/src/routes/index.kay/add --body 'title=Milk' -i
 
 The server runs on a Unix socket of its own, so it runs beside a `kay dev` holding the port. The whole app boots, so its jobs run, and a `POST` to an action runs against the app's database.
 
-A redirect prints `kay render: 302 Found, to /login` on stderr and exits 0. A status of 400 or above prints its line on stderr, the body still on stdout, and exits 1. With `--format json`, stdout holds `{ status, headers, body, ms }` instead, and the exit code is the same.
+A redirect prints `kay render: 302 Found, to /login` on stderr and exits 0. A status of 400 or above prints its line on stderr, the body still on stdout, and exits 1. With `--format json`, stdout holds `{ status, headers, body, ms }` instead, and the exit code is the same. `body` is text, so a binary response is not kept.
 
 | Option | Effect |
 | --- | --- |

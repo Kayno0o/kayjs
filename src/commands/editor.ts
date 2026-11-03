@@ -5,8 +5,8 @@ import { formatOption, printDocument, printFailure, projectRoot } from './comman
 
 // Sets up the editors that read `.kay` through tree-sitter and the language server: the files they need, written in their own configuration.
 export const editorInstall: Command = {
-  usage: 'editor install [helix|zed] [dir] [--format text|json]',
-  options: { format: { type: 'string' } },
+  usage: 'editor install [helix|zed] [dir] [--dry-run] [--format text|json]',
+  options: { 'format': { type: 'string' }, 'dry-run': { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals: [wanted, path] }, refuse) => {
     const format = formatOption('editor install', values.format)
@@ -34,7 +34,7 @@ export const editorInstall: Command = {
 
     for (const editor of editors) {
       try {
-        setups.push(await installEditor(editor, { root }))
+        setups.push(await installEditor(editor, { root, dryRun: values['dry-run'] === true }))
       }
       catch (error) {
         printFailure('editor install', error, format)
@@ -44,7 +44,7 @@ export const editorInstall: Command = {
     }
 
     if (format === 'json') {
-      printDocument({ editors: setups })
+      printDocument({ editors: setups, dryRun: values['dry-run'] === true })
 
       return 0
     }

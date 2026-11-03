@@ -88,6 +88,23 @@ describe('helix', () => {
     expect(setup.summary).toContain('built')
   })
 
+  it('lists what it would write under dryRun, and writes nothing', async () => {
+    const home = await scratch('editor-home-')
+    const root = await scratch('editor-root-')
+    const { path, calls } = await fakePath(['hx'])
+    const helix = await installHelix({ root, configHome: home, path, dryRun: true })
+    const zed = await installZed({ root, configHome: home, path, dryRun: true })
+
+    expect(helix.files.length).toBeGreaterThan(0)
+    expect(zed.files.length).toBeGreaterThan(0)
+    expect(helix.summary).toContain('would write')
+    expect(zed.summary).toContain('would be written')
+    expect(await Bun.file(join(home, 'helix/languages.toml')).exists()).toBe(false)
+    expect(await Bun.file(join(home, 'zed/kay-extension/extension.toml')).exists()).toBe(false)
+    expect(await Bun.file(join(root, '.zed/settings.json')).exists()).toBe(false)
+    expect(await callsOf(calls)).toEqual([])
+  })
+
   it('rewrites its own section on a second run and keeps the rest of the file', async () => {
     const home = await scratch('editor-home-')
     const root = await scratch('editor-root-')

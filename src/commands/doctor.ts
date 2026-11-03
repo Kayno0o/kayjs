@@ -38,8 +38,8 @@ const QUOTED = /^(['"`])(.*)\1$/
 
 // Everything that can keep a project from running, one check each: a fault is reported with what to do about it, and the others still run.
 export const doctor: Command = {
-  usage: 'doctor [dir] [--port <port>] [--format text|json]',
-  options: { format: { type: 'string' }, port: { type: 'string' } },
+  usage: 'doctor [dir] [--port <port>] [--format text|json] [--quiet]',
+  options: { format: { type: 'string' }, port: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }, refuse) => {
     const format = formatOption('doctor', values.format)
@@ -61,8 +61,8 @@ export const doctor: Command = {
 
     if (format === 'json')
       printDocument({ checks })
-    else
-      console.log(checks.map(formatCheck).join('\n'))
+    else if (values.quiet !== true || checks.some(check => !check.ok))
+      console.log(checks.filter(check => values.quiet !== true || !check.ok).map(formatCheck).join('\n'))
 
     return checks.every(check => check.ok) ? 0 : 1
   },

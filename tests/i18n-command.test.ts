@@ -291,6 +291,25 @@ describe('kay i18n', () => {
     expect(await Bun.file(join(root, 'src/messages/fr.ts')).text()).toBe(before)
   })
 
+  it('accept takes --format json and --quiet', async () => {
+    const root = await project(site)
+    const before = await Bun.file(join(root, 'src/messages/fr.ts')).text()
+    const dry = await kay(['i18n', 'accept', 'fr', '--dry-run', '--format', 'json'], root)
+
+    expect(JSON.parse(dry.stdout)).toEqual({ locale: 'fr', file: 'src/messages/fr.ts', accepted: 2, dryRun: true })
+    expect(await Bun.file(join(root, 'src/messages/fr.ts')).text()).toBe(before)
+    expect((await kay(['i18n', 'accept', 'fr', '--quiet'], root)).stdout).toBe('')
+    expect(draftMessages(await Bun.file(join(root, 'src/messages/fr.ts')).text())).toEqual([])
+  })
+
+  it('missing --quiet leaves out the locales that lack nothing', async () => {
+    const root = await project(site)
+    const { stdout } = await kay(['i18n', 'missing', '--quiet'], root)
+
+    expect(stdout).toContain('fr lacks')
+    expect(stdout).not.toContain('lacks nothing')
+  })
+
   it('gives a library what each locale lacks, with the default locale\'s message for each', async () => {
     const root = await project(site)
     const config = { i18n, extensions: [{ name: 'kay-lib', messages: './lib/messages' }] }

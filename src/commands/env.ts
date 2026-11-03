@@ -48,8 +48,8 @@ const METRICS_VARIABLES: EnvVariable[] = [
 
 // Every variable the project's `defineEnv` schemas and its extensions declare, with whether each is required, in production only or always, and its default. The server entry is not run: the modules under `src` that call `defineEnv` are imported without the server's environment.
 export const env: Command = {
-  usage: 'env [dir] [--compose <file>]... [--example <file>] [--write] [--format text|json]',
-  options: { format: { type: 'string' }, compose: { type: 'string', multiple: true }, example: { type: 'string' }, write: { type: 'boolean' } },
+  usage: 'env [dir] [--compose <file>]... [--example <file>] [--write] [--format text|json] [--quiet]',
+  options: { format: { type: 'string' }, quiet: { type: 'boolean' }, compose: { type: 'string', multiple: true }, example: { type: 'string' }, write: { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }) => {
     const format = formatOption('env', values.format)
@@ -88,7 +88,8 @@ export const env: Command = {
         return findings === undefined || !findings.some(({ severity }) => severity === 'error') ? 0 : 1
       }
 
-      console.log(formatListing(variables) + (unread.length === 0 ? '' : `\n\n${unread.map(({ file, error }) => `Not read: ${file} (${error})`).join('\n')}`))
+      if (values.quiet !== true)
+        console.log(formatListing(variables) + (unread.length === 0 ? '' : `\n\n${unread.map(({ file, error }) => `Not read: ${file} (${error})`).join('\n')}`))
 
       if (findings === undefined)
         return 0

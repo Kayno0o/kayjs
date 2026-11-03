@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { engines } from '../../package.json'
 import { DEPRECATION_MINORS, minorAfter, minorOf, UPGRADE_FROM } from '../compiler/lints'
-import { done, formatOption, printDocument, printFailure, projectRoot, withStdoutOnStderr } from './command'
+import { done, formatOption, printDocument, printFailure, projectRoot } from './command'
 
 // What an upgrade asks of the outside: the registry, the package manager and the project's own kay, which a test replaces so none of them is reached.
 export interface UpgradeDeps {
@@ -72,7 +72,7 @@ export function registryDepsFor(bun: string, logTo: 'inherit' | number = 'inheri
 }
 
 const registryDeps = registryDepsFor(process.execPath)
-// Under `--format json` stdout holds the document alone, so what the project's own kay and the install print goes to stderr.
+// Under `--format json` stdout holds the document alone, so what the project's own kay and the install print goes to stderr; nothing else of the upgrade runs the app's code in this process.
 const registryDepsToStderr = registryDepsFor(process.execPath, 2)
 
 // Whether the project holds an npm `bun` older than the Bun the installed kay needs.
@@ -114,7 +114,7 @@ export const upgrade: Command = {
 
     const options = { dryRun: values['dry-run'] === true, quiet: values.quiet === true, format }
 
-    return format === 'json' ? withStdoutOnStderr(async () => upgradeProject(root, registryDepsToStderr, options)) : upgradeProject(root, registryDeps, options)
+    return upgradeProject(root, format === 'json' ? registryDepsToStderr : registryDeps, options)
   },
 }
 
@@ -278,9 +278,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
 
   if (clean)
     say('upgraded', `to kay ${latestKay}, nothing left to do by hand`, true)
-  else if (format === 'json')
-    result.steps.push({ verb: 'upgraded', rest: `to kay ${latestKay}, the problems above are left for you` })
-  else
+  else if (format === 'text')
     console.log(`upgraded to kay ${latestKay}, the problems above are left for you`)
 
   return finish(clean ? 0 : 1)

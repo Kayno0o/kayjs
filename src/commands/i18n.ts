@@ -12,8 +12,8 @@ import { count, done, formatOption, printDocument, printFailure, projectRoot, wi
 
 // What each locale lacks against the default locale: message keys, its extensions' included, and the entries of its localized collections.
 export const i18nMissing: Command = {
-  usage: 'i18n missing [locale] [dir] [--format text|json]',
-  options: { format: { type: 'string' } },
+  usage: 'i18n missing [locale] [dir] [--format text|json] [--quiet]',
+  options: { format: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals: [wanted, path] }) => {
     const format = formatOption('i18n missing', values.format)
@@ -51,7 +51,8 @@ export const i18nMissing: Command = {
           ...Object.entries(entries).map(([name, slugs]) => `${locale} lacks ${slugs.length} ${slugs.length === 1 ? 'entry' : 'entries'} of ${name}: ${slugs.join(', ')}`),
         ]
 
-        console.log(lines.length === 0 ? `${locale} lacks nothing` : lines.join('\n'))
+        if (lines.length > 0 || values.quiet !== true)
+          console.log(lines.length === 0 ? `${locale} lacks nothing` : lines.join('\n'))
       }
 
       return 0
@@ -66,14 +67,19 @@ export const i18nMissing: Command = {
 
 // Deletes the `// draft` comment of every message of a locale's file, a person having checked them.
 export const i18nAccept: Command = {
-  usage: 'i18n accept <locale> [dir] [--dry-run]',
-  options: { 'dry-run': { type: 'boolean' } },
+  usage: 'i18n accept <locale> [dir] [--dry-run] [--format text|json] [--quiet]',
+  options: { 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals: [locale, path] }, refuse) => {
     if (locale === undefined)
       return refuse('i18n accept needs the locale whose drafts to accept')
 
-    const project = await translated('i18n accept', path, 'text')
+    const format = formatOption('i18n accept', values.format)
+
+    if (format === undefined)
+      return 1
+
+    const project = await translated('i18n accept', path, format)
 
     if (project === undefined)
       return 1
@@ -81,7 +87,7 @@ export const i18nAccept: Command = {
     const { root, i18n } = project
 
     if (!i18n.locales.includes(locale)) {
-      printFailure('i18n accept', `${locale} is not one of the locales i18n lists: ${i18n.locales.join(', ')}`, 'text')
+      printFailure('i18n accept', `${locale} is not one of the locales i18n lists: ${i18n.locales.join(', ')}`, format)
 
       return 1
     }
@@ -90,27 +96,28 @@ export const i18nAccept: Command = {
     const shown = relative(process.cwd(), file)
 
     if (!existsSync(file)) {
-      printFailure('i18n accept', `${shown} does not exist, so it holds no draft`, 'text')
+      printFailure('i18n accept', `${shown} does not exist, so it holds no draft`, format)
 
       return 1
     }
 
     const { source, accepted } = acceptDrafts(await Bun.file(file).text())
 
-    if (accepted === 0) {
+    const dryRun = values['dry-run'] === true
+
+    if (accepted > 0 && !dryRun)
+      await Bun.write(file, source)
+
+    if (format === 'json') {
+      printDocument({ locale, file: shown, accepted, dryRun })
+
+      return 0
+    }
+
+    if (accepted === 0)
       console.log(`${shown} holds no draft`)
-
-      return 0
-    }
-
-    if (values['dry-run'] === true) {
-      done('Would accept', `${count(accepted, 'draft')} in ${shown}`)
-
-      return 0
-    }
-
-    await Bun.write(file, source)
-    done('Accepted', `${count(accepted, 'draft')} in ${shown}`)
+    else if (values.quiet !== true)
+      done(dryRun ? 'Would accept' : 'Accepted', `${count(accepted, 'draft')} in ${shown}`)
 
     return 0
   },

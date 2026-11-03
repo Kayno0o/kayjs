@@ -86,6 +86,7 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [The dev tool](llms/dev-tool.md): its tabs and the problems it lists
 - [Building and starting](llms/build-and-start.md): `kay build`, one executable, static export, `kay start`
 - [Check, inspect and tool commands](llms/check-and-tools.md): `check`, `render`, `routes`, `env`, `doctor`, `upgrade`, `fmt`
+- [Compiling a component](llms/compiler-api.md): `kay/compiler` for a tool
 - [Language server, screenshot and MCP](llms/editor-and-agent-commands.md): `kay lsp`, `screenshot`, `mcp`, `docs`
 - [Running in production](llms/production.md): logs, tracing, health checks, shutdown, cron, jobs
 - [Several workers](llms/workers.md): `--workers`, what the processes share

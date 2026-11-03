@@ -7,6 +7,7 @@ import { KAY_DIR } from '../build/assets'
 import { isLintGroup, LINT_GROUPS } from '../compiler/lints'
 import { MAX_HEIGHT, MAX_WIDTH, MIN_SIZE } from '../dev/screenshot-limits'
 import { docFiles } from '../docs-search'
+import { KINDS } from '../generate'
 import { DEV_ERRORS_FILE } from '../server/dev-errors'
 
 const CLI = join(import.meta.dir, '..', 'cli.ts')
@@ -24,7 +25,6 @@ const CONTENT_TYPE = /^content-type:\s*([^;\s]+)/im
 // A body read as text: a `text/` type, or one of the structured formats that are text, `+json` and `+xml` suffixes included.
 const TEXT_TYPE = /^(?:text\/|application\/(?:json|xml|javascript|ecmascript|x-www-form-urlencoded|graphql|yaml|.+\+(?:json|xml)))/i
 const HEADING = /^(#{1,2}) (.+)$/gm
-const GENERATED_KINDS = ['page', 'component', 'island', 'action', 'api', 'guard', 'resource']
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
 
 // The commands running for a call.
@@ -228,9 +228,13 @@ function tools(root: string): Tool[] {
       inputSchema: { type: 'object', properties: { paths: { type: 'array', items: { type: 'string' }, description: 'Files or directories in the project to check, relative to the project root; the whole project by default.' } }, additionalProperties: false },
       annotations: READ_ONLY,
       run: async (args) => {
-        const paths = stringList(args.paths, 'paths').map(path => insideProject(root, path))
+        // The project root among the paths is `.`, as an empty path is none.
+        const paths = stringList(args.paths, 'paths').map(path => insideProject(root, path) || '.')
+        const result = await kay(['fmt', '--check', '--format', 'json', ...paths.length === 0 ? [] : ['--', ...paths]])
+        const answer = jsonResult(result)
 
-        return document(['fmt', '--check', '--format', 'json', ...paths.length === 0 ? [] : ['--', ...paths]])
+        // The command exits 1 for a file not formatted or not compiling, with the document on stdout and nothing on stderr.
+        return result.code === 0 ? answer : { ...answer, isError: true }
       },
     },
     {
@@ -240,7 +244,7 @@ function tools(root: string): Tool[] {
       inputSchema: {
         type: 'object',
         properties: {
-          kind: { type: 'string', enum: GENERATED_KINDS, description: 'What to generate.' },
+          kind: { type: 'string', enum: [...KINDS], description: 'What to generate.' },
           name: { type: 'string', description: 'The name, such as `about` or `post-card`.' },
           fields: { type: 'array', items: { type: 'string' }, description: 'For a resource, its fields each as `name:type`.' },
           plural: { type: 'string', description: 'For a resource, the plural of its name.' },
@@ -253,13 +257,19 @@ function tools(root: string): Tool[] {
         const { kind, name } = args
         const plural = optionalString(args.plural, 'plural')
 
-        if (typeof kind !== 'string' || !GENERATED_KINDS.includes(kind))
-          throw new Error(`kind takes one of ${GENERATED_KINDS.join(', ')}`)
+        if (typeof kind !== 'string' || !(KINDS as readonly string[]).includes(kind))
+          throw new Error(`kind takes one of ${KINDS.join(', ')}`)
 
         if (typeof name !== 'string' || name === '')
           throw new Error('name takes a name')
 
-        return document(['generate', '--dry-run', '--format', 'json', ...plural === undefined ? [] : [`--plural=${plural}`], '--', kind, name, ...stringList(args.fields, 'fields')])
+        const fields = stringList(args.fields, 'fields')
+
+        // Only a resource reads its extra arguments as fields; for any other kind the first one would be taken as the project folder.
+        if (kind !== 'resource' && (fields.length > 0 || plural !== undefined))
+          throw new Error('fields and plural are for a resource')
+
+        return document(['generate', '--dry-run', '--format', 'json', ...plural === undefined ? [] : [`--plural=${plural}`], '--', kind, name, ...fields])
       },
     },
     {
@@ -271,8 +281,8 @@ function tools(root: string): Tool[] {
       run: async (args) => {
         const features = stringList(args.features, 'features')
 
-        if (features.length === 0)
-          throw new Error('features takes at least one feature')
+        if (features.length === 0 || features.some(feature => feature.includes(',')))
+          throw new Error('features takes a list of features, one each, none holding a comma')
 
         return document(['add', '--dry-run', '--no-install', '--format', 'json', '--', features.join(',')])
       },

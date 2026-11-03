@@ -104,7 +104,7 @@ kay fmt --check
   - `kay build` reports them as it checks, and the editor after a save or a change on disk.
 - `kay render <url> [dir] [--method <method>] [--body <text>] [--header <name: value>]... [--cookie <name=value>]... [-i|--include] [--entry <file>] [--format text|json]`:
   - Answer one request as the server entry answers it under `NODE_ENV=development`, as `kay dev` serves it but without the inspector's attributes, and print the body on stdout; the server runs on a Unix socket of its own, not a port, stops once it answered, or starts stopping within a second once `kay render` is killed, and builds the browser code into a directory under `.kay` it removes, never touching `kay build`'s or `kay dev`'s; the next `kay render` removes what a SIGKILLed one left.
-  - What the server logs, a page's error report included, goes to stderr; a redirect prints `kay render: 302 Found, to /login` there and exits 0, a status of 400 or above prints its line there and exits 1, and a server exiting before it serves fails with its code. `--format json` prints `{ status, headers, body, ms }` on stdout instead of the body (`headers` an object, `set-cookie` a list, `body` the text), with no status line, and the exit code is the same.
+  - What the server logs, a page's error report included, goes to stderr; a redirect prints `kay render: 302 Found, to /login` there and exits 0, a status of 400 or above prints its line there and exits 1, and a server exiting before it serves fails with its code. `--format json` prints `{ status, headers, body, ms }` on stdout instead of the body (`headers` an object, `set-cookie` a list, `body` the response read as text, so a binary body is not preserved: take the bytes without `--format json`), with no status line, and the exit code is the same.
   - `--body` posts as a form does, `application/x-www-form-urlencoded`, unless a `--header` names another `content-type`; `--header` and `--cookie` repeat, a guarded page rendering signed in with the session cookie a browser holds; `-i` prints the status and headers on stderr.
   - Under `base`, a path under it is taken as the proxy in front of the server hands it over, so a link a page printed renders as it is.
   - The whole app boots for it: its jobs and modules' top-level code run, and a `POST` to an action runs it against the app's database. The request goes to the first server the entry starts, with the host a full URL names, over plain HTTP; a server not listening after 60 seconds fails it.
@@ -117,14 +117,14 @@ kay fmt --check
   - Lists the paths visitors asked for with a GET and found nothing at, most hit first, from `data/not-found.sqlite` (or `--file`), with the hosts they came from and a suggested target; those a `redirects` entry answers already are left out ([Redirects](routing-endpoints-and-base.md#redirects));
   - `--redirect <path>` adds the redirect to `redirects` in kay.config.ts, to `--to` or to the suggested target, and drops the path from the list; a config with no object literal to add it to prints the line to add by hand;
   - `--runtime` writes it to the file instead, which the running site reads with no deploy and no change to kay.config.ts; the rules are those of [Redirects](routing-endpoints-and-base.md#redirects), and `kay check` reports such a target nothing serves.
-- `kay doctor [dir] [--port <port>] [--format text|json]`:
+- `kay doctor [dir] [--port <port>] [--format text|json] [--quiet]`:
   - Checks, one line each (`ok` or `FAIL` with a `fix:` line under it), what can keep a project from running, and exits 1 on any failure, the others still running: `bun` (the version kay needs), `versions` (`@kaynooo/kayjs` and each `@kaynooo/kayjs-*` listed in package.json installed, the libraries on the minor of kay's), `config` (kay.config.ts loads), `env` (each variable `kay env` lists as `always` required is set in the shell or the project's `.env` files, or `production` ones too under `NODE_ENV=production`), `port` (`--port`, else `PORT`, else 3000, free to listen on at `HOST` or else on every IPv4 address and both loopback ones, `0` meaning the system picks, or held by this project's own `kay dev`) and `build` (`.kay/client` and `.kay/dev` built by this kay: `kay build` and `kay dev` stamp `kay` in their `manifest.json`, so a build by another kay or by one before the stamp fails).
   - `--format json` prints `{ checks }`, each with `name`, `ok`, `message` and, on a failure, `fix`; the MCP `doctor` tool answers the same document, a failing check being a result.
-- `kay env [dir] [--compose <file>]... [--example <file>] [--write] [--format text|json]`:
+- `kay env [dir] [--compose <file>]... [--example <file>] [--write] [--format text|json] [--quiet]`:
   - Lists the environment variables the project declares, for a deploy script to compare with a compose or an env file: each `defineEnv` schema in the modules under `src` (imported without the server's environment, so their top-level code runs and its output goes to stderr; the server entry is not run, and a schema it declares is not listed; a schema built inside a function is not seen), the `env` schema of each extension, and kay's own `PORT`, `HOST`, `SITE_URL` and `KAY_SECRET`, and `KAY_PROXY_KEY` and `KAY_PROXY_KEY_FILE` while `proxy.key` is set, and `KAY_MCP_KEY` and `KAY_MCP_KEY_FILE` while `mcp.key` asks for a key;
   - Each with its source, type, whether it is required (`always`, `production` for a field with `requiredInProduction: true`, or `optional`) and its default; a module that does not load is named as not read.
   - With `--compose` and `--example`, or `env` in kay.config.ts, compares them with those files, else with the project's production `compose*.yaml` and `.env.example`, and exits 1 on an error; `kay check` does the same. `--write` appends the declared variables the example lacks ([Server](server.md)).
-- `kay i18n missing [locale] [dir] [--format text|json]` and `kay i18n accept <locale> [dir] [--dry-run]`:
+- `kay i18n missing [locale] [dir] [--format text|json] [--quiet]` and `kay i18n accept <locale> [dir] [--dry-run] [--format text|json] [--quiet]`:
   - List what each locale lacks against the default one, messages and localized entries; accept a locale's draft messages, deleting their `// draft` comments (see [Locales](locales.md#messages)).
   - `kay i18n --help` lists every `i18n` command, those a library adds included, such as `kay i18n translate <locale> [--dry-run]` of `@kaynooo/kayjs-ai`, which fills the missing messages and entries as drafts.
 - `kay upgrade [dir] [--dry-run] [--quiet] [--format text|json]`:
@@ -132,7 +132,7 @@ kay fmt --check
   - A release that dropped the lints of a minor no longer rewrites its forms, so an app that may still hold them goes through the minor before that release first (an app on 1.70 to 1.77 installs 1.73, then 1.76, then the latest), each stop installing the ranges, rewriting its minors and moving on; `DEPRECATION_MINORS` in `src/compiler/lints.ts` lists them, and a test fails until dropping a lint's last minor writes its release there. A stop whose install fails leaves `package.json` at the last stop that installed.
   - An install that leaves an npm `bun` in `node_modules` older than the installed kay's `engines.bun` (the auto-installed peer of `bun-plugin-tailwind`) is followed by `bun update bun`.
   - `--dry-run` lists the packages it would move and writes, installs and rewrites nothing.
-  - `--format json` prints `{ steps, changed }` on stdout, each step a `{ verb, rest }` and each `changed` package the `{ name, spec, section }` it moved (or would move) to, the install and the checks it runs printing on stderr; the exit code is the text output's.
+  - `--format json` prints `{ steps, changed }` on stdout (a failure prints `{ errors, warnings, problems }` as `kay check` does, and exits 1), each step a `{ verb, rest }` and each `changed` package the `{ name, spec, section }` it moved (or would move) to, the install and the checks it runs printing on stderr; the exit code is the text output's.
   - A last `kay check --fix` also moves a root Dockerfile's `oven/bun:<version>` to the Bun the new kay needs (`old-bun-image`). An app already on the latest is left as it is, a registry older than the app's range never moves it back, and a failed install puts `package.json` back as it was. A deprecated form is one `deprecated` lint with its `since` minor and a safe fix; a minor's breaking changes carry one when `kay check` can see the old form, see [Checks](checks.md).
 - `kay explain [lint|error|group] [--format text|json]`:
   - List the lints with their groups and default levels and the errors with theirs, or a group's, or print one: a lint with an example it reports and the same written right, an error with where its fix is written; a name that is none names the `kay docs` section documenting it.
@@ -148,29 +148,10 @@ kay fmt --check
   - Run `bun test` in the project with `--isolate` and `kay/test/preload`, so it needs no `bunfig.toml` and no flag, and report a failure at its `.kay` line; the arguments are `bun test`'s and its exit code is the answer (see [Testing](testing.md)).
 - `kay types [dir] [--format text|json] [--quiet]`:
   - Write `.kay/types`, which the language server, `kay lint` and the editor's ESLint read, without checking anything; the editor's ESLint runs it through `bun` the first time it meets a component whose types are missing.
+- `kay/compiler`, for a tool that reads `.kay` source outside kay, is in [Compiling a component](compiler-api.md).
 - `kay lsp`, `kay screenshot`, `kay mcp` and `kay docs` are in [Language server, screenshot and MCP commands](editor-and-agent-commands.md).
 
 - `kay fmt --stdin [path]` reads a source on stdin and prints it formatted on stdout, for an editor's formatter (conform.nvim, Helix, Zed): `path` names the file it is for, which may not exist and decides the Tailwind order; a source that does not compile prints its problems on stderr, nothing on stdout, and exits 1; `--check`, `--from-html`, `--format json` and several paths are refused.
 - `kay fmt` refuses a path that is missing or is neither a directory nor a `.kay` file.
 - Neovim, Helix and Zed highlight `.kay` files with the tree-sitter grammar in `editors/tree-sitter-kay` of the kay repository (queries for highlights, injections and indents; scripts and holes inject TypeScript, `--- style` CSS, `markdown` Markdown), and Zed with the extension in `editors/zed`, which also starts `kay lsp --stdio`; setup in the docs' Other editors guide.
 - The TextMate grammar the extension highlights `.kay` files with ships as `kay/kay.tmLanguage.json`, for a highlighter such as Shiki: register it as `{ ...grammar, name: 'kay', embeddedLangs: ['typescript'] }`.
-
-### Compile a component from a tool
-
-`kay/compiler` is for a tool that reads `.kay` source outside kay, such as a formatter, a docs checker or a CSS scanner; it exports `compileKay`, `formatDiagnostic` and the types `Diagnostic`, `CompileOptions` and `CompileResult`:
-
-```ts
-import { compileKay, formatDiagnostic } from 'kay/compiler'
-
-const source = await Bun.file('src/routes/index.kay').text()
-const { diagnostics, classes } = compileKay(source, 'src/routes/index.kay')
-
-for (const diagnostic of diagnostics)
-  console.error(formatDiagnostic(source, 'src/routes/index.kay', diagnostic))
-```
-
-- `compileKay(source, filename, options?)` returns `{ tsx, map, island?, promote?, why?, classes, diagnostics }` and reports a problem in the source in `diagnostics`. `filename` is read for its base name and, with `root`, its island id: a `_layout.kay`, `_404.kay` or `_error.kay`, like a file with a `--- server` fence, is a route file the server renders, never an island.
-- `tsx` is the generated code: TSX for type checking by default, or with `output: 'html'` or `output: 'dom'` the server's or the browser's code that runs. `map` maps it back to the source, `island` is the component's island id when it renders as one, `classes` the `.class` shorthand names a CSS scanner cannot read off the template.
-- Options: `root` (island ids are paths relative to it), `includeServer: false` for a browser build, `params` and `paramTypes` typing `ctx.params`, `check: true` for the type-checking output's link, form field and island prop assertions plus the lints, with `lints` setting their levels, `inspect` for `data-kay-src`, and `hydratable`, `twinBuild`, `clientOnly`, `insideIsland` and `importedSignals`, which kay's own build sets.
-- A `Diagnostic` is `{ start, end, message, label?, related?, note?, help?, code?, severity?, fixes? }`, `start` and `end` offsets into `source`, `code` a lint's name, `severity` `'warning'` for a lint at the `warn` level.
-- `formatDiagnostic(source, filename, diagnostic, paint?)` prints it as `kay check` does, with the file, line and column, the source line and its `help`; `paint` is `(styles, text) => string` for colour, plain text without it.

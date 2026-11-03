@@ -712,6 +712,37 @@ describe('kay upgrade through the package manager', () => {
     }
   })
 
+  it('sends what the install prints to stderr when told to, so stdout keeps a document', async () => {
+    const { bun, root } = await stub('echo noise')
+
+    try {
+      const script = `import { registryDepsFor } from ${JSON.stringify(join(import.meta.dir, '../src/commands/upgrade'))}\nawait registryDepsFor(${JSON.stringify(bun)}, 2).install(${JSON.stringify(root)}, [])`
+      const child = Bun.spawn([process.execPath, '-e', script], { stdout: 'pipe', stderr: 'pipe' })
+      const [out, err] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()])
+
+      expect(out).toBe('')
+      expect(err).toContain('noise')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('prints its failure as a document on stdout under --format json', async () => {
+    const root = await project('{ "name": "app" }\n')
+
+    try {
+      const child = Bun.spawn([process.execPath, CLI, 'upgrade', '--format', 'json', root], { stdout: 'pipe', stderr: 'pipe' })
+      const [out, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
+
+      expect(code).toBe(1)
+      expect(JSON.parse(out)).toMatchObject({ errors: 1, problems: [{ message: expect.stringContaining('no `kay` dependency') }] })
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('runs the project\'s own kay through the package manager, handing back its output', async () => {
     const { bun, root, calls } = await stub('echo out')
 

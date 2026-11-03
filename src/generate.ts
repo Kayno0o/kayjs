@@ -6,7 +6,7 @@ import { detectFeatures } from './add'
 import { parseProgram } from './compiler/estree'
 import { resourceFiles, withTable } from './generate-resource'
 
-const KINDS = ['page', 'component', 'island', 'action', 'api', 'guard', 'resource'] as const
+export const KINDS = ['page', 'component', 'island', 'action', 'api', 'guard', 'resource'] as const
 
 type Kind = typeof KINDS[number]
 

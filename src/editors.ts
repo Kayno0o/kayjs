@@ -29,6 +29,8 @@ export interface EditorOptions {
   installing?: boolean
   // The directories searched for the editors and the tools, `PATH` by default.
   path?: string
+  // List what would be written and write nothing.
+  dryRun?: boolean
 }
 
 const BINARIES: Record<Editor, string[]> = { helix: ['hx', 'helix'], zed: ['zed', 'zeditor', 'zed-editor'] }
@@ -132,6 +134,9 @@ export async function installHelix(options: EditorOptions): Promise<EditorSetup>
   const files = [languages, ...QUERIES.map(name => join(queries, name))]
   const notes: string[] = []
 
+  if (options.dryRun)
+    return { editor: 'helix', summary: `Helix: would write the language, queries and grammar entry to ${home}`, notes, files }
+
   await mkdir(queries, { recursive: true })
   await writeFile(languages, text)
   await Promise.all(QUERIES.map(async name => cp(join(EDITOR_ROOT, 'tree-sitter-kay', 'queries', name), join(queries, name))))
@@ -161,11 +166,15 @@ export async function installZed(options: EditorOptions): Promise<EditorSetup> {
   const files: string[] = []
   const notes: string[] = []
 
-  await rm(target, { recursive: true, force: true })
-  await mkdir(target, { recursive: true })
+  const writing = options.dryRun !== true
 
-  for (const name of ZED_COPIED)
-    await cp(join(EDITOR_ROOT, 'zed', name), join(target, name), { recursive: true })
+  if (writing) {
+    await rm(target, { recursive: true, force: true })
+    await mkdir(target, { recursive: true })
+
+    for (const name of ZED_COPIED)
+      await cp(join(EDITOR_ROOT, 'zed', name), join(target, name), { recursive: true })
+  }
 
   files.push(...['extension.toml', 'Cargo.toml', 'src/lib.rs', 'languages/kay/config.toml', ...QUERIES.map(name => `languages/kay/${name}`)].map(name => join(target, name)))
 
@@ -187,7 +196,10 @@ export async function installZed(options: EditorOptions): Promise<EditorSetup> {
       const found = parsed as { languages?: Record<string, Record<string, unknown>> }
 
       found.languages = { ...found.languages, Kay: { semantic_tokens: 'combined', ...found.languages?.Kay } }
-      await writeFile(settings, `${JSON.stringify(found, undefined, 2)}\n`)
+
+      if (writing)
+        await writeFile(settings, `${JSON.stringify(found, undefined, 2)}\n`)
+
       files.push(settings)
     }
     else {
@@ -195,8 +207,11 @@ export async function installZed(options: EditorOptions): Promise<EditorSetup> {
     }
   }
   else {
-    await mkdir(join(options.root, '.zed'), { recursive: true })
-    await writeFile(settings, `${JSON.stringify(wanted, undefined, 2)}\n`)
+    if (writing) {
+      await mkdir(join(options.root, '.zed'), { recursive: true })
+      await writeFile(settings, `${JSON.stringify(wanted, undefined, 2)}\n`)
+    }
+
     files.push(settings)
   }
 
@@ -205,7 +220,7 @@ export async function installZed(options: EditorOptions): Promise<EditorSetup> {
 
   notes.push(`in Zed, run "zed: install dev extension" from the command palette and pick ${target}`)
 
-  return { editor: 'zed', summary: `Zed: extension written to ${target}`, notes, files }
+  return { editor: 'zed', summary: `Zed: extension ${writing ? 'written' : 'would be written'} to ${target}`, notes, files }
 }
 
 // One line per editor on stdout, what is left to do under it on stderr.

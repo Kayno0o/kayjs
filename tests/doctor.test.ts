@@ -85,6 +85,15 @@ describe('kay doctor', () => {
     expect(lines.every(line => line.startsWith('ok '))).toBe(true)
   })
 
+  it('--quiet prints nothing while every check passes', async () => {
+    const root = await project()
+    const port = String(freePort())
+    const text = Bun.spawnSync([process.execPath, cli, 'doctor', '--quiet'], { cwd: root, env: { PATH: process.env.PATH!, PORT: port } })
+
+    expect(text.exitCode).toBe(0)
+    expect(text.stdout.toString()).toBe('')
+  })
+
   it('refuses a path that is no directory, and an option it does not take', async () => {
     const root = await project()
 

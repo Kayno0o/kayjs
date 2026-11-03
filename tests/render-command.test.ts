@@ -109,6 +109,15 @@ describe('kay render', () => {
     expect(missing.err).toBe('')
   })
 
+  it('keeps what the config prints off the document under --format json', async () => {
+    const noisy = await project('(console.log(\'NOISE\'), {})')
+    const { out, err, code } = await render('/', noisy, '--format', 'json')
+
+    expect(code).toBe(0)
+    expect(JSON.parse(out)).toMatchObject({ status: 200 })
+    expect(err).toContain('NOISE')
+  })
+
   it('reports a redirect with its location and prints no page', async () => {
     const { out, err, code } = await render('/?next=/later', bare)
 
