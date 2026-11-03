@@ -1674,6 +1674,43 @@ describe('lifecycle', () => {
     }
   })
 
+  it('pings a method store with its own this, a store named by two keys once, and one that throws at once', async () => {
+    class Remote {
+      pinged = 0
+      up = true
+      get = () => undefined
+      set = () => undefined
+      delete = () => undefined
+      hit = () => ({ count: 1, resetAt: 0 })
+      peek = () => undefined
+      ping() {
+        this.pinged += 1
+
+        if (!this.up)
+          throw new Error('remote down')
+      }
+    }
+
+    const remote = new Remote()
+    const app = await pages({ root: PRODUCTION, prebuilt: false, store: { sessions: remote, rates: remote } })
+    const failing = new Remote()
+
+    failing.up = false
+
+    const down = await pages({ root: PRODUCTION, prebuilt: false, store: { sessions: failing } })
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      expect((await app.handle(new Request('http://localhost/_kay/health'))).status).toBe(200)
+      expect(remote.pinged).toBe(1)
+      expect((await down.handle(new Request('http://localhost/_kay/health'))).status).toBe(503)
+    }
+    finally {
+      logged.mockRestore()
+      setupStore(undefined)
+    }
+  })
+
   it('logs a health check that throws with its path, never its query', async () => {
     const failing = await pages({ root: PRODUCTION, prebuilt: false, health: { check: () => {
       throw new Error('Database down')

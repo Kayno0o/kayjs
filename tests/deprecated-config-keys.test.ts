@@ -58,7 +58,7 @@ describe('deprecated-config-keys', () => {
       expect(found.find(diagnostic => diagnostic.line === 4)!.message).toBe('`routes` is now `routesDir` in the config, so every directory key ends in `Dir` and no two keys differ by a letter; the old name works until 1.87')
 
       await applySafeFixes(root, found)
-      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe(config.replace('routes:', 'routesDir:').replace('\'api\':', 'apiDir:').replace('storage:', 'fileStore:'))
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe(config.replace('routes:', 'routesDir:').replace('\'api\':', 'apiDir:').replace('storage: undefined', 'store: { files: undefined }'))
       expect(await Bun.file(join(root, 'src/server.ts')).text()).toBe(server.replace('{ content, maxSizes: {', '{ contentConfig: content, maxSizeByPath: {').replace('settings: {}', 'librarySettings: {}'))
       expect(await Bun.file(join(root, 'src/site.ts')).text()).toBe(test)
       expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe(other)
@@ -77,7 +77,8 @@ describe('deprecated-file-store', () => {
     const shorthand = 'import { testSite } from \'kay/test\'\n\nconst fileStore = undefined\nexport const site = testSite({ fileStore })\n'
     const beside = 'import { pages, sqliteData } from \'kay/server\'\n\nexport const app = pages({ store: sqliteData(\'data/app.sqlite\'), fileStore: undefined })\n'
     const other = 'import { pages } from \'./mine\'\n\nexport const x = pages({ fileStore: 1 })\nexport const files = { fileStore: 1 }\n'
-    const root = await project({ 'kay.config.ts': config, 'src/site.ts': shorthand, 'src/server.ts': beside, 'src/other.ts': other })
+    const spread = 'import { pages } from \'kay/server\'\n\nconst base = {}\nexport const a = pages({ ...base, fileStore: undefined })\nexport const b = pages({ [\'store\']: undefined, fileStore: undefined, storage: undefined })\n'
+    const root = await project({ 'kay.config.ts': config, 'src/site.ts': shorthand, 'src/server.ts': beside, 'src/other.ts': other, 'src/spread.ts': spread })
 
     try {
       const found = await deprecatedConfigKeys(root, {})
@@ -86,6 +87,9 @@ describe('deprecated-file-store', () => {
         ['kay.config.ts', 'deprecated-file-store', false],
         ['src/server.ts', 'deprecated-file-store', true],
         ['src/site.ts', 'deprecated-file-store', false],
+        ['src/spread.ts', 'deprecated-config-keys', true],
+        ['src/spread.ts', 'deprecated-file-store', true],
+        ['src/spread.ts', 'deprecated-file-store', true],
       ])
 
       await applySafeFixes(root, found)
@@ -93,8 +97,9 @@ describe('deprecated-file-store', () => {
       expect(await Bun.file(join(root, 'src/site.ts')).text()).toBe(shorthand.replace('{ fileStore }', '{ store: { files: fileStore } }'))
       expect(await Bun.file(join(root, 'src/server.ts')).text()).toBe(beside)
       expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe(other)
-      expect((await deprecatedConfigKeys(root, {})).map(diagnostic => diagnostic.file.slice(root.length + 1))).toEqual(['src/server.ts'])
-      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-file-store': 'allow' } })).toEqual([])
+      expect(await Bun.file(join(root, 'src/spread.ts')).text()).toBe(spread)
+      expect((await deprecatedConfigKeys(root, {})).map(diagnostic => diagnostic.file.slice(root.length + 1)).filter(file => file !== 'src/spread.ts')).toEqual(['src/server.ts'])
+      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-config-keys': 'allow', 'deprecated-file-store': 'allow' } })).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -135,7 +140,7 @@ describe('deprecated-config-keys beyond pages() and testSite() by name', () => {
 
       await applySafeFixes(root, found)
       expect(await Bun.file(join(root, 'src/a.ts')).text()).toBe(aliased.replace('routes', 'routesDir'))
-      expect(await Bun.file(join(root, 'src/lib.ts')).text()).toBe(extension.replace('storage', 'fileStore'))
+      expect(await Bun.file(join(root, 'src/lib.ts')).text()).toBe(extension.replace('storage: undefined', 'store: { files: undefined }'))
     }
     finally {
       await rm(root, { recursive: true, force: true })

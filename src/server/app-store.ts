@@ -30,8 +30,9 @@ export interface AppStore extends StoreBase {
   files?: FileStore | undefined
 }
 
-// Every kind of store an `AppStore` holds, by its key.
-const KINDS = ['sessions', 'cache', 'live', 'jobs', 'rates', 'rooms', 'vitals', 'notifications', 'push', 'files'] as const
+// Every kind of store an `AppStore` holds, by its key: a record, so a key added to `AppStore` and left out here is a type error.
+const KIND_KEYS: Record<Exclude<keyof AppStore, 'database' | keyof StoreBase>, true> = { sessions: true, cache: true, live: true, jobs: true, rates: true, rooms: true, vitals: true, notifications: true, push: true, files: true }
+const KINDS = Object.keys(KIND_KEYS) as (keyof typeof KIND_KEYS)[]
 
 // Each store an `AppStore` holds, then the object itself, each once however many keys name it: what `health` pings and a stop closes, the object last so a `pgData` closes its connection after the rooms dropped this process's members through it.
 export function storesOf(store: AppStore | undefined): StoreBase[] {

@@ -164,9 +164,9 @@ export default defineConfig({
 })
 ```
 
-The check runs at most once every three seconds, however often the route is polled, and the probes in between get its last answer.
+The check runs at most once every three seconds, however often the route is polled, and the probes in between get its last answer. A store in `store` that has a `ping` is checked beside it, as `pgData` is with a round trip to the database, and a store that fails or takes longer than `health.timeout` makes the route answer 503.
 
-On SIGTERM, SIGINT or SIGHUP the server stops taking connections, lets open requests finish and ends the event streams and websockets that never would, such as live values and presence, so browsers reconnect to the next instance.
+On SIGTERM, SIGINT or SIGHUP the server stops taking connections, lets open requests finish and ends the event streams and websockets that never would, such as live values and presence, so browsers reconnect to the next instance. It then calls the `close` of each store, so a replica leaves no presence member and no connection behind.
 
 A queue job whose handler ignores its signal is handed back after 3 seconds, or less with a short `shutdownTimeout`, and the rooms store lets go of this replica's members. The server then runs the `onStop` hooks and exits. Requests still open after `shutdownTimeout`, 10 seconds by default, are closed.
 

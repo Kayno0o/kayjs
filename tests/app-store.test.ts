@@ -1,6 +1,6 @@
 import type { Action, Duration } from '../src/runtime'
+import type { AppStore } from '../src/server/app-store'
 import { existsSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Database } from 'bun:sqlite'
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
@@ -175,6 +175,15 @@ describe('an app store without peek', () => {
 })
 
 describe('the store contract', () => {
+  it('takes a close or ping answering anything, as a client\'s quit() does', async () => {
+    const redis = { quit: async () => 'OK' as const }
+    const store: AppStore = { close: async () => redis.quit(), ping: () => 1 }
+
+    setupStore(store)
+    await closeStores()
+    expect(appStore()).toBe(store)
+  })
+
   it('lists each store once, the store object last', () => {
     const shared = { get: () => undefined, set: () => undefined, delete: () => undefined }
     const files = { write: async () => undefined, read: async () => undefined, delete: async () => undefined }
@@ -213,31 +222,19 @@ describe('the store contract', () => {
     }
   })
 
-  it('reads the files from store.files, or the fileStore of before 1.87', () => {
+  it('reads the fileStore of before 1.87 first, then store.files, so no store factory moves files', () => {
     const files = { write: async () => undefined, read: async () => undefined, delete: async () => undefined }
     const old = { ...files }
 
-    expect(configuredFiles({ store: { files }, fileStore: old })).toBe(files)
-    expect(configuredFiles({ store: {}, fileStore: old })).toBe(old)
+    expect(configuredFiles({ store: { files }, fileStore: old })).toBe(old)
+    expect(configuredFiles({ store: { files } })).toBe(files)
+    expect(configuredFiles({ store: sqliteData(':memory:'), fileStore: old })).toBe(old)
+    expect(configuredFiles({ store: sqliteData(':memory:') })).toBeUndefined()
     expect(configuredFiles({})).toBeUndefined()
   })
 
-  it('keeps the files of sqliteData beside the database, where they go by default', async () => {
-    const root = await scratchDir('sqlite-files-')
-
-    try {
-      const { files } = sqliteData(join(root, 'data/app.sqlite'))
-
-      await files.write('a.txt', new Blob(['hi']))
-      expect(await Bun.file(join(root, 'data/files/a.txt')).text()).toBe('hi')
-      expect(await sqliteData(':memory:').files.read('a.txt')).toBeUndefined()
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('leaves the files of pgData to the app, as Postgres is no file server', () => {
+  it('leaves the files to the app: neither sqliteData nor pgData fills them', () => {
+    expect(sqliteData(':memory:')).not.toHaveProperty('files')
     expect(pgData('postgres://localhost/none')).not.toHaveProperty('files')
   })
 

@@ -37,7 +37,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - The failed branch of a `track()` result, `FormFailure` and `LocalIssue` gain `message`; an object built by hand to satisfy one of these types needs the field. A route's refusal now reads its `message` as `errors['']`, else the field messages, else `data.message`, else the text it answered.
 ### `fileStore` is `store.files`
 
-- `fileStore: x` in `kay.config.ts` (and in `pages()`, `testSite()` and an extension's `config`) is `store: { files: x }`: it works until 1.90, `kay check` reports it as `deprecated-file-store` and `kay upgrade` moves it, unless the object has a `store` already, where `files` goes into it by hand. `sqliteData(path)` now keeps files in a `files` folder beside its database (`data/files` for `data/app.sqlite`, the default place); `pgData` leaves them to the app.
+- `fileStore: x` in `kay.config.ts` (and in `pages()`, `testSite()` and an extension's `config`) is `store: { files: x }`: it works until 1.90, `kay check` reports it as `deprecated-file-store` and `kay upgrade` moves it, unless the object has a `store` already, where `files` goes into it by hand. `sqliteData` and `pgData` leave files where they are: `store.files` is only what an app writes, and `fileStore` wins while both are written.
 
 ## 1.86.0
 

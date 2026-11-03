@@ -35,7 +35,7 @@ export interface RoomStoreBase extends StoreBase {
   // Called with each message published from then on; returns what stops it.
   subscribe: (listener: RoomListener) => () => void
   // Stops what the store runs in the background and lets go of its file; a store keeping members elsewhere drops this process's first, and may return a promise a stop waits for.
-  close: () => void | Promise<void>
+  close: () => unknown
 }
 
 export interface RoomStore extends RoomStoreBase {
@@ -358,7 +358,9 @@ export function sqliteRooms(path: string, { poll }: { poll?: Duration } = {}): R
   }
 
   // A reload closes the file for the module that named the store, whichever module first used it; the module running again names a store of its own.
-  onReload(async () => opened?.close())
+  onReload(async () => {
+    await opened?.close()
+  })
 
   return {
     add: (room, connection, member) => open().add(room, connection, member),
@@ -370,8 +372,7 @@ export function sqliteRooms(path: string, { poll }: { poll?: Duration } = {}): R
     subscribe: listener => open().subscribe(listener),
     close: async () => {
       closed = true
-
-      return opened?.close()
+      await opened?.close()
     },
   }
 }

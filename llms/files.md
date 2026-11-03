@@ -137,7 +137,7 @@ const real = holdsType(await file.slice(0, SNIFFED_BYTES).bytes(), typeOfName(fi
 
 ### Stores
 
-`store.files` in kay.config.ts says where files go: `diskFiles('data/files')` from `kay/server` by default, relative to where the server runs, as the job store is; `sqliteData(path)` keeps them in a `files` folder beside its database, the same place for `data/app.sqlite`, and every store is in [Stores](stores.md).
+`store.files` in kay.config.ts says where files go: `diskFiles('data/files')` from `kay/server` by default, relative to where the server runs, as the job store is; `sqliteData(path)` and `pgData(db)` leave them alone, so `store: { ...sqliteData(path), files: s3Files() }` names another place beside them, and every store is in [Stores](stores.md).
 
 ```ts
 import { defineConfig, s3Files } from 'kay/server'

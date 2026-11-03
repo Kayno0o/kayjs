@@ -17,6 +17,7 @@ import { requestUrl } from './request-url'
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = '10s'
 const HEALTH_CACHE_MS = 3000
+const CLOSE_TIMEOUT_MS = 5000
 const REQUEST_POLL_MS = 25
 
 // Set on `globalThis` while a server watches its parent, so the watch `kay render` preloads, for a server nothing else stops, leaves it the stop.
@@ -37,7 +38,7 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
   const headers = { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }
   const path = config.path ?? HEALTH_PATH
   const timeoutMs = healthTimeoutMs(config)
-  let checked: { at: number, healthy: Promise<boolean> } | undefined
+  let checked: { at: number, healthy: Promise<boolean>, settled: boolean } | undefined
 
   const asked = (request: Request): boolean => {
     // A request's URL comes normalized (dot segments, `%2e` and backslashes resolved), so one whose pathname is the path holds it as written, and any other, an asset's say, is told apart with no parse.
@@ -76,9 +77,20 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
 
     const now = Date.now()
 
-    // Probes from a balancer and a container check may arrive many a second: the check runs once per window, and probes meanwhile share its answer.
-    if (checked === undefined || now - checked.at >= HEALTH_CACHE_MS)
-      checked = { at: now, healthy: runCheck(check, stores, timeoutMs, request) }
+    // Probes from a balancer and a container check may arrive many a second: the check runs once per window, and probes meanwhile share its answer, a run still in flight past the window included, so a slow ping is never started again beside itself.
+    if (checked === undefined || (checked.settled && now - checked.at >= HEALTH_CACHE_MS)) {
+      const run: NonNullable<typeof checked> = { at: now, settled: false, healthy: Promise.resolve(false) }
+
+      run.healthy = (async () => {
+        try {
+          return await runCheck(check, stores, timeoutMs, request)
+        }
+        finally {
+          run.settled = true
+        }
+      })()
+      checked = run
+    }
 
     return await checked.healthy ? wholeResponse('ok', { headers }) : wholeResponse('unhealthy', { status: 503, headers })
   })
@@ -87,7 +99,9 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
 // Runs the app's `check` and the `ping` of each store together, under one timeout: healthy when none throws or times out and `check` does not return false.
 async function runCheck(check: HealthConfig['check'], stores: StoreBase[], timeoutMs: number, request: Request): Promise<boolean> {
   try {
-    const [answer] = await withTimeout(Promise.all([check?.(), ...stores.map(async ({ ping }) => ping?.())]), timeoutMs) as unknown[]
+    const [answer] = await withTimeout(Promise.all([check?.(), ...stores.map(async (store) => {
+      await store.ping?.()
+    })]), timeoutMs, 'the health check') as unknown[]
 
     return answer !== false
   }
@@ -192,10 +206,10 @@ export function alive(pid: number): boolean {
   }
 }
 
-async function withTimeout(check: unknown, ms: number): Promise<unknown> {
+async function withTimeout(check: unknown, ms: number, what: string): Promise<unknown> {
   let timer: Timer | undefined
   const timedOut = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`kay: the health check took longer than ${ms / 1000} s`)), ms)
+    timer = setTimeout(() => reject(new Error(`kay: ${what} took longer than ${ms / 1000} s`)), ms)
   })
 
   try {
@@ -206,17 +220,28 @@ async function withTimeout(check: unknown, ms: number): Promise<unknown> {
   }
 }
 
-// Closes each store of `store` once, so a replica that stops leaves no member behind in the rooms for the others to list until it is dropped as quiet, and no connection open: one store failing to close leaves the others closing.
+// Closes each store of `store` once, so a replica that stops leaves no member behind in the rooms for the others to list until it is dropped as quiet, and no connection open.
+// The stores close side by side, each given a few seconds, then the `store` object itself: one failing or hanging leaves the others closing.
 export async function closeStores(): Promise<void> {
-  for (const store of storesOf(appStore())) {
+  const close = async (store: StoreBase) => {
     try {
-      await store.close?.()
+      await withTimeout((async () => {
+        await store.close?.()
+      })(), CLOSE_TIMEOUT_MS, 'closing a store')
     }
     catch (error) {
       await reportBackgroundError('closing a store failed', error)
       process.exitCode = 1
     }
   }
+
+  const stores = storesOf(appStore())
+  const last = stores.pop()
+
+  await Promise.all(stores.map(close))
+
+  if (last !== undefined)
+    await close(last)
 }
 
 // Stops taking connections and waits for the open requests; a websocket, which never ends by itself, is closed once no request is left, the browser reconnecting to the next instance.

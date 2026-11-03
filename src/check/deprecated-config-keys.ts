@@ -99,6 +99,9 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
 
     for (const object of objects) {
       const names = new Set(object.properties.flatMap(property => isPlain(property) ? [keyName(property)] : []))
+      // A spread or a computed key may carry a `store`, which a `store` written beside it would shadow or be shadowed by.
+      const mayHoldStore = names.has('store') || object.properties.some(property => !isPlain(property))
+      const filesMove = (property: ObjectProperty, shorthandName: string): string => `store: { files: ${property.shorthand ? shorthandName : source.slice(property.value.start, property.value.end)} }`
 
       for (const property of object.properties) {
         if (!isPlain(property))
@@ -114,7 +117,7 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
 
           const start = property.key.start
           const end = property.value.end
-          const held = names.has('store')
+          const held = mayHoldStore
 
           found.push({
             file,
@@ -124,7 +127,7 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
             help: held ? 'move it into the `files` of the `store` beside it' : 'write `store: { files: ... }`',
             code: 'deprecated-file-store',
             severity: level === 'warn' ? 'warning' : 'error',
-            ...!held && { fixes: [{ title: 'Move fileStore under store.files', edits: [{ start, end, text: `store: { files: ${property.shorthand ? 'fileStore' : source.slice(property.value.start, property.value.end)} }` }], safe: true }] },
+            ...!held && { fixes: [{ title: 'Move fileStore under store.files', edits: [{ start, end, text: filesMove(property, 'fileStore') }], safe: true }] },
           })
 
           continue
@@ -146,6 +149,22 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
         const start = property.key.start
         const end = property.key.end
         const clash = names.has(name)
+
+        // `storage` went to `fileStore` in 1.84 and to `store.files` in 1.87: one fix goes all the way.
+        if (old === 'storage' && !clash && !mayHoldStore) {
+          found.push({
+            file,
+            ...positionAt(source, start),
+            end,
+            message: '`storage` is `store.files` in the config, which every store is named in; the old name works until 1.87',
+            help: 'write `store: { files: ... }`',
+            code: 'deprecated-config-keys',
+            severity: level === 'warn' ? 'warning' : 'error',
+            fixes: [{ title: 'Move storage under store.files', edits: [{ start, end: property.value.end, text: filesMove(property, 'storage') }], safe: true }],
+          })
+
+          continue
+        }
 
         found.push({
           file,

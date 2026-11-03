@@ -77,7 +77,7 @@ On disk, private files are written readable by the server's user alone, and the 
 
 ## Where files go
 
-Files go to `data/files` on the server's disk unless `store.files` in `kay.config.ts` says otherwise. `sqliteData('data/app.sqlite')` keeps files in a `files` folder beside its database, which is `data/files` here. An S3 bucket, or R2, Spaces or MinIO, reads its settings from the usual `S3_*` variables.
+Files go to `data/files` on the server's disk unless `store.files` in `kay.config.ts` says otherwise. `sqliteData` and `pgData` leave files alone, so write `store: { ...sqliteData('data/app.sqlite'), files: s3Files() }` to name a place beside them. An S3 bucket, or R2, Spaces or MinIO, reads its settings from the usual `S3_*` variables.
 
 ```ts
 import { defineConfig, s3Files } from 'kay/server'

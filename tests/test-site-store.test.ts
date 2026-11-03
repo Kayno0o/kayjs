@@ -19,6 +19,8 @@ it('replaces a store the config names with memory, creating no file', async () =
     expect(await site.call(actions.perUser, {}, { headers: { 'x-user': 'ada-memory' } })).toBe('ok')
     expect(existsSync(path)).toBe(false)
     expect(appStore()?.live).toBeUndefined()
+    expect(appStore()?.files).toBeUndefined()
+    expect(existsSync(join(root, 'data', 'files'))).toBe(false)
   }
   finally {
     await site.close()
