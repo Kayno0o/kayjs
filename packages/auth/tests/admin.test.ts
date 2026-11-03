@@ -81,12 +81,12 @@ describe('admin', () => {
       body: JSON.stringify(args),
     })
 
-    expect(await withToken('listUsers')).toEqual({ ok: false, error: 'forbidden' })
-    expect(await withToken('getUser', ada.id)).toEqual({ ok: false, error: 'forbidden' })
-    expect(await withToken('grantRole', ada.id, 'admin')).toEqual({ ok: false, error: 'forbidden' })
-    expect(await withToken('banUser', ada.id)).toEqual({ ok: false, error: 'forbidden' })
-    expect(await withToken('deleteUser', ada.id)).toEqual({ ok: false, error: 'forbidden' })
-    expect(await withToken('listAdminAuditLog')).toEqual({ ok: false, error: 'forbidden' })
+    expect(await withToken('admin.listUsers')).toEqual({ ok: false, error: 'forbidden' })
+    expect(await withToken('admin.getUser', ada.id)).toEqual({ ok: false, error: 'forbidden' })
+    expect(await withToken('admin.grantRole', ada.id, 'admin')).toEqual({ ok: false, error: 'forbidden' })
+    expect(await withToken('admin.ban', ada.id)).toEqual({ ok: false, error: 'forbidden' })
+    expect(await withToken('admin.deleteUser', ada.id)).toEqual({ ok: false, error: 'forbidden' })
+    expect(await withToken('admin.auditLog')).toEqual({ ok: false, error: 'forbidden' })
   })
 
   test('an admin changes users only within ten minutes of signing in or re-proving, and reads them any time', async () => {

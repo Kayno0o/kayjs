@@ -160,27 +160,26 @@ describe('missing-captcha', () => {
     expect(found('export const a = action(s.Object({ email: s.String() }), async (input) => auth.password.signIn(input))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'signIn' }])
   })
 
-  it('reports the flat names before 1.82 alike', () => {
-    expect(found('export const a = action(s.Object({ email: s.String() }), async ({ email }, ctx) => ctx.locals.auth.requestPasswordReset(email))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'requestPasswordReset' }])
-    expect(found('export const a = action(s.Object({ email: s.String() }), async (input) => auth.signInWithPassword(input))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'signInWithPassword' }])
+  it('leaves a flat name, which kayjs-auth dropped in 1.86', () => {
+    expect(found('export const a = action(s.Object({ email: s.String() }), async ({ email }, ctx) => ctx.locals.auth.requestPasswordReset(email))')).toEqual([])
   })
 
   it('leaves a call naming captcha, options it cannot read, a receiver that is no auth and an auth with captcha off', () => {
-    expect(found('export const a = (input: never) => auth.register(input, { captcha: input.captcha })')).toEqual([])
-    expect(found('export const a = (input: never, captcha: string) => auth.register(input, { captcha })')).toEqual([])
-    expect(found('export const a = (input: never, options: never) => auth.register(input, options)')).toEqual([])
-    expect(found('export const a = (input: never, options: never) => auth.register(input, { ...options })')).toEqual([])
+    expect(found('export const a = (input: never) => auth.password.register(input, { captcha: input.captcha })')).toEqual([])
+    expect(found('export const a = (input: never, captcha: string) => auth.password.register(input, { captcha })')).toEqual([])
+    expect(found('export const a = (input: never, options: never) => auth.password.register(input, options)')).toEqual([])
+    expect(found('export const a = (input: never, options: never) => auth.password.register(input, { ...options })')).toEqual([])
     expect(found('export const a = (input: never) => registry.register(input)')).toEqual([])
     expect(found('export const a = (input: never) => auth.password.register(input, { captcha: \'x\' })')).toEqual([])
     expect(found('export const a = (response: never) => auth.passkeys.register(response)')).toEqual([])
     expect(found('export const a = (input: never) => registry.password.register(input)')).toEqual([])
-    expect(found('export const a = (input: never) => auth.register(input)\nexport const auth = createAuth({ captcha: false })')).toEqual([])
-    expect(found('// kay-allow missing-captcha\nexport const a = (input: never) => auth.register(input)')).toEqual([])
+    expect(found('export const a = (input: never) => auth.password.register(input)\nexport const auth = createAuth({ captcha: false })')).toEqual([])
+    expect(found('// kay-allow missing-captcha\nexport const a = (input: never) => auth.password.register(input)')).toEqual([])
   })
 
   it('is found in a plain module as in a fence', () => {
-    expect(moduleChecks('export const a = (email: string) => ctx.locals.auth.requestPasswordReset(email)').map(d => d.code)).toEqual(['missing-captcha'])
-    expect(moduleChecks('export const a = (email: string) => ctx.locals.auth.requestPasswordReset(email, { captcha: \'x\' })')).toEqual([])
+    expect(moduleChecks('export const a = (email: string) => ctx.locals.auth.password.requestReset(email)').map(d => d.code)).toEqual(['missing-captcha'])
+    expect(moduleChecks('export const a = (email: string) => ctx.locals.auth.password.requestReset(email, { captcha: \'x\' })')).toEqual([])
   })
 })
 
@@ -433,7 +432,7 @@ describe('the checks that read a module', () => {
   })
 
   it('reads a module that parses once, whatever the number of checks that look at it', () => {
-    const module = 'import theme from \'./theme.css\'\nexport const a = (email: string) => ctx.locals.auth.requestPasswordReset(email)\nexport default guard(({ redirect, url }) => redirect(url.searchParams.get(\'r\')))\n'
+    const module = 'import theme from \'./theme.css\'\nexport const a = (email: string) => ctx.locals.auth.password.requestReset(email)\nexport default guard(({ redirect, url }) => redirect(url.searchParams.get(\'r\')))\n'
     const parse = spyOn(parser, 'parseSync')
 
     try {

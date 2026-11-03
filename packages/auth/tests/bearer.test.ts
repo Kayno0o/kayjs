@@ -65,9 +65,9 @@ describe('bearer tokens', () => {
     const device = browser()
     const post = async (method: string, ...args: unknown[]) => device.json(`/call/${method}`, { method: 'POST', headers: { ...bearer, 'content-type': 'application/json' }, body: JSON.stringify(args) })
 
-    expect(await post('listTokens')).toEqual([])
-    expect(await post('revokeBearerToken', minted.id)).toEqual({ ok: false, error: 'signed-out' })
-    expect(await post('enableTwoFactor', '123456')).toEqual({ ok: false, error: 'signed-out' })
+    expect(await post('tokens.list')).toEqual([])
+    expect(await post('tokens.revoke', minted.id)).toEqual({ ok: false, error: 'signed-out' })
+    expect(await post('twoFactor.enable', '123456')).toEqual({ ok: false, error: 'signed-out' })
     expect(await ada.call('tokens.list')).toHaveLength(1)
   })
 
@@ -77,9 +77,9 @@ describe('bearer tokens', () => {
     const post = async (method: string, ...args: unknown[]) => device.json(`/call/${method}`, { method: 'POST', headers: { ...bearer, 'content-type': 'application/json' }, body: JSON.stringify(args) })
     const refused = { ok: false, error: 'signed-out' }
 
-    expect(await post('setUpTwoFactor', { password: PASSWORD })).toEqual(refused)
-    expect(await post('disableTwoFactor', { password: PASSWORD })).toEqual(refused)
-    expect(await post('regenerateRecoveryCodes', { password: PASSWORD })).toEqual(refused)
+    expect(await post('twoFactor.setUp', { password: PASSWORD })).toEqual(refused)
+    expect(await post('twoFactor.disable', { password: PASSWORD })).toEqual(refused)
+    expect(await post('twoFactor.regenerateRecoveryCodes', { password: PASSWORD })).toEqual(refused)
     expect(await post('reprove', { password: PASSWORD })).toEqual(refused)
     expect(await ada.call('twoFactor.setUp', { password: PASSWORD })).toMatchObject({ ok: true })
   })

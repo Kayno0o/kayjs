@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-auth's flat methods (`auth.listUsers()` for `auth.admin.listUsers()`) and the `deprecated-auth-methods` lint are removed: [grouped methods](../packages/auth/llms/grouped-methods.md).
 - The `hreflang` alternates in the head of a routed localized entry point at each translation's own slug (`translationKey`), as `alternate()` does: [locales](locales.md).
 - kayjs-auth's prebuilt pages write their content in a `main` landmark (`kay a11y` no longer reports `landmark-one-main`), and keep an app layout's own `main` the only one: [setup](../packages/auth/llms/setup.md).
 - kayjs-auth's prebuilt pages write their content in a `main` landmark (`kay a11y` no longer reports `landmark-one-main`), and `main: false` leaves it to an app layout that already writes one: [setup](../packages/auth/llms/setup.md).

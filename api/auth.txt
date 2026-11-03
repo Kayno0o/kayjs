@@ -164,38 +164,20 @@ function auth(options: AuthExtensionOptions): AuthPages<AnyElysia>
 [.] Auth
 class Auth
   new <Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>>(session: Session<AuthSessionData>, core: Core, request: Request, client: string, address: string): Auth<Scope, Role, OrgRole, UserData>
-  acceptInvitation: (invitationId: string) => Promise<AcceptResult<OrgRole>>
   admin: AdminMethods<Role>
-  adminRoles: () => string[]
-  banUser: (userId: string, options?: { reason?: string; until?: Date; } | undefined) => Promise<BanResult>
   bareUser: () => Promise<BareUser<UserData> | null>
   captchaChallenge: (action: CaptchaAction) => Promise<string | null>
   captchaRequired: (action: CaptchaAction) => Promise<boolean>
-  changeEmail: (proof: Proof, email: string) => Promise<ChangeEmailResult>
-  changePassword: (proof: Proof, password: string) => Promise<Off | ChangePasswordResult>
   changeUsername: (username: string) => Promise<ChangeUsernameResult>
-  confirmEmailChange: (token: string) => Promise<LinkResult>
   cookies: string[]
   core: Core
-  createOrganization: (input: { name: string; slug?: string | null | undefined; }) => Promise<CreateOrganizationResult<OrgRole>>
-  createToken: (proof: Proof, label: string, options?: TokenOptions<Scope> | undefined) => Promise<CreateTokenResult>
   deleteAccount: (proof: Proof) => Promise<DeleteAccountResult>
-  deleteMember: (ref: string, userId: string) => Promise<MemberResult>
-  deleteOrganization: (ref: string) => Promise<DeleteOrganizationResult>
-  deleteUser: (userId: string) => Promise<DeleteResult>
   deletionImpact: () => Promise<DeletionImpact>
-  disableTwoFactor: (proof: Proof) => Promise<DisableTwoFactorResult>
   email: EmailMethods
-  emailCodePending: () => Promise<PendingEmailCode>
-  enableTwoFactor: (code: string) => Promise<Off | EnableTwoFactorResult>
   establish: (record: UserRecord, method: string) => Promise<void>
   exportData: () => Promise<ExportResult>
   features: () => AuthFeatures
   genuine: (signedIn: SignedIn) => Promise<boolean>
-  getInvitation: (invitationId: string) => Promise<Invitation<OrgRole> | null>
-  getOrganization: (ref: string) => Promise<Membership<OrgRole> | null>
-  getUser: (userId: string) => Promise<GetUserResult>
-  grantRole: (userId: string, role: Role) => Promise<RoleResult>
   groups: Partial<Groups<Scope, Role, OrgRole>>
   guarded: (ctx: GuardContext, options: {
   redirect?: string | undefined;
@@ -203,40 +185,21 @@ class Auth
   scope?: string | false | string[] | undefined;
 }) => Promise<void>
   hasScope: (scope: Scope) => Promise<boolean>
-  impersonate: (userId: string) => Promise<ImpersonateResult>
   impersonator: () => Promise<User<Record<string, unknown>> | null>
-  invite: (ref: string, email: string, roles?: OrgRole[] | undefined) => Promise<InviteResult<OrgRole>>
-  isMember: (ref: string, role?: OrgRole | undefined) => Promise<boolean>
   known?: { record: Promise<UserRecord | null>; at: number; } | undefined
   leave: () => Promise<void>
-  leaveOrganization: (ref: string) => Promise<MemberResult>
   linkProvider: (provider: string, proof: Proof, options?: { redirect?: string; }) => Promise<LinkProviderResult>
   linked: WeakMap<UserRecord, Promise<Record<string, { id: string; }>>>
-  listAdminAuditLog: (query?: { userId?: string; before?: AuditCursorInput; limit?: number; } | undefined) => Promise<AdminAuditLogResult>
   listAuditLog: (options?: { before?: AuditCursorInput; limit?: number; }) => Promise<AuditEntry[]>
   listIdentities: () => Promise<string[]>
-  listInvitations: (ref: string) => Promise<ListInvitationsResult<OrgRole>>
-  listMembers: (ref: string) => Promise<ListMembersResult<OrgRole>>
-  listMyInvitations: () => Promise<Invitation<OrgRole>[]>
-  listOAuthClients: () => Promise<ApprovedClient[]>
-  listOrganizations: () => Promise<Membership<OrgRole>[]>
-  listPasskeys: () => Promise<Passkey[]>
-  listSessions: () => Promise<UserSession[]>
-  listTokens: () => Promise<BearerToken[]>
-  listUsers: (query?: { search?: string; offset?: number; limit?: number; } | undefined) => Promise<ListUsersResult>
   live: (signedIn: SignedIn, record: UserRecord, stored: SessionRecord | undefined) => Promise<boolean>
   magicLink: MagicLinkMethods
   markBrowser: (signedIn: boolean, maxAge?: number | undefined) => void
-  oauthAuthorize: (params: AuthorizeParams) => Promise<AuthorizeOutcome>
-  oauthDecide: (fields: AuthorizeParams, allow: boolean) => Promise<DecideResult>
   oauthFixed: () => boolean
   oauthOrigin: () => string | undefined
   oauthResource: (path: string, name: string) => Record<string, unknown> | null
   oauthServer: OAuthServerMethods
   organizations: OrganizationMethods<OrgRole>
-  passkeyProofOptions: () => Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>>
-  passkeyRegistrationOptions: (proof: Proof) => Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, "off" | ProofFailure>>
-  passkeySignInOptions: () => Promise<PublicKeyCredentialRequestOptionsJSON>
   passkeys: PasskeyMethods
   password: PasswordMethods
   profile: (locale?: string | undefined) => Promise<ProfileFieldView[] | null>
@@ -244,15 +207,8 @@ class Auth
   providerToken: (provider: string) => Promise<string | null>
   providersOf: (record: UserRecord) => Promise<Record<string, { id: string; }>>
   record: () => Promise<UserRecord | null>
-  recoveryCodesLeft: () => Promise<number>
-  regenerateRecoveryCodes: (proof: Proof) => Promise<RecoveryCodesResult>
-  register: (input: RegisterInput, options?: Pick<SignInOptions, "redirect" | "remember" | "captcha"> | undefined) => Promise<RegisterResult | Off>
-  registerPasskey: (response: RegistrationResponseJSON, name?: string | undefined) => Promise<Off | RegisterPasskeyResult>
-  rejectInvitation: (invitationId: string) => Promise<RejectInvitationResult>
   reprove: (proof: Proof) => Promise<ReproveResult>
   request: Request
-  requestMagicLink: (email: string, options?: SignInOptions | undefined) => Promise<Off | MailRequestResult>
-  requestPasswordReset: (email: string, options?: Pick<SignInOptions, "redirect" | "captcha"> | undefined) => Promise<Off | MailRequestResult>
   requireAdmin: () => Promise<User<UserData>>
   requireUser: {
   (options: RequireUserOptions<Scope, Role> & {
@@ -262,50 +218,26 @@ class Auth
     bare?: undefined;
   }) | undefined): Promise<User<UserData>>;
 }
-  resetPassword: (token: string, password: string) => Promise<Off | ResetPasswordResult>
   resolve: () => Promise<UserRecord | null>
   resolving: Promise<UserRecord | null> | undefined
-  revokeBearerToken: (id: string) => Promise<RevokeTokenResult>
-  revokeInvitation: (ref: string, invitationId: string) => Promise<RevokeInvitationResult>
-  revokeOAuthGrant: (clientId: string) => Promise<RevokeGrantResult>
-  revokePasskey: (id: string, proof: Proof) => Promise<RevokePasskeyResult>
-  revokeRole: (userId: string, role: Role) => Promise<RoleResult>
-  revokeSession: (id: string) => Promise<RevokeSessionResult>
   saveProfile: (values: Record<string, unknown>) => Promise<SaveProfileResult>
   scopes: () => Promise<string[] | null>
-  sendVerification: () => Promise<SendVerificationResult>
   session: Session<AuthSessionData>
   sessions: SessionMethods
-  setMemberRoles: (ref: string, userId: string, roles: OrgRole[]) => Promise<MemberResult>
-  setUpTwoFactor: (proof: Proof) => Promise<Off | SetUpTwoFactorResult>
   signIn: (user: Pick<User<Record<string, unknown>>, "id">, options?: { remember?: boolean | undefined; }) => Promise<void>
   signInAsGuest: (options?: { captcha?: string | undefined; }) => Promise<GuestSignInResult>
   signInLink: (page: string, back?: string | undefined) => string
   signInUrl: (back?: string | undefined) => string
-  signInWithEmailCode: (code: string) => Promise<Off | CodeResult>
-  signInWithMagicLink: (token: string) => Promise<Off | LinkResult>
-  signInWithPasskey: (response: AuthenticationResponseJSON, options?: Pick<SignInOptions, "redirect" | "remember"> | undefined) => Promise<Off | PasskeySignInResult>
-  signInWithPassword: (input: PasswordSignInInput, options?: SignInOptions | undefined) => Promise<Off | PasswordSignInResult>
   signOut: () => Promise<void>
   signOutEverywhere: (options?: { keepThisOne?: boolean; }) => Promise<void>
   source: "session" | "bearer" | null
-  stopImpersonating: () => Promise<boolean>
   tokenScopes: string[] | null
   tokens: TokenMethods<Scope>
   twoFactor: TwoFactorMethods
-  twoFactorPasskeyOptions: () => Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>>
-  twoFactorPending: () => Promise<boolean>
-  unbanUser: (userId: string) => Promise<UnbanResult>
   unlink: (provider: string, proof: Proof) => Promise<UnlinkResult>
   updateLocale: (locale: string) => Promise<UpdateLocaleResult>
-  updateOrganization: (ref: string, patch: { name?: string | undefined; slug?: string | null | undefined; }) => Promise<UpdateOrganizationResult>
-  updatePasskeyName: (id: string, name: string) => Promise<RenamePasskeyResult>
   user: () => Promise<User<UserData> | null>
   userIdsHolding: (role: string) => Promise<string[]>
-  verifyEmail: (token: string, password?: string | undefined) => Promise<VerifyEmailResult>
-  verifyEmailCode: (code: string) => Promise<CodeResult>
-  verifyTwoFactor: (code: string) => Promise<TwoFactorResult>
-  verifyTwoFactorPasskey: (response: AuthenticationResponseJSON) => Promise<Off | TwoFactorResult>
   via: () => Promise<"session" | "bearer" | null>
 
 [.] AuthEvent
@@ -1523,7 +1455,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   guests?: { maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; } | undefined
   home?: string | undefined
   hooks?: (() => Promise<{
-  hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "exportData" | "authorize" | "allow" | "onSignUp" | "profileFields" | "onDelete" | "onAuthEvent" | "locate">>;
+  hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "exportData" | "allow" | "onSignUp" | "profileFields" | "onDelete" | "onAuthEvent" | "locate" | "authorize">>;
 }>) | undefined
   locate?: ((ip: string) => string | Promise<string | null | undefined> | null | undefined) | undefined
   magicLink?: boolean | undefined

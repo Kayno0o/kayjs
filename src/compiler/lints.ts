@@ -296,7 +296,7 @@ export const LINTS = {
   'missing-captcha': {
     level: 'warn',
     group: 'forms',
-    summary: 'A call to `password.register`, `password.requestReset`, `magicLink.request` or `password.signIn` on an auth (a receiver named `auth`, or ending in `auth`), or to their flat names before 1.82, with no `captcha` option, while no `captcha: false` is written in the same file or in a `createAuth` call of the project (`kay check` reads every module): kayjs-auth asks a proof of work by default, so such a call answers `{ ok: false, error: \'captcha\' }` until the form carries the challenge. Put `input(type="hidden" name="captcha" data-kay-work={await auth.captchaChallenge(\'register\')})` in the form (action `\'reset\'`, `\'magic-link\'` or `\'sign-in\'` for the others), read the field in the action and pass it as `{ captcha: input.captcha }`. Found in `.kay` fences and `.ts` modules alike.',
+    summary: 'A call to `password.register`, `password.requestReset`, `magicLink.request` or `password.signIn` on an auth (a receiver named `auth`, or ending in `auth`), with no `captcha` option, while no `captcha: false` is written in the same file or in a `createAuth` call of the project (`kay check` reads every module): kayjs-auth asks a proof of work by default, so such a call answers `{ ok: false, error: \'captcha\' }` until the form carries the challenge. Put `input(type="hidden" name="captcha" data-kay-work={await auth.captchaChallenge(\'register\')})` in the form (action `\'reset\'`, `\'magic-link\'` or `\'sign-in\'` for the others), read the field in the action and pass it as `{ captcha: input.captcha }`. Found in `.kay` fences and `.ts` modules alike.',
     wrong: '--- server\nexport const reset = action(s.Object({ email: s.String() }), ({ email }, ctx) => ctx.locals.auth.password.requestReset(email))\n---\np x',
     right: '--- server\nexport const reset = action(s.Object({ email: s.String(), captcha: s.String() }), ({ email, captcha }, ctx) => ctx.locals.auth.password.requestReset(email, { captcha }))\n---\np x',
   },
@@ -653,15 +653,6 @@ export const LINTS = {
     wrong: 'export default defineConfig({ api: \'src/endpoints\', storage: diskFiles(\'data/files\') })',
     right: 'export default defineConfig({ apiDir: \'src/endpoints\', fileStore: diskFiles(\'data/files\') })',
   },
-  'deprecated-auth-methods': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.82',
-    site: true,
-    summary: 'A call of one of the flat methods kayjs-auth\'s `Auth` had before 1.82, such as `auth.listUsers()` or `ctx.locals.auth.signInWithPassword(input)`: the methods of a feature are grouped under it, `auth.admin.listUsers()`, `auth.password.signIn(input)`, and the flat names are kept as aliases until 1.85. Found on a receiver named `auth`, alone or ending a chain, in the TypeScript files and `.kay` fences of a project depending on `@kaynooo/kayjs-auth`; the fix renames the call, its arguments unchanged. An `auth` the file imports is the app\'s own module and left alone, and a flat method read without a call, destructured, under `typeof` or in a template is not found.',
-    wrong: '--- server\nconst users = await ctx.locals.auth.listUsers({ search: \'ada\' })\n---\np x',
-    right: '--- server\nconst users = await ctx.locals.auth.admin.listUsers({ search: \'ada\' })\n---\np x',
-  },
   'deprecated-session-stores': {
     level: 'warn',
     group: 'deprecated',
@@ -725,7 +716,7 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.72', removedIn: '1.75' },
   { since: '1.74', removedIn: '1.77' },
   { since: '1.81', removedIn: '1.85' },
-  { since: '1.82' },
+  { since: '1.82', removedIn: '1.86' },
   { since: '1.84' },
 ]
 

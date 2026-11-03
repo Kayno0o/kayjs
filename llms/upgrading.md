@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.86.0
 
+### kayjs-auth: the flat methods are gone
+
+- The flat `Auth` methods deprecated in 1.82 (`auth.listUsers()`, `auth.signInWithPassword(input)`, `auth.invite(ref, email)`) no longer exist, and the `deprecated-auth-methods` lint goes with them; `missing-captcha` reads the grouped calls only. Call the grouped method ([the table](../packages/auth/llms/grouped-methods.md)): an app still on a flat name upgrades to 1.85 first, where `kay upgrade` renames the calls, then to 1.86.
+
 ### The prebuilt auth pages write a main landmark
 
 - The sign-in, register, reset, two-factor, verify, confirm, magic-link, invitation and OAuth pages and the account and admin layouts now write their content in a `main`. An app whose layout already wraps pages in a `main` sets `auth({ pages: { main: false } })` (or `createAuth`) once, and the pages write a `div` instead: left as it is, the page holds two `main` landmarks. No lint recognises it, so none ships with this change.
@@ -92,7 +96,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### kayjs-auth: the methods of a feature are grouped under it
 
-- `auth.listUsers()` is `auth.admin.listUsers()`, `auth.signInWithPassword(input)` is `auth.password.signIn(input)`, and so on for `password`, `email`, `magicLink`, `twoFactor`, `passkeys`, `sessions`, `tokens`, `oauthServer`, `admin` and `organizations` ([the table](../packages/auth/llms/grouped-methods.md)). The flat names still work until 1.85; `kay upgrade` renames the calls on `auth` and `ctx.locals.auth` (`deprecated-auth-methods`), and a flat method read without a call, destructured, under `typeof` or in a template expression is renamed by hand.
+- `auth.listUsers()` is `auth.admin.listUsers()`, `auth.signInWithPassword(input)` is `auth.password.signIn(input)`, and so on for `password`, `email`, `magicLink`, `twoFactor`, `passkeys`, `sessions`, `tokens`, `oauthServer`, `admin` and `organizations` ([the table](../packages/auth/llms/grouped-methods.md)). The flat names work until 1.85 and are removed in 1.86; `kay upgrade` renames the calls on `auth` and `ctx.locals.auth` (`deprecated-auth-methods`), and a flat method read without a call, destructured, under `typeof` or in a template expression is renamed by hand.
 
 ## 1.81.0
 

@@ -84,7 +84,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }` |
 | `external-redirect` | warn | security | A `redirect()` whose target is not written as a path of the site or wrapped in `localPath()`, and that the request can reach, which makes it an open redirect |
 | `async-reply` | warn | code | An `async` function returning kayjs-ai's `ask()`, which awaits the reply so nothing streams |
-| `missing-captcha` | warn | forms | A kayjs-auth call that asks a CAPTCHA by default (`password.register`, `password.requestReset`, `magicLink.request`, `password.signIn`, or their flat names before 1.82) written with no `captcha` option, unless a module's `createAuth` sets `captcha: false`, which silences it project-wide, in the editor too |
+| `missing-captcha` | warn | forms | A kayjs-auth call that asks a CAPTCHA by default (`password.register`, `password.requestReset`, `magicLink.request`, `password.signIn`) written with no `captcha` option, unless a module's `createAuth` sets `captcha: false`, which silences it project-wide, in the editor too |
 | `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
 | `over-budget` | warn | code | A page loading more JavaScript, CSS or weight than `budget` allows, or with a worse EcoIndex grade |
 | `uncaught-await` | warn | code | An `await` block with no `catch` and no `try` around it |
@@ -122,7 +122,6 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `broken-canonical` | warn | seo | A canonical link to a page that is a 404 or a redirect |
 | `one-way-hreflang` | warn | seo | Alternates that do not point back at each other |
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
-| `deprecated-auth-methods` | warn | deprecated | A call of one of kayjs-auth's flat methods, the names before 1.82, such as `auth.listUsers()` for `auth.admin.listUsers()`; the flat names work until 1.85, and `kay upgrade` renames the calls |
 | `deprecated-safe-redirect` | warn | deprecated | A call of kayjs-auth's `safeRedirect(path, fallback?)`, now kay's `localPath(path, fallback)`; the old name works until 1.87, and `kay upgrade` calls `localPath` |
 | `deprecated-session-stores` | warn | deprecated | An import of `memoryStore` or `sqliteStore` from `kay/server`, the session stores before 1.84, now `memorySessions` and `sqliteSessions`; the old names work until 1.87, and `kay upgrade` renames them |
 | `deprecated-config-keys` | warn | deprecated | A config key under its name before 1.84 (`routes`, `api`, `content`, `storage`, `maxSizes`, `settings`), in `kay.config.ts`, in the options of `pages()` and `testSite()` or in an extension's `config`; the old names work until 1.87, and `kay upgrade` renames them |

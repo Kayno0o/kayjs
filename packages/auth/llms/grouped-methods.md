@@ -10,13 +10,13 @@ The methods no feature owns stay on `auth` itself: the user (`user()`, `bareUser
 
 ### Move off the flat names
 
-The flat names before 1.82 still work until 1.85, each calling its grouped method. `kay upgrade`, or `kay check --fix --since 1.82`, renames every call of one on `auth` or `ctx.locals.auth` (`deprecated-auth-methods`); a flat method read without a call, destructured (`const { listUsers } = auth`), under `typeof` or in a template expression is renamed by hand.
+The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassword(input)`) are gone since 1.86, along with the `deprecated-auth-methods` lint: call the grouped method the table gives. An app still on them runs `kay upgrade` on 1.85 first, which renames the calls.
 
 ## Reference
 
 ### The groups
 
-| Group | Method | Flat name before 1.82 |
+| Group | Method | Flat name (gone in 1.86) |
 | --- | --- | --- |
 | `password` | `register` | `register` |
 | `password` | `signIn` | `signInWithPassword` |

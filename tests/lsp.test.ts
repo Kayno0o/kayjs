@@ -757,7 +757,7 @@ describe('kay lsp following the project on disk', () => {
     const missing = (diagnostics: Diagnostic[]) => diagnostics.filter(diagnostic => diagnostic.code === 'missing-captcha').length
 
     try {
-      await Bun.write(join(dir, route), '---\nexport const join = action(s.Object({ email: s.String() }), async (input) => auth.signInWithPassword(input))\n---\nh1 Join\n')
+      await Bun.write(join(dir, route), '---\nexport const join = action(s.Object({ email: s.String() }), async (input) => auth.password.signIn(input))\n---\nh1 Join\n')
       expect(missing(await editor.open(route))).toBe(1)
 
       await Bun.write(join(dir, 'src/auth.ts'), 'export const auth = createAuth({ captcha: false })\n')

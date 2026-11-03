@@ -1,5 +1,4 @@
 import type { Auth, AuthOptions, AuthSessionData } from '../../src/auth'
-import type { FlatMethods } from '../../src/flatMethods'
 import type { SignInOptions } from '../../src/signInOptions'
 import type { AuthStore, UserRecord } from '../../src/store'
 import { Elysia } from 'elysia'
@@ -109,12 +108,8 @@ export function testApp<const Scope extends string = never, OrgRole extends stri
   return { auth, app, store, browser: () => browserOn(app), browserOn, pruned }
 }
 
-// The flat names before 1.82, which the tests leave to `flatMethods.test.ts`.
-type Flat = Exclude<keyof FlatMethods<string, string, string>, Groups>
-type Groups = 'password' | 'email' | 'magicLink' | 'twoFactor' | 'passkeys' | 'sessions' | 'tokens' | 'oauthServer' | 'admin' | 'organizations'
-
 // What `call` takes: a method of `auth`, or `group.method` for one of its groups.
-type MethodPath<A> = { [K in Exclude<keyof A & string, Flat>]: A[K] extends (...args: never[]) => unknown ? K : A[K] extends object ? `${K}.${keyof A[K] & string}` : never }[Exclude<keyof A & string, Flat>]
+type MethodPath<A> = { [K in keyof A & string]: A[K] extends (...args: never[]) => unknown ? K : A[K] extends object ? `${K}.${keyof A[K] & string}` : never }[keyof A & string]
 
 type At<A, P extends string> = P extends `${infer G}.${infer K}` ? G extends keyof A ? K extends keyof A[G] ? A[G][K] : never : never : P extends keyof A ? A[P] : never
 

@@ -144,7 +144,7 @@ const user = await ctx.locals.auth.requireUser()
 p Hello {user.email}
 ```
 
-The methods of each feature are grouped under it: `auth.password`, `auth.email`, `auth.magicLink`, `auth.twoFactor`, `auth.passkeys`, `auth.sessions`, `auth.tokens`, `auth.oauthServer`, `auth.admin` and `auth.organizations`. Before 1.82 they were flat, `auth.listUsers()` for `auth.admin.listUsers()`; the flat names work until 1.85, and `kay upgrade` renames the calls. The [grouped methods](/llms/kayjs-auth-grouped-methods) lists them all.
+The methods of each feature are grouped under it: `auth.password`, `auth.email`, `auth.magicLink`, `auth.twoFactor`, `auth.passkeys`, `auth.sessions`, `auth.tokens`, `auth.oauthServer`, `auth.admin` and `auth.organizations`. Before 1.82 they were flat, `auth.listUsers()` for `auth.admin.listUsers()`; the flat names were removed in 1.86. The [grouped methods](/llms/kayjs-auth-grouped-methods) lists them all.
 
 ### Your own data on the user
 

@@ -512,8 +512,8 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
   return diagnostics
 }
 
-// The kayjs-auth methods that ask a CAPTCHA by default, with the position of the options holding `captcha`: grouped as `auth.password.register`, and flat as before 1.82.
-const CAPTCHA_CALLS = new Map([['password.register', 1], ['password.signIn', 1], ['password.requestReset', 1], ['magicLink.request', 1], ['register', 1], ['signInWithPassword', 1], ['requestPasswordReset', 1], ['requestMagicLink', 1]])
+// The kayjs-auth methods that ask a CAPTCHA by default, with the position of the options holding `captcha`: grouped as `auth.password.register`.
+const CAPTCHA_CALLS = new Map([['password.register', 1], ['password.signIn', 1], ['password.requestReset', 1], ['magicLink.request', 1]])
 const CAPTCHA_GROUPS = new Set(['password', 'magicLink'])
 const AUTH_NAME = /auth$/i
 const CAPTCHA_OFF = /\bcaptcha\s*:\s*false\b/
