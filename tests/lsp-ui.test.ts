@@ -82,7 +82,7 @@ describe('what a component offers src/ui.ts', () => {
 
     expect(info?.name).toBe('Card')
     expect(info?.recipe).toBe(true)
-    expect(info?.parts.map(part => part.name).sort()).toEqual(['body', 'head', 'root', 'title'])
+    expect(info?.parts.map(part => part.name).sort()).toEqual(['body', 'head', 'link', 'root', 'title'])
     expect(info?.parts.find(part => part.name === 'body')?.classes).toBe('p-[calc(var(--spacing)*2.5*var(--density))]')
   })
 

@@ -37,6 +37,10 @@ describe('icons', () => {
     expect(installedIconSets(scratch).size).toBe(0)
   })
 
+  it('draws a folder without a package.json from the nearest one above it', () => {
+    expect([...installedIconSets(join(FIXTURE, 'src')).keys()]).toEqual(['tabler'])
+  })
+
   it('renders an imported icon as an svg on the server, an alias as its parent', async () => {
     const app = await pages({ root: 'tests/fixtures/icons', prebuilt: false })
     const html = await (await app.handle(new Request('http://localhost/'))).text()

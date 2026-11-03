@@ -1,6 +1,6 @@
 import type { IconProps, IconSet } from '../runtime/icons'
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { KayError } from '../compiler/errors'
 import * as iconSet from '../runtime/icons'
@@ -11,12 +11,25 @@ export const ICON_IMPORT = /^~icons\/([a-z0-9-]+)\/([a-z0-9-]+)$/
 const ICONIFY_PACKAGE = '@iconify-json/'
 const sets = new Map<string, IconSet | undefined>()
 
+// The nearest package.json at or above the root: a folder without one, as a fixture inside a workspace, draws its sets from the workspace's.
+function manifestOf(root: string): string | undefined {
+  for (let dir = root; ; dir = dirname(dir)) {
+    const manifest = join(dir, 'package.json')
+
+    if (existsSync(manifest))
+      return manifest
+
+    if (dir === dirname(dir))
+      return undefined
+  }
+}
+
 // The `@iconify-json/*` packages the project depends on, by prefix, with the file holding each set.
 export function installedIconSets(root: string): Map<string, string> {
   const found = new Map<string, string>()
-  const manifest = join(root, 'package.json')
+  const manifest = manifestOf(root)
 
-  if (!existsSync(manifest))
+  if (manifest === undefined)
     return found
 
   const { dependencies = {}, devDependencies = {} } = JSON.parse(readFileSync(manifest, 'utf8')) as { dependencies?: Record<string, string>, devDependencies?: Record<string, string> }
