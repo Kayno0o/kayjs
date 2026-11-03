@@ -9,7 +9,7 @@ import NoticeDismiss from './internal/notice-dismiss.kay'
 
 const look = recipe({
   parts: {
-    root: 'kui-notice [overflow-wrap:anywhere] rounded-lg border-solid px-4 py-3 text-sm [font-weight:var(--font-weight-normal)] [background-color:var(--_notice-ground,var(--color-surface-strong))] [border-color:var(--_notice-tone,var(--color-border-strong))] [border-width:var(--border-width)] [color:var(--_notice-tone,var(--color-foreground))] data-compact:border-0 data-compact:bg-transparent data-compact:p-0 data-framed:flex data-framed:items-start data-framed:gap-3 [&[hidden]]:hidden',
+    root: 'kui-notice [overflow-wrap:anywhere] rounded-lg border-solid px-4 py-3 text-sm [font-weight:var(--font-weight-normal)] [background-color:var(--_notice-ground,var(--color-surface-strong))] [border-color:var(--_notice-tone,var(--color-border-strong))] [border-width:var(--border-width)] [color:var(--_notice-tone,var(--color-foreground))] data-compact:border-0 data-compact:bg-transparent data-compact:p-0 not-[[hidden]]:data-framed:flex data-framed:items-start data-framed:gap-3',
     icon: 'mt-0.5 size-4 shrink-0',
     body: 'min-w-0 flex-1',
     actions: 'flex shrink-0 flex-wrap items-center gap-2',
