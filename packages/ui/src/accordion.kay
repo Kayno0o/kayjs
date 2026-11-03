@@ -44,7 +44,7 @@ effect(() => {
   const wanted = asked()
 
   if (wanted)
-    opened.set(multiple ? wanted : new Set([...wanted].slice(0, 1)))
+    opened = multiple ? wanted : new Set([...wanted].slice(0, 1))
 })
 
 // Without `multiple`, a section closing as another opens reports only the opening, so the value is never briefly empty.
@@ -61,7 +61,7 @@ function toggled(item: string, now: boolean) {
   else
     next.delete(item)
 
-  opened.set(next)
+  opened = next
   onChange?.([...next])
 }
 

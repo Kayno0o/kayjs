@@ -808,6 +808,7 @@ component default
   label: string
   name?: string | undefined
   onChange?: ((value: Value[]) => unknown) | undefined
+  option?: ((option: { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[]
   showLabel?: boolean | undefined
   value: readonly Value[]
@@ -1294,13 +1295,14 @@ component default
   emptyLabel?: string | undefined
   errorLabel?: string | undefined
   gridLabel?: string | undefined
+  icons?: readonly IconChoice[] | undefined
   moreLabel?: string | undefined
   name?: string | undefined
   onChange?: ((name: string) => unknown) | undefined
   onError?: ((error: unknown) => unknown) | undefined
   onSearch?: ((query: string) => unknown) | undefined
   placeholder?: string | undefined
-  search: (query: string, limit: number, offset: number) => Promise<IconChoice[]>
+  search?: ((query: string, limit: number, offset: number) => Promise<IconChoice[]>) | undefined
   searchLabel?: string | undefined
   searchingLabel?: string | undefined
   value?: string | undefined
@@ -1561,28 +1563,35 @@ component default
   options?: string | undefined;
   option?: string | undefined;
   checkbox?: string | undefined;
+  label?: string | undefined;
   icon?: string | {
     root?: string | undefined;
   } | undefined;
-  label?: string | undefined;
   empty?: string | undefined;
 } | undefined
   disabled?: boolean | undefined
   emptyLabel?: string | undefined
+  failureLabel?: string | undefined
   id?: string | undefined
   label: string
+  loadingLabel?: string | undefined
+  minLength?: number | undefined
   name?: string | undefined
   noneLabel?: string | undefined
   onChange?: ((value: Value[]) => unknown) | undefined
+  onError?: ((error: unknown, query: string) => unknown) | undefined
+  onLoad?: ((options: readonly MultiSelectOption<Value>[], query: string) => unknown) | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
-  options: readonly MultiSelectOption<Value>[]
+  option?: ((option: MultiSelectOption<Value>) => Element) | undefined
+  options: readonly MultiSelectOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly MultiSelectOption<Value>[]>)
   placeholder?: string | undefined
   placement?: PopoverPlacement | undefined
   search?: boolean | undefined
   searchLabel?: string | undefined
   selectedLabel?: ((count: number) => string) | undefined
   value?: readonly Value[] | undefined
+  valueLabels?: Readonly<Record<string, string>> | undefined
 
 [./notice.kay] default
 component default
@@ -1674,6 +1683,7 @@ component default
   label?: string | undefined
   name?: string | undefined
   onChange?: ((value: Value | (null extends Held ? Held & null : never)) => unknown) | undefined
+  option?: ((option: { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: readonly { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }[] & NullOption<Value, Held>
   value: Held
 
@@ -1841,6 +1851,7 @@ component default
   label: string
   name?: string | undefined
   onChange?: ((value: Value | (null extends Held ? Held & null : never)) => unknown) | undefined
+  option?: ((option: { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[] & NullOption<Value, Held>
   orientation?: "horizontal" | "vertical" | undefined
   param?: string | undefined
@@ -1853,9 +1864,12 @@ component default
   busy?: boolean | undefined
   class?: string | { root?: string | undefined; } | undefined
   emptyOption?: Empty
+  failureLabel?: string | undefined
   loadingLabel?: string | undefined
   onChange?: ((value: Value | (Empty extends string | true ? "" : never)) => unknown) | undefined
-  options: readonly { value: Value; label: string; disabled?: boolean | undefined; }[]
+  onError?: ((error: unknown) => unknown) | undefined
+  onLoad?: ((options: readonly SelectOption<Value>[]) => unknown) | undefined
+  options: readonly SelectOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly SelectOption<Value>[]>)
   param?: string | undefined
   paramDefault?: string | number | undefined
   submit?: boolean | undefined

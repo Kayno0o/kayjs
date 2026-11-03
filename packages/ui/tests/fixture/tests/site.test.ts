@@ -1356,3 +1356,22 @@ describe('TreeView link rows under base and trailingSlash', () => {
     }
   })
 })
+
+describe('the option snippet of the choice controls', () => {
+  test('draws each option in place of its label, the input kept, checked and named by the option\'s label', async () => {
+    for (const [id, kind] of [['radio', 'radio'], ['chips', 'checkbox'], ['segmented', 'radio']] as const) {
+      const inputs = await find('/drawn-options', `#${id} input[type=${kind}]`)
+
+      expect(inputs.length).toBeGreaterThan(0)
+      expect(inputs.map(input => attr(input, 'aria-label'))).toEqual(inputs.length === 2 && id === 'radio' ? ['Free', 'Pro'] : ['Alpha', 'Beta'])
+    }
+
+    expect(await find('/drawn-options', '#radio .title')).toHaveLength(2)
+    expect((await find('/drawn-options', '#radio [data-part=description]')).map(found => found.text)).toEqual(['For trying', 'For teams'])
+    expect(await find('/drawn-options', '#radio [data-part=label]')).toHaveLength(2)
+    expect((await find('/drawn-options', '#radio input[checked]')).map(input => attr(input, 'value'))).toEqual(['pro'])
+    expect((await find('/drawn-options', '#chips .dot')).map(found => found.text)).toEqual(['a', 'b'])
+    expect((await find('/drawn-options', '#multi .dot')).map(found => found.text)).toEqual(['a', 'b'])
+    expect((await find('/drawn-options', '#multi input[type=checkbox]')).map(input => attr(input, 'aria-label'))).toEqual(['Alpha', 'Beta'])
+  })
+})

@@ -23,3 +23,7 @@ Return a promise from `onChange` to hold the group busy until it settles. If the
 ## Label
 
 `label` is required. It names the group for screen readers. `showLabel` also writes it above the chips and names the group by it, as on [Segmented](/ui/segmented#label).
+
+## Drawing an option
+
+`@option(option)` draws each option in place of its label, and its icon if it has one, as in Combobox: an avatar with a name, a price, a colour dot. The input stays, with its checked and disabled state, and the option's `label` still names it for screen readers.

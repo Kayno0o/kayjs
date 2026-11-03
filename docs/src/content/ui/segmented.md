@@ -51,3 +51,7 @@ An `onChange` of your own still runs first, and a `false` from it stops the move
 `label` is required. It names the group for screen readers. `showLabel` also writes it above the group, in the type a [Slider](/ui/slider) writes its label in, and names the radiogroup by it, so a row of controls mixing the two shows every label: `Segmented(label="Grid" showLabel options={GRIDS} value="square")`.
 
 The label and the group then sit in a `field` part, the label being `heading`; `class` still reaches the group. Leave it off in a toolbar or a table header, where the group speaks for itself.
+
+## Drawing an option
+
+`@option(option)` draws each option in place of its label, and its icon if it has one, as in Combobox: an avatar with a name, a price, a colour dot. The input stays, with its checked and disabled state, and the option's `label` still names it for screen readers.

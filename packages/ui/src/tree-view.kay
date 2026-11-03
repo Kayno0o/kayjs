@@ -73,7 +73,7 @@ effect(() => current = target())
 effect(() => {
   const wanted = [...expanded]
 
-  untrack(() => open.set(new Set<TreeId>([...wanted, ...path(target()) ?? []])))
+  untrack(() => open = new Set<TreeId>([...wanted, ...path(target()) ?? []]))
 })
 
 function without<Item>(set: ReadonlySet<Item>, item: Item) {

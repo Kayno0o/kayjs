@@ -27,3 +27,7 @@ Return a promise from `onChange` to hold the group busy until it settles. If the
 ## Label
 
 Without a FormField, `label` names the group for screen readers.
+
+## Drawing an option
+
+`@option(option)` draws each option in place of its label, and its icon if it has one, as in Combobox: an avatar with a name, a price, a colour dot. The input stays, with its checked and disabled state, and the option's `label` still names it for screen readers.

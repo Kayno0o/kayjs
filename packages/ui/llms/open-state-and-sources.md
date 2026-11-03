@@ -31,6 +31,16 @@
 
 - `Pagination(page pages)` with no `url` links the address the page has, the page parameter set. `@step(direction)` draws the content of Previous and Next (`'previous'` or `'next'`) in place of their words, an icon for instance, and `previousLabel` and `nextLabel` still name the links. It stays a static component of plain links: a handler for a list paged in the browser is not offered, since it would make every `Pagination(of={list})` of a page an island whose props must serialize.
 
+### Options from a list or a function
+
+- `MultiSelect(options={({ q }) => api.people(q)} valueLabels={{ ada: 'Ada' }})`: `options` is a list, or a function returning a promise of the options for the text typed, as Combobox's. It is asked when the panel opens and after each 200 ms pause in typing, only the latest answer lands, `minLength` holds the asks back, and the status line says `loadingLabel` or `failureLabel`. What was picked keeps its label across searches, from the answers seen or `valueLabels` for values never listed. `onLoad(options, query)` and `onError(error, query)` follow each answer.
+- `Select(options={() => api.sizes()})`: the same function, asked once with an empty `q` when the select is drawn in the browser; it is busy under `loadingLabel` until the answer, or shows `failureLabel` once rejected, with `onLoad` and `onError`.
+- `IconPicker(icons={[{ name, icon }]})` takes a fixed set instead of `search`, filtered by name and paged like an answer.
+
+### Drawing an option
+
+`MultiSelect`, `RadioGroup`, `ChipGroup` and `Segmented` take `@option(option)`, drawn in place of the label (and icon) as Combobox's. The input stays, with its checked and disabled state and the option's `label` as its accessible name; RadioGroup keeps the description as its quiet line. A block taking a parameter cannot be sent to the browser as data, so the component hydrates itself on the page, as Combobox does; without the block it stays static.
+
 ## Reference
 
 - The shape every component of the library follows: state the app can hold is a prop followed when it changes plus a callback on each transition (`open`/`onOpenChange` as Popover, `value`/`onChange` as the pickers), a data source is a list or a function returning a promise, and each visible part can be replaced by a block.

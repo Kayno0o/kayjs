@@ -39,3 +39,7 @@ The select takes `param` as its name. Inside a GET form with a button it works w
 Set `submit` on a Select inside a form to submit that form once an option is picked, after `onChange`. A GET filter form then needs no ref to itself.
 
 A pick with the mouse submits at once. Some browsers report a change on every arrow key, so a pick with the keyboard waits for Enter, or for the select to lose focus, and a person moving through the options does not post once per key.
+
+## Options from an action
+
+`options` can be a function returning a promise of the options, such as an action. It is asked once when the select is drawn in the browser, and the select is busy under `loadingLabel` until the answer lands. When it fails the select says `failureLabel`. `onLoad` and `onError` follow the answer.

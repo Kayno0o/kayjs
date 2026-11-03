@@ -1,5 +1,5 @@
 --- <Value extends string | number | null, Held extends Value | null = Value>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import { recipe, uid, untrack } from 'kay'
@@ -22,7 +22,7 @@ const look = recipe({
   },
 })
 
-const { options, value, label, showLabel = false, name, param, paramDefault, disabled = false, orientation = 'horizontal', onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value, label, showLabel = false, name, param, paramDefault, disabled = false, orientation = 'horizontal', onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that option from being picked.
   options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[] & NullOption<Value, Held>
   // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it.
@@ -45,6 +45,8 @@ const { options, value, label, showLabel = false, name, param, paramDefault, dis
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   // Hears `null` as well, for a reset to none, only when `value` is typed nullable.
   onChange?: ((value: Value | (null extends Held ? null : never)) => unknown) | undefined
+  // Draws each option in place of its label (and icon): `@option(option)`. The input stays named by the option's `label`, and keeps its checked and disabled state.
+  option?: Snippet<[option: { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }]> | undefined
 }>()
 
 const { group, picked, busy, ref, pick } = controlledRadios({
@@ -65,11 +67,14 @@ snippet radios()
   div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() ? 'true' : undefined})
     for option of options key={option.value}
       label(part="option")
-        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} onChange={() => pick(option.value)})
+        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => pick(option.value)})
         span(part="label")
-          if option.icon
-            Icon(icon={option.icon} part="icon")
-          | {option.label}
+          if drawRow
+            | {drawRow(option)}
+          else
+            if option.icon
+              Icon(icon={option.icon} part="icon")
+            | {option.label}
 if showLabel
   div(part="field")
     span(part="heading" id={heading}) {label}

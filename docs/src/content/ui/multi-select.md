@@ -25,3 +25,13 @@ The trigger opens the panel on its search box, or its first checkbox. ArrowDown 
 ## Opened by the app
 
 `open` shows the panel when your code sets it, and `onOpenChange(open)` is called with the new state whenever the panel shows or hides: the trigger, a click outside, Escape or focus leaving it. When you drive `open`, set your own value back in `onOpenChange`, or a click outside would leave it saying "open".
+
+## Options from an action
+
+`options` can be a function answering the options for the text typed, such as an action or a wrapped API call: `options={({ q }) => people(q)}`. It is asked when the panel opens and after a pause in typing, and the latest answer wins.
+
+The status line says `loadingLabel` while it waits and `failureLabel` when it fails, and `minLength` holds the ask back until enough is typed. What is picked keeps its label when a later search no longer lists it. For a value picked before any answer lists it, give its label in `valueLabels`. `onLoad(options, query)` and `onError(error, query)` follow each answer.
+
+## Drawing an option
+
+`@option(option)` draws each option in place of its label and icon, as in Combobox. The checkbox stays, named by the option's `label`.

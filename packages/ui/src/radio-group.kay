@@ -1,5 +1,5 @@
 --- <Value extends string | number | null, Held extends Value | null = Value>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { recipe, uid, untrack } from 'kay'
 import type { NullOption } from './null-option'
 import { controlledRadios } from './controlled-radios'
@@ -16,7 +16,7 @@ const look = recipe({
   },
 })
 
-const { options, value, label, name, disabled = false, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value, label, name, disabled = false, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `description` is a quieter line under the label, which screen readers hear after it; `disabled` keeps that option from being picked.
   options: readonly { value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }[] & NullOption<Value, Held>
   // The option picked to start with, or `null` for none; a group whose parent passes another follows it.
@@ -31,6 +31,8 @@ const { options, value, label, name, disabled = false, onChange, ...rest } = pro
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   // Hears `null` as well, for a reset to none, only when `value` is typed nullable.
   onChange?: ((value: Value | (null extends Held ? null : never)) => unknown) | undefined
+  // Draws each option in place of its label (and icon): `@option(option)`. The input stays named by the option's `label`, and keeps its checked and disabled state. The description stays under it as the quiet line.
+  option?: Snippet<[option: { value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }]> | undefined
 }>()
 
 const { group, picked, busy, ref, pick } = controlledRadios({
@@ -50,7 +52,11 @@ div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-bu
   for option, index of options key={option.value}
     div(part="radio")
       label(part="choice")
-        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
-        span(part="label") {option.label}
+        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
+        span(part="label")
+          if drawRow
+            | {drawRow(option)}
+          else
+            | {option.label}
       if option.description
         span(part="description" id={`${prefix}-${index}`}) {option.description}
