@@ -85,7 +85,9 @@ export function sqlitePush(path: string): PushStore {
     return opened ??= openPush(path)
   }
 
-  onReload(async () => opened?.close?.())
+  onReload(async () => {
+    await opened?.close?.()
+  })
 
   return {
     add: async (user, subscription, most) => open().add(user, subscription, most),
@@ -94,8 +96,7 @@ export function sqlitePush(path: string): PushStore {
     erase: async user => open().erase(user),
     close: async () => {
       closed = true
-
-      return opened?.close?.()
+      await opened?.close?.()
     },
   }
 }

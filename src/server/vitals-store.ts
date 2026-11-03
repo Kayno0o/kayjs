@@ -126,15 +126,16 @@ export function sqliteVitals(path: string): VitalsStore {
   }
 
   // A reload closes the file for the module that named the store, whichever module first used it; the module running again names a store of its own.
-  onReload(async () => opened?.close?.())
+  onReload(async () => {
+    await opened?.close?.()
+  })
 
   return {
     add: async (route, readings, day) => open().add(route, readings, day),
     counts: async since => open().counts(since),
     close: async () => {
       closed = true
-
-      return opened?.close?.()
+      await opened?.close?.()
     },
   }
 }

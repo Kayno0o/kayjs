@@ -185,7 +185,9 @@ export function sqliteNotifications(path: string): NotificationStore {
     return opened ??= openNotifications(path)
   }
 
-  onReload(async () => opened?.close?.())
+  onReload(async () => {
+    await opened?.close?.()
+  })
 
   return {
     add: async (user, note, most) => open().add(user, note, most),
@@ -197,8 +199,7 @@ export function sqliteNotifications(path: string): NotificationStore {
     prune: async now => open().prune(now),
     close: async () => {
       closed = true
-
-      return opened?.close?.()
+      await opened?.close?.()
     },
   }
 }
