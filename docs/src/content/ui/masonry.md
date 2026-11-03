@@ -25,3 +25,7 @@ Tiles are placed absolutely inside the Masonry's box, so put padding on a wrappe
 ## Props
 
 `items` is the list to place, and `key` is required: it returns a string or a number for each item. `style` is added to the Masonry's own box.
+
+## Loaded page by page
+
+It takes `list`, an `infiniteList`, in place of the array.`LoadMore` follows the tiles, so the next page loads as the reader nears the end, and a failed page shows its alert with a retry. See [Infinite lists](/ui/load-more).

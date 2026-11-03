@@ -1,12 +1,17 @@
 --- <Item>
 import type { JSX, Snippet } from 'kay'
 import { memo, onCleanup, onMount, recipe } from 'kay'
+import type { InfiniteList } from './infinite-list'
+import LoadMore from './load-more.kay'
 import { virtualRows } from './virtual'
 
 const look = recipe({ parts: { root: 'kui-virtual-list' } })
 
-const { items, item, itemKey, estimate = 48, overscan = 4, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'tabindex'> & {
-  items: Item[]
+const { items: given, list: source, item, itemKey, estimate = 48, overscan = 4, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'tabindex'> & {
+  // The items to draw. Left out when `list` holds them: one of the two is required.
+  items?: Item[] | undefined
+  // Items loaded page by page, from `infiniteList`: `LoadMore` follows the rows inside the box, loading the next page as the reader nears the end and showing a failed page's alert with its retry.
+  list?: InfiniteList<Item> | undefined
   // Draws a row, from the `@item(item, index)` block.
   item: Snippet<[Item, number]>
   // Tells a row from another, so the height measured for it follows it when the list shifts; the row's index without one.
@@ -17,10 +22,12 @@ const { items, item, itemKey, estimate = 48, overscan = 4, label, ...rest } = pr
   overscan?: number | undefined
   // Names the list, which is read out when it takes the focus: a focusable list with no name is a stop a screen reader cannot place.
   label: string
-}>()
+} & ({ items: Item[], list?: undefined } | { items?: undefined, list: InfiniteList<Item> })>()
+
+const items = () => source ? source.rows() : given ?? []
 
 const keyOf = (row: Item, index: number) => itemKey === undefined ? index : itemKey(row, index)
-const list = virtualRows({ items: () => items, keyOf, estimate, overscan })
+const list = virtualRows({ items, keyOf, estimate, overscan })
 const entries = memo(() => list.rows().map((row, position) => ({ row, index: list.start() + position })))
 let box: HTMLElement | undefined
 let content: HTMLElement | undefined
@@ -35,3 +42,5 @@ div(part="root" {...rest} ref={element => box = element} role="list" tabindex="0
     for entry of entries() key={keyOf(entry.row, entry.index)}
       div(part="item" role="listitem" data-virtual-index={entry.index} aria-posinset={entry.index + 1} aria-setsize={list.count()})
         | {item(entry.row, entry.index)}
+  if source
+    LoadMore(list={source})

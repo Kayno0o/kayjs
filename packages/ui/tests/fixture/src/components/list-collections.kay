@@ -1,0 +1,30 @@
+---
+// kay-island
+import { infiniteList } from '@kaynooo/kayjs-ui'
+import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
+import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
+import Masonry from '@kaynooo/kayjs-ui/masonry.kay'
+import VirtualList from '@kaynooo/kayjs-ui/virtual-list.kay'
+
+const { kind, onLoad } = props<{ kind: 'virtual' | 'masonry' | 'gallery' | 'carousel', onLoad: (offset: number) => Promise<number[] | undefined> }>()
+
+const row = (id: number) => ({ id, key: id, kind: 'image' as const, thumb: `/t${id}.png`, preview: `/p${id}.png`, src: `/s${id}.png`, alt: `Row ${id}`, title: `Row ${id}` })
+
+const feed = infiniteList([0, 1, 2].map(row), { pageSize: 3, key: one => one.id, load: async ({ offset }) => {
+  const ids = await onLoad(offset)
+
+  return ids?.map(row)
+} })
+---
+if kind === 'virtual'
+  VirtualList#collection(list={feed} itemKey={one => one.id} label="Rows" estimate={20})
+    @item(one)
+      p.cell {one.title}
+else if kind === 'masonry'
+  Masonry#collection(list={feed} key={one => one.id})
+    @tile(one)
+      p.cell {one.title}
+else if kind === 'gallery'
+  MediaGallery#collection(list={feed})
+else
+  Carousel#collection(list={feed})

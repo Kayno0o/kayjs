@@ -1,10 +1,12 @@
----
+--- <Item extends MediaItem = MediaItem>
 import type { JSX } from 'kay'
 import type { MediaItem } from './media'
-import { effect, onCleanup, recipe, signal } from 'kay'
+import type { InfiniteList } from './infinite-list'
+import { effect, onCleanup, recipe, signal, untrack } from 'kay'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
+import LoadMore from './load-more.kay'
 import { isPlayable, playSource } from './media'
 import { wording } from 'kay/words'
 
@@ -30,8 +32,11 @@ const look = recipe({
   },
 })
 
-const { items, index = 0, onIndexChange, ratio = '16 / 9', emptyLabel, previousLabel = wording('ui.mediaGallery.previous', 'Previous'), nextLabel = wording('ui.mediaGallery.next', 'Next'), closeLabel = wording('ui.mediaGallery.close', 'Close'), openLabel = wording('ui.mediaGallery.open', 'Open full size'), itemLabel = wording('ui.mediaGallery.item', 'Media {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
-  items: MediaItem[]
+const { items: given, list, index = 0, onIndexChange, ratio = '16 / 9', emptyLabel, previousLabel = wording('ui.mediaGallery.previous', 'Previous'), nextLabel = wording('ui.mediaGallery.next', 'Next'), closeLabel = wording('ui.mediaGallery.close', 'Close'), openLabel = wording('ui.mediaGallery.open', 'Open full size'), itemLabel = wording('ui.mediaGallery.item', 'Media {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+  // The items to show. Left out when `list` holds them: one of the two is required.
+  items?: Item[] | undefined
+  // Items loaded page by page, from `infiniteList`: the next page loads when the reader reaches the last items, and a failed page shows LoadMore's alert with its retry under the strip.
+  list?: InfiniteList<Item> | undefined
   // The item on the stage to start with; a gallery whose parent passes another follows it, and `onIndexChange` reports each turn.
   index?: number | undefined
   onIndexChange?: ((index: number) => unknown) | undefined
@@ -46,7 +51,9 @@ const { items, index = 0, onIndexChange, ratio = '16 / 9', emptyLabel, previousL
   openLabel?: string | undefined
   // Names an item with no title, `{n}` standing for its number.
   itemLabel?: string | undefined
-}>()
+} & ({ items: Item[], list?: undefined } | { items?: undefined, list: InfiniteList<Item> })>()
+
+const all = () => list ? list.rows() : given ?? []
 
 const nothing = () => emptyLabel ?? wording('ui.mediaGallery.empty', 'No media.')
 const shown = signal(index)
@@ -59,19 +66,25 @@ let swipeFrom: { x: number, y: number } | null = null
 
 effect(() => shown = index)
 
-const active = () => Math.min(Math.max(shown(), 0), Math.max(items.length - 1, 0))
-const current = () => items[active()]
+// The next page loads once the reader is on the last items.
+effect(() => {
+  if (list && active() >= all().length - 2)
+    void untrack(() => list.more())
+})
+
+const active = () => Math.min(Math.max(shown(), 0), Math.max(all().length - 1, 0))
+const current = () => all()[active()]
 const named = (position: number) => itemLabel.replaceAll('{n}', String(position + 1))
 
 function go(next: number) {
-  const target = stepIndex(next, 0, items.length)
+  const target = stepIndex(next, 0, all().length)
 
   shown = target
   onIndexChange?.(target)
 }
 
 function step(delta: number) {
-  go(stepIndex(active(), delta, items.length))
+  go(stepIndex(active(), delta, all().length))
 }
 
 function sweep() {
@@ -97,10 +110,10 @@ function keyDown(event: KeyboardEvent) {
   const target = event.target as HTMLElement
 
   // A video's own controls and a text box keep their arrows.
-  if (items.length < 2 || event.altKey || event.ctrlKey || event.metaKey || target.closest('video, input, textarea'))
+  if (all().length < 2 || event.altKey || event.ctrlKey || event.metaKey || target.closest('video, input, textarea'))
     return
 
-  const moves: Partial<Record<string, () => void>> = { ArrowLeft: () => step(-1), ArrowRight: () => step(1), Home: () => go(0), End: () => go(items.length - 1) }
+  const moves: Partial<Record<string, () => void>> = { ArrowLeft: () => step(-1), ArrowRight: () => step(1), Home: () => go(0), End: () => go(all().length - 1) }
   const move = moves[event.key]
 
   if (!move)
@@ -158,8 +171,8 @@ effect(() => {
   sweep()
   strip?.scrollTo?.({ left: (thumb?.offsetLeft ?? 0) - (strip.clientWidth - (thumb?.offsetWidth ?? 0)) / 2, behavior: 'smooth' })
 
-  for (const delta of items.length > 1 ? [1, -1] : []) {
-    const neighbour = items[stepIndex(at, delta, items.length)]
+  for (const delta of all().length > 1 ? [1, -1] : []) {
+    const neighbour = all()[stepIndex(at, delta, all().length)]
 
     if (neighbour && !isPlayable(neighbour))
       new Image().src = zoomed() ? neighbour.full ?? neighbour.preview : neighbour.preview
@@ -169,6 +182,8 @@ effect(() => {
 if !current()
   // The app's id and class stay on whichever element shows.
   p.kui-media-gallery-empty.text-xs.text-muted(part="root" id={rest.id}) {nothing()}
+  if list && list.failed()
+    LoadMore(list={list})
 else
   // Arrows turn the gallery while focus is anywhere inside it, which a keyboard user reaches through its buttons.
   div(part="root" {...rest} onKeyDown={keyDown})
@@ -183,20 +198,22 @@ else
           button(part="zoom" type="button" aria-label={item.title ? `${openLabel}: ${item.title}` : openLabel} onClick={() => zoomed = true})
             // kay-allow unsized-image
             img(part="frame" src={item.preview} alt={item.title ?? ''})
-      if items.length > 1
+      if all().length > 1
         IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={() => step(-1)})
         IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={() => step(1)})
-        span(part="counter") {active() + 1} / {items.length}
+        span(part="counter") {active() + 1} / {all().length}
       if current()!.title
         span(part="caption") {current()!.title}
-    if items.length > 1
+    if all().length > 1
       div(part="strip" ref={element => strip = element})
-        for item, position of items key={item.key}
+        for item, position of all() key={item.key}
           button(part="thumb" type="button" aria-current={position === active() ? 'true' : undefined} aria-label={item.title ?? named(position)} onClick={() => go(position)})
             // kay-allow unsized-image
             img(part="thumbImage" src={item.thumb} alt="" loading="lazy" decoding="async")
             if item.kind === 'video'
               Icon(icon="play" part="play")
+    if list && list.failed()
+      LoadMore(list={list})
     dialog(part="lightbox" ref={element => lightbox = element} closedby="any" aria-label={current()!.title ?? named(active())} onClose={() => zoomed = false} onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={() => swipeFrom = null})
       if zoomed()
         for item of [current()!] key={item.key}
@@ -207,7 +224,7 @@ else
           else
             // kay-allow unsized-image
             img(part="full" src={item.full ?? item.preview} alt={item.title ?? ''})
-        if items.length > 1
+        if all().length > 1
           IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={() => step(-1)})
           IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={() => step(1)})
         if current()!.title

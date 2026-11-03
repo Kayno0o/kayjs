@@ -25,3 +25,7 @@ Set `label` to name the carousel for screen readers.
 ## Labels
 
 `previousLabel` and `nextLabel` name the arrows, `Previous slide` and `Next slide` by default. `slideLabel` names a slide, `Slide {n} of {count}`, and `dotLabel` a dot, `Go to slide {n}`. `{n}` stands for the slide's number and `{count}` for how many there are.
+
+## Loaded page by page
+
+It takes `list`, an `infiniteList`, in place of the array.The next page loads when the reader reaches the last slides, and a failed page shows `LoadMore`'s alert with its retry under the controls. See [Infinite lists](/ui/load-more).

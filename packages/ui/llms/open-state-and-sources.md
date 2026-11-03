@@ -7,6 +7,10 @@
 - `CollapsibleSection(title open={open()} onOpenChange={now => ...})`: `open` follows the page when it changes, `onOpenChange(open)` is called on every fold and unfold, however it came about. Passing it makes the section an island; without it the section stays static. `disabled` keeps it as it is, `title` takes a string or a block.
 - `Accordion(items value={open()} onChange={values => ...})`: `value` is the open value, or an array of them with `multiple`, and the accordion follows it when the page passes a new one; left out, the reader decides. `onChange(values)` gets the values open (at most one without `multiple`), and closing a section as another opens reports only the opening. An item takes `disabled` and `meta` (a string); `@title(value)` and `@meta(value)` replace the heading and the band content.
 
+### VirtualList, Masonry, MediaGallery, Carousel
+
+- `list={feed}` (an `infiniteList`) replaces `items` on VirtualList, Masonry and MediaGallery and `slides` on Carousel, as it replaces `rows` on Table: exactly one of the two. VirtualList and Masonry draw `LoadMore` after their rows, so the next page loads when the end nears and a failed page shows its alert with the retry; MediaGallery and Carousel load the next page when the reader is on one of the last two items and show LoadMore's alert under the strip or the controls when a page failed. MediaGallery and Carousel are generic over the item type: a list of your own rows that carry the fields they read passes as is.
+
 ### Menu
 
 - `Menu(items={() => loadTargets()} label="Move to")`: `items` is a list, a function returning one or a promise of one, or a promise; a function runs each time the menu opens (a promise is awaited once), the latest answer winning, with a `status` row (`ui.menu.loading`) meanwhile and, when it throws or rejects, an alert row (`ui.menu.failure`) and a `Try again` entry (`ui.menu.retry`). The first entry takes focus when the answer arrives.

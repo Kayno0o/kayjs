@@ -19,3 +19,7 @@ A row's height is its border box, so give its content padding or a gap rather th
 The list is `role="list"` named by `label`, which is required, and each row a `listitem` with its position among all, so a screen reader hears "3 of 10000". The box takes the focus to scroll by keyboard: arrows, Page Up and Down, Home and End.
 
 Find-in-page only sees the rows drawn, and a focused control in a row that scrolls out of view loses its focus. Give a long list a filter to find a row by.
+
+## Loaded page by page
+
+It takes `list`, an `infiniteList`, in place of the array.`LoadMore` follows the rows inside the box, so the next page loads as the reader nears the end, and a failed page shows its alert with a retry. See [Infinite lists](/ui/load-more).

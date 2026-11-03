@@ -1,8 +1,10 @@
----
+--- <Slide extends { src: string, alt: string }>
 import type { Duration, JSX } from 'kay'
-import { durationMs, effect, every, onCleanup, recipe, reducedMotion, signal } from 'kay'
+import { durationMs, effect, every, onCleanup, recipe, reducedMotion, signal, untrack } from 'kay'
 import IconButton from './icon-button.kay'
 import { startRef } from './form-reset'
+import type { InfiniteList } from './infinite-list'
+import LoadMore from './load-more.kay'
 import { stepIndex } from './cycle'
 import { wording } from 'kay/words'
 
@@ -22,8 +24,11 @@ const look = recipe({
   },
 })
 
-const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previous', 'Previous slide'), nextLabel = wording('ui.carousel.next', 'Next slide'), pauseLabel = wording('ui.carousel.pause', 'Pause'), playLabel = wording('ui.carousel.play', 'Play'), slideLabel = wording('ui.carousel.slide', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dot', 'Go to slide {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
-  slides: readonly { src: string, alt: string }[]
+const { slides: given, list, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previous', 'Previous slide'), nextLabel = wording('ui.carousel.next', 'Next slide'), pauseLabel = wording('ui.carousel.pause', 'Pause'), playLabel = wording('ui.carousel.play', 'Play'), slideLabel = wording('ui.carousel.slide', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dot', 'Go to slide {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
+  // The slides to draw. Left out when `list` holds them: one of the two is required.
+  slides?: readonly Slide[] | undefined
+  // Slides loaded page by page, from `infiniteList`: the next page loads when the reader reaches the last slides, and a failed page shows LoadMore's alert with its retry under the controls.
+  list?: InfiniteList<Slide> | undefined
   // The slide shown first; a carousel whose parent passes another follows it.
   index?: number | undefined
   onIndexChange?: ((index: number) => unknown) | undefined
@@ -41,7 +46,9 @@ const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wo
   // `{n}` stands for the slide's number and `{count}` for how many there are.
   slideLabel?: string | undefined
   dotLabel?: string | undefined
-}>()
+} & ({ slides: readonly Slide[], list?: undefined } | { slides?: undefined, list: InfiniteList<Slide> })>()
+
+const all = () => list ? list.rows() : given ?? []
 
 const shown = signal(index)
 // Whether the pointer or the focus is on the carousel, or the carousel scrolled out of view, which holds the autoplay, as `every` does for a hidden tab.
@@ -55,6 +62,12 @@ const paused = signal(false)
 const ref = startRef<HTMLElement>(element => root = element, rest.ref)
 
 effect(() => shown = index)
+
+// The next page loads once the reader is on the last slides.
+effect(() => {
+  if (list && active() >= all().length - 2)
+    void untrack(() => list.more())
+})
 
 effect(() => {
   const element = root()
@@ -78,7 +91,7 @@ if (autoplay) {
   every(autoplay, () => step(1), { while: () => !paused() && !pointed() && !focused() && !offscreen() && !still() })
 }
 
-const active = () => stepIndex(shown(), 0, slides.length)
+const active = () => stepIndex(shown(), 0, all().length)
 
 function go(next: number) {
   shown = next
@@ -86,24 +99,26 @@ function go(next: number) {
 }
 
 function step(delta: number) {
-  go(stepIndex(active(), delta, slides.length))
+  go(stepIndex(active(), delta, all().length))
 }
 
 function numbered(text: string, position: number) {
-  return text.replaceAll('{n}', String(position + 1)).replaceAll('{count}', String(slides.length))
+  return text.replaceAll('{n}', String(position + 1)).replaceAll('{count}', String(all().length))
 }
 ---
 section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-label={label} onPointerEnter={() => pointed = true} onPointerLeave={() => pointed = false} onFocusIn={() => focused = true} onFocusOut={() => focused = false})
   div(part="viewport" style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
-    for slide, position of slides key={slide.src}
+    for slide, position of all() key={slide.src}
       div(part="slide" role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={position === active() ? undefined : 'true'} inert={position !== active()} style={`transform: translateX(${(position - active()) * 100}%)`})
         // kay-allow unsized-image
         img(part="image" src={slide.src} alt={slide.alt} loading={position === 0 ? 'eager' : 'lazy'})
-  if slides.length > 1
+  if all().length > 1
     div(part="controls")
       IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={() => step(-1)})
-      for slide, position of slides key={slide.src}
+      for slide, position of all() key={slide.src}
         button(part="dot" type="button" aria-label={numbered(dotLabel, position)} aria-current={position === active() ? 'true' : undefined} onClick={() => go(position)})
       IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={() => step(1)})
       if autoplay
         IconButton(icon={paused() ? 'play' : 'pause'} label={paused() ? playLabel : pauseLabel} variant="ghost" part="pause" onClick={() => paused = !paused()})
+  if list && list.failed()
+    LoadMore(list={list})

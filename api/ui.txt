@@ -745,8 +745,7 @@ component default
 
 [./carousel.kay] default
 component default
-  autoplay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  class?: string | {
+  | { autoplay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; class?: string | {
   root?: string | undefined;
   viewport?: string | undefined;
   slide?: string | undefined;
@@ -763,18 +762,25 @@ component default
       root?: string | undefined;
     } | undefined;
   } | undefined;
-} | undefined
-  dotLabel?: string | undefined
-  index?: number | undefined
-  label?: string | undefined
-  nextLabel?: string | undefined
-  onIndexChange?: ((index: number) => unknown) | undefined
-  pauseLabel?: string | undefined
-  playLabel?: string | undefined
-  previousLabel?: string | undefined
-  ratio?: string | undefined
-  slideLabel?: string | undefined
-  slides: readonly { src: string; alt: string; }[]
+} | undefined; dotLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slideLabel?: string | undefined; slides: readonly Slide[] }
+  | { autoplay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; class?: string | {
+  root?: string | undefined;
+  viewport?: string | undefined;
+  slide?: string | undefined;
+  image?: string | undefined;
+  controls?: string | undefined;
+  step?: string | {
+    root?: string | {
+      root?: string | undefined;
+    } | undefined;
+  } | undefined;
+  dot?: string | undefined;
+  pause?: string | {
+    root?: string | {
+      root?: string | undefined;
+    } | undefined;
+  } | undefined;
+} | undefined; dotLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list: InfiniteList<Slide>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slideLabel?: string | undefined; slides?: undefined }
 
 [./checkbox.kay] default
 component default
@@ -1431,17 +1437,12 @@ component default
 
 [./masonry.kay] default
 component default
-  class?: string | { root?: string | undefined; tile?: string | undefined; } | undefined
-  gap?: number | undefined
-  items: readonly Item[]
-  key: (item: Item) => Key
-  minWidth?: number | undefined
-  style?: string | undefined
-  tile: (item: Item) => Element
+  | { class?: string | { root?: string | undefined; tile?: string | undefined; } | undefined; gap?: number | undefined; items: readonly Item[]; key: (item: Item) => Key; list?: undefined; minWidth?: number | undefined; style?: string | undefined; tile: (item: Item) => Element }
+  | { class?: string | { root?: string | undefined; tile?: string | undefined; } | undefined; gap?: number | undefined; items?: undefined; key: (item: Item) => Key; list: InfiniteList<Item>; minWidth?: number | undefined; style?: string | undefined; tile: (item: Item) => Element }
 
 [./media-gallery.kay] default
 component default
-  class?: string | {
+  | { class?: string | {
   root?: string | undefined;
   stage?: string | undefined;
   frame?: string | undefined;
@@ -1466,17 +1467,33 @@ component default
       root?: string | undefined;
     } | undefined;
   } | undefined;
-} | undefined
-  closeLabel?: string | undefined
-  emptyLabel?: string | undefined
-  index?: number | undefined
-  itemLabel?: string | undefined
-  items: MediaItem[]
-  nextLabel?: string | undefined
-  onIndexChange?: ((index: number) => unknown) | undefined
-  openLabel?: string | undefined
-  previousLabel?: string | undefined
-  ratio?: string | undefined
+} | undefined; closeLabel?: string | undefined; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items: Item[]; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
+  | { class?: string | {
+  root?: string | undefined;
+  stage?: string | undefined;
+  frame?: string | undefined;
+  zoom?: string | undefined;
+  step?: string | {
+    root?: string | {
+      root?: string | undefined;
+    } | undefined;
+  } | undefined;
+  counter?: string | undefined;
+  caption?: string | undefined;
+  strip?: string | undefined;
+  thumb?: string | undefined;
+  thumbImage?: string | undefined;
+  play?: string | {
+    root?: string | undefined;
+  } | undefined;
+  lightbox?: string | undefined;
+  full?: string | undefined;
+  close?: string | {
+    root?: string | {
+      root?: string | undefined;
+    } | undefined;
+  } | undefined;
+} | undefined; closeLabel?: string | undefined; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items?: undefined; list: InfiniteList<Item>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
 
 [./menu.kay] default
 component default
@@ -2272,13 +2289,8 @@ component default
 
 [./virtual-list.kay] default
 component default
-  class?: string | { root?: string | undefined; content?: string | undefined; item?: string | undefined; } | undefined
-  estimate?: number | undefined
-  item: (args_0: Item, args_1: number) => Element
-  itemKey?: ((item: Item, index: number) => unknown) | undefined
-  items: Item[]
-  label: string
-  overscan?: number | undefined
+  | { class?: string | { root?: string | undefined; content?: string | undefined; item?: string | undefined; } | undefined; estimate?: number | undefined; item: (args_0: Item, args_1: number) => Element; itemKey?: ((item: Item, index: number) => unknown) | undefined; items: Item[]; label: string; list?: undefined; overscan?: number | undefined }
+  | { class?: string | { root?: string | undefined; content?: string | undefined; item?: string | undefined; } | undefined; estimate?: number | undefined; item: (args_0: Item, args_1: number) => Element; itemKey?: ((item: Item, index: number) => unknown) | undefined; items?: undefined; label: string; list: InfiniteList<Item>; overscan?: number | undefined }
 
 [./when-visible.kay] default
 component default

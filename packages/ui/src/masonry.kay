@@ -1,6 +1,8 @@
 --- <Item>
 import type { JSX, Snippet } from 'kay'
 import { effect, elementSize, memo, onCleanup, onMount, recipe, signal, untrack } from 'kay'
+import type { InfiniteList } from './infinite-list'
+import LoadMore from './load-more.kay'
 import { laneCount, masonryLayout } from './masonry'
 
 type Key = string | number
@@ -13,8 +15,11 @@ const look = recipe({
   },
 })
 
-const { items, key, minWidth = 256, gap = 12, tile, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
-  items: readonly Item[]
+const { items: given, list, key, minWidth = 256, gap = 12, tile, style, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'style' | 'children'> & {
+  // The items to lay out. Left out when `list` holds them: one of the two is required.
+  items?: readonly Item[] | undefined
+  // Items loaded page by page, from `infiniteList`: `LoadMore` follows the tiles, loading the next page as the reader nears the end and showing a failed page's alert with its retry.
+  list?: InfiniteList<Item> | undefined
   // Names an item across updates, so its tile keeps its place and its measured height.
   key: (item: Item) => Key
   // The narrowest a lane may get, in pixels: as many lanes as fit at that width share the row.
@@ -24,7 +29,7 @@ const { items, key, minWidth = 256, gap = 12, tile, style, ...rest } = props<Omi
   // Draws each tile: `@tile(item)`.
   tile: Snippet<[item: Item]>
   style?: string | undefined
-}>()
+} & ({ items: readonly Item[], list?: undefined } | { items?: undefined, list: InfiniteList<Item> })>()
 
 const rootSize = elementSize()
 // A height stays known while the item is in the list, and goes with it when the item leaves.
@@ -33,13 +38,14 @@ const keys = new WeakMap<Element, Key>()
 let root: HTMLElement | undefined
 let observer: ResizeObserver | undefined
 
+const all = () => list ? list.rows() : given ?? []
 const lanes = memo(() => laneCount(rootSize.width(), minWidth, gap))
 // Until the width is known, as on the server, the tiles stay in a plain grid of the same lanes.
-const layout = memo(() => rootSize.width() > 0 ? masonryLayout(items.map(item => heights().get(key(item))), lanes(), gap) : null)
+const layout = memo(() => rootSize.width() > 0 ? masonryLayout(all().map(item => heights().get(key(item))), lanes(), gap) : null)
 
 // The height of a tile whose item left goes with it, whether or not another tile resizes.
 effect(() => {
-  const present = new Set(items.map(key))
+  const present = new Set(all().map(key))
   const known = untrack(heights)
 
   if ([...known.keys()].some(name => !present.has(name)))
@@ -51,7 +57,7 @@ const place = (index: number) => layout()?.places[index]
 // One observer for every tile's height.
 onMount(() => {
   observer = new ResizeObserver((entries) => {
-    const present = new Set(items.map(key))
+    const present = new Set(all().map(key))
     const next = new Map([...heights()].filter(([name]) => present.has(name)))
 
     for (const entry of entries) {
@@ -64,7 +70,7 @@ onMount(() => {
   })
 
   for (const [index, node] of [...root!.children].entries()) {
-    keys.set(node, key(items[index]!))
+    keys.set(node, key(all()[index]!))
     observer.observe(node)
   }
 
@@ -80,6 +86,8 @@ function measure(node: HTMLElement, id: Key) {
 ---
 // Tiles placed absolutely inside the layout's own box, so padding goes on a wrapper, never on the Masonry.
 div(part="root" {...rest} ref={element => { root = element; rootSize.ref(element) }} style={`--_masonry-min: ${minWidth}px; --_masonry-gap: ${gap}px; --_masonry-lanes: ${lanes()};${layout() ? ` height: ${layout()!.height}px;` : ''}${style ? ` ${style}` : ''}`} data-laid-out={layout() ? '' : undefined})
-  for item, index of items key={key(item)}
+  for item, index of all() key={key(item)}
     div(part="tile" ref={element => measure(element, key(item))} style={place(index) ? `--_masonry-lane: ${place(index)!.lane}; --_masonry-top: ${place(index)!.top}px;` : undefined} data-placed={place(index) ? '' : undefined} data-pending={place(index) && !heights().has(key(item)) ? '' : undefined})
       | {tile(item)}
+if list
+  LoadMore(list={list})
