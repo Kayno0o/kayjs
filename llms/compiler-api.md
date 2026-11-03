@@ -1,5 +1,9 @@
 # Compile a component from a tool
 
+## Common tasks
+
+### Report a component's problems from a tool
+
 `kay/compiler` is for a tool that reads `.kay` source outside kay, such as a formatter, a docs checker or a CSS scanner; it exports `compileKay`, `formatDiagnostic` and the types `Diagnostic`, `CompileOptions` and `CompileResult`:
 
 ```ts
@@ -11,6 +15,8 @@ const { diagnostics, classes } = compileKay(source, 'src/routes/index.kay')
 for (const diagnostic of diagnostics)
   console.error(formatDiagnostic(source, 'src/routes/index.kay', diagnostic))
 ```
+
+## Reference
 
 - `compileKay(source, filename, options?)` returns `{ tsx, map, island?, promote?, why?, classes, diagnostics }` and reports a problem in the source in `diagnostics`. `filename` is read for its base name and, with `root`, its island id: a `_layout.kay`, `_404.kay` or `_error.kay`, like a file with a `--- server` fence, is a route file the server renders, never an island.
 - `tsx` is the generated code: TSX for type checking by default, or with `output: 'html'` or `output: 'dom'` the server's or the browser's code that runs. `map` maps it back to the source, `island` is the component's island id when it renders as one, `classes` the `.class` shorthand names a CSS scanner cannot read off the template.
