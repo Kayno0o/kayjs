@@ -79,13 +79,15 @@ import { queue } from 'kay/server'
 export const welcomeMails = queue(
   'welcome-mails',
   async ({ to }: { to: string }) => sendWelcome(to),
-  { attempts: 5, backoff: '30s', onFailed: reportFailedMail },
+  { attempts: 5, backoff: '30s', onError: reportFailedMail },
 )
 ```
 
 The server runs it with `.use(welcomeMails)`. An action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later.
 
-A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onFailed` as `{ payload, error }`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
+A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onError` as `{ id, payload, attempts, error }`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
+
+`onStart`, `onSuccess` and `onRetry` tell the other moments of a run, and a schedule takes `onStart`, `onSuccess` and `onError` too. A hook that throws is logged and reported, and never fails the job. `onFailed` is the old name of `onError` and works until 1.90. Queue and workflow runs are counted in `kay_queue_runs_total`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
 
 Under `kay dev`, the dev tool's Jobs tab lists every queue's jobs and retries or deletes a failed one ([the dev tool](/guides/performance/#jobs)).
 
@@ -153,7 +155,7 @@ export const welcomeMails = queue('welcome-mails', sendWelcome, {
 })
 ```
 
-The queue drops expired ones whenever you enqueue, list or remove jobs too, so a process with no worker still cleans up. `redact` gives what a failed job keeps instead of its payload, such as a mail without its body. `onFailed` still gets the whole payload, and a custom `JobStore` stores the redacted one only if its `fail` takes a third argument.
+The queue drops expired ones whenever you enqueue, list or remove jobs too, so a process with no worker still cleans up. `redact` gives what a failed job keeps instead of its payload, such as a mail without its body. `onError` still gets the whole payload, and a custom `JobStore` stores the redacted one only if its `fail` takes a third argument.
 
 To run a job once however often it is asked for, give `enqueue` a `key`. While a job with that key is waiting or running, `enqueue` stores nothing and resolves with that job's id.
 
@@ -317,7 +319,7 @@ The function runs again from its top each time the run is taken, and a finished 
 
 A step that throws is retried with the queue's `attempts` and `backoff`, and the steps done before it do not run again. A step finishing starts the count of attempts again. A stop ends the run before its next step starts, so the process taking over never runs a step beside the first.
 
-The options are those of a queue: `store`, `attempts`, `backoff`, `concurrency`, `lostAfter`, `idlePoll` and `keepFailed`, and `onFailed` gets `{ id, input, error }`. `lostAfter` bounds the time between two sleeps or waits. A custom job store needs `update`, `release` and `state`.
+The options are those of a queue: `store`, `attempts`, `backoff`, `concurrency`, `lostAfter`, `idlePoll` and `keepFailed`, and `onStart`, `onSuccess`, `onRetry` and `onError` get `{ id, input }` (`onStart` once per run, not after each sleep). `lostAfter` bounds the time between two sleeps or waits. A custom job store needs `update`, `release` and `state`.
 
 The job holds the input and every kept result, so keep results small and free of secrets: a failed run keeps them for 30 days, and the jobs page shows them.
 

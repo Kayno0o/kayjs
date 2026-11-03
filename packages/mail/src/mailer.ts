@@ -136,6 +136,7 @@ interface Owner {
   run: (run: ListRun, signal: AbortSignal) => Promise<void>
   redact: (mail: Queued) => Queued
   failed: (mail: Mail, error: unknown) => Promise<void>
+  errored: (event: Parameters<NonNullable<QueueOptions<Mail>['onError']>>[0]) => unknown
 }
 
 // The mailers of this process by the id their queued jobs carry.
@@ -640,7 +641,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   suppressions.lists = lists
 
-  const { name = 'mail', onFailed, ...queueOptions } = options.queue ?? {}
+  const { name = 'mail', onFailed, onError, ...queueOptions } = options.queue ?? {}
   const via = crypto.randomUUID()
   const redact = queueOptions.redact ?? withoutBody
   const owner: Owner = {
@@ -653,6 +654,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
       if (onFailed)
         await onFailed({ payload: mail, error })
     },
+    errored: event => onError?.(event),
   }
 
   agreeOnQueue(name, queueOptions.store, { attempts: queueOptions.attempts, backoff: queueOptions.backoff, keepFailed: queueOptions.keepFailed, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll, concurrency: queueOptions.concurrency }, owner)
@@ -666,6 +668,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     ...queueOptions,
     keepFailed: queueOptions.keepFailed ?? FAILED_KEPT,
     redact: queued => ownerOf(queued.via).redact(queued),
+    onError: ({ payload: { via: queuedBy, ...mail }, ...event }) => ownerOf(queuedBy).errored({ ...event, payload: mail }),
     onFailed: async ({ payload: { via: queuedBy, ...mail }, error }) => ownerOf(queuedBy).failed(mail, error),
   })
   // The mails of a list are sent by a job of their own, a batch at a time, so a broadcast to a long list resumes after a restart where it stopped. Its worker starts with the first `mail.list()`, so a mailer with no list runs no more queue than before lists.

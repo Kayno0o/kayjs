@@ -33,13 +33,13 @@ function shared() {
 }
 
 describe('a mail queued by one mailer and claimed by another', () => {
-  it('is given up to the onFailed of the mailer that queued it', async () => {
+  it('is given up to the onError of the mailer that queued it', async () => {
     silenced()
 
     const queue = shared()
     const failed: string[] = []
-    const queuing = mailer({ from: 'a@example.com', transport: { send: refuse }, queue: { ...queue, onFailed: ({ payload }) => void failed.push(`queuing:${payload.subject}`) } })
-    const claiming = mailer({ from: 'b@example.com', transport: { send: refuse }, queue: { ...queue, onFailed: ({ payload }) => void failed.push(`claiming:${payload.subject}`) } })
+    const queuing = mailer({ from: 'a@example.com', transport: { send: refuse }, queue: { ...queue, onError: ({ payload }) => void failed.push(`queuing:${payload.subject}`) } })
+    const claiming = mailer({ from: 'b@example.com', transport: { send: refuse }, queue: { ...queue, onError: ({ payload }) => void failed.push(`claiming:${payload.subject}`) } })
 
     await queuing.enqueue({ to: 'ada@example.com', subject: 'Hi', text: 'Hello' })
     await claiming.drain()
@@ -143,7 +143,7 @@ describe('mailers sharing a queue', () => {
     const queue = shared()
 
     mailer({ from: 'a@example.com', queue })
-    expect(() => mailer({ from: 'b@example.com', queue: { ...queue, onFailed: () => undefined, redact: mail => mail } })).not.toThrow()
+    expect(() => mailer({ from: 'b@example.com', queue: { ...queue, onError: () => undefined, redact: mail => mail } })).not.toThrow()
   })
 
   it('do not clash across queues or stores', () => {

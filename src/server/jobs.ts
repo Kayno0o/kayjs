@@ -1,5 +1,6 @@
 import type { CronSchedule, PositiveDuration } from '../runtime/checks'
 import type { Duration } from '../runtime/duration'
+import type { Hook } from './hooks'
 import type { JobStore } from './queue'
 import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -9,6 +10,7 @@ import { DURATION_TEXT, durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { MAX_TIMER_MS } from './config-limits'
 import { onDrain, stopGraceMs, STOPPED } from './drain'
+import { notify } from './hooks'
 import { defaultJobStore } from './queue'
 import { reportBackgroundError } from './report'
 
@@ -26,6 +28,12 @@ export interface ScheduleOptions {
   timeout?: Duration | false | undefined
   // `false` adds nothing: the schedule never runs, so a job needing an optional service is switched by its setting, `enabled: url !== undefined`, without a conditional plugin around it.
   enabled?: boolean | undefined
+  // Told when a run starts, once it holds its lock: `schedule` is the cron or `every 30s` text naming it, `boot` whether it is the boot run.
+  onStart?: Hook<{ schedule: string, boot: boolean }> | undefined
+  // Told when a run ended well, with how long it took in ms.
+  onSuccess?: Hook<{ schedule: string, boot: boolean, duration: number }> | undefined
+  // Told when a run threw or outlasted its timeout; a run the server's stop cut short is no failure.
+  onError?: Hook<{ schedule: string, boot: boolean, duration: number, error: unknown }> | undefined
 }
 
 type Job = (signal: AbortSignal) => unknown
@@ -233,6 +241,7 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout> | undefined
     let grace: ReturnType<typeof setTimeout> | undefined
+    let began = performance.now()
 
     active.add(controller)
 
@@ -268,14 +277,18 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
           arm()
       })
 
+      await notify('schedule.onStart', [options.onStart], { schedule: label, boot })
+      began = performance.now()
       await Promise.race([job(controller.signal), limit])
       countJobRun(label, 'ok')
+      await notify('schedule.onSuccess', [options.onSuccess], { schedule: label, boot, duration: Math.round(performance.now() - began) })
     }
     catch (error) {
       // A run the stop cut short is no failure to report.
       if (controller.signal.reason !== STOPPED) {
         countJobRun(label, 'failed')
         await reportBackgroundError(`the job scheduled ${label} failed`, error)
+        await notify('schedule.onError', [options.onError], { schedule: label, boot, duration: Math.round(performance.now() - began), error })
       }
     }
     finally {

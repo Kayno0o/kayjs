@@ -39,6 +39,7 @@ import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-typ
 import { apiErrorAnswers, refusalMessages } from './error-shape'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
+import { hookNames } from './hook-names'
 import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
 import { mcpRoutes } from './mcp-routes'
@@ -148,6 +149,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => refusalMessages(root, options),
   async ({ root, options }) => deprecatedConfigKeys(root, options),
   async ({ root, options }) => deprecatedCollectionLinks(root, options),
+  async ({ root, options }) => hookNames(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

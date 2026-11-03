@@ -1,7 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { MetricsConfig, ProxyConfig } from '../config'
 import process from 'node:process'
-import { cacheReads, jobRuns, pageRoutes } from '../runtime/counters'
+import { cacheReads, jobRuns, pageRoutes, queueRuns } from '../runtime/counters'
 import { kayLog } from '../runtime/log'
 import { routerPath } from './base'
 import { pathOf, statusOf } from './log'
@@ -97,6 +97,13 @@ export function serveMetrics(app: Elysia, options: { path: string, base: string,
     for (const [label, runs] of jobRuns) {
       for (const result of ['ok', 'failed', 'skipped'] as const)
         out.push(`kay_job_runs_total{schedule="${labelled(label)}",result="${result}"} ${runs[result]}`)
+    }
+
+    put('kay_queue_runs_total', 'Queue and workflow runs, by queue and how each ended.', 'counter')
+
+    for (const [name, runs] of queueRuns) {
+      for (const result of ['ok', 'retried', 'failed'] as const)
+        out.push(`kay_queue_runs_total{queue="${labelled(name)}",result="${result}"} ${runs[result]}`)
     }
 
     put('kay_cache_reads_total', 'Cached values read, by whether the value was there already.', 'counter')

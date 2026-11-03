@@ -743,6 +743,15 @@ export const LINTS = {
     wrong: '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n---\nTimeline(label="Day" entries={entries} selected={picked()} onSelect={picked.set})',
     right: '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n---\nTimeline(label="Day" entries={entries} selected={picked()} onSelectedChange={picked.set})',
   },
+  'deprecated-hook-names': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.87',
+    site: true,
+    summary: 'A hook key under the name it had before the hook convention of 1.87 (`llms/hooks.md`): `onFailed` of `queue()`, `workflow()` and `mailer({ queue })` is `onError`, as every run that fails names it. The old keys work until 1.90. Found in the options object handed to those calls, imported from `kay/server` or `@kaynooo/kayjs-mail`, in the TypeScript files and `.kay` fences of the project; the fix renames the key, a shorthand `{ onFailed }` becoming `{ onError: onFailed }`. A key written beside its new name is reported with no fix, as both would run. Each later release of the convention adds its renames here.',
+    wrong: '--- server\nimport { queue } from \'kay/server\'\n\nexport const sync = queue(\'sync\', () => undefined, { onFailed: ({ error }) => console.error(error) })\n---\np x',
+    right: '--- server\nimport { queue } from \'kay/server\'\n\nexport const sync = queue(\'sync\', () => undefined, { onError: ({ error }) => console.error(error) })\n---\np x',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

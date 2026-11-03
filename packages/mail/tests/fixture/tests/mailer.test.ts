@@ -387,12 +387,12 @@ describe('the log', () => {
     expect(lines).toEqual([['error', 'kayjs-mail: A mail to 1 recipient at example.com was not sent: 550 mailbox unavailable']])
   })
 
-  it('names an enqueued mail given up after its last attempt, then hands it to the queue\'s onFailed', async () => {
+  it('names an enqueued mail given up after its last attempt, then hands it to the queue\'s onError', async () => {
     const refusing: Transport = { send: async () => {
       throw new Error('550 mailbox unavailable')
     } }
     const failed: string[] = []
-    const queued = mailer({ from: 'site@example.com', transport: refusing, queue: { name: 'given-up-mail', attempts: 1, onFailed: ({ payload: mail }) => {
+    const queued = mailer({ from: 'site@example.com', transport: refusing, queue: { name: 'given-up-mail', attempts: 1, onError: ({ payload: mail }) => {
       failed.push(mail.subject)
     } } })
     const lines = await logged(async () => {

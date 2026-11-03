@@ -40,6 +40,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-ui: Dialog and SidePanel share a head line
 
 - A Dialog now draws a close button in its head line, so positional `button` selectors in an app's tests shift: pick the footer's buttons by `[data-part=footer] button` or by name. Its `title` part lost its border and padding to the new `head` part, so a restyle of `title` that set them is set on `head` now. A SidePanel closes no more on a click outside once something was typed inside, as a Dialog does (`dirty` locks it too), and `onInput` is no longer one of its props.
+### A queue or workflow `onFailed` is `onError`
+
+- `onFailed` of `queue()`, `workflow()` and `mailer({ queue })` is `onError`, the name every run that fails takes (`onStart`, `onSuccess`, `onRetry` and `onError` are new beside it). `onFailed` still works until 1.90, told right after `onError`; `kay upgrade` renames the key (`deprecated-hook-names`). A queue or workflow `onError` also gets the job's `id` and `attempts`.
 
 ### kayjs-auth: the account, provider and audit methods are grouped
 

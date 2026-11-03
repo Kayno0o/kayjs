@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite'
 import type { Duration } from '../runtime/duration'
 import type { StoreBase } from '../runtime/store-base'
+import type { Hook } from './hooks'
 import type { LiveJob } from './queue-live'
 import type { WorkflowAdmin } from './workflow'
 import { existsSync } from 'node:fs'
@@ -8,12 +9,14 @@ import process from 'node:process'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
+import { countQueueRun } from '../runtime/counters'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { MAX_TIMER_MS } from './config-limits'
 import { stopGraceMs, STOPPED } from './drain'
+import { notify } from './hooks'
 import { inMemory } from './memory-mark'
 import { forgetShownJobs, showJobs } from './queue-live'
 import { forgetDrain, inFlightWork, POLL_MS, Scheduler } from './queue-scheduler'
@@ -107,7 +110,16 @@ export interface QueueOptions<Payload> {
   keepFailed?: Duration | false | undefined
   // What a failed job keeps in place of its payload, such as a mail without its body: applied once it is given up, so a failed job holds no more than the app needs to see what went wrong. The payload is kept whole when it throws.
   redact?: ((payload: Payload) => Payload) | undefined
+  // Told before each run of a job, once its worker has taken it: `attempts` counts this run.
+  onStart?: Hook<{ id: string, payload: Payload, attempts: number }> | undefined
+  // Told once a job ran to its end.
+  onSuccess?: Hook<{ id: string, payload: Payload, attempts: number }> | undefined
+  // Told when an attempt failed and the job runs again after `wait` ms; a run that asks `retryLater()` is no retry.
+  onRetry?: Hook<{ id: string, payload: Payload, attempts: number, error: unknown, wait: number }> | undefined
+  // Told when the last attempt failed, once the job is kept as failed.
+  onError?: Hook<{ id: string, payload: Payload, attempts: number, error: unknown }> | undefined
   // Gets a job that failed its last attempt, once it is kept as failed.
+  // @deprecated `onError`, which gets the job's `id` and `attempts` too and is told in order with the other hooks; kept until 1.90.
   onFailed?: ((event: { payload: Payload, error: unknown }) => unknown) | undefined
   // Starts no worker with the server: the first `activate()` or `enqueue` does, so a queue an app may never use costs it no idle poll. A job already stored waits until then.
   lazy?: boolean | undefined
@@ -566,14 +578,14 @@ export function defaultJobStore(): JobStore {
 }
 
 // A queue of jobs the server runs in the background, each surviving a restart: `enqueue` from an action, `app.use(queue)` in the server to run them.
-// A run that throws is retried later, waiting `backoff` then twice as long each time, until `attempts` runs failed: it is then kept as failed, logged and handed to `onFailed`.
+// A run that throws is retried later, waiting `backoff` then twice as long each time, until `attempts` runs failed: it is then kept as failed, logged and handed to `onError`.
 export function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>) => unknown, options: QueueOptions<Payload> = {}): Queue<Payload, Progress> {
   // Wrapped, so an app's handler never gets the run's hold as a fourth argument.
   return jobQueue<Payload, Progress>(name, (payload, signal, job) => handler(payload, signal, job), options).queued
 }
 
 // `queue` for `workflow`: its handler also gets the hold of its run, and the admin it returns is what the workflow wakes its own queue and attaches its calls with.
-export function jobQueue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>, run: RunHold) => unknown, options: QueueOptions<Payload> = {}): { queued: Queue<Payload, Progress>, admin: QueueAdmin } {
+export function jobQueue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>, run: RunHold) => unknown, options: QueueOptions<Payload> = {}, kind: 'queue' | 'workflow' = 'queue'): { queued: Queue<Payload, Progress>, admin: QueueAdmin } {
   const attempts = options.attempts ?? DEFAULT_ATTEMPTS
   const backoff = durationSeconds(options.backoff ?? DEFAULT_BACKOFF, `queue('${name}')'s backoff`) * 1000
   const lostAfter = durationSeconds(options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s lostAfter`) * 1000
@@ -595,17 +607,31 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
   const shown = live === undefined || live === false ? undefined : showJobs(name, ownStore, live === true ? undefined : live as (payload: unknown, job: LiveJob) => unknown)
   const store = shown === undefined ? ownStore : tellingStore(ownStore, shown.changed)
 
-  const reportFailed = async (job: StoredJob, error: unknown) => {
-    try {
-      if (options.onFailed) {
-        const payload = parse(job.payload) as Payload
+  // The job's payload for a hook, undefined when no hook is set to read it or the stored text cannot be read: a job never fails for its hooks.
+  const payloadFor = (job: StoredJob, hooks: readonly unknown[]): { payload: Payload } | undefined => {
+    if (!hooks.some(hook => hook !== undefined))
+      return undefined
 
-        await options.onFailed({ payload, error })
-      }
+    try {
+      return { payload: parse(job.payload) as Payload }
     }
-    catch (failure) {
-      kayLog('error', `onFailed of queue('${name}') failed`, failure)
+    catch (error) {
+      kayLog('error', `the payload of a job of queue('${name}') could not be read for its hooks`, error)
+
+      return undefined
     }
+  }
+
+  const reportFailed = async (job: StoredJob, error: unknown, attempts: number) => {
+    countQueueRun(name, 'failed')
+
+    const read = payloadFor(job, [options.onError, options.onFailed])
+
+    if (read === undefined)
+      return
+
+    await notify(`${kind}.onError`, [options.onError], { id: job.id, payload: read.payload, attempts, error })
+    await notify(`${kind}.onFailed`, [options.onFailed], { payload: read.payload, error })
   }
 
   // The payload a failed job keeps, undefined to keep it whole.
@@ -735,7 +761,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
 
       if (await store().fail(job.id, message, redacted(job), held) !== false) {
         kayLog('error', `a job of queue('${name}') is kept as failed without running: ${message}`)
-        await reportFailed(job, new Error(message))
+        await reportFailed(job, new Error(message), job.attempts - 1)
       }
 
       return true
@@ -756,6 +782,11 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
     }
 
     const reports = progressWriter(job.id, held)
+    const started = payloadFor(job, [options.onStart])
+
+    if (started !== undefined)
+      await notify(`${kind}.onStart`, [options.onStart], { id: job.id, payload: started.payload, attempts: job.attempts })
+
     let succeeded = false
     // A handler may lower its own `attempts`: a workflow that kept a step starts its count again.
     const context: JobContext<Progress> = { id: job.id, attempts: job.attempts, progress: reports.write }
@@ -805,6 +836,12 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
           // The worker looking for jobs may sleep past the time this one is due.
           scheduler.wake()
           kayLog('warn', `a job of queue('${name}') failed, attempt ${context.attempts} of ${attempts}, and runs again in ${Math.round(wait / 1000)} s: ${message}`)
+          countQueueRun(name, 'retried')
+
+          const read = payloadFor(job, [options.onRetry])
+
+          if (read !== undefined)
+            await notify(`${kind}.onRetry`, [options.onRetry], { id: job.id, payload: read.payload, attempts: context.attempts, error, wait })
         }
 
         return true
@@ -812,7 +849,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
 
       if (await store().fail(job.id, message, redacted(job), held) !== false) {
         await reportBackgroundError(`a job of queue('${name}') failed ${context.attempts} times and is kept as failed`, error)
-        await reportFailed(job, error)
+        await reportFailed(job, error, context.attempts)
       }
     }
     finally {
@@ -839,6 +876,13 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
           break
         }
       }
+
+      countQueueRun(name, 'ok')
+
+      const read = payloadFor(job, [options.onSuccess])
+
+      if (read !== undefined)
+        await notify(`${kind}.onSuccess`, [options.onSuccess], { id: job.id, payload: read.payload, attempts: context.attempts })
     }
 
     return true

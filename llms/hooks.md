@@ -61,7 +61,7 @@ export function notes({ beforeSave, onSave }: NotesOptions) {
 
 ### What ships
 
-This release ships the helpers (`notify()`, `decide()`, `hookContext()`, `HookContext`, `Hook`, `BeforeHook`), `refuse()` and `ErrorShape` (from `kay` too), and `source` on `onError` of `kay.config.ts`. The hooks that exist today keep their names (`onAuthEvent`, kayjs-ai's `onRequest` and `onFinish`, a queue's `onFailed`, kayjs-ui's `onSaved`); later releases rename them to the rule and list each rename in [Upgrading](upgrading.md) with a `kay upgrade` fix. New hooks follow the rule from the start.
+This release ships the helpers (`notify()`, `decide()`, `hookContext()`, `HookContext`, `Hook`, `BeforeHook`), `refuse()` and `ErrorShape` (from `kay` too), and `source` on `onError` of `kay.config.ts`. The hooks that exist today keep their names (`onAuthEvent`, kayjs-ai's `onRequest` and `onFinish`, kayjs-ui's `onSaved`); queues, workflows and schedules already follow the rule (`onStart`, `onSuccess`, `onRetry`, `onError`, with the queue's `onFailed` deprecated for `onError`). Later releases rename them to the rule and list each rename in [Upgrading](upgrading.md) with a `kay upgrade` fix. New hooks follow the rule from the start.
 
 ### The rule
 

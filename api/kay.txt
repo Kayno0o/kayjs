@@ -3037,7 +3037,11 @@ interface QueueOptions<Payload>
   lazy?: boolean | undefined
   live?: boolean | ((payload: Payload, job: LiveJob) => unknown) | undefined
   lostAfter?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  onError?: Hook<{ id: string; payload: Payload; attempts: number; error: unknown; }> | undefined
   onFailed?: ((event: { payload: Payload; error: unknown; }) => unknown) | undefined
+  onRetry?: Hook<{ id: string; payload: Payload; attempts: number; error: unknown; wait: number; }> | undefined
+  onStart?: Hook<{ id: string; payload: Payload; attempts: number; }> | undefined
+  onSuccess?: Hook<{ id: string; payload: Payload; attempts: number; }> | undefined
   redact?: ((payload: Payload) => Payload) | undefined
   store?: JobStore | undefined
 
@@ -3293,6 +3297,9 @@ interface ScheduleOptions
   boot?: boolean | undefined
   enabled?: boolean | undefined
   lock?: string | false | undefined
+  onError?: Hook<{ schedule: string; boot: boolean; duration: number; error: unknown; }> | undefined
+  onStart?: Hook<{ schedule: string; boot: boolean; }> | undefined
+  onSuccess?: Hook<{ schedule: string; boot: boolean; duration: number; }> | undefined
   store?: JobStore | undefined
   timeout?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   tz?: string | undefined
@@ -3550,7 +3557,11 @@ interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'at
   idlePoll?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   keepFailed?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
   lostAfter?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  onError?: Hook<{ id: string; input: Input; attempts: number; error: unknown; }> | undefined
   onFailed?: ((event: { id: string; input: Input; error: unknown; }) => unknown) | undefined
+  onRetry?: Hook<{ id: string; input: Input; attempts: number; error: unknown; wait: number; }> | undefined
+  onStart?: Hook<{ id: string; input: Input; }> | undefined
+  onSuccess?: Hook<{ id: string; input: Input; }> | undefined
   store?: JobStore | undefined
 
 [./server] WorkflowRun
