@@ -226,6 +226,7 @@ interface MultiSelectOption<Value extends string = string>
 
 [.] NavLink
 interface NavLink
+  children?: readonly NavLink[] | undefined
   href: string
   icon?: IconProps | IconSlot | undefined
   label: string
@@ -386,6 +387,7 @@ interface SwitcherApp
 
 [.] TimelineEntry
 interface TimelineEntry<Key extends string | number = string>
+  href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   key: Key
   pickable?: boolean | undefined
@@ -484,6 +486,10 @@ component default
   brand?: string | undefined;
   nav?: string | {
     root?: string | undefined;
+    link?: string | undefined;
+    icon?: string | {
+      root?: string | undefined;
+    } | undefined;
     toggle?: string | undefined;
     menuIcon?: string | {
       root?: string | undefined;
@@ -493,18 +499,23 @@ component default
     } | undefined;
     list?: string | undefined;
     item?: string | undefined;
-    link?: string | undefined;
-    icon?: string | {
+    expand?: string | undefined;
+    expandIcon?: string | {
       root?: string | undefined;
     } | undefined;
+    children?: string | undefined;
   } | undefined;
   end?: string | undefined;
 } | undefined
   current: string | URL
   end?: Element
+  expandLabel?: string | undefined
   label: string
+  link?: ((link: NavLink) => Element) | undefined
   links: readonly NavLink[]
   menuLabel?: string | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
   sticky?: boolean | undefined
 
 [./app-switcher.kay] default
@@ -603,6 +614,7 @@ component default
 component default
   class?: string | { root?: string | undefined; image?: string | undefined; initial?: string | undefined; } | undefined
   fallback?: Element
+  href?: string | undefined
   label?: string | undefined
   name: string
   onError?: ((event: Event) => unknown) | undefined
@@ -614,6 +626,7 @@ component default
 component default
   children?: Element
   class?: string | { root?: string | undefined; icon?: string | { root?: string | undefined; } | undefined; } | undefined
+  href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   label?: string | number | undefined
   tone?: "info" | "success" | "neutral" | "danger" | "warning" | "accent" | undefined
@@ -711,13 +724,17 @@ component default
 component default
   class?: string | {
   root?: string | undefined;
+  icon?: string | {
+    root?: string | undefined;
+  } | undefined;
   list?: string | undefined;
   more?: string | undefined;
   item?: string | undefined;
   link?: string | undefined;
   text?: string | undefined;
 } | undefined
-  items: readonly { label: string; href?: string | undefined; }[]
+  item?: ((item: Pick<NavItem, "label" | "icon"> & { href?: string | undefined; }) => Element) | undefined
+  items: readonly (Pick<NavItem, "label" | "icon"> & { href?: string | undefined; })[]
   label: string
   structured?: boolean | undefined
 
@@ -730,18 +747,15 @@ component default
 component default
   actions?: Element
   children?: Element
-  class?: string | { root?: string | undefined; body?: string | undefined; actions?: string | undefined; } | undefined
+  class?: string | { root?: string | undefined; body?: string | undefined; link?: string | undefined; actions?: string | undefined; } | undefined
+  href?: string | undefined
   left?: Element
   right?: Element
 
 [./card.kay] default
 component default
-  bare?: boolean | undefined
-  children?: Element
-  class?: string | { root?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; } | undefined
-  head?: Element
-  level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined
-  title?: string | undefined
+  | { bare?: boolean | undefined; children?: Element; class?: string | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; } | undefined; head?: Element; href?: undefined; level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined; title?: Element }
+  | { bare?: boolean | undefined; children?: Element; class?: string | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; } | undefined; head?: Element; href: string; level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined; title: Element }
 
 [./carousel.kay] default
 component default
@@ -749,6 +763,7 @@ component default
   root?: string | undefined;
   viewport?: string | undefined;
   slide?: string | undefined;
+  link?: string | undefined;
   image?: string | undefined;
   controls?: string | undefined;
   step?: string | {
@@ -762,11 +777,12 @@ component default
       root?: string | undefined;
     } | undefined;
   } | undefined;
-} | undefined; dotLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slideLabel?: string | undefined; slides: readonly Slide[] }
+} | undefined; dotLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides: readonly Slide[] }
   | { autoplay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; class?: string | {
   root?: string | undefined;
   viewport?: string | undefined;
   slide?: string | undefined;
+  link?: string | undefined;
   image?: string | undefined;
   controls?: string | undefined;
   step?: string | {
@@ -780,7 +796,7 @@ component default
       root?: string | undefined;
     } | undefined;
   } | undefined;
-} | undefined; dotLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list: InfiniteList<Slide>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slideLabel?: string | undefined; slides?: undefined }
+} | undefined; dotLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list: InfiniteList<Slide>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides?: undefined }
 
 [./checkbox.kay] default
 component default
@@ -930,8 +946,10 @@ component default
   } | undefined;
   armed?: string | undefined;
   message?: string | undefined;
+  details?: string | undefined;
 } | undefined
   confirmLabel?: string | undefined
+  details?: Element
   disabled?: boolean | undefined
   failure: string
   label?: string | undefined
@@ -1077,6 +1095,7 @@ component default
   class?: string | { root?: string | undefined; title?: string | undefined; body?: string | undefined; footer?: string | undefined; } | undefined
   dirty?: boolean | undefined
   footer?: Element
+  heading?: Element
   level?: 2 | 3 | 4 | 5 | 6 | undefined
   onOpenChange: (open: boolean) => unknown
   open: boolean
@@ -1181,9 +1200,9 @@ interface SortableOptions
 component default
   actions?: Element
   class?: string | { root?: string | undefined; title?: string | undefined; description?: string | undefined; actions?: string | undefined; } | undefined
-  description?: string | undefined
+  description?: Element
   level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined
-  title: string
+  title: Element
 
 [./extension] ui
 function ui(): KayExtension<AnyElysia>
@@ -1218,6 +1237,7 @@ component default
 } | undefined
   extra?: Element
   failure: string
+  heading?: Element
   id?: string | undefined
   onError?: ((error: unknown) => unknown) | undefined
   onOpenChange: (open: boolean) => unknown
@@ -1444,7 +1464,7 @@ component default
 
 [./media-gallery.kay] default
 component default
-  | { class?: string | {
+  | { caption?: ((item: Item, index: number) => Element) | undefined; class?: string | {
   root?: string | undefined;
   stage?: string | undefined;
   frame?: string | undefined;
@@ -1469,8 +1489,8 @@ component default
       root?: string | undefined;
     } | undefined;
   } | undefined;
-} | undefined; closeLabel?: string | undefined; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items: Item[]; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
-  | { class?: string | {
+} | undefined; closeLabel?: string | undefined; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items: Item[]; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; onOpenChange?: ((open: boolean, index: number) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
+  | { caption?: ((item: Item, index: number) => Element) | undefined; class?: string | {
   root?: string | undefined;
   stage?: string | undefined;
   frame?: string | undefined;
@@ -1495,7 +1515,7 @@ component default
       root?: string | undefined;
     } | undefined;
   } | undefined;
-} | undefined; closeLabel?: string | undefined; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items?: undefined; list: InfiniteList<Item>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
+} | undefined; closeLabel?: string | undefined; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items?: undefined; list: InfiniteList<Item>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; onOpenChange?: ((open: boolean, index: number) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
 
 [./menu.kay] default
 component default
@@ -1595,9 +1615,23 @@ component default
 
 [./notice.kay] default
 component default
+  actions?: Element
   children?: Element
-  class?: string | { root?: string | undefined; } | undefined
+  class?: string | {
+  root?: string | undefined;
+  icon?: string | {
+    root?: string | undefined;
+  } | undefined;
+  body?: string | undefined;
+  actions?: string | undefined;
+  dismiss?: any;
+} | undefined
+  dismissLabel?: string | undefined
+  dismissible?: boolean | undefined
+  icon?: boolean | IconProps | IconSlot | undefined
   label?: string | undefined
+  onDismiss?: (() => unknown) | undefined
+  open?: boolean | undefined
   size?: "sm" | "md" | undefined
   tone?: "info" | "success" | "danger" | "warning" | undefined
 
@@ -1613,9 +1647,9 @@ component default
   actions?: string | undefined;
   description?: string | undefined;
 } | undefined
-  description?: string | undefined
+  description?: Element
   meta?: Element
-  title: string
+  title: Element
 
 [./page-section.kay] default
 component default
@@ -1631,7 +1665,7 @@ component default
   level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined
   sticky?: boolean | undefined
   subtitle?: string | undefined
-  title: string
+  title: Element
 
 [./pagination.kay] default
 component default
@@ -1719,6 +1753,12 @@ component default
   live?: string | undefined;
   problem?: string | {
     root?: string | undefined;
+    icon?: string | {
+      root?: string | undefined;
+    } | undefined;
+    body?: string | undefined;
+    actions?: string | undefined;
+    dismiss?: any;
   } | undefined;
 } | undefined
   failure?: string | undefined
@@ -1890,7 +1930,7 @@ component default
       root?: string | undefined;
     } | undefined;
   } | undefined;
-} | undefined; closeHref: string; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; launcher?: undefined; launcherHref?: undefined; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: string | number | undefined; size?: number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
+} | undefined; closeHref: string; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; heading?: Element; launcher?: undefined; launcherHref?: undefined; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: string | number | undefined; size?: number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
   | { actions?: Element; children?: Element; class?: string | {
   root?: string | undefined;
   grip?: string | undefined;
@@ -1904,7 +1944,7 @@ component default
       root?: string | undefined;
     } | undefined;
   } | undefined;
-} | undefined; closeHref: string; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; launcher: string; launcherHref: string; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: string | number | undefined; size?: number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
+} | undefined; closeHref: string; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; heading?: Element; launcher: string; launcherHref: string; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: string | number | undefined; size?: number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
   | { actions?: Element; children?: Element; class?: string | {
   root?: string | undefined;
   grip?: string | undefined;
@@ -1918,7 +1958,7 @@ component default
       root?: string | undefined;
     } | undefined;
   } | undefined;
-} | undefined; closeHref?: string | undefined; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; launcher?: string | undefined; launcherHref?: string | undefined; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: string | number | undefined; size?: number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
+} | undefined; closeHref?: string | undefined; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; heading?: Element; launcher?: string | undefined; launcherHref?: string | undefined; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: string | number | undefined; size?: number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
 
 [./site-favicon.kay] default
 component default
@@ -1933,6 +1973,10 @@ component default
 component default
   class?: string | {
   root?: string | undefined;
+  link?: string | undefined;
+  icon?: string | {
+    root?: string | undefined;
+  } | undefined;
   toggle?: string | undefined;
   menuIcon?: string | {
     root?: string | undefined;
@@ -1942,16 +1986,21 @@ component default
   } | undefined;
   list?: string | undefined;
   item?: string | undefined;
-  link?: string | undefined;
-  icon?: string | {
+  expand?: string | undefined;
+  expandIcon?: string | {
     root?: string | undefined;
   } | undefined;
+  children?: string | undefined;
 } | undefined
   current: string | URL
+  expandLabel?: string | undefined
   id?: string | undefined
   label: string
+  link?: ((link: NavLink) => Element) | undefined
   links: readonly NavLink[]
   menuLabel?: string | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
 
 [./skeleton.kay] default
 component default
@@ -2082,8 +2131,22 @@ component default
 
 [./tab-nav.kay] default
 component default
-  | { class?: string | { root?: string | undefined; link?: string | undefined; } | undefined; current: string | URL; keep?: readonly string[] | undefined; label: string; links: readonly ({ href: string; label: string; } & Omit<TabLink, "href">)[]; param?: undefined; paramDefault?: undefined; tabs?: undefined }
-  | { class?: string | { root?: string | undefined; link?: string | undefined; } | undefined; current?: undefined; keep?: undefined; label: string; links?: undefined; param: string; paramDefault?: string | number | undefined; tabs: readonly { value: string | number; label: string; }[] }
+  | { class?: string | {
+  root?: string | undefined;
+  icon?: string | {
+    root?: string | undefined;
+  } | undefined;
+  badge?: string | undefined;
+  link?: string | undefined;
+} | undefined; current: string | URL; keep?: readonly string[] | undefined; label: string; links: readonly ({ href: string; } & NavItem & Omit<TabLink, "href">)[]; param?: undefined; paramDefault?: undefined; tab?: ((tab: TabEntry) => Element) | undefined; tabs?: undefined }
+  | { class?: string | {
+  root?: string | undefined;
+  icon?: string | {
+    root?: string | undefined;
+  } | undefined;
+  badge?: string | undefined;
+  link?: string | undefined;
+} | undefined; current?: undefined; keep?: undefined; label: string; links?: undefined; param: string; paramDefault?: string | number | undefined; tab?: ((tab: TabEntry) => Element) | undefined; tabs: readonly ({ value: string | number; } & NavItem)[] }
 
 [./table.kay] default
 component default
@@ -2173,8 +2236,9 @@ component default
   icon?: string | {
     root?: string | undefined;
   } | undefined;
+  badge?: string | undefined;
   panel?: string | undefined;
-} | undefined; label: string; onChange?: ((value: Value) => unknown) | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; tabs: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[]; value: Value }
+} | undefined; label: string; onChange?: ((value: Value) => unknown) | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: readonly ({ value: Value; } & NavItem)[]; value: Value }
   | { class?: string | {
   root?: string | undefined;
   list?: string | undefined;
@@ -2182,8 +2246,9 @@ component default
   icon?: string | {
     root?: string | undefined;
   } | undefined;
+  badge?: string | undefined;
   panel?: string | undefined;
-} | undefined; label: string; onChange?: ((value: Value) => unknown) | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; tabs: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[]; value?: undefined }
+} | undefined; label: string; onChange?: ((value: Value) => unknown) | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: readonly ({ value: Value; } & NavItem)[]; value?: undefined }
 
 [./text-input.kay] default
 component default
@@ -2320,7 +2385,8 @@ component default
   empty?: Element
   icon?: IconProps | IconSlot | undefined
   isEmpty?: boolean | undefined
-  title?: string | undefined
+  level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined
+  title?: Element
 
 [./zoom-pane.kay] default
 component default

@@ -27,6 +27,10 @@ What each release before 1.84 added, and the end of a newest release that was cu
 - kayjs-ui's `SidePanel` takes `scrollKey`, whose change brings its body back to the top, so a panel kept in a `persist` island needs no ref into its parts: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
 - A form posting to an action keeps its honeypot and time stamp inside an island, so kayjs-ui's ContactForm and SubscribeForm given `onSent` or `onError` no longer drop them from the server HTML: [forms](../packages/ui/llms/forms-and-steps.md).
 
+- An unknown `tooltip` attribute on an element names `data-tooltip` and `data-hint` in `kay check`: [checks](checks.md).
+- Kay's tsconfig includes `scripts`, so a script run with `bun scripts/x.ts` is type checked and linted with no `include` in the app: [project](project.md).
+- `kay lint --cache` drops ESLint's cache when `tsconfig.json` or a file under `.kay/types` changed, so a parsing error does not outlive the tsconfig that caused it: [checks](checks.md).
+
 ## 1.83.0
 
 - kayjs-ai: `ground(found, read)` turns the rows pg-orm 8's `nearest()` found into the `system` and `sources` of an `ask`, so a chat answers from the app's own documents and cites them, and the fake answers it all under `bun test`: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).

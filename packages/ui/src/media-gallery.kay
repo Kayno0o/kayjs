@@ -194,7 +194,7 @@ effect(() => {
 })
 ---
 // The caption's content: the app's block, else the item's title.
-snippet captioned(item: MediaItem, position: number)
+snippet captioned(item: Item, position: number)
   if caption
     slot caption(item, position)
   else
