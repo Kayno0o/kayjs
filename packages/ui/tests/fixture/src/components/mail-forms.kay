@@ -19,7 +19,7 @@ const action = Object.assign(async () => undefined, {
 }) as unknown as Action<never, unknown>
 ---
 button#sent(onClick={() => { failed = undefined; done = { data: 'ok' } }}) Sent
-button#refused(onClick={() => { done = undefined; failed = { status: 422, values: {}, errors: { email: 'Invalid' } } }}) Refused
+button#refused(onClick={() => { done = undefined; failed = { status: 422, message: 'Invalid', values: {}, errors: { email: 'Invalid' } } }}) Refused
 ContactForm(action={action} onSent={onSent} onError={onError})
   @sent
     p#custom-sent Custom
