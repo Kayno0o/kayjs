@@ -25,7 +25,7 @@ import { MCP_PATH, mcpPath } from '../server/api-modules'
 import { servePages } from '../server/app'
 import { basePath, routerPath } from '../server/base'
 import { clientOptionsKey, readManifest } from '../server/client'
-import { shutdown } from '../server/lifecycle'
+import { runStopHooks, shutdown } from '../server/lifecycle'
 import { forgetStamps } from '../server/live'
 import { loaderRoot } from '../server/loader'
 import { tapLogs } from '../server/log'
@@ -280,6 +280,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   // The URL the browser shows a page at that answered a post in place: the one posted to.
   const answeredAt = new WeakMap<Visit, string>()
   let server: Bun.Server<unknown> | undefined
+  let stopped = false
   let mounted: ReturnType<typeof mountedAt> | undefined
   const opened = new Set<TestPage>()
   const connections = new Set<{ close: () => void }>()
@@ -449,9 +450,13 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         mounted?.stop()
         mounted = undefined
 
+        // A site that never listened has its plugins' `onStop` hooks run all the same, once however often it is closed.
         if (server)
           await shutdown(app, true)
+        else if (!stopped)
+          await runStopHooks(app)
 
+        stopped = true
         server = undefined
         await release()
 

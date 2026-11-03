@@ -1,5 +1,6 @@
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
 import { testSite } from '../src/test'
 import { fixtureCopy } from './scratch'
 
@@ -89,5 +90,28 @@ describe('testSite close with connections the site opened', () => {
 
     await site.close()
     await site.close()
+  })
+})
+
+describe('testSite close runs the plugins\' onStop hooks', () => {
+  const plugin = (stops: string[]) => new Elysia().onStop(() => void stops.push('stopped'))
+
+  it('for a site that never listened, once however often it is closed', async () => {
+    const stops: string[] = []
+    const site = await testSite({ root: fixture, use: [plugin(stops)] })
+
+    expect((await site.fetch('/')).status).toBeLessThan(500)
+    await site.close()
+    await site.close()
+    expect(stops).toEqual(['stopped'])
+  })
+
+  it('for a site that listened', async () => {
+    const stops: string[] = []
+    const site = await testSite({ root: fixture, api, use: [plugin(stops)] })
+
+    site.socket(chat, '/:room', { params: { room: 'stop' } })
+    await site.close()
+    expect(stops).toEqual(['stopped'])
   })
 })

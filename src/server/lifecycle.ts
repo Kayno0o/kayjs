@@ -283,7 +283,11 @@ export async function shutdown(app: AnyElysia, force = false): Promise<void> {
 
   await stopServer(server, force)
   app.server = null
+  await runStopHooks(app)
+}
 
+// Runs each `onStop` hook in turn, awaiting it: for an app that never listened too, as a plugin may have started its timers when it was set up.
+export async function runStopHooks(app: AnyElysia): Promise<void> {
   for (const hook of app.event.stop ?? []) {
     try {
       await hook.fn(app)
