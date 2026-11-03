@@ -75,7 +75,7 @@ Attempts are counted in the store's `rates` (`memoryAuthStore` and `pgStore` kee
 - `resend`, `forgot` and `magicLink` 12 per client and 3 per account per hour (`resendAccount`, `forgotAccount` and `magicLinkAccount`, the last two counted per address); `emailChange` 12 and `emailChangeAccount` 5.
 - `invite` 30 per manager per hour, `inviteAddress` 5 per invited address per day.
 - `organization` 10 per account per day, for `organizations.create`.
-- `export` 6 per account per hour, for `exportData()` and `GET <prefix>/export`.
+- `export` 6 per account per hour, for `account.export()` and `GET <prefix>/export`.
 - `twoFactor` 30 and `twoFactorAccount` 8 per 15 minutes, for signing in and for turning the factor on; the first sign-in guess past `twoFactorAccount` mails the holder the `sign-in-locked` notice, at most once a day; `reprove` 6 per 15 minutes; `link` 40 per hour; `emailCode` 30 per client and `emailCodeAccount` 10 per address per 15 minutes.
 
 ### Stores

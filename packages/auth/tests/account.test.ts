@@ -44,7 +44,7 @@ describe('the actions that re-prove the user', () => {
     ['changing the password', false, async (ada, proof) => ada.call('password.change', proof, 'a first password')],
     ['changing the email', true, async (ada, proof) => ada.call('email.change', proof, 'ada@new.test')],
     ['adding a passkey', true, async (ada, proof) => ada.call('passkeys.registrationOptions', proof)],
-    ['linking a provider', true, async (ada, proof) => ada.call('linkProvider', 'github', proof)],
+    ['linking a provider', true, async (ada, proof) => ada.call('oauth.link', 'github', proof)],
   ]
 
   // One account of each shape, signed in, with the action's own failures told apart from its refusals by `error`.
@@ -197,11 +197,11 @@ describe('changing the username', () => {
   test('names a user without one, the name then signing in, and lets them recase it', async () => {
     const { ada, browser } = await registered()
 
-    expect(await ada.call('changeUsername', ' Ada  Lovelace ')).toMatchObject({ ok: true, user: { username: 'Ada Lovelace' } })
+    expect(await ada.call('account.changeUsername', ' Ada  Lovelace ')).toMatchObject({ ok: true, user: { username: 'Ada Lovelace' } })
     expect(await ada.json('/me')).toMatchObject({ username: 'Ada Lovelace' })
     expect(await browser().post('/password', { identifier: 'ada lovelace', password: PASSWORD })).toMatchObject({ ok: true })
-    expect(await ada.call('changeUsername', 'ada lovelace')).toMatchObject({ ok: true, user: { username: 'ada lovelace' } })
-    await ada.call('changeUsername', 'countess')
+    expect(await ada.call('account.changeUsername', 'ada lovelace')).toMatchObject({ ok: true, user: { username: 'ada lovelace' } })
+    await ada.call('account.changeUsername', 'countess')
 
     expect(await browser().post('/password', { identifier: 'ada lovelace', password: PASSWORD })).toEqual({ ok: false, error: 'invalid' })
   })
@@ -210,12 +210,12 @@ describe('changing the username', () => {
     const { ada, browser, store } = await registered()
 
     await store.users.create(userRecord({ id: 'u2', username: 'Bob' }))
-    await ada.call('changeUsername', 'ada')
+    await ada.call('account.changeUsername', 'ada')
 
-    expect(await ada.call('changeUsername', 'a')).toEqual({ ok: false, errors: { username: 'length' } })
-    expect(await ada.call('changeUsername', 'bob')).toEqual({ ok: false, errors: { username: 'taken' } })
-    expect(await ada.call('changeUsername', 'ada')).toEqual({ ok: false, errors: { username: 'unchanged' } })
-    expect(await browser().call('changeUsername', 'carol')).toEqual({ ok: false, error: 'signed-out' })
+    expect(await ada.call('account.changeUsername', 'a')).toEqual({ ok: false, errors: { username: 'length' } })
+    expect(await ada.call('account.changeUsername', 'bob')).toEqual({ ok: false, errors: { username: 'taken' } })
+    expect(await ada.call('account.changeUsername', 'ada')).toEqual({ ok: false, errors: { username: 'unchanged' } })
+    expect(await browser().call('account.changeUsername', 'carol')).toEqual({ ok: false, error: 'signed-out' })
   })
 
   // Each test builds its own store, so the stubs below need no restoring.
@@ -228,7 +228,7 @@ describe('changing the username', () => {
       throw new Error('unique violation')
     }
 
-    expect(await ada.call('changeUsername', 'ada')).toEqual({ ok: false, errors: { username: 'taken' } })
+    expect(await ada.call('account.changeUsername', 'ada')).toEqual({ ok: false, errors: { username: 'taken' } })
 
     store.users.update = async () => {
       throw new Error('connection lost')
@@ -251,7 +251,7 @@ describe('changing the username', () => {
 
     // Added before the first request, which compiles the routes.
     app.post('/rename', async ({ auth }) => {
-      await auth.changeUsername('ada')
+      await auth.account.changeUsername('ada')
 
       return auth.user()
     })
@@ -271,14 +271,14 @@ describe('unlinking a provider', () => {
 
     await ada.fetch('/sign-in/u1', POST)
 
-    expect(await ada.call('listIdentities')).toEqual(['discord'])
-    expect(await ada.call('unlink', 'github', {})).toEqual({ ok: false, error: 'not-linked' })
-    expect(await ada.call('unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
+    expect(await ada.call('oauth.identities')).toEqual(['discord'])
+    expect(await ada.call('oauth.unlink', 'github', {})).toEqual({ ok: false, error: 'not-linked' })
+    expect(await ada.call('oauth.unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
 
     await ada.call('password.change', {}, 'a first password')
 
-    expect(await ada.call('unlink', 'discord', { password: 'a first password' })).toEqual({ ok: true })
-    expect(await ada.call('listIdentities')).toEqual([])
+    expect(await ada.call('oauth.unlink', 'discord', { password: 'a first password' })).toEqual({ ok: true })
+    expect(await ada.call('oauth.identities')).toEqual([])
   })
 })
 
@@ -291,8 +291,8 @@ describe('deleting the account', () => {
       },
     })
 
-    expect(await ada.call('deleteAccount', { password: 'wrong password!' })).toEqual({ ok: false, error: 'proof' })
-    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.call('account.delete', { password: 'wrong password!' })).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
 
     expect(await ada.json('/me')).toBe('anonymous')
     expect(deleted.map(user => user.email)).toEqual(['ada@example.com'])
@@ -335,7 +335,7 @@ describe('deleting the account', () => {
 
     fail = false
 
-    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
     expect(await store.users.findByEmail('ada@example.com')).toBeUndefined()
   })
 
@@ -346,7 +346,7 @@ describe('deleting the account', () => {
     await ada.call('email.change', { password: PASSWORD }, 'ada@new.example')
     await browser().post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })
 
-    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
 
     const entries = await store.audit!.list({ limit: 100 })
     const pseudonym = entries[0]!.userId
@@ -363,14 +363,14 @@ describe('deleting the account', () => {
 
     await store.users.update(adaRecord.id, { roles: ['admin'] })
 
-    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: false, error: 'last-admin' })
+    expect(await ada.call('account.delete', { password: PASSWORD })).toEqual({ ok: false, error: 'last-admin' })
     expect(await store.users.get(adaRecord.id)).toBeTruthy()
 
     const { user } = await browser().callHas('user', 'password.register', { email: 'grace@example.com', password: PASSWORD })
 
     await store.users.update(user.id, { roles: ['admin'] })
 
-    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
   })
 
   test('with a second factor and no password, takes a code', async () => {
@@ -385,7 +385,7 @@ describe('deleting the account', () => {
 
     await ada.call('twoFactor.enable', await totpCode(setup.secret, totpStep()))
 
-    expect(await ada.call('deleteAccount', {})).toEqual({ ok: false, error: 'proof' })
-    expect(await ada.call('deleteAccount', { code: await totpCode(setup.secret, totpStep() + 1) })).toEqual({ ok: true })
+    expect(await ada.call('account.delete', {})).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('account.delete', { code: await totpCode(setup.secret, totpStep() + 1) })).toEqual({ ok: true })
   })
 })

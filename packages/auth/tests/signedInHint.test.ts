@@ -11,8 +11,8 @@ const HINT = /(?:^|\n)kay_user=([\w-]+); /
 // The Set-Cookie lines of a response, as one text.
 const cookiesOf = (response: Response): string => response.headers.getSetCookie().join('\n')
 
-async function user(app: { auth: { createUser: (input: { email: string, password: string, emailVerified: boolean }) => Promise<{ ok: true, user: { id: string } } | { ok: false, errors: unknown }> } }, email = 'ada@example.com') {
-  const made = await app.auth.createUser({ email, password: PASSWORD, emailVerified: true })
+async function user(app: { auth: { admin: { createUser: (input: { email: string, password: string, emailVerified: boolean }) => Promise<{ ok: true, user: { id: string } } | { ok: false, errors: unknown }> } } }, email = 'ada@example.com') {
+  const made = await app.auth.admin.createUser({ email, password: PASSWORD, emailVerified: true })
 
   if (!made.ok)
     throw new Error('no user')

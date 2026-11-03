@@ -309,7 +309,7 @@ An account registered and never verified goes the same way, 30 days after it was
 
 A guest costs nothing to make, so kayjs-auth does not name it to other libraries: kayjs-ai's limits count a guest by address, and a signed-in user by id.
 
-`signUp: false` in `createAuth` closes self-service accounts. `password.register` and `signInAsGuest` answer `'closed'`. Make users yourself with `auth.createUser({ email, password, roles })`, or the first one from the terminal:
+`signUp: false` in `createAuth` closes self-service accounts. `password.register` and `signInAsGuest` answer `'closed'`. Make users yourself with `auth.admin.createUser({ email, password, roles })`, or the first one from the terminal:
 
 ```sh
 kay auth create-user ada@example.com --role admin
@@ -409,7 +409,7 @@ export const auth = createAuth({
 
 A `label` is a string, or an object by locale such as `{ en: 'Bio', fr: 'Biographie' }`. The page shows the one for its own locale.
 
-A page of your own calls `auth.profile(locale)` and `auth.saveProfile(values)`. `saveProfile` throws when `pages` has no `profile`.
+A page of your own calls `auth.account.profile(locale)` and `auth.account.saveProfile(values)`. `saveProfile` throws when `pages` has no `profile`.
 
 ## Switching features off
 
@@ -513,7 +513,7 @@ With `audit: true`, the same events are kept in the store for a year. Pass `audi
 
 Each entry keeps the address cut to its network, the first three bytes of an IPv4 address and the first three groups of an IPv6 one. Pass `audit: { ip: 'full' }` to keep the whole address.
 
-Deleting an account removes the address and browser from its entries, and fails if the store cannot, with the account still there unless it was the last entry, the one recording the deletion. `auth.listAuditLog({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
+Deleting an account removes the address and browser from its entries, and fails if the store cannot, with the account still there unless it was the last entry, the one recording the deletion. `auth.audit.list({ before, limit })` gives the signed-in user their own, newest first. Pass the last entry of a page as `before` for the next one.
 
 `describeAuditEntry(entry, { locale })` words an entry for a person, such as `Role editor granted`, in English or French.
 
@@ -572,7 +572,7 @@ createAuth({
 
 Whoever creates an organization holds `owner`. The last owner cannot leave, lose the role or delete their account: `deleteAccount` answers `last-owner` until another member is made an owner. An admin's `admin.deleteUser` does not: the organization passes to its longest-standing member, who is told. Requests that race for the last owner, or for a user's last way in, cannot both win: a write that would leave none is undone and answers `last-owner` (or `last-way-in`), so at least one stays.
 
-An owner who is the only member deletes the organization along with the account. `deletionImpact()` lists both kinds of organization by name, and the account page shows them before the user confirms.
+An owner who is the only member deletes the organization along with the account. `account.deletionImpact()` lists both kinds of organization by name, and the account page shows them before the user confirms.
 
 A guest or an unverified account that is dropped without anyone asking passes an organization it solely owned to its longest-standing member. `manage` is the role that renames, invites and removes members. It is `owner` by default.
 
@@ -636,7 +636,7 @@ createAuth({
 a(href="/auth/discord?redirect=/account" data-no-prefetch) Sign in with Discord
 ```
 
-A sign-in stores none of the provider's tokens unless the app asks. Set `keepTokens: true` on the entry to keep them, encrypted, for `providerToken('discord')`. Unlinking a provider and deleting the account then revoke the token at the provider when it has a revocation endpoint (Discord, Google, GitLab, Apple, and OpenID Connect providers that list one). GitHub and Microsoft have none, so the user ends the grant in their provider settings.
+A sign-in stores none of the provider's tokens unless the app asks. Set `keepTokens: true` on the entry to keep them, encrypted, for `oauth.providerToken('discord')`. Unlinking a provider and deleting the account then revoke the token at the provider when it has a revocation endpoint (Discord, Google, GitLab, Apple, and OpenID Connect providers that list one). GitHub and Microsoft have none, so the user ends the grant in their provider settings.
 
 Opening that link again while a sign-in is under way goes on with it, and never cancels a provider being linked to an account.
 

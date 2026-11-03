@@ -69,7 +69,7 @@ async function signInWith(visitor: Browser, provider: string, account: string) {
 }
 
 async function linkWith(visitor: Browser, provider: string, account: string) {
-  const started = await visitor.callOk('linkProvider', provider, {}, {})
+  const started = await visitor.callOk('oauth.link', provider, {}, {})
   const state = new URL(started.url).searchParams.get('state')!
 
   return visitor.fetch(`/auth/${provider}/callback?code=code-${account}&state=${state}`)
@@ -117,7 +117,7 @@ describe('app data and provider ids on the user', () => {
 
     expect((await me(ada)).providers).toEqual({ discord: { id: '1' }, github: { id: '7' } })
 
-    expect(await ada.call('unlink', 'discord', {})).toEqual({ ok: true })
+    expect(await ada.call('oauth.unlink', 'discord', {})).toEqual({ ok: true })
     expect((await me(ada)).providers).toEqual({ github: { id: '7' } })
   })
 

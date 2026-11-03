@@ -302,7 +302,7 @@ describe('what ends the user\'s other sessions and bearer tokens', () => {
       await app.store.identities.create({ provider: 'discord', providerId: '1', userId: app.id, accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() })
       const ended = await app.otherWaysIn()
 
-      expect(await app.ada.call('unlink', 'discord', { password: PASSWORD })).toEqual({ ok: true })
+      expect(await app.ada.call('oauth.unlink', 'discord', { password: PASSWORD })).toEqual({ ok: true })
       await ended()
     }],
     ['removing a passkey', async (app) => {

@@ -198,7 +198,7 @@ export const CHECK_USER = Symbol('kayjs-auth.checkUser')
 export interface UserMaker {
   // What `createUser` would refuse the login for, asked before the password is.
   [CHECK_USER]: (input: Omit<CreateUserInput, 'roles'> & { roles?: string[] | undefined }) => Promise<Partial<Record<'email' | 'username' | 'password', string>>>
-  createUser: (input: Omit<CreateUserInput, 'roles'> & { roles?: string[] | undefined }) => Promise<CreateUserResult>
+  admin: { createUser: (input: Omit<CreateUserInput, 'roles'> & { roles?: string[] | undefined }) => Promise<CreateUserResult> }
 }
 
 // The commands both extensions add.

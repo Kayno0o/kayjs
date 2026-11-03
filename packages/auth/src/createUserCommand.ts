@@ -196,7 +196,7 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
         }
 
         // An address the operator types is vouched for: the user cannot receive a verification mail before they can sign in.
-        const result = await auth.createUser({ ...email !== undefined && { email, emailVerified: true }, ...username !== undefined && { username }, ...password !== undefined && { password }, ...roles && { roles } })
+        const result = await auth.admin.createUser({ ...email !== undefined && { email, emailVerified: true }, ...username !== undefined && { username }, ...password !== undefined && { password }, ...roles && { roles } })
 
         if (!result.ok) {
           console.error(`kay auth create-user: refused: ${Object.entries(result.errors).map(([field, code]) => `${field} ${code}`).join(', ')}`)

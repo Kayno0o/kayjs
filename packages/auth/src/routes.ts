@@ -20,7 +20,7 @@ const UNSAFE_FILE_NAME = /[^\w.-]/g
 
 // What the routes read of Elysia's context.
 interface RouteContext {
-  auth: Pick<Auth, typeof STATE | 'exportData' | 'signOut' | 'admin'>
+  auth: Pick<Auth, typeof STATE | 'account' | 'signOut' | 'admin'>
   request: Request
   body: unknown
   query: Record<string, unknown>
@@ -64,7 +64,7 @@ export function sendCookies(context: { set: { headers: Record<string, unknown> }
 
 // The signed-in user's data as a JSON download, linked from their account page.
 export async function exportRoute({ auth, set, status }: RouteContext, core: Core) {
-  const exported = await auth.exportData()
+  const exported = await auth.account.export()
 
   if (!exported.ok) {
     if (exported.error === 'limited')

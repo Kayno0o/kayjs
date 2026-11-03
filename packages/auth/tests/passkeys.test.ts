@@ -319,9 +319,9 @@ describe('a passkey as second factor and as proof', () => {
     await app.store.passkeys.update(id, { userVerified: false })
 
     expect(await ada.call('passkeys.list')).toMatchObject([{ userVerified: false }])
-    expect(await ada.call('unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
+    expect(await ada.call('oauth.unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
     expect(await ada.call('passkeys.revoke', id, {})).toEqual({ ok: true })
-    expect(await ada.call('unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
+    expect(await ada.call('oauth.unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
   })
 
   test('a sole passkey that is not proven stays while it is the only way in', async () => {

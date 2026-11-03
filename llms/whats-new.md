@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - Every kayjs-ui field control takes `size` (`sm`, `md`, `lg`) and `invalid` (the danger line and `aria-invalid`), and the field look is one constant: [forms](../packages/ui/llms/forms.md).
 - Every kayjs-ui component with a `tone` (Button, IconButton, BareIconButton, RecordButton, CopyButton, Badge, Stat, Notice, Toast, Timeline, Sparkline, StatusStrip, ConfirmDelete, Menu and its entries) takes the one exported `Tone` and styles all six: [Button](../docs/src/content/ui/button.md).
 - `toast.warning(...)` pushes a warning toast, `ToastOptions.tone` takes any `Tone`, and `kay check` flags the old `muted` tone with the safe-fixable `deprecated-ui-tone` lint: [deprecated lints](deprecated-lints.md).
+- kayjs-auth groups its account, provider and audit methods (`auth.account.delete(proof)`, `auth.oauth.link(...)`, `auth.audit.list()`, `auth.admin.createUser(input)`), and the `deprecated-auth-account-methods` lint renames the flat names: [grouped methods](../packages/auth/llms/grouped-methods.md).
 - kayjs-auth checks new passwords against Have I Been Pwned by default in production (`breachedPasswords: false` opts out), and warns at boot in production when password sign-up is open with no `email`: [hardening and testing](../packages/auth/llms/hardening-and-testing.md).
 
 ## 1.86.0

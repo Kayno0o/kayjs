@@ -6,9 +6,11 @@
 
 The methods of a feature live under it on the request's `auth`, so an editor lists one feature at a time: `ctx.locals.auth.admin.listUsers()`, `ctx.locals.auth.password.signIn(input)`, `ctx.locals.auth.organizations.invite(ref, email)`. A group is there whether its feature is on or not; a method of a feature that is off answers `{ ok: false, error: 'off' }` as before.
 
-The methods no feature owns stay on `auth` itself: the user (`user()`, `bareUser()`, `requireUser()`, `requireAdmin()`, `guarded()`, `signInUrl()`, `via`), signing in and out (`signIn`, `signOut`, `signOutEverywhere`, `signInAsGuest`), what the request may do (`features()`, `scopes()`, `hasScope`, `provedLately`, `reprove`, `captchaRequired`, `captchaChallenge`, `impersonator()`, `userIdsHolding`), the account (`changeUsername`, `deleteAccount`, `deletionImpact`, `linkProvider`, `unlink`, `listIdentities`, `providerToken`, `updateLocale`, `profile`, `saveProfile`, `exportData`, `listAuditLog`) and the OAuth server's resource (`oauthResource`, `oauthOrigin`, `oauthFixed`).
+The methods no feature owns stay on `auth` itself: the user (`user()`, `bareUser()`, `requireUser()`, `requireAdmin()`, `guarded()`, `signInUrl()`, `via`), signing in and out (`signIn`, `signOut`, `signOutEverywhere`, `signInAsGuest`), what the request may do (`features()`, `scopes()`, `hasScope`, `provedLately`, `reprove`, `captchaRequired`, `captchaChallenge`, `impersonator()`, `userIdsHolding`) and the OAuth server's resource (`oauthResource`, `oauthOrigin`, `oauthFixed`).
 
 ### Move off the flat names
+
+Since 1.87 the account, provider and audit methods are grouped too (table below), and the flat names `auth.deleteAccount(proof)` and `auth.createUser(input)` keep working until 1.90: `kay upgrade` renames the calls (`deprecated-auth-account-methods`). `createUser` belongs to the `createAuth` result, so it is `auth.admin.createUser(input)` there.
 
 The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassword(input)`) are gone since 1.86, along with the `deprecated-auth-methods` lint: call the grouped method the table gives. An app still on them runs `kay upgrade` on 1.85 first, which renames the calls.
 
@@ -86,3 +88,21 @@ The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassw
 | `organizations` | `invitation` | `getInvitation` |
 | `organizations` | `acceptInvitation` | `acceptInvitation` |
 | `organizations` | `rejectInvitation` | `rejectInvitation` |
+
+### The groups added in 1.87
+
+| Group | Method | Flat name (works until 1.90) |
+| --- | --- | --- |
+| `account` | `changeUsername` | `changeUsername` |
+| `account` | `updateLocale` | `updateLocale` |
+| `account` | `delete` | `deleteAccount` |
+| `account` | `deletionImpact` | `deletionImpact` |
+| `account` | `profile` | `profile` |
+| `account` | `saveProfile` | `saveProfile` |
+| `account` | `export` | `exportData` |
+| `oauth` | `link` | `linkProvider` |
+| `oauth` | `unlink` | `unlink` |
+| `oauth` | `identities` | `listIdentities` |
+| `oauth` | `providerToken` | `providerToken` |
+| `audit` | `list` | `listAuditLog` |
+| `admin` (on the `createAuth` result) | `createUser` | `createUser` |

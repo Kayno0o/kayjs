@@ -120,7 +120,7 @@ describe('bearer tokens', () => {
   test('die with their user', async () => {
     const { ada, browser, bearer } = await withToken()
 
-    await ada.call('deleteAccount', { password: PASSWORD })
+    await ada.call('account.delete', { password: PASSWORD })
 
     expect(await browser().json('/me', { headers: bearer })).toBe('anonymous')
   })

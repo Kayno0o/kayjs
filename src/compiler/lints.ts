@@ -653,6 +653,15 @@ export const LINTS = {
     wrong: 'export default defineConfig({ api: \'src/endpoints\', storage: diskFiles(\'data/files\') })',
     right: 'export default defineConfig({ apiDir: \'src/endpoints\', fileStore: diskFiles(\'data/files\') })',
   },
+  'deprecated-auth-account-methods': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.87',
+    site: true,
+    summary: 'A call of one of the flat methods kayjs-auth\'s `Auth` had before 1.87 for the account, the providers and the audit log, such as `ctx.locals.auth.deleteAccount(proof)` or `auth.listAuditLog()`: they are grouped under `account`, `oauth` and `audit` like every other feature, and the flat names are kept as aliases until 1.90. Found on a receiver named `auth`, alone or ending a chain, in the TypeScript files and `.kay` fences of a project depending on `@kaynooo/kayjs-auth`; the fix renames the call, its arguments unchanged. `createUser` is found on an imported `auth` too, as the `createAuth` result is, and becomes `admin.createUser`. An `auth` the file imports is otherwise the app\'s own module and left alone, and a flat method read without a call, destructured, under `typeof` or in a template is not found.',
+    wrong: '--- server\nawait ctx.locals.auth.deleteAccount(proof)\n---\np x',
+    right: '--- server\nawait ctx.locals.auth.account.delete(proof)\n---\np x',
+  },
   'deprecated-session-stores': {
     level: 'warn',
     group: 'deprecated',

@@ -140,7 +140,7 @@ describe('OAuth', () => {
 
     await ada.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
 
-    const started = await ada.callOk('linkProvider', 'discord', { password: PASSWORD })
+    const started = await ada.callOk('oauth.link', 'discord', { password: PASSWORD })
     const linkState = new URL(started.url).searchParams.get('state')
 
     const intruder = await ada.fetch('/auth/github')
@@ -152,7 +152,7 @@ describe('OAuth', () => {
     expect(callback.headers.get('location')).toBe('/login?error=cancelled')
 
     // Signed out, an abandoned link no longer blocks signing in with a provider.
-    await ada.callOk('linkProvider', 'discord', { password: PASSWORD })
+    await ada.callOk('oauth.link', 'discord', { password: PASSWORD })
     await ada.call('signOut')
     expect((await ada.fetch('/auth/github')).headers.get('location')).toContain('github.com')
   })

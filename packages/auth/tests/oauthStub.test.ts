@@ -65,7 +65,7 @@ describe('stubbing an OAuth provider in a test', () => {
 
   test('signs a linked account in, and asks for the second factor of a member who has one', async () => {
     const { as, auth, store } = setup()
-    const made = await auth.createUser({ email: 'ada@example.com', password: PASSWORD, emailVerified: true })
+    const made = await auth.admin.createUser({ email: 'ada@example.com', password: PASSWORD, emailVerified: true })
 
     if (!made.ok)
       throw new Error(JSON.stringify(made.errors))

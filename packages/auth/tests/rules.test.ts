@@ -40,18 +40,18 @@ describe('credential rules', () => {
     expect(await ada.call('password.reset', token, 'short1')).toEqual({ ok: false, errors: { password: 'too-short' } })
     expect(await ada.call('password.change', { password: GOOD }, 'twelve chars!')).toEqual({ ok: false, errors: { password: 'Add a digit.' } })
     expect(await ada.call('password.change', { password: GOOD }, 'twelve chars 2')).toEqual({ ok: true })
-    expect(await ada.call('changeUsername', 'toolongname')).toEqual({ ok: false, errors: { username: 'length' } })
-    expect(await ada.call('changeUsername', 'Ada')).toMatchObject({ ok: true })
-    expect(await auth.createUser({ email: 'bob@example.com', username: 'Bob', password: 'nodigitsatall' })).toEqual({ ok: false, errors: { password: 'Add a digit.' } })
-    expect(await auth.createUser({ email: 'bob@example.com', username: 'bo', password: GOOD })).toEqual({ ok: false, errors: { username: 'length' } })
-    expect(await auth.createUser({ email: 'bob@example.com', username: 'Bob', password: GOOD })).toMatchObject({ ok: true })
+    expect(await ada.call('account.changeUsername', 'toolongname')).toEqual({ ok: false, errors: { username: 'length' } })
+    expect(await ada.call('account.changeUsername', 'Ada')).toMatchObject({ ok: true })
+    expect(await auth.admin.createUser({ email: 'bob@example.com', username: 'Bob', password: 'nodigitsatall' })).toEqual({ ok: false, errors: { password: 'Add a digit.' } })
+    expect(await auth.admin.createUser({ email: 'bob@example.com', username: 'bo', password: GOOD })).toEqual({ ok: false, errors: { username: 'length' } })
+    expect(await auth.admin.createUser({ email: 'bob@example.com', username: 'Bob', password: GOOD })).toMatchObject({ ok: true })
   })
 
   test('a lower ceiling still lets an older, longer password sign in', async () => {
     const long = 'x'.repeat(40)
     const { browser, store, auth } = testApp({ rules: { password: { max: 64 } } })
 
-    await auth.createUser({ email: 'ada@example.com', password: long })
+    await auth.admin.createUser({ email: 'ada@example.com', password: long })
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: long })).toMatchObject({ ok: true })
 
     const tight = testApp({ store, rules: { password: { max: 20 } } })

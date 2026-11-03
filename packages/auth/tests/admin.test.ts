@@ -320,7 +320,7 @@ describe('admin', () => {
 
     await admin.browser.call('admin.grantRole', ada.id, 'editor')
 
-    expect(await admin.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await admin.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
 
     const granted = (await store.audit!.list({ userId: ada.id, limit: 10 })).find(entry => entry.event === 'role-granted')!
 

@@ -30,7 +30,7 @@ describe('signUp: false', () => {
 
   test('a user the app made signs in with their password', async () => {
     const { auth, browser } = setup({ signUp: false })
-    const created = await auth.createUser({ email: 'ada@example.com', password: PASSWORD })
+    const created = await auth.admin.createUser({ email: 'ada@example.com', password: PASSWORD })
     const ada = browser()
 
     expect(created.ok).toBe(true)
@@ -48,7 +48,7 @@ describe('signUp: false', () => {
 describe('createUser', () => {
   test('makes a user with the default roles and the given ones, signing no one in', async () => {
     const { auth, signUps } = setup({ defaultRoles: ['editor'] })
-    const result = await auth.createUser({ email: 'Ada@Example.com', username: 'ada', password: PASSWORD, roles: ['admin', 'editor'], emailVerified: true, locale: 'fr' })
+    const result = await auth.admin.createUser({ email: 'Ada@Example.com', username: 'ada', password: PASSWORD, roles: ['admin', 'editor'], emailVerified: true, locale: 'fr' })
 
     expect(result).toMatchObject({ ok: true, user: { email: 'ada@example.com', username: 'ada', emailVerified: true, hasPassword: true, roles: ['editor', 'admin'], locale: 'fr', guest: false } })
     expect(signUps).toHaveLength(1)
@@ -58,28 +58,28 @@ describe('createUser', () => {
   test('a user without a password or a verified address, by username alone', async () => {
     const { auth } = setup()
 
-    expect(await auth.createUser({ username: 'grace' })).toMatchObject({ ok: true, user: { email: null, username: 'grace', emailVerified: false, hasPassword: false, roles: [] } })
+    expect(await auth.admin.createUser({ username: 'grace' })).toMatchObject({ ok: true, user: { email: null, username: 'grace', emailVerified: false, hasPassword: false, roles: [] } })
   })
 
   test('refuses what registering refuses, field by field', async () => {
     const { auth } = setup()
 
-    await auth.createUser({ email: 'ada@example.com', username: 'ada' })
+    await auth.admin.createUser({ email: 'ada@example.com', username: 'ada' })
 
-    expect(await auth.createUser({ email: 'ada@example.com', username: 'ADA', password: 'short' })).toEqual({ ok: false, errors: { email: 'taken', username: 'taken', password: 'too-short' } })
-    expect(await auth.createUser({ email: 'not-an-address' })).toMatchObject({ ok: false, errors: { email: expect.any(String) } })
+    expect(await auth.admin.createUser({ email: 'ada@example.com', username: 'ADA', password: 'short' })).toEqual({ ok: false, errors: { email: 'taken', username: 'taken', password: 'too-short' } })
+    expect(await auth.admin.createUser({ email: 'not-an-address' })).toMatchObject({ ok: false, errors: { email: expect.any(String) } })
   })
 
   test('throws without an email or a username to sign in with', async () => {
     const { auth } = setup()
 
-    await expect(auth.createUser({ password: PASSWORD })).rejects.toThrow('needs an email or a username')
+    await expect(auth.admin.createUser({ password: PASSWORD })).rejects.toThrow('needs an email or a username')
   })
 
   test('throws on a role the `roles` option does not declare, as one read from a script\'s arguments may be', async () => {
     const { auth, store } = setup()
 
-    await expect(auth.createUser({ username: 'ada', roles: ['ghost' as 'admin'] })).rejects.toThrow('\'ghost\', which the `roles` option does not declare')
+    await expect(auth.admin.createUser({ username: 'ada', roles: ['ghost' as 'admin'] })).rejects.toThrow('\'ghost\', which the `roles` option does not declare')
     expect((await store.users.list({ offset: 0, limit: 10 })).total).toBe(0)
   })
 })

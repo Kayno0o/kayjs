@@ -82,7 +82,7 @@ async function signInWith(visitor: Browser, provider: string, account: string, s
 
 // Leaves for the provider to link `account` to the visitor's user once `proof` re-proves them, and comes back with its code.
 async function linkWith(visitor: Browser, provider: string, account: string, proof: Proof = {}, redirect?: string) {
-  const started = await visitor.callOk('linkProvider', provider, proof, redirect === undefined ? {} : { redirect })
+  const started = await visitor.callOk('oauth.link', provider, proof, redirect === undefined ? {} : { redirect })
   const state = new URL(started.url).searchParams.get('state')!
 
   return { response: await visitor.fetch(`/auth/${provider}/callback?code=code-${account}&state=${state}`) }
@@ -445,8 +445,8 @@ describe('linking a provider', () => {
     await signInWith(bob, 'discord', '2')
 
     expect((await linkWith(ada, 'discord', '2')).response.headers.get('location')).toBe('/login?error=taken')
-    expect(await browser().call('linkProvider', 'discord', {})).toEqual({ ok: false, error: 'signed-out' })
-    expect(await ada.call('linkProvider', 'gitlab', {})).toEqual({ ok: false, error: 'not-found' })
+    expect(await browser().call('oauth.link', 'discord', {})).toEqual({ ok: false, error: 'signed-out' })
+    expect(await ada.call('oauth.link', 'gitlab', {})).toEqual({ ok: false, error: 'not-found' })
   })
 
   test('joins the provider to the account that asked for it, not to one signed in since in the same browser', async () => {
@@ -457,7 +457,7 @@ describe('linking a provider', () => {
     await browser().call('password.register', { email: 'bob@example.com', password: 'correct horse battery' })
     await signInWith(shared, 'discord', '1')
 
-    const leaving = await shared.callOk('linkProvider', 'github', {})
+    const leaving = await shared.callOk('oauth.link', 'github', {})
     const state = new URL(leaving.url).searchParams.get('state')!
 
     await shared.call('password.signIn', { identifier: 'bob@example.com', password: 'correct horse battery' })
@@ -472,7 +472,7 @@ describe('linking a provider', () => {
     const ada = browser()
 
     await signInWith(ada, 'discord', '1')
-    const started = await ada.callOk('linkProvider', 'github', {}, {})
+    const started = await ada.callOk('oauth.link', 'github', {}, {})
     const state = new URL(started.url).searchParams.get('state')!
 
     expect((await ada.fetch('/auth/github/callback?code=code-7&state=forged')).headers.get('location')).toBe('/login?error=oauth')
@@ -498,7 +498,7 @@ describe('linking a provider', () => {
 
 describe('provider tokens', () => {
   function withTokenRoute(app: ReturnType<typeof setup>) {
-    return app.app.get('/token', async ({ auth }) => (await auth.providerToken('discord')) ?? 'none')
+    return app.app.get('/token', async ({ auth }) => (await auth.oauth.providerToken('discord')) ?? 'none')
   }
 
   test('gives the signed-in user\'s access token, refreshed once it is about to expire', async () => {

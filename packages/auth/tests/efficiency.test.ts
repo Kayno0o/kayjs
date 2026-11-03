@@ -292,7 +292,7 @@ describe('the last admin', () => {
     }
 
     log.reset()
-    expect(await root.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await root.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
 
     const lists = log.calls.filter(call => call.name === 'users.list')
 

@@ -15,7 +15,7 @@ export const prove = action(schemas.proof, async (input, ctx) => {
 })
 
 export const remove = action(schemas.proof, async (input, ctx) => {
-  const result = await ctx.locals.auth.deleteAccount(proofOf(input))
+  const result = await ctx.locals.auth.account.delete(proofOf(input))
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
@@ -41,7 +41,7 @@ const notProved = prove.failed()?.data?.error
 const proved = await auth.provedLately()
 // Neither proof form can pass: an admin acting as the user proves nothing, and an account with nothing to prove it by has only its sign-in, now old.
 const impersonated = await auth.impersonator() !== null
-const impact = await auth.deletionImpact()
+const impact = await auth.account.deletionImpact()
 const stale = !proved && !user.hasPassword && !user.twoFactor
 ---
 if impersonated

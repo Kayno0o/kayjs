@@ -93,7 +93,7 @@ describe('changes to what protects the account', () => {
     const { ada, notices, events } = await verified()
 
     await ada.call('tokens.create', { password: PASSWORD }, 'Phone')
-    await ada.call('deleteAccount', { password: PASSWORD })
+    await ada.call('account.delete', { password: PASSWORD })
 
     expect(notices()).toEqual(['token-created', 'account-deleted'])
     expect(events.find(entry => entry.event === 'token-created')).toMatchObject({ name: 'Phone' })

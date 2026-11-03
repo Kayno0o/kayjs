@@ -10,7 +10,7 @@ const SIGNED_IN = /^kay_session=/
 
 async function signInAt(url: string, forwardAuth: ForwardDomains | ForwardAuthOptions = 'example.test', sessionDomain?: string, headers: Record<string, string> = {}) {
   const { app, auth } = testApp({ site: PORTAL, forwardAuth, sessions: session<AuthSessionData>({ secret: SECRET, ...sessionDomain !== undefined && { domain: sessionDomain } }) })
-  const made = await auth.createUser({ password: PASSWORD, emailVerified: true, username: 'ada' })
+  const made = await auth.admin.createUser({ password: PASSWORD, emailVerified: true, username: 'ada' })
 
   if (!made.ok)
     throw new Error(JSON.stringify(made.errors))

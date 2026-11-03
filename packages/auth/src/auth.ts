@@ -173,7 +173,14 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
     socketUser,
     ...testHelpers<Role, UserData>(core, plugin as unknown as Elysia),
 
-    // A user made by the app, as a script or an admin page makes one: checked as registering is, open with `signUp: false` too, signing no one in and mailing no one.
+    admin: {
+      // A user made by the app, as a script or an admin page makes one: checked as registering is, open with `signUp: false` too, signing no one in and mailing no one.
+      async createUser(input: Omit<CreateUserInput, 'roles'> & { roles?: Role[] | undefined }): Promise<CreateUserResult> {
+        return (await load.password()).createUser(core, input)
+      },
+    },
+
+    /** @deprecated since 1.87: `auth.admin.createUser` */
     async createUser(input: Omit<CreateUserInput, 'roles'> & { roles?: Role[] | undefined }): Promise<CreateUserResult> {
       return (await load.password()).createUser(core, input)
     },

@@ -270,7 +270,7 @@ describe('organizations', () => {
       const { ada, bob, grace, invitation, org, store } = await sentByBob()
 
       expect(await ada.browser.call('organizations.removeMember', org, bob.id)).toEqual({ ok: true })
-      expect(await bob.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+      expect(await bob.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
       expect((await store.invitations?.get(invitation.id))?.invitedBy).toBeNull()
       expect(await grace.browser.call('organizations.acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'not-found' })
     })
@@ -279,7 +279,7 @@ describe('organizations', () => {
       const { ada, bob, grace, invitation, org } = await sentByBob()
 
       expect((await ada.browser.callOk('organizations.invitations', org)).invitations).toHaveLength(1)
-      expect(await bob.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+      expect(await bob.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
       expect((await ada.browser.callOk('organizations.invitations', org)).invitations).toEqual([])
       expect(await grace.browser.call('organizations.acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'not-found' })
     })
@@ -340,8 +340,8 @@ describe('organizations', () => {
 
     await join(ada, grace, 'grace@example.com')
 
-    expect((await grace.browser.callOk('exportData')).data.organizations).toMatchObject([{ organization: { id: org }, roles: ['member'] }])
-    expect(await grace.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect((await grace.browser.callOk('account.export')).data.organizations).toMatchObject([{ organization: { id: org }, roles: ['member'] }])
+    expect(await grace.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
     expect(await store.members!.listByOrganization(org)).toHaveLength(1)
   })
 
@@ -352,7 +352,7 @@ describe('organizations', () => {
     await ada.browser.call('organizations.invite', org, 'grace@example.com')
     await ada.browser.call('organizations.invite', org, 'alan@example.com')
 
-    expect(await grace.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await grace.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
     expect(await store.invitations!.listByEmail('grace@example.com')).toEqual([])
     expect(await store.invitations!.listByEmail('alan@example.com')).toHaveLength(1)
   })
@@ -363,15 +363,15 @@ describe('organizations', () => {
 
     await join(ada, grace, 'grace@example.com')
 
-    expect(await ada.browser.call('deleteAccount', { password: 'wrong password here' })).toEqual({ ok: false, error: 'last-owner' })
-    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: false, error: 'last-owner' })
+    expect(await ada.browser.call('account.delete', { password: 'wrong password here' })).toEqual({ ok: false, error: 'last-owner' })
+    expect(await ada.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: false, error: 'last-owner' })
     expect(await store.users.get(ada.id)).toBeTruthy()
     expect(await store.members!.get(org, ada.id)).toBeTruthy()
-    expect(await ada.browser.call('deletionImpact')).toEqual({ deleted: [], blocked: ['Acme'] })
+    expect(await ada.browser.call('account.deletionImpact')).toEqual({ deleted: [], blocked: ['Acme'] })
 
     await ada.browser.callOk('organizations.setMemberRoles', org, grace.id, ['owner'])
 
-    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
     expect((await store.members!.listByOrganization(org)).map(member => member.userId)).toEqual([grace.id])
     expect(await store.organizations!.get(org)).toBeTruthy()
   })
@@ -379,8 +379,8 @@ describe('organizations', () => {
   test('a sole owner alone in an organization deletes it with their account, its slug freed', async () => {
     const { ada, org, person, store } = await setup()
 
-    expect(await ada.browser.call('deletionImpact')).toEqual({ deleted: ['Acme'], blocked: [] })
-    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.browser.call('account.deletionImpact')).toEqual({ deleted: ['Acme'], blocked: [] })
+    expect(await ada.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
     expect(await store.organizations!.get(org)).toBeUndefined()
     expect(await store.organizations!.findBySlug('acme')).toBeUndefined()
     expect(await store.members!.listByOrganization(org)).toEqual([])
@@ -398,10 +398,10 @@ describe('organizations', () => {
     await join(ada, grace, 'grace@example.com', ['owner'])
     await join(ada, alan, 'alan@example.com')
 
-    expect(await alan.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
-    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await alan.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
     expect((await store.members!.listByOrganization(org)).map(member => member.userId)).toEqual([grace.id])
-    expect(await grace.browser.call('deletionImpact')).toEqual({ deleted: ['Acme'], blocked: [] })
+    expect(await grace.browser.call('account.deletionImpact')).toEqual({ deleted: ['Acme'], blocked: [] })
   })
 
   test('a sole owner of several organizations is refused for the one with members, and loses none when refused', async () => {
@@ -411,13 +411,13 @@ describe('organizations', () => {
 
     await join(ada, grace, 'grace@example.com')
 
-    expect(await ada.browser.call('deletionImpact')).toEqual({ deleted: ['Solo'], blocked: ['Acme'] })
-    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: false, error: 'last-owner' })
+    expect(await ada.browser.call('account.deletionImpact')).toEqual({ deleted: ['Solo'], blocked: ['Acme'] })
+    expect(await ada.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: false, error: 'last-owner' })
     expect(await store.organizations!.get(membership.organization.id)).toBeTruthy()
 
     await ada.browser.callOk('organizations.setMemberRoles', org, grace.id, ['owner'])
 
-    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
     expect(await store.organizations!.get(membership.organization.id)).toBeUndefined()
     expect(await store.organizations!.get(org)).toBeTruthy()
   })
@@ -430,8 +430,8 @@ describe('organizations', () => {
     await join(ada, grace, 'grace@example.com', ['owner'])
     await join(ada, alan, 'alan@example.com')
 
-    expect(await ada.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
-    expect(await grace.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: false, error: 'last-owner' })
+    expect(await ada.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await grace.browser.call('account.delete', { password: PASSWORD })).toEqual({ ok: false, error: 'last-owner' })
     expect((await store.members!.listByOrganization(org)).map(member => member.userId)).toEqual([grace.id, alan.id])
   })
 
@@ -444,7 +444,7 @@ describe('organizations', () => {
     await join(ada, grace, 'grace@example.com', ['owner'])
     await join(ada, alan, 'alan@example.com')
 
-    const answers = await Promise.all([ada.browser.call('deleteAccount', { password: PASSWORD }), grace.browser.call('deleteAccount', { password: PASSWORD })])
+    const answers = await Promise.all([ada.browser.call('account.delete', { password: PASSWORD }), grace.browser.call('account.delete', { password: PASSWORD })])
     const left = await store.members!.listByOrganization(org)
 
     expect(answers).toEqual([{ ok: true }, { ok: true }])
@@ -458,7 +458,7 @@ describe('organizations', () => {
     const grace = await person('grace@example.com')
 
     await join(ada, grace, 'grace@example.com', ['owner'])
-    await Promise.all([ada.browser.call('deleteAccount', { password: PASSWORD }), grace.browser.call('deleteAccount', { password: PASSWORD })])
+    await Promise.all([ada.browser.call('account.delete', { password: PASSWORD }), grace.browser.call('account.delete', { password: PASSWORD })])
 
     expect(await store.members!.listByOrganization(org)).toEqual([])
     expect(await store.organizations!.get(org)).toBeUndefined()

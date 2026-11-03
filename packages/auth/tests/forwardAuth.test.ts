@@ -13,7 +13,7 @@ function setup(forwardAuth: ForwardDomains | ForwardAuthOptions = 'example.test'
 
   // A person signed in on their own browser.
   async function signedIn(fields: { username?: string, email?: string, roles?: ('admin' | 'editor')[] }, twoFactor = false) {
-    const made = await app.auth.createUser({ password: PASSWORD, emailVerified: true, ...fields })
+    const made = await app.auth.admin.createUser({ password: PASSWORD, emailVerified: true, ...fields })
 
     if (!made.ok)
       throw new Error(JSON.stringify(made.errors))
@@ -154,7 +154,7 @@ describe('a proxy asking whether to let a request through', () => {
 
   test('requireTwoFactor sends a user to the security page, a passkey holder too, as the session does not say how it signed in; the page is under of the pages\' prefix', async () => {
     const app = testApp({ site: PORTAL, pages: { prefix: '/account-area' }, forwardAuth: { domains: 'example.test', requireTwoFactor: true } })
-    const made = await app.auth.createUser({ username: 'key', password: PASSWORD, emailVerified: true })
+    const made = await app.auth.admin.createUser({ username: 'key', password: PASSWORD, emailVerified: true })
 
     if (!made.ok)
       throw new Error('no user')
@@ -170,7 +170,7 @@ describe('a proxy asking whether to let a request through', () => {
 
   test('without the prebuilt pages a user missing two-factor is refused with a 403, there being no page to send them to', async () => {
     const app = testApp({ site: PORTAL, forwardAuth: { domains: 'example.test', requireTwoFactor: true } })
-    const made = await app.auth.createUser({ username: 'plain', password: PASSWORD, emailVerified: true })
+    const made = await app.auth.admin.createUser({ username: 'plain', password: PASSWORD, emailVerified: true })
 
     if (!made.ok)
       throw new Error('no user')

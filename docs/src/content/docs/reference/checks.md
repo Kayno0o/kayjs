@@ -122,6 +122,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `broken-canonical` | warn | seo | A canonical link to a page that is a 404 or a redirect |
 | `one-way-hreflang` | warn | seo | Alternates that do not point back at each other |
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
+| `deprecated-auth-account-methods` | warn | deprecated | A call of one of kayjs-auth's flat account, provider and audit methods, the names before 1.87, such as `auth.deleteAccount(proof)` for `auth.account.delete(proof)`; the flat names work until 1.90, and `kay upgrade` renames the calls |
 | `deprecated-safe-redirect` | warn | deprecated | A call of kayjs-auth's `safeRedirect(path, fallback?)`, now kay's `localPath(path, fallback)`; the old name works until 1.87, and `kay upgrade` calls `localPath` |
 | `deprecated-ui-tone` | warn | deprecated | The `muted` tone of a kayjs-ui Sparkline, StatusStrip or Timeline, now `neutral`, and a native `size` on a field, now `sm`, `md` or `lg` |
 | `deprecated-session-stores` | warn | deprecated | An import of `memoryStore` or `sqliteStore` from `kay/server`, the session stores before 1.84, now `memorySessions` and `sqliteSessions`; the old names work until 1.87, and `kay upgrade` renames them |

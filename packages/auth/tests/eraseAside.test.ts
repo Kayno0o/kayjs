@@ -50,7 +50,7 @@ describe('erasing a user takes their notifications and mailing list rows', () =>
     const { ada, user, erased } = await setup()
 
     expect(await notifications.list(user.id)).toHaveLength(1)
-    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
     expect(await notifications.list(user.id)).toEqual([])
     expect(erased).toEqual(['ada@example.com'])
   })
@@ -94,7 +94,7 @@ describe('erasing a user takes their notifications and mailing list rows', () =>
     const { ada, user, store, erased } = await setup()
 
     await store.users.update(user.id, { emailVerifiedAt: null })
-    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
     expect(await notifications.list(user.id)).toEqual([])
     expect(erased).toEqual([])
   })
@@ -114,7 +114,7 @@ describe('erasing a user takes their notifications and mailing list rows', () =>
     expect((await ada.fetch('/call/deleteAccount', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }]) })).status).toBe(500)
     expect(await store.users.findByEmail('ada@example.com')).toBeDefined()
     fail = false
-    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
   })
 
   test('without a mailer that erases, only the notifications go', async () => {
@@ -123,7 +123,7 @@ describe('erasing a user takes their notifications and mailing list rows', () =>
     const { user } = await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
     await notify(user.id, { title: 'Welcome' })
-    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
     expect(await notifications.list(user.id)).toEqual([])
   })
 })
@@ -131,7 +131,7 @@ describe('erasing a user takes their notifications and mailing list rows', () =>
 describe('the export lists them', () => {
   test('notifications and mailing lists, pending ones included', async () => {
     const { ada } = await setup()
-    const exported = await ada.callOk('exportData')
+    const exported = await ada.callOk('account.export')
 
     expect(exported.data.notifications).toMatchObject([{ title: 'Welcome', read: false }])
     expect(exported.data.mailingLists).toMatchObject([{ list: 'news', status: 'confirmed' }, { list: 'offers', status: 'pending', confirmedAt: null }])
@@ -143,7 +143,7 @@ describe('the export lists them', () => {
 
     await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    const exported = await ada.callOk('exportData')
+    const exported = await ada.callOk('account.export')
 
     expect(exported.data.notifications).toEqual([])
     expect(exported.data.mailingLists).toEqual([])

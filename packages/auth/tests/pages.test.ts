@@ -156,7 +156,7 @@ describe('exporting a user\'s data', () => {
     await ada.call('tokens.create', { password: PASSWORD }, 'Phone')
     await store.identities.create({ provider: 'discord', providerId: '42', userId: user.id, accessToken: 'sealed-access', refreshToken: 'sealed-refresh', tokenExpiresAt: null, createdAt: new Date() })
 
-    const exported = await ada.callOk('exportData')
+    const exported = await ada.callOk('account.export')
     const text = JSON.stringify(exported)
 
     expect(exported).toMatchObject({
@@ -180,7 +180,7 @@ describe('exporting a user\'s data', () => {
   test('needs a session', async () => {
     const { browser } = testApp()
 
-    expect(await browser().call('exportData')).toEqual({ ok: false, error: 'signed-out' })
+    expect(await browser().call('account.export')).toEqual({ ok: false, error: 'signed-out' })
   })
 
   test('counts each export, the download included, against the account\'s limit', async () => {
@@ -189,9 +189,9 @@ describe('exporting a user\'s data', () => {
 
     await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    expect((await ada.call('exportData')).ok).toBe(true)
+    expect((await ada.call('account.export')).ok).toBe(true)
     expect((await ada.fetch('/auth/export')).status).toBe(200)
-    expect(await ada.call('exportData')).toEqual({ ok: false, error: 'limited' })
+    expect(await ada.call('account.export')).toEqual({ ok: false, error: 'limited' })
     expect((await ada.fetch('/auth/export')).status).toBe(429)
   })
 
@@ -203,7 +203,7 @@ describe('exporting a user\'s data', () => {
       await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
       setSystemTime(new Date(Date.now() + LATER))
 
-      expect(await ada.call('exportData')).toEqual({ ok: false, error: 'stale' })
+      expect(await ada.call('account.export')).toEqual({ ok: false, error: 'stale' })
 
       const response = await ada.fetch('/auth/export')
 
@@ -212,7 +212,7 @@ describe('exporting a user\'s data', () => {
 
       await ada.call('reprove', { password: PASSWORD })
 
-      expect((await ada.call('exportData')).ok).toBe(true)
+      expect((await ada.call('account.export')).ok).toBe(true)
     })
 
     test('a wrong proof leaves it refused, a right one opens the route again', async () => {
@@ -239,10 +239,10 @@ describe('exporting a user\'s data', () => {
       await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
       await ada.fetch('/sign-in/u1', { method: 'POST' })
 
-      expect((await ada.call('exportData')).ok).toBe(true)
+      expect((await ada.call('account.export')).ok).toBe(true)
       setSystemTime(new Date(Date.now() + LATER))
 
-      expect(await ada.call('exportData')).toEqual({ ok: false, error: 'stale' })
+      expect(await ada.call('account.export')).toEqual({ ok: false, error: 'stale' })
       expect(await ada.call('reprove', {})).toEqual({ ok: false, error: 'stale' })
       expect((await ada.fetch('/auth/export')).status).toBe(403)
     })
@@ -258,13 +258,13 @@ describe('exporting a user\'s data', () => {
       await ada.call('twoFactor.enable', await totpCode(setup.secret, totpStep()))
       setSystemTime(new Date(Date.now() + LATER))
 
-      expect(await ada.call('exportData')).toEqual({ ok: false, error: 'stale' })
+      expect(await ada.call('account.export')).toEqual({ ok: false, error: 'stale' })
       expect(await ada.call('reprove', { code: '000000' })).toEqual({ ok: false, error: 'proof' })
-      expect(await ada.call('exportData')).toEqual({ ok: false, error: 'stale' })
+      expect(await ada.call('account.export')).toEqual({ ok: false, error: 'stale' })
 
       await ada.call('reprove', { password: PASSWORD })
 
-      expect((await ada.call('exportData')).ok).toBe(true)
+      expect((await ada.call('account.export')).ok).toBe(true)
     })
 
     test('a signed-out visitor still gets signed-out, not stale', async () => {
@@ -272,7 +272,7 @@ describe('exporting a user\'s data', () => {
 
       setSystemTime(new Date(Date.now() + LATER))
 
-      expect(await browser().call('exportData')).toEqual({ ok: false, error: 'signed-out' })
+      expect(await browser().call('account.export')).toEqual({ ok: false, error: 'signed-out' })
     })
   })
 })

@@ -162,7 +162,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
     await join(grace, ['owner'])
     await join(alan, ['member'])
     race.arm()
-    await Promise.all([ada.browser.call('organizations.removeMember', org, ada.id), grace.browser.call('deleteAccount', { password: PASSWORD })])
+    await Promise.all([ada.browser.call('organizations.removeMember', org, ada.id), grace.browser.call('account.delete', { password: PASSWORD })])
 
     expect(race.overlapped()).toBe(true)
     expect(await store.organizations!.get(org)).toBeTruthy()
@@ -209,7 +209,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
 
     race.arm()
 
-    const answers = await Promise.all([ada.browser.call('deleteAccount', { password: PASSWORD }), grace.browser.call('deleteAccount', { password: PASSWORD })])
+    const answers = await Promise.all([ada.browser.call('account.delete', { password: PASSWORD }), grace.browser.call('account.delete', { password: PASSWORD })])
     const remaining = (await Promise.all([app.store.users.get(ada.id), app.store.users.get(grace.id)])).filter(user => user !== undefined)
 
     expect(race.overlapped()).toBe(true)
@@ -232,7 +232,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
     await ada.fetch('/sign-in/u1', POST)
     race.arm()
 
-    const answers = await Promise.all([ada.call('unlink', 'discord', {}), ada.call('unlink', 'github', {})])
+    const answers = await Promise.all([ada.call('oauth.unlink', 'discord', {}), ada.call('oauth.unlink', 'github', {})])
 
     expect(race.overlapped()).toBe(true)
     expect((await app.store.identities.listByUser('u1')).length).toBeGreaterThanOrEqual(1)
@@ -252,7 +252,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
     await ada.fetch('/sign-in/u1', POST)
     race.arm()
 
-    const answers = await Promise.all([ada.call('unlink', 'discord', {}), ada.call('passkeys.revoke', 'key', {})])
+    const answers = await Promise.all([ada.call('oauth.unlink', 'discord', {}), ada.call('passkeys.revoke', 'key', {})])
 
     expect(race.overlapped()).toBe(true)
     expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-way-in')).toBe(true)
@@ -290,7 +290,7 @@ describe('an undo meeting a store outage', () => {
     race.arm()
     outage = true
 
-    const answers = await Promise.allSettled([ada.call('unlink', 'discord', {}), ada.call('unlink', 'github', {})])
+    const answers = await Promise.allSettled([ada.call('oauth.unlink', 'discord', {}), ada.call('oauth.unlink', 'github', {})])
 
     expect(race.overlapped()).toBe(true)
     expect((await app.store.identities.listByUser('u1')).length).toBe(0)

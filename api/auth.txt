@@ -164,7 +164,9 @@ function auth(options: AuthExtensionOptions): AuthPages<AnyElysia>
 [.] Auth
 class Auth
   new <Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>>(session: Session<AuthSessionData>, core: Core, request: Request, client: string, address: string): Auth<Scope, Role, OrgRole, UserData>
+  account: AccountMethods
   admin: AdminMethods<Role>
+  audit: AuditMethods
   bareUser: () => Promise<BareUser<UserData> | null>
   captchaChallenge: (action: CaptchaAction) => Promise<string | null>
   captchaRequired: (action: CaptchaAction) => Promise<boolean>
@@ -188,13 +190,14 @@ class Auth
   impersonator: () => Promise<User<Record<string, unknown>> | null>
   known?: { record: Promise<UserRecord | null>; at: number; } | undefined
   leave: () => Promise<void>
-  linkProvider: (provider: string, proof: Proof, options?: { redirect?: string; }) => Promise<LinkProviderResult>
+  linkProvider: (provider: string, proof: Proof, options?: { redirect?: string; } | undefined) => Promise<LinkProviderResult>
   linked: WeakMap<UserRecord, Promise<Record<string, { id: string; }>>>
-  listAuditLog: (options?: { before?: AuditCursorInput; limit?: number; }) => Promise<AuditEntry[]>
+  listAuditLog: (options?: { before?: AuditCursorInput; limit?: number; } | undefined) => Promise<AuditEntry[]>
   listIdentities: () => Promise<string[]>
   live: (signedIn: SignedIn, record: UserRecord, stored: SessionRecord | undefined) => Promise<boolean>
   magicLink: MagicLinkMethods
   markBrowser: (signedIn: boolean, maxAge?: number | undefined) => void
+  oauth: OAuthMethods
   oauthFixed: () => boolean
   oauthOrigin: () => string | undefined
   oauthResource: (path: string, name: string) => Record<string, unknown> | null
@@ -659,6 +662,11 @@ interface ConsentFields
 
 [.] createAuth
 function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = "/auth", const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>): {
+  admin: {
+    createUser(input: Omit<CreateUserInput, "roles"> & {
+      roles?: Role[] | undefined;
+    }): Promise<CreateUserResult>;
+  };
   createUser(input: Omit<CreateUserInput, "roles"> & {
     roles?: Role[] | undefined;
   }): Promise<CreateUserResult>;
@@ -733,12 +741,7 @@ function createAuth<Data extends AuthSessionData, Role extends string = string, 
       };
     };
     parser: (Meta & {
-      schema: {};
-      standaloneSchema: {};
-      macro: {};
-      macroFn: {};
-      parser: {};
-      response: {} & ExtractErrorFromHandle<{ ...#17b2dbd2 (3885 lines)
+      schema: {}; ...#5fcbd34a (3890 lines)
   guard: (guardOptions?: RouteGuardOptions<Role, Scope>) => Guard;
   test: (site: OAuthSite) => { ...#e872ca38 (9 lines)
   sessionCookie(userId: string, cookieOptions?: { ...#73ac2c57 (3 lines)
@@ -1455,7 +1458,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   guests?: { maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; } | undefined
   home?: string | undefined
   hooks?: (() => Promise<{
-  hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "exportData" | "allow" | "onSignUp" | "profileFields" | "onDelete" | "onAuthEvent" | "locate" | "authorize">>;
+  hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "allow" | "onSignUp" | "profileFields" | "onDelete" | "exportData" | "onAuthEvent" | "locate" | "authorize">>;
 }>) | undefined
   locate?: ((ip: string) => string | Promise<string | null | undefined> | null | undefined) | undefined
   magicLink?: boolean | undefined

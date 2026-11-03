@@ -10,7 +10,7 @@ export const save = action(t.Object({ text: t.String({ maxLength: 100 }) }), asy
 })
 
 export const rename = action(t.Object({ name: t.String({ maxLength: 100 }) }), async ({ name }, ctx) => {
-  const result = await ctx.locals.auth.saveProfile({ displayName: name })
+  const result = await ctx.locals.auth.account.saveProfile({ displayName: name })
 
   return result.ok ? 'saved' : ctx.fail(400, {})
 })

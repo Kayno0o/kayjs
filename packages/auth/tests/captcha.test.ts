@@ -298,7 +298,7 @@ describe('breached passwords', () => {
 
       expect(await browser().post('/register', { email: 'ada@example.com', password: 'password1234' })).toEqual({ ok: false, errors: { password: 'breached' } })
       expect(asked).toHaveLength(1)
-      expect(await auth.createUser({ email: 'bob@example.com', password: 'password1234' })).toEqual({ ok: false, errors: { password: 'breached' } })
+      expect(await auth.admin.createUser({ email: 'bob@example.com', password: 'password1234' })).toEqual({ ok: false, errors: { password: 'breached' } })
     })
 
     test('in production an outage lets the password through', async () => {

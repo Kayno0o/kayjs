@@ -13,13 +13,13 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 export const connect = action(schemas.unlink, async (input, ctx) => {
   const auth = ctx.locals.auth
   const features = auth.features()
-  const started = await auth.linkProvider(input.provider, proofOf(input), { redirect: localize(`${features.pages?.prefix ?? features.prefix}/account/connections`) })
+  const started = await auth.oauth.link(input.provider, proofOf(input), { redirect: localize(`${features.pages?.prefix ?? features.prefix}/account/connections`) })
 
   return started.ok ? ctx.redirect(started.url) : ctx.fail(400, { error: started.error, provider: input.provider })
 })
 
 export const disconnect = action(schemas.unlink, async (input, ctx) => {
-  const result = await ctx.locals.auth.unlink(input.provider, proofOf(input))
+  const result = await ctx.locals.auth.oauth.unlink(input.provider, proofOf(input))
 
   return result.ok ? 'disconnected' : ctx.fail(400, { error: result.error, provider: input.provider })
 })
@@ -27,7 +27,7 @@ export const disconnect = action(schemas.unlink, async (input, ctx) => {
 const auth = ctx.locals.auth
 const user = await auth.requireUser()
 const features = auth.features()
-const linked = new Set(await auth.listIdentities())
+const linked = new Set(await auth.oauth.identities())
 const refused = connect.failed()?.data ?? disconnect.failed()?.data
 ---
 PageSection(title={wording('auth.account.connections.title', 'Connected accounts')})

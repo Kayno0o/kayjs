@@ -1,15 +1,9 @@
 import type { GuardContext } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
-import type { ChangeUsernameResult, DeleteAccountResult, UnlinkResult, UpdateLocaleResult } from './account'
 import type { CaptchaAction } from './captcha'
 import type { AuthSessionData, BareUser, Core, SignedIn, User } from './core'
-import type { DeletionImpact } from './erase'
-import type { AuditCursorInput, AuditEntry } from './events'
-import type { ExportResult } from './export'
 import type { ScopeRequirement } from './gate'
-import type { LinkProviderResult } from './oauth/flow'
-import type { AuthFeatures, ProfileFieldView } from './pages'
-import type { SaveProfileResult } from './profile'
+import type { AuthFeatures } from './pages'
 import type { Proof, ReproveResult } from './proof'
 import type { GuestSignInResult } from './sessions'
 import type { RequestState } from './state'
@@ -22,13 +16,17 @@ import { protectedResourceMetadata, rootIsFixed, rootUsable, siteRoot } from './
 import { bearerRequest, bearerToken } from './bearerHeader'
 import { admit, captchaChallenge, captchaRequired } from './captcha'
 import { banned, guardPageOf, isNavigation, linkedProviders, linkedUser, newUserRecord, publicUser, unlinked, withBack } from './core'
-import { auditEntries, report } from './events'
+import { report } from './events'
+import { FlatMethods } from './flatMethods'
 import { scopeAllows } from './gate'
 import { load } from './load'
 import { acceptedLocales } from './locale'
+import { AccountMethods } from './methods/account'
 import { AdminMethods } from './methods/admin'
+import { AuditMethods } from './methods/audit'
 import { EmailMethods } from './methods/email'
 import { MagicLinkMethods } from './methods/magicLink'
+import { OAuthMethods } from './methods/oauth'
 import { OAuthServerMethods } from './methods/oauthServer'
 import { OrganizationMethods } from './methods/organizations'
 import { PasskeyMethods } from './methods/passkeys'
@@ -103,10 +101,13 @@ interface Groups<Scope extends string, Role extends string, OrgRole extends stri
   oauthServer: OAuthServerMethods
   admin: AdminMethods<Role>
   organizations: OrganizationMethods<OrgRole>
+  account: AccountMethods
+  oauth: OAuthMethods
+  audit: AuditMethods
 }
 
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.
-export class Auth<Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>> {
+export class Auth<Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>> extends FlatMethods {
   readonly [STATE]: RequestState
   readonly [REQUIRES] = true
   private known?: { record: Promise<UserRecord | null>, at: number } | undefined
@@ -121,6 +122,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   private readonly cookies: string[] = []
 
   constructor(session: Session<AuthSessionData>, private readonly core: Core, private readonly request: Request, client: string, address: string) {
+    super()
+
     const bearer = bearerRequest(request)
     const crossSite = () => !bearer && crossSiteRefused(request, core.url)
 
@@ -246,6 +249,23 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return this.groups.organizations ??= new OrganizationMethods<OrgRole>(this[STATE])
   }
 
+  // The signed-in user's own account: username, language, profile, data export and deletion.
+  get account(): AccountMethods {
+    return this.groups.account ??= new AccountMethods(this[STATE])
+  }
+
+  // The providers the signed-in user signs in with: linking, unlinking and their tokens.
+  get oauth(): OAuthMethods {
+    return this.groups.oauth ??= new OAuthMethods(this[STATE], () => {
+      this.linked = new WeakMap()
+    })
+  }
+
+  // The signed-in user's own audit log.
+  get audit(): AuditMethods {
+    return this.groups.audit ??= new AuditMethods(this[STATE])
+  }
+
   // The signed-in user, or the owner of the request's `Authorization: Bearer` token, or null; read on first use, and again past 30 seconds on a websocket.
   async user(): Promise<User<UserData> | null> {
     const record = await this.record()
@@ -323,33 +343,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const here = new URL(this.request.url)
 
     return withBack(page, localPath(back ?? here.pathname + here.search, '/'))
-  }
-
-  // The fields of the profile form the account page shows beside the username, with what this user holds in each, or null when `pages.profile` is not set or the user is not signed in with a session.
-  async profile(locale?: string): Promise<ProfileFieldView[] | null> {
-    const profile = this.core.pages?.profile
-    const user = profile && await this.bareUser()
-
-    if (!profile || !user || await this.via() !== 'session')
-      return null
-
-    return (await load.profile()).profileFields(profile, user as BareUser, locale)
-  }
-
-  // Stores the values posted from that form through `pages.profile.save`, once trimmed and checked against each field's `required` and `maxLength`: names that are no field are dropped, and nothing is stored while any field is refused.
-  async saveProfile(values: Record<string, unknown>): Promise<SaveProfileResult> {
-    const profile = this.core.pages?.profile
-
-    if (!profile)
-      throw new Error('kayjs-auth: saveProfile needs `pages.profile` in createAuth')
-
-    const user = await this.bareUser()
-
-    // A device's token cannot edit the profile of the account it was given for, as it cannot rename it.
-    if (!user || await this.via() !== 'session')
-      return { ok: false, error: 'signed-out' }
-
-    return (await load.profile()).saveProfile(profile, user as BareUser, values)
   }
 
   // How `user()` found the user: their session, or a bearer token; null when anonymous.
@@ -461,16 +454,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return { ok: true, user: publicUser(record) }
   }
 
-  // A fresh access token for the signed-in user's account at `provider`, refreshed when about to expire; null without one, or once the provider refuses a refresh.
-  async providerToken(provider: string): Promise<string | null> {
-    return (await load.flow()).providerToken(this[STATE], provider)
-  }
-
-  // Sets the language the signed-in user's mails are written in, a BCP 47 tag such as `fr`; refused with `signed-out`, or `invalid-locale` for anything else than a tag.
-  async updateLocale(locale: string): Promise<UpdateLocaleResult> {
-    return (await load.account()).updateLocale(this[STATE], locale)
-  }
-
   // What the config enables, for a page to show only what works: the providers, mail, passkeys, scopes and the prebuilt pages.
   features(): AuthFeatures {
     return featuresOf(this.core)
@@ -496,13 +479,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return rootIsFixed(this.core)
   }
 
-  // The providers the signed-in user has linked.
-  async listIdentities(): Promise<string[]> {
-    const record = await this.record()
-
-    return record ? (await this.core.store.identities.listByUser(record.id)).map(identity => identity.provider) : []
-  }
-
   // Whether this client's next `action` needs a CAPTCHA token, for the page to show the widget.
   async captchaRequired(action: CaptchaAction): Promise<boolean> {
     return captchaRequired(this[STATE], action)
@@ -525,33 +501,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return proved.ok ? { ok: true } : proved
   }
 
-  // Names the signed-in user, or renames them, under the rules register checks; no proof, a name being no credential.
-  async changeUsername(username: string): Promise<ChangeUsernameResult> {
-    return (await load.account()).changeUsername(this[STATE], username)
-  }
-
-  // Where to send the browser to link `provider` to the signed-in user once `proof` re-proves them, the second factor when it is on; it comes back to `redirect`.
-  async linkProvider(provider: string, proof: Proof, options: { redirect?: string } = {}): Promise<LinkProviderResult> {
-    return this.core.oauth.has(provider) ? (await load.flow()).startLink(this[STATE], provider, proof, options.redirect) : { ok: false, error: 'not-found' }
-  }
-
-  // Unlinks a provider from the signed-in user, unless it is their last way in.
-  async unlink(provider: string, proof: Proof): Promise<UnlinkResult> {
-    this.linked = new WeakMap()
-
-    return (await load.account()).unlink(this[STATE], provider, proof)
-  }
-
-  // Deletes the signed-in user, calling `onDelete` for the app's own records, and signs this session out; the last admin and the only owner of an organization with other members are refused, an organization they are alone in is deleted with them.
-  async deleteAccount(proof: Proof): Promise<DeleteAccountResult> {
-    return (await load.account()).deleteAccount(this[STATE], proof, async () => this.signOut())
-  }
-
-  // The organizations deleting the signed-in user's account touches, by name: `deleted` are the ones they are the only member of, which go with them, `blocked` the ones they solely own with other members, which refuse the deletion (`last-owner`) until another owner is named.
-  async deletionImpact(): Promise<DeletionImpact> {
-    return (await load.erase()).deletionImpact(this[STATE])
-  }
-
   // The scopes of the bearer token this request came with; null for a session, or a token with every scope.
   async scopes(): Promise<string[] | null> {
     await this.record()
@@ -562,13 +511,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // Whether this request may reach what `scope` guards: a session may, and a token given that scope or every one.
   async hasScope(scope: Scope): Promise<boolean> {
     return scopeAllows(await this.scopes(), scope)
-  }
-
-  // The signed-in user's own audit log, newest first, a page of `limit` (50 by default) before `before`, an instant or the last entry of the page (which tells entries of one millisecond apart); empty without the `audit` option.
-  async listAuditLog(options: { before?: AuditCursorInput, limit?: number } = {}): Promise<AuditEntry[]> {
-    const record = await this.record()
-
-    return record ? auditEntries(this.core, { ...options, userId: record.id }) : []
   }
 
   // The ids of the users holding `role`, one of the `roles` option or a role above it in its hierarchy, banned users left out, for server code that tells them something (a notification). Needs a signed-in user, and reads the 10,000 newest users at most.
@@ -600,11 +542,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const actor = signedIn?.impersonator && await this.core.store.users.get(signedIn.impersonator.user)
 
     return actor ? linkedUser(this.core, actor) : null
-  }
-
-  // Everything kayjs-auth keeps about the signed-in user, secrets left out, with the app's own from `exportData`: for a download of their data.
-  async exportData(): Promise<ExportResult> {
-    return (await load.exports()).exportData(this[STATE])
   }
 
   // Under a new session id, so one planted before is worth nothing; `method` says how, for the `signed-in` event.

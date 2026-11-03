@@ -135,7 +135,7 @@ describe('erasing a user', () => {
     const ada = browser()
     const { user } = await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })
 
     const entries = await store.audit!.list({ limit: 20 })
 
@@ -199,7 +199,7 @@ describe('provider tokens', () => {
     const ada = await signIn(app)
 
     expect((await app.store.identities.find('discord', '1'))?.refreshToken).not.toBeNull()
-    expect(await ada.call('deleteAccount', {})).toEqual({ ok: true })
+    expect(await ada.call('account.delete', {})).toEqual({ ok: true })
     expect(revoked).toEqual(['refresh-1'])
   })
 
@@ -209,7 +209,7 @@ describe('provider tokens', () => {
     const ada = await signIn(app)
 
     await ada.call('password.change', {}, PASSWORD)
-    expect(await ada.call('unlink', 'discord', { password: PASSWORD })).toEqual({ ok: true })
+    expect(await ada.call('oauth.unlink', 'discord', { password: PASSWORD })).toEqual({ ok: true })
     expect(revoked).toEqual(['refresh-1'])
   })
 
@@ -222,7 +222,7 @@ describe('provider tokens', () => {
 
     globalThis.fetch = (async (_input: string | URL | Request) => new Response('down', { status: 503 })) as typeof fetch
 
-    expect(await ada.call('deleteAccount', {})).toEqual({ ok: true })
+    expect(await ada.call('account.delete', {})).toEqual({ ok: true })
     expect(logged).toHaveBeenCalled()
     logged.mockRestore()
   })
@@ -270,7 +270,7 @@ describe('exporting a user\'s data', () => {
     await store.invitations!.create({ id: 'received', organizationId: 'other', email: 'ada@example.com', roles: ['member'], invitedBy: null, createdAt: now, expiresAt: new Date(now.getTime() - DAY_MS) })
     await store.users.update(user.id, { bannedAt: new Date(now.getTime() - 2 * DAY_MS), bannedUntil: new Date(now.getTime() - DAY_MS), banReason: 'spam' })
 
-    const { data } = await ada.callOk('exportData')
+    const { data } = await ada.callOk('account.export')
 
     expect(data.grants).toMatchObject([{ id: 'client', name: 'Claude Code' }])
     expect(data.invitations.sent).toMatchObject([{ id: 'sent', email: 'grace@example.com' }])
@@ -284,7 +284,7 @@ describe('exporting a user\'s data', () => {
 
     await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    expect((await ada.callOk('exportData')).data).toMatchObject({ ban: null, grants: [], invitations: { received: [], sent: [] } })
+    expect((await ada.callOk('account.export')).data).toMatchObject({ ban: null, grants: [], invitations: { received: [], sent: [] } })
   })
 })
 

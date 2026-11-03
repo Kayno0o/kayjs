@@ -227,7 +227,7 @@ describe('turning the second factor off', () => {
 describe('enrolling for a test', () => {
   async function enrolledByTest() {
     const app = testApp({ name: 'Site' })
-    const made = await app.auth.createUser({ email: 'ada@example.com', password: PASSWORD, emailVerified: true })
+    const made = await app.auth.admin.createUser({ email: 'ada@example.com', password: PASSWORD, emailVerified: true })
 
     if (!made.ok)
       throw new Error(JSON.stringify(made.errors))
