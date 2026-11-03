@@ -31,6 +31,14 @@ What each release before 1.84 added, and the end of a newest release that was cu
 - Kay's tsconfig includes `scripts`, so a script run with `bun scripts/x.ts` is type checked and linted with no `include` in the app: [project](project.md).
 - `kay lint --cache` drops ESLint's cache when `tsconfig.json` or a file under `.kay/types` changed, so a parsing error does not outlive the tsconfig that caused it: [checks](checks.md).
 
+- `kay` runs on `@kaynooo/cli-kit`: `kay --version`, shell completion through `kay __complete`, `--plain` and `--color`, a typo naming the command or option it likely meant, and a usage error (unknown command or option, a missing argument, a `refuse(reason)`) exiting 2 where it exited 1; `kay <command> --help` lists the options with a line each: [project](project.md#commands).
+- kayjs-ui's Combobox draws no second line for an option whose `description` is only whitespace: [tables, tabs and navigation](../packages/ui/llms/tables-navigation-and-layout.md).
+- `kay dev` warns in the browser console of a keyed live value an island reads only in an effect, which the page's render never noted and so no connection follows: [live values](live-values.md).
+- kayjs-ui's Menu and Popover opened `at` a point wait for the release of a pointer button held at that moment, so a context menu opened by Linux's `contextmenu` on the right press stays open: [tabs and navigation](../packages/ui/llms/tables-navigation-and-layout.md).
+- kayjs-ui's SiteNav, TabNav and TreeView compare the page's address with each link as the site renders it, so the current link is marked on a page of a prefixed locale, with a trailing slash on the address ignored: [tabs and navigation](../packages/ui/llms/tables-navigation-and-layout.md).
+- The Forgejo CI workflow `kay new` and `kay add ci` write runs on an Alpine runner image with bun and git baked in, as on `debian`: its install step adds only the missing `git` and `unzip` (with `apt-get` or `apk`) and Setup Bun is skipped when bun is already there: [project new and add](project-new-and-add.md).
+- A bare `---` after a `--- server` or `--- module` fence that was meant as the script fence is reported with the fix, `--- script` on the line closing the first fence, which `kay check --fix` applies: [checks](checks.md).
+
 ## 1.83.0
 
 - kayjs-ai: `ground(found, read)` turns the rows pg-orm 8's `nearest()` found into the `system` and `sources` of an `ask`, so a chat answers from the app's own documents and cites them, and the fake answers it all under `bun test`: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).
