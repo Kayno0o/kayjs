@@ -266,6 +266,7 @@ p {game.miners[0].ore}
 - `effect(fn)` runs once the render is done and again whenever what it read changes.
 - `onMount`, `onCleanup`, `untrack`, `batch`, `root` and `flush` come from `kay` too.
 - An event handler runs under the owner it was bound in, the enclosing block or component, so an `onCleanup` it registers runs when that goes.
+- An `onCleanup` that throws is logged and handed to the page's error report (`reportError`), never to an `onError` or `catch` boundary, and the owner's other cleanups and children still end.
 - `root(fn)` runs `fn(dispose)` under an owner of its own, not attached to the one it was called under: the effects and `onCleanup`s created inside live until `dispose()` is called, and `root` returns what `fn` returns. It is for code with no component to stop it, such as a module-level subscription.
 - A write applies at once; the effects it touches run together in a microtask, or right away through `flush()`.
 - `durationMs('3s')` from `kay` is the milliseconds a duration written with its unit stands for, `'250ms'` 250 and `'2m'` 120000, for a timer of your own: a bare number throws, and a text that is no duration gives `NaN`.

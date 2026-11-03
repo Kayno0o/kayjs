@@ -393,13 +393,7 @@ export function disposeIslands(root: ParentNode): void {
     const dispose = disposers.get(element)
 
     disposers.delete(element)
-
-    try {
-      dispose?.()
-    }
-    catch (error) {
-      reportError(error)
-    }
+    dispose?.()
   }
 }
 
