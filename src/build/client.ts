@@ -36,7 +36,6 @@ import { hoistLayerOrder } from './layer-order'
 import { fileWords, importEdges, libraryOf, reachedFrom, reachingAny } from './libraries'
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
-
 import { kay } from './plugin'
 import { buildFiles, promotedFiles } from './promotion'
 import { unusedLibraryClasses } from './prune'
