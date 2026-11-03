@@ -36,7 +36,7 @@ import { hoistLayerOrder } from './layer-order'
 import { fileWords, importEdges, libraryOf, reachedFrom, reachingAny } from './libraries'
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
-import { navigationLocale } from './navigation-locale'
+
 import { kay } from './plugin'
 import { buildFiles, promotedFiles } from './promotion'
 import { unusedLibraryClasses } from './prune'
@@ -550,7 +550,7 @@ async function bundleIslands(root: string, islands: Map<string, string>, actionF
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build; a build for development, not NODE_ENV, asks for theirs.
   const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), 'KAY_STATIC_EXPORT': options.exported === true ? 'true' : 'undefined', 'KAY_NAV_ENTRY': 'undefined', 'KAY_FRENCH': options.french === true ? 'true' : 'undefined', 'KAY_I18N': options.i18n === true ? 'true' : 'undefined', 'KAY_NO_ACTION_PROPS': options.hot !== true && !actionProps ? 'true' : 'undefined', 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
   const external = publicEnv !== undefined ? [publicEnv] : []
-  const plugins = (anchor?: string, anchored?: ReadonlySet<string>, direct?: boolean) => [withoutStyles(), api, ...options.i18n === true ? [navigationLocale()] : [], kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.librarySettings, anchor, anchored, direct, inspect: options.inspect, api: trees, external, classTable }), ...options.plugins ?? []]
+  const plugins = (anchor?: string, anchored?: ReadonlySet<string>, direct?: boolean) => [withoutStyles(), api, kay({ target: 'dom', root, localeLinks: options.i18n === true, cacheDir: projectPaths(root).cache, settings: options.librarySettings, anchor, anchored, direct, inspect: options.inspect, api: trees, external, classTable }), ...options.plugins ?? []]
 
   await Bun.write(entryFile, `import ${JSON.stringify(bootFile)}\n`)
 

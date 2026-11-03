@@ -1,7 +1,7 @@
 import type { LocaleSettings } from '../src/runtime/i18n'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { importsNavigate } from '../src/build/navigation-locale'
+import { importsNavigate, withLocaleLinks } from '../src/build/navigation-locale'
 
 const SETTINGS: LocaleSettings = { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false, pages: ['/', '/second'] }
 
@@ -46,6 +46,8 @@ describe('the modules that import navigate', () => {
     'import { navigate } from \'kay\'',
     'import { refresh, navigate as go } from "kay"',
     'import * as kay from \'kay\'',
+    'export { navigate } from \'kay\'',
+    'export * from \'kay\'',
   ])('are found by %s', (line) => {
     expect(importsNavigate(`${line}\ngo()`)).toBe(true)
   })
@@ -54,8 +56,17 @@ describe('the modules that import navigate', () => {
     'import { refresh } from \'kay\'',
     'import type { navigate } from \'kay\'',
     'import { navigate } from \'./navigate\'',
+    'export type { navigate } from \'kay\'',
+    'const kay = import(\'kay\')',
     'const navigate = () => undefined',
   ])('are not found by %s', (line) => {
     expect(importsNavigate(line)).toBe(false)
+  })
+})
+
+describe('the module that gets the localizer', () => {
+  it('has it on its first line, so the lines of its source map stay', () => {
+    expect(withLocaleLinks('import { navigate } from \'kay\'\nnavigate(\'/x\')')).toBe('import \'kay/i18n-links\';import { navigate } from \'kay\'\nnavigate(\'/x\')')
+    expect(withLocaleLinks('const x = 1')).toBe('const x = 1')
   })
 })

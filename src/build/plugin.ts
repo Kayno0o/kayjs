@@ -19,6 +19,7 @@ import { expandGlobs } from './glob'
 import { iconModule, iconNames, installedIconSets } from './icons'
 import { linkedKayCopies, settingsReplacements } from './libraries'
 import { liveIds } from './live-ids'
+import { withLocaleLinks } from './navigation-locale'
 import { embeddedMapTail } from './sourcemap'
 import { embeddedMapCached, transformKayCached } from './transform'
 
@@ -46,6 +47,8 @@ export interface KayPluginOptions {
   // A browser build's API trees, whose modules islands get as stubs, and the modules it leaves to the page, which a worker's bundle takes as the islands do.
   api?: RouteMount[] | undefined
   external?: string[] | undefined
+  // The island bundle of an app with locales: a module importing `navigate` loads `kay/i18n-links`, which localizes the path it is given.
+  localeLinks?: boolean | undefined
   // Points an import of names from `kay` at the runtime modules holding them: see direct-imports.ts.
   direct?: boolean | undefined
   // An executable's modules carry their own source map, for it to map the stacks of the errors it meets to `.kay` lines with no compiler: they register it under the path Bun shows for the file, relative to the working directory.
@@ -217,6 +220,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       }
 
       const anchoring = (path: string, contents: string) => options.anchored?.has(path) === true ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents
+      const localizing = (contents: string) => options.localeLinks === true ? withLocaleLinks(contents) : contents
 
       const pointed = async (contents: string, loader: Bun.JavaScriptLoader = 'ts') => options.direct === true ? directImports(contents, loader) : contents
 
@@ -299,7 +303,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         const original = await Bun.file(path).text()
         const source = options.rewrite?.(path, original) ?? original
         const loader = scriptLoader(path)
-        const contents = anchoring(path, await pointed(await shippingFiles(cacheIds(liveIds(expandGlobs(source, path, root, loader), path, realRoot, loader === 'tsx' || loader === 'jsx', build.config?.target !== 'browser'), path, realRoot, loader === 'tsx' || loader === 'jsx'), path, loader), loader))
+        const contents = localizing(anchoring(path, await pointed(await shippingFiles(cacheIds(liveIds(expandGlobs(source, path, root, loader), path, realRoot, loader === 'tsx' || loader === 'jsx', build.config?.target !== 'browser'), path, realRoot, loader === 'tsx' || loader === 'jsx'), path, loader), loader)))
 
         return contents === original && build.config !== undefined ? undefined : { contents, loader }
       })
@@ -311,7 +315,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
             return undefined
 
           const source = await Bun.file(path).text()
-          const contents = anchoring(path, await pointed(await shippingFiles(source, path, scriptLoader(path)), scriptLoader(path)))
+          const contents = localizing(anchoring(path, await pointed(await shippingFiles(source, path, scriptLoader(path)), scriptLoader(path))))
 
           return contents === source ? undefined : { contents, loader: scriptLoader(path) }
         })
