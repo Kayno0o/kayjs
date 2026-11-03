@@ -9,6 +9,8 @@ export interface Entry {
   // Read only where a help or a completion lists the command, when it is a function.
   summary: Summary
   run: (args: string[]) => Promise<number>
+  // The command's own declaration, for what reads its options.
+  load?: () => Promise<Command>
   // The heading the command is listed under in `kay --help`.
   group?: string
 }
@@ -18,7 +20,7 @@ const GROUP_SUMMARIES: Record<string, string> = { editor: 'set up the editors th
 
 // Each loaded when it is the one run, so `kay <command>` reads only its own code; a name of two words is a subcommand.
 function own(name: string, summary: string, load: () => Promise<Command>): Entry {
-  return { name, summary, run: async args => runCommand(await load(), args) }
+  return { name, summary, run: async args => runCommand(await load(), args), load }
 }
 
 export const COMMANDS: Entry[] = [

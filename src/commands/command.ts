@@ -94,6 +94,40 @@ const OPTION_HELP: Record<string, string> = {
   'yes': 'take the defaults and ask nothing',
 }
 
+// The options every command takes or refuses: `--quiet` prints only what fails, `--format` prints the result as one JSON document, `--dry-run` lists what would be written and writes nothing.
+export const SHARED_OPTIONS = ['quiet', 'format', 'dry-run'] as const
+
+export type SharedOption = typeof SHARED_OPTIONS[number]
+
+const PASSES_ON = 'passes every argument on to the tool it runs'
+const PROTOCOL = 'speaks a protocol on stdin and stdout'
+const READS_ONLY = 'writes nothing'
+const GENERATED_ONLY = 'writes generated output only'
+const LISTS_ONLY = 'prints only what was asked for'
+
+// Why a command of kay does not take a shared option, by the command's name: a command that takes it has no entry, one that does not has the reason here, and `tests/command-options.test.ts` holds both.
+export const SHARED_REFUSALS: Record<string, Partial<Record<SharedOption, string>>> = {
+  'dev': { 'dry-run': `serves the app and ${GENERATED_ONLY}` },
+  'build': { 'dry-run': GENERATED_ONLY },
+  'start': { 'format': 'serves and prints no result', 'dry-run': READS_ONLY },
+  'render': { 'dry-run': `sends one request and ${READS_ONLY}` },
+  'screenshot': { 'quiet': 'prints only the path of the picture', 'dry-run': 'writes only the picture it prints the path of' },
+  'routes': { 'dry-run': READS_ONLY },
+  'not-found': { quiet: LISTS_ONLY },
+  'env': { 'quiet': LISTS_ONLY, 'dry-run': `${READS_ONLY} without --write` },
+  'doctor': { 'quiet': LISTS_ONLY, 'dry-run': READS_ONLY },
+  'explain': { 'quiet': LISTS_ONLY, 'dry-run': READS_ONLY },
+  'docs': { 'quiet': LISTS_ONLY, 'dry-run': READS_ONLY },
+  'types': { 'dry-run': GENERATED_ONLY },
+  'lint': { 'quiet': PASSES_ON, 'format': PASSES_ON, 'dry-run': PASSES_ON },
+  'test': { 'quiet': PASSES_ON, 'format': PASSES_ON, 'dry-run': PASSES_ON },
+  'i18n missing': { 'quiet': LISTS_ONLY, 'dry-run': READS_ONLY },
+  'i18n accept': { quiet: 'prints one line', format: 'prints one line' },
+  'editor install': { 'quiet': LISTS_ONLY, 'dry-run': 'merges into the editor\'s own configuration, which it reports once written' },
+  'lsp': { 'quiet': PROTOCOL, 'format': PROTOCOL, 'dry-run': PROTOCOL },
+  'mcp': { 'quiet': PROTOCOL, 'format': PROTOCOL, 'dry-run': PROTOCOL },
+}
+
 export interface Command {
   // Its line of the usage, after `kay `.
   usage: string

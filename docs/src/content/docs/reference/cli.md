@@ -28,7 +28,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay screenshot <path> [dir]` | Shoot a page of the running `kay dev` in a headless Chrome |
 | `kay a11y [dir]` | Check every page of the site with axe-core and draft its accessibility statement |
 | `kay check [dir]` | Type-check the project, `.kay` files included |
-| `kay upgrade [dir] [--dry-run] [--quiet]` | Move kay and its libraries to the latest version and rewrite the old forms |
+| `kay upgrade [dir] [--dry-run] [--quiet] [--format json]` | Move kay and its libraries to the latest version and rewrite the old forms |
 | `kay routes [dir]` | List every route the project serves, and the file serving it |
 | `kay not-found [dir]` | List the old URLs visitors hit and found nothing at, and turn one into a redirect |
 | `kay doctor [dir]` | Check Bun, versions, config, environment, port and build, and say how to fix each failure |
@@ -370,7 +370,7 @@ kay render /_kay/action/src/routes/index.kay/add --body 'title=Milk' -i
 
 The server runs on a Unix socket of its own, so it runs beside a `kay dev` holding the port. The whole app boots, so its jobs run, and a `POST` to an action runs against the app's database.
 
-A redirect prints `kay render: 302 Found, to /login` on stderr and exits 0. A status of 400 or above prints its line on stderr, the body still on stdout, and exits 1.
+A redirect prints `kay render: 302 Found, to /login` on stderr and exits 0. A status of 400 or above prints its line on stderr, the body still on stdout, and exits 1. With `--format json`, stdout holds `{ status, headers, body, ms }` instead, and the exit code is the same.
 
 | Option | Effect |
 | --- | --- |
@@ -498,7 +498,7 @@ If the install leaves an npm `bun` package older than the Bun kay needs, as the 
 
 A last `kay check --fix` applies any other quick fix, such as moving a Dockerfile's `FROM oven/bun:<version>` up to the Bun the new kay needs, and prints what is left for you to change by hand, warnings too: `kay upgrade` says nothing is left only when nothing was printed, and exits 1 otherwise. An app already on the latest version is left alone. If the install fails, `package.json` goes back as it was.
 
-`--dry-run` lists the packages it would move and changes nothing: no write, no install, no rewrite. `--quiet` leaves out the step lines, keeping the packages it would move and how it ended. The old forms it would then fix are known only to the new version, so they are not listed.
+`--dry-run` lists the packages it would move and changes nothing: no write, no install, no rewrite. `--quiet` leaves out the step lines, keeping the packages it would move and how it ended. The old forms it would then fix are known only to the new version, so they are not listed. `--format json` prints `{ steps, changed }`: what each step said, and the packages moved.
 
 What a minor breaks that `kay check` cannot see is in [Upgrading](/guides/upgrading).
 
@@ -744,7 +744,7 @@ Each tool runs its command in a child process, so a call costs what the command 
 
 `kay types`, `kay build` and `kay dev` write only generated output under `.kay` and `dist`, never a file of yours, so they take none.
 
-`kay add`, `kay generate`, `kay new` and `kay types` also take `--format json`.
+Every command takes `--quiet`, `--format json` and `--dry-run` where it has something to say, and refuses the rest, so a script can rely on the option set: `kay lint` and `kay test` pass every argument on, and `kay lsp` and `kay mcp` speak a protocol on stdout. `--format json` prints one JSON document on one line.
 
 ```sh
 kay fmt src --quiet   # formatted 3 files

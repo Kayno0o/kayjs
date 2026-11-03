@@ -1,11 +1,11 @@
-import type { Command } from './command'
+import type { Command, ProblemFormat } from './command'
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { engines } from '../../package.json'
 import { DEPRECATION_MINORS, minorAfter, minorOf, UPGRADE_FROM } from '../compiler/lints'
-import { done, printFailure, projectRoot } from './command'
+import { done, formatOption, printDocument, printFailure, projectRoot, withStdoutOnStderr } from './command'
 
 // What an upgrade asks of the outside: the registry, the package manager and the project's own kay, which a test replaces so none of them is reached.
 export interface UpgradeDeps {
@@ -36,7 +36,8 @@ const SEMVER = /^\d+\.\d+\.\d+$/
 const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 
 // `bun install` alone can read a hand-edited range as no change and keep the old package in node_modules, so a package still at another version is added again, in the section it was in.
-export function registryDepsFor(bun: string): UpgradeDeps {
+// `logTo` is where the output of the commands it runs goes: this process's stdout, or a file descriptor such as 2 when stdout holds a document.
+export function registryDepsFor(bun: string, logTo: 'inherit' | number = 'inherit'): UpgradeDeps {
   return {
     latest: async (name, root) => {
       const { code, stdout } = await run([bun, 'info', name, 'version'], root, true)
@@ -44,7 +45,7 @@ export function registryDepsFor(bun: string): UpgradeDeps {
       return code === 0 ? stdout.trim() : undefined
     },
     install: async (root, changes) => {
-      if ((await run([bun, 'install'], root, false)).code !== 0)
+      if ((await run([bun, 'install'], root, false, {}, logTo)).code !== 0)
         return false
 
       for (const { name, spec, section } of changes) {
@@ -56,21 +57,23 @@ export function registryDepsFor(bun: string): UpgradeDeps {
 
         const flag = SECTION_FLAGS[section] ?? []
 
-        if ((await run([bun, 'add', ...flag, '--no-cache', `${name}@${spec}`], root, false)).code !== 0)
+        if ((await run([bun, 'add', ...flag, '--no-cache', `${name}@${spec}`], root, false, {}, logTo)).code !== 0)
           return false
       }
 
       // bun-plugin-tailwind's auto-installed `bun` peer stays at its old version in the lockfile and shadows the system Bun, which kay then refuses to run on.
-      if (await staleBun(root) && (await run([bun, 'update', 'bun'], root, false)).code !== 0)
+      if (await staleBun(root) && (await run([bun, 'update', 'bun'], root, false, {}, logTo)).code !== 0)
         console.error('kay upgrade: `bun update bun` failed; kay refuses to run on the old npm `bun` until it is updated')
 
       return true
     },
-    kay: async (root, args, capture, env) => run([bun, join(root, 'node_modules/kay/src/cli.ts'), ...args], root, capture, env),
+    kay: async (root, args, capture, env) => run([bun, join(root, 'node_modules/kay/src/cli.ts'), ...args], root, capture, env, logTo),
   }
 }
 
 const registryDeps = registryDepsFor(process.execPath)
+// Under `--format json` stdout holds the document alone, so what the project's own kay and the install print goes to stderr.
+const registryDepsToStderr = registryDepsFor(process.execPath, 2)
 
 // Whether the project holds an npm `bun` older than the Bun the installed kay needs.
 async function staleBun(root: string): Promise<boolean> {
@@ -95,27 +98,60 @@ async function staleBun(root: string): Promise<boolean> {
 
 // Moves kay and the kay libraries an app lists to their latest version, installs, then has that kay rewrite the old forms the minors crossed deprecated, one minor at a time, and report what is left to do by hand.
 export const upgrade: Command = {
-  usage: 'upgrade [dir] [--dry-run] [--quiet]',
-  options: { 'dry-run': { type: 'boolean' }, 'quiet': { type: 'boolean' } },
+  usage: 'upgrade [dir] [--dry-run] [--quiet] [--format text|json]',
+  options: { 'dry-run': { type: 'boolean' }, 'quiet': { type: 'boolean' }, 'format': { type: 'string' } },
   positionals: 1,
   run: async ({ values, positionals: [dir] }) => {
-    const root = projectRoot('upgrade', dir)
+    const format = formatOption('upgrade', values.format)
 
-    return root === undefined ? 1 : upgradeProject(root, registryDeps, { dryRun: values['dry-run'] === true, quiet: values.quiet === true })
+    if (format === undefined)
+      return 2
+
+    const root = projectRoot('upgrade', dir, format)
+
+    if (root === undefined)
+      return 1
+
+    const options = { dryRun: values['dry-run'] === true, quiet: values.quiet === true, format }
+
+    return format === 'json' ? withStdoutOnStderr(async () => upgradeProject(root, registryDepsToStderr, options)) : upgradeProject(root, registryDeps, options)
   },
 }
 
+// What `--format json` prints: each step the upgrade announced, and the packages it moved, or with `dryRun` would move, to the range they ended on.
+export interface UpgradeResult {
+  steps: { verb: string, rest: string }[]
+  changed: DependencyChange[]
+}
+
 // With `dryRun`, lists the packages that would move and touches nothing: no write, no install, no rewrite.
-export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun = false, quiet = false }: { dryRun?: boolean, quiet?: boolean } = {}): Promise<number> {
-  // Quiet, the steps are not announced: what would move, and how it ended, still are.
-  const step = (verb: string, rest: string) => {
-    if (!quiet)
+export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun = false, quiet = false, format = 'text' }: { dryRun?: boolean, quiet?: boolean, format?: ProblemFormat } = {}): Promise<number> {
+  const result: UpgradeResult = { steps: [], changed: [] }
+  // Said in text, or kept in the document under json; quiet, the steps are not announced: what would move, and how it ended, still are.
+  const say = (verb: string, rest: string, always: boolean) => {
+    result.steps.push({ verb, rest })
+
+    if (format === 'json')
+      return
+
+    if (always || !quiet)
       done(verb, rest)
+  }
+  const step = (verb: string, rest: string) => say(verb, rest, false)
+  const finish = (code: number) => {
+    if (format === 'json')
+      printDocument(result)
+
+    return code
+  }
+  const moved = (changes: DependencyChange[]) => {
+    for (const change of changes)
+      result.changed = [...result.changed.filter(({ name }) => name !== change.name), change]
   }
   const manifest = join(root, 'package.json')
 
   if (!existsSync(manifest)) {
-    printFailure('upgrade', `${root} has no package.json`, 'text')
+    printFailure('upgrade', `${root} has no package.json`, format)
 
     return 1
   }
@@ -127,7 +163,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     packageJson = JSON.parse(original)
   }
   catch (error) {
-    printFailure('upgrade', `package.json does not parse: ${error instanceof Error ? error.message : String(error)}`, 'text')
+    printFailure('upgrade', `package.json does not parse: ${error instanceof Error ? error.message : String(error)}`, format)
 
     return 1
   }
@@ -136,7 +172,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   const kay = found.find(dependency => dependency.registry === KAY_PACKAGE)
 
   if (kay === undefined) {
-    printFailure('upgrade', 'package.json has no `kay` dependency with a full version range to move, as `npm:@kaynooo/kayjs@~1.45.0`; one written another way, a path or a workspace, is moved by hand', 'text')
+    printFailure('upgrade', 'package.json has no `kay` dependency with a full version range to move, as `npm:@kaynooo/kayjs@~1.45.0`; one written another way, a path or a workspace, is moved by hand', format)
 
     return 1
   }
@@ -144,7 +180,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   const latestKay = await deps.latest(KAY_PACKAGE, root)
 
   if (latestKay === undefined || !SEMVER.test(latestKay)) {
-    printFailure('upgrade', `the registry gave no version of ${KAY_PACKAGE}`, 'text')
+    printFailure('upgrade', `the registry gave no version of ${KAY_PACKAGE}`, format)
 
     return 1
   }
@@ -156,7 +192,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     const target = dependency === kay ? latestKay : await deps.latest(dependency.registry, root)
 
     if (target === undefined || !SEMVER.test(target)) {
-      printFailure('upgrade', `the registry gave no version of ${dependency.registry}`, 'text')
+      printFailure('upgrade', `the registry gave no version of ${dependency.registry}`, format)
 
       return 1
     }
@@ -167,26 +203,28 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   const phases = planPhases(original, found, latest, steppingStones(from, latestKay))
 
   if (typeof phases === 'string') {
-    printFailure('upgrade', `package.json lists ${phases}, but kay could not find that entry to move: edit it by hand, then run \`kay upgrade\` again`, 'text')
+    printFailure('upgrade', `package.json lists ${phases}, but kay could not find that entry to move: edit it by hand, then run \`kay upgrade\` again`, format)
 
     return 1
   }
 
   if (phases.every(phase => phase.changes.length === 0)) {
-    done('upgraded', `nothing: kay ${from} is the latest, run \`kay check --fix\` for the rest`)
+    say('upgraded', `nothing: kay ${from} is the latest, run \`kay check --fix\` for the rest`, true)
 
-    return 0
+    return finish(0)
   }
 
   if (dryRun) {
     for (const { version, changes, stone } of phases) {
+      moved(changes)
+
       for (const { name, spec } of changes)
-        done('would move', `${name} to ${spec.slice(spec.lastIndexOf('~'))}${stone ? ` (kay ${version} still rewrites forms the next minors drop)` : ''}`)
+        say('would move', `${name} to ${spec.slice(spec.lastIndexOf('~'))}${stone ? ` (kay ${version} still rewrites forms the next minors drop)` : ''}`, true)
     }
 
-    done('dry run', 'nothing written; run `kay upgrade` to install them and rewrite the old forms')
+    say('dry run', 'nothing written; run `kay upgrade` to install them and rewrite the old forms', true)
 
-    return 0
+    return finish(0)
   }
 
   // What the project holds after the last phase that landed, so a failing one puts back that state and not an older one.
@@ -200,6 +238,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
       continue
 
     await Bun.write(manifest, phase.source)
+    moved(phase.changes)
     step('moved', phase.changes.map(({ name, spec }) => `${name} to ${spec.slice(spec.lastIndexOf('~'))}`).join(', '))
 
     if (!await deps.install(root, phase.changes) || !existsSync(join(root, 'node_modules/kay/src/cli.ts'))) {
@@ -214,7 +253,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
 
       printFailure('upgrade', behind === from
         ? `the install of kay ${phase.version} failed or left no kay in node_modules, so package.json and the lockfile are back as they were and nothing was rewritten; node_modules may still hold what the install did, so run \`bun install\` once the install is fixed, then \`kay upgrade\` again`
-        : `the install of kay ${phase.version} failed or left no kay in node_modules, after the forms of the minors up to ${behind} were rewritten on the way; package.json and the lockfile are back at kay ${behind}, so run \`bun install\` once the install is fixed, then \`kay upgrade\` again`, 'text')
+        : `the install of kay ${phase.version} failed or left no kay in node_modules, after the forms of the minors up to ${behind} were rewritten on the way; package.json and the lockfile are back at kay ${behind}, so run \`bun install\` once the install is fixed, then \`kay upgrade\` again`, format)
 
       return 1
     }
@@ -235,12 +274,16 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
 
   const left = await deps.kay(root, ['check', '--fix', '--deny-warnings', ...quiet ? ['--quiet'] : []], false, { [UPGRADE_FROM]: from })
 
-  if (left.code === 0 && !leftOnTheWay)
-    done('upgraded', `to kay ${latestKay}, nothing left to do by hand`)
+  const clean = left.code === 0 && !leftOnTheWay
+
+  if (clean)
+    say('upgraded', `to kay ${latestKay}, nothing left to do by hand`, true)
+  else if (format === 'json')
+    result.steps.push({ verb: 'upgraded', rest: `to kay ${latestKay}, the problems above are left for you` })
   else
     console.log(`upgraded to kay ${latestKay}, the problems above are left for you`)
 
-  return left.code === 0 && !leftOnTheWay ? 0 : 1
+  return finish(clean ? 0 : 1)
 }
 
 async function readLocks(root: string): Promise<{ path: string, content: Uint8Array | undefined }[]> {
@@ -430,9 +473,9 @@ function replaceSpec(source: string, dependency: KayDependency, spec: string): s
   return entry.test(inside) ? source.slice(0, span.start) + inside.replace(entry, (_whole, key: string) => `${key}${JSON.stringify(spec)}`) + source.slice(span.end) : undefined
 }
 
-async function run(args: string[], root: string, capture: boolean, env: Record<string, string> = {}): Promise<{ code: number, stdout: string }> {
-  const child = Bun.spawn(args, { cwd: root, env: { ...process.env, ...env }, stdin: 'ignore', stdout: capture ? 'pipe' : 'inherit', stderr: 'inherit' })
-  const [stdout, code] = await Promise.all([capture ? new Response(child.stdout).text() : '', child.exited])
+async function run(args: string[], root: string, capture: boolean, env: Record<string, string> = {}, logTo: 'inherit' | number = 'inherit'): Promise<{ code: number, stdout: string }> {
+  const child = Bun.spawn(args, { cwd: root, env: { ...process.env, ...env }, stdin: 'ignore', stdout: capture ? 'pipe' : logTo, stderr: 'inherit' })
+  const [stdout, code] = await Promise.all([capture ? new Response(child.stdout as ReadableStream).text() : '', child.exited])
 
   return { code, stdout }
 }

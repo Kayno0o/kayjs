@@ -134,6 +134,26 @@ describe('kay upgrade', () => {
     }
   })
 
+  it('prints the steps and the packages moved as one document under --format json', async () => {
+    const root = await project()
+    const { deps } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+
+    try {
+      expect(await upgradeProject(root, deps, { format: 'json' })).toBe(0)
+      expect(log.mock.calls).toHaveLength(1)
+
+      const document = JSON.parse(String(log.mock.calls[0]![0])) as { changed: DependencyChange[], steps: { verb: string }[] }
+
+      expect(document.changed.map(change => change.name)).toContain('@kaynooo/kayjs-ui')
+      expect(document.steps.map(step => step.verb)).toEqual(['moved', 'checking', 'upgraded'])
+    }
+    finally {
+      log.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('says --dry-run has nothing to move for an app on the latest', async () => {
     const root = await project()
     const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.40.1', '@kaynooo/kayjs-ui': '1.39.0' })

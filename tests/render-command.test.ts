@@ -90,6 +90,25 @@ describe('kay render', () => {
     expect(err).toBe('')
   })
 
+  it('prints the response as one JSON document under --format json, the exit code unchanged', async () => {
+    const ok = await render('/', bare, '--format', 'json')
+    const document = JSON.parse(ok.out) as { status: number, headers: Record<string, string>, body: string, ms: number }
+
+    expect(ok.code).toBe(0)
+    expect(Object.keys(document)).toEqual(['status', 'headers', 'body', 'ms'])
+    expect(document.status).toBe(200)
+    expect(document.body).toContain('<title>Home</title>')
+    expect(typeof document.headers['content-type']).toBe('string')
+    expect(typeof document.ms).toBe('number')
+    expect(ok.err).toBe('')
+
+    const missing = await render('/nowhere', bare, '--format', 'json')
+
+    expect(missing.code).toBe(1)
+    expect((JSON.parse(missing.out) as { status: number }).status).toBe(404)
+    expect(missing.err).toBe('')
+  })
+
   it('reports a redirect with its location and prints no page', async () => {
     const { out, err, code } = await render('/?next=/later', bare)
 

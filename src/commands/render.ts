@@ -3,7 +3,7 @@ import type { Command } from './command'
 import { loadConfig } from '../config-loader'
 import { startRenderServer } from '../dev/render-server'
 import { basePath, routerPath } from '../server/base'
-import { projectRoot } from './command'
+import { formatOption, printDocument, projectRoot, reportFailure } from './command'
 
 const SCHEME = /^https?:\/\//
 // An HTTP method is a token, as RFC 9110 writes it.
@@ -13,8 +13,8 @@ const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308])
 
 // Answers one request as `kay dev` would serve it, the server entry and its plugins included, and prints the body: a server listening on a Unix socket of its own, gone once it answered.
 export const render: Command = {
-  usage: 'render <url> [dir] [--entry <file>] [--method <method>] [--body <text>] [--header <name: value>]... [--cookie <name=value>]... [-i|--include] [--quiet]',
-  options: { entry: { type: 'string' }, method: { type: 'string' }, body: { type: 'string' }, header: { type: 'string', multiple: true }, cookie: { type: 'string', multiple: true }, include: { type: 'boolean', short: 'i' }, quiet: { type: 'boolean' } },
+  usage: 'render <url> [dir] [--entry <file>] [--method <method>] [--body <text>] [--header <name: value>]... [--cookie <name=value>]... [-i|--include] [--quiet] [--format text|json]',
+  options: { entry: { type: 'string' }, method: { type: 'string' }, body: { type: 'string' }, header: { type: 'string', multiple: true }, cookie: { type: 'string', multiple: true }, include: { type: 'boolean', short: 'i' }, quiet: { type: 'boolean' }, format: { type: 'string' } },
   positionals: 2,
   run: async ({ values, positionals: [url, path] }, refuse) => {
     const { entry: option, method, body, include } = values
@@ -42,7 +42,12 @@ export const render: Command = {
     if (cookies.length > 0)
       headers.set('cookie', [headers.get('cookie'), ...cookies].filter(Boolean).join('; '))
 
-    const root = projectRoot('render', path)
+    const format = formatOption('render', values.format)
+
+    if (format === undefined)
+      return 2
+
+    const root = projectRoot('render', path, format)
 
     if (root === undefined)
       return 1
@@ -65,16 +70,23 @@ export const render: Command = {
     const started = await startRenderServer(root, 'render', config, { entry: typeof option === 'string' ? option : undefined })
 
     if (typeof started === 'string') {
-      console.error(`kay render: ${started}`)
+      reportFailure(`kay render: ${started}`, format)
 
       return 1
     }
 
     try {
+      const began = performance.now()
       // Sent as the browser would, through the socket, with the host the URL names; a path under `base` loses it, as the proxy in front of such a server takes it off, so a link the page printed renders as it is.
       const init: BunFetchRequestInit = { unix: started.socket, method: verb, headers, body: typeof body === 'string' ? body : null, redirect: 'manual' }
       const response = await fetch(`http://${target.host}${routerPath(target.pathname, baseOf(config?.base))}${target.search}`, init)
       const location = response.headers.get('location')
+
+      if (format === 'json') {
+        printDocument({ status: response.status, headers: headersOf(response.headers), body: await response.text(), ms: Math.round(performance.now() - began) })
+
+        return response.status >= 400 ? 1 : 0
+      }
 
       if (include === true)
         console.error([`${response.status} ${response.statusText}`, ...[...response.headers].map(([name, value]) => `${name}: ${value}`)].join('\n'))
@@ -112,4 +124,23 @@ function baseOf(base: string | undefined): string {
   catch {
     return ''
   }
+}
+
+// The response headers as an object, a header sent several times, as `set-cookie` is, an array.
+function headersOf(headers: Headers): Record<string, string | string[]> {
+  const listed: Record<string, string | string[]> = {}
+
+  for (const [name, value] of headers) {
+    if (name === 'set-cookie')
+      continue
+
+    listed[name] = value
+  }
+
+  const cookies = headers.getSetCookie()
+
+  if (cookies.length > 0)
+    listed['set-cookie'] = cookies
+
+  return listed
 }
