@@ -1280,6 +1280,9 @@ interface NavLink
   icon?: IconProps | IconSlot | undefined
   label: string
 
+[./lib/index] OverlaySize
+type OverlaySize = 'sm' | 'md' | 'lg' | 'full'
+
 [./lib/index] PageAt
 interface PageAt<Row>
   filter: ListFilter
@@ -1819,6 +1822,20 @@ type NullOption<Value, Held> = null extends Value ? null extends Held ? '' exten
 
 [./lib/outside] OUTSIDE
 const OUTSIDE: { readonly target: "_blank"; readonly rel: "noopener noreferrer"; readonly 'data-new-tab': ""; }
+
+[./lib/overlay] closeWatcher
+function closeWatcher({ modal, docked, dirty, edited, footer }: CloseWatcherState): "none" | "any" | "closerequest"
+
+[./lib/overlay] CloseWatcherState
+interface CloseWatcherState
+  dirty: boolean
+  docked?: boolean | undefined
+  edited: boolean
+  footer: boolean
+  modal: boolean
+
+[./lib/overlay] OverlaySize
+type OverlaySize = 'sm' | 'md' | 'lg' | 'full'
 
 [./lib/pagination] currentPage
 function currentPage(page: number, pages: number): number

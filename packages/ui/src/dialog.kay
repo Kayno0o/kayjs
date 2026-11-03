@@ -1,18 +1,22 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { effect, recipe, signal } from 'kay'
+import { effect, navigate, recipe, signal } from 'kay'
+import { wording } from 'kay/words'
+import IconButton from './icon-button.kay'
+import { closeWatcher } from './overlay'
 
 // 'kui-dialog' stays as the component's name for an app's CSS and the always-hidden guard.
 const look = recipe({
   parts: {
-    root: 'kui-dialog m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(42rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border-solid border-[length:var(--border-width)] border-border-strong bg-surface p-0',
-    title: 'shrink-0 border-b border-border px-5 py-4 text-lg [font-weight:var(--font-weight-semibold)] tracking-label text-foreground [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
+    root: 'kui-dialog m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(42rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border-solid border-[length:var(--border-width)] border-border-strong bg-surface p-0 data-[modal=false]:fixed data-[modal=false]:inset-0 data-[modal=false]:z-30 data-[modal=false]:h-fit',
+    head: 'flex shrink-0 items-center gap-2 border-b border-border px-5 py-3',
+    title: 'min-w-0 flex-1 text-lg [font-weight:var(--font-weight-semibold)] tracking-label text-foreground [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     // The body of a `bare` dialog writes data-bare too, as a child cannot read the attribute of its parent in a utility.
     body: 'min-h-0 flex-1 overflow-y-auto px-5 py-4 data-bare:overflow-hidden data-bare:p-0',
     footer: 'flex shrink-0 flex-wrap justify-end gap-2 border-t border-border px-5 py-4',
   },
   variants: {
-    // The width: `sm`, `md` (the default), `lg`, or `full`, which takes the whole viewport width and height less the margin, for content such as a canvas that fills the dialog.
+    // The width, the one vocabulary of every overlay: `sm`, `md` (the default), `lg`, or `full`, which takes the whole viewport width and height less the margin, for content such as a canvas that fills the dialog.
     size: {
       sm: { root: 'max-w-[min(28rem,calc(100vw-2rem))]' },
       md: '',
@@ -23,8 +27,8 @@ const look = recipe({
   defaults: { size: 'md' },
 })
 
-const { open, title, heading, level = 2, size = 'md', bare = false, dirty = false, onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
-  // Shows the dialog as a modal; the parent sets it back to false in `onOpenChange`.
+const { open, title, heading, level = 2, size = 'md', bare = false, dirty = false, modal = true, closeHref, actions, header, close, closeLabel = wording('ui.dialog.close', 'Close'), onOpenChange, footer, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy'> & {
+  // Shows the dialog, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
   // Names the dialog for screen readers, and is the heading unless a `@heading` block draws it.
   title: string
@@ -36,14 +40,32 @@ const { open, title, heading, level = 2, size = 'md', bare = false, dirty = fals
   bare?: boolean | undefined
   // Work the dialog must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside the dialog counts on its own, though Escape still closes one with no footer.
   dirty?: boolean | undefined
+  // `false` shows the dialog over the page without blocking it: the page stays interactive, a click outside leaves it open and only Escape or the close control closes it. It renders open on the server, so a page driven by the URL shows it with no JavaScript.
+  modal?: boolean | undefined
+  // Controls in the head line, before its close button, such as previous and next.
+  actions?: Snippet
+  // The whole head line in place of the title, `actions` and the close button.
+  header?: Snippet
+  // The close button in place of the library's own: it closes by `onOpenChange(false)`, or by going to `closeHref`.
+  close?: Snippet
+  closeLabel?: string | undefined
   footer?: Snippet
+} & (
+  // Makes the close control a link to this URL, for a dialog open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate. Without an `onOpenChange`, Escape follows it too, so a server page renders the dialog with no island of its own.
+  | { closeHref: string, onOpenChange?: undefined }
   // Called with `false` however the dialog closes, a click outside and Escape included. Closed by Escape or a click outside, its content is still there to read; closed by the parent setting `open` to false, it is already gone.
-  onOpenChange: (open: boolean) => unknown
-}>()
+  | { closeHref?: string | undefined, onOpenChange: (open: boolean) => unknown }
+)>()
 
 // Set by any typing inside, and cleared however the dialog closes, since every way ends in its `close` event.
 const edited = signal(false)
 let dialog: HTMLDialogElement | undefined
+
+// A dialog with a `closeHref` and no handler closes by going there: its link on a click, and Escape, which only closes the dialog, through `navigate`.
+const follows = () => closeHref !== undefined && onOpenChange === undefined
+
+// What the server renders, so a page driven by the URL shows the dialog open before any script runs; the client then opens it again as a modal when it is one.
+const renderedOpen = open && closeHref !== undefined
 
 effect(() => {
   const shown = open
@@ -51,41 +73,53 @@ effect(() => {
   if (!dialog)
     return
 
-  if (shown && !dialog.open)
+  if (shown && modal && dialog.open && !dialog.matches(':modal')) {
+    // The server's open attribute dropped without a close event, so the dialog opens again as a modal.
+    dialog.removeAttribute('open')
     dialog.showModal()
-  else if (!shown && dialog.open)
+  }
+  else if (shown && !dialog.open) {
+    if (modal)
+      dialog.showModal()
+    else
+      dialog.show()
+  }
+  else if (!shown && dialog.open) {
     dialog.close()
+  }
 })
 
-// Work in flight or typed text keeps a click outside from closing it; a dialog with no footer to close it from still closes with Escape once typed in.
-function closeWatcher() {
-  if (dirty)
-    return 'none'
-
-  if (!edited())
-    return 'any'
-
-  return footer ? 'none' : 'closerequest'
-}
-
 function closed() {
-  onOpenChange(false)
   edited = false
+
+  if (follows() && closeHref !== undefined)
+    navigate(closeHref)
+  else
+    onOpenChange?.(false)
 }
 ---
 // Named by its title for screen readers, which announce the dialog as it opens.
-dialog(aria-label={title} {...rest} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher()} onInput={() => edited = true} onClose={closed})
+dialog(aria-label={title} {...rest} open={renderedOpen} data-modal={modal ? undefined : 'false'} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher({ modal, dirty, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
   if open
-    if level === 2
-      h2(part="title") {heading ?? title}
-    else if level === 3
-      h3(part="title") {heading ?? title}
-    else if level === 4
-      h4(part="title") {heading ?? title}
-    else if level === 5
-      h5(part="title") {heading ?? title}
-    else
-      h6(part="title") {heading ?? title}
+    header(part="head")
+      if header
+        | {header}
+      else
+        if level === 2
+          h2(part="title") {heading ?? title}
+        else if level === 3
+          h3(part="title") {heading ?? title}
+        else if level === 4
+          h4(part="title") {heading ?? title}
+        else if level === 5
+          h5(part="title") {heading ?? title}
+        else
+          h6(part="title") {heading ?? title}
+        | {actions}
+        if close
+          | {close}
+        else
+          IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} disabled={dirty} onClick={() => follows() || dialog?.close()})
     div(part="body" data-bare={bare ? '' : undefined})
       slot
     if footer

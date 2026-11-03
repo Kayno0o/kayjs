@@ -97,7 +97,7 @@ describe('ConfirmDelete', () => {
     click(dialog().querySelector('.kui-btn-danger'))
     await settle()
 
-    expect([...dialog().querySelectorAll('button')].map(button => [button.textContent, button.disabled])).toEqual([['Cancel', true], ['Deleting…', true]])
+    expect([...dialog().querySelectorAll<HTMLButtonElement>('[data-part=footer] button')].map(button => [button.textContent, button.disabled])).toEqual([['Cancel', true], ['Deleting…', true]])
     expect(dialog().getAttribute('closedby')).toBe('none')
 
     finish()

@@ -532,7 +532,8 @@ describe('the overlays whose recipe holds their look', () => {
 
   test.each([
     ['dialog', undefined, 'overflow-hidden', undefined],
-    ['dialog', 'title', 'shrink-0', 'text-xl'],
+    ['dialog', 'head', 'border-b', undefined],
+    ['dialog', 'title', 'min-w-0', 'text-xl'],
     ['dialog', 'body', 'overflow-y-auto', undefined],
     ['menu', 'list', 'flex-col', 'min-w-48'],
     ['menu', 'item', 'cursor-pointer', 'py-3'],

@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test'
 import { Glob } from 'bun'
+import { expect, test } from 'bun:test'
 
 const CALLBACK = /^ {2}(on[A-Z]\w*)\??:/gm
 const CHANGE = /^on([A-Z]\w*)Change$/

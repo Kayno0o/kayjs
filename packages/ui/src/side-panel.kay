@@ -2,13 +2,16 @@
 import type { JSX, Snippet } from 'kay'
 import { effect, listen, navigate, onCleanup, persisted, recipe, signal, untrack } from 'kay'
 import IconButton from './icon-button.kay'
+import type { OverlaySize } from './overlay'
+import { closeWatcher } from './overlay'
 import { wording } from 'kay/words'
 
 // 'kui-side-panel' stays as the component's name for an app's CSS and the always-hidden guard; theme.css keeps the docked panel's shadow.
 // A dialog shown with show(), beside the page, is positioned absolute and sits in the page, so it is fixed to the edge and above the page.
 const look = recipe({
   parts: {
-    root: 'kui-side-panel inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-[length:var(--border-width)] border-border-strong bg-surface p-0 text-foreground [transition:translate_0.2s_ease-out,overlay_0.2s_allow-discrete,display_0.2s_allow-discrete] open:starting:[translate:100%_0] [&:not([open])]:[translate:100%_0] backdrop:bg-black/50 data-[modal=false]:fixed data-[modal=false]:z-30 data-dock:overflow-visible data-dock:[transition:none] data-dock:open:starting:[translate:none] data-dock:[&:not([open])]:[translate:none]',
+    // The width of a panel not docked comes by name, the one vocabulary of every overlay: `md` is the default 42rem.
+    root: 'kui-side-panel inset-y-0 right-0 left-auto m-0 flex h-dvh max-h-dvh w-full max-w-[min(42rem,100vw)] flex-col overflow-hidden border-0 border-solid border-l-[length:var(--border-width)] border-border-strong bg-surface p-0 text-foreground [transition:translate_0.2s_ease-out,overlay_0.2s_allow-discrete,display_0.2s_allow-discrete] open:starting:[translate:100%_0] [&:not([open])]:[translate:100%_0] data-[size=sm]:max-w-[min(28rem,100vw)] data-[size=lg]:max-w-[min(72rem,100vw)] data-[size=full]:max-w-full backdrop:bg-black/50 data-[modal=false]:fixed data-[modal=false]:z-30 data-dock:overflow-visible data-dock:[transition:none] data-dock:open:starting:[translate:none] data-dock:[&:not([open])]:[translate:none]',
     grip: 'group/grip absolute z-[2] touch-none focus-visible:outline-2 focus-visible:outline-accent data-[dock=right]:inset-y-0 data-[dock=right]:-left-3 data-[dock=right]:w-6 data-[dock=right]:cursor-ew-resize data-[dock=bottom]:inset-x-0 data-[dock=bottom]:-top-3 data-[dock=bottom]:h-6 data-[dock=bottom]:cursor-ns-resize',
     line: 'pointer-events-none absolute bg-accent opacity-0 shadow-[0_0_0_1px_var(--color-popover)] group-[&:hover]/grip:opacity-100 group-focus-visible/grip:opacity-100 data-[dock=right]:inset-y-0 data-[dock=right]:left-[calc(50%-1px)] data-[dock=right]:w-0.5 data-[dock=bottom]:inset-x-0 data-[dock=bottom]:top-[calc(50%-1px)] data-[dock=bottom]:h-0.5',
     head: 'flex shrink-0 items-center gap-2 border-b border-border px-5 py-3',
@@ -20,15 +23,23 @@ const look = recipe({
   },
 })
 
-const { open, title, heading, actions, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, sizeKey, onSizeChange, scrollKey, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
+const { open, title, heading, level = 2, actions, header, close, dirty = false, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, sizeKey, onSizeChange, scrollKey, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'onInput' | 'closedby' | 'closedBy' | 'style'> & {
   // Shows the panel along the edge, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
   // Names the panel for screen readers, and is the heading unless a `@heading` block draws it.
   title: string
   // Markup in the heading in place of the title's text, such as an icon, a status badge or an emphasised name: the panel is still named by `title`.
   heading?: Snippet
+  // The title's heading level.
+  level?: 2 | 3 | 4 | 5 | 6 | undefined
   // Controls in the head line, before its close button, such as previous and next.
   actions?: Snippet
+  // The whole head line in place of the title, `actions` and the close button.
+  header?: Snippet
+  // The close button in place of the library's own: it closes by `onOpenChange(false)`, or by going to `closeHref`.
+  close?: Snippet
+  // Work the panel must not drop, such as a request in flight: a click outside or Escape leaves it open. Typing inside counts on its own, though Escape still closes a modal with no footer.
+  dirty?: boolean | undefined
   footer?: Snippet
   closeLabel?: string | undefined
   // `false` shows the panel beside the page instead of over it: the page under it stays interactive, a click outside leaves it open and only Escape or the close control closes it. It renders open on the server, so a page driven by the URL shows it with no JavaScript.
@@ -41,8 +52,8 @@ const { open, title, heading, actions, footer, modal = true, closeHref, launcher
   launcherLayer?: number | undefined
   // With `modal={false}`, docks the panel to this edge as a tool beside the page: fixed along the edge next to the dev tool's docked drawer, padding the page's `body` by its size, publishing it as `--kay-panel-right` or `-bottom` (for the dev tool's bar) and `--kui-dock-right` or `-bottom`, resized by a grip on its inner edge. Only its close control closes it, Escape does not. A fixed header across the top is cleared with `--kui-dock-top` on `html`.
   dock?: 'right' | 'bottom' | undefined
-  // The docked panel's width (right) or height (bottom) in px, kept within what the page and the panel need; 24rem or half the window when not given.
-  size?: number | undefined
+  // The width by name, as a Dialog's (`sm`, `md`, `lg`, `full`), or, with `dock`, the docked panel's width (right) or height (bottom) in px, kept within what the page and the panel need; 24rem or half the window when not given.
+  size?: OverlaySize | number | undefined
   // Keeps the size the grip settled on in a cookie of this name, from one visit to the next, and draws it on the server, so the saved width shows from the first paint with no jump. A `size` given wins over it.
   sizeKey?: string | undefined
   // Called with the size the grip reached: `settled` is false while a drag is under way and true once it ends or a key moved it, so a parent keeps it then.
@@ -66,7 +77,12 @@ const LAUNCHER_GAP = 16
 
 // A panel with a `closeHref` and no handler closes by going there: its link on a click, and Escape, which only closes the dialog, through `navigate`.
 const follows = () => closeHref !== undefined && onOpenChange === undefined
+// Set by any typing inside, and cleared however the panel closes.
+const edited = signal(false)
+
 function closed() {
+  edited = false
+
   if (follows() && closeHref !== undefined)
     navigate(closeHref)
   else
@@ -120,7 +136,7 @@ function clamp(edge: 'right' | 'bottom', value: number) {
 
 // The size on show: the parent's, else the one the grip reached, else the edge's own default.
 function shownSize() {
-  return dock === undefined ? 0 : clamp(dock, (dragging() ? reached() : undefined) ?? size ?? (kept?.() || undefined) ?? reached() ?? (dock === 'right' ? DOCKS.right.fallback : room().height / 2))
+  return dock === undefined ? 0 : clamp(dock, (dragging() ? reached() : undefined) ?? (typeof size === 'number' ? size : undefined) ?? (kept?.() || undefined) ?? reached() ?? (dock === 'right' ? DOCKS.right.fallback : room().height / 2))
 }
 
 function resizeTo(next: number, settled: boolean) {
@@ -316,15 +332,30 @@ listen(document, 'keydown', event => {
 })
 ---
 // Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onOpenChange` is the one place the parent learns of it.
-dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={modal ? undefined : 'false'} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={modal ? 'any' : docked() ? 'none' : 'closerequest'} onClose={closed})
+dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={modal ? undefined : 'false'} data-size={typeof size === 'string' && size !== 'md' ? size : undefined} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={closeWatcher({ modal, docked: docked(), dirty, edited: edited(), footer: footer !== undefined })} onInput={() => edited = true} onClose={closed})
   if open
     if docked() && dock as edge
       div(part="grip" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation={edge === 'right' ? 'vertical' : 'horizontal'} aria-valuenow={shownSize()} aria-valuemin={limits(edge).min} aria-valuemax={Number.isFinite(limits(edge).max) ? limits(edge).max : undefined} data-dock={edge} onPointerDown={startResize} onKeyDown={resizeByKey})
         span(part="line" data-dock={edge})
     header(part="head")
-      h2(part="title") {heading ?? title}
-      | {actions}
-      IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} onClick={() => follows() || panel?.close()})
+      if header
+        | {header}
+      else
+        if level === 2
+          h2(part="title") {heading ?? title}
+        else if level === 3
+          h3(part="title") {heading ?? title}
+        else if level === 4
+          h4(part="title") {heading ?? title}
+        else if level === 5
+          h5(part="title") {heading ?? title}
+        else
+          h6(part="title") {heading ?? title}
+        | {actions}
+        if close
+          | {close}
+        else
+          IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} disabled={dirty} onClick={() => follows() || panel?.close()})
     div(part="body" ref={element => body = element})
       slot
     if footer

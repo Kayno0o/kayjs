@@ -73,6 +73,7 @@ export default defineMessages({
     copyButton: { copied: 'Copié !', failure: 'Impossible de copier dans le presse-papiers' },
     dateInput: { next: 'Mois suivant', open: 'Choisir une date', previous: 'Mois précédent', today: 'Aujourd’hui', unavailable: 'Cette date n’est pas disponible' },
     dateRangeInput: { from: '{label} du', to: '{label} au' },
+    dialog: { close: 'Fermer' },
     dnd: { handleItem: 'Déplacer {item}', handle: 'Déplacer', moved: 'Déplacé en position {position} sur {count}' },
     formDialog: { cancel: 'Annuler', saving: 'Enregistrement…' },
     iconPicker: {

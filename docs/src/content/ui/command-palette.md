@@ -49,3 +49,7 @@ Cmd on macOS and Ctrl elsewhere with `hotkey` (`k` by default) opens and closes 
 ## Attributes
 
 Other attributes, such as a `data-testid`, go on the `dialog` element.
+
+## Size
+
+`size` takes the names of every overlay: `sm`, `md` (the default), `lg` or `full`.

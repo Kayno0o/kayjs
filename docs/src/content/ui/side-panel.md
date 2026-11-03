@@ -34,7 +34,7 @@ Escape and the close button still close it through `onOpenChange(false)`. It ren
 
 `dock="right"` or `"bottom"`, with `modal={false}`, docks the panel to that edge as a tool beside the page. The page's `body` is given room by the panel's size (a right margin, or bottom padding), the panel sits beside the dev tool's docked drawer, and a grip on its inner edge resizes it with the pointer or the arrow keys (Shift moves four steps). The panel and the page each keep a minimum of the window.
 
-`size` is the width, or the height at the bottom, in pixels, and `onSizeChange(size, settled)` tells the parent each size the grip reached: `settled` is false while a drag is under way and true when it ends or a key moved it, so keep it then. Only the close control closes a docked panel, Escape does not.
+`size` is the width, or the height at the bottom, in pixels (a panel not docked takes `sm`, `md`, `lg` or `full` as a Dialog does), and `onSizeChange(size, settled)` tells the parent each size the grip reached: `settled` is false while a drag is under way and true when it ends or a key moved it, so keep it then. Only the close control closes a docked panel, Escape does not.
 
 `sizeKey="pane"` keeps the size the grip settled on in a cookie of that name, with no handler and no signal of your own. The server reads the cookie too, so the panel is drawn at the saved width from the first paint, with no jump on load. A `size` you give wins over it.
 
@@ -47,3 +47,7 @@ The panel publishes its size on `html` as `--kui-dock-right` or `--kui-dock-bott
 `closeHref` makes the close button a link to that URL, so such a page closes it with no JavaScript too. With JavaScript the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate.
 
 With `closeHref`, `onOpenChange` is optional. Leave it out and a server page renders the panel with no island of its own: the link closes it, and Escape follows `closeHref` too.
+
+## Replacing the head
+
+`@header` draws the whole head line in place of the title, the actions and the close button, and `@close` replaces the close button alone. `dirty` keeps work in flight: a click outside and Escape leave the panel open and the close button is disabled. `level` sets the title's heading level.

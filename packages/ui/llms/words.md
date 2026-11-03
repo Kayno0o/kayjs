@@ -45,6 +45,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.copyButton.*`: `copied` (`Copied!`), `failure` (`Could not copy to the clipboard`)
 - `ui.dateInput.*`: `next` (`Next month`), `open` (`Choose a date`), `previous` (`Previous month`), `today` (`Today`), `unavailable` (`This date is not available`)
 - `ui.dateRangeInput.*`: `from` (`{label} from`), `to` (`{label} to`)
+- `ui.dialog.*`: `close` (`Close`)
 - `ui.dnd.*`: `handleItem` (`Reorder {item}`), `handle` (`Reorder`), `moved` (`Moved to {position} of {count}`)
 - `ui.formDialog.*`: `cancel` (`Cancel`), `saving` (`Saving…`)
 - `ui.iconPicker.*`: `clear` (`Clear icon selection`), `empty` (`No icons found.`), `error` (`The icons could not be loaded.`), `grid` (`Icons`), `more` (`Show more`), `placeholder` (`Search icons…`), `search` (`Search icons`), `searching` (`Searching…`)

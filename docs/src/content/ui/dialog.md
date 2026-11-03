@@ -1,5 +1,5 @@
 ---
-description: A modal dialog driven by an open flag, with a title and a footer.
+description: A modal dialog driven by an open flag, with a title, a close button and a footer.
 ---
 
 <Demo name="dialog/basic" />
@@ -25,6 +25,14 @@ Set `dirty` for other work the dialog must not drop, such as a request in flight
 ## Size and bare content
 
 `size` is the width: `sm`, `md` (the default) or `lg`, and `full` fills the viewport less its margin in both directions. `bare` drops the body's inset and scroll, as Card's does, for content that runs to the dialog's edge such as a pan and zoom canvas; give that content `h-full` to fill the body. The title and the footer keep their inset.
+
+## Close button, links and parts
+
+The head line holds the title, the `@actions` block and a close button, named `Close` or by `closeLabel`. The button closes through `onOpenChange(false)`, and is disabled while `dirty`. `@header` draws the whole head line yourself and `@close` replaces the button alone.
+
+`closeHref` makes the close button a link, so a dialog open on the server closes with no JavaScript. With it `onOpenChange` is optional: leave it out and Escape follows the link too. `modal={false}` shows the dialog over the page without blocking it, open on the server, as SidePanel does.
+
+SidePanel, FormDialog and CommandPalette take the same `size` names, and FormDialog passes `size`, `level`, `actions` and `closeLabel` to its Dialog.
 
 ## Heading level
 

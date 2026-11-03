@@ -1,0 +1,31 @@
+---
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+
+// Overlays held open, to read what the shared head, close control, link and size write.
+const { onClosed } = props<{ onClosed: (name: string) => void }>()
+---
+Dialog#plain(open title="Plain" onOpenChange={() => onClosed('plain')}) Body
+Dialog#named(open title="Named" closeLabel="Dismiss" onOpenChange={() => onClosed('named')})
+  @actions
+    button#prev Previous
+  p Body
+Dialog#busy(open dirty title="Busy" onOpenChange={() => onClosed('busy')}) Body
+Dialog#linked(open modal={false} title="Linked" closeHref="/back") Body
+Dialog#header(open title="Header" onOpenChange={() => onClosed('header')})
+  @header
+    strong#own Mine
+  p Body
+Dialog#close(open title="Close" onOpenChange={() => onClosed('close')})
+  @close
+    button#bye Bye
+  p Body
+SidePanel#panel-sm(open title="Small panel" size="sm" onOpenChange={() => onClosed('panel')}) Body
+SidePanel#panel-header(open title="Header panel" onOpenChange={() => onClosed('panel')})
+  @header
+    strong#panel-own Mine
+  p Body
+SidePanel#panel-close(open title="Close panel" onOpenChange={() => onClosed('panel')})
+  @close
+    button#panel-bye Bye
+  p Body

@@ -537,7 +537,7 @@ describe('SaveForm confirm', () => {
 
     expect([calls, dialogOf(root)!.textContent]).toEqual([[], expect.stringContaining('Apply this change?')])
 
-    click([...dialogOf(root)!.querySelectorAll('button')][1]!)
+    click([...dialogOf(root)!.querySelectorAll('[data-part=footer] button')][1]!)
     await settle()
 
     expect([calls, saved, dialogOf(root)!.open]).toEqual([['Grace'], ['Grace'], false])
@@ -707,7 +707,7 @@ describe('SaveForm driven by signals', () => {
       return undefined
     }, { confirm: 'Apply this change?' })
     const dialog = () => root.querySelector<HTMLDialogElement>('dialog')!
-    const footer = () => [...dialog().querySelectorAll('button')]
+    const footer = () => [...dialog().querySelectorAll('[data-part=footer] button')]
 
     await edit(root)
     root.querySelector('#title')!.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }))
