@@ -181,11 +181,12 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
   // A kay minor may break, so the project takes its patches only.
   const dependency = kayDependency ?? (existsSync(join(KAY_ROOT, '.git')) ? await packKay(join(dir, 'vendor')) : `npm:${kay.name}@~${kay.version}`)
   const scripts = {
-    dev: 'kay dev',
+    'dev': 'kay dev',
     ...has('server') ? { build: 'kay build', compile: 'kay build --compile server', start: 'kay start' } : { build: 'kay build --static' },
-    check: 'kay check',
+    'check': 'kay check',
     ...has('eslint') && { 'lint': 'kay lint --cache', 'lint:fix': 'kay lint --fix --cache' },
-    fmt: 'kay fmt',
+    'fmt': 'kay fmt',
+    'fmt:check': 'kay fmt --check',
     ...has('tests') && { test: 'kay test' },
     ...has('postgres') && { 'db:generate': 'pg-orm generate', 'db:migrate': 'pg-orm apply' },
   }

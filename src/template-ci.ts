@@ -64,6 +64,8 @@ ${workflowSetup(host)}`,
     `      # Each problem shows on the diff.
       - name: Check
         run: bun run check --format github`,
+    `      - name: Format
+        run: bun run fmt:check`,
     has('eslint') && `      - name: Lint
         run: bun run lint`,
     has('tests') && `      - name: Test
@@ -72,6 +74,9 @@ ${workflowSetup(host)}`,
         env:
           DATABASE_URL: postgres://app:app@${host === 'forgejo' ? 'postgres' : 'localhost'}:5432/app_test`
           : ''}`,
+    // A build-only failure (the server entry, a budget) shows here and not on deploy.
+    `      - name: Build
+        run: bun run build`,
   )
 }
 
@@ -124,6 +129,8 @@ ${workflowSetup(host)}`,
           SITE_URL: https://pages.example.com
           SITE_BASE: /\${{ github.repository }}`}
         run: bun run build`,
+    `      - name: Format
+        run: bun run fmt:check`,
     has('eslint') && `      - name: Lint
         run: bun run lint`,
     github

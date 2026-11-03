@@ -688,7 +688,7 @@ describe('kay new', () => {
     // As strict as kay itself, and checked, linted and tested on every push.
     expect(await Bun.file(join(dir, 'tsconfig.json')).json()).toEqual({ extends: 'kay/tsconfig.json' })
     expect(((await Bun.file(join(repo, 'src/tsconfig.app.json')).json()) as { compilerOptions: Record<string, unknown> }).compilerOptions).toMatchObject({ strict: true, exactOptionalPropertyTypes: true, noFallthroughCasesInSwitch: true, noImplicitOverride: true, noUncheckedIndexedAccess: true })
-    expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain('run: bun run check --format github\n\n      - name: Lint\n        run: bun run lint\n\n      - name: Test\n        run: bun run test\n')
+    expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain('run: bun run check --format github\n\n      - name: Format\n        run: bun run fmt:check\n\n      - name: Lint\n        run: bun run lint\n\n      - name: Test\n        run: bun run test\n\n      - name: Build\n        run: bun run build\n')
 
     // Stricter than kay itself: its source fails this flag, its declarations must not.
     const scaffolded = await Bun.file(join(dir, 'tsconfig.json')).text()
@@ -751,7 +751,7 @@ describe('kay new', () => {
       expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toContain('uses: peaceiris/actions-gh-pages@373f7f263a76c20808c831209c920827a82a2847 # v3.9.3')
       // Tested before it builds, which checks it, and linted after.
       expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toMatch(/run: bun run test\n\n {6}- name: Build the site\n/)
-      expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toMatch(/run: bun run build\n\n {6}- name: Lint\n {8}run: bun run lint\n/)
+      expect(await Bun.file(join(dir, '.forgejo/workflows/pages.yml')).text()).toMatch(/run: bun run build\n\n {6}- name: Format\n {8}run: bun run fmt:check\n\n {6}- name: Lint\n {8}run: bun run lint\n/)
 
       await installKay(dir)
       // Linted before any check or dev run wrote the types its rules read.
@@ -961,7 +961,7 @@ describe('kay new', () => {
       expect(files).toEqual(['.gitignore', '.npmrc', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'kay.config.ts', 'package.json', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tsconfig.json'])
       // kay itself comes from the registry this names, whatever else is left out.
       expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
-      expect(manifest.scripts).toEqual({ dev: 'kay dev', build: 'kay build --static', check: 'kay check', fmt: 'kay fmt' })
+      expect(manifest.scripts).toEqual({ 'dev': 'kay dev', 'build': 'kay build --static', 'check': 'kay check', 'fmt': 'kay fmt', 'fmt:check': 'kay fmt --check' })
       // An agent reads kay's docs as installed, renames the site every title ends with, and runs the checks this project's scripts hold.
       expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toBe('# my-app\n\nBuilt with kay, a Bun web framework: a `.kay` file is one component, TypeScript fences then a pug-like template. Read kay\'s docs for the installed version before writing kay code; the topic files they link are in `node_modules/kay/llms/`, and `bunx kay docs <words>` prints the section of them or of an installed library\'s that matches:\n\n@node_modules/kay/llms.txt\n\nEvery page title ends with `seo.name` from `kay.config.ts`, which `kay new` filled in from the folder name: set it to the site\'s real name.\n\nBefore calling a change done, run `bun run check` and `bun run fmt`.\n')
       // Published, so the docs AGENTS.md imports are in node_modules/kay.
