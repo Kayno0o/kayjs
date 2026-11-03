@@ -407,16 +407,23 @@ export interface MailExtensionOptions extends MailerOptions {
   server?: (() => Promise<Mailer>) | undefined
 }
 
-// The mailers of the sites running in this process, the latest started last: what `send` and `enqueue` use.
-const running: { load: () => Promise<Mailer> }[] = []
+// The mailers of the sites running in this process, the latest started last: what `send` and `enqueue` use. A site that is closed without stopping (kaynooo/kayjs#3053) leaves its entry until the next start.
+const running: Mailer[] = []
 
-// Registers a started site's mailer for `send`, and gives what takes it off again when the site stops.
+// Registers a started site's mailer for `send`, and takes it off when the site stops. A mailer a module exports is the same one at each start, so it is listed once, as the latest.
 function register(mailerOf: Mailer): void {
-  const entry = { load: async () => Promise.resolve(mailerOf) }
+  const known = running.includes(mailerOf)
 
-  running.push(entry)
+  if (known)
+    running.splice(running.indexOf(mailerOf), 1)
+
+  running.push(mailerOf)
+
+  if (known)
+    return
+
   mailerOf.onStop(() => {
-    const at = running.indexOf(entry)
+    const at = running.indexOf(mailerOf)
 
     if (at >= 0)
       running.splice(at, 1)
@@ -425,7 +432,7 @@ function register(mailerOf: Mailer): void {
 
 /** The mailer of the running site `mail()` registered, the latest started when several run in one process; undefined when none runs. */
 export async function registeredMailer(): Promise<Mailer | undefined> {
-  return running.at(-1)?.load()
+  return Promise.resolve(running.at(-1))
 }
 
 async function registeredOrThrow(): Promise<Mailer> {

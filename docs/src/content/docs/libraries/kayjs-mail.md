@@ -33,7 +33,7 @@ export default defineConfig({
 })
 ```
 
-Send from anywhere with `send`, or `enqueue` to leave the mail to the queue. Both use the mailer the config registered.
+Send from anywhere with `send`, or `enqueue` to leave the mail to the queue. Both use the mailer the config registered, and assume one running site per process: when several run, as test sites can, call the `send` of each site's own mailer.
 
 ```ts
 import { send } from '@kaynooo/kayjs-mail'

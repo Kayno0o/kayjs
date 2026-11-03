@@ -109,6 +109,23 @@ describe('mail() with no module', () => {
     expect(outbox.last()?.from).toBe('own@site.test')
   })
 
+  it('lists the mailer of a module once however often kay starts a site, and a stop takes it off', async () => {
+    const own = mailer({ from: 'own@site.test' })
+    const other = mailer({ from: 'other@site.test' })
+    const extension = mail({ module: './src/mail' })
+
+    await extension.serverModule!.prepare!(own)
+    await extension.serverModule!.prepare!(other)
+    await extension.serverModule!.prepare!(own)
+    expect(await registeredMailer()).toBe(own)
+    own.listen(0)
+    await own.stop()
+    expect(await registeredMailer()).toBe(other)
+    other.listen(0)
+    await other.stop()
+    expect(await registeredMailer()).toBeUndefined()
+  })
+
   it('registers a mailer a server function loads', async () => {
     const own = mailer({ from: 'loaded@site.test' })
 
