@@ -821,7 +821,7 @@ type DataValue = string | number | boolean | bigint | null | undefined | Date | 
 function decide<E extends object, C extends object>(source: string, hooks: readonly (BeforeHook<E, C> | undefined)[], event: E): Promise<{
   change: Partial<C>;
 } | {
-  refused: ErrorShape & {
+  refused: ErrorShape<unknown> & {
     retryAfter?: number | undefined;
   };
 }>
@@ -849,8 +849,8 @@ function durationWords(seconds: number, locale: string): string
 function editSessionAdmitted(request: Request): boolean
 
 [./library] ErrorShape
-interface ErrorShape
-  data: unknown
+interface ErrorShape<Data = unknown>
+  data: Data | undefined
   errors: Record<string, string>
   message: string
   status: number

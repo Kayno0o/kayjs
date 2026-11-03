@@ -1,20 +1,27 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, jest } from 'bun:test'
 import { connection, listenerSet, retryLater } from '../src/runtime/connection'
 
 const sleep = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 describe('retryLater', () => {
-  it('runs after the backoff, and not once cancelled', async () => {
-    let runs = 0
-    const cancel = retryLater(0, () => runs++)
+  it('runs after the backoff, and not once cancelled', () => {
+    jest.useFakeTimers()
 
-    await sleep(600)
-    expect(runs).toBe(1)
+    try {
+      let runs = 0
+      const cancel = retryLater(0, () => runs++)
 
-    retryLater(0, () => runs++)()
-    await sleep(30)
-    expect(runs).toBe(1)
-    cancel()
+      jest.advanceTimersByTime(500)
+      expect(runs).toBe(1)
+
+      retryLater(0, () => runs++)()
+      jest.advanceTimersByTime(500)
+      expect(runs).toBe(1)
+      cancel()
+    }
+    finally {
+      jest.useRealTimers()
+    }
   })
 })
 

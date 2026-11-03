@@ -1,7 +1,7 @@
 // The first segment of a validation path: `/title` and `title.0` name `title`.
 const FIRST_SEGMENT = /^\/?([^/.]*)/
 
-// What every failure of a call carries, whichever source it came from: `errors` holds a message per field, the form-wide one under '', and `data` what the server answered with.
+// What every failure carries, whichever source it came from (a call, a hook that stops a transition, an action's answer to it): `errors` holds a message per field, the form-wide one under '', and `data` what the server answered with.
 export interface ErrorShape<Data = unknown> {
   // The status the server answered with, 0 when no answer came.
   status: number

@@ -29,9 +29,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `breachedPasswords` defaults to on when `NODE_ENV` is `production`: `password.register`, `password.reset`, `password.change` and `createUser` ask Have I Been Pwned (the first five characters of the SHA-1 only; an outage lets the password through) and refuse a listed one as `errors.password: 'breached'`. An app that must not call the service sets `breachedPasswords: false`; a test running with `NODE_ENV=production` stubs `fetch` or sets it.
 - In production `createAuth` warns when password sign-up is open with no `email` option, as registering then answers `taken` for a held address. No lint recognises it.
-### kay/compiler: `compileKay` gives `cause` instead of `why`
 
-- A tool reading `compileKay(...).why`, the sentence saying what makes a component an island, reads `cause` now: `{ kind, name, span, line }`, with `kind` one of `client`, `attribute`, `value`, `live`, `prop`, `spread` and `block`, and `span` the offsets in the source that decide it. `kay build --format json` keeps `why` on each island and adds `cause` beside it.
 ### Every failure carries `status`, `message`, `errors` and `data`
 
 - `ApiError.answer` is `data`, and `ApiError` gains `errors`; an `ActionError`'s `answer` stays its response body text, now named `body`. Both old names work until 1.90. `kay upgrade` renames a read inside `if (x instanceof ActionError)` (or the right side of an `&&`) to `.body`; a read narrowed to `ApiError` gets a `.data` fix that `kay upgrade` does not apply, as the receiver may be an `ActionError`; a receiver only a `catch` or a cast says is an error is reported with no fix (`deprecated-api-error-answer`).

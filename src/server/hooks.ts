@@ -1,4 +1,4 @@
-import type { ErrorShape } from '../runtime/refuse'
+import type { ErrorShape } from '../runtime/api-error'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { thrownRefusal } from '../runtime/refuse'

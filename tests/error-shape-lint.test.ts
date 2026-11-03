@@ -67,6 +67,14 @@ describe('deprecated-api-error-answer', () => {
     expect(after['src/a.ts']).toBe(source)
   })
 
+  it('drops the narrowing of a receiver the consequent assigns again', async () => {
+    const source = `${head}export function a(error: unknown, other: unknown) {\n  if (error instanceof ActionError) {\n    error = other\n    return error.answer\n  }\n}\n`
+    const { diagnostics, after } = await found({ 'src/a.ts': source })
+
+    expect(diagnostics).toEqual([])
+    expect(after['src/a.ts']).toBe(source)
+  })
+
   it('reports a catch or a cast with no fix, a function made inside a narrowing without its narrowing, and leaves other files alone', async () => {
     const caught = `${head}export async function b(run: () => Promise<void>) {\n  try {\n    await run()\n  }\n  catch (error) {\n    return (error as ApiError).answer ?? error\n  }\n}\n`
     const nested = `${head}export const c = (error: unknown) => error instanceof ActionError ? [1].map(() => (error as { answer?: unknown }).answer) : 0\n`

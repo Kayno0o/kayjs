@@ -261,13 +261,6 @@ interface ErrorPageContext<Params extends Record<string, unknown> = Record<strin
   url: URL
 
 [.] ErrorShape
-interface ErrorShape
-  data: unknown
-  errors: Record<string, string>
-  message: string
-  status: number
-
-[.] ErrorShape
 interface ErrorShape<Data = unknown>
   data: Data | undefined
   errors: Record<string, string>
@@ -539,7 +532,7 @@ interface NavigateOptions
   transition?: boolean | undefined
 
 [.] navigation
-const navigation: { status: () => NavigationState; pending: () => boolean; to: () => URL | undefined; error: () => ApiError | undefined; }
+const navigation: { status: () => NavigationState; pending: () => boolean; to: () => URL | undefined; error: () => ApiError<unknown> | undefined; }
 
 [.] NavigationState
 type NavigationState = 'idle' | 'loading' | 'swapping'

@@ -59,6 +59,20 @@ function narrows(test: Node, classes: Map<string, string>): [string, string][] {
   return test.type === 'LogicalExpression' && test.operator === '&&' ? [...narrows(test.left, classes), ...narrows(test.right, classes)] : []
 }
 
+// The names a node assigns anywhere inside it, whose narrowing it cannot keep: `x = other` makes `x` anything.
+function assigned(node: Node, names = new Set<string>()): Set<string> {
+  if (node.type === 'AssignmentExpression' && node.left.type === 'Identifier')
+    names.add(node.left.name)
+
+  if (node.type === 'UpdateExpression' && node.argument.type === 'Identifier')
+    names.add(node.argument.name)
+
+  for (const child of childrenOf(node))
+    assigned(child, names)
+
+  return names
+}
+
 // `.answer` of an `ApiError`, `data` since 1.87, and of an `ActionError`, whose `answer` was its `body`. Only a read inside the consequent of an `if` or a conditional, or the right side of an `&&`, whose test is `x instanceof C` for the same `x` is narrowed: an `ActionError` read is fixed to `body` (safe), an `ApiError` one to `data` (not safe, as it may be an `ActionError`). A receiver only a `catch` or a cast says is an error is reported with no fix. Any other `.answer` is none of this lint's.
 export async function apiErrorAnswers(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   if (lintLevel('deprecated-api-error-answer', options.lints) === 'allow')
@@ -82,7 +96,9 @@ export async function apiErrorAnswers(root: string, options: CheckOptions): Prom
             report(base + node.property.start, base + node.property.end, '`answer` is deprecated since 1.87, `data` on an `ApiError` and `body` on an `ActionError`, and the old name works until 1.90', kind === 'ActionError' ? 'read `body`' : 'read `data`', kind === undefined ? null : edit(kind === 'ActionError' ? 'body' : 'data'), kind === 'ActionError')
         }
 
-        const within = (child: Node, add: [string, string][]) => {
+        const within = (child: Node, narrowing: [string, string][]) => {
+          const reassigned = narrowing.length === 0 ? new Set<string>() : assigned(child)
+          const add = narrowing.filter(([name]) => !reassigned.has(name))
           const next = add.length === 0 ? narrowed : new Map<string, string>([...narrowed, ...add.filter(([name, kind]) => kind === 'ActionError' || narrowed.get(name) !== 'ActionError')])
 
           visit(child, SCOPES.has(child.type) ? caught(child) : catches, SCOPES.has(child.type) ? new Map<string, string>() : next)

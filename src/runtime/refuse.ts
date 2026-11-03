@@ -1,10 +1,4 @@
-// The one shape a failure has wherever it is told: a hook that stops a transition, an action's answer to it, a test's reading of it.
-export interface ErrorShape {
-  status: number
-  message: string
-  errors: Record<string, string>
-  data: unknown
-}
+import type { ErrorShape } from './api-error'
 
 export interface RefuseOptions {
   // An error status, from 400 to 599: 422 when `errors` names fields, else 403.

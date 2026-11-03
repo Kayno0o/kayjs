@@ -126,7 +126,7 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
     reset: () => {
       attempt = 0
     },
-    // A start by the app, which a `close()` before it does not hold back.
+    // A start by the app, which a `close()` before it does not hold back; the caller runs `stop()` first, which cancels a pending retry.
     restart: () => {
       attempt = 0
       setStatus('connecting')
