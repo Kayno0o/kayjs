@@ -35,6 +35,27 @@ describe('the island cause', () => {
     expect(cause('p a\n')).toBeUndefined()
   })
 
+  it('finds an implicit `kay` value where the script reads it, not in a comment or a string before', () => {
+    const source = '---\n// signal comes later\nconst label = \'signal\'\nconst n = signal(0)\n---\np {n()}\n'
+
+    expect(slice(source, cause(source)!.span)).toBe('signal')
+    expect(cause(source)).toMatchObject({ kind: 'value', name: 'signal', line: 4 })
+    expect(source.indexOf('signal(0)')).toBe(cause(source)!.span.start)
+  })
+
+  it('counts the span and the line in the file the author wrote, not in the markdown it expands to', () => {
+    const source = 'main\n  markdown\n    # Hello\n\n    - one\n    - two\n\n    para **bold**\n  button(onClick={() => 1}) +\n'
+
+    expect(slice(source, cause(source)!.span)).toBe('onClick')
+    expect(cause(source)).toMatchObject({ kind: 'attribute', name: 'onClick', line: 9 })
+    expect(compileKay(source, 'src/components/part.kay').why).toBe('`onClick`, line 9')
+  })
+
+  it('keeps `why` as the sentence of the cause', () => {
+    expect(compileKay('button(onClick={() => 1}) b\n', 'src/components/part.kay').why).toBe('`onClick`, line 1')
+    expect(compileKay('p a\n', 'src/components/part.kay').why).toBeUndefined()
+  })
+
   it('names what a static component passes, with the component it passes it to', () => {
     const prop = '---\nimport Picker from \'./picker.kay\'\nfunction shout() {}\n---\nPicker(format={shout})\n'
     const block = '---\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n'
@@ -49,10 +70,11 @@ describe('the island cause', () => {
 describe('the island lens', () => {
   it('reveals the span that makes the component an island when clicked', () => {
     const source = 'p a\nbutton(onClick={() => 1}) b\n'
-    const [lens] = islandLens(source, 'src/components/part.kay', { route: false, insideIsland: false, uri: 'file:///app/part.kay' })
+    const [lens] = islandLens(source, 'src/components/part.kay', { route: false, insideIsland: false, reveal: { command: 'kay.revealIslandCause:/app', uri: 'file:///app/part.kay' } })
 
-    expect(lens!.command).toEqual({ title: 'Island: `onClick`, line 2', command: 'kay.revealIslandCause', arguments: ['file:///app/part.kay', { start: { line: 1, character: 7 }, end: { line: 1, character: 14 } }] })
-    expect(islandLens('p a\n', 'src/components/part.kay', { route: false, insideIsland: false, uri: 'file:///app/part.kay' })[0]!.command.command).toBe('')
+    expect(lens!.command).toEqual({ title: 'Island: `onClick`, line 2', command: 'kay.revealIslandCause:/app', arguments: ['file:///app/part.kay', { start: { line: 1, character: 7 }, end: { line: 1, character: 14 } }] })
+    expect(islandLens('p a\n', 'src/components/part.kay', { route: false, insideIsland: false, reveal: { command: 'kay.revealIslandCause:/app', uri: 'file:///app/part.kay' } })[0]!.command.command).toBe('')
+    expect(islandLens(source, 'src/components/part.kay', { route: false, insideIsland: false })[0]!.command).toEqual({ title: 'Island: `onClick`, line 2', command: '' })
   })
 })
 
@@ -82,7 +104,7 @@ describe('kay explain island', () => {
     return { stdout, stderr, code }
   }
 
-  async function project(): Promise<string> {
+  async function project(more: Record<string, string> = {}): Promise<string> {
     const root = await scratchDir('island-cause-')
 
     dirs.push(root)
@@ -90,7 +112,11 @@ describe('kay explain island', () => {
       'package.json': '{"name":"x","type":"module"}',
       'src/components/button.kay': 'button(onClick={() => 1}) Go\n',
       'src/components/plain.kay': 'p Plain\n',
+      'src/components/wrap.kay': '---\nimport Button from \'./button.kay\'\nfunction pick() {}\n---\nButton(format={pick})\n',
+      'src/routes/_layout.kay': 'main\n  button(onClick={() => 1}) Menu\n  slot\n',
+      'src/routes/server.kay': '--- server\nconst n = 1\n---\nbutton(onClick={() => 1}) {n}\n',
       'src/routes/index.kay': '---\nimport Button from \'../components/button.kay\'\n---\nButton\n',
+      ...more,
     }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
     return root
@@ -107,7 +133,39 @@ describe('kay explain island', () => {
     expect(one.stdout).toContain('cause: `onClick`, line 1')
     expect(one.stdout).toContain('rule: A component is an island when')
     expect(JSON.parse(plain.stdout)).toMatchObject({ file: 'src/components/plain.kay', role: 'static' })
-    expect((JSON.parse(all.stdout) as { islands: unknown[] }).islands).toEqual([{ file: 'src/components/button.kay', role: 'island', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 1 }) }])
+    expect((JSON.parse(all.stdout) as { islands: unknown[] }).islands).toEqual([
+      { file: 'src/components/button.kay', role: 'island', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 1 }) },
+      { file: 'src/components/wrap.kay', role: 'promoted', cause: expect.objectContaining({ kind: 'prop', name: 'format', line: 5 }) },
+      { file: 'src/routes/_layout.kay', role: 'island', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 2 }) },
+      { file: 'src/routes/server.kay', role: 'island', cause: expect.objectContaining({ kind: 'attribute', name: 'onClick', line: 4 }) },
+    ])
+  })
+
+  it('says what a promoted component is, and reports a layout or a server page with a handler as the compiler decides it', async () => {
+    const root = await project()
+    const [promoted, layout, server] = await Promise.all([
+      kay(['explain', 'island', 'src/components/wrap.kay', '--format', 'json'], root),
+      kay(['explain', 'island', 'src/routes/_layout.kay', '--format', 'json'], root),
+      kay(['explain', 'island', 'src/routes/server.kay'], root),
+    ])
+
+    expect(JSON.parse(promoted.stdout)).toMatchObject({ file: 'src/components/wrap.kay', role: 'promoted', cause: { kind: 'prop', name: 'format', line: 5, description: '`format` passed to Button, line 5' } })
+    expect(JSON.parse(layout.stdout)).toMatchObject({ role: 'island', cause: { kind: 'attribute', name: 'onClick', line: 2 } })
+    expect(server.stdout).toContain('src/routes/server.kay: an island')
+    expect((await kay(['explain', 'island', 'src/components/wrap.kay'], root)).stdout).toContain('which the build bundles only when its imports reach an island')
+  })
+
+  it('reports the error of a file that does not compile instead of a role', async () => {
+    const root = await project({ 'src/components/broken.kay': 'button(onClick={() => 1}\n' })
+    const one = await kay(['explain', 'island', 'src/components/broken.kay'], root)
+    const all = await kay(['explain', 'island', '--format', 'json'], root)
+
+    expect(one.code).toBe(1)
+    expect(one.stdout).not.toContain('static')
+    expect(one.stderr).toContain('broken.kay')
+    expect(all.code).toBe(1)
+    expect((JSON.parse(all.stdout) as { islands: { file: string }[], broken: string[] }).broken).toHaveLength(1)
+    expect((JSON.parse(all.stdout) as { islands: { file: string }[] }).islands.map(entry => entry.file)).not.toContain('src/components/broken.kay')
   })
 
   it('refuses a file that is none, and a name that takes no file', async () => {

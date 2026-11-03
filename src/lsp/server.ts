@@ -27,7 +27,7 @@ import { completion, resolveCompletion } from './completions'
 import { DiagnosticsQueue } from './diagnostics'
 import { links } from './document-links'
 import { FIX_ALL, guard, QUICK_FIX, shadowSettingsOf } from './host'
-import { islandLens, REVEAL_ISLAND_CAUSE } from './island-lens'
+import { islandLens, revealCommand } from './island-lens'
 import { applyEdit, filePath, vscodeUri } from './mapping'
 import { definition, highlights, hover, inlayHints, references, signatureHelp } from './navigation'
 import { documentSymbols, foldingRanges } from './outline'
@@ -69,6 +69,8 @@ export class KayLanguageServer implements LspHost {
   private routesSetting: string | undefined
   nodeUris = false
   private watchesFiles = false
+  // The command of the island lens, set when the editor can show a document.
+  private reveal: string | undefined
   readonly projects = new Map<string, Project>()
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
   readonly documents = new Map<string, Document>()
@@ -143,6 +145,7 @@ export class KayLanguageServer implements LspHost {
     this.nodeUris = rootUri !== undefined && rootUri !== vscodeUri(this.root) && rootUri === pathToFileURL(this.root).href
 
     await this.writeShadows()
+    this.reveal = (params.capabilities.window as { showDocument?: { support?: boolean } } | undefined)?.showDocument?.support === true ? revealCommand(this.root) : undefined
     this.watchesFiles = (params.capabilities.workspace as { didChangeWatchedFiles?: { dynamicRegistration?: boolean } } | undefined)?.didChangeWatchedFiles?.dynamicRegistration === true
 
     const child = Bun.spawn([nativeExe(), '--lsp', '--stdio'], { cwd: this.root, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' })
@@ -179,7 +182,7 @@ export class KayLanguageServer implements LspHost {
         inlayHintProvider: true,
         documentLinkProvider: {},
         codeLensProvider: {},
-        executeCommandProvider: { commands: [REVEAL_ISLAND_CAUSE] },
+        ...this.reveal !== undefined && { executeCommandProvider: { commands: [this.reveal] } },
       },
       workspace: { fileOperations: { willRename: { filters: [{ pattern: { glob: '**/*.kay' } }, { pattern: { glob: '**', matches: 'folder' } }] } } },
       serverInfo: { name: 'kay' },
@@ -461,15 +464,21 @@ export class KayLanguageServer implements LspHost {
     const project = this.projectAt(projectRootOf(path, this.root))
     const route = path.startsWith(`${project.routesDir}${sep}`)
 
-    return islandLens(document.source, path, { route, insideIsland: project.islandOnly.has(path), signals: importedSignals(path, document.source), uri })
+    return islandLens(document.source, path, { route, insideIsland: project.islandOnly.has(path), signals: importedSignals(path, document.source), reveal: this.reveal === undefined ? undefined : { command: this.reveal, uri } })
   }
 
   // A click on an island lens: the editor shows the span that makes the component an island.
   private async executed({ command, arguments: given = [] }: { command: string, arguments?: unknown[] }): Promise<null> {
     const [uri, selection] = given
 
-    if (command === REVEAL_ISLAND_CAUSE && typeof uri === 'string')
-      await this.client.request('window/showDocument', { uri, takeFocus: true, selection })
+    if (command === this.reveal && typeof uri === 'string') {
+      try {
+        await this.client.request('window/showDocument', { uri, takeFocus: true, selection })
+      }
+      catch {
+        // The editor refused to show it, which the click has no use telling.
+      }
+    }
 
     return null
   }

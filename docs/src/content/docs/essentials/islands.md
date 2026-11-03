@@ -69,7 +69,7 @@ Write `// kay-island` on a line of its own in the component to say it is meant, 
 
 The editor shows a lens on the first line of a component saying whether it is an island and why. A click on it shows the line that decides it.
 
-`kay build --format json` gives the same as `why` on each island of `built.sizes`, and on each route's `islands`.
+`kay build --format json` gives the same as `why` on each island of `built.sizes`, with its `cause` (`kind`, `name` and `line`) as data.
 
 `kay explain island src/components/counter.kay` prints the role of one component, what decides it and the rule. `kay explain island` lists every island of the project. Both take `--format json`.
 

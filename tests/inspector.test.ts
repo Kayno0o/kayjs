@@ -204,6 +204,21 @@ describe('the inspector', () => {
     }
   })
 
+  it('shows the cause an island slot carries as data-why on its card, and none on a slot without one', async () => {
+    document.body.innerHTML = '<slot data-component="src/islands/counter.kay" data-why="`onClick`, line 4"></slot><slot data-component="src/islands/late.kay"></slot>'
+    const inspector = start()
+
+    try {
+      [...host().querySelectorAll<HTMLButtonElement>('.bar > button')].find(button => button.textContent.endsWith('islands'))!.click()
+
+      await eventually(() => expect(host().querySelector('#kay-dev-islands')?.textContent).toBe('src/islands/counter.kaynot hydrated`onClick`, line 4src/islands/late.kaynot hydrated'))
+      expect([...host().querySelectorAll('#kay-dev-islands .note')].map(note => note.textContent)).toEqual(['`onClick`, line 4'])
+    }
+    finally {
+      inspector.stop()
+    }
+  })
+
   it('opens the line of the element clicked once Inspect is on, the click kept from the page, then turns itself off', async () => {
     document.body.innerHTML = '<a href="/away" data-kay-src="src/routes/index.kay:4:3"><span>Away</span></a><p>plain</p>'
     const inspector = start()

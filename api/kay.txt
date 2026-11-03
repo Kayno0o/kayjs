@@ -1428,6 +1428,7 @@ interface CompileResult
   moduleLines: number[]
   promote?: string | undefined
   tsx: string
+  why?: string | undefined
 
 [./compiler] Diagnostic
 interface Diagnostic extends Span

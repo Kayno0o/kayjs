@@ -2146,3 +2146,71 @@ describe('kay lsp when a handler throws', () => {
     }
   })
 })
+
+describe('the island lens command', () => {
+  const component = 'src/components/part.kay'
+  const SHOWS = { window: { showDocument: { support: true } } }
+  let dir: string
+
+  beforeAll(async () => {
+    dir = await scratchDir('lsp-reveal-')
+    await Promise.all([
+      Bun.write(join(dir, 'tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
+      Bun.write(join(dir, component), 'p a\nbutton(onClick={() => 1}) b\n'),
+    ])
+  })
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  async function lensOf(editor: Editor) {
+    await editor.open(component)
+
+    const [lens] = await editor.connection.request<{ command: { title: string, command: string, arguments?: unknown[] } }[]>('textDocument/codeLens', { textDocument: { uri: editor.uri(component) } })
+
+    return lens!.command
+  }
+
+  it('is advertised under the root of the server, and reveals the cause in the editor', async () => {
+    const editor = new Editor(dir, false, SHOWS)
+    const shown: unknown[] = []
+
+    editor.connection.onRequest('window/showDocument', (params) => {
+      shown.push(params)
+
+      return { success: true }
+    })
+
+    await editor.start()
+
+    try {
+      const { commands } = (editor.advertised as { executeCommandProvider?: { commands: string[] } }).executeCommandProvider!
+      const command = await lensOf(editor)
+
+      expect(commands).toEqual([`kay.revealIslandCause:${dir}`])
+      expect(command).toEqual({ title: 'Island: `onClick`, line 2', command: commands[0]!, arguments: [editor.uri(component), { start: { line: 1, character: 7 }, end: { line: 1, character: 14 } }] })
+      expect(await editor.connection.request('workspace/executeCommand', { command: command.command, arguments: command.arguments })).toBeNull()
+      expect(shown).toEqual([{ uri: editor.uri(component), takeFocus: true, selection: command.arguments![1] }])
+      expect(await editor.connection.request('workspace/executeCommand', { command: 'kay.other', arguments: command.arguments })).toBeNull()
+      expect(shown).toHaveLength(1)
+    }
+    finally {
+      await editor.stop()
+    }
+  })
+
+  it('advertises no command and puts none on the lens for an editor that cannot show a document', async () => {
+    const editor = new Editor(dir)
+
+    await editor.start()
+
+    try {
+      expect((editor.advertised as { executeCommandProvider?: unknown }).executeCommandProvider).toBeUndefined()
+      expect(await lensOf(editor)).toEqual({ title: 'Island: `onClick`, line 2', command: '' })
+    }
+    finally {
+      await editor.stop()
+    }
+  })
+})

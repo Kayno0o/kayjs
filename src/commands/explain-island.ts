@@ -2,16 +2,15 @@ import type { IslandCause } from '../compiler/island-cause'
 import type { ProblemFormat } from './command'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { basename, relative, resolve } from 'node:path'
-import process from 'node:process'
+import { relative, resolve } from 'node:path'
 import { findKayFiles } from '../build/files'
 import { importedSignals } from '../build/signals'
-import { compileKay, ROUTE_FILES } from '../compiler'
+import { compileKay } from '../compiler'
+import { formatDiagnostic } from '../compiler/frame'
 import { CAUSE_KINDS, describeCause, ISLAND_RULE } from '../compiler/island-cause'
+import { printDocument, printFailure, projectRoot } from './command'
 
-import { printDocument, printFailure } from './command'
-
-type Role = 'island' | 'promoted' | 'static' | 'route'
+type Role = 'island' | 'promoted' | 'static'
 
 interface Explained {
   file: string
@@ -21,39 +20,43 @@ interface Explained {
 
 const ROLE_WORDS: Record<Role, string> = {
   island: 'an island: it renders on the server and hydrates in the browser',
-  promoted: 'static, and an island only when a page passes it what only an island sends',
+  promoted: 'static, and an island only when a page passes it what only an island sends, which the build bundles only when its imports reach an island',
   static: 'static: it ships no JavaScript',
-  route: 'a layout or special page: the server renders it and it is never an island',
 }
 
 function shown(cause: IslandCause) {
   return { kind: cause.kind, name: cause.name, line: cause.line, description: describeCause(cause), meaning: CAUSE_KINDS[cause.kind] }
 }
 
-function roleOf(route: boolean, island: string | undefined, promote: string | undefined): Role {
-  if (route)
-    return 'route'
-
+function roleOf(island: string | undefined, promote: string | undefined): Role {
   if (island !== undefined)
     return 'island'
 
   return promote === undefined ? 'static' : 'promoted'
 }
 
-// The role of each file, as the build decides it, with what decides it.
-async function explained(root: string, files: string[]): Promise<Explained[]> {
+// The role of each file, as `compileKay` decides it, with what decides it, and the files that do not compile, which have no role.
+async function explained(root: string, files: string[]): Promise<{ found: Explained[], broken: string[] }> {
   const found: Explained[] = []
+  const broken: string[] = []
 
   for (const file of files) {
     const source = await readFile(file, 'utf8')
-    const { island, promote, cause } = compileKay(source, file, { root, importedSignals: importedSignals(file, source) })
-    const route = ROUTE_FILES.has(basename(file))
-    const role = roleOf(route, island, promote)
+    const { island, promote, cause, diagnostics } = compileKay(source, file, { root, importedSignals: importedSignals(file, source) })
+    const error = diagnostics.find(diagnostic => diagnostic.severity !== 'warning')
 
-    found.push({ file: relative(root, file), role, ...role !== 'route' && cause && { cause: shown(cause) } })
+    if (error !== undefined) {
+      broken.push(formatDiagnostic(source, relative(root, file), error))
+
+      continue
+    }
+
+    const role = roleOf(island, promote)
+
+    found.push({ file: relative(root, file), role, ...cause && { cause: shown(cause) } })
   }
 
-  return found
+  return { found, broken }
 }
 
 function lines(entry: Explained): string[] {
@@ -65,7 +68,10 @@ function lines(entry: Explained): string[] {
 
 // `kay explain island [file]`: the role of one component and what decides it, or every island of the project; the rule beside it.
 export async function explainIsland(file: string | undefined, format: ProblemFormat): Promise<number> {
-  const root = process.cwd()
+  const root = projectRoot('explain', '.', format)
+
+  if (root === undefined)
+    return 1
 
   if (file !== undefined) {
     const path = resolve(file)
@@ -76,23 +82,32 @@ export async function explainIsland(file: string | undefined, format: ProblemFor
       return 1
     }
 
-    const [entry] = await explained(root, [path])
+    const { found: [entry], broken } = await explained(root, [path])
+
+    if (entry === undefined) {
+      printFailure('explain', broken[0]!, format)
+
+      return 1
+    }
 
     if (format === 'json')
       printDocument({ rule: ISLAND_RULE, ...entry })
     else
-      console.log([...lines(entry!), `  rule: ${ISLAND_RULE}`].join('\n'))
+      console.log([...lines(entry), `  rule: ${ISLAND_RULE}`].join('\n'))
 
     return 0
   }
 
-  const all = await explained(root, await findKayFiles(root, { project: true, ownOnly: true, ownKayOnly: true }))
-  const islands = all.filter(entry => entry.role === 'island' || entry.role === 'promoted').sort((a, b) => a.file.localeCompare(b.file))
+  const { found, broken } = await explained(root, await findKayFiles(root, { project: true, ownOnly: true, ownKayOnly: true }))
+  const islands = found.filter(entry => entry.role !== 'static').sort((a, b) => a.file.localeCompare(b.file))
 
   if (format === 'json')
-    printDocument({ rule: ISLAND_RULE, islands })
+    printDocument({ rule: ISLAND_RULE, islands, ...broken.length > 0 && { broken } })
   else
     console.log([ISLAND_RULE, '', ...islands.length === 0 ? ['No component of this project is an island.'] : islands.flatMap(lines)].join('\n'))
 
-  return 0
+  for (const problem of broken)
+    console.error(problem)
+
+  return broken.length === 0 ? 0 : 1
 }

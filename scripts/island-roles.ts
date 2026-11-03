@@ -1,11 +1,14 @@
+import type { Subprocess } from 'bun'
 import { readdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
+import { parseArgs } from 'node:util'
 
 // Which components are islands on this branch against main, for kay's own apps: `bun scripts/island-roles.ts [--ref <rev>] [--only <target>...] [--format text|json]`.
 // Each target is built with `kay build --format json --no-check` on the working tree and on a temporary worktree of main, installed on its own as the `base` CLI links the checkout's node_modules, whose `kay` and libraries would then be this branch's: the docs site, each `packages/*/tests/fixture`, `examples/*`, `bench/apps/kay` and a `kay new` scaffold.
 // It diffs `built.sizes.islands` (the role of each file, and its cause) and each `built.routes[].islands`, prints every changed role and cause, and exits 1 when a component is an island here that main had neither as an island nor as `promoted: true`: no component that is static today may become an island.
-// `--collect --root <dir>` builds the targets of that tree and prints their roles as one JSON line.
+// A target built on main and not on this branch is left out, one built only on this branch is an error, as main has nothing to compare it with.
+// An interrupted run removes its worktree and stops its builds; two runs at once each have their own.
 const HERE = resolve(import.meta.dir, '..')
 const SCAFFOLD = 'new-scaffold'
 
@@ -156,26 +159,45 @@ async function listing(dir: string): Promise<string[]> {
   try {
     return await readdir(dir)
   }
-  catch {
-    return []
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+      return []
+
+    throw error
   }
 }
 
-// The apps to build, by the name each is reported under.
-async function targets(ROOT: string): Promise<Record<string, string>> {
-  const found: Record<string, string> = { docs: join(ROOT, 'docs'), bench: join(ROOT, 'bench/apps/kay') }
+// The scaffold of this run, so two runs of the script do not scaffold into the same folder.
+function scaffoldDir(tree: string): string {
+  return join(tree, '.kay/scratch', `${SCAFFOLD}-${process.pid}`)
+}
 
-  for (const library of await listing(join(ROOT, 'packages'))) {
-    if ((await listing(join(ROOT, 'packages', library, 'tests/fixture'))).length > 0)
-      found[`${library}-fixture`] = join(ROOT, 'packages', library, 'tests/fixture')
+// The apps to build, by the name each is reported under.
+async function targets(tree: string): Promise<Record<string, string>> {
+  const found: Record<string, string> = { docs: join(tree, 'docs'), bench: join(tree, 'bench/apps/kay') }
+
+  for (const library of await listing(join(tree, 'packages'))) {
+    if ((await listing(join(tree, 'packages', library, 'tests/fixture'))).length > 0)
+      found[`${library}-fixture`] = join(tree, 'packages', library, 'tests/fixture')
   }
 
-  for (const example of await listing(join(ROOT, 'examples')))
-    found[`example-${example}`] = join(ROOT, 'examples', example)
+  for (const example of await listing(join(tree, 'examples')))
+    found[`example-${example}`] = join(tree, 'examples', example)
 
-  found[SCAFFOLD] = join(ROOT, '.kay/scratch', SCAFFOLD)
+  found[SCAFFOLD] = scaffoldDir(tree)
 
   return found
+}
+
+// The builds running, which an interrupted or failed run stops.
+const running = new Set<Subprocess>()
+let stopped = false
+
+function stopBuilds(): void {
+  stopped = true
+
+  for (const child of running)
+    child.kill()
 }
 
 async function run(argv: string[], cwd = HERE): Promise<{ out: string, err: string, code: number }> {
@@ -184,42 +206,63 @@ async function run(argv: string[], cwd = HERE): Promise<{ out: string, err: stri
   delete environment.BUN_TEST_WORKER_ID
 
   const child = Bun.spawn(argv, { cwd, env: environment, stdout: 'pipe', stderr: 'pipe' })
-  const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
-  return { out, err, code }
+  running.add(child)
+
+  try {
+    const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    return { out, err, code }
+  }
+  finally {
+    running.delete(child)
+  }
 }
 
 // The scaffold sits under the checkout, where the packages it imports resolve from, so it builds the kay of the tree it was made in.
-async function scaffold(ROOT: string): Promise<void> {
-  const dir = join(ROOT, '.kay/scratch', SCAFFOLD)
+async function scaffold(tree: string): Promise<void> {
+  const dir = scaffoldDir(tree)
 
   await rm(dir, { recursive: true, force: true })
 
-  const made = await run([process.execPath, join(ROOT, 'src/cli.ts'), 'new', dir, '-y', '--quiet'], ROOT)
+  const made = await run([process.execPath, join(tree, 'src/cli.ts'), 'new', dir, '-y', '--quiet'], tree)
 
   if (made.code !== 0)
     throw new Error(`kay new exited with ${made.code}: ${made.out}${made.err}`)
 }
 
-async function collect(ROOT: string, only: string[]): Promise<Collected> {
-  const all = await targets(ROOT)
+function firstLine(text: string): string {
+  const end = text.indexOf('\n')
+
+  return end === -1 ? text : text.slice(0, end)
+}
+
+async function collect(tree: string, only: string[]): Promise<Collected> {
+  const all = await targets(tree)
   const collected: Collected = {}
 
   for (const [name, dir] of Object.entries(all)) {
+    if (stopped)
+      break
+
     if (only.length > 0 && !only.includes(name))
       continue
 
     try {
       if (name === SCAFFOLD)
-        await scaffold(ROOT)
+        await scaffold(tree)
 
-      const built = await run([process.execPath, join(ROOT, 'src/cli.ts'), 'build', dir, '--no-check', '--quiet', '--format', 'json'], ROOT)
+      const built = await run([process.execPath, join(tree, 'src/cli.ts'), 'build', dir, '--no-check', '--quiet', '--format', 'json'], tree)
       const document = JSON.parse(built.out.trim().split('\n').findLast(line => line.startsWith('{')) ?? '') as BuildDocument & { failed?: { stage: string } }
 
       collected[name] = document.failed === undefined ? rolesOf(document) : { error: `the build failed at ${document.failed.stage}` }
     }
     catch (error) {
-      collected[name] = { error: error instanceof Error ? error.message.slice(0, !error.message.includes('\n') ? undefined : error.message.indexOf('\n')) : String(error) }
+      collected[name] = { error: firstLine(error instanceof Error ? error.message : String(error)) }
+    }
+    finally {
+      if (name === SCAFFOLD)
+        await rm(dir, { recursive: true, force: true })
     }
   }
 
@@ -228,16 +271,26 @@ async function collect(ROOT: string, only: string[]): Promise<Collected> {
 
 // The targets built in a temporary worktree of `ref`, with its own dependencies.
 async function collectAt(ref: string, only: string[]): Promise<Collected> {
-  const dir = join(HERE, '.kay/scratch/island-roles-main')
+  const dir = join(HERE, '.kay/scratch', `island-roles-main-${process.pid}`)
   const git = async (...argv: string[]) => run(['git', ...argv])
+  const remove = async () => {
+    await git('worktree', 'remove', '--force', dir)
+    await rm(dir, { recursive: true, force: true })
+  }
+  const interrupted = () => {
+    stopBuilds()
+    void remove().finally(() => process.exit(130))
+  }
 
-  await git('worktree', 'remove', '--force', dir)
-  await rm(dir, { recursive: true, force: true })
+  await remove()
 
   const added = await git('worktree', 'add', '--detach', dir, ref)
 
   if (added.code !== 0)
     throw new Error(`git worktree add ${ref} exited with ${added.code}: ${added.err.trim()}`)
+
+  process.once('SIGINT', interrupted)
+  process.once('SIGTERM', interrupted)
 
   try {
     const installed = await run(['bun', 'install', '--frozen-lockfile'], dir)
@@ -248,23 +301,36 @@ async function collectAt(ref: string, only: string[]): Promise<Collected> {
     return await collect(dir, only)
   }
   finally {
-    await git('worktree', 'remove', '--force', dir)
+    process.off('SIGINT', interrupted)
+    process.off('SIGTERM', interrupted)
+    await remove()
   }
 }
 
 if (import.meta.main) {
-  const { parseArgs } = await import('node:util')
-  const { values } = parseArgs({ options: { collect: { type: 'boolean' }, root: { type: 'string' }, ref: { type: 'string' }, only: { type: 'string', multiple: true }, format: { type: 'string' } } })
+  const { values } = parseArgs({ options: { ref: { type: 'string' }, only: { type: 'string', multiple: true }, format: { type: 'string' } } })
   const only = values.only ?? []
+  const known = Object.keys(await targets(HERE))
+  const unknown = only.filter(name => !known.includes(name))
 
-  if (values.collect === true) {
-    process.stdout.write(`${JSON.stringify(await collect(resolve(values.root ?? HERE), only))}\n`)
+  if (unknown.length > 0) {
+    console.error(`island-roles: no target ${unknown.join(', ')}; the targets are ${known.join(', ')}`)
+    process.exit(2)
   }
-  else {
-    const [before, after] = await Promise.all([collectAt(values.ref ?? 'main', only), collect(HERE, only)])
-    const comparison = compare(before, after)
 
-    console.log(values.format === 'json' ? JSON.stringify(comparison, null, 2) : formatComparison(comparison))
-    process.exitCode = comparison.violations.length > 0 || comparison.errors.length > 0 ? 1 : 0
+  let sides: [Collected, Collected]
+
+  try {
+    sides = await Promise.all([collectAt(values.ref ?? 'main', only), collect(HERE, only)])
   }
+  catch (error) {
+    stopBuilds()
+
+    throw error
+  }
+
+  const comparison = compare(...sides)
+
+  console.log(values.format === 'json' ? JSON.stringify(comparison, null, 2) : formatComparison(comparison))
+  process.exitCode = comparison.violations.length > 0 || comparison.errors.length > 0 ? 1 : 0
 }

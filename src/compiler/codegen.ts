@@ -20,7 +20,7 @@ import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 import { helperName } from './markup'
 import { defaultName, LOAD, PROPS, VALUES } from './names'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
-import { reactiveValue } from './script'
+import { codeOf, reactiveValue } from './script'
 import { shadowedBinds } from './template-reads'
 import { headTagProblem, sharedImports } from './validate'
 
@@ -1183,16 +1183,23 @@ export function islandCause(file: KayFile, script: ScriptAnalysis): IslandCause 
   return { kind: 'value', name: value.name, span, line: lineOf(file.source, span.start), source: value.source }
 }
 
-// Where the script says a `kay` value: its import, or its first read in the file as an implicit one.
+// Where the script says a `kay` value: its import, or its first read in a script or module fence as an implicit one, outside comments and strings; a value only the template reads sits at the top of the file.
 function valueSpan(file: KayFile, script: ScriptAnalysis, name: string): Span {
   const binding = script.imports.find(binding => !binding.typeOnly && binding.local === name)
 
   if (binding !== undefined)
     return binding.span
 
-  for (let index = file.source.indexOf(name); index !== -1; index = file.source.indexOf(name, index + 1)) {
-    if (!IDENTIFIER_PART.test(file.source[index - 1] ?? ' ') && !IDENTIFIER_PART.test(file.source[index + name.length] ?? ' '))
-      return { start: index, end: index + name.length }
+  for (const fence of [file.script, file.module]) {
+    if (fence === undefined)
+      continue
+
+    const text = file.source.slice(fence.start, fence.end)
+
+    for (let index = text.indexOf(name); index !== -1; index = text.indexOf(name, index + 1)) {
+      if (!IDENTIFIER_PART.test(text[index - 1] ?? ' ') && !IDENTIFIER_PART.test(text[index + name.length] ?? ' ') && codeOf(text.slice(0, index + name.length)).endsWith(name))
+        return { start: fence.start + index, end: fence.start + index + name.length }
+    }
   }
 
   return { start: 0, end: 0 }

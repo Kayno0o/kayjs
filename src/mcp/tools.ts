@@ -90,14 +90,18 @@ function tools(root: string): Tool[] {
     },
     {
       name: 'explain',
-      title: 'Explain a lint or an error code',
-      description: 'Without a name, lists the lints and the error codes kay raises with their groups and summaries. With the name of a lint, a lint group, an error code or an error group, explains it: for a lint an example it reports and the same written right, for an error code where its fix is written in the guide.',
-      inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'A lint such as `missing-alt`, an error code, or a group of either.' } }, additionalProperties: false },
+      title: 'Explain a lint, an error code or an island',
+      description: 'Without a name, lists the lints and the error codes kay raises with their groups and summaries. With the name of a lint, a lint group, an error code or an error group, explains it: for a lint an example it reports and the same written right, for an error code where its fix is written in the guide. With `island` and a `.kay` file, says whether the component is an island, why and the rule; with `island` alone, lists every island of the project.',
+      inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'A lint such as `missing-alt`, an error code, a group of either, or `island`.' }, file: { type: 'string', description: 'With `island`, the `.kay` file to explain, relative to the project.' } }, additionalProperties: false },
       annotations: READ_ONLY,
       run: async (args) => {
         const name = optionalString(args.name, 'name')
+        const file = optionalString(args.file, 'file')
 
-        return document(['explain', '--format', 'json', ...name === undefined ? [] : ['--', name]])
+        if (file !== undefined && name !== 'island')
+          throw new Error('file takes the name `island`')
+
+        return document(['explain', '--format', 'json', ...name === undefined ? [] : ['--', name, ...file === undefined ? [] : [file]]])
       },
     },
     {

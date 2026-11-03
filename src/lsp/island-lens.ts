@@ -5,8 +5,10 @@ import { compileKay, ROUTE_FILES } from '../compiler'
 import { describeCause } from '../compiler/island-cause'
 import { toPosition } from './positions'
 
-// Run by a click on the lens: the editor shows the line that makes the component an island.
-export const REVEAL_ISLAND_CAUSE = 'kay.revealIslandCause'
+// Run by a click on the lens: the editor shows the line that makes the component an island. Each server registers it under its own root, as an editor with several servers registers every command a server lists and refuses one twice.
+export function revealCommand(root: string): string {
+  return `kay.revealIslandCause:${root}`
+}
 
 export interface LensContext {
   // The file is a page, a layout or a special page, rendered by the server and never an island.
@@ -14,8 +16,8 @@ export interface LensContext {
   // Only islands render the component, so it is part of them.
   insideIsland: boolean
   signals?: ImportedSignals | undefined
-  // The document, for the command revealing the cause in it.
-  uri?: string | undefined
+  // The command revealing the cause in the document, which the editor runs on a click; none for an editor that cannot show a document.
+  reveal?: { command: string, uri: string } | undefined
 }
 
 function titleOf(island: string | undefined, cause: string | undefined, insideIsland: boolean): string {
@@ -36,7 +38,7 @@ export function islandLens(source: string, filename: string, context: LensContex
   const { island, cause } = compileKay(source, filename, { importedSignals: context.signals })
   const first = { line: 0, character: 0 }
   const title = titleOf(island, cause && describeCause(cause), context.insideIsland)
-  const reveal = cause !== undefined && !context.insideIsland && context.uri !== undefined
+  const reveal = cause !== undefined && !context.insideIsland ? context.reveal : undefined
 
-  return [{ range: { start: first, end: first }, command: { title, command: reveal ? REVEAL_ISLAND_CAUSE : '', ...reveal && { arguments: [context.uri, { start: toPosition(source, cause.span.start), end: toPosition(source, cause.span.end) }] } } }]
+  return [{ range: { start: first, end: first }, command: { title, command: reveal?.command ?? '', ...reveal && cause && { arguments: [reveal.uri, { start: toPosition(source, cause.span.start), end: toPosition(source, cause.span.end) }] } } }]
 }

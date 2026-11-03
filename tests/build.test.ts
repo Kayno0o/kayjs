@@ -2170,6 +2170,16 @@ describe('the size report', () => {
       'src/wrap.kay': '`format` passed to Clicks, line 7',
     })
     expect(report!.islands.filter(island => island.promoted).map(island => island.file)).toEqual(['src/wrap.kay'])
+    // The same cause as data, which `kay build --format json` carries beside the sentence.
+    expect(Object.fromEntries(report!.islands.map(island => [island.file, island.cause]))).toEqual({
+      'src/clicks.kay': { kind: 'attribute', name: 'onClick', line: 1 },
+      'src/field.kay': { kind: 'attribute', name: 'bind:value', line: 4 },
+      'src/state.kay': { kind: 'value', name: 'signal', line: 2 },
+      'src/client.kay': { kind: 'client', name: '--- client', line: 1 },
+      'src/handle.kay': { kind: 'attribute', name: 'ref', line: 4 },
+      'src/ago.kay': { kind: 'value', name: 'relativeTime', line: 2 },
+      'src/wrap.kay': { kind: 'prop', name: 'format', line: 7, target: 'Clicks' },
+    })
     expect(formatSizeReport(report!)).toContain('static unless it passes an island what only an island sends: `format` passed to Clicks, line 7')
   })
 

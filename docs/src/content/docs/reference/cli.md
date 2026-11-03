@@ -35,7 +35,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay env [dir]` | List the environment variables the project, its libraries and kay declare |
 | `kay i18n missing [locale] [dir]` | List what each locale lacks against the default one |
 | `kay i18n accept <locale> [dir]` | Accept a locale's draft messages |
-| `kay explain [lint\|error\|group]` | List the lints and the errors, or a group's, or explain one |
+| `kay explain [lint\|error\|group\|island [file]]` | List the lints and the errors, or a group's, or explain one; `island` says whether a component is an island and why, or lists every island |
 | `kay docs [words]` | Print the section of kay's or an installed library's docs that matches |
 | `kay fmt [paths]` | Format `.kay` files, or with `--stdin` a source on stdin, or with `--from-html` turn HTML into a template |
 | `kay lint [args]` | Run ESLint with the types it reads for `.kay` files |
@@ -795,7 +795,7 @@ A command that cannot run, such as on a directory that does not exist, prints `{
 | `exported` | `{ pages, files, dir, ms }`, under `--static` |
 | `compiled` | `{ executable, ms }`, under `--compile` |
 
-`sizes` has the `raw` and `gzip` bytes of the entry, of the navigation-only entry as `navigation` and of each island, with `modules` under `--analyze`. Each island says `why` it is one.
+`sizes` has the `raw` and `gzip` bytes of the entry, of the navigation-only entry as `navigation` and of each island, with `modules` under `--analyze`. Each island says `why` it is one, and its `cause` as `kind`, `name` and `line`.
 
 `routes` has each route's `js` and `css` gzip bytes and the `islands` its pages render. It also has `pages` prerendered and `kept`, the pages the build kept on its own. For a route rendered per request it gives the `stop` that decided so, and `estimated` when its scripts are a guess, see [What a page weighs](/guides/performance#what-a-page-weighs). `stages` is a list of `{ name, ms }`, and `caches` of `{ name, cached, made }`.
 

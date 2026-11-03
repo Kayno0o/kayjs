@@ -4,6 +4,7 @@ import type { Attribute, Diagnostic, KayFile, Node, Span } from './ast'
 import type { ErrorName } from './errors'
 import type { IslandCause } from './island-cause'
 import type { LintLevels } from './lints'
+import type { Expansion } from './markdown-block'
 import type { ImportedSignals, SignalKind } from './module-signals'
 import type { NameFindings } from './rewrite'
 import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
@@ -91,6 +92,8 @@ export interface CompileResult {
   promote?: string | undefined
   // What makes the component an island, or what may make it one when `promote` is set: its kind, name and span in the file.
   cause?: IslandCause | undefined
+  /** @deprecated Read `cause`: `why`, the sentence of it as `onClick, line 4`, goes with the last slice of #2808. */
+  why?: string | undefined
   // The `.class` shorthand names, which CSS tools scanning for class names cannot read off `div.md:flex.w-1/2`.
   classes: string[]
   // Set when the template renders a form posting to an action, which a page holding no island posts through the navigation-only entry.
@@ -127,6 +130,16 @@ function liveCause(file: KayFile, script: ScriptAnalysis, live: string | undefin
   const binding = script.imports.find(binding => binding.local === live)
 
   return live === undefined || binding === undefined ? undefined : { kind: 'live', name: live, span: binding.span, line: lineOf(file.source, binding.span.start) }
+}
+
+// A cause found in the expanded source, in the file: its span, and its line counted in what the author wrote.
+function realCause(cause: IslandCause | undefined, expansion: Expansion | undefined, original: string): IslandCause | undefined {
+  if (cause === undefined || expansion === undefined)
+    return cause
+
+  const span = expansion.realSpan(cause.span)
+
+  return { ...cause, span, line: lineOf(original, span.start) }
 }
 
 function liveImport(script: ScriptAnalysis, imported: ImportedSignals | undefined): string | undefined {
@@ -241,7 +254,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
   const promotion = island === undefined && !routeFile ? promotionSite(file, script, options.importedSignals) : undefined
   const promote = promotion === undefined ? undefined : islandId(filename, options.root)
-  const cause = island === undefined ? promotion : islandCause(file, script) ?? liveCause(file, script, live)
+  const cause = realCause(island === undefined ? promotion : islandCause(file, script) ?? liveCause(file, script, live), expansion, original)
   const generateOptions = { cause: options.inspect === true && cause !== undefined ? causeSummary(cause, island === undefined) : undefined, classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && (routeFile || options.page === true), pageFile: routeFile || options.page === true, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: basename(filename) === ERROR_PAGE, cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
@@ -313,7 +326,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const lives = liveBindings(script, options.importedSignals)
     const imports = lives.map(binding => `import { ${binding.imported} as ${binding.local} } from ${JSON.stringify(binding.source)}\n`).join('')
 
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local))})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, cause, classes, actionForm: facts.actionForm, diagnostics: reported }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local))})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, cause, why: cause && describeCause(cause), classes, actionForm: facts.actionForm, diagnostics: reported }
   }
 
   return {
@@ -324,6 +337,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     island,
     promote,
     cause,
+    why: cause && describeCause(cause),
     classes,
     actionForm: facts.actionForm,
     diagnostics: reported,
