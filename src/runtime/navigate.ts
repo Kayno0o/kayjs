@@ -1,5 +1,5 @@
 import type { HeadElement, HistoryState, NavigationHooks, Swap } from './navigation'
-import { asks, dropScrollSave, historyState, leave, mayLeave, navigation, onScroll, pageKey, restoreScroll, saveScroll, swappable } from './navigation'
+import { dirtyGuard, dropScrollSave, historyState, leave, mayLeave, navigation, onScroll, pageKey, restoreScroll, saveScroll, swappable } from './navigation'
 
 // Swaps pages in place: a link or a form of the app fetches the next page from the server and puts it in this one, islands marked `persist` kept alive.
 // Everything here runs in the browser only, started by the entry; without JavaScript links and forms load pages as they always did.
@@ -239,7 +239,7 @@ function onPopState(event: PopStateEvent): void {
   }
 
   // Leaving with unsaved changes goes back to the page left first, so it keeps its URL while asked. An entry kay did not write tells no place, so it is let through.
-  if (!passing && saved?.at !== undefined && saved.at !== navigation.at && pageKey(url) !== navigation.shown && asks()) {
+  if (!passing && saved?.at !== undefined && saved.at !== navigation.at && pageKey(url) !== navigation.shown && (navigation.before || dirtyGuard())) {
     held = { url, delta: saved.at - navigation.at }
     history.go(-held.delta)
 
@@ -265,7 +265,7 @@ function onPopState(event: PopStateEvent): void {
 }
 
 async function traverseAsked(url: URL, delta: number): Promise<void> {
-  if (await mayLeave(url, swappable(url))) {
+  if (await mayLeave(url)) {
     passing = true
     history.go(delta)
   }

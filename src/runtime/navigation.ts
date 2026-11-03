@@ -112,17 +112,12 @@ let apiPath: string | undefined
 
 // Whether the page may be left for `to`: the `onBeforeNavigate` handlers answer first, for a page kay swaps in place only (`hooked`), then the first guard holding unsaved changes asks, once for them all.
 export async function mayLeave(to: URL, hooked = true): Promise<boolean> {
-  if (hooked && navigation.before && !await navigation.before(to))
+  if (hooked && navigation.before && swappable(to) && !await navigation.before(to))
     return false
 
   const guard = dirtyGuard()
 
   return guard ? guard.confirm(to) : true
-}
-
-// Whether a leave may have to ask, which a traversal is bounced back to the page left for.
-export function asks(): boolean {
-  return Boolean(navigation.before || dirtyGuard())
 }
 
 export function dirtyGuard(): LeaveGuard | undefined {
