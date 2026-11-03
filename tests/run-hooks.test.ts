@@ -3,10 +3,17 @@ import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { jobRuns, queueRuns } from '../src/runtime/counters'
+import { localeState, runInLocale } from '../src/runtime/locale-state'
+import { previewState } from '../src/runtime/preview'
+import { currentServerScope } from '../src/runtime/reactive'
+import { withQuery } from '../src/runtime/with-query'
 import { memoryJobs, queue, retryLater, schedule, shutdown, workflow } from '../src/server'
+import { inLiveReads } from '../src/server/live'
 import { answeringRequest } from '../src/server/log'
+import { inPreview } from '../src/server/preview'
 import { forgetQueue } from '../src/server/queue'
 import { useAppOnError } from '../src/server/report'
+import { inLoad, inServerScope } from '../src/server/scope'
 
 let names = 0
 const named = (kind: string) => `${kind}-hooks-${++names}`
@@ -289,7 +296,40 @@ describe('a queue\'s hook context', () => {
     }
   })
 
-  it('does not count a slow onStart against lostAfter', async () => {
+  it('shows a job\'s handler and hooks no request state, whichever request woke the lazy queue\'s workers', async () => {
+    const seen: unknown[] = []
+    const read = (where: string) => {
+      let url: string | undefined
+
+      try {
+        url = withQuery({})
+      }
+      catch {
+        url = undefined
+      }
+
+      seen.push([where, currentServerScope()?.request?.url, localeState() === undefined, previewState() === undefined, url])
+    }
+    const jobs = queue<number>(named('queue'), () => read('run'), { store: memoryJobs(), lazy: true, onStart: () => read('start'), onSuccess: () => read('success') })
+    const app = new Elysia().use(jobs).listen(0)
+    const request = new Request('http://x/first-visitor?q=1')
+
+    try {
+      await answeringRequest(request, async () => inServerScope(request, () => undefined, async () => runInLocale({ locale: 'fr' } as never, async () => inLoad(new URL(request.url), async () => inPreview(async () => inLiveReads(async () => jobs.enqueue(1), request))))))
+      await until(() => seen.length >= 3)
+      await jobs.enqueue(2)
+      await until(() => seen.length >= 6)
+
+      for (const [where, url, noLocale, noPreview, loaded] of seen as [string, unknown, boolean, boolean, unknown][])
+        expect([where, url, noLocale, noPreview, loaded]).toEqual([where, undefined, true, true, undefined])
+    }
+    finally {
+      await shutdown(app)
+      forgetQueue(jobs)
+    }
+  })
+
+  it('counts a slow onStart against lostAfter, as the store\'s hold started at the claim', async () => {
     const seen: string[] = []
     const jobs = queue<undefined>(named('queue'), async () => {
       await Bun.sleep(100)
@@ -306,7 +346,8 @@ describe('a queue\'s hook context', () => {
     try {
       await jobs.enqueue(undefined)
       await jobs.drain()
-      expect(seen).toEqual(['ran', 'success'])
+      expect(seen).toContain('error')
+      expect(seen).not.toContain('success')
     }
     finally {
       forgetQueue(jobs)

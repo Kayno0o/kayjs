@@ -720,9 +720,9 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
   }
 
   // A run that outlasts `lostAfter` fails and its signal aborts, so its worker takes the next job and a handler listening to the signal stops rather than run beside the retry.
-  // It ends a moment before the hold does, so no other process takes the job while this one still marks how it went: counted from when the run began, after its `onStart` hook, on this process's monotonic clock, as a store holding by its own clock stores a hold this one's cannot be compared to.
+  // It ends a moment before the hold does, so no other process takes the job while this one still marks how it went: counted from before the claim on this process's monotonic clock, so a slow `onStart` hook spends it too and the run never outlives the hold, as a store holding by its own clock stores a hold this one's cannot be compared to.
   // A stop waits for the run to wind down, but not past the grace, so a handler ignoring its signal never holds a shutdown or keeps its job held until `lostAfter`: the job is given back as for a run that gave up.
-  const withinLostAfter = async (run: unknown, from: number, ended: AbortController): Promise<void> => {
+  const withinLostAfter = async (run: unknown, claimedAt: number, ended: AbortController): Promise<void> => {
     let timer: ReturnType<typeof setTimeout> | undefined
     let grace: ReturnType<typeof setTimeout> | undefined
 
@@ -743,7 +743,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
 
           ended.abort(error)
           reject(error)
-        }, Math.min(Math.max(lostAfter - Math.min(1000, lostAfter / 10) - (performance.now() - from), 0), MAX_TIMER_MS))
+        }, Math.min(Math.max(lostAfter - Math.min(1000, lostAfter / 10) - (performance.now() - claimedAt), 0), MAX_TIMER_MS))
       })])
     }
     finally {
@@ -755,6 +755,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
   // Runs one job it claimed, then marks how it went; false when none was due.
   const runOne = async (scheduler: Scheduler): Promise<boolean> => {
     const now = Date.now()
+    const claimedAt = performance.now()
     const job = await store().claim(name, now, now + lostAfter)
 
     if (!job)
@@ -797,9 +798,6 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
     if (started !== undefined)
       await notify(`${kind}.onStart`, [options.onStart], { id: job.id, payload: started.payload, attempts: job.attempts })
 
-    // A slow hook does not eat the run's time: lostAfter counts from here.
-    const ranFrom = performance.now()
-
     let succeeded = false
     // A handler may lower its own `attempts`: a workflow that kept a step starts its count again.
     const context: JobContext<Progress> = { id: job.id, attempts: job.attempts, progress: reports.write }
@@ -812,7 +810,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
     }
 
     try {
-      await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal, context, hold), ranFrom, ended)
+      await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal, context, hold), claimedAt, ended)
       await reports.settle()
       succeeded = true
     }

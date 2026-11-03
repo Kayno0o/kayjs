@@ -1,9 +1,9 @@
 import type { JobStore } from './queue'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { kayLog } from '../runtime/log'
+import { outsideRequest } from './clean-context'
 import { MAX_TIMER_MS } from './config-limits'
 import { onDrain } from './drain'
-import { outsideRequest } from './log'
 
 // How soon an idle queue looks again after a job, the first wait of its backoff.
 export const POLL_MS = 1000
