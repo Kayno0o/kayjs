@@ -138,9 +138,72 @@ export interface Command {
   run: (parsed: Parsed, refuse: (reason?: string) => number) => Promise<number> | number
 }
 
-// A command a library adds to `kay` through its extension's `commands`, run in the project of the current directory, which it is given with its config.
+// What a command a library adds is given: the project of the current directory with its config, the shared options as they were given, and the one way to report that it failed.
+export interface CommandProject {
+  root: string
+  config: KayConfig
+  // `text`, or `json` for `--format json`, where `result` prints the command's answer.
+  format: 'text' | 'json'
+  // `--quiet`: only what fails is printed.
+  quiet: boolean
+  // `--dry-run`: say what would be written and write nothing.
+  dryRun: boolean
+  // Prints a failure as `kay <command>: <message>` on stderr, and as the document of a failed command under `--format json`; answers the exit code, 1.
+  fail: (message: string) => number
+  // Prints the command's answer as one JSON document under `--format json`, and nothing otherwise.
+  result: (document: object) => void
+}
+
+// A command a library adds to `kay` through its extension's `commands`, run in the project of the current directory. It takes `--quiet`, `--format` and `--dry-run` as kay's own commands do, unless `refuses` names why not, by option.
 export interface KayCommand extends Omit<Command, 'run'> {
-  run: (parsed: Parsed, refuse: (reason?: string) => number, project: { root: string, config: KayConfig }) => Promise<number> | number
+  refuses?: Partial<Record<SharedOption, string>>
+  run: (parsed: Parsed, refuse: (reason?: string) => number, project: CommandProject) => Promise<number> | number
+}
+
+// The options of a library command with the shared ones it takes added, and the project it is run with.
+export function libraryCommand(command: KayCommand, name: string, root: string, config: KayConfig): Command {
+  const shared: CommandOptions = { 'quiet': { type: 'boolean' }, 'format': { type: 'string' }, 'dry-run': { type: 'boolean' } }
+  const options: CommandOptions = { ...command.options }
+
+  for (const option of SHARED_OPTIONS) {
+    if (!(option in options) && command.refuses?.[option] === undefined)
+      options[option] = shared[option]!
+  }
+
+  return {
+    ...command,
+    options,
+    run: async (parsed, refuse) => {
+      const format = parsed.values.format ?? 'text'
+
+      if (format !== 'text' && format !== 'json')
+        return refuse(`--format takes \`text\` or \`json\`, not \`${String(format)}\``)
+
+      return command.run(parsed, refuse, commandProject(name, root, config, { format, quiet: parsed.values.quiet === true, dryRun: parsed.values['dry-run'] === true }))
+    },
+  }
+}
+
+// The project a library command runs in; tests give the options they exercise.
+export function commandProject(name: string, root: string, config: KayConfig, shared: Partial<Pick<CommandProject, 'format' | 'quiet' | 'dryRun'>> = {}): CommandProject {
+  const { format = 'text', quiet = false, dryRun = false } = shared
+
+  return {
+    root,
+    config,
+    format,
+    quiet,
+    dryRun,
+    fail: (message) => {
+      reportFailure(`kay ${name}: ${message}`, format)
+
+      return 1
+    },
+    result: (document) => {
+      if (format === 'json')
+        printDocument(document)
+    },
+  }
 }
 
 // Runs a command on its arguments: `--help` prints its usage and options, and an option or argument it does not take throws the kit's usage error, which `runCli` prints, with a hint at the option meant, and answers with exit 2.

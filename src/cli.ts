@@ -9,7 +9,7 @@ import process from 'node:process'
 import { COMPLETE, Exit, fail, printError, runCli } from '@kaynooo/cli-kit'
 import { version } from '../package.json'
 import { bunProblem } from './bun'
-import { runCommand } from './commands/command'
+import { libraryCommand, runCommand } from './commands/command'
 import { COMMANDS, NAMES, tree } from './commands/registry'
 
 async function main(args: string[]): Promise<number> {
@@ -127,7 +127,7 @@ function extensionEntry(command: ExtensionCommand, root: string, config: KayConf
         return fail(error instanceof Error ? error.message : String(error), 1)
       }
 
-      return runCommand({ ...loaded, run: async (parsed, refuse) => loaded.run(parsed, refuse, { root, config }) }, args)
+      return runCommand(libraryCommand(loaded, command.name, root, config), args)
     },
   }
 }

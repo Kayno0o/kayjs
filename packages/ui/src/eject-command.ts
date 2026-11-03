@@ -4,40 +4,34 @@ import { relative } from 'node:path'
 import { changesFor, componentFile, EJECTED_DIR, guarded, plan, readManifest, writeAll } from './eject'
 
 const command: KayCommand = {
-  usage: 'ui eject <component> [--dry-run]',
-  options: { 'dry-run': { type: 'boolean' } },
+  usage: 'ui eject <component>',
+  options: {},
   positionals: 1,
-  run: async ({ values, positionals: [name] }, refuse, { root }) => guarded('eject', async () => {
+  run: async ({ positionals: [name] }, refuse, { root, fail, format, dryRun, quiet, result }) => guarded(fail, async () => {
     if (name === undefined)
       return refuse('ui eject needs the component to copy, such as `kay ui eject card`')
 
     const file = componentFile(name)
 
-    if (file === undefined) {
-      console.error(`kay ui eject: kayjs-ui has no component ${name}`)
+    if (file === undefined)
+      return fail(`kayjs-ui has no component ${name}`)
 
-      return 1
-    }
-
-    if ((await readManifest(root))[file] !== undefined) {
-      console.error(`kay ui eject: ${file} is ejected already; \`kay ui diff ${name}\` shows what kayjs-ui changed since`)
-
-      return 1
-    }
+    if ((await readManifest(root))[file] !== undefined)
+      return fail(`${file} is ejected already; \`kay ui diff ${name}\` shows what kayjs-ui changed since`)
 
     const ejection = await plan(file)
     const changes = await changesFor(root, ejection)
 
-    if ('exists' in changes) {
-      console.error(`kay ui eject: ${changes.exists.map(path => relative(root, path)).join(', ')} exists already, so nothing was copied`)
-
-      return 1
-    }
-
-    const dryRun = values['dry-run'] === true
+    if ('exists' in changes)
+      return fail(`${changes.exists.map(path => relative(root, path)).join(', ')} exists already, so nothing was copied`)
 
     if (!dryRun)
       await writeAll(changes.writes)
+
+    result({ component: name, files: ejection.files, rewritten: changes.rewritten, notes: changes.notes, stillOnLibrary: ejection.users, dryRun })
+
+    if (quiet || format === 'json')
+      return 0
 
     console.log(`${dryRun ? 'would copy' : 'copied'} ${ejection.files.join(', ')} to src/${EJECTED_DIR}`)
 

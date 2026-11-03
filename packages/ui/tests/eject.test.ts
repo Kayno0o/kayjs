@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import { kay } from '../../../src/build/plugin'
+import { commandProject } from '../../../src/commands/command'
 import { createProject, PRESETS } from '../../../src/new'
 import { child } from '../../../src/runtime/html'
 import { scratchDir } from '../../../tests/scratch'
@@ -55,7 +56,7 @@ async function run(command: typeof eject, args: string[], flags: Record<string, 
       refused.push(reason ?? '')
 
       return 1
-    }, { root, config: {} })
+    }, commandProject(command.usage.split(' ').slice(0, 2).join(' '), root, {}, { dryRun: flags['dry-run'] === true, quiet: flags.quiet === true }))
 
     return { code, out: log.mock.calls.flat().join('\n'), err: [...error.mock.calls.flat(), ...refused].join('\n') }
   }

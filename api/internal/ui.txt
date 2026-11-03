@@ -905,7 +905,7 @@ interface Ejection
   users: string[]
 
 [./lib/eject] guarded
-function guarded(name: string, run: () => Promise<number>): Promise<number>
+function guarded(fail: (message: string) => number, run: () => Promise<number>): Promise<number>
 
 [./lib/eject] hashOf
 function hashOf(text: string): string

@@ -11,7 +11,7 @@ it('is a kay command ai() adds as `kay i18n translate`', async () => {
   const { 'i18n translate': module } = ai().commands!
 
   expect(existsSync(module!)).toBe(true)
-  expect((await import(module!) as { default: { usage: string } }).default.usage).toBe('i18n translate <locale> [--dry-run]')
+  expect((await import(module!) as { default: { usage: string } }).default.usage).toBe('i18n translate <locale>')
 })
 
 it('checks a text against its source', () => {

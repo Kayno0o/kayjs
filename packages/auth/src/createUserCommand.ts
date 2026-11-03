@@ -135,7 +135,7 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
       'no-password': { type: 'boolean' },
     },
     positionals: 1,
-    run: async ({ values, positionals: [login] }, refuse, { config, root }) => {
+    run: async ({ values, positionals: [login] }, refuse, { config, root, fail, format, quiet, dryRun, result }) => {
       if (login === undefined || login === '')
         return refuse('auth create-user needs the email or the username to sign in with')
 
@@ -149,11 +149,8 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
 
       const loader = (config.extensions ?? []).map(extension => (extension as { [LOAD_AUTH]?: (root: string, extensions: string[], database?: string) => Promise<UserMaker> })[LOAD_AUTH]).find(load => load !== undefined)
 
-      if (loader === undefined) {
-        console.error('kay auth create-user: kay.config.ts lists no auth() to find the app\'s auth through')
-
-        return 1
-      }
+      if (loader === undefined)
+        return fail('kay.config.ts lists no auth() to find the app\'s auth through')
 
       const email = isEmail ? login : values.email as string | undefined
       const username = isEmail ? values.username as string | undefined : login
@@ -168,9 +165,7 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
           setSite(site, config.trailingSlash)
       }
       catch (error) {
-        console.error(`kay auth create-user: ${error instanceof Error ? error.message : String(error)}`)
-
-        return 1
+        return fail(error instanceof Error ? error.message : String(error))
       }
 
       try {
@@ -178,10 +173,17 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
         const auth = await loader(root, (config.extensions ?? []).map(extension => extension.name), config.store?.database)
         const problems = await auth[CHECK_USER]({ ...email !== undefined && { email }, ...username !== undefined && { username }, ...roles && { roles } })
 
-        if (Object.keys(problems).length > 0) {
-          console.error(`kay auth create-user: refused: ${Object.entries(problems).map(([field, code]) => `${field} ${code}`).join(', ')}`)
+        if (Object.keys(problems).length > 0)
+          return fail(`refused: ${Object.entries(problems).map(([field, code]) => `${field} ${code}`).join(', ')}`)
 
-          return 1
+        // With --dry-run the login is checked as a creation would, and no password is asked.
+        if (dryRun) {
+          result({ dryRun: true, email, username, roles: roles ?? [] })
+
+          if (!quiet && format === 'text')
+            console.log(`Would create ${username ?? email}${roles && roles.length > 0 ? ` (${roles.join(', ')})` : ''}.`)
+
+          return 0
         }
 
         const password = values['no-password'] === true ? undefined : await ask()
@@ -189,29 +191,24 @@ export function createUserCommand(ask: () => Promise<string | undefined>): KayCo
         if (password === undefined && values['no-password'] !== true)
           return 1
 
-        if (password === '') {
-          console.error('kay auth create-user: no password given; pass --no-password for a user who signs in another way')
-
-          return 1
-        }
+        if (password === '')
+          return fail('no password given; pass --no-password for a user who signs in another way')
 
         // An address the operator types is vouched for: the user cannot receive a verification mail before they can sign in.
-        const result = await auth.admin.createUser({ ...email !== undefined && { email, emailVerified: true }, ...username !== undefined && { username }, ...password !== undefined && { password }, ...roles && { roles } })
+        const created = await auth.admin.createUser({ ...email !== undefined && { email, emailVerified: true }, ...username !== undefined && { username }, ...password !== undefined && { password }, ...roles && { roles } })
 
-        if (!result.ok) {
-          console.error(`kay auth create-user: refused: ${Object.entries(result.errors).map(([field, code]) => `${field} ${code}`).join(', ')}`)
+        if (!created.ok)
+          return fail(`refused: ${Object.entries(created.errors).map(([field, code]) => `${field} ${code}`).join(', ')}`)
 
-          return 1
-        }
+        result({ id: created.user.id, email: created.user.email, username: created.user.username, roles: created.user.roles })
 
-        console.log(`Created ${result.user.username ?? result.user.email ?? result.user.id}${result.user.roles.length > 0 ? ` (${result.user.roles.join(', ')})` : ''}.`)
+        if (!quiet && format === 'text')
+          console.log(`Created ${created.user.username ?? created.user.email ?? created.user.id}${created.user.roles.length > 0 ? ` (${created.user.roles.join(', ')})` : ''}.`)
 
         return 0
       }
       catch (error) {
-        console.error(`kay auth create-user: ${error instanceof Error ? error.message : String(error)}`)
-
-        return 1
+        return fail(error instanceof Error ? error.message : String(error))
       }
     },
   }

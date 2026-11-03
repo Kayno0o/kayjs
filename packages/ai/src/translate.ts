@@ -34,26 +34,21 @@ interface EntryPlan {
 type Message = Parameters<typeof writeDraftMessages>[3][string]
 
 const command: KayCommand = {
-  usage: 'i18n translate <locale> [--dry-run]',
-  options: { 'dry-run': { type: 'boolean' } },
+  usage: 'i18n translate <locale>',
+  options: {},
+  refuses: { format: 'prints what the model translated as it goes, for a person to check' },
   positionals: 1,
-  run: async ({ values, positionals: [locale] }, refuse, { root, config }) => {
+  run: async ({ positionals: [locale] }, refuse, { root, config, fail, quiet, dryRun }) => {
     if (locale === undefined)
       return refuse('i18n translate needs the locale to translate into')
 
     const { i18n } = config
 
-    if (!i18n) {
-      console.error('kay i18n translate: kay.config.ts sets no i18n, so the site has no locale to translate')
+    if (!i18n)
+      return fail('kay.config.ts sets no i18n, so the site has no locale to translate')
 
-      return 1
-    }
-
-    if (!i18n.locales.includes(locale) || locale === i18n.defaultLocale) {
-      console.error(`kay i18n translate: ${locale} is not one of the locales translated from ${i18n.defaultLocale}: ${i18n.locales.filter(code => code !== i18n.defaultLocale).join(', ')}`)
-
-      return 1
-    }
+    if (!i18n.locales.includes(locale) || locale === i18n.defaultLocale)
+      return fail(`${locale} is not one of the locales translated from ${i18n.defaultLocale}: ${i18n.locales.filter(code => code !== i18n.defaultLocale).join(', ')}`)
 
     const stop = new AbortController()
     const interrupt = () => stop.abort()
@@ -61,12 +56,10 @@ const command: KayCommand = {
     process.once('SIGINT', interrupt)
 
     try {
-      return await translateLocale({ root, config, locale, from: i18n.defaultLocale, dryRun: values['dry-run'] === true, signal: stop.signal })
+      return await translateLocale({ root, config, locale, from: i18n.defaultLocale, dryRun, quiet, fail, signal: stop.signal })
     }
     catch (error) {
-      console.error(`kay i18n translate: ${error instanceof Error ? error.message : String(error)}`)
-
-      return 1
+      return fail(error instanceof Error ? error.message : String(error))
     }
     finally {
       process.off('SIGINT', interrupt)
@@ -82,10 +75,12 @@ interface Run {
   locale: string
   from: string
   dryRun: boolean
+  quiet: boolean
+  fail: (message: string) => number
   signal: AbortSignal
 }
 
-async function translateLocale({ root, config, locale, from, dryRun, signal }: Run): Promise<number> {
+async function translateLocale({ root, config, locale, from, dryRun, quiet, fail, signal }: Run): Promise<number> {
   const missing = (await missingTranslations(root, config))[locale]
   const messages = Object.entries(missing?.messages ?? {})
   const failures: string[] = []
@@ -105,13 +100,14 @@ async function translateLocale({ root, config, locale, from, dryRun, signal }: R
   const units = messageUnits(messages, locale)
 
   if (messages.length === 0 && plans.length === 0 && failures.length === 0) {
-    console.log(`${locale} lacks nothing`)
+    if (!quiet)
+      console.log(`${locale} lacks nothing`)
 
     return 0
   }
 
   if (dryRun)
-    return report(locale, from, messages.map(([key]) => key), plans, units, failures)
+    return report({ locale, from, keys: messages.map(([key]) => key), plans, units, failures, quiet, fail })
 
   let written = 0
   let writtenEntries = 0
@@ -136,11 +132,11 @@ async function translateLocale({ root, config, locale, from, dryRun, signal }: R
     failures.push(error instanceof Error ? error.message : String(error))
   }
 
-  if (written + writtenEntries > 0)
+  if (written + writtenEntries > 0 && !quiet)
     console.log(`Translated ${written} ${written === 1 ? 'message' : 'messages'} and ${writtenEntries} ${writtenEntries === 1 ? 'entry' : 'entries'} into ${locale} as drafts: \`kay check\` lists the messages, \`kay i18n accept ${locale}\` accepts them once checked, and an entry is accepted by saving it from a CMS or removing its \`# draft\` line.`)
 
   for (const failure of failures)
-    console.error(`kay i18n translate: ${failure}`)
+    fail(failure)
 
   if (signal.aborted)
     return 130
@@ -201,7 +197,24 @@ function joinBody(plan: EntryPlan, done: Map<string, string>): string {
   }).join('')
 }
 
-function report(locale: string, from: string, keys: string[], plans: EntryPlan[], units: MessageUnit[], failures: string[]): number {
+interface DryRunReport {
+  locale: string
+  from: string
+  keys: string[]
+  plans: EntryPlan[]
+  units: MessageUnit[]
+  failures: string[]
+  quiet: boolean
+  fail: (message: string) => number
+}
+
+function report({ locale, from, keys, plans, units, failures, quiet, fail }: DryRunReport): number {
+  for (const failure of failures)
+    fail(failure)
+
+  if (quiet)
+    return failures.length === 0 ? 0 : 1
+
   const all = [...units, ...plans.flatMap(plan => plan.units)]
   const tokens = estimateTokens(all, from, locale, batches(units).length + plans.reduce((sum, plan) => sum + unitBatches(plan.units).length, 0))
 
@@ -214,9 +227,6 @@ function report(locale: string, from: string, keys: string[], plans: EntryPlan[]
 
   for (const [collection, planned] of byCollection)
     console.log(`  ${collection}: ${planned.map(plan => `${plan.slug} (${fieldNames(plan).join(', ')})`).join(', ')}`)
-
-  for (const failure of failures)
-    console.error(`kay i18n translate: ${failure}`)
 
   return failures.length === 0 ? 0 : 1
 }

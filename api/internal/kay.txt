@@ -789,6 +789,19 @@ type CheckedAnswer = { value: unknown } | { issues: AnswerIssue[] }
 [./library] clearMissing
 function clearMissing(file?: string | undefined): number
 
+[./library] commandProject
+function commandProject(name: string, root: string, config: KayConfig, shared?: Partial<Pick<CommandProject, "format" | "quiet" | "dryRun">>): CommandProject
+
+[./library] CommandProject
+interface CommandProject
+  config: KayConfig
+  dryRun: boolean
+  fail: (message: string) => number
+  format: "text" | "json"
+  quiet: boolean
+  result: (document: object) => void
+  root: string
+
 [./library] configError
 function configError(message: string, options?: ErrorOptions | undefined): KayError
 function configError(option: string, value: unknown, takes: string): KayError
@@ -924,7 +937,8 @@ interface KayCommand extends Omit<Command, 'run'>
   normalize?: (args: string[]) => string[]
   options: CommandOptions
   positionals: number
-  run: (parsed: Parsed, refuse: (reason?: string | undefined) => number, project: { root: string; config: KayConfig; }) => number | Promise<number>
+  refuses?: Partial<Record<"format" | "quiet" | "dry-run", string>>
+  run: (parsed: Parsed, refuse: (reason?: string | undefined) => number, project: CommandProject) => number | Promise<number>
   usage: string
 
 [./library] keyedDigest
@@ -942,6 +956,9 @@ interface LazyGuard
 
 [./library] libraryCacheSlot
 function libraryCacheSlot(root: string, library: string, id: string, inputs: string): CacheSlot
+
+[./library] libraryCommand
+function libraryCommand(command: KayCommand, name: string, root: string, config: KayConfig): Command
 
 [./library] LibraryTool
 interface LibraryTool

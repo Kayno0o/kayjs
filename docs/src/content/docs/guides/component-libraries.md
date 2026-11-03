@@ -119,7 +119,11 @@ An extension may set these fields. Only `name` is required.
 - `check`: a function returning the problems with how the app configured the extension, as `{ message, file?, severity?, help? }`. `kay check` and the editor show them beside kay's own without starting the server, so a mistake the library would only log once the server listens is seen as you type. A warning at `kay.config.ts` unless it names a file.
 - `devTool`: a browser module adding a tab to the dev tool.
 - `references`: stylesheets the app's own can `@apply` and read `theme()` tokens of with no `@reference` line, as if each began with one. kayjs-ui lists its `theme.css`. kay adds the line after the Tailwind import of each stylesheet of the app, which writes no rule, so the stylesheet you write stays as it is.
-- `commands`: commands added to `kay`, such as `kay i18n translate`. Each names a module whose default export is a `KayCommand` from `kay/library`. It runs in the project of the current directory and gets its root and config. A command that rewrites the app's `src/ui.ts` reads it with `uiConfigEntries(text)` from `kay/library`, which gives each entry's key and the spans of its key and value, following const objects and spreads; `kay ui eject` uses it.
+- `commands`: commands added to `kay`, such as `kay i18n translate`. Each names a module whose default export is a `KayCommand` from `kay/library`. It runs in the project of the current directory and gets its root and config.
+
+A command takes `--quiet`, `--format json` and `--dry-run` like kay's own, and reads them as `quiet`, `format` and `dryRun`. It reports a failure with `fail(message)`, so `--format json` gets a document. It lists a reason in `refuses` for each of the three it does not take.
+
+A command that rewrites the app's `src/ui.ts` reads it with `uiConfigEntries(text)` from `kay/library`, which gives each entry's key and the spans of its key and value, following const objects and spreads; `kay ui eject` uses it.
 
 Type the result `KayExtension<typeof plugin>` when it has a `server` of its own, so the plugin's locals reach the app's types.
 

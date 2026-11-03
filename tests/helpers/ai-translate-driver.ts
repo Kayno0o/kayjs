@@ -5,6 +5,7 @@ import { dirname } from 'node:path'
 import process from 'node:process'
 import { AiError, fakeAi } from '../../packages/ai/src'
 import translate from '../../packages/ai/src/translate'
+import { commandProject } from '../../src/commands/command'
 
 type Edit = string | { replace: [string, string][] }
 
@@ -63,6 +64,6 @@ const code = await translate.run({ values: flags, positionals: args }, () => {
   refused = true
 
   return 1
-}, { root, config: { i18n } as never })
+}, commandProject('i18n translate', root, { i18n } as never, { dryRun: flags['dry-run'] === true, quiet: flags.quiet === true }))
 
 process.stdout.write(JSON.stringify({ code, refused, out: out.join('\n'), err: err.join('\n'), asked: fakeAi.asked }))

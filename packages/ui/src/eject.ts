@@ -399,7 +399,7 @@ export async function readManifest(root: string): Promise<Manifest> {
 }
 
 // Runs a command whose failure on a damaged record is a message and an exit code, not a stack trace.
-export async function guarded(name: string, run: () => Promise<number>): Promise<number> {
+export async function guarded(fail: (message: string) => number, run: () => Promise<number>): Promise<number> {
   try {
     return await run()
   }
@@ -407,9 +407,7 @@ export async function guarded(name: string, run: () => Promise<number>): Promise
     if (!(error instanceof UpstreamError))
       throw error
 
-    console.error(`kay ui ${name}: ${error.message}`)
-
-    return 1
+    return fail(error.message)
   }
 }
 

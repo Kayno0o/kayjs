@@ -3,7 +3,7 @@ import type { Parsed } from 'kay/library'
 import type { KayConfig } from 'kay/server'
 import { parseArgs } from 'node:util'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
-import { configuredSite, setSite } from 'kay/library'
+import { commandProject, configuredSite, libraryCommand, setSite } from 'kay/library'
 import { session } from 'kay/server'
 import { createAuth } from '../src/auth'
 import { createUserCommand, readFromTerminal, typedSecret } from '../src/createUserCommand'
@@ -29,13 +29,13 @@ afterEach(() => {
 async function run(args: string[], password: string | null = PASSWORD, config?: KayConfig) {
   const ask = async () => password ?? undefined
   const command = createUserCommand(ask)
-  const { values, positionals } = parseArgs({ args, options: command.options, allowPositionals: true })
+  const { values, positionals } = parseArgs({ args, options: libraryCommand(command, 'auth create-user', FIXTURE, CONFIG).options, allowPositionals: true })
   let refused: string | undefined
   const code = await command.run({ values: values as Parsed['values'], positionals }, (reason) => {
     refused = reason
 
     return 1
-  }, { root: FIXTURE, config: config ?? CONFIG })
+  }, commandProject('auth create-user', FIXTURE, config ?? CONFIG, { quiet: values.quiet === true, dryRun: values['dry-run'] === true, format: values.format === 'json' ? 'json' : 'text' }))
 
   return { code, refused, said: errors.mock.calls.map(call => call.join(' ')).join('\n') }
 }
@@ -110,7 +110,7 @@ describe('kay auth create-user', () => {
       return PASSWORD
     })
 
-    const code = await command.run({ values: { 'no-password': true }, positionals: ['linus'] }, () => 1, { root: FIXTURE, config: CONFIG })
+    const code = await command.run({ values: { 'no-password': true }, positionals: ['linus'] }, () => 1, commandProject('auth create-user', FIXTURE, CONFIG))
 
     expect(code).toBe(0)
     expect(asked).toBe(false)
@@ -279,9 +279,9 @@ describe('the order of the command', () => {
     }
     const command = createUserCommand(ask)
     const attempt = async (args: string[], config: KayConfig) => {
-      const { values, positionals } = parseArgs({ args, options: command.options, allowPositionals: true })
+      const { values, positionals } = parseArgs({ args, options: libraryCommand(command, 'auth create-user', FIXTURE, config).options, allowPositionals: true })
 
-      return command.run({ values: values as Parsed['values'], positionals }, () => 1, { root: FIXTURE, config })
+      return command.run({ values: values as Parsed['values'], positionals }, () => 1, commandProject('auth create-user', FIXTURE, config))
     }
 
     expect(await attempt(['taken@example.com'], CONFIG)).toBe(1)
