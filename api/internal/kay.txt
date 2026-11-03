@@ -821,7 +821,9 @@ type DataValue = string | number | boolean | bigint | null | undefined | Date | 
 function decide<E extends object, C extends object>(source: string, hooks: readonly (BeforeHook<E, C> | undefined)[], event: E): Promise<{
   change: Partial<C>;
 } | {
-  refused: ErrorShape;
+  refused: ErrorShape & {
+    retryAfter?: number | undefined;
+  };
 }>
 
 [./library] defineContext

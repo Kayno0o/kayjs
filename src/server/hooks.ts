@@ -129,7 +129,7 @@ export async function notify<E extends object>(source: string, hooks: readonly (
 }
 
 // Runs the `beforeX` hooks of one transition in order: each sees the event with what the ones before changed, the first refusal stops the chain, and a throw other than `refuse()` refuses as a server error after it is reported.
-export async function decide<E extends object, C extends object>(source: string, hooks: readonly (BeforeHook<E, C> | undefined)[], event: E): Promise<{ change: Partial<C> } | { refused: ErrorShape }> {
+export async function decide<E extends object, C extends object>(source: string, hooks: readonly (BeforeHook<E, C> | undefined)[], event: E): Promise<{ change: Partial<C> } | { refused: ErrorShape & { retryAfter?: number | undefined } }> {
   if (!hooks.some(hook => hook !== undefined))
     return { change: {} }
 
@@ -149,7 +149,7 @@ export async function decide<E extends object, C extends object>(source: string,
       const refusal = thrownRefusal(error)
 
       if (refusal !== undefined)
-        return { refused: { status: refusal.status, message: refusal.message, errors: refusal.errors, data: refusal.data } }
+        return { refused: refusal }
 
       await reportHookError(source, error, context.request)
 

@@ -69,7 +69,7 @@ A library's factory takes the hook keys in its options and runs them with the he
 
 ```ts
 import type { BeforeHook, Hook } from 'kay/library'
-import { decide, notify } from 'kay/library'
+import { decide, notify, refuse } from 'kay/library'
 
 interface NotesOptions {
   beforeSave?: BeforeHook<{ text: string }, { text: string }> | undefined
@@ -81,16 +81,17 @@ export function notes({ beforeSave, onSave }: NotesOptions) {
     const answer = await decide('notes.beforeSave', [beforeSave], input)
 
     if ('refused' in answer)
-      throw refusedAs(answer.refused)
+      refuse(answer.refused.message, answer.refused)
 
     const saved = { ...input, ...answer.change }
 
-    await store(saved)
     await notify('notes.onSave', [onSave], saved)
+
+    return saved
   }
 }
 ```
 
 - `notify(source, hooks, event, { detached })` never rejects. `source` is `'<library>.<hook>'`, what `onError` receives. `undefined` entries are skipped, so options pass straight through. `detached: true` does not wait for the hooks.
 - `decide(source, hooks, event)` answers `{ change }` or `{ refused }`, the refusal as `ErrorShape`. A `false` is `{ status: 403, message: 'Refused' }`, a throw other than a refusal (`refuse()` or any error carrying `Symbol.for('kay.refused')`) is reported and answers 500.
-- Throw the refusal as the transition's own error where the library has one (`refusedAs` above): `refused.status`, `.message`, `.errors` and `.data` carry what to answer.
+- Throw the refusal on with `refuse()`, or as the transition's own error where the library has one: `refused.status`, `.message`, `.errors`, `.data` and `.retryAfter` carry what to answer.

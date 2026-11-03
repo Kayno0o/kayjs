@@ -314,12 +314,12 @@ describe('decide', () => {
     expect(first).not.toBe(second)
   })
 
-  it('honours any error carrying kay.refused, such as a library\'s', async () => {
+  it('honours any error carrying kay.refused, such as a library\'s, its retryAfter kept', async () => {
     const answer = await decide('t.library', [() => {
       throw Object.assign(new Error('limit'), { [Symbol.for('kay.refused')]: { status: 429, retryAfter: 5, message: 'Slow down' } })
     }], {})
 
-    expect(answer).toEqual({ refused: { status: 429, message: 'Slow down', errors: {}, data: undefined } })
+    expect(answer).toEqual({ refused: { status: 429, retryAfter: 5, message: 'Slow down', errors: {}, data: undefined } })
     expect(reported).toEqual([])
   })
 
