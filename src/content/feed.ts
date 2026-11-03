@@ -6,7 +6,7 @@ import { escape as escapeHtml, escapeAttribute as escapeHtmlAttribute } from '..
 import { exportNameOf } from '../runtime/fields'
 import { slashedPath } from '../server/routes'
 import { dataOf, entryModified, entryPublished, text } from './entry-head'
-import { humanize } from './validate'
+import { humanize } from './humanize'
 
 export interface FeedItem {
   title: string
