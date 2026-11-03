@@ -358,6 +358,25 @@
     }
   }
 
+  /* The sizes of a field drawn by its class alone, as a Combobox, a MultiSelect and a RangeInput: medium is the base above, the others change the padding and the type. A TextInput, a Textarea and a Select carry the same numbers as utilities (FIELD_SIZES in the field look module), which this layer would lose to. */
+  .kui-field-input:where([data-size='sm']) {
+    @apply px-[calc(var(--spacing)*1.75*var(--density))] py-[calc(var(--spacing)*0.5*var(--density))] text-xs;
+  }
+
+  .kui-field-input:where([data-size='lg']) {
+    @apply px-[calc(var(--spacing)*3*var(--density))] py-[calc(var(--spacing)*1.5*var(--density))] text-base;
+  }
+
+  /* A refused field: the line and the focus ring in the danger colour, on a control marked by its `invalid` prop or by a FormField showing a message. */
+  .kui-field-input[aria-invalid='true'],
+  .kui-form-field :where(input, select, textarea)[aria-invalid='true'] {
+    border-color: var(--color-danger);
+
+    &:focus {
+      outline-color: var(--color-danger);
+    }
+  }
+
   .kui-stat-badge {
     @apply inline-flex items-center gap-[calc(var(--spacing)*1.25*var(--density))] px-2.25 py-0.75 text-xs;
   }

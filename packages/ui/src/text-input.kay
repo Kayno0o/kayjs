@@ -1,14 +1,20 @@
 ---
+import type { FieldSize } from './field-look'
 import type { JSX } from 'kay'
+import { FIELD_BOX, FIELD_LOOK } from './field-look'
 import { recipe, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
 
-type Field = Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange'>
+type Field = Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange' | 'size'> & {
+  // The box's size: `md` by default, `sm` and `lg` change its padding and type.
+  size?: FieldSize | undefined
+  // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
+  invalid?: boolean | undefined
+}
 
-// 'kui-field-input' is the field's name for an app's CSS and the skins, and the hook of the rule that gives the raw controls of a FormField this look. The focus outline doubles the accent border, so focus reads by more than a colour change.
 const look = recipe({
-  parts: { root: 'kui-field-input rounded-md bg-surface px-[calc(var(--spacing)*2.25*var(--density))] py-[calc(var(--spacing)*var(--density))] text-sm text-foreground outline-none [font-family:inherit] [border:var(--border-width)_solid_var(--color-input)] placeholder:text-[var(--color-muted)] focus:border-ring focus:[outline:1px_solid_var(--color-ring)] focus:[box-shadow:none] disabled:cursor-default disabled:opacity-50' },
+  parts: { root: `${FIELD_LOOK} ${FIELD_BOX}` },
 })
 
 type AsText = Field & {
@@ -28,7 +34,7 @@ type AsNumber = Field & {
   onChange?: ((value: number | null) => unknown) | undefined
 }
 
-const { value, onInput, onChange, onBlur, type = 'text', ...rest } = props<AsText | AsNumber>()
+const { size = 'md', invalid, value, onInput, onChange, onBlur, type = 'text', ...rest } = props<AsText | AsNumber>()
 
 let box: HTMLInputElement | undefined
 
@@ -79,4 +85,4 @@ function left(event: FocusEvent & { currentTarget: HTMLInputElement, target: Ele
   onBlur?.(event)
 }
 ---
-input({...rest} ref={ref} type={type} value={untrack(() => value === undefined ? undefined : spelled(value))} onInput={event => report(onInput, event.currentTarget)} onChange={event => report(onChange, event.currentTarget)} onBlur={left})
+input({...rest} data-size={size === 'md' ? undefined : size} aria-invalid={invalid ? 'true' : rest['aria-invalid']} ref={ref} type={type} value={untrack(() => value === undefined ? undefined : spelled(value))} onInput={event => report(onInput, event.currentTarget)} onChange={event => report(onChange, event.currentTarget)} onBlur={left})

@@ -56,3 +56,8 @@ Enter picks the active row, Escape closes the list, even one with no rows, and, 
 ## Opened by the app
 
 `open` shows the list when your code sets it, and `onOpenChange(open)` is called whenever the list opens or closes: focus, typing, Escape, a pick or focus leaving. When you drive `open`, set your own value back in `onOpenChange`.
+
+
+## Size and invalid
+
+`size` is `sm`, `md` or `lg`, `md` by default, and changes the padding and the type of the box. `invalid` draws the line and the focus ring in the danger colour and sets `aria-invalid="true"`, for a refusal the page knows of. A FormField marks its control itself while it shows a message.

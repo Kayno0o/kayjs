@@ -43,3 +43,8 @@ DateInput(aria-label="Arrival" name="arrival" isDisabled={iso => closed.has(iso)
 ```
 
 `onMonthChange(month)` hears the month on show as `YYYY-MM`, on opening and on each move, so an app can load that month's availability. `DateRangeInput` takes the same three, `onMonthChange(month, box)` with the box.
+
+
+## Size and invalid
+
+`size` is `sm`, `md` or `lg`, `md` by default, and changes the padding and the type of the box. `invalid` draws the line and the focus ring in the danger colour and sets `aria-invalid="true"`, for a refusal the page knows of. A FormField marks its control itself while it shows a message.

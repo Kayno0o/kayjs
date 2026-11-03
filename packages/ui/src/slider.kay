@@ -1,20 +1,25 @@
 ---
+import type { FieldSize } from './field-look'
 import type { JSX } from 'kay'
 import { recipe } from 'kay'
 import { controlledInput } from './controlled-input'
-import { LABEL_TEXT } from './field-look'
+import { LABEL_TEXT, SLIDER_STATE } from './field-look'
 import { rangeTrack } from './range-track'
 
 const look = recipe({
   parts: {
     root: 'kui-slider grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1',
     label: LABEL_TEXT,
-    input: `col-span-2 ${rangeTrack}`,
+    input: `col-span-2 ${rangeTrack} ${SLIDER_STATE}`,
     value: 'text-xs text-foreground tabular-nums',
   },
 })
 
-const { value, min = 0, max = 100, step, label, showValue = true, formatValue, onInput, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'min' | 'max' | 'step' | 'onInput' | 'onChange'> & {
+const { size = 'md', invalid, value, min = 0, max = 100, step, label, showValue = true, formatValue, onInput, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'class' | 'children' | 'type' | 'value' | 'min' | 'max' | 'step' | 'onInput' | 'onChange'> & {
+  // The box's size: `md` by default, `sm` and `lg` change its padding and type.
+  size?: FieldSize | undefined
+  // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
+  invalid?: boolean | undefined
   // The value to start with; a slider whose parent passes another follows it.
   value: number
   // The bounds, 0 and 100 by default.
@@ -70,7 +75,7 @@ function held(event: Event) {
 ---
 div(part="root")
   span(part="label") {label}
-  input({...rest} part="input" ref={sliderRef} type="range" aria-label={rest['aria-label'] || label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} aria-busy={busy() ? 'true' : undefined} onInput={moved} onChange={event => released(event.currentTarget)} onMouseDown={held} onTouchStart={held} onKeyDown={held})
+  input({...rest} data-size={size === 'md' ? undefined : size} aria-invalid={invalid ? 'true' : rest['aria-invalid']} part="input" ref={sliderRef} type="range" aria-label={rest['aria-label'] || label} aria-valuetext={formatValue ? words(shown()) : undefined} min={min} max={max} step={step} value={shown()} aria-busy={busy() ? 'true' : undefined} onInput={moved} onChange={event => released(event.currentTarget)} onMouseDown={held} onTouchStart={held} onKeyDown={held})
   if showValue
     // Not an `output`, which a form reset empties; the input itself speaks the value.
     span(part="value" aria-hidden="true") {words(shown())}

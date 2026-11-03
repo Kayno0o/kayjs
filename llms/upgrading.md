@@ -11,6 +11,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `url` as a function and a feed item's `path` beside a `route`
 
 - A collection with a literal `route` writes no `url` function, as its entries' `url` comes from the route, and a feed's `item` leaves out `path` when it is that route with the slug. Both forms keep working until 1.90, reported by the `deprecated-collection-links` lint, which `kay upgrade` fixes.
+### kayjs-ui: `size` on a field is its own
+
+- TextInput, Select, Combobox, DateInput and the other field controls take `size` as `sm`, `md` or `lg`, so the native `size` attribute (an input's character width, a select's row count) is no longer passed through: set the width with CSS (`w-48`).
+
 ### kayjs-ui: one `Tone` for every component
 
 - `SparkTone`, and the `tone` of a `TimelineEntry`, a Sparkline bar and a StatusStrip cell, name the quiet grey `neutral` instead of `muted`: change `tone: 'muted'` to `'neutral'`. `SparkTone` is deprecated for `Tone` and goes in 2.0.0.

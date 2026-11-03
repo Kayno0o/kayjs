@@ -11,3 +11,8 @@ The field is a native `input type="datetime-local"`, which carries no zone, so a
 `value` is any ISO instant, with an offset or `Z`, and the box shows it on the visitor's clock. `min` and `max` are instants too, as text or a `Date`, and bound the box on that clock. Without `value` the field keeps what is typed, for a form posting it by its `name`.
 
 The server cannot know the visitor's zone, so it draws the box empty, with no `min` or `max`. Without JavaScript the box posts the local text it holds, with no offset, which `s.Date()` refuses.
+
+
+## Size and invalid
+
+`size` is `sm`, `md` or `lg`, `md` by default, and changes the box. `invalid` draws the line and the focus ring in the danger colour and sets `aria-invalid="true"`, for a refusal the page knows of. A FormField marks its control itself while it shows a message.

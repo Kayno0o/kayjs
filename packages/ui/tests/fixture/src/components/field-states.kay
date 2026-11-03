@@ -1,0 +1,40 @@
+---
+import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
+import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
+import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
+import DateTimeInput from '@kaynooo/kayjs-ui/date-time-input.kay'
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import Slider from '@kaynooo/kayjs-ui/slider.kay'
+import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
+
+// Every form control once, large and refused, each in a wrapper named after it, and a TextInput left at its defaults.
+const options = [{ value: 'a', label: 'A' }]
+---
+div#text
+  TextInput(size="lg" invalid)
+div#plain
+  TextInput
+div#area
+  Textarea(size="lg" invalid)
+div#select
+  Select(size="lg" invalid options={options} value="a")
+div#combobox
+  Combobox(size="lg" invalid label="Planet" options={options})
+div#multi
+  MultiSelect(size="lg" invalid label="Tags" options={options})
+div#date
+  DateInput(size="lg" invalid)
+div#time
+  TimeInput(size="lg" invalid)
+div#datetime
+  DateTimeInput(size="lg" invalid)
+div#dates
+  DateRangeInput(size="lg" invalid label="Dates")
+div#range
+  RangeInput(size="lg" invalid label="Range")
+div#slider
+  Slider(size="lg" invalid label="Volume" value={3})

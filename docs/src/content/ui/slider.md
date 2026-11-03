@@ -25,3 +25,8 @@ One that moves onto the value being changed while the promise is pending (set fr
 An `aria-label` passed to Slider names the input in place of `label`. With a `name` the input posts its number in a plain form, and `id`, `disabled` and the other input attributes go on the input.
 
 The track and the thumb are drawn from the theme tokens, so an app styles no `::-webkit-slider-thumb` itself.
+
+
+## Size and invalid
+
+`size` is `sm`, `md` or `lg`, `md` by default, and changes the thumb. `invalid` draws the line and the focus ring in the danger colour and sets `aria-invalid="true"`, for a refusal the page knows of. A FormField marks its control itself while it shows a message.

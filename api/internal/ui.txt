@@ -1,11 +1,29 @@
 [./field-look] CHECKBOX
 const CHECKBOX: { root: string; input: string; label: string; hint: string; }
 
+[./field-look] FIELD_BOX
+const FIELD_BOX: "px-[calc(var(--spacing)*2.25*var(--density))] py-[calc(var(--spacing)*var(--density))] text-sm data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-height:calc(2*var(--border-width)_+_var(--spacing)*var(--density)_+_var(--text-xs)*var(--text-xs--line-height))] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-height:calc(2*var(--border-width)_+_3*var(--spacing)*var(--density)_+_var(--text-base)*var(--text-base--line-height))]"
+
+[./field-look] FIELD_LOOK
+const FIELD_LOOK: "kui-field-input rounded-md bg-surface text-foreground outline-none [font-family:inherit] [border:var(--border-width)_solid_var(--color-input)] placeholder:text-[var(--color-muted)] focus:border-ring focus:[outline:1px_solid_var(--color-ring)] focus:[box-shadow:none] disabled:cursor-default disabled:opacity-50 aria-invalid:border-danger aria-invalid:focus:border-danger aria-invalid:focus:[outline-color:var(--color-danger)]"
+
 [./field-look] FIELD_MESSAGE
 const FIELD_MESSAGE: { hint: string; issues: string; issue: string; }
 
+[./field-look] FIELD_SELECT_BOX
+const FIELD_SELECT_BOX: string
+
+[./field-look] FIELD_SIZES
+const FIELD_SIZES: "data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-height:calc(2*var(--border-width)_+_var(--spacing)*var(--density)_+_var(--text-xs)*var(--text-xs--line-height))] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-height:calc(2*var(--border-width)_+_3*var(--spacing)*var(--density)_+_var(--text-base)*var(--text-base--line-height))]"
+
+[./field-look] FieldSize
+type FieldSize = 'sm' | 'md' | 'lg'
+
 [./field-look] LABEL_TEXT
 const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]"
+
+[./field-look] SLIDER_STATE
+const SLIDER_STATE: "aria-invalid:[&::-webkit-slider-thumb]:bg-danger aria-invalid:[&::-moz-range-thumb]:bg-danger data-[size=sm]:h-3 data-[size=sm]:[&::-webkit-slider-thumb]:-mt-1 data-[size=sm]:[&::-webkit-slider-thumb]:size-3 data-[size=sm]:[&::-moz-range-thumb]:size-3 data-[size=lg]:h-5 data-[size=lg]:[&::-webkit-slider-thumb]:-mt-2 data-[size=lg]:[&::-webkit-slider-thumb]:size-5 data-[size=lg]:[&::-moz-range-thumb]:size-5"
 
 [./lib/accept] acceptsFile
 function acceptsFile(accept: string | undefined, file: Pick<File, "type" | "name">): boolean
@@ -931,11 +949,29 @@ function ui(): KayExtension<AnyElysia>
 [./lib/field-look] CHECKBOX
 const CHECKBOX: { root: string; input: string; label: string; hint: string; }
 
+[./lib/field-look] FIELD_BOX
+const FIELD_BOX: "px-[calc(var(--spacing)*2.25*var(--density))] py-[calc(var(--spacing)*var(--density))] text-sm data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-height:calc(2*var(--border-width)_+_var(--spacing)*var(--density)_+_var(--text-xs)*var(--text-xs--line-height))] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-height:calc(2*var(--border-width)_+_3*var(--spacing)*var(--density)_+_var(--text-base)*var(--text-base--line-height))]"
+
+[./lib/field-look] FIELD_LOOK
+const FIELD_LOOK: "kui-field-input rounded-md bg-surface text-foreground outline-none [font-family:inherit] [border:var(--border-width)_solid_var(--color-input)] placeholder:text-[var(--color-muted)] focus:border-ring focus:[outline:1px_solid_var(--color-ring)] focus:[box-shadow:none] disabled:cursor-default disabled:opacity-50 aria-invalid:border-danger aria-invalid:focus:border-danger aria-invalid:focus:[outline-color:var(--color-danger)]"
+
 [./lib/field-look] FIELD_MESSAGE
 const FIELD_MESSAGE: { hint: string; issues: string; issue: string; }
 
+[./lib/field-look] FIELD_SELECT_BOX
+const FIELD_SELECT_BOX: string
+
+[./lib/field-look] FIELD_SIZES
+const FIELD_SIZES: "data-[size=sm]:px-[calc(var(--spacing)*1.75*var(--density))] data-[size=sm]:py-[calc(var(--spacing)*0.5*var(--density))] data-[size=sm]:text-xs data-[size=sm]:[--_field-height:calc(2*var(--border-width)_+_var(--spacing)*var(--density)_+_var(--text-xs)*var(--text-xs--line-height))] data-[size=lg]:px-[calc(var(--spacing)*3*var(--density))] data-[size=lg]:py-[calc(var(--spacing)*1.5*var(--density))] data-[size=lg]:text-base data-[size=lg]:[--_field-height:calc(2*var(--border-width)_+_3*var(--spacing)*var(--density)_+_var(--text-base)*var(--text-base--line-height))]"
+
+[./lib/field-look] FieldSize
+type FieldSize = 'sm' | 'md' | 'lg'
+
 [./lib/field-look] LABEL_TEXT
 const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]"
+
+[./lib/field-look] SLIDER_STATE
+const SLIDER_STATE: "aria-invalid:[&::-webkit-slider-thumb]:bg-danger aria-invalid:[&::-moz-range-thumb]:bg-danger data-[size=sm]:h-3 data-[size=sm]:[&::-webkit-slider-thumb]:-mt-1 data-[size=sm]:[&::-webkit-slider-thumb]:size-3 data-[size=sm]:[&::-moz-range-thumb]:size-3 data-[size=lg]:h-5 data-[size=lg]:[&::-webkit-slider-thumb]:-mt-2 data-[size=lg]:[&::-webkit-slider-thumb]:size-5 data-[size=lg]:[&::-moz-range-thumb]:size-5"
 
 [./lib/form-reset] defaultKept
 function defaultKept<Value>(element: () => Element | undefined, current: () => Value, start: Value): () => Value

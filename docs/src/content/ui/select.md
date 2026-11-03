@@ -43,3 +43,8 @@ A pick with the mouse submits at once. Some browsers report a change on every ar
 ## Options from an action
 
 `options` can be a function returning a promise of the options, such as an action. It is asked once when the select is drawn in the browser, and the select is busy under `loadingLabel` until the answer lands. When it fails the select says `failureLabel`. `onLoad` and `onError` follow the answer.
+
+
+## Size and invalid
+
+`size` is `sm`, `md` or `lg`, `md` by default, and changes the padding and the type. `invalid` draws the line and the focus ring in the danger colour and sets `aria-invalid="true"`, for a refusal the page knows of. A FormField marks its control itself while it shows a message.

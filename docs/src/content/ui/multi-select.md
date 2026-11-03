@@ -35,3 +35,8 @@ The status line says `loadingLabel` while it waits and `failureLabel` when it fa
 ## Drawing an option
 
 `@option(option)` draws each option in place of its label and icon, as in Combobox. The checkbox stays, named by the option's `label`.
+
+
+## Size and invalid
+
+`size` is `sm`, `md` or `lg`, `md` by default, and changes the padding and the type of the button. `invalid` draws the line and the focus ring in the danger colour and sets `aria-invalid="true"`, for a refusal the page knows of. A FormField marks its control itself while it shows a message.

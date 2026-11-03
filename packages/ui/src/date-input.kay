@@ -1,4 +1,5 @@
 ---
+import type { FieldSize } from './field-look'
 import type { JSX, Snippet } from 'kay'
 import { effect, memo, onMount, recipe, signal, untrack } from 'kay'
 import { addDays, addMonths, clampDate, dayName, firstDayOf, isDate, monthTitle, monthWeeks, sameMonth, today, weekdays, weekEdge, withinBounds } from './date'
@@ -26,7 +27,11 @@ const look = recipe({
   },
 })
 
-const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Choose a date'), previousLabel = wording('ui.dateInput.previous', 'Previous month'), nextLabel = wording('ui.dateInput.next', 'Next month'), todayLabel = wording('ui.dateInput.today', 'Today'), unavailableLabel = wording('ui.dateInput.unavailable', 'This date is not available'), isDisabled, day, open, onOpenChange, onMonthChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
+const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Choose a date'), previousLabel = wording('ui.dateInput.previous', 'Previous month'), nextLabel = wording('ui.dateInput.next', 'Next month'), todayLabel = wording('ui.dateInput.today', 'Today'), unavailableLabel = wording('ui.dateInput.unavailable', 'This date is not available'), isDisabled, day, open, onOpenChange, onMonthChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'value' | 'type' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
+  // The box's size: `md` by default, `sm` and `lg` change its padding and type.
+  size?: FieldSize | undefined
+  // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
+  invalid?: boolean | undefined
   // The date as `YYYY-MM-DD`, or `''` for none. Without it, the box starts empty and keeps what is picked, for a form posting it by its `name`.
   value?: string | undefined
   // The earliest and latest date allowed, as `YYYY-MM-DD`; the calendar greys out the days outside them.
