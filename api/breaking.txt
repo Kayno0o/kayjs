@@ -1,0 +1,15 @@
+ui [./combobox.kay] default
+ui [./date-input.kay] default
+ui [./date-range-input.kay] default
+ui [./date-time-input.kay] default
+ui [./multi-select.kay] default
+ui [./range-input.kay] default
+ui [./select.kay] default
+ui [./slider.kay] default
+ui [./sparkline.kay] default
+ui [./status-strip.kay] default
+ui [./text-input.kay] default
+ui [./textarea.kay] default
+ui [./time-input.kay] default
+ui [.] SparkTone
+ui [.] TimelineEntry
