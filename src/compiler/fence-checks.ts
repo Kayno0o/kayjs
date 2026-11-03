@@ -512,6 +512,72 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
   return diagnostics
 }
 
+// The name an action handler reads `fail` by: `ctx.fail` for a `ctx` parameter, `fail` for a destructured one.
+function failReader(ctx: Node | undefined): ((call: NodeOfType<'CallExpression'>) => boolean) | undefined {
+  if (ctx?.type === 'Identifier') {
+    const name = ctx.name
+
+    return call => call.callee.type === 'MemberExpression' && !call.callee.computed && call.callee.object.type === 'Identifier' && call.callee.object.name === name && call.callee.property.type === 'Identifier' && call.callee.property.name === 'fail'
+  }
+
+  if (ctx?.type !== 'ObjectPattern')
+    return undefined
+
+  for (const property of ctx.properties) {
+    if (isPlainProperty(property) && !property.computed && property.key.type === 'Identifier' && property.key.name === 'fail' && property.value.type === 'Identifier') {
+      const local = property.value.name
+
+      return call => call.callee.type === 'Identifier' && call.callee.name === local
+    }
+  }
+
+  return undefined
+}
+
+// A `ctx.fail(...)` statement in an action's handler: `fail` returns the failure, where `deny`, `notFound` and `redirect` throw, so a statement not returned does nothing and the handler carries on.
+export function unreturnedFails(fence: ParsedFence): Diagnostic[] {
+  if (!fence.code.includes('fail(') || !fence.code.includes('action'))
+    return []
+
+  const diagnostics: Diagnostic[] = []
+
+  eachNode(fence.ast, (node) => {
+    if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== 'action')
+      return
+
+    const handler = node.arguments.findIndex(argument => argument.type === 'ArrowFunctionExpression' || argument.type === 'FunctionExpression')
+    const fn = node.arguments[handler]
+
+    if (!fn || !isFunction(fn) || !fn.body || fn.body.type !== 'BlockStatement')
+      return
+
+    const reads = failReader(fn.params[handler === 0 ? 0 : 1])
+
+    if (!reads)
+      return
+
+    eachNode(fn.body, (inner) => {
+      if (isFunction(inner))
+        return false
+
+      if (inner.type === 'ExpressionStatement' && inner.expression.type === 'CallExpression' && reads(inner.expression)) {
+        diagnostics.push({
+          ...fence.shift(inner.expression),
+          code: 'unreturned-fail',
+          message: 'This `fail()` is not returned, so it does nothing and the handler carries on',
+          note: '`fail` returns the failure the action answers with, where `deny`, `notFound` and `redirect` throw',
+          help: 'write `return ctx.fail(...)`',
+          fixes: [{ title: 'Return it', edits: [{ start: fence.offset + inner.start, end: fence.offset + inner.start, text: 'return ' }], safe: true }],
+        })
+      }
+
+      return true
+    })
+  })
+
+  return diagnostics
+}
+
 // The kayjs-auth methods that ask a CAPTCHA by default, with the position of the options holding `captcha`: grouped as `auth.password.register`.
 const CAPTCHA_CALLS = new Map([['password.register', 1], ['password.signIn', 1], ['password.requestReset', 1], ['magicLink.request', 1]])
 const CAPTCHA_GROUPS = new Set(['password', 'magicLink'])
@@ -957,7 +1023,7 @@ export function openRedirects(fence: ParsedFence): Diagnostic[] {
 // The checks a plain module takes, parsed only when one of them may find something.
 // A module the browser bundle reaches (`browser`) is checked for the names the browser's entries lack as well.
 export function moduleChecks(source: string, browser = false): Diagnostic[] {
-  if (!CSS_BINDING.test(source) && !(browser && source.includes('kay/cache')) && !(source.includes(AI_PACKAGE) && source.includes('async')) && !source.includes('redirect(') && !CAPTCHA_CALLS.keys().some(name => source.includes(name)))
+  if (!CSS_BINDING.test(source) && !(browser && source.includes('kay/cache')) && !(source.includes(AI_PACKAGE) && source.includes('async')) && !source.includes('redirect(') && !source.includes('fail(') && !CAPTCHA_CALLS.keys().some(name => source.includes(name)))
     return []
 
   const whole = { start: 0, end: source.length }
@@ -976,5 +1042,5 @@ export function moduleChecks(source: string, browser = false): Diagnostic[] {
 }
 
 function checksOf(module: ParsedFence, browser: boolean): Diagnostic[] {
-  return [...cssImportsWithoutText(module), ...asyncReplies(module), ...openRedirects(module), ...missingCaptchas(module), ...browser ? serverOnlyImports(module) : []]
+  return [...cssImportsWithoutText(module), ...asyncReplies(module), ...openRedirects(module), ...missingCaptchas(module), ...unreturnedFails(module), ...browser ? serverOnlyImports(module) : []]
 }

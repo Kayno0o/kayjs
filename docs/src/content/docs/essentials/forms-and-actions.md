@@ -190,7 +190,7 @@ markInvalid(input, 'length', input.value.length < 8)
 
 ## Failing on purpose
 
-A handler refuses a post with `ctx.fail(status, data)`. The page reads `data` with `add.failed()?.data`.
+A handler refuses a post with `ctx.fail(status, data)`. The page reads `data` with `add.failed()?.data`. Always `return` it: unlike `ctx.deny` and `ctx.notFound`, `ctx.fail` does not throw, so a call without `return` does nothing and the handler carries on. `kay check` reports it as `unreturned-fail`.
 
 ```kay
 --- server

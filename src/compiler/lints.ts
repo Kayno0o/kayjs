@@ -293,6 +293,13 @@ export const LINTS = {
     wrong: '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\nimport { action, s } from \'kay\'\n\nexport const reply = action(s.Object({ messages: s.Array(s.Any()) }), async ({ messages }) => ask(messages))\n---\np x',
     right: '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\nimport { action, s } from \'kay\'\n\nexport const reply = action(s.Object({ messages: s.Array(s.Any()) }), ({ messages }) => ask(messages))\n---\np x',
   },
+  'unreturned-fail': {
+    level: 'warn',
+    group: 'code',
+    summary: 'A `ctx.fail(...)` statement in an action\'s handler (or `fail(...)` destructured from the context) that is not returned: `fail` returns the failure the action answers with, where `deny`, `notFound` and `redirect` throw, so the statement does nothing and the handler carries on. An arrow function with an expression body already returns, and a nested function is left alone. The fix prepends `return`. Found in `.kay` fences and `.ts` modules alike.',
+    wrong: '--- server\nexport const rename = action(s.Object({ name: s.String() }), ({ name }, ctx) => {\n  if (name === \'admin\')\n    ctx.fail(409, \'That name is taken\')\n\n  return name\n})\n---\np x',
+    right: '--- server\nexport const rename = action(s.Object({ name: s.String() }), ({ name }, ctx) => {\n  if (name === \'admin\')\n    return ctx.fail(409, \'That name is taken\')\n\n  return name\n})\n---\np x',
+  },
   'missing-captcha': {
     level: 'warn',
     group: 'forms',

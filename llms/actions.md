@@ -204,6 +204,7 @@ form(action={add})
 
 ### Refused posts
 
+- `ctx.fail` returns the failure where `ctx.deny`, `ctx.notFound` and `ctx.redirect` throw, so write `return ctx.fail(...)`: a statement without `return` does nothing, which `kay check` reports as `unreturned-fail` and `--fix` repairs.
 - A post the schema refuses, or whose handler returns `ctx.fail(status, data)`, is answered with the page it came from, rendered with the failure's status, rather than with a redirect.
 - There `add.failed()` returns `{ status, message, values, errors, data }`, typed from the action, or `undefined`.
 - `values` is what the form posted (fields named like a password left out).

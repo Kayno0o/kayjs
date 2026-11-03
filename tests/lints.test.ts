@@ -1182,3 +1182,36 @@ describe('deprecated-lifetimes on the Chat of kayjs-ai', () => {
     expect(found('// kay-allow deprecated-lifetimes\nChat(action={reply} label="x" keep={2})')).toEqual([])
   })
 })
+
+describe('unreturned-fail', () => {
+  const server = (body: string) => `--- server\nimport { action, s } from 'kay'\n\n${body}\n---\np x`
+  const found = (body: string) => lints(server(body)).filter(d => d.code === 'unreturned-fail')
+  const handler = 'export const rename = action(s.Object({ name: s.String({ maxLength: 20 }) }), ({ name }, ctx) => {\n  if (name === \'admin\')\n    ctx.fail(409, \'taken\')\n\n  return name\n})'
+
+  it('reports a ctx.fail statement in a handler, with a fix prepending return', () => {
+    expect(found(handler)).toEqual([{ code: 'unreturned-fail', severity: 'warning', at: 'ctx.fail(409, \'taken\')' }])
+    expect(fixed(server(handler))).toEqual([server(handler.replace('    ctx.fail', '    return ctx.fail'))])
+  })
+
+  it('reports the destructured fail, a no-input handler and a function expression', () => {
+    expect(found('export const a = action(s.Object({}), (input, { fail }) => {\n  fail(400, \'x\')\n})')).toHaveLength(1)
+    expect(found('export const a = action((ctx) => {\n  ctx.fail(400, \'x\')\n})')).toHaveLength(1)
+    expect(found('export const a = action(s.Object({}), function (input, context) {\n  context.fail(400, \'x\')\n})')).toHaveLength(1)
+  })
+
+  it('leaves a returned fail, an expression body, a nested function and other receivers alone', () => {
+    expect(found('export const a = action(s.Object({}), (input, ctx) => {\n  return ctx.fail(400, \'x\')\n})')).toEqual([])
+    expect(found('export const a = action(s.Object({}), (input, ctx) => ctx.fail(400, \'x\'))')).toEqual([])
+    expect(found('export const a = action(s.Object({}), (input, ctx) => {\n  items.forEach(() => ctx.fail(400, \'x\'))\n  list.map((item) => {\n    ctx.fail(400, \'x\')\n  })\n})')).toEqual([])
+    expect(found('export const a = action(s.Object({}), (input, ctx) => {\n  other.fail(400, \'x\')\n  fail(400, \'x\')\n})')).toEqual([])
+    expect(found('export const a = (input, ctx) => {\n  ctx.fail(400, \'x\')\n}')).toEqual([])
+    expect(found(`export const a = action(s.Object({}), (input, ctx) => {\n  // kay-allow unreturned-fail\n  ctx.fail(400, 'x')\n})`)).toEqual([])
+  })
+
+  it('is found in a plain module as in a fence', () => {
+    const module = 'export const a = action(s.Object({}), (input, ctx) => {\n  ctx.fail(400, \'x\')\n})'
+
+    expect(moduleChecks(module).map(d => d.code)).toEqual(['unreturned-fail'])
+    expect(moduleChecks(module.replace('  ctx', '  return ctx'))).toEqual([])
+  })
+})

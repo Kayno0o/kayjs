@@ -12,7 +12,7 @@ import { basename, relative } from 'node:path'
 import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandCause, islandMessages, lineOf, promotionSite } from './codegen'
-import { asyncReplies, cssImportsWithoutText, missingCaptchas, openRedirects, separatePageSettings, serverOnlyImports, unboundedFields } from './fence-checks'
+import { asyncReplies, cssImportsWithoutText, missingCaptchas, openRedirects, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
 import { cwd, iconSetsOf, scopeStorage } from './host'
 import { causeSummary, describeCause } from './island-cause'
 import { islandMarker, markerMismatch } from './island-marker'
@@ -297,7 +297,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)
 
   if (checked) {
-    const fenceLints = [script.fence, script.moduleFence, server?.fence].flatMap(fence => fence ? [...cssImportsWithoutText(fence), ...asyncReplies(fence), ...openRedirects(fence), ...missingCaptchas(fence)] : [])
+    const fenceLints = [script.fence, script.moduleFence, server?.fence].flatMap(fence => fence ? [...cssImportsWithoutText(fence), ...asyncReplies(fence), ...openRedirects(fence), ...missingCaptchas(fence), ...unreturnedFails(fence)] : [])
     // The script runs in the browser as an island's and in a component only islands render; a static one that may be promoted to an island is read by the project check, which knows whether the build promotes it.
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
