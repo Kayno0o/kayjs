@@ -117,17 +117,16 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
 
           const start = property.key.start
           const end = property.value.end
-          const held = mayHoldStore
 
           found.push({
             file,
             ...positionAt(source, start),
             end: property.key.end,
             message: '`fileStore` is `store.files` in the config since 1.87, so every kind of store is named in one place; the old key works until 1.90',
-            help: held ? 'move it into the `files` of the `store` beside it' : 'write `store: { files: ... }`',
+            help: names.has('store') ? 'move it into the `files` of the `store` beside it' : 'write `store: { files: ... }`, in the `store` a spread or computed key may give this object if it has one',
             code: 'deprecated-file-store',
             severity: level === 'warn' ? 'warning' : 'error',
-            ...!held && { fixes: [{ title: 'Move fileStore under store.files', edits: [{ start, end, text: filesMove(property, 'fileStore') }], safe: true }] },
+            ...!mayHoldStore && { fixes: [{ title: 'Move fileStore under store.files', edits: [{ start, end, text: filesMove(property, 'fileStore') }], safe: true }] },
           })
 
           continue
