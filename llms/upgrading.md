@@ -19,6 +19,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `SparkTone`, and the `tone` of a `TimelineEntry`, a Sparkline bar and a StatusStrip cell, name the quiet grey `neutral` instead of `muted`: change `tone: 'muted'` to `'neutral'`. `SparkTone` is deprecated for `Tone` and goes in 2.0.0.
 - A Notice's `info` tone is now drawn in `--color-info` and its default tone is `neutral`, which keeps the look `info` had: pass `tone="info"` only for the coloured one. It writes `data-tone="neutral"` where it wrote `info`, so a `defineUi` restyle or a `[data-tone=info]` rule of an app no longer reaches a default Notice: target `neutral`, or pass `tone="info"`.
+### kayjs-auth: breached passwords are checked in production
+
+- `breachedPasswords` defaults to on when `NODE_ENV` is `production`: `password.register`, `password.reset`, `password.change` and `createUser` ask Have I Been Pwned (the first five characters of the SHA-1 only; an outage lets the password through) and refuse a listed one as `errors.password: 'breached'`. An app that must not call the service sets `breachedPasswords: false`; a test running with `NODE_ENV=production` stubs `fetch` or sets it.
+- In production `createAuth` warns when password sign-up is open with no `email` option, as registering then answers `taken` for a held address. No lint recognises it.
 
 ## 1.86.0
 

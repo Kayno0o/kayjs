@@ -206,6 +206,10 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     return made
   }
 
+  // Without a mailer registering signs the new user in, so it cannot answer alike for a held address and a free one.
+  if (process.env.NODE_ENV === 'production' && (options.signUp ?? true) && options.password !== false && !options.email)
+    log.warn('password sign-up is open with no `email` option, so `password.register` answers `taken` for an address that has an account and tells a guest which addresses exist: set `email` with a mailer, or `signUp: false`')
+
   const core: Core = {
     store: options.store,
     rates: authRates(options.store),
@@ -325,8 +329,9 @@ function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: strin
   return { fetchDocument: async url => (await import('./authorize/clients')).documentFetcher(custom)(url), documents: new Map(), defaultScopes }
 }
 
+// On by default in production, where `false` turns it off.
 function breachedCheck(option: boolean | ((password: string) => boolean | Promise<boolean>) | undefined): ((password: string) => boolean | Promise<boolean>) | undefined {
-  if (option === true)
+  if (option === true || (option === undefined && process.env.NODE_ENV === 'production'))
     return pwnedPassword
 
   return typeof option === 'function' ? option : undefined

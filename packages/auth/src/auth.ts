@@ -119,7 +119,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   twoFactor?: boolean | undefined
   // A CAPTCHA asked of registering, password sign-in, password resets and magic links: kay's proof of work by default, `proofOfWork({ difficulty })` to tune it, `{ verify: turnstile(secret) }` for a third party's, false for none.
   captcha?: CaptchaOptions | false | undefined
-  // Refuses a new password Have I Been Pwned lists, with `true`, or that a check of the app's own finds.
+  // Refuses a new password Have I Been Pwned lists, with `true`, or that a check of the app's own finds. On by default in production, `false` turns it off; a check that fails lets the password through.
   breachedPasswords?: boolean | ((password: string) => boolean | Promise<boolean>) | undefined
   // The proxies in front, read as kay.config.ts's `proxy` is, for a plain Elysia app that kay's `pages()` does not serve; a kay app sets it in kay.config.ts instead.
   proxy?: KayConfig['proxy'] | undefined

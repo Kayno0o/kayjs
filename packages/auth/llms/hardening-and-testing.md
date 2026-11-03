@@ -12,7 +12,7 @@ import { createAuth, turnstile, turnstileWidget } from '@kaynooo/kayjs-auth'
 createAuth({
   // ...
   captcha: { verify: turnstile(process.env.TURNSTILE_SECRET!), widget: turnstileWidget(process.env.TURNSTILE_SITE_KEY!), on: { 'sign-in': 3, 'reset': 'always' } },
-  breachedPasswords: true,
+  breachedPasswords: true, // the default in production
 })
 ```
 
@@ -64,7 +64,7 @@ An app with a `src/auth.ts` module calls the same on its `auth` with the site fi
 - `captcha.verify(token, action, { hostname })` checks the token the page's widget posted, `hostname` being the site's own from `site`, for `action` one of `'register'`, `'guest'`, `'sign-in'`, `'reset'` and `'magic-link'`. `turnstile(secret)` and `hcaptcha(secret)` are presets calling the provider's siteverify; their widgets post the token as `cf-turnstile-response` and `h-captcha-response`, which the action passes on. The presets refuse a token the provider says was made for another hostname, and Turnstile one made for another action (the prebuilt pages' widgets set `data-action`; a widget with none passes). The documented test secrets of both providers skip these two checks, as their answers name a hostname and action of their own.
 - The token goes in the trailing `captcha` option of `password.register`, `password.signIn`, `password.requestReset` and `magicLink.request`. A missing or refused token, or a `verify` that throws, answers `{ ok: false, error: 'captcha' }`, still counted against the client's limit.
 - `captcha.on` sets each request to `'always'` (every one, by default for a third party's check, a guest sign-in as registering), `false`, or a number: asked only once this client made that many of it in the limit's window, so people rarely see it. `auth.captchaRequired(action)` says whether the next one needs it, for the page to show the widget. `captcha.widget` names that widget for the prebuilt pages and `features()`.
-- `breachedPasswords: true` refuses a new password Have I Been Pwned lists, on `password.register`, `password.reset` and `password.change`, as `errors.password: 'breached'`. Only the first five characters of the password's SHA-1 leave the server, the answer padded with decoys. A function `(password) => boolean` checks against a list of the app's own instead. A check that fails or takes over three seconds lets the password through, logged: an outage never stops anyone registering. `pwnedPassword(password)` is exported for a check of the app's own.
+- `breachedPasswords` is on by default in production (`NODE_ENV=production`) and off elsewhere, `false` turning it off in production: it refuses a new password Have I Been Pwned lists, on `password.register`, `password.reset` and `password.change`, as `errors.password: 'breached'`. Only the first five characters of the password's SHA-1 leave the server, the answer padded with decoys. A function `(password) => boolean` checks against a list of the app's own instead. In production, `createAuth` warns at boot when password sign-up is open with no `email`: registering then answers `taken` for a held address. A check that fails or takes over three seconds lets the password through, logged: an outage never stops anyone registering. `pwnedPassword(password)` is exported for a check of the app's own.
 
 ### Limits
 

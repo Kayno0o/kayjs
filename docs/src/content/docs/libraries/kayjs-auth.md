@@ -321,7 +321,7 @@ It needs `kay.config.ts` and the source, so it cannot run from a built or compil
 
 ### Breached passwords
 
-`breachedPasswords: true` refuses a new password that Have I Been Pwned lists, as `errors.password: 'breached'`. It runs on `password.register`, `password.reset` and `password.change`.
+`breachedPasswords` refuses a new password that Have I Been Pwned lists (on by default in production, `false` turns it off), as `errors.password: 'breached'`. It runs on `password.register`, `password.reset` and `password.change`.
 
 Only the first five characters of the password's SHA-1 leave the server. A check that fails or takes over three seconds lets the password through, so an outage never stops anyone registering.
 

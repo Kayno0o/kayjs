@@ -269,4 +269,61 @@ describe('breached passwords', () => {
 
     expect(await browser().post('/register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
   })
+
+  describe('by default', () => {
+    const real = process.env.NODE_ENV ?? 'test'
+    const realFetch = globalThis.fetch
+
+    afterEach(() => {
+      process.env.NODE_ENV = real
+      globalThis.fetch = realFetch
+    })
+
+    function listing(): string[] {
+      const asked: string[] = []
+
+      globalThis.fetch = (async (input: string) => {
+        asked.push(input)
+
+        return new Response(`${createHash('sha1').update('password1234').digest('hex').toUpperCase().slice(5)}:9\r\n`)
+      }) as unknown as typeof fetch
+
+      return asked
+    }
+
+    test('in production a listed password is refused, signUp open or not', async () => {
+      process.env.NODE_ENV = 'production'
+      const asked = listing()
+      const { browser, auth } = setup()
+
+      expect(await browser().post('/register', { email: 'ada@example.com', password: 'password1234' })).toEqual({ ok: false, errors: { password: 'breached' } })
+      expect(asked).toHaveLength(1)
+      expect(await auth.createUser({ email: 'bob@example.com', password: 'password1234' })).toEqual({ ok: false, errors: { password: 'breached' } })
+    })
+
+    test('in production an outage lets the password through', async () => {
+      process.env.NODE_ENV = 'production'
+      globalThis.fetch = (async () => {
+        throw new Error('offline')
+      }) as unknown as typeof fetch
+
+      expect(await setup().browser().post('/register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
+    })
+
+    test('in production `breachedPasswords: false` asks no one', async () => {
+      process.env.NODE_ENV = 'production'
+      const asked = listing()
+
+      expect(await setup({ breachedPasswords: false }).browser().post('/register', { email: 'ada@example.com', password: 'password1234' })).toMatchObject({ ok: true })
+      expect(asked).toEqual([])
+    })
+
+    test.each(['development', 'test'])('in %s nothing is asked', async (env) => {
+      process.env.NODE_ENV = env
+      const asked = listing()
+
+      expect(await setup().browser().post('/register', { email: 'ada@example.com', password: 'password1234' })).toMatchObject({ ok: true })
+      expect(asked).toEqual([])
+    })
+  })
 })
