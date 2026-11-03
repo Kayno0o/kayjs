@@ -94,6 +94,15 @@ describe('translations', () => {
     expect(dom('img(src="/logo.png" alt="")\ndiv({...attrs})')).not.toContain(links)
     expect(compileKay('a(href="/about") About', 'test.kay').tsx).not.toContain(links)
   })
+
+  it('has the browser code of a script calling navigate() import kay/i18n-links, which puts the locale prefix on its path', () => {
+    const dom = (script: string) => compileKay(`---\n${script}\n---\np x`, 'test.kay', { output: 'dom' }).tsx
+    const links = 'import \'kay/i18n-links\''
+
+    expect(dom('const go = () => navigate(\'/second\')')).toContain(links)
+    expect(dom('import { navigate } from \'kay\'\nconst go = () => navigate(\'/second\')')).toContain(links)
+    expect(dom('const go = () => router.navigate(\'/second\')')).not.toContain(links)
+  })
 })
 
 describe('values of kay without an import', () => {

@@ -91,6 +91,8 @@ export const navigation: {
   before?: ((to: URL) => boolean | Promise<boolean>) | undefined
   // Set by the `navigation` value once an island reads it: told each step of a swap, which `./page-swap` reports without importing the reactive code.
   phase?: (state: NavigationState, to?: URL, error?: Error) => void
+  // Set by `kay/i18n-links` on a site with locales: puts the page's locale prefix on a path `navigate()` is given, as on a link's `href`.
+  localize?: (href: string) => string
   // Lands the query param writes held back to be spaced out, which run before the address is read to leave or change it.
   flush?: () => void
   // Development: set while `kay dev` refreshes the page for an edit, where a field the edit leaves as it was keeps what was typed into it.

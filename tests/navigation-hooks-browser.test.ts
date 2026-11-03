@@ -9,11 +9,11 @@ import { browserPath, testSite } from '../src/test'
 const ROOT = 'tests/fixtures/navigation-hooks'
 const chrome = browserPath() ?? (existsSync(chromium.executablePath()) ? chromium.executablePath() : undefined)
 
-// What the handler is asked for a link and for `navigate('/second')`, and the path each ends on: a link carries the base and the locale prefix as rendered, `navigate()` the path as given with the base put on, the server's slash redirect adding the trailing slash.
+// What the handler is asked for a link and for `navigate('/second')`, and the path each ends on: a link carries the base and the locale prefix as rendered, `navigate()` the same, the server's slash redirect adding the trailing slash.
 const SETTINGS = [
   { name: 'a base', options: { base: '/repo' }, start: '/repo/', link: ['/repo/second', '/repo/second'], navigate: ['/repo/second', '/repo/second'] },
   { name: 'trailingSlash always', options: { trailingSlash: 'always' as const }, start: '/', link: ['/second', '/second/'], navigate: ['/second', '/second/'] },
-  { name: 'a locale prefix', options: { i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }, start: '/fr', link: ['/fr/second', '/fr/second'], navigate: ['/second', '/second'] },
+  { name: 'a locale prefix', options: { i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } }, start: '/fr', link: ['/fr/second', '/fr/second'], navigate: ['/fr/second', '/fr/second'] },
 ]
 
 const sites: TestSite[] = []
@@ -38,5 +38,31 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the URL 
       expect(await page.evaluate(() => sessionStorage.getItem('asked'))).toBe(`${asked};`)
       expect(await page.path()).toBe(landed)
     }
+  }, 180_000)
+})
+
+const I18N = { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') }
+// Where `navigate()` from a button goes, by the path it is given: the current locale's prefix is put on a path with none, and a prefixed one stays as written.
+const LOCALE_TARGETS = [
+  { name: 'a plain path on a prefixed page', options: { i18n: I18N }, start: '/fr', button: 'go', path: '/fr/second' },
+  { name: 'a query and a hash', options: { i18n: I18N }, start: '/fr', button: 'query', path: '/fr/second?x=1' },
+  { name: 'a path already prefixed', options: { i18n: I18N }, start: '/fr', button: 'prefixed', path: '/fr/second' },
+  { name: 'another locale path', options: { i18n: { ...I18N, prefixDefault: true } }, start: '/fr', button: 'other', path: '/en/second' },
+  { name: 'the default locale, unprefixed', options: { i18n: I18N }, start: '/', button: 'go', path: '/second' },
+  { name: 'a prefixed default locale', options: { i18n: { ...I18N, prefixDefault: true } }, start: '/en', button: 'go', path: '/en/second' },
+  { name: 'a base', options: { i18n: I18N, base: '/repo' }, start: '/repo/fr', button: 'go', path: '/repo/fr/second' },
+  { name: 'trailingSlash always', options: { i18n: I18N, trailingSlash: 'always' as const }, start: '/fr', button: 'go', path: '/fr/second/' },
+]
+
+describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('navigate() under a locale', () => {
+  it.each(LOCALE_TARGETS)('reaches $path for $name', async ({ options, start, button, path }) => {
+    const site = await testSite({ root: ROOT, browser: { path: chrome }, ...options })
+
+    sites.push(site)
+    await using page = await site.open(start)
+
+    await page.click(`button.${button}`)
+    await page.waitUntil(() => document.querySelector('h1')?.textContent === 'Second')
+    expect(await page.path()).toBe(path)
   }, 180_000)
 })

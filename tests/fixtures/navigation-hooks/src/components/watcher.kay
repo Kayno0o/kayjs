@@ -5,4 +5,8 @@ onBeforeNavigate(({ url }) => {
   sessionStorage.setItem('asked', `${sessionStorage.getItem('asked') ?? ''}${url.pathname};`)
 })
 ---
-button.go(onClick={() => navigate('/second')}) Go
+.targets
+  button.go(onClick={() => navigate('/second')}) Go
+  button.query(onClick={() => navigate('/second?x=1#top')}) Query
+  button.prefixed(onClick={() => navigate('/fr/second')}) Prefixed
+  button.other(onClick={() => navigate('/en/second')}) Other

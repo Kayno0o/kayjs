@@ -68,8 +68,9 @@ export class DomTemplate extends TemplateWriter {
   }
 
   // The module-level templates the code clones, declared after the components that use them.
-  declarations(): string {
-    return `${this.templates.map((html, index) => `const KayT${index} = KayTemplate(${JSON.stringify(html)})\n`).join('')}${this.writesLinks ? 'import \'kay/i18n-links\'\n' : ''}`
+  // `navigates`: the script calls `navigate()`, which puts the locale prefix on a path as a link does through the same module.
+  declarations(navigates: boolean): string {
+    return `${this.templates.map((html, index) => `const KayT${index} = KayTemplate(${JSON.stringify(html)})\n`).join('')}${this.writesLinks || navigates ? 'import \'kay/i18n-links\'\n' : ''}`
   }
 
   private fragment(nodes: Node[]): void {

@@ -273,6 +273,8 @@ import { navigate } from 'kay'
 button(onClick={() => navigate('/todos')}) Todos
 ```
 
+A path goes where the same `href` would: your `base` and the current locale's prefix are added, `/todos` on a French page going to `/fr/todos`, and a path that already has a locale prefix is left as it is.
+
 `navigate({ query: { sort: 'name', page: null } })` changes the current page's query in place. The scroll and the focus stay, and a null or empty value drops its param. A text field the swap replaces, such as a search box whose island gets the new value, keeps its caret and selection, and the keys typed meanwhile, so a search as you type keeps taking the keys.
 
 To link to the current page with one param changed, use `withQuery`. It works in a server fence, a template and an island, and follows the same rules as `navigate({ query })`.

@@ -1,6 +1,7 @@
 import type { LocaleSettings } from './i18n'
 import { localizeLinks } from './dom'
 import { localizedLink } from './i18n'
+import { navigation } from './navigation'
 import { pageData } from './page-data'
 
 // Defined by a build for a site with `i18n`, which alone has links to localize.
@@ -37,5 +38,7 @@ export function localizedHref(href: string): string {
 }
 
 // Imported by the islands writing a link and by `kay/i18n`, so a page whose islands do neither ships none of it.
-if (typeof KAY_I18N !== 'undefined')
+if (typeof KAY_I18N !== 'undefined') {
   localizeLinks(localizedHref)
+  navigation.localize = localizedHref
+}

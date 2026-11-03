@@ -31,6 +31,7 @@ const WRITE_NAMES: Record<keyof typeof WRITE_HELPERS, KayHelper> = { to: 'writeT
 
 const WORD = /[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*/gu
 const KEY_COLON = /^\s*:/
+const NAVIGATE_CALL = /(?<![\w$.])navigate\s*\(/
 const TEXT_ATTRIBUTE = /\bwith\s*\{\s*type\s*:\s*(['"])text\1/
 
 export interface GenerateOptions {
@@ -615,7 +616,7 @@ class ModuleShell {
 
       dom.block(visible)
       b.add('\n}\n')
-      b.add(dom.declarations())
+      b.add(dom.declarations(NAVIGATE_CALL.test(src)))
     }
     else {
       this.jsx.emitRoot(rooted)

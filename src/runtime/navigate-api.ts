@@ -36,7 +36,7 @@ export async function navigate(to: { query: QueryChanges }, options?: NavigateOp
 // Last, so a path no page serves is reported against it.
 export async function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions): Promise<boolean>
 export async function navigate(to: string | { query: QueryChanges }, options: NavigateOptions = {}): Promise<boolean> {
-  return navigateTo(to, options, true)
+  return navigateTo(typeof to === 'string' && navigation.localize ? navigation.localize(to) : to, options, true)
 }
 
 // `navigate()`, with `hooked` off for a redirect an action's call asks for, which `onBeforeNavigate` cannot refuse as the action already ran: the leave guards still ask.
