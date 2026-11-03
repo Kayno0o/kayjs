@@ -476,7 +476,8 @@ describe('the mailer auth() picks', () => {
       const picked = await emailOf(undefined, bare([MAIL_EXTENSION]))
 
       await picked?.mailer?.send({ to: 'ada@example.com', subject: 'Hi', text: 'Hello' } as never)
-      expect(outbox.last()?.from).toBe('site@site.test')
+      // auth enqueues through the registered mailer, so the mail reaches the outbox once a worker runs it.
+      expect((await outbox.waitFor('ada@example.com')).from).toBe('site@site.test')
     }
     finally {
       await built.stop()
