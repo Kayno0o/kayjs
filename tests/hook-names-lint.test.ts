@@ -50,6 +50,35 @@ describe('deprecated-hook-names', () => {
     expect(after['src/b.ts']).toBe(other)
   })
 
+  it('renames a method-form key and a string key, through an aliased or namespace import', async () => {
+    const source = [
+      'import { queue as q, workflow } from \'kay/server\'',
+      'import * as server from \'kay/server\'',
+      'export const a = q(\'a\', run, { async onFailed() {} })',
+      'export const b = server.queue(\'b\', run, { \'onFailed\': () => undefined })',
+      'export const c = workflow(\'c\', run, { "onFailed": () => undefined })',
+      '',
+    ].join('\n')
+    const { found, after } = await run({ 'src/a.ts': source })
+
+    expect(found).toHaveLength(3)
+    expect(after['src/a.ts']).toBe(source.replace('async onFailed()', 'async onError()').replace('\'onFailed\'', '\'onError\'').replace('"onFailed"', '"onError"'))
+  })
+
+  it('finds the options in a .kay fence', async () => {
+    const source = '--- server\nimport { queue } from \'kay/server\'\n\nexport const sync = queue(\'sync\', () => undefined, { onFailed: () => undefined })\n---\np x\n'
+    const { found, after } = await run({ 'src/routes/index.kay': source })
+
+    expect(found).toHaveLength(1)
+    expect(after['src/routes/index.kay']).toBe(source.replace('onFailed', 'onError'))
+  })
+
+  it('leaves an options object held in a variable alone', async () => {
+    const source = 'import { queue } from \'kay/server\'\nconst options = { onFailed: () => undefined }\nexport const a = queue(\'a\', run, options)\nexport const b = queue(\'b\', run, { ...options })\n'
+
+    expect((await run({ 'src/a.ts': source })).found).toEqual([])
+  })
+
   it('honours kay-allow', async () => {
     const source = 'import { queue } from \'kay/server\'\n// kay-allow deprecated-hook-names\nexport const a = queue(\'a\', run, { onFailed: y })\n'
 

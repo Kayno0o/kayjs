@@ -1,6 +1,6 @@
 import type { Mail } from '../src/types'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
 import { memoryJobs } from 'kay/server'
 import { scratchDir, testSite } from 'kay/test'
 import { openLists } from '../src/list-store'
@@ -45,6 +45,38 @@ describe('a mail queued by one mailer and claimed by another', () => {
     await claiming.drain()
 
     expect(failed).toEqual(['queuing:Hi'])
+  })
+
+  it('tells onStart, onRetry and onSuccess to the mailer that queued it, with the mail and without the queue\'s own via', async () => {
+    silenced()
+
+    const queue = { ...shared(), attempts: 2, backoff: '10s' as const }
+    const told: unknown[] = []
+    const hooks = (who: string) => ({
+      onStart: ({ payload, attempts }: { payload: Mail, attempts: number }) => void told.push([who, 'start', payload.subject, attempts, 'via' in payload]),
+      onRetry: ({ payload, attempts }: { payload: Mail, attempts: number }) => void told.push([who, 'retry', payload.subject, attempts]),
+      onSuccess: ({ payload }: { payload: Mail }) => void told.push([who, 'success', payload.subject]),
+    })
+    let sent = 0
+    const flaky = async () => {
+      if (++sent === 1)
+        throw new Error('451 try later')
+
+      return { messageId: 'x', accepted: ['ada@example.com'], rejected: [], response: 'ok' }
+    }
+    const queuing = mailer({ from: 'a@example.com', transport: { send: flaky }, queue: { ...queue, ...hooks('queuing') } })
+    const claiming = mailer({ from: 'b@example.com', transport: { send: flaky }, queue: { ...queue, ...hooks('claiming') } })
+
+    try {
+      await queuing.enqueue({ to: 'ada@example.com', subject: 'Hi', text: 'Hello' })
+      await claiming.drain()
+      setSystemTime(Date.now() + 11_000)
+      await claiming.drain()
+      expect(told).toEqual([['queuing', 'start', 'Hi', 1, false], ['queuing', 'retry', 'Hi', 1], ['queuing', 'start', 'Hi', 2, false], ['queuing', 'success', 'Hi']])
+    }
+    finally {
+      setSystemTime()
+    }
   })
 
   it('is kept as failed by the redact of the mailer that queued it', async () => {

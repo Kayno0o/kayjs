@@ -1,13 +1,23 @@
 import type { ScheduleOptions } from '../src/server/jobs'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
+import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { jobRuns, queueRuns } from '../src/runtime/counters'
 import { memoryJobs, queue, retryLater, schedule, shutdown, workflow } from '../src/server'
+import { answeringRequest } from '../src/server/log'
 import { forgetQueue } from '../src/server/queue'
 import { useAppOnError } from '../src/server/report'
 
 let names = 0
 const named = (kind: string) => `${kind}-hooks-${++names}`
+
+async function until(condition: () => boolean): Promise<void> {
+  for (const start = Date.now(); !condition(); await Bun.sleep(20)) {
+    if (Date.now() - start > 5000)
+      throw new Error('timed out')
+  }
+}
+
 const quiet = () => [spyOn(console, 'error').mockImplementation(() => undefined), spyOn(console, 'warn').mockImplementation(() => undefined)] as const
 
 afterEach(() => {
@@ -255,6 +265,55 @@ describe('a queue\'s run hooks', () => {
   })
 })
 
+describe('a queue\'s hook context', () => {
+  it('holds no request in a job, though a visitor\'s request woke the lazy queue\'s workers', async () => {
+    const seen: unknown[] = []
+    const jobs = queue<number>(named('queue'), () => undefined, {
+      store: memoryJobs(),
+      lazy: true,
+      onStart: ({ context }) => void seen.push(['start', context.request, context.ip, context.userId, context.locale]),
+      onSuccess: ({ context }) => void seen.push(['success', context.request]),
+    })
+    const app = new Elysia().use(jobs).listen(0)
+
+    try {
+      await answeringRequest(new Request('http://x/first-visitor'), async () => jobs.enqueue(1))
+      await until(() => seen.length >= 2)
+      await jobs.enqueue(2)
+      await until(() => seen.length >= 4)
+      expect(seen).toEqual([['start', undefined, undefined, undefined, undefined], ['success', undefined], ['start', undefined, undefined, undefined, undefined], ['success', undefined]])
+    }
+    finally {
+      await shutdown(app)
+      forgetQueue(jobs)
+    }
+  })
+
+  it('does not count a slow onStart against lostAfter', async () => {
+    const seen: string[] = []
+    const jobs = queue<undefined>(named('queue'), async () => {
+      await Bun.sleep(100)
+      seen.push('ran')
+    }, {
+      store: memoryJobs(),
+      lostAfter: '300ms',
+      attempts: 1,
+      onStart: async () => Bun.sleep(400),
+      onSuccess: () => void seen.push('success'),
+      onError: () => void seen.push('error'),
+    })
+
+    try {
+      await jobs.enqueue(undefined)
+      await jobs.drain()
+      expect(seen).toEqual(['ran', 'success'])
+    }
+    finally {
+      forgetQueue(jobs)
+    }
+  })
+})
+
 describe('a workflow\'s run hooks', () => {
   it('tells onStart once with the run and its input, onSuccess when the flow ends, not for each wake', async () => {
     const seen: unknown[] = []
@@ -324,6 +383,74 @@ describe('a workflow\'s run hooks', () => {
       forgetQueue(flow)
       logged.mockRestore()
       warned.mockRestore()
+    }
+  })
+})
+
+describe('a workflow\'s started flag', () => {
+  it('tells onStart once for a run that retries after a kept step', async () => {
+    const [logged, warned] = quiet()
+    const seen: unknown[] = []
+    let failed = false
+    const flow = workflow<undefined>(named('flow'), async ({ step }) => {
+      await step.run('one', () => undefined)
+
+      if (!failed) {
+        failed = true
+
+        throw new Error('once')
+      }
+    }, {
+      store: memoryJobs(),
+      backoff: '10s',
+      onStart: () => void seen.push('start'),
+      onRetry: ({ attempts }) => void seen.push(['retry', attempts]),
+      onSuccess: () => void seen.push('success'),
+    })
+
+    try {
+      await flow.start()
+      await flow.drain()
+      setSystemTime(Date.now() + 11_000)
+      await flow.drain()
+      expect(seen).toEqual(['start', ['retry', 1], 'success'])
+    }
+    finally {
+      forgetQueue(flow)
+      logged.mockRestore()
+      warned.mockRestore()
+    }
+  })
+
+  it('tells onStart once more for a run stored before the flag existed, and not again after', async () => {
+    const seen: string[] = []
+    const store = memoryJobs()
+    const name = named('flow')
+    const flow = workflow<undefined>(name, async ({ step }) => {
+      await step.sleep('1h')
+      await step.sleep('1h')
+    }, { store, onStart: () => void seen.push('start') })
+
+    try {
+      const id = await flow.start()
+
+      await flow.drain()
+      expect(seen).toEqual(['start'])
+
+      const found = await store.state!(`workflow:${name}`, { key: id }, Date.now())
+      const old = parse(found!.payload) as Record<string, unknown>
+
+      delete old.started
+      expect(await store.update!(found!.id, { payload: stringify(old), runAt: found!.runAt }, { payload: found!.payload, now: Date.now() })).toBe(true)
+      setSystemTime(Date.now() + 2 * 60 * 60_000)
+      await flow.drain()
+      expect(seen).toEqual(['start', 'start'])
+      setSystemTime(Date.now() + 2 * 60 * 60_000)
+      await flow.drain()
+      expect(seen).toEqual(['start', 'start'])
+    }
+    finally {
+      forgetQueue(flow)
     }
   })
 })
@@ -402,6 +529,79 @@ describe('a schedule\'s run hooks', () => {
 
     expect(seen).toEqual(['run'])
     expect(reported).toEqual([{ source: 'schedule.onStart', message: 'hook broke' }])
+  })
+
+  it('tells onStart for a boot run, with boot true', async () => {
+    const seen: unknown[] = []
+
+    await runOnce(() => void seen.push('run'), { boot: true, onStart: ({ boot }) => void seen.push(['start', boot]), onSuccess: ({ boot }) => void seen.push(['success', boot]) })
+    // The harness then fires the schedule once more, not as a boot run.
+    expect(seen.slice(0, 3)).toEqual([['start', true], 'run', ['success', true]])
+  })
+
+  it('tells onError once for a run past its timeout, and onSuccess never', async () => {
+    const [logged] = quiet()
+    const seen: unknown[] = []
+
+    try {
+      await runOnce(async () => new Promise(() => undefined), { timeout: '1s', onStart: () => void seen.push('start'), onSuccess: () => void seen.push('success'), onError: ({ error }) => void seen.push(['error', (error as Error).message]) })
+    }
+    finally {
+      logged.mockRestore()
+    }
+
+    expect(seen).toEqual(['start', ['error', 'it ran past its timeout, 1 s']])
+  })
+
+  it('tells neither onSuccess nor onError for a run a stop cut short', async () => {
+    const seen: string[] = []
+    const fired: (() => unknown)[] = []
+    const parseCron = Bun.cron.parse.bind(Bun.cron)
+    const cron = spyOn(Bun, 'cron')
+
+    cron.mockImplementation(((_: string, handler: () => unknown) => {
+      fired.push(handler)
+
+      return { stop: () => undefined }
+    }) as unknown as typeof Bun.cron)
+    Object.assign(Bun.cron, { parse: parseCron })
+
+    const app = new Elysia().use(schedule('22 * * * *', async () => {
+      seen.push('run')
+      // Ignores the signal, so the stop's grace ends the run.
+      await new Promise(() => undefined)
+    }, { onStart: () => void seen.push('start'), onSuccess: () => void seen.push('success'), onError: () => void seen.push('error') })).listen(0)
+
+    try {
+      const running = Promise.all(fired.map(async handler => handler()))
+
+      await until(() => seen.includes('run'))
+      await shutdown(app)
+      await running
+      expect(seen).toEqual(['start', 'run'])
+    }
+    finally {
+      cron.mockRestore()
+    }
+  })
+
+  it('reports a lock store that throws and tells neither onStart nor onError', async () => {
+    const [logged] = quiet()
+    const reported = collect()
+    const seen: string[] = []
+    const store = { ...memoryJobs(), lock: () => {
+      throw new Error('store down')
+    } }
+
+    try {
+      await runOnce(() => void seen.push('run'), { lock: 'broken', store, onStart: () => void seen.push('start'), onError: () => void seen.push('error') })
+    }
+    finally {
+      logged.mockRestore()
+    }
+
+    expect(seen).toEqual([])
+    expect(reported.map(report => report.message)).toEqual(['store down'])
   })
 
   it('tells no hook of a run another process took the lock of', async () => {

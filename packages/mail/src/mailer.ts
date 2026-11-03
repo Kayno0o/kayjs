@@ -1,3 +1,4 @@
+import type { Hook } from 'kay/library'
 import type { EnqueueOptions, FailedJob, KayExtension, QueueOptions } from 'kay/server'
 import type { EventSecrets, Found, Suppression, SuppressionReason } from './events'
 import type { ListOptions, ListRun, ListsHandle, MailingList, Subscription } from './list'
@@ -12,7 +13,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
 import { direction } from 'kay/i18n'
-import { configError, escapeHtml as escape, inFlightWork, underKayDev } from 'kay/library'
+import { configError, escapeHtml as escape, inFlightWork, notify, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
@@ -131,12 +132,16 @@ export type Mailer = Elysia & {
 const FAILED_KEPT = '7d'
 
 // What a queued job needs from the mailer that queued it: mailers sharing a queue name share its jobs and any of their workers may claim one, so the claimed job is run, redacted and given up by its own mailer.
+// What the queue's run hooks are told, the payload being the mail.
+interface QueueEvent { id: string, payload: Mail, attempts: number, error?: unknown, wait?: number }
+
 interface Owner {
   deliver: (mail: Mail, signal?: AbortSignal) => Promise<Delivery>
   run: (run: ListRun, signal: AbortSignal) => Promise<void>
   redact: (mail: Queued) => Queued
   failed: (mail: Mail, error: unknown) => Promise<void>
-  errored: (event: Parameters<NonNullable<QueueOptions<Mail>['onError']>>[0]) => unknown
+  // The queue's run hooks, for the mailer that queued the mail, its payload without the internal `via`.
+  told: (hook: 'onStart' | 'onSuccess' | 'onRetry' | 'onError', event: QueueEvent) => Promise<void>
 }
 
 // The mailers of this process by the id their queued jobs carry.
@@ -641,7 +646,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   suppressions.lists = lists
 
-  const { name = 'mail', onFailed, onError, ...queueOptions } = options.queue ?? {}
+  const { name = 'mail', onFailed, onStart, onSuccess, onRetry, onError, ...queueOptions } = options.queue ?? {}
   const via = crypto.randomUUID()
   const redact = queueOptions.redact ?? withoutBody
   const owner: Owner = {
@@ -654,7 +659,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
       if (onFailed)
         await onFailed({ payload: mail, error })
     },
-    errored: event => onError?.(event),
+    told: async (hook, event) => notify(`mail.${hook}`, [({ onStart, onSuccess, onRetry, onError } as Record<typeof hook, Hook<QueueEvent> | undefined>)[hook]], event),
   }
 
   agreeOnQueue(name, queueOptions.store, { attempts: queueOptions.attempts, backoff: queueOptions.backoff, keepFailed: queueOptions.keepFailed, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll, concurrency: queueOptions.concurrency }, owner)
@@ -663,12 +668,17 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   // The id is dropped before delivery; a job queued by a mailer this process no longer has (a restart) goes to whichever worker claims it.
   const ownerOf = (queuedBy: string | undefined): Owner => queuedBy === undefined || queuedBy === via ? owner : MAILERS.get(queuedBy)?.deref() ?? owner
+  // A queue hook goes to the mailer that queued the mail, with the mail as it was sent.
+  const told = (hook: 'onStart' | 'onSuccess' | 'onRetry' | 'onError') => async ({ payload: { via: queuedBy, ...mail }, context: _, ...event }: QueueEvent & { payload: Queued, context: unknown }) => ownerOf(queuedBy).told(hook, { ...event, payload: mail })
   const deliverQueued = async ({ via: queuedBy, ...mail }: Queued, signal: AbortSignal): Promise<Delivery> => ownerOf(queuedBy).deliver(mail, signal)
   const jobs = queue<Queued>(name, deliverQueued, {
     ...queueOptions,
     keepFailed: queueOptions.keepFailed ?? FAILED_KEPT,
     redact: queued => ownerOf(queued.via).redact(queued),
-    onError: ({ payload: { via: queuedBy, ...mail }, ...event }) => ownerOf(queuedBy).errored({ ...event, payload: mail }),
+    ...onStart && { onStart: told('onStart') },
+    ...onSuccess && { onSuccess: told('onSuccess') },
+    ...onRetry && { onRetry: told('onRetry') },
+    ...onError && { onError: told('onError') },
     onFailed: async ({ payload: { via: queuedBy, ...mail }, error }) => ownerOf(queuedBy).failed(mail, error),
   })
   // The mails of a list are sent by a job of their own, a batch at a time, so a broadcast to a long list resumes after a restart where it stopped. Its worker starts with the first `mail.list()`, so a mailer with no list runs no more queue than before lists.

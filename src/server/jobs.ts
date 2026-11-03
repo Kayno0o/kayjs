@@ -242,6 +242,7 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
     let timer: ReturnType<typeof setTimeout> | undefined
     let grace: ReturnType<typeof setTimeout> | undefined
     let began = performance.now()
+    let begun = false
 
     active.add(controller)
 
@@ -277,9 +278,13 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
           arm()
       })
 
+      begun = true
       await notify('schedule.onStart', [options.onStart], { schedule: label, boot })
       began = performance.now()
       await Promise.race([job(controller.signal), limit])
+      // The run is over: its timeout and stop grace must not fire while the hook is told.
+      clearTimeout(timer)
+      clearTimeout(grace)
       countJobRun(label, 'ok')
       await notify('schedule.onSuccess', [options.onSuccess], { schedule: label, boot, duration: Math.round(performance.now() - began) })
     }
@@ -288,7 +293,10 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
       if (controller.signal.reason !== STOPPED) {
         countJobRun(label, 'failed')
         await reportBackgroundError(`the job scheduled ${label} failed`, error)
-        await notify('schedule.onError', [options.onError], { schedule: label, boot, duration: Math.round(performance.now() - began), error })
+
+        // A run that never began, its lock store failing say, has no start to match an error to.
+        if (begun)
+          await notify('schedule.onError', [options.onError], { schedule: label, boot, duration: Math.round(performance.now() - began), error })
       }
     }
     finally {

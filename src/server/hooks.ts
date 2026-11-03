@@ -4,7 +4,7 @@ import { kayLog } from '../runtime/log'
 import { thrownRefusal } from '../runtime/refuse'
 import { requestOfContext } from './log'
 import { knownAddress } from './protection'
-import { trackDetached } from './queue-scheduler'
+import { insideJob, trackDetached } from './queue-scheduler'
 import { reportHookError } from './report'
 import { userOf } from './request-user'
 
@@ -35,8 +35,9 @@ const HOOK_TIMEOUT_MS = 10_000
 
 // The context of the request this async context was started for, with empty fields outside one.
 export async function hookContext(): Promise<HookContext> {
-  const request = requestOfContext()
-  const locale = localeState()?.locale
+  // A job belongs to no request, even one that started its worker.
+  const request = insideJob() ? undefined : requestOfContext()
+  const locale = insideJob() ? undefined : localeState()?.locale
 
   if (request === undefined)
     return { request, ip: undefined, userAgent: undefined, userId: undefined, locale }

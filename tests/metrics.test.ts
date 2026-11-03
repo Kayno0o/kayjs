@@ -4,7 +4,7 @@ import { dirname } from 'node:path'
 import process from 'node:process'
 import { afterAll, afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { cacheReads, countJobRun, jobRuns } from '../src/runtime/counters'
+import { cacheReads, countJobRun, countQueueRun, jobRuns, queueRuns } from '../src/runtime/counters'
 import { liveConnections } from '../src/server/live'
 import { statusOf } from '../src/server/log'
 import { metricsAllowed } from '../src/server/metrics'
@@ -92,6 +92,7 @@ describe('metrics', () => {
     expect(text).toMatch(/^kay_cache_reads_total\{result="hit"\} \d+$/m)
     expect(text).toMatch(/^kay_live_connections \d+$/m)
     expect(text).toMatch(/^# TYPE kay_job_runs_total counter$/m)
+    expect(text).toMatch(/^# TYPE kay_queue_runs_total counter$/m)
     // The scrape and the health probe are no traffic of the site.
     expect(text).not.toContain('route="/metrics"')
     expect(text).not.toContain('/_kay/health')
@@ -261,5 +262,21 @@ describe('counters', () => {
     countJobRun('metrics-test-schedule', 'failed')
 
     expect(jobRuns.get('metrics-test-schedule')).toEqual({ ok: 1, failed: 1, skipped: 0 })
+  })
+
+  it('writes the queue and workflow runs as kay_queue_runs_total, one line for each result', async () => {
+    countQueueRun('metrics-test-queue', 'ok')
+    countQueueRun('workflow:metrics-test-flow', 'retried')
+    countQueueRun('workflow:metrics-test-flow', 'failed')
+    expect(queueRuns.get('workflow:metrics-test-flow')).toEqual({ ok: 0, retried: 1, failed: 1 })
+
+    const url = await listening({ metrics: true })
+    const text = await (await fetch(`${url}/metrics`)).text()
+
+    expect(text).toMatch(/^kay_queue_runs_total\{queue="metrics-test-queue",result="ok"\} 1$/m)
+    expect(text).toMatch(/^kay_queue_runs_total\{queue="metrics-test-queue",result="retried"\} 0$/m)
+    expect(text).toMatch(/^kay_queue_runs_total\{queue="metrics-test-queue",result="failed"\} 0$/m)
+    expect(text).toMatch(/^kay_queue_runs_total\{queue="workflow:metrics-test-flow",result="retried"\} 1$/m)
+    expect(text).toMatch(/^kay_queue_runs_total\{queue="workflow:metrics-test-flow",result="failed"\} 1$/m)
   })
 })

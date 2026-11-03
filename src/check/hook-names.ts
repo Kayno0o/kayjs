@@ -2,7 +2,7 @@ import type { CallExpression, ObjectExpression, ObjectProperty } from 'oxc-parse
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { Node } from '../compiler/estree'
 import { lintLevel } from '../compiler/lints'
-import { keyName, unwrapped } from '../compiler/object-literal'
+import { unwrapped } from '../compiler/object-literal'
 import { importsOf, walk } from './ast'
 import { scan } from './renamed-exports'
 
@@ -25,9 +25,18 @@ export const HOOK_RENAMES: readonly HookRename[] = [
 
 const OLD_NAMES = new RegExp(`\\b(?:${[...new Set(HOOK_RENAMES.map(row => row.from))].join('|')})\\b`)
 
-// A `key: value` or shorthand property with a name written out: not a spread, a method, an accessor or a computed key.
+// A `key: value`, shorthand or method property with a name written out: not a spread, an accessor or a computed key.
 function isPlain(property: ObjectExpression['properties'][number]): property is ObjectProperty {
-  return property.type === 'Property' && property.kind === 'init' && !property.method && !property.computed
+  return property.type === 'Property' && property.kind === 'init' && !property.computed
+}
+
+function nameOf(property: ObjectProperty): string | undefined {
+  const { key } = property
+
+  if (key.type === 'Identifier')
+    return key.name
+
+  return key.type === 'Literal' && typeof key.value === 'string' ? key.value : undefined
 }
 
 function isCallOf(callee: CallExpression['callee'], imported: { locals: Set<string>, namespaces: Set<string> }, name: string): boolean {
@@ -59,7 +68,7 @@ export async function hookNames(root: string, options: CheckOptions): Promise<Ch
           let object: Node | undefined = argument && unwrapped(argument)
 
           if (row.key !== undefined && object?.type === 'ObjectExpression') {
-            const inner = object.properties.find(property => isPlain(property) && keyName(property) === row.key)
+            const inner = object.properties.find(property => isPlain(property) && nameOf(property) === row.key)
 
             object = inner?.type === 'Property' ? unwrapped(inner.value) : undefined
           }
@@ -67,14 +76,15 @@ export async function hookNames(root: string, options: CheckOptions): Promise<Ch
           if (object?.type !== 'ObjectExpression')
             continue
 
-          const clash = object.properties.some(property => isPlain(property) && keyName(property) === row.to)
+          const clash = object.properties.some(property => isPlain(property) && nameOf(property) === row.to)
 
           for (const property of object.properties) {
-            if (!isPlain(property) || keyName(property) !== row.from)
+            if (!isPlain(property) || nameOf(property) !== row.from)
               continue
 
             const { key } = property
-            const written = key.type === 'Identifier' ? row.to : `'${row.to}'`
+            const quote = key.type === 'Literal' ? key.raw?.[0] ?? '\'' : ''
+            const written = `${quote}${row.to}${quote}`
             const text = property.shorthand ? `${row.to}: ${row.from}` : written
 
             report(base + key.start, base + key.end, `\`${row.from}\` of \`${row.call}()\` is \`${row.to}\` since 1.87, as every hook of a run that fails: it works until 1.90`, clash ? `\`${row.to}\` is set beside it, and both run: drop \`${row.from}\`` : `write \`${row.to}\``, clash ? null : [{ start: base + key.start, end: base + (property.shorthand ? property.value.end : key.end), text }])

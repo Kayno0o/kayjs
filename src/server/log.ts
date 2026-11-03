@@ -178,6 +178,11 @@ export async function answeringRequest<T>(request: Request, run: () => Promise<T
   }
 }
 
+// Runs `run` outside the request this context was started for, so work it starts for the long run, a queue's workers, never reads that visitor's request.
+export function outsideRequest<T>(run: () => T): T {
+  return answering.exit(run)
+}
+
 // The requests answered as pages, whose URL is the page the visitor is on.
 const pages = new WeakSet<Request>()
 

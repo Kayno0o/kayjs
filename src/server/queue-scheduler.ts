@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { kayLog } from '../runtime/log'
 import { MAX_TIMER_MS } from './config-limits'
 import { onDrain } from './drain'
+import { outsideRequest } from './log'
 
 // How soon an idle queue looks again after a job, the first wait of its backoff.
 export const POLL_MS = 1000
@@ -27,6 +28,11 @@ interface SchedulerOptions {
 
 // Set while a job runs, so a drain the job awaits does not wait for the run awaiting it.
 const inJob = new AsyncLocalStorage<true>()
+
+// Whether this async context is a job's run.
+export function insideJob(): boolean {
+  return inJob.getStore() === true
+}
 
 // The schedulers of this process, which `drainQueues` drains.
 const schedulers = new Set<Scheduler>()
@@ -152,7 +158,8 @@ export class Scheduler {
 
     this.#controller = started
     this.#state = 'running'
-    this.#workers = Array.from({ length: this.#options.concurrency }, async () => this.#work(started.signal))
+    // Started from whichever request first woke a lazy queue, the workers must not keep that visitor's request for every job after.
+    this.#workers = outsideRequest(() => Array.from({ length: this.#options.concurrency }, async () => this.#work(started.signal)))
   }
 
   #beginStop(): void {

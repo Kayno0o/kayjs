@@ -608,24 +608,35 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
   const store = shown === undefined ? ownStore : tellingStore(ownStore, shown.changed)
 
   // The job's payload for a hook, undefined when no hook is set to read it or the stored text cannot be read: a job never fails for its hooks.
-  const payloadFor = (job: StoredJob, hooks: readonly unknown[]): { payload: Payload } | undefined => {
-    if (!hooks.some(hook => hook !== undefined))
+  const anyHook = [options.onStart, options.onSuccess, options.onRetry, options.onError, options.onFailed].some(hook => hook !== undefined)
+  const parsed = new WeakMap<StoredJob, { payload: Payload } | null>()
+
+  // Read once per claimed job, and only when a hook is set to want it.
+  const payloadFor = (job: StoredJob): { payload: Payload } | undefined => {
+    if (!anyHook)
       return undefined
 
-    try {
-      return { payload: parse(job.payload) as Payload }
-    }
-    catch (error) {
-      kayLog('error', `the payload of a job of queue('${name}') could not be read for its hooks`, error)
+    let read = parsed.get(job)
 
-      return undefined
+    if (read === undefined) {
+      try {
+        read = { payload: parse(job.payload) as Payload }
+      }
+      catch (error) {
+        kayLog('error', `the payload of a job of queue('${name}') could not be read for its hooks`, error)
+        read = null
+      }
+
+      parsed.set(job, read)
     }
+
+    return read ?? undefined
   }
 
   const reportFailed = async (job: StoredJob, error: unknown, attempts: number) => {
     countQueueRun(name, 'failed')
 
-    const read = payloadFor(job, [options.onError, options.onFailed])
+    const read = payloadFor(job)
 
     if (read === undefined)
       return
@@ -709,9 +720,9 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
   }
 
   // A run that outlasts `lostAfter` fails and its signal aborts, so its worker takes the next job and a handler listening to the signal stops rather than run beside the retry.
-  // It ends a moment before the hold does, so no other process takes the job while this one still marks how it went: counted from before the claim on this process's monotonic clock, as a store holding by its own clock stores a hold this one's cannot be compared to.
+  // It ends a moment before the hold does, so no other process takes the job while this one still marks how it went: counted from when the run began, after its `onStart` hook, on this process's monotonic clock, as a store holding by its own clock stores a hold this one's cannot be compared to.
   // A stop waits for the run to wind down, but not past the grace, so a handler ignoring its signal never holds a shutdown or keeps its job held until `lostAfter`: the job is given back as for a run that gave up.
-  const withinLostAfter = async (run: unknown, claimedAt: number, ended: AbortController): Promise<void> => {
+  const withinLostAfter = async (run: unknown, from: number, ended: AbortController): Promise<void> => {
     let timer: ReturnType<typeof setTimeout> | undefined
     let grace: ReturnType<typeof setTimeout> | undefined
 
@@ -732,7 +743,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
 
           ended.abort(error)
           reject(error)
-        }, Math.min(Math.max(lostAfter - Math.min(1000, lostAfter / 10) - (performance.now() - claimedAt), 0), MAX_TIMER_MS))
+        }, Math.min(Math.max(lostAfter - Math.min(1000, lostAfter / 10) - (performance.now() - from), 0), MAX_TIMER_MS))
       })])
     }
     finally {
@@ -744,7 +755,6 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
   // Runs one job it claimed, then marks how it went; false when none was due.
   const runOne = async (scheduler: Scheduler): Promise<boolean> => {
     const now = Date.now()
-    const claimedAt = performance.now()
     const job = await store().claim(name, now, now + lostAfter)
 
     if (!job)
@@ -782,10 +792,13 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
     }
 
     const reports = progressWriter(job.id, held)
-    const started = payloadFor(job, [options.onStart])
+    const started = options.onStart === undefined ? undefined : payloadFor(job)
 
     if (started !== undefined)
       await notify(`${kind}.onStart`, [options.onStart], { id: job.id, payload: started.payload, attempts: job.attempts })
+
+    // A slow hook does not eat the run's time: lostAfter counts from here.
+    const ranFrom = performance.now()
 
     let succeeded = false
     // A handler may lower its own `attempts`: a workflow that kept a step starts its count again.
@@ -799,7 +812,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
     }
 
     try {
-      await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal, context, hold), claimedAt, ended)
+      await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal, context, hold), ranFrom, ended)
       await reports.settle()
       succeeded = true
     }
@@ -838,7 +851,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
           kayLog('warn', `a job of queue('${name}') failed, attempt ${context.attempts} of ${attempts}, and runs again in ${Math.round(wait / 1000)} s: ${message}`)
           countQueueRun(name, 'retried')
 
-          const read = payloadFor(job, [options.onRetry])
+          const read = options.onRetry === undefined ? undefined : payloadFor(job)
 
           if (read !== undefined)
             await notify(`${kind}.onRetry`, [options.onRetry], { id: job.id, payload: read.payload, attempts: context.attempts, error, wait })
@@ -879,7 +892,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
 
       countQueueRun(name, 'ok')
 
-      const read = payloadFor(job, [options.onSuccess])
+      const read = options.onSuccess === undefined ? undefined : payloadFor(job)
 
       if (read !== undefined)
         await notify(`${kind}.onSuccess`, [options.onSuccess], { id: job.id, payload: read.payload, attempts: context.attempts })
