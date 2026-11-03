@@ -16,6 +16,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay mcp` serves `fmt`, `generate` and `add` (dry run), `test`, `env`, `i18n_missing` and `a11y` as tools, and the llms.txt and guides of each installed kayjs-* library as resources: [MCP](editor-and-agent-commands.md).
 - One hook convention for kay and its libraries: `onX` observes after X, `beforeX` alone changes or refuses (returning fields, `false`, or throwing `refuse()` from `kay`), runs use `onStart`/`onSuccess`/`onError`; `kay/library` gets `HookContext`, `hookContext()`, `notify()` and `decide()`, and `onError` in `kay.config.ts` receives the `source` of a hook that threw: [hooks](hooks.md).
 - `refuse(message, { status, errors, data })` from `kay` stops an action with a message, field errors and data, answered as `ctx.fail` is (the `Symbol.for('kay.refused')` contract gains `errors` and `data`); `kay/library` gets `HookContext`, `hookContext()`, `notify()` and `decide()` for libraries' hooks, and `onError` in `kay.config.ts` receives the `source` of a hook that threw: [hooks](hooks.md).
+- `kay explain island [file]` says whether a component is an island, why and the rule, or lists every island of the project; the editor's island lens reveals the line that decides it on a click, `kay build --format json` adds `cause` to each island and the dev tool's Islands tab shows why each is one: [islands](islands.md).
 
 ## 1.86.0
 

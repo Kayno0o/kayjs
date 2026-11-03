@@ -1,5 +1,6 @@
 import type { Diagnostic, SourceMap } from '../compiler'
 import type { ErrorName } from '../compiler/errors'
+import type { IslandCause } from '../compiler/island-cause'
 import type { LintLevels } from '../compiler/lints'
 import type { ImportedSignals } from '../compiler/module-signals'
 import type { ClassTable } from '../runtime/class-table'
@@ -67,7 +68,7 @@ export interface Analysis {
   island?: string | undefined
   promote?: string | undefined
   // What makes the component an island, or may make it one when `promote` is set.
-  why?: string | undefined
+  cause?: IslandCause | undefined
   classes: string[]
   actionForm: boolean
   diagnostics: Diagnostic[]
@@ -175,8 +176,8 @@ export async function analyzeKayCached(source: string, filename: string, root: s
     return cached
   }
 
-  const { island, promote, why, classes, actionForm, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals, page: component ? false : undefined })
-  const analysis = { island, promote, why, classes, actionForm, diagnostics }
+  const { island, promote, cause, classes, actionForm, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals, page: component ? false : undefined })
+  const analysis = { island, promote, cause, classes, actionForm, diagnostics }
 
   if (diagnostics.every(diagnostic => diagnostic.checkOnly)) {
     analyzed.set(slot, { file: filename, key: entry.key, analysis })

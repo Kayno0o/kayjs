@@ -1,3 +1,4 @@
+kay [./compiler] CompileResult
 ui [./combobox.kay] default
 ui [./date-input.kay] default
 ui [./date-range-input.kay] default

@@ -6,17 +6,27 @@ import { ERROR_GROUPS, errorList, ERRORS, explainError, isErrorCode, isErrorGrou
 import { explainLint, isLint, isLintGroup, LINT_GROUPS, lintList, LINTS } from '../compiler/lints'
 import { docFiles, searchDocs } from '../docs-search'
 import { formatOption, printDocument, printFailure } from './command'
+import { explainIsland } from './explain-island'
 
-// Lists the lints and the errors, or a group's, or explains the lint or error named.
+// Lists the lints and the errors, or a group's, or explains the lint or error named; `island [file]` says whether a component is an island and why, or lists every island.
 export const explain: Command = {
-  usage: 'explain [lint|error|group] [--format text|json]',
+  usage: 'explain [lint|error|group|island [file]] [--format text|json]',
   options: { format: { type: 'string' } },
-  positionals: 1,
-  run: ({ values, positionals: [name] }) => {
+  positionals: 2,
+  run: async ({ values, positionals: [name, file] }) => {
     const format = formatOption('explain', values.format)
 
     if (format === undefined)
       return 1
+
+    if (name === 'island')
+      return explainIsland(file, format)
+
+    if (file !== undefined) {
+      printFailure('explain', `\`${name}\` takes no file: only \`island\` does`, format)
+
+      return 1
+    }
 
     if (name === undefined || isLintGroup(name) || isErrorGroup(name)) {
       if (format === 'json')

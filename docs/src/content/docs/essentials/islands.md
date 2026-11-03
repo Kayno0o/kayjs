@@ -67,9 +67,11 @@ A value read from an object of strings, numbers or `~icons/` imports of an insta
 
 Write `// kay-island` on a line of its own in the component to say it is meant, or `// kay-static` to say it is not: `kay check` reports a marker the component contradicts as `island-marker`.
 
-The editor shows a lens on the first line of a component saying whether it is an island and why.
+The editor shows a lens on the first line of a component saying whether it is an island and why. A click on it shows the line that decides it.
 
 `kay build --format json` gives the same as `why` on each island of `built.sizes`, and on each route's `islands`.
+
+`kay explain island src/components/counter.kay` prints the role of one component, what decides it and the rule. `kay explain island` lists every island of the project. Both take `--format json`.
 
 ## Props to an island
 

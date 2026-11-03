@@ -1,6 +1,7 @@
 import type { ClassTable } from '../runtime/class-table'
 import type { UiEntry } from '../runtime/ui'
 import type { ConstNode, ElementNode, ErrorMessages, KayFile, Node, SlotNode, Span, TemplateFacts, TemplateHelper } from './ast'
+import type { IslandCause } from './island-cause'
 import type { Rewrite } from './mapping'
 import type { ImportedSignals } from './module-signals'
 import type { WRITE_HELPERS } from './names'
@@ -24,6 +25,7 @@ import { shadowedBinds } from './template-reads'
 import { headTagProblem, sharedImports } from './validate'
 
 const HORIZONTAL_SPACE = /^[ \t]*/
+const IDENTIFIER_PART = /[\w$]/
 
 const WRITE_NAMES: Record<keyof typeof WRITE_HELPERS, KayHelper> = { to: 'writeTo', update: 'updateTo', back: 'writeBack', updateBack: 'updateBack' }
 
@@ -41,6 +43,8 @@ export interface GenerateOptions {
   writes?: ReadonlySet<keyof typeof WRITE_HELPERS> | undefined
   // Set for an interactive component: its export is wrapped so the server renders it as an island root.
   island?: string | undefined
+  // Under `kay dev`, why the component is an island or may become one, written on its slot as `data-why`.
+  cause?: string | undefined
   // The island renders in the browser only: `--- client`, or a package it imports cannot load on the server.
   client?: boolean | undefined
   // The live values the island imports, which its server render notes to prove the page may follow them even when the render reads none, as a handler does not run there.
@@ -667,15 +671,15 @@ class ModuleShell {
       b.add(`\nexport const slots = ${JSON.stringify(outlets)}\n`)
 
     if (this.kind === 'promotable twin')
-      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${islandMessages(src)}) as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
+      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${this.options.cause === undefined ? islandMessages(src) : `${islandMessages(src) || ', []'}, ${JSON.stringify(this.options.cause)}`}) as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
     else if (this.kind === 'twin')
       b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props)) as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
     else if (this.kind === 'island' && widened && !this.genericComponent)
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined)}) as unknown as ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>${this.widenedCall(`ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>`)}\n`)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' ? this.options.cause : undefined)}) as unknown as ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>${this.widenedCall(`ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>`)}\n`)
     else if (widened && this.kind !== 'island')
       b.add(`\nexport default ${name} as typeof ${name}${this.widenedCall(`typeof ${name}`)}\n`)
     else if (this.kind === 'island')
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined)})${this.genericIslandType()}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' ? this.options.cause : undefined)})${this.genericIslandType()}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
   }
 
   private get wrapped(): boolean {
@@ -1113,16 +1117,10 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
   return script.reactive || templateFacts(file).interactive
 }
 
-// What a static component passes a component that may render it as an island, a function, a class or an instance of one, or a block taking parameters, as `onPick passed to Picker, line 8`: the first in the template.
-export function promotionCause(file: KayFile, script: ScriptAnalysis, imported?: ImportedSignals): string | undefined {
-  return promotionSite(file, script, imported)?.cause
-}
-
-// The call that makes a static component promotable, with the span of its tag. A name imported from a module that exports it as a literal of strings and numbers is data, `imported` telling which.
-export function promotionSite(file: KayFile, script: ScriptAnalysis, imported?: ImportedSignals): { cause: string, span: Span } | undefined {
+// What a static component passes a component that may render it as an island, a function, a class or an instance of one, or a block taking parameters, the first in the template, with the span of that component's tag. A name imported from a module that exports it as a literal of strings and numbers is data, `imported` telling which.
+export function promotionSite(file: KayFile, script: ScriptAnalysis, imported?: ImportedSignals): IslandCause | undefined {
   const names = new Set([...script.functions, ...script.imports.filter(binding => !binding.typeOnly && !binding.source.startsWith('~icons/') && imported?.[binding.source]?.[binding.imported] !== 'data').map(binding => binding.local)])
-  let cause: string | undefined
-  let span: Span | undefined
+  let cause: IslandCause | undefined
 
   visitNodes(file.template, (node) => {
     if (node.kind === 'snippet')
@@ -1135,29 +1133,25 @@ export function promotionSite(file: KayFile, script: ScriptAnalysis, imported?: 
 
     const attribute = node.attributes.find(attribute => (attribute.kind === 'expression' || attribute.kind === 'spread') && mayHoldFunction(file.source.slice(attribute.expression.start, attribute.expression.end), names))
 
-    if (attribute !== undefined) {
-      const prop = attribute.kind === 'spread' ? 'a spread' : `\`${file.source.slice(attribute.name.start, attribute.name.end)}\``
+    const line = lineOf(file.source, node.start)
 
-      cause = `${prop} passed to ${node.name}, line ${lineOf(file.source, node.start)}`
-    }
-    else if (node.children.some(child => child.kind === 'slot' && child.params !== undefined)) {
-      cause = `a block taking parameters passed to ${node.name}, line ${lineOf(file.source, node.start)}`
-    }
-
-    span = node.tag
+    if (attribute !== undefined)
+      cause = attribute.kind === 'spread' ? { kind: 'spread', name: '', span: node.tag, line, target: node.name } : { kind: 'prop', name: file.source.slice(attribute.name.start, attribute.name.end), span: node.tag, line, target: node.name }
+    else if (node.children.some(child => child.kind === 'slot' && child.params !== undefined))
+      cause = { kind: 'block', name: '', span: node.tag, line, target: node.name }
 
     return cause !== undefined
   })
 
-  return cause === undefined || span === undefined ? undefined : { cause, span }
+  return cause
 }
 
-// The first thing that makes a component interactive, so an island: `onClick, line 4`, `bind:value, line 9`, `ref, line 3`, `signal from kay` or a `--- client` fence.
-export function islandCause(file: KayFile, script: ScriptAnalysis): string | undefined {
+// The first thing that makes a component interactive, so an island: an `on*`, `bind:` or `ref` attribute, a `kay` value of the script, or a `--- client` fence.
+export function islandCause(file: KayFile, script: ScriptAnalysis): IslandCause | undefined {
   if (file.client !== undefined)
-    return 'a `--- client` fence'
+    return { kind: 'client', name: '--- client', span: file.client, line: lineOf(file.source, file.client.start) }
 
-  let cause: string | undefined
+  let cause: IslandCause | undefined
 
   someNode(file.template, (node) => {
     if (node.kind !== 'element')
@@ -1170,7 +1164,7 @@ export function islandCause(file: KayFile, script: ScriptAnalysis): string | und
       const name = file.source.slice(attribute.name.start, attribute.name.end)
 
       if (INTERACTIVE_ATTRIBUTE.test(name)) {
-        cause = `\`${name}\`, line ${lineOf(file.source, attribute.name.start)}`
+        cause = { kind: 'attribute', name, span: attribute.name, line: lineOf(file.source, attribute.name.start) }
 
         return true
       }
@@ -1181,10 +1175,30 @@ export function islandCause(file: KayFile, script: ScriptAnalysis): string | und
 
   const value = cause === undefined && script.reactive ? reactiveValue(script) : undefined
 
-  return value === undefined ? cause : `\`${value.name}\` from ${value.source}`
+  if (value === undefined)
+    return cause
+
+  const span = valueSpan(file, script, value.name)
+
+  return { kind: 'value', name: value.name, span, line: lineOf(file.source, span.start), source: value.source }
 }
 
-function lineOf(source: string, offset: number): number {
+// Where the script says a `kay` value: its import, or its first read in the file as an implicit one.
+function valueSpan(file: KayFile, script: ScriptAnalysis, name: string): Span {
+  const binding = script.imports.find(binding => !binding.typeOnly && binding.local === name)
+
+  if (binding !== undefined)
+    return binding.span
+
+  for (let index = file.source.indexOf(name); index !== -1; index = file.source.indexOf(name, index + 1)) {
+    if (!IDENTIFIER_PART.test(file.source[index - 1] ?? ' ') && !IDENTIFIER_PART.test(file.source[index + name.length] ?? ' '))
+      return { start: index, end: index + name.length }
+  }
+
+  return { start: 0, end: 0 }
+}
+
+export function lineOf(source: string, offset: number): number {
   let line = 1
 
   for (let index = source.indexOf('\n'); index !== -1 && index < offset; index = source.indexOf('\n', index + 1))
@@ -1238,11 +1252,12 @@ function messageKeys(source: string): string[] {
 }
 
 // The message keys an island's source names, as the third argument to `island()`, or nothing for an island naming none; the live values it imports go last.
-export function islandMessages(source: string, client = false, lives: string[] = []): string {
+// Under `kay dev` the cause goes last, as the `data-why` the dev tool shows.
+export function islandMessages(source: string, client = false, lives: string[] = [], cause?: string): string {
   const keys = messageKeys(source)
 
-  if (lives.length > 0)
-    return `, ${JSON.stringify(keys)}, ${client}, undefined, [${lives.join(', ')}]`
+  if (lives.length > 0 || cause !== undefined)
+    return `, ${JSON.stringify(keys)}, ${client}, undefined, [${lives.join(', ')}]${cause === undefined ? '' : `, ${JSON.stringify(cause)}`}`
 
   if (client)
     return `, ${JSON.stringify(keys)}, true`

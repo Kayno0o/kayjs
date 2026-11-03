@@ -1,6 +1,8 @@
+import type { IslandCause, IslandCauseKind } from '../compiler/island-cause'
 import type { ClientManifest } from '../server/client'
 import type { RouteFootprint } from './footprint'
 import { join, relative, resolve } from 'node:path'
+import { describeCause } from '../compiler/island-cause'
 import { ASSET_PREFIX } from './assets'
 import { writeAtomically } from './files'
 import { ECOINDEX_VERSION, SWD_VERSION, VIEWPORT_WIDTH } from './footprint-models'
@@ -10,15 +12,19 @@ export interface Size {
   gzip: number
 }
 
-// Why a component is in the island list.
+// Why a component is in the island list: what makes it an island, or for a static component that only becomes one when it passes an island a function, what may.
 export interface IslandWhy {
-  // What makes it an island, as `onClick, line 4`; for a static component that only becomes one when it passes an island a function, what may, as `onPick passed to Picker, line 8`.
-  why?: string | undefined
+  cause?: IslandCause | undefined
   // The component renders as an island only when a page passes it what only an island sends, so a page may ship none of it.
   promoted?: boolean | undefined
 }
 
-export interface IslandSize extends IslandWhy {
+export interface IslandSize {
+  // The cause as a sentence, as `onClick, line 4` or `onPick passed to Picker, line 8`.
+  why?: string | undefined
+  // The same cause as data, its span left out.
+  cause?: { kind: IslandCauseKind, name: string, line: number, target?: string | undefined } | undefined
+  promoted?: boolean | undefined
   // The island's `.kay` file, relative to the root.
   file: string
   // What it loads beyond the entry, the chunks it shares with other islands included.
@@ -73,6 +79,12 @@ const PACKAGE = /(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+)/
 const KAY_ROOT = resolve(import.meta.dir, '../..')
 const SHOWN_MODULES = 5
 
+function causeOf(found: IslandWhy | undefined): Pick<IslandSize, 'why' | 'cause' | 'promoted'> {
+  const cause = found?.cause
+
+  return { ...cause && { why: describeCause(cause), cause: { kind: cause.kind, name: cause.name, line: cause.line, ...cause.target !== undefined && { target: cause.target } } }, ...found?.promoted !== undefined && { promoted: found.promoted } }
+}
+
 // Sizes read off the files the build wrote, gzip as most hosts serve them; `inputs` breaks each chunk down by module.
 export async function sizeReport(root: string, dir: string, manifest: Omit<ClientManifest, 'styles'>, islands: Map<string, string>, why: Map<string, IslandWhy>, inputs?: ChunkInputs): Promise<SizeReport> {
   const sizes = new Map<string, Size>()
@@ -112,7 +124,7 @@ export async function sizeReport(root: string, dir: string, manifest: Omit<Clien
     const own = chunks.filter(chunk => !loaded.has(chunk))
     const file = islands.get(id)
 
-    report.islands.push({ file: file === undefined ? id : relative(root, file).replaceAll('\\', '/'), size: await total(own), chunks: own, modules: modules(own), ...why.get(id) })
+    report.islands.push({ file: file === undefined ? id : relative(root, file).replaceAll('\\', '/'), size: await total(own), chunks: own, modules: modules(own), ...causeOf(why.get(id)) })
   }
 
   report.islands.sort((a, b) => b.size.gzip - a.size.gzip || a.file.localeCompare(b.file))

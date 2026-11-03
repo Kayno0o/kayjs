@@ -2,6 +2,7 @@ import type { ClassTable } from '../runtime/class-table'
 import type { UiEntry } from '../runtime/ui'
 import type { Attribute, Diagnostic, KayFile, Node, Span } from './ast'
 import type { ErrorName } from './errors'
+import type { IslandCause } from './island-cause'
 import type { LintLevels } from './lints'
 import type { ImportedSignals, SignalKind } from './module-signals'
 import type { NameFindings } from './rewrite'
@@ -9,9 +10,10 @@ import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
 import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
-import { generate, isInteractive, islandCause, islandMessages, promotionCause, promotionSite } from './codegen'
+import { generate, isInteractive, islandCause, islandMessages, lineOf, promotionSite } from './codegen'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, openRedirects, separatePageSettings, serverOnlyImports, unboundedFields } from './fence-checks'
 import { cwd, iconSetsOf, scopeStorage } from './host'
+import { causeSummary, describeCause } from './island-cause'
 import { islandMarker, markerMismatch } from './island-marker'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
@@ -87,8 +89,8 @@ export interface CompileResult {
   island?: string | undefined
   // Set when the static component renders as an island should it pass one what only an island sends.
   promote?: string | undefined
-  // What makes the component an island, or what may make it one when `promote` is set, as `onClick, line 4`.
-  why?: string | undefined
+  // What makes the component an island, or what may make it one when `promote` is set: its kind, name and span in the file.
+  cause?: IslandCause | undefined
   // The `.class` shorthand names, which CSS tools scanning for class names cannot read off `div.md:flex.w-1/2`.
   classes: string[]
   // Set when the template renders a form posting to an action, which a page holding no island posts through the navigation-only entry.
@@ -118,6 +120,13 @@ export function iconSetsKey(source: string, root: string): string {
 // The live values a script imports, which make its component an island: the server changes them and the page follows.
 function liveBindings(script: ScriptAnalysis, imported: ImportedSignals | undefined): ScriptAnalysis['imports'] {
   return script.imports.filter(binding => !binding.typeOnly && imported?.[binding.source]?.[binding.imported] === 'live')
+}
+
+// The live value an island imports, at its import.
+function liveCause(file: KayFile, script: ScriptAnalysis, live: string | undefined): IslandCause | undefined {
+  const binding = script.imports.find(binding => binding.local === live)
+
+  return live === undefined || binding === undefined ? undefined : { kind: 'live', name: live, span: binding.span, line: lineOf(file.source, binding.span.start) }
 }
 
 function liveImport(script: ScriptAnalysis, imported: ImportedSignals | undefined): string | undefined {
@@ -161,7 +170,7 @@ function roleOf(original: string, imported: ImportedSignals | undefined, root: s
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root), imported)
   const always = file.client !== undefined || isInteractive(file, script)
-  const role = { always, live: liveImport(script, imported) !== undefined, promotable: !always && promotionCause(file, script, imported) !== undefined, server: file.server !== undefined }
+  const role = { always, live: liveImport(script, imported) !== undefined, promotable: !always && promotionSite(file, script, imported) !== undefined, server: file.server !== undefined }
 
   if (kept) {
     const inner = kept.get(original) ?? new Map<string, Role>()
@@ -205,8 +214,8 @@ export function promotedChecks(original: string, root?: string, imported?: Impor
   const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root), imported)
   const site = promotionSite(file, script, imported)
   const marker = islandMarker(source)
-  const announced = site === undefined || marker !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${site.cause}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `// kay-island` in it to say so, or pass the island what can be serialized', checkOnly: true }]
-  const contradicted = marker?.kind === 'static' && site !== undefined ? [{ start: marker.start, end: marker.end, code: 'island-marker', message: `This component renders as an island, and \`// kay-static\` says it does not: ${site.cause}`, note: 'it passes an island what only an island can send', help: 'delete the marker, or pass the island what can be serialized', checkOnly: true }] : []
+  const announced = site === undefined || marker !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${describeCause(site)}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `// kay-island` in it to say so, or pass the island what can be serialized', checkOnly: true }]
+  const contradicted = marker?.kind === 'static' && site !== undefined ? [{ start: marker.start, end: marker.end, code: 'island-marker', message: `This component renders as an island, and \`// kay-static\` says it does not: ${describeCause(site)}`, note: 'it passes an island what only an island can send', help: 'delete the marker, or pass the island what can be serialized', checkOnly: true }] : []
 
   return [...scriptFences(script).flatMap(fence => serverOnlyImports(fence)), ...announced, ...contradicted]
 }
@@ -230,10 +239,10 @@ export function compileKay(original: string, filename: string, options: CompileO
   const island = client || isInteractive(file, script) || live !== undefined ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
-  const promotion = island === undefined && !routeFile ? promotionCause(file, script, options.importedSignals) : undefined
+  const promotion = island === undefined && !routeFile ? promotionSite(file, script, options.importedSignals) : undefined
   const promote = promotion === undefined ? undefined : islandId(filename, options.root)
-  const why = island === undefined ? promotion : islandCause(file, script) ?? (live === undefined ? undefined : `\`${live}\`, a live value`)
-  const generateOptions = { classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && (routeFile || options.page === true), pageFile: routeFile || options.page === true, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: basename(filename) === ERROR_PAGE, cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
+  const cause = island === undefined ? promotion : islandCause(file, script) ?? liveCause(file, script, live)
+  const generateOptions = { cause: options.inspect === true && cause !== undefined ? causeSummary(cause, island === undefined) : undefined, classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && (routeFile || options.page === true), pageFile: routeFile || options.page === true, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: basename(filename) === ERROR_PAGE, cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {
@@ -284,7 +293,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const marker = checked ? islandMarker(source) : undefined
 
   if (marker !== undefined)
-    diagnostics.push(...markerMismatch(marker, { route: routeFile, island: island !== undefined, why, promotion }))
+    diagnostics.push(...markerMismatch(marker, { route: routeFile, island: island !== undefined, why: cause && describeCause(cause), promotion: promotion && describeCause(promotion) }))
 
   if (file.client && file.module)
     diagnostics.push({ ...file.client, code: 'fence-invalid', message: 'A `--- client` component has no `--- module` fence', note: 'the server loads only its live imports, so its exports would be missing there', help: 'put the shared values in a `.ts` module' })
@@ -304,7 +313,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const lives = liveBindings(script, options.importedSignals)
     const imports = lives.map(binding => `import { ${binding.imported} as ${binding.local} } from ${JSON.stringify(binding.source)}\n`).join('')
 
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local))})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, why, classes, actionForm: facts.actionForm, diagnostics: reported }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local))})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, cause, classes, actionForm: facts.actionForm, diagnostics: reported }
   }
 
   return {
@@ -314,7 +323,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     moduleLines: final.builder.moduleLines,
     island,
     promote,
-    why,
+    cause,
     classes,
     actionForm: facts.actionForm,
     diagnostics: reported,

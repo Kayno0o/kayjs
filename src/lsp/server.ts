@@ -27,7 +27,7 @@ import { completion, resolveCompletion } from './completions'
 import { DiagnosticsQueue } from './diagnostics'
 import { links } from './document-links'
 import { FIX_ALL, guard, QUICK_FIX, shadowSettingsOf } from './host'
-import { islandLens } from './island-lens'
+import { islandLens, REVEAL_ISLAND_CAUSE } from './island-lens'
 import { applyEdit, filePath, vscodeUri } from './mapping'
 import { definition, highlights, hover, inlayHints, references, signatureHelp } from './navigation'
 import { documentSymbols, foldingRanges } from './outline'
@@ -109,6 +109,7 @@ export class KayLanguageServer implements LspHost {
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/semanticTokens/full', ({ textDocument }) => this.tokens(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/foldingRange', ({ textDocument }) => this.folds(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/codeLens', ({ textDocument }) => this.lenses(textDocument.uri))
+    client.onRequest<{ command: string, arguments?: unknown[] }>('workspace/executeCommand', async params => this.executed(params))
     client.onRequest<{ files: { oldUri: string, newUri: string }[] }>('workspace/willRenameFiles', async ({ files }) => inWalkScope(async () => renamedFiles(this, files)))
     client.onRequest('shutdown', async () => this.server.request('shutdown'))
     client.onNotification('exit', () => this.exit())
@@ -178,6 +179,7 @@ export class KayLanguageServer implements LspHost {
         inlayHintProvider: true,
         documentLinkProvider: {},
         codeLensProvider: {},
+        executeCommandProvider: { commands: [REVEAL_ISLAND_CAUSE] },
       },
       workspace: { fileOperations: { willRename: { filters: [{ pattern: { glob: '**/*.kay' } }, { pattern: { glob: '**', matches: 'folder' } }] } } },
       serverInfo: { name: 'kay' },
@@ -459,7 +461,17 @@ export class KayLanguageServer implements LspHost {
     const project = this.projectAt(projectRootOf(path, this.root))
     const route = path.startsWith(`${project.routesDir}${sep}`)
 
-    return islandLens(document.source, path, { route, insideIsland: project.islandOnly.has(path), signals: importedSignals(path, document.source) })
+    return islandLens(document.source, path, { route, insideIsland: project.islandOnly.has(path), signals: importedSignals(path, document.source), uri })
+  }
+
+  // A click on an island lens: the editor shows the span that makes the component an island.
+  private async executed({ command, arguments: given = [] }: { command: string, arguments?: unknown[] }): Promise<null> {
+    const [uri, selection] = given
+
+    if (command === REVEAL_ISLAND_CAUSE && typeof uri === 'string')
+      await this.client.request('window/showDocument', { uri, takeFocus: true, selection })
+
+    return null
   }
 
   // Signals, props and server values told apart from other names, whose tokens TypeScript does not know.

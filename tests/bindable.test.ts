@@ -22,7 +22,7 @@ describe('bind: on a component', () => {
     const result = compile('---\nimport { signal } from \'kay\'\nimport Toggle from \'./Toggle.kay\'\nconst open = signal(false)\n---\nToggle(bind:open={open})\n', 'dom')
 
     expect(result.island).toBeTruthy()
-    expect(result.why).toContain('bind:open')
+    expect(result.cause).toMatchObject({ kind: 'attribute', name: 'bind:open', line: 6 })
   })
 
   it('passes a Bindable prop of the parent on by name, through two levels', () => {

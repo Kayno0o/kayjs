@@ -148,7 +148,7 @@ export interface DocumentLink {
 
 export interface CodeLens {
   range: Range
-  command: { title: string, command: string }
+  command: { title: string, command: string, arguments?: unknown[] | undefined }
 }
 
 export interface InlayHint {

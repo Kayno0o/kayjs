@@ -147,7 +147,7 @@ h1 src/routes/index.kay:12:3
 
 Alt+click opens that line in your editor, and the click never reaches the page. Inspect, on the dev tool's bar, does what Alt does until the next click or Escape. Use it where your system keeps Alt+click for itself.
 
-The Islands tab lists each island's component. A click opens its file, and hovering a row outlines the island.
+The Islands tab lists each island's component and why it is one. A click opens its file, and hovering a row outlines the island.
 
 ## Choose the editor
 

@@ -204,6 +204,7 @@ kay explain            # lists the lints and the errors
 kay explain seo        # lists a group's
 kay explain missing-alt
 kay explain template-syntax   # an error: where its fix is written
+kay explain island src/components/counter.kay   # whether a component is an island, and why
 kay check --only seo   # one group's lints alone, as an audit
 kay upgrade            # moves kay to the latest version, then fixes what it deprecated
 ```

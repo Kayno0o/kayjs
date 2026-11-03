@@ -360,7 +360,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
 
     if (compiled.island !== undefined) {
       islands.set(compiled.island, file)
-      why.set(compiled.island, { why: compiled.why, promoted: false })
+      why.set(compiled.island, { cause: compiled.cause, promoted: false })
     }
     else if (file === editor) {
       throw new KayError('inert-editor', `kay: the editor ${relative(root, file)} runs nothing in the browser, where an editor edits the page: give it a script reading signals, or a \`--- client\` fence`)
@@ -390,7 +390,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
 
     if (yes && promote !== undefined) {
       islands.set(promote, files[index]!)
-      why.set(promote, { why: analyses[index]!.why, promoted: true })
+      why.set(promote, { cause: analyses[index]!.cause, promoted: true })
     }
   }
 

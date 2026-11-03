@@ -1420,6 +1420,7 @@ interface CompileOptions
 interface CompileResult
   actionForm: boolean
   bodyLines: number[]
+  cause?: IslandCause | undefined
   classes: string[]
   diagnostics: Diagnostic[]
   island?: string | undefined
@@ -1427,7 +1428,6 @@ interface CompileResult
   moduleLines: number[]
   promote?: string | undefined
   tsx: string
-  why?: string | undefined
 
 [./compiler] Diagnostic
 interface Diagnostic extends Span

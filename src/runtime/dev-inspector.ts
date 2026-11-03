@@ -176,8 +176,9 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
       values: win.$kaySignals?.(island)?.map(value => [formatted(value), typeOf(value)] as const),
       hydration: hydrationText(win.$kayHydrationMs?.(island)),
       props: propsBytes(island),
+      why: island.dataset.why,
     }))
-    const text = JSON.stringify(rows.map(({ component, values, hydration, props }) => [component, values, hydration, props]))
+    const text = JSON.stringify(rows.map(({ component, values, hydration, props, why }) => [component, values, hydration, props, why]))
 
     if (shown?.text === text && shown.islands.length === found.length && shown.islands.every((island, index) => island === found[index]))
       return
@@ -191,7 +192,7 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
       return
     }
 
-    panel.replaceChildren(...rows.map(({ island, component, values, hydration, props }) => {
+    panel.replaceChildren(...rows.map(({ island, component, values, hydration, props, why }) => {
       const card = tool.make('div', 'island')
       const top = tool.make('div', 'top')
       const name = tool.make('button', 'name', component)
@@ -205,6 +206,11 @@ export function startInspector(tool: DevTool, doc: Document = document): Inspect
 
       top.append(values === undefined ? tool.make('span', 'pill', 'not hydrated') : tool.make('span', 'pill ok', hydration === undefined ? 'hydrated' : `hydrated in ${hydration}`))
       card.append(top)
+
+      // Written under `kay dev` only, from the same cause `kay build` and the editor give.
+      if (why !== undefined)
+        card.append(tool.make('span', 'note', why))
+
       card.onpointerenter = () => show(island, component)
       card.onpointerleave = hide
 
