@@ -1,0 +1,10 @@
+---
+import Watcher from '../components/watcher.kay'
+---
+head
+  title Watched
+h1 Watched
+Watcher(persist)
+a.two(href="/watched-two") Two
+a.second(href="/second") Second
+div(style="height: 3000px")

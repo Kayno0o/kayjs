@@ -1236,6 +1236,190 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
+  describe('navigation state, hooks and events', () => {
+    // What the watcher island and the document's listeners recorded, in order.
+    async function logOf(on: TestPage): Promise<string[]> {
+      return on.evaluate(() => (window as { kayLog?: string[] }).kayLog ?? [])
+    }
+
+    // Records the events on the page itself, into the log the island writes to.
+    async function listen(on: TestPage): Promise<void> {
+      await on.evaluate(() => {
+        const log = (window as { kayLog?: string[] }).kayLog ??= []
+
+        for (const name of ['kay:navigate-start', 'kay:navigate-error', 'kay:navigate'])
+          document.addEventListener(name, event => log.push(`event ${name} ${new URL((event as CustomEvent<{ url: string }>).detail.url).pathname}`))
+      })
+    }
+
+    it('reports loading, then swapping, then idle, each navigation superseded by a later one giving way to it', async () => {
+      const own = await open('/watched')
+
+      try {
+        const { promise: held, resolve: release } = Promise.withResolvers<void>()
+
+        await own.route(`${origin}/second`, async (request) => {
+          await held
+
+          try {
+            await request.continue()
+          }
+          catch {}
+        })
+        await listen(own)
+        await own.click('a.second')
+        await own.waitUntil(() => document.documentElement.getAttribute('aria-busy') === 'true')
+        // Another page asked for before the first answered: it takes over.
+        await own.click('a.two')
+        await own.waitFor('h1', { text: 'Watched two' })
+        release()
+        await settled(own)
+
+        const log = (await logOf(own)).filter(line => !line.startsWith('before'))
+
+        expect(log).toEqual([
+          'state idle -',
+          'event kay:navigate-start /second',
+          'state loading /second',
+          'event kay:navigate-start /watched-two',
+          'state loading /watched-two',
+          'state swapping /watched-two',
+          'navigate /watched-two',
+          'event kay:navigate /watched-two',
+          // Effects run after the handlers, which already read the state as idle.
+          'state idle -',
+        ])
+        expect(await own.text('p.state')).toBe('idle')
+      }
+      finally {
+        own.close()
+      }
+    })
+
+    it('keeps the page when onBeforeNavigate refuses a link, navigate() or Back, firing no start', async () => {
+      const own = await open('/watched')
+
+      try {
+        await listen(own)
+        await own.evaluate(() => {
+          (window as { kayAlive?: boolean }).kayAlive = true
+        })
+        await own.click('a.two')
+        await own.waitFor('h1', { text: 'Watched two' })
+        await own.click('button.block')
+        await own.click('a.back')
+        await own.click('button.go')
+        await own.evaluate(() => history.back())
+        await settled(own)
+
+        const log = await logOf(own)
+
+        expect(log.filter(line => line.startsWith('before'))).toEqual(['before /watched-two', 'before /watched', 'before /watched-two', 'before /watched'])
+        // Only the first, allowed visit started a swap.
+        expect(log.filter(line => line.startsWith('event kay:navigate-start'))).toEqual(['event kay:navigate-start /watched-two'])
+        expect(await own.path()).toBe('/watched-two')
+        expect(await own.text('h1')).toBe('Watched two')
+        expect(await own.text('p.state')).toBe('idle')
+        expect(await sameDocument(own)).toBe(true)
+      }
+      finally {
+        own.close()
+      }
+    })
+
+    it('fires start on Back and Forward, and navigate once each page is in place', async () => {
+      const own = await open('/watched')
+
+      try {
+        await listen(own)
+        await own.click('a.two')
+        await own.waitUntil(() => location.pathname === '/watched-two' && document.querySelector('h1')!.textContent === 'Watched two')
+        await own.back()
+        await own.waitUntil(() => location.pathname === '/watched' && document.querySelector('h1')!.textContent === 'Watched')
+        await own.forward()
+        await own.waitUntil(() => location.pathname === '/watched-two' && document.querySelector('h1')!.textContent === 'Watched two')
+
+        expect((await logOf(own)).filter(line => line.startsWith('event kay:navigate-start') || line.startsWith('navigate '))).toEqual([
+          'event kay:navigate-start /watched-two',
+          'navigate /watched-two',
+          'event kay:navigate-start /watched',
+          'navigate /watched',
+          'event kay:navigate-start /watched-two',
+          'navigate /watched-two',
+        ])
+      }
+      finally {
+        own.close()
+      }
+    })
+
+    it('reports a fetch that failed through kay:navigate-error and error(), then the browser loads the page in full', async () => {
+      const own = await open('/watched')
+
+      try {
+        let failed = false
+
+        await own.evaluate(() => {
+          (window as { kayAlive?: boolean }).kayAlive = true
+
+          for (const name of ['kay:navigate-start', 'kay:navigate-error'])
+            document.addEventListener(name, event => sessionStorage.setItem(name, new URL((event as CustomEvent<{ url: string }>).detail.url).pathname))
+        })
+        await own.route(`${origin}/watched-two`, async (request) => {
+          // The swap's fetch fails; the full load the page falls back to goes through.
+          if (!failed) {
+            failed = true
+            await request.abort()
+
+            return
+          }
+
+          await request.continue()
+        })
+        await own.click('a.two')
+        await own.waitFor('h1', { text: 'Watched two' })
+        expect(await sameDocument(own)).toBe(false)
+        expect(await own.evaluate(() => [sessionStorage.getItem('kay:navigate-start'), sessionStorage.getItem('kay:navigate-error')])).toEqual(['/watched-two', '/watched-two'])
+        expect(await own.text('p.state')).toBe('idle')
+      }
+      finally {
+        own.close()
+      }
+    })
+
+    it('fires start and navigate for the page a post redirects to', async () => {
+      const own = await open('/posted')
+
+      try {
+        await listen(own)
+        await own.click('form.away button')
+        await own.waitFor('h1', { text: 'Plain' })
+        expect(await logOf(own)).toEqual(['event kay:navigate-start /plain', 'event kay:navigate /plain'])
+      }
+      finally {
+        own.close()
+      }
+    })
+
+    it('fires no start for a refresh, which leaves the page where it is and ends in kay:navigate alone', async () => {
+      const own = await open('/')
+
+      try {
+        await listen(own)
+
+        const before = await own.text('p.bumps')
+
+        await own.click('button.bump')
+        await own.waitUntil((text: string | null) => document.querySelector('p.bumps')!.textContent !== text, {}, before)
+        await settled(own)
+        expect((await logOf(own)).filter(line => !line.endsWith('kay:navigate /'))).toEqual([])
+      }
+      finally {
+        own.close()
+      }
+    })
+  })
+
   it('swaps in a streamed page with its blocks in place', async () => {
     await page.click('a.later')
     await page.waitFor('p.answer', { text: 'The answer is 42' })

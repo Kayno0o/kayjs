@@ -1,0 +1,25 @@
+---
+import { effect, navigate, navigation, onBeforeNavigate, onNavigate, signal } from 'kay'
+
+const blocking = signal(false)
+const log = (globalThis as { kayLog?: string[] }).kayLog ??= []
+
+effect(() => {
+  log.push(`state ${navigation.state()} ${navigation.to()?.pathname ?? '-'}`)
+})
+effect(() => {
+  const error = navigation.error()
+
+  if (error)
+    log.push(`error ${error.message}`)
+})
+onBeforeNavigate((to) => {
+  log.push(`before ${to.pathname}`)
+
+  return !blocking()
+})
+onNavigate(url => log.push(`navigate ${url.pathname}`))
+---
+p.state {navigation.state()}
+button.block(onClick={() => blocking.set(true)}) Block
+button.go(onClick={() => navigate('/watched-two')}) Go

@@ -117,6 +117,12 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
 
   document.documentElement.setAttribute('aria-busy', 'true')
 
+  // A refresh is no navigation: the page stays where it is.
+  const navigating = swap.intent !== 'refresh'
+
+  if (navigating)
+    began(url)
+
   try {
     let page: FetchedPage
 
@@ -130,18 +136,26 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
         if (inFlight.fetch === flight)
           controller.abort()
 
-        if (isCurrent())
+        if (isCurrent()) {
+          if (navigating)
+            failed(url, new Error(`kay: ${url.href} did not answer in time`))
+
           leave(url)
+        }
 
         return
       }
 
       page = fetched
     }
-    catch {
+    catch (error) {
       // A fetch a newer navigation cancelled leaves nothing to load.
-      if (isCurrent())
+      if (isCurrent()) {
+        if (navigating)
+          failed(url, error)
+
         leave(url)
+      }
 
       return
     }
@@ -153,6 +167,9 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
     if (!isCurrent())
       return
 
+    if (navigating)
+      navigation.phase?.('swapping', url)
+
     try {
       await show(page, url.hash, swap, isCurrent)
     }
@@ -160,18 +177,40 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
       // A page the swap could not put in place is loaded instead, as following the link would have.
       console.error(error)
 
-      if (isCurrent())
+      if (isCurrent()) {
+        if (navigating)
+          failed(url, error)
+
         leave(new URL(page.url), pageKey(new URL(location.href)) === pageKey(new URL(page.url)) || change === 'none')
+      }
     }
   }
   finally {
-    if (isCurrent())
+    if (isCurrent()) {
       document.documentElement.removeAttribute('aria-busy')
+
+      if (navigating)
+        navigation.phase?.('idle')
+    }
 
     // A swap that ended before its page came leaves nothing to join.
     if (inFlight.fetch === flight)
       inFlight.fetch = undefined
   }
+}
+
+// Tells the app a swap to another page began: the `loading` state and `kay:navigate-start` on `document`.
+function began(url: URL): void {
+  navigation.phase?.('loading', url)
+  document.dispatchEvent(new CustomEvent('kay:navigate-start', { detail: { url: url.href } }))
+}
+
+// The swap gave up on `url` and lets the browser load it in full: `kay:navigate-error` on `document` carries the reason.
+function failed(url: URL, reason: unknown): void {
+  const error = reason instanceof Error ? reason : new Error(String(reason))
+
+  navigation.phase?.('idle', url, error)
+  document.dispatchEvent(new CustomEvent('kay:navigate-error', { detail: { url: url.href, error } }))
 }
 
 // Puts a fetched page in place of this one; anything that is no page of this build, a file or an error answered as text, is loaded or shown as the browser would.
@@ -280,6 +319,7 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
 
     navigation.hooks!.hydrate(document.body)
     void navigation.hooks!.arrive?.(target.search, scrollY)
+    navigation.phase?.('idle')
     // For plain scripts, which no island tells of the swap.
     document.dispatchEvent(new CustomEvent('kay:navigate', { detail: { url: target.href } }))
   }

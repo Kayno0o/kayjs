@@ -511,14 +511,26 @@ interface NavigateOptions
   scroll?: "top" | "keep" | undefined
   transition?: boolean | undefined
 
+[.] navigation
+const navigation: { state: () => NavigationState; to: () => URL | undefined; error: () => Error | undefined; }
+
+[.] NavigationState
+type NavigationState = 'idle' | 'loading' | 'swapping'
+
 [.] NoInputAction
 type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions) => Promise<Answer<Success<Output>>>)
+
+[.] onBeforeNavigate
+function onBeforeNavigate(fn: Before): () => void
 
 [.] onCleanup
 function onCleanup(fn: () => void): void
 
 [.] onMount
 function onMount(fn: () => void): void
+
+[.] onNavigate
+function onNavigate(fn: (url: URL) => void): () => void
 
 [.] PageContext
 interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>> extends RequestContext<Params>

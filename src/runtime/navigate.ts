@@ -239,7 +239,7 @@ function onPopState(event: PopStateEvent): void {
   }
 
   // Leaving with unsaved changes goes back to the page left first, so it keeps its URL while asked. An entry kay did not write tells no place, so it is let through.
-  if (!passing && saved?.at !== undefined && saved.at !== navigation.at && pageKey(url) !== navigation.shown && dirtyGuard()) {
+  if (!passing && saved?.at !== undefined && saved.at !== navigation.at && pageKey(url) !== navigation.shown && (dirtyGuard() || navigation.before)) {
     held = { url, delta: saved.at - navigation.at }
     history.go(-held.delta)
 

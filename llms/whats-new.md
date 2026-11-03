@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- `navigation` from `kay` tells an island where an in-place navigation stands (`state()`, `to()`, `error()`), `onBeforeNavigate(fn)` may cancel one and `onNavigate(fn)` follows each shown page, and `kay:navigate-start` and `kay:navigate-error` join `kay:navigate`: [navigation state and hooks](navigation-from-code.md#navigation-state-and-hooks).
+
 ## 1.86.0
 
 - kayjs-auth's flat methods (`auth.listUsers()` for `auth.admin.listUsers()`) and the `deprecated-auth-methods` lint are removed: [grouped methods](../packages/auth/llms/grouped-methods.md).

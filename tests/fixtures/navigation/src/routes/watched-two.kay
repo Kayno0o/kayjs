@@ -1,0 +1,8 @@
+---
+import Watcher from '../components/watcher.kay'
+---
+head
+  title Watched two
+h1 Watched two
+Watcher(persist)
+a.back(href="/watched") Back

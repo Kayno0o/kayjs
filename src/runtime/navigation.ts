@@ -43,6 +43,9 @@ export interface Swap {
   refused?: { form: number, control: number }
 }
 
+// Where a swap to another page stands: its page is being fetched, or being put in place.
+export type NavigationState = 'idle' | 'loading' | 'swapping'
+
 // A guard `guardLeave` registers, which a leave asks once it holds unsaved changes.
 export interface LeaveGuard {
   dirty: () => boolean
@@ -84,6 +87,10 @@ export const navigation: {
   loads: number
   // A response showed the server runs another build than this page's: the next link loads in full, as the new build's pages are not this page's to swap in.
   stale?: boolean
+  // Set by `onBeforeNavigate` once an island uses it: asked before every leave, a `false` answer keeps the page.
+  before?: ((to: URL) => boolean | Promise<boolean>) | undefined
+  // Set by the `navigation` value once an island reads it: told each step of a swap, which `./page-swap` reports without importing the reactive code.
+  phase?: (state: NavigationState, to?: URL, error?: Error) => void
   // Lands the query param writes held back to be spaced out, which run before the address is read to leave or change it.
   flush?: () => void
   // Development: set while `kay dev` refreshes the page for an edit, where a field the edit leaves as it was keeps what was typed into it.
@@ -101,8 +108,11 @@ let scrollTimer: ReturnType<typeof setTimeout> | undefined
 // The API's path, as the `kay-api` meta of the page first loaded names it: the app's, so the same on every page a swap brings.
 let apiPath: string | undefined
 
-// Whether the page may be left for `to`: the first guard holding unsaved changes asks, once for them all.
+// Whether the page may be left for `to`: the `onBeforeNavigate` handlers answer first, then the first guard holding unsaved changes asks, once for them all.
 export async function mayLeave(to: URL): Promise<boolean> {
+  if (navigation.before && !await navigation.before(to))
+    return false
+
   const guard = dirtyGuard()
 
   return guard ? guard.confirm(to) : true
