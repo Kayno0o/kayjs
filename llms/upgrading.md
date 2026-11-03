@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.86.0
 
+### The prebuilt auth pages write a main landmark
+
+- The sign-in, register, reset, two-factor, verify, confirm, magic-link, invitation and OAuth pages and the account and admin layouts now write their content in a `main`. An app whose layout already wraps pages in a `main` sets `auth({ pages: { main: false } })` (or `createAuth`) once, and the pages write a `div` instead: left as it is, the page holds two `main` landmarks. No lint recognises it, so none ships with this change.
+
 ### A usage error exits 2
 
 - A command line `kay` cannot take (an unknown command, an unknown option, an argument too many or missing, a `refuse(reason)` of an extension command) exits 2 and prints `error: kay <command>: <reason>` with a `hint:` line, where it exited 1 and printed the reason and the usage. A script or CI step testing for exit 1 on a bad command line tests for 2; a command that ran and failed still exits 1. `kay <command> --help` prints the options with a line each after the usage, and `kay i18n` alone, a group with no command named, is the same error, `kay i18n --help` lists the group. No lint recognises a command line, so none ships with this.
