@@ -372,8 +372,11 @@ function stepHref(url: string | URL, key: string, param?: string): string
 
 [.] StepItem
 interface StepItem<Key extends string = string>
+  icon?: IconProps | IconSlot | undefined
   key: Key
   label: string
+  linkable?: boolean | undefined
+  state?: "error" | "skipped" | undefined
 
 [.] SwitcherApp
 interface SwitcherApp
@@ -440,6 +443,18 @@ const TOOLBAR_ACTIONS: readonly ["bold", "italic", "heading", "bulletList", "num
 
 [.] ToolbarAction
 type ToolbarAction = typeof TOOLBAR_ACTIONS[number]
+
+[.] ToolbarTools
+interface ToolbarTools
+  edit: (change: {
+  text: string;
+  start?: number | undefined;
+  end?: number | undefined;
+  selectionStart?: number | undefined;
+  selectionEnd?: number | undefined;
+}) => void
+  selection: () => { start: number; end: number; text: string; }
+  wrap: (open: string, closing?: string | undefined) => void
 
 [.] TreeId
 type TreeId = string | number
@@ -634,14 +649,16 @@ component default
 
 [./bar-chart.kay] default
 component default
+  active?: number | null | undefined
   class?: string | {
   root?: string | undefined;
+  bar?: string | undefined;
   plot?: string | undefined;
   grid?: string | undefined;
   tick?: string | undefined;
   columns?: string | undefined;
   column?: string | undefined;
-  bar?: string | undefined;
+  tooltip?: string | undefined;
   axis?: string | undefined;
   axisLabel?: string | undefined;
   legend?: string | undefined;
@@ -651,11 +668,15 @@ component default
   emptyLabel?: string | undefined
   formatLabel?: LabelFormat | undefined
   formatValue?: ((value: number) => string) | undefined
+  href?: ((mark: ChartMark) => string | undefined) | undefined
   label: string
   labels: string[]
   legend?: boolean | undefined
+  onActive?: ((index: number | null) => unknown) | undefined
+  onSelect?: ((mark: ChartMark) => unknown) | undefined
   series: BarSeries[]
   stacked?: boolean | undefined
+  tooltip?: ((mark: ChartMark) => Element) | undefined
   totalLabel?: string | undefined
   xLabels?: boolean | undefined
 
@@ -994,11 +1015,15 @@ component default
 
 [./contribution-graph.kay] default
 component default
+  active?: number | null | undefined
   class?: string | { root?: string | undefined; month?: string | undefined; cell?: string | undefined; } | undefined
   color: string
   days: readonly ContributionDay[]
+  href?: ((day: ContributionDay) => string | undefined) | undefined
   label?: string | undefined
   months?: boolean | undefined
+  onActive?: ((index: number | null) => unknown) | undefined
+  onSelect?: ((day: ContributionDay) => unknown) | undefined
   today: string
 
 [./copy-button.kay] default
@@ -1042,29 +1067,36 @@ component default
   day?: string | undefined;
   today?: string | undefined;
 } | undefined
+  day?: ((iso: string, state: { selected: boolean; today: boolean; outside: boolean; disabled: boolean; }) => Element) | undefined
   firstDay?: 0 | 2 | 1 | 3 | 4 | 5 | 6 | undefined
+  isDisabled?: ((iso: string) => boolean) | undefined
   max?: string | undefined
   min?: string | undefined
   nextLabel?: string | undefined
   onChange?: ((value: string) => unknown) | undefined
+  onMonthChange?: ((month: string) => unknown) | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
   openLabel?: string | undefined
   previousLabel?: string | undefined
   todayLabel?: string | undefined
+  unavailableLabel?: string | undefined
   value?: string | undefined
 
 [./date-range-input.kay] default
 component default
   class?: string | { root?: string | undefined; separator?: string | undefined; } | undefined
+  day?: ((iso: string, state: { selected: boolean; today: boolean; outside: boolean; disabled: boolean; }) => Element) | undefined
   disabled?: boolean | undefined
   firstDay?: 0 | 2 | 1 | 3 | 4 | 5 | 6 | undefined
   fromLabel?: string | undefined
   fromName?: string | undefined
+  isDisabled?: ((iso: string) => boolean) | undefined
   label: string
   max?: string | undefined
   min?: string | undefined
   onChange?: ((value: DateRange) => unknown) | undefined
+  onMonthChange?: ((month: string, box: "from" | "to") => unknown) | undefined
   onOpenChange?: ((open: boolean, box: "from" | "to") => unknown) | undefined
   open?: false | "from" | "to" | undefined
   toLabel?: string | undefined
@@ -1363,6 +1395,7 @@ component default
 
 [./line-chart.kay] default
 component default
+  active?: number | null | undefined
   animate?: boolean | undefined
   class?: string | {
   root?: string | undefined;
@@ -1389,7 +1422,9 @@ component default
   label: string
   labels: string[]
   legend?: boolean | undefined
+  onActive?: ((index: number | null) => unknown) | undefined
   onRange?: ((from: number, to: number) => unknown) | undefined
+  onSelect?: ((mark: ChartMark) => unknown) | undefined
   options?: LineChartPresetOptions | undefined
   pointKey?: "label" | "index" | ((point: { series: number; index: number; label: string; }) => string | number) | undefined
   rangeHint?: string | undefined
@@ -1427,6 +1462,7 @@ component default
   surface?: string | undefined;
   list?: string | undefined;
   item?: string | undefined;
+  popup?: string | undefined;
 } | undefined
   darkAttribution?: string | undefined
   darkTiles?: string | undefined
@@ -1435,6 +1471,9 @@ component default
   lines?: readonly (readonly MapPoint[])[] | undefined
   markers?: readonly MapMarker[] | undefined
   maxZoom?: number | undefined
+  onMarkerClick?: ((marker: MapMarker, index: number) => unknown) | undefined
+  onMove?: ((view: { center: MapPoint; zoom: number; }) => unknown) | undefined
+  popup?: ((marker: MapMarker, index: number) => Element) | undefined
   tiles?: string | undefined
   zoom?: number | undefined
 
@@ -1446,14 +1485,19 @@ component default
   grid?: string | undefined;
   bar?: string | undefined;
   barFailed?: string | undefined;
+  extra?: string | undefined;
 } | undefined
   keysHint?: string | undefined
   onImage?: ((file: File) => Promise<string>) | undefined
+  onImageError?: ((file: File, error: unknown) => unknown) | undefined
   onInput?: ((value: string) => unknown) | undefined
+  onPreviewChange?: ((previewing: boolean) => unknown) | undefined
   preview?: ((markdown: string) => Promise<string>) | undefined
   previewClass?: string | undefined
   previewTrusted?: boolean | undefined
+  previewing?: boolean | undefined
   toolbar?: boolean | readonly ("image" | "bold" | "italic" | "heading" | "bulletList" | "numberedList" | "link")[] | undefined
+  toolbarExtra?: ((tools: ToolbarTools) => Element) | undefined
   uploadFailure?: string | undefined
   value?: string | undefined
 
@@ -1736,9 +1780,23 @@ component default
 
 [./rating.kay] default
 component default
-  class?: string | { root?: string | undefined; stars?: string | undefined; fill?: string | undefined; } | undefined
+  allowClear?: boolean | undefined
+  class?: string | {
+  root?: string | undefined;
+  star?: string | undefined;
+  input?: string | undefined;
+  glyph?: string | {
+    root?: string | undefined;
+  } | undefined;
+  stars?: string | undefined;
+  fill?: string | undefined;
+} | undefined
+  disabled?: boolean | undefined
+  icon?: IconProps | IconSlot | undefined
   label: string
   max?: number | undefined
+  name?: string | undefined
+  onChange?: ((value: number | null) => unknown) | undefined
   value: number
 
 [./record-button.kay] default
@@ -1786,6 +1844,7 @@ component default
 [./rows-field.kay] default
 component default
   addLabel?: string | undefined
+  cell?: ((column: { key: string; label: string; name: string | undefined; }, row: Row, index: number, set: (value: string) => void) => Element) | undefined
   class?: string | {
   root?: string | undefined;
   head?: string | undefined;
@@ -1808,14 +1867,17 @@ component default
   key: string;
   label: string;
   placeholder?: string | undefined;
-  type?: "search" | "text" | "email" | "tel" | "url" | undefined;
+  type?: "number" | "search" | "text" | "email" | "tel" | "url" | undefined;
   name?: string | undefined;
+  cell?: boolean | undefined;
 }[]
   label: string
   max?: number | undefined
   min?: number | undefined
   name?: string | undefined
+  onAdd?: ((row: Row, index: number) => unknown) | undefined
   onChange?: ((rows: Row[]) => unknown) | undefined
+  onRemove?: ((row: Row, index: number) => unknown) | undefined
   removeLabel?: ((index: number) => string) | undefined
   rows?: readonly Row[] | undefined
   style?: string | undefined
@@ -1855,6 +1917,7 @@ component default
 
 [./scatter-chart.kay] default
 component default
+  active?: number | null | undefined
   class?: string | {
   root?: string | undefined;
   axisLabel?: string | undefined;
@@ -1864,13 +1927,17 @@ component default
   guide?: string | undefined;
   corner?: string | undefined;
   dot?: string | undefined;
+  tooltip?: string | undefined;
 } | undefined
   corners?: { topLeft?: string; topRight?: string; bottomLeft?: string; bottomRight?: string; } | undefined
   emptyLabel?: string | undefined
+  href?: ((point: Point) => string | undefined) | undefined
   label: string
+  onActive?: ((index: number | null) => unknown) | undefined
   onSelect?: ((point: Point) => unknown) | undefined
   points: Point[]
   quadrant?: { x: number; y: number; } | undefined
+  tooltip?: ((point: Point) => Element) | undefined
   x?: ScatterAxis | undefined
   y?: ScatterAxis | undefined
 
@@ -1884,6 +1951,7 @@ component default
   icon?: string | {
     root?: string | undefined;
   } | undefined;
+  link?: string | undefined;
   field?: string | undefined;
   heading?: string | undefined;
 } | undefined
@@ -2027,9 +2095,13 @@ component default
 
 [./sparkline.kay] default
 component default
-  class?: string | { root?: string | undefined; item?: string | undefined; bar?: string | undefined; } | undefined
+  active?: number | null | undefined
+  class?: string | { root?: string | undefined; bar?: string | undefined; item?: string | undefined; } | undefined
   hints?: readonly (string | undefined)[] | undefined
+  href?: ((mark: SparkMark) => string | undefined) | undefined
   label: string
+  onActive?: ((index: number | null) => unknown) | undefined
+  onSelect?: ((mark: SparkMark) => unknown) | undefined
   tone?: SparkTone | undefined
   tones?: readonly (SparkTone | undefined)[] | undefined
   values: readonly (number | null)[]
@@ -2098,20 +2170,27 @@ component default
 component default
   class?: string | {
   root?: string | undefined;
+  marker?: string | undefined;
+  icon?: string | {
+    root?: string | undefined;
+  } | undefined;
+  label?: string | undefined;
+  state?: string | undefined;
   list?: string | undefined;
   item?: string | undefined;
   link?: string | undefined;
-  marker?: string | undefined;
-  label?: string | undefined;
-  state?: string | undefined;
 } | undefined
   current: string
   done?: readonly string[] | undefined
   doneLabel?: string | undefined
+  errorLabel?: string | undefined
   label: string
+  onSelect?: ((key: string) => unknown) | undefined
   param?: string | undefined
+  skippedLabel?: string | undefined
+  stepLabel?: ((step: StepItem<string>, state: "current" | "done" | "upcoming") => Element) | undefined
   steps: readonly StepItem<string>[]
-  url: string | URL
+  url?: string | URL | undefined
 
 [./subscribe-form.kay] default
 component default
@@ -2397,6 +2476,7 @@ component default
   least?: number | undefined
   most?: number | undefined
   onChange?: ((plate: Plate) => unknown) | undefined
+  plate?: Plate | undefined
   style?: string | undefined
   tools?: boolean | undefined
   zoomInLabel?: string | undefined

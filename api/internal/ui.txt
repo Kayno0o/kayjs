@@ -529,6 +529,43 @@ function xAxisOptions(labels: string[], times: number[] | null, showLabels: bool
   readonly type?: AxisFactory | LegacyAxisClass;
 }
 
+[./lib/chart-marks] activeMarks
+function activeMarks(options: {
+  active: () => number | null | undefined;
+  onActive: () => ((index: number | null) => unknown) | undefined;
+}): {
+  current: () => number | null;
+  anchor: () => {
+    clientX: number;
+    clientY: number;
+  } | null;
+  enter: (index: number, element: Element) => void;
+  leave: (index: number) => void;
+}
+
+[./lib/chart-marks] ChartMark
+interface ChartMark
+  index: number
+  label: string
+  values: (number | null)[]
+
+[./lib/chart-marks] chartTooltip
+function chartTooltip(): { place(at: { clientX: number; clientY: number; }): string; watch(element: HTMLElement): void; stop(): void; }
+
+[./lib/chart-marks] markKind
+function markKind(href: string | undefined, selectable: boolean): MarkKind
+
+[./lib/chart-marks] MarkKind
+type MarkKind = 'link' | 'button' | 'image'
+
+[./lib/chart-marks] SparkMark
+interface SparkMark
+  index: number
+  value: number | null
+
+[./lib/chart-marks] TOOLTIP_LOOK
+const TOOLTIP_LOOK: "pointer-events-none fixed top-0 left-0 z-50 flex w-max max-w-full flex-col gap-0.5 border-solid border-[length:var(--border-width)] border-border-strong bg-surface-strong px-3 py-2 text-xs"
+
 [./lib/chartist] loaders
 const loaders: Loaders
 
@@ -1321,8 +1358,11 @@ function stepHref(url: string | URL, key: string, param?: string): string
 
 [./lib/index] StepItem
 interface StepItem<Key extends string = string>
+  icon?: IconProps | IconSlot | undefined
   key: Key
   label: string
+  linkable?: boolean | undefined
+  state?: "error" | "skipped" | undefined
 
 [./lib/index] SwitcherApp
 interface SwitcherApp
@@ -1389,6 +1429,18 @@ const TOOLBAR_ACTIONS: readonly ["bold", "italic", "heading", "bulletList", "num
 
 [./lib/index] ToolbarAction
 type ToolbarAction = typeof TOOLBAR_ACTIONS[number]
+
+[./lib/index] ToolbarTools
+interface ToolbarTools
+  edit: (change: {
+  text: string;
+  start?: number | undefined;
+  end?: number | undefined;
+  selectionStart?: number | undefined;
+  selectionEnd?: number | undefined;
+}) => void
+  selection: () => { start: number; end: number; text: string; }
+  wrap: (open: string, closing?: string | undefined) => void
 
 [./lib/index] TreeId
 type TreeId = string | number
@@ -1501,6 +1553,7 @@ interface LeafletPath extends LeafletLayer
   bindTooltip: (content: HTMLElement) => LeafletPath
   closePopup: () => LeafletPath
   getElement: () => SVGElement | undefined
+  on: (event: string, handler: () => void) => LeafletPath
   remove: () => LeafletPath
   togglePopup: () => LeafletPath
 
@@ -1508,7 +1561,9 @@ interface LeafletPath extends LeafletLayer
 interface LeafletView
   addControl: (control: unknown) => LeafletView
   fitBounds: (bounds: unknown, options: { padding: [number, number]; maxZoom: number; animate: boolean; }) => LeafletView
+  getCenter: () => { lat: number; lng: number; }
   getSize: () => { x: number; y: number; }
+  getZoom: () => number
   invalidateSize: (options: { animate: boolean; }) => LeafletView
   on: (events: string, handler: () => void) => LeafletView
   panInside: (at: MapPoint, options: { padding: [number, number]; animate: boolean; }) => LeafletView
@@ -1573,6 +1628,18 @@ const TOOLBAR_ACTIONS: readonly ["bold", "italic", "heading", "bulletList", "num
 
 [./lib/markdown-edit] ToolbarAction
 type ToolbarAction = typeof TOOLBAR_ACTIONS[number]
+
+[./lib/markdown-edit] ToolbarTools
+interface ToolbarTools
+  edit: (change: {
+  text: string;
+  start?: number | undefined;
+  end?: number | undefined;
+  selectionStart?: number | undefined;
+  selectionEnd?: number | undefined;
+}) => void
+  selection: () => { start: number; end: number; text: string; }
+  wrap: (open: string, closing?: string | undefined) => void
 
 [./lib/markdown-edit] wrapEdit
 function wrapEdit(value: string, start: number, end: number, marker: string): TextEdit
@@ -1993,8 +2060,11 @@ function stepHref(url: string | URL, key: string, param?: string): string
 
 [./lib/steps] StepItem
 interface StepItem<Key extends string = string>
+  icon?: IconProps | IconSlot | undefined
   key: Key
   label: string
+  linkable?: boolean | undefined
+  state?: "error" | "skipped" | undefined
 
 [./lib/tab-nav] addressHref
 function addressHref(href: string): string
