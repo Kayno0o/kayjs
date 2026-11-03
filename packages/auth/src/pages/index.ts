@@ -11,6 +11,7 @@ import { resolve } from 'node:path'
 import { appModules, configError } from 'kay/library'
 import { pickLocale } from '../locale'
 import { buildOwn, MAIL_EXTENSION, ownEnv } from '../own'
+import { dropNestedMain } from './main'
 
 export interface AuthPagesOptions {
   // Where the pages are served, `/auth` by default, beside kayjs-auth's own routes: `/auth/sign-in`. `createAuth` reads it when `auth()` loads it with `module`.
@@ -114,6 +115,9 @@ export const DEFAULT_PREFIX = '/auth'
 
 // The files an `auth()` with no module reads by convention: kay imports, bakes and reloads them.
 const APP_FILES = { hooks: 'src/auth.ts', mail: 'src/mail.ts' }
+
+// The prebuilt pages' `main` yields to the one an app's layout writes.
+const MAIN_HOOKS = { transformPage: dropNestedMain, transformServedPage: dropNestedMain }
 
 // The dev tool's Auth tab, which kay loads on dev pages.
 const DEV_TOOL = { module: `${import.meta.dir}/../devTool.ts` }
@@ -284,7 +288,7 @@ function ownAuth(options: OwnOptions): AuthPages {
     name: '@kaynooo/kayjs-auth',
     appFiles: APP_FILES,
     server: async app => (await build(app)).plugin,
-    ...options.pages !== false && { routes: { dir: `${import.meta.dir}/routes`, prefix } },
+    ...options.pages !== false && { routes: { dir: `${import.meta.dir}/routes`, prefix }, ...MAIN_HOOKS },
     ...viewerExtension(options.viewer),
     env: ownEnv(options),
     devTool: DEV_TOOL,
@@ -307,7 +311,7 @@ function moduleAuth(options: AuthExtensionOptions): AuthPages {
     name: '@kaynooo/kayjs-auth',
     ...module !== undefined && { serverModule: { path: module, export: 'auth', prepare: (exported: unknown) => pages ? authOfExport(exported, module)[PAGES_OF]?.adopt(given) : undefined } },
     ...module === undefined && server !== undefined && { server },
-    ...pages && { routes: { dir: `${import.meta.dir}/routes`, prefix } },
+    ...pages && { routes: { dir: `${import.meta.dir}/routes`, prefix }, ...MAIN_HOOKS },
     ...viewerExtension(viewer),
     devTool: DEV_TOOL,
     commands: COMMANDS,

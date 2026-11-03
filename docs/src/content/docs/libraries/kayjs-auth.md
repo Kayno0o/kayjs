@@ -172,6 +172,8 @@ It is read for `user()` and `requireUser()` and for the hooks (`onSignUp`, `prof
 
 With no prebuilt pages, `requireUser({ redirect: '/login' })` names your sign-in page. A bearer token limited to scopes is refused with a 403 unless `requireUser({ scope })` names one it holds. `requireUser({ require: 'editor' })` refuses with a 403 a user who does not meet it, through your `authorize` as `guard()` does. Add `bare: true` to get the user without `providers` and skip that read, when you only want the checks.
 
+Each prebuilt page writes its content in a `main`, so a screen reader can jump to it. If your layout already wraps pages in a `main`, the pages' own becomes a `div` and yours stays the one landmark.
+
 The prebuilt pages that open from a mailed link, to reset a password, verify an address, sign in by link or confirm a new address, send `Referrer-Policy: same-origin`. The token in the address never reaches another site through a link or an image on the page. An address with a comma, an angle bracket or a double quote in it is refused as an email.
 
 For a link of your own, `signInUrl()` is the sign-in page leading back to the current page, and `signInUrl('/pricing')` to another path of the site. A path that is not of the site leads home.

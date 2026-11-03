@@ -1,0 +1,9 @@
+--- server
+// Set by tests/landmark.test.ts to wrap every page in the main an app's layout writes.
+const wrapped = process.env.FIXTURE_MAIN === '1'
+---
+if wrapped
+  main#app
+    slot
+else
+  slot
