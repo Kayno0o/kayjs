@@ -1,6 +1,7 @@
 export { s } from '#schema'
 export type { Action, ActionContext, ActionFor, ActionProtect, ActionProtection, ActionRateLimit, ActionStream, Answer, CallOptions, CallResult, Failure, FailureData, FailureOf, FieldName, FormFailure, FormSuccess, HoneypotOptions, InputOf, MinTimeOptions, MinTimeRefusal, NoInputAction, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, ResolvedProtection, ServerAction, Success, SuccessOf, TrackedCall } from './action'
 export { action, ActionError, ActionRedirectError } from './action'
+export type { ErrorShape } from './api-error'
 export { localPath, withBase } from './base'
 export type { ApiRoutesOf, AwaitProps, Bindable, BindableMark, BoundProp, BoundValue, CheckedHref, CheckedHtml, Deferred, ExtensionServersOf, FunctionProp, HandedPart, HandedSignal, HandsPart, HydrateWhen, Inferred, IslandBrand, IslandComponent, IslandOptions, IslandProp, Locals, LocalsOf, PartClass, PlainIslandProp, Redirect, Register, RouteParams, SafeHtml, ServerOfModule, TemplateHelpers, Truthy, Unmatched, UnresolvedParameter } from './checks'
 // The names `kay` exports. What this file defines itself is in `core.ts`, so a build imports the module holding a name rather than this one, which an entry importing it would take every name's module along with.

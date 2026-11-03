@@ -267,6 +267,13 @@ interface ErrorShape
   message: string
   status: number
 
+[.] ErrorShape
+interface ErrorShape<Data = unknown>
+  data: Data | undefined
+  errors: Record<string, string>
+  message: string
+  status: number
+
 [.] EventHandler
 type EventHandler<Target, E extends Event> = (event: E & { currentTarget: Target, target: globalThis.Element }) => void
 
