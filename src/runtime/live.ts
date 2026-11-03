@@ -2,6 +2,7 @@ import type { CallResult } from './call-result'
 import { ApiError, fieldsOf, messageOf } from './api-error'
 import { withBase } from './base'
 import { trackCalls } from './call-result'
+import { connection, listenerSet } from './connection'
 import { effect, onCleanup, onMount, ownSignal } from './reactive'
 import { parseEvents } from './sse'
 import { decodeServerValue } from './wire'
@@ -19,10 +20,6 @@ export type EventStream<T> = Response & { readonly [EVENTS]: T }
 export const END_EVENT = 'end'
 export const ERROR_EVENT = 'error'
 
-const RECONNECT_MS = 500
-const MAX_RECONNECT_MS = 30_000
-// How often a visible tab the browser says is offline tries anyway, as `navigator.onLine` can be wrong, behind some VPNs for one.
-const OFFLINE_RETRY_MS = 60_000
 // The close code of a connection either side ended on purpose, which is not reconnected.
 const NORMAL_CLOSURE = 1000
 // What a socket keeps to send while it connects, the oldest dropped past it: half the 100 messages a second a route takes by default, so the flush after a reconnect stays under it.
@@ -107,41 +104,6 @@ export interface EventReader<T> {
   close: () => void
 }
 
-interface Listeners<T> {
-  last: () => T | undefined
-  receive: (value: T) => void
-  on: (listener: (value: T) => void) => () => void
-  forget: () => void
-}
-
-function listeners<T>(): Listeners<T> {
-  const [last, setLast] = ownSignal<T | undefined>(undefined, { equals: false })
-  const all = new Set<(value: T) => void>()
-
-  return {
-    last,
-    receive: (value) => {
-      setLast(value)
-
-      // One listener failing leaves the others and the connection alone.
-      for (const listener of all) {
-        try {
-          listener(value)
-        }
-        catch (error) {
-          console.error(error)
-        }
-      }
-    },
-    on: (listener) => {
-      all.add(listener)
-
-      return () => void all.delete(listener)
-    },
-    forget: () => setLast(undefined),
-  }
-}
-
 // A message as Elysia sends it: an object as JSON, anything else as its text, which its own parser reads back the same way.
 function readMessage(data: unknown): unknown {
   if (typeof data !== 'string')
@@ -178,91 +140,15 @@ export function dispatch<Message extends { type: string }, Handlers extends { [T
   return (handlers[message.type as Message['type']] as unknown as (message: Message) => ReturnType<Handlers[Message['type']]>)(message)
 }
 
-function backoff(attempt: number): number {
-  return Math.min(RECONNECT_MS * 2 ** attempt, MAX_RECONNECT_MS)
-}
-
-function asleep(): boolean {
-  return typeof document !== 'undefined' && (document.hidden || navigator.onLine === false)
-}
-
-// Runs `reconnect` after the attempt's backoff, shortened by up to half at random so the clients a restart dropped together come back apart, and not before the tab is visible and online again; gives what cancels it.
-function scheduleRetry(attempt: number, reconnect: () => void): () => void {
-  const delay = backoff(attempt)
-  // Read only once asleep, which a browser alone can be.
-  const wakers = () => [[globalThis, 'online'], [document, 'visibilitychange']] as const
-  let waiting = false
-  let timer: ReturnType<typeof setTimeout> | undefined
-  let fallback: ReturnType<typeof setTimeout> | undefined
-
-  function stopWaiting() {
-    clearTimeout(fallback)
-
-    if (!waiting)
-      return
-
-    waiting = false
-
-    for (const [target, type] of wakers())
-      target.removeEventListener(type, wake)
-  }
-
-  function rest() {
-    clearTimeout(fallback)
-
-    if (!document.hidden) {
-      fallback = setTimeout(() => {
-        stopWaiting()
-        reconnect()
-      }, OFFLINE_RETRY_MS)
-    }
-  }
-
-  function wake() {
-    if (asleep()) {
-      rest()
-
-      return
-    }
-
-    stopWaiting()
-    // The clients a network coming back wakes together come back apart too.
-    timer = setTimeout(reconnect, Math.random() * RECONNECT_MS)
-  }
-
-  timer = setTimeout(() => {
-    if (!asleep()) {
-      reconnect()
-
-      return
-    }
-
-    waiting = true
-
-    for (const [target, type] of wakers())
-      target.addEventListener(type, wake)
-
-    rest()
-  }, delay - Math.random() * delay / 2)
-
-  return () => {
-    clearTimeout(timer)
-    stopWaiting()
-  }
-}
-
 // A websocket that reconnects after a drop, waiting longer each time, until `close()`; `connect` gives none where there is nothing to connect from.
 export function openSocket<Send, Receive>(connect: () => WebSocket | undefined): Socket<Send, Receive> & { start: () => void } {
-  const [status, setStatus] = ownSignal<SocketStatus>('connecting')
-  const messages = listeners<Receive>()
-  const opened = listeners<undefined>()
+  const link = connection<Receive>(start, true)
+  const opened = listenerSet<undefined>()
   const queued: string[] = []
   let current: WebSocket | undefined
   let closed = false
-  let attempt = 0
-  let cancelRetry: (() => void) | undefined
 
-  const start = () => {
+  function start() {
     if (closed || current)
       return
 
@@ -273,26 +159,25 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
 
     current = ws
     ws.addEventListener('open', () => {
-      attempt = 0
-      setStatus('open')
-      opened.receive(undefined)
+      link.reset()
+      link.set('open')
+      opened.emit(undefined)
 
       for (const message of queued.splice(0))
         ws.send(message)
     })
-    ws.addEventListener('message', event => messages.receive(readMessage(event.data) as Receive))
+    ws.addEventListener('message', event => link.receive(readMessage(event.data) as Receive))
     ws.addEventListener('close', (event) => {
       current = undefined
 
       if (closed || event.code === NORMAL_CLOSURE) {
         closed = true
-        setStatus('closed')
+        link.set('closed')
 
         return
       }
 
-      setStatus('connecting')
-      cancelRetry = scheduleRetry(attempt++, start)
+      link.lost()
     })
   }
 
@@ -306,15 +191,15 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
       else if (!closed && queued.push(text) > MAX_QUEUED)
         queued.shift()
     },
-    last: messages.last,
-    status,
-    on: messages.on,
+    last: link.last,
+    status: link.status as () => SocketStatus,
+    on: link.on,
     onOpen: listener => opened.on(listener),
     close: () => {
       closed = true
       queued.length = 0
-      cancelRetry?.()
-      setStatus('closed')
+      link.stop()
+      link.set('closed')
       current?.close(NORMAL_CLOSURE)
     },
   }
@@ -323,17 +208,10 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
 // An event stream read as it arrives, through `request`; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is; with `retryRefused`, a response that is not ok is tried again after the backoff too, as a stream across a restart needs.
 // `start()` opens it once; given a request, it opens a new run of it, closing the one going and forgetting its last value.
 export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response>, reconnect: boolean, idle = false, retryRefused = false): EventReader<T> & { start: (next?: (signal: AbortSignal) => Promise<Response>) => void } {
-  const [status, setStatus] = ownSignal<StreamStatus>(idle ? 'idle' : 'connecting')
-  const values = listeners<T>()
   let run: AbortController | undefined
   let started = false
-  let attempt = 0
-  let cancelRetry: (() => void) | undefined
 
-  const settle = (final: StreamStatus) => {
-    if (status() !== 'closed')
-      setStatus(final)
-  }
+  const link = connection<T>(() => void read(run!), reconnect, idle)
 
   const onEvent = (event: string, data: string): StreamStatus | undefined => {
     if (event === END_EVENT)
@@ -354,13 +232,13 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
     }
 
     // Only a stream that delivered something counts as back, so one dropping as soon as it opens keeps backing off.
-    attempt = 0
-    values.receive(value)
+    link.reset()
+    link.receive(value)
 
     return undefined
   }
 
-  const read = async (controller: AbortController) => {
+  async function read(controller: AbortController) {
     let ended: StreamStatus | undefined
 
     try {
@@ -374,7 +252,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
 
       if (!response.ok || !response.body) {
         if (!retryRefused) {
-          settle('failed')
+          link.set('failed')
 
           return
         }
@@ -383,7 +261,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
         void response.body?.cancel()
       }
       else {
-        setStatus('open')
+        link.set('open')
         ended = await parseEvents(response.body, controller.signal, onEvent)
       }
     }
@@ -392,20 +270,10 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
     if (controller.signal.aborted)
       return
 
-    if (ended) {
-      settle(ended)
-
-      return
-    }
-
-    if (!reconnect) {
-      settle('failed')
-
-      return
-    }
-
-    setStatus('connecting')
-    cancelRetry = scheduleRetry(attempt++, () => void read(controller))
+    if (ended)
+      link.set(ended)
+    else
+      link.lost()
   }
 
   return {
@@ -416,22 +284,22 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
         return
 
       if (next && started)
-        values.forget()
+        link.forget()
 
       started = true
-      cancelRetry?.()
+      link.stop()
       run?.abort()
       run = new AbortController()
-      attempt = 0
-      setStatus('connecting')
+      link.reset()
+      link.set('connecting')
       void read(run)
     },
-    last: values.last,
-    status,
-    on: values.on,
+    last: link.last,
+    status: link.status,
+    on: link.on,
     close: () => {
-      cancelRetry?.()
-      setStatus('closed')
+      link.stop()
+      link.set('closed')
       run?.abort()
     },
   }
@@ -555,34 +423,34 @@ export interface StreamRun<T, Options> extends EventReader<T> {
 
 // An async iterable read as it arrives, from the moment the island is in the page.
 function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): EventReader<unknown> {
-  const [status, setStatus] = ownSignal<StreamStatus>('connecting')
-  const values = listeners<unknown>()
+  const link = connection<unknown>(() => void read(), false)
   const controller = new AbortController()
 
-  const read = async () => {
+  async function read() {
     if (controller.signal.aborted)
       return
 
-    setStatus('open')
+    link.set('open')
 
     try {
       for await (const value of source(controller.signal)) {
         if (controller.signal.aborted)
           return
 
-        values.receive(value)
+        link.receive(value)
       }
 
       if (!controller.signal.aborted)
-        setStatus('done')
+        link.set('done')
     }
     catch {
       if (!controller.signal.aborted)
-        setStatus('failed')
+        link.set('failed')
     }
   }
+
   const close = () => {
-    setStatus('closed')
+    link.set('closed')
     controller.abort()
   }
 
@@ -592,7 +460,7 @@ function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): Event
   })
   onCleanup(close)
 
-  return { last: values.last, status, on: values.on, close }
+  return { last: link.last, status: link.status, on: link.on, close }
 }
 
 // Reads a route of a module under `src/api` answering with `eventStream()` from an island, once it is in the page, or with `start: false` each time `start()` is called: each value typed as the route sends it, Dates, Maps and Sets included.
