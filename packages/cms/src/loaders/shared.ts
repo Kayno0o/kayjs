@@ -1,6 +1,6 @@
 import type { ContentLoader, LoadedEntry } from 'kay/content'
 import { ContentChangedError, contentKey } from 'kay/content'
-import { configError, durationSeconds, invalidateLocally, onKeysInvalidated } from 'kay/library'
+import { configError, durationSeconds, invalidateLocally, onKeysInvalidated, outsideRequest } from 'kay/library'
 
 // An entry a loader holds from its first start: the app's initial content.
 export interface SeedEntry {
@@ -188,7 +188,7 @@ export function watcher(name: string, scope: string, watch: LoaderOptions['watch
 
       known = await signature(true)
       running.get(id)?.()
-      timer = setInterval(() => void look(), every)
+      timer = outsideRequest(() => setInterval(() => void look(), every))
       timer.unref()
 
       const mine = timer

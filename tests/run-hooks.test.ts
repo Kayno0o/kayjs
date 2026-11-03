@@ -2,13 +2,14 @@ import type { ScheduleOptions } from '../src/server/jobs'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
+import { cached } from '../src/runtime/cache'
 import { jobRuns, queueRuns } from '../src/runtime/counters'
 import { localeState, runInLocale } from '../src/runtime/locale-state'
 import { previewState } from '../src/runtime/preview'
 import { currentServerScope } from '../src/runtime/reactive'
 import { withQuery } from '../src/runtime/with-query'
 import { memoryJobs, queue, retryLater, schedule, shutdown, workflow } from '../src/server'
-import { inLiveReads } from '../src/server/live'
+import { followsCaches, inLiveReads } from '../src/server/live'
 import { answeringRequest } from '../src/server/log'
 import { inPreview } from '../src/server/preview'
 import { forgetQueue } from '../src/server/queue'
@@ -308,20 +309,24 @@ describe('a queue\'s hook context', () => {
         url = undefined
       }
 
-      seen.push([where, currentServerScope()?.request?.url, localeState() === undefined, previewState() === undefined, url])
+      seen.push([where, currentServerScope()?.request?.url, localeState() === undefined, previewState() === undefined, url, followsCaches()])
     }
     const jobs = queue<number>(named('queue'), () => read('run'), { store: memoryJobs(), lazy: true, onStart: () => read('start'), onSuccess: () => read('success') })
     const app = new Elysia().use(jobs).listen(0)
     const request = new Request('http://x/first-visitor?q=1')
 
     try {
-      await answeringRequest(request, async () => inServerScope(request, () => undefined, async () => runInLocale({ locale: 'fr' } as never, async () => inLoad(new URL(request.url), async () => inPreview(async () => inLiveReads(async () => jobs.enqueue(1), request))))))
+      await answeringRequest(request, async () => inServerScope(request, () => undefined, async () => runInLocale({ locale: 'fr' } as never, async () => inLoad(new URL(request.url), async () => inPreview(async () => inLiveReads(async () => {
+        await cached('wakes-the-queue', '1m', () => 1, { live: true })
+
+        return jobs.enqueue(1)
+      }, request))))))
       await until(() => seen.length >= 3)
       await jobs.enqueue(2)
       await until(() => seen.length >= 6)
 
-      for (const [where, url, noLocale, noPreview, loaded] of seen as [string, unknown, boolean, boolean, unknown][])
-        expect([where, url, noLocale, noPreview, loaded]).toEqual([where, undefined, true, true, undefined])
+      for (const [where, url, noLocale, noPreview, loaded, reads] of seen as [string, unknown, boolean, boolean, unknown, boolean][])
+        expect([where, url, noLocale, noPreview, loaded, reads]).toEqual([where, undefined, true, true, undefined, false])
     }
     finally {
       await shutdown(app)
@@ -652,5 +657,23 @@ describe('a schedule\'s run hooks', () => {
     await store.lock('held', Math.round(Date.now() / 60_000))
     await runOnce(() => void seen.push('run'), { lock: 'held', store, onStart: () => void seen.push('start'), onSuccess: () => void seen.push('success') })
     expect(seen).toEqual([])
+  })
+})
+
+describe('the clean context', () => {
+  it('is loaded with the server, so the first request is not carried into a worker', async () => {
+    const dir = import.meta.dir.replace(/\/tests$/, '')
+    const script = `
+      import { currentServerScope } from '${dir}/src/runtime/reactive'
+      import '${dir}/src/server'
+      import { inServerScope } from '${dir}/src/server/scope'
+      await inServerScope(new Request('http://localhost/'), () => undefined, async () => {
+        const { outsideRequest } = await import('${dir}/src/server/clean-context')
+        console.log(outsideRequest(() => currentServerScope() === undefined))
+      })
+    `
+    const run = Bun.spawnSync([process.execPath, '-e', script], { stderr: 'pipe' })
+
+    expect(run.stdout.toString().trim()).toBe('true')
   })
 })

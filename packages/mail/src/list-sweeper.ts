@@ -1,4 +1,5 @@
 import type { ListStore } from './list-store'
+import { outsideRequest } from 'kay/library'
 import { log } from './log'
 
 // The first sweep of the stores waits for the app to boot; the next ones follow at this pace.
@@ -30,8 +31,9 @@ export function listSweeper(stores: () => Iterable<ListStore | undefined>, timin
       if (every !== undefined)
         return
 
-      first = setTimeout(() => void sweep(), timing.after ?? FIRST_SWEEP_MS)
-      every = setInterval(() => void sweep(), timing.every ?? SWEEP_EVERY_MS)
+      // Started by the first `mail.list()`, which may run in a request the sweeps must not keep.
+      first = outsideRequest(() => setTimeout(() => void sweep(), timing.after ?? FIRST_SWEEP_MS))
+      every = outsideRequest(() => setInterval(() => void sweep(), timing.every ?? SWEEP_EVERY_MS))
       first.unref()
       every.unref()
     },

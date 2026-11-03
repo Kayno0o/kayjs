@@ -2,6 +2,7 @@ import type { SQL } from 'bun'
 import type { PgHandle } from './pg-data'
 import { kayLog } from '../runtime/log'
 import { delayAfter, pollClock } from '../runtime/poll-backoff'
+import { outsideRequest } from './clean-context'
 import { startedStatements, trackStatements } from './pg-jobs'
 import { onReload } from './reload'
 
@@ -159,7 +160,7 @@ function createPoller(pg: PgHandle): Poller {
     if (idle.length === 0)
       return
 
-    timer = pollClock.setTimeout(tick, Math.max(0, Math.min(...idle.map(entry => entry.next)) - pollClock.now()))
+    timer = outsideRequest(() => pollClock.setTimeout(tick, Math.max(0, Math.min(...idle.map(entry => entry.next)) - pollClock.now())))
   }
 
   const runEntry = async (entry: Entry, db: Promise<SQL>) => {

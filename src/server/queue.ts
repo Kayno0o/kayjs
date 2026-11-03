@@ -810,6 +810,10 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
     }
 
     try {
+      // A slow `onStart` can spend the whole of `lostAfter`: the run is then lost without starting, rather than started with no time.
+      if (performance.now() - claimedAt >= lostAfter - Math.min(1000, lostAfter / 10))
+        throw new Error(`it ran past lostAfter, ${Math.round(lostAfter / 1000)} s`)
+
       await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal, context, hold), claimedAt, ended)
       await reports.settle()
       succeeded = true

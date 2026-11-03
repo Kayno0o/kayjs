@@ -35,7 +35,7 @@ const HOOK_TIMEOUT_MS = 10_000
 
 // The context of the request this async context was started for, with empty fields outside one.
 export async function hookContext(): Promise<HookContext> {
-  // A job belongs to no request, even one that started its worker.
+  // A job belongs to no request: its runs start outside any, and a hook of one run another way is told so too.
   const request = insideJob() ? undefined : requestOfContext()
   const locale = insideJob() ? undefined : localeState()?.locale
 

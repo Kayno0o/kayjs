@@ -1019,6 +1019,9 @@ function openWith(keys: Uint8Array<ArrayBufferLike>[], value: string, context?: 
 [./library] optionMs
 function optionMs(value: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, what: string): number
 
+[./library] outsideRequest
+function outsideRequest<R, TArgs extends any[]>(fn: (...args: TArgs) => R, ...args: TArgs): R
+
 [./library] overHttps
 function overHttps(request: Request): boolean
 

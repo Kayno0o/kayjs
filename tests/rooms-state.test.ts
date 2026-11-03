@@ -4,11 +4,13 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Database } from 'bun:sqlite'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { TypeCompiler } from 'elysia/type-system'
 import { s } from '../src/runtime'
+import { currentServerScope } from '../src/runtime/reactive'
 import { api } from '../src/server/api'
 import { memoryRooms, rooms, sqliteRooms } from '../src/server/rooms'
+import { inServerScope } from '../src/server/scope'
 
 interface State { round: number, scores: Record<string, number>, at?: Date }
 type Message = { type: 'state', state: State } | { type: 'said', text: string }
@@ -333,6 +335,33 @@ describe('a room\'s state in a SQLite file', () => {
     finally {
       file.close()
     }
+  })
+
+  it('beats outside the request whose join started it', async () => {
+    const store = sqliteRooms(join(dir, 'beat-scope.sqlite'), { poll: '5ms' })
+    const live = rooms<Message, string, State>({ ...options, store })
+    const scopes: boolean[] = []
+    const now = Date.now.bind(Date)
+
+    await inServerScope(new Request('http://localhost/'), () => undefined, () => live.join(connection(), 'hall', 'ada'))
+
+    const clock = spyOn(Date, 'now').mockImplementation(() => {
+      scopes.push(currentServerScope() !== undefined)
+
+      return now()
+    })
+
+    try {
+      // The first beat is two seconds out.
+      await Bun.sleep(2_300)
+    }
+    finally {
+      clock.mockRestore()
+      store.close()
+    }
+
+    expect(scopes.length).toBeGreaterThan(0)
+    expect(scopes.every(inScope => !inScope)).toBe(true)
   })
 
   it('drops the state of a room whose only process died', async () => {

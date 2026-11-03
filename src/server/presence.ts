@@ -2,6 +2,7 @@ import type { RoomStoreBase } from './rooms'
 import { kayLog } from '../runtime/log'
 import { readPresenceWith } from '../runtime/presence'
 import { appStore } from './app-store'
+import { outsideRequest } from './clean-context'
 import { currentRequest, requestOfContext } from './log'
 import { memoryRooms } from './rooms'
 
@@ -164,10 +165,10 @@ function leave(room: string, tab: string): void {
 }
 
 function startTicker(): void {
-  ticker ??= setInterval(() => {
+  ticker ??= outsideRequest(() => setInterval(() => {
     for (const room of watchers.keys())
       recheckRoom(room)
-  }, RECHECK_MS)
+  }, RECHECK_MS))
   ticker.unref()
 }
 

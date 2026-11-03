@@ -7,6 +7,7 @@ import type { VitalCount, VitalReading, VitalsStore } from './vitals-store'
 import { parse, stringify } from 'devalue'
 import { durationSeconds, optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
+import { outsideRequest } from './clean-context'
 import { rowsOf } from './pg-jobs'
 import { limited, limitedStore, MAINTENANCE_TIMEOUT_MS } from './pg-limit'
 import { closeWith, TimeoutError } from './pg-poll'
@@ -49,7 +50,7 @@ export function pgSessions(pg: PgHandle): DeletableSessionStore {
     if (timer !== undefined)
       return
 
-    timer = setInterval(() => void sweepLogged(), SWEEP_SESSIONS_MS)
+    timer = outsideRequest(() => setInterval(() => void sweepLogged(), SWEEP_SESSIONS_MS))
     timer.unref()
     closeWith(pg, () => clearInterval(timer))
   }
@@ -224,7 +225,7 @@ export function pgNotifications(pg: PgHandle): NotificationStore {
     if (timer !== undefined)
       return
 
-    timer = setInterval(() => void sweep(), SWEEP_SESSIONS_MS)
+    timer = outsideRequest(() => setInterval(() => void sweep(), SWEEP_SESSIONS_MS))
     timer.unref()
     closeWith(pg, () => clearInterval(timer))
   }

@@ -4,6 +4,7 @@ import type { PgHandle } from './pg-data'
 import type { AsyncRoomStore } from './rooms'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
+import { outsideRequest } from './clean-context'
 import { limited } from './pg-limit'
 import { closeWith, eventWindow, pollerOf } from './pg-poll'
 import { escaped, NOW, query, unescaped } from './pg-sql'
@@ -324,7 +325,7 @@ export function pgRooms(pg: PgHandle, { poll }: { poll?: Duration } = {}): Async
 
     if (held && beating === undefined) {
       beat()
-      beating = setInterval(beat, HEARTBEAT)
+      beating = outsideRequest(() => setInterval(beat, HEARTBEAT))
       beating.unref()
     }
     else if (!held && beating !== undefined) {

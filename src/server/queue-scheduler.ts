@@ -171,7 +171,8 @@ export class Scheduler {
   }
 
   async #runNext(byDrain = false): Promise<boolean> {
-    const run = inJob.run(true, this.#options.run, this)
+    // A drain called inside a request runs its jobs outside it, as the workers do.
+    const run = outsideRequest(async () => inJob.run(true, this.#options.run, this))
 
     this.#running.add(run)
 

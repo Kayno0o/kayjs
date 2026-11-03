@@ -7,6 +7,7 @@ import { t } from 'elysia'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
+import { outsideRequest } from './clean-context'
 import { inMemory } from './memory-mark'
 import { onReload } from './reload'
 
@@ -480,7 +481,7 @@ function openRooms(path: string, askedMs: number | undefined): RoomStore {
 
     if (held && !beating) {
       beat()
-      beating = setInterval(guarded('marking this process alive in the rooms store', beat), HEARTBEAT)
+      beating = outsideRequest(() => setInterval(guarded('marking this process alive in the rooms store', beat), HEARTBEAT))
       beating.unref()
     }
     else if (!held && beating) {
@@ -520,11 +521,12 @@ function openRooms(path: string, askedMs: number | undefined): RoomStore {
         if (reading)
           clearInterval(reading)
 
-        reading = setInterval(reader, ms)
+        reading = outsideRequest(() => setInterval(reader, ms))
         reading.unref()
       }
 
-      watcher = watchStore(path, () => {
+      // Started by whichever connection came first, the watcher and the timers must outlive it without its request.
+      watcher = outsideRequest(() => watchStore(path, () => {
         // Several writes of one transaction wake it once.
         woken ??= setTimeout(() => {
           woken = undefined
@@ -539,7 +541,7 @@ function openRooms(path: string, askedMs: number | undefined): RoomStore {
           idle = 0
           readEvery(askedMs ?? UNWATCHED_POLL_MS)
         }
-      })
+      }))
       readEvery(askedMs ?? (watcher ? WATCHED_POLL_MS : UNWATCHED_POLL_MS))
     }
     else if (!(held && listeners.size > 0) && reading) {

@@ -5,6 +5,7 @@ import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { readJobsWith } from '../runtime/queue-jobs'
 import { encodeValue, unsendable } from '../runtime/wire'
+import { outsideRequest } from './clean-context'
 
 // The most jobs a queue shows, the earliest due first, so a long queue is never read or sent whole.
 const SHOWN_JOBS = 100
@@ -266,10 +267,10 @@ export function jobsEntry(name: string): { value: () => QueuedJob[], watch: (not
       entry.watchers.add(notify)
 
       if (entry.timer === undefined) {
-        entry.timer = setInterval(() => {
+        entry.timer = outsideRequest(() => setInterval(() => {
           if (entry.declared)
             refresh(entry)
-        }, RECHECK_MS)
+        }, RECHECK_MS))
         entry.timer.unref()
       }
 
