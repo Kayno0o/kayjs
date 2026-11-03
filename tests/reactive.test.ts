@@ -180,6 +180,36 @@ describe('effects', () => {
     expect(log).toEqual(['run 0', 'inner 0', 'clean 0', 'run 1', 'inner 1', 'clean 1'])
   })
 
+  it('keep tearing down after a cleanup throws', () => {
+    const failure = new Error('destroy failed')
+    const log: string[] = []
+    const errors = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    const dispose = root((dispose) => {
+      onCleanup(() => log.push('first'))
+      renderEffect(() => {
+        onCleanup(() => log.push('child'))
+        onCleanup(() => {
+          throw failure
+        })
+        onCleanup(() => log.push('child after'))
+      })
+      onCleanup(() => {
+        throw failure
+      })
+      onCleanup(() => log.push('last'))
+
+      return dispose
+    })
+
+    dispose()
+    dispose()
+
+    expect(log).toEqual(['child', 'child after', 'first', 'last'])
+    expect(errors.mock.calls).toEqual([[failure], [failure]])
+    errors.mockRestore()
+  })
+
   it('do not depend on what they read untracked', () => {
     const tracked = signal(0)
     const quiet = signal(0)

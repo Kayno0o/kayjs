@@ -390,8 +390,16 @@ async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean
 // Ends every island under `root`, `root` itself included, as a page swap takes them away.
 export function disposeIslands(root: ParentNode): void {
   for (const element of [root, ...root.querySelectorAll(ISLAND)]) {
-    disposers.get(element)?.()
+    const dispose = disposers.get(element)
+
     disposers.delete(element)
+
+    try {
+      dispose?.()
+    }
+    catch (error) {
+      reportError(error)
+    }
   }
 }
 

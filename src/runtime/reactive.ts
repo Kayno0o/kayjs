@@ -783,10 +783,12 @@ function run(node: Computation): void {
 
 function disposeChildren(node: Owner): void {
   if (node.children) {
-    for (const child of node.children)
-      dispose(child)
+    const children = node.children
 
     node.children = undefined
+
+    for (const child of children)
+      dispose(child)
   }
 
   if (node.cleanups) {
@@ -794,8 +796,15 @@ function disposeChildren(node: Owner): void {
 
     node.cleanups = undefined
 
-    for (const cleanup of cleanups)
-      cleanup()
+    // One cleanup that throws (a library's `destroy()`) is reported and the others still run.
+    for (const cleanup of cleanups) {
+      try {
+        cleanup()
+      }
+      catch (error) {
+        reportError(error)
+      }
+    }
   }
 }
 
