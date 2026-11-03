@@ -88,7 +88,7 @@ Table.kcms-media(columns={columns} rows={uploads} rowKey={upload => upload.key})
     else if column.key === 'name'
       if renaming() === row.key
         form.kcms-media-rename(onKeyDown={(event) => { if (event.key === 'Escape') renaming = undefined }} onSubmit={(event) => { event.preventDefault(); void rename(row) }})
-          TextInput(autofocus value={typed()} onInput={text => typed = text} aria-label={wording('cms.media.renameAria', 'New name of {name}', { name: row.name })} size={24})
+          TextInput(autofocus value={typed()} onInput={text => typed = text} aria-label={wording('cms.media.renameAria', 'New name of {name}', { name: row.name })} class="w-[24ch]")
           IconButton(icon="success" label={wording('cms.media.rename', 'Rename')} type="submit" variant="ghost" size="sm")
           IconButton(icon="close" label={wording('cms.media.cancel', 'Cancel')} variant="ghost" size="sm" onClick={() => renaming = undefined})
       else

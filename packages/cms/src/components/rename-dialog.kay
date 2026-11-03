@@ -89,6 +89,6 @@ Dialog(open={open} title={wording('cms.entry.renameTitle', 'Rename {slug}', { sl
   // The dialog may sit inside the entry's form, whose own submit saves the edits: this one must not reach it.
   form(onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); void submit() }})
     FormField(label={wording('cms.entry.renameSlug', 'New slug')} hint={hint()} issue={reason() ?? refusal()})
-      TextInput(autofocus value={typed()} onInput={type} size={32})
+      TextInput(autofocus value={typed()} onInput={type} class="w-[32ch]")
     if referrers.length > 0
       p.kcms-rename-referrers {wording('cms.entry.renameReferrers', 'Referred to by {names}, which follow the new slug where they can', { names: referrers.join(', ') })}
