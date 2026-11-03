@@ -61,6 +61,8 @@ export interface CompileOptions {
   twinBuild?: boolean | undefined
   // Whether the file is a page of a routes directory, which nothing renders inside an island, so a page without a server fence reads its loops as static as the build does; `false` says it is a component, where a root `@block` is refused.
   page?: boolean | undefined
+  // Whether the file is known to be a component, which has no `--- server` fence: a library checked on its own has pages no routes directory names, so only a caller knowing its routes says so.
+  component?: boolean | undefined
   // Type checking only: the level of each lint, over its default.
   lints?: LintLevels | undefined
   // Type checking only: the types alone, for a file whose problems nothing reads, so the ones only `kay check` reports are not looked for.
@@ -311,10 +313,8 @@ export function compileKay(original: string, filename: string, options: CompileO
   if (file.client && file.module)
     diagnostics.push({ ...file.client, code: 'fence-invalid', message: 'A `--- client` component has no `--- module` fence', note: 'the server loads only its live imports, so its exports would be missing there', help: 'put the shared values in a `.ts` module' })
 
-  if (file.server && options.page === false && !basename(filename).startsWith('_')) {
-    const start = source.lastIndexOf('--- server', file.server.start)
-
-    diagnostics.push({ start, end: start + '--- server'.length, code: 'fence-invalid', message: 'A component has no `--- server` fence', note: 'only a page or a layout runs on the server for each request, and a component would take its values as required props', help: 'compute the value in the page or layout and pass it as a prop, or read it in an action' })
+  if (file.server && options.component === true && !basename(filename).startsWith('_')) {
+    diagnostics.push({ ...file.serverFence!, code: 'fence-invalid', message: 'A component has no `--- server` fence', note: 'only a page or a layout runs on the server for each request, and a component would take its values as required props', help: 'compute the value in the page or layout and pass it as a prop, or read it in an action' })
   }
 
   if (file.client && routeFile)

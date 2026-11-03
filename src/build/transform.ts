@@ -176,7 +176,7 @@ export async function analyzeKayCached(source: string, filename: string, root: s
     return cached
   }
 
-  const { island, promote, cause, classes, actionForm, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals, page: component ? false : undefined })
+  const { island, promote, cause, classes, actionForm, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals, page: component ? false : undefined, component })
   const analysis = { island, promote, cause, classes, actionForm, diagnostics }
 
   if (diagnostics.every(diagnostic => diagnostic.checkOnly)) {

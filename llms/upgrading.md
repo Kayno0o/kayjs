@@ -18,6 +18,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### Lifetimes are `ttl`
 
 - A page's `revalidate` is `ttl`, a `notify` option `keep` is `ttl`, a `queue` or `workflow` option `keepFailed` is `failedTtl` and kayjs-ai's `Chat` prop `keep` is `history`, so `keep` only ever means a boolean. The old names work until 1.90 and `deprecated-lifetimes` writes the new ones: [deprecated lints](deprecated-lints.md).
+### A component has no `--- server` fence
+
+- A component (a `.kay` file that is no page, layout or special page) with a `--- server` fence is a `fence-invalid` error in `kay check` and `kay build`: move the value into the page or layout and pass it as a prop. No `deprecated` lint is possible because the old form never worked: its values became required props nobody could pass.
 
 ### A page at a collection's route prerenders
 

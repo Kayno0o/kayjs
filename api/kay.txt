@@ -1443,6 +1443,7 @@ interface CompileOptions
   classMerge?: boolean | undefined
   classTable?: ClassTable | undefined
   clientOnly?: boolean | undefined
+  component?: boolean | undefined
   contextModule?: string | undefined
   hydratable?: boolean | undefined
   importedSignals?: ImportedSignals | undefined

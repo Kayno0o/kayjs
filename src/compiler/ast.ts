@@ -551,6 +551,8 @@ export interface KayFile {
   source: string
   script?: Span | undefined
   server?: Span | undefined
+  // The `--- server` line itself.
+  serverFence?: Span | undefined
   // The `--- module` fence: code at module level, whose exports are the file's own.
   module?: Span | undefined
   // The `--- style` fence: CSS scoped to the elements this component writes.

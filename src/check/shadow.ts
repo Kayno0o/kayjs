@@ -121,7 +121,7 @@ export function compileShadow(root: string, file: string, source: string, { rout
   }
   const queries = layoutQueries(file, source, routesDir, mounts)
   const slots = outerSlots(file, source, routesDir, mounts)
-  const { tsx, map, bodyLines, moduleLines, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerSlots: slots, outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, page: route !== undefined, typesOnly, insideIsland, relocateImport, lints, importedSignals: signals, ui: uiEntryOf(root, file), contextModule: contextSpecifier(file, shadowDir) })
+  const { tsx, map, bodyLines, moduleLines, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerSlots: slots, outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, page: route !== undefined, component: route === undefined && existsSync(routesDir), typesOnly, insideIsland, relocateImport, lints, importedSignals: signals, ui: uiEntryOf(root, file), contextModule: contextSpecifier(file, shadowDir) })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 
@@ -262,6 +262,8 @@ function wordEnd(source: string, offset: number): number {
   return end === offset ? Math.min(offset + 1, source.length) : end
 }
 
+const NODE_MODULES = `${sep}node_modules${sep}`
+
 // The route of `file` when it is a page, its path read from the routes directory holding it: the app's, or an extension's, which an app reaching it through a link in node_modules names by its real folder. Its matchers are the app's either way.
 export function pageRoute(file: string, routesDir: string, mounts: RouteMount[]): ReturnType<typeof routeOf> {
   const pagesDir = mounts.find(({ dir }) => file.startsWith(dir + sep))?.dir ?? routesDir
@@ -269,8 +271,8 @@ export function pageRoute(file: string, routesDir: string, mounts: RouteMount[])
   if (file.startsWith(pagesDir + sep))
     return routeOf(pagesDir, file)
 
-  // Only a mounted extension's file can be reached through a link, so the real path is looked up when a mount exists.
-  const real = mounts.length > 0 && existsSync(file) ? realpathSync(file) : file
+  // Only a file under a `node_modules` folder is reached through a link.
+  const real = mounts.length > 0 && file.includes(NODE_MODULES) && existsSync(file) ? realpathSync(file) : file
   const mount = real === file ? undefined : mounts.find(({ dir }) => real.startsWith(dir + sep))
 
   return mount ? routeOf(mount.dir, real) : undefined

@@ -2027,6 +2027,34 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types the params of an extension page reached through a link', async () => {
+    const base = await scratchDir('linked-params-')
+    const root = join(base, 'app')
+    const lib = join(base, 'lib')
+
+    try {
+      await Promise.all(Object.entries({
+        'app/tsconfig.json': tsconfig,
+        'app/package.json': JSON.stringify({ name: 'app', dependencies: { lib: '*' } }),
+        'app/src/routes/index.kay': 'p home\n',
+        'lib/package.json': JSON.stringify({ name: 'lib', peerDependencies: { kay: '*' } }),
+        'lib/routes/[id=integer].kay': '--- server\nconst id: string = ctx.params.id\n---\np {id}\n',
+      }).map(async ([path, content]) => Bun.write(join(base, path), content)))
+      await mkdir(join(base, 'node_modules'), { recursive: true })
+      await symlink(lib, join(base, 'node_modules/lib'))
+      expect((await check(root, { extensions: [{ name: 'lib', routes: { dir: join(lib, 'routes'), prefix: '/auth' } }] })).map(d => [basename(d.file), named(d)])).toEqual([['[id=integer].kay', 'TS2322']])
+    }
+    finally {
+      await rm(base, { recursive: true, force: true })
+    }
+  })
+
+  it('checks a library with a --- server page outside any routes directory of its own clean', async () => {
+    const root = await scratchProject({ 'src/pages/routes/account.kay': '--- server\nconst a = 1\n---\np {a}\n' })
+
+    expect(await check(root)).toEqual([])
+  })
+
   it('reports a name a layout and its page declare with different schemas, and a special page declaring a query', async () => {
     const schema = (field: string) => `--- server\nimport { s } from 'kay'\n\nexport const page = { query: s.Object({ period: ${field} }) }\n---\np Page\n`
     const root = await scratchProject({

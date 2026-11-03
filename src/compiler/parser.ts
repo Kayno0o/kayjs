@@ -93,6 +93,7 @@ export function parseKay(source: string): KayFile {
   let client: Span | undefined
   let templateStart = 0
   let unclosedServer: Diagnostic | undefined
+  let serverFence: Span | undefined
   // The bare `---` closing a named fence while no script fence is open yet, which a later bare `---` was meant to be the script fence of.
   let bareClosing: Span | undefined
 
@@ -126,12 +127,18 @@ export function parseKay(source: string): KayFile {
         diagnostics.push(unclosed)
     }
 
-    if (!spaced || (kind !== 'script' && kind !== 'server' && kind !== 'module' && kind !== 'style'))
+    if (!spaced || (kind !== 'script' && kind !== 'server' && kind !== 'module' && kind !== 'style')) {
       diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` or `--- script` for the component script, `--- client` for one rendering in the browser only, `--- server` for server code, `--- module` for module-level code that exports values, or `--- style` for CSS scoped to the component' })
-    else if (fences[kind])
+    }
+    else if (fences[kind]) {
       diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `A file has one ${kind === 'script' ? 'script' : `\`--- ${kind}\``} fence` })
-    else
+    }
+    else {
       fences[kind] = span
+
+      if (kind === 'server')
+        serverFence = { start: fence.index, end: bodyStart - 1 }
+    }
 
     const parameters = fence.indices?.[3] ?? fence.indices?.[4]
 
@@ -153,7 +160,7 @@ export function parseKay(source: string): KayFile {
   if (bareClosing)
     explainSecondFence(source, bareClosing, diagnostics)
 
-  return { source, script: fences.script, server: fences.server, module: fences.module, style: fences.style, typeParameters, client, templateStart, template, diagnostics, unclosedServer }
+  return { source, script: fences.script, server: fences.server, serverFence, module: fences.module, style: fences.style, typeParameters, client, templateStart, template, diagnostics, unclosedServer }
 }
 
 // A bare `---` in the template after a named fence closed by a bare `---`: the first bare line closed that fence, so the author meant the second fence as the script, which takes `--- script` once a named fence is there.
