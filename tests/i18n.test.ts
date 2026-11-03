@@ -462,6 +462,41 @@ describe('localized content', () => {
     expect(onHost).not.toContain('Lancement')
   })
 
+  it('points the head alternates of an entry at each translation\'s own url', async () => {
+    const copy = await fixtureCopy('i18n-content')
+    const paired = async (trailingSlash?: 'always', domains?: Record<string, string>) => pages({ ...config, root: copy, content: resolve(`${copy}/src/content.config.ts`), trailingSlash, i18n: { ...config.i18n, messages: resolve(`${copy}/src/messages`), ...domains && { domains } } })
+
+    try {
+      const configFile = join(copy, 'src/content.config.ts')
+
+      await Bun.write(configFile, (await Bun.file(configFile).text()).replace('localized: true,', 'localized: true,\n  route: \'/news/:slug\','))
+      await Bun.write(join(copy, 'src/content/news/fr/du-prototype.md'), '---\ntitle: Du prototype\ndate: 2026-10-02\ntranslationKey: prototype\n---\n')
+      await Bun.write(join(copy, 'src/content/news/en/from-prototype.md'), '---\ntitle: From prototype\ndate: 2026-10-02\ntranslationKey: prototype\n---\n')
+
+      const plain = new Elysia().use(await paired())
+      const english = (await get('/en/news/from-prototype', plain)).html
+      const french = (await get('/news/du-prototype', plain)).html
+      const alternates = (html: string) => html.match(/<link rel="alternate"[^>]*>/g)
+
+      expect(alternates(english)).toEqual(['<link rel="alternate" hreflang="fr" href="https://x.example/news/du-prototype">', '<link rel="alternate" hreflang="en" href="https://x.example/en/news/from-prototype">', '<link rel="alternate" hreflang="x-default" href="https://x.example/news/du-prototype">'])
+      expect(alternates(french)).toEqual(alternates(english))
+      expect(english).toContain('<link rel="canonical" href="https://x.example/en/news/from-prototype">')
+
+      const slashed = new Elysia().use(await paired('always'))
+
+      expect(alternates((await get('/en/news/from-prototype/', slashed)).html)).toEqual(['<link rel="alternate" hreflang="fr" href="https://x.example/news/du-prototype/">', '<link rel="alternate" hreflang="en" href="https://x.example/en/news/from-prototype/">', '<link rel="alternate" hreflang="x-default" href="https://x.example/news/du-prototype/">'])
+
+      const domains = new Elysia().use(await paired(undefined, { fr: 'x.fr', en: 'x.com' }))
+
+      expect(alternates((await get('http://x.com/news/from-prototype', domains)).html)).toEqual(['<link rel="alternate" hreflang="fr" href="https://x.fr/news/du-prototype">', '<link rel="alternate" hreflang="en" href="https://x.com/news/from-prototype">', '<link rel="alternate" hreflang="x-default" href="https://x.fr/news/du-prototype">'])
+      // An entry with no translation keeps the route's path for the locales that lack one.
+      expect(alternates((await get('/en/news/english-only', plain)).html)).toContain('<link rel="alternate" hreflang="fr" href="https://x.example/news/english-only">')
+    }
+    finally {
+      await rm(copy, { recursive: true, force: true })
+    }
+  }, 30_000)
+
   it('lists every locale\'s entries outside a request, and refuses an entry outside a locale folder', async () => {
     const { news } = await import('./fixtures/i18n-content/src/content.config')
 

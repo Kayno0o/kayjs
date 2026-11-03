@@ -256,7 +256,7 @@ export default defineMessages({
 ### The page's markup
 
 - The page's `<html lang>` is its locale, with `dir="rtl"` for one written right to left, such as Arabic, Hebrew, Persian or Urdu, so the page lays itself out that way and CSS logical properties, `margin-inline-start`, follow.
-- With `site`, every page links its copy in each locale, `<link rel="alternate" hreflang>`, `x-default` being the default locale's, its canonical URL is its own locale's, and the sitemap lists every copy with the others as `xhtml:link` alternates.
+- With `site`, every page links its copy in each locale, `<link rel="alternate" hreflang>` (a routed entry's translation at its own slug), `x-default` being the default locale's, its canonical URL is its own locale's, and the sitemap lists every copy with the others as `xhtml:link` alternates.
 - `kay build` prerenders a page once per locale.
 
 ### French typography

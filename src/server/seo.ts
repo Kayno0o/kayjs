@@ -194,7 +194,10 @@ function pageLinks(origin: string, url: URL, trailingSlash: TrailingSlash | unde
   if (!state || state.implicit)
     return [{ tag: 'link', props: { rel: 'canonical', href: origin + slashedPath(url.pathname, trailingSlash) } }]
 
-  const copies = localeCopies(state.settings, state.path)
+  const shown = state.path.length > 1 && state.path.endsWith('/') ? state.path.slice(0, -1) : state.path
+  const entryUrls = state.entryUrls?.get(shown)
+  // A routed entry whose translation has another slug points at the translation's own url, as `alternate()` does.
+  const copies = localeCopies(state.settings, state.path).map(copy => copy.locale !== undefined && entryUrls?.[copy.locale] !== undefined ? localeCopies(state.settings, entryUrls[copy.locale]!).find(own => own.locale === copy.locale)! : copy)
   const absolute = (copy: LocaleCopy) => `${copy.host === undefined ? origin : `https://${copy.host}`}${slashedPath(copy.path, trailingSlash)}`
   const own = copies.find(copy => copy.locale === state.locale)!
   const fallback = copies.find(copy => copy.locale === state.settings.defaultLocale)!
