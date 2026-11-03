@@ -475,8 +475,8 @@ export class KayLanguageServer implements LspHost {
       try {
         await this.client.request('window/showDocument', { uri, takeFocus: true, selection })
       }
-      catch {
-        // The editor refused to show it, which the click has no use telling.
+      catch (error) {
+        console.error('kay lsp: the editor did not show the island cause', error)
       }
     }
 
