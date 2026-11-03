@@ -1,5 +1,5 @@
+import type { ApiError } from './api-error'
 import type { ConnectionStatus } from './live'
-import { ApiError } from './api-error'
 import { ownSignal, untrack } from './reactive'
 
 // The one place a connection is retried and its state kept: the reconnect, the backoff, the listeners and the status of `socket()`, `stream()`, the cached values a page follows and the live values.
@@ -158,10 +158,11 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
       attempt = 0
       setStatus('connecting')
     },
-    // The attempt dropped: tried again after the backoff, else failed with `failure`, which says it was lost when none is given.
+    // The attempt dropped: tried again after the backoff, else failed with `failure`, which a connection that may not reconnect always gets.
     lost: (failure?: ApiError) => {
       if (!reconnect) {
-        fail(failure ?? new ApiError(0, 'The connection was lost'))
+        if (failure)
+          fail(failure)
 
         return
       }

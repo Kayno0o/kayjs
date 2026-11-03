@@ -372,7 +372,7 @@ export const reply = action(s.Object({ prompt: s.String({ maxLength: 2000 }) }),
 
 If the handler throws an error carrying `Symbol.for('kay.refused')` as `{ status, retryAfter?, message, errors?, data? }`, the action answers that status with a `Retry-After` header and the message, with `errors` beside the fields and `data` as `ctx.fail` gives them, in place of a 500. `refuse()` from `kay` throws one. kayjs-ai refuses a visitor over its limit this way, and the action's `messages.rateLimit` can word it.
 
-An island calling it gets a stream once the first value is there. `last()` reads the latest value, `status()` tells whether it is still open, and `close()` stops it.
+An island calling it gets a stream once the first value is there. `last()` reads the latest value, `status()` tells whether it is still open (`pending()` and `error()` read it too), and `close()` stops it.
 
 ```kay
 ---
@@ -425,7 +425,9 @@ The values travel in the form's action URL. A visitor can change them as they co
 
 `add.pending()` is true while any call to `add` is running, so a row of buttons calling one action would all spin together.
 
-`add.track()` gives a handle for one component. Its `pending()` reads only the calls made through it. A call resolves with how it went, instead of throwing when the server refuses it. [`call.track()`](/guides/api-routes) gives an API route's calls the same result.
+`add.track()` gives a handle for one component. Its `pending()` reads only the calls made through it, `status()` is `idle` before the first call, `error()` is the last failure as an `ApiError`, and `retry()` sends the call that failed again with the same arguments, as they were.
+
+A retry gives no result back until the hooks of a later release; read `status()`. A call resolves with how it went, instead of throwing when the server refuses it. [`call.track()`](/guides/api-routes) gives an API route's calls the same result.
 
 To wait for writes you did not await, `await add.settled()` resolves once no call to `add` is running, and `removing.settled()` once none made through the handle is. It resolves whichever way the calls went, and never throws. A call whose action redirects stays running while the page goes away, unless a leave guard keeps the visitor on it.
 

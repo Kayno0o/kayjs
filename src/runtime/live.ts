@@ -200,7 +200,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
 
       // The server refused on purpose: a code of its own, 4000 plus the status, is not worth reconnecting for.
       if (event.code >= REFUSED_CODES && event.code < REFUSED_CODES + 1000) {
-        const reason = (event).reason
+        const reason = event.reason
 
         link.fail(new ApiError(event.code - REFUSED_CODES, reason === '' ? `The server closed the connection with ${event.code}` : reason))
 
@@ -251,9 +251,9 @@ async function refusalOf(response: Response): Promise<ApiError> {
   }
   catch {}
 
-  const text = (data as { message?: unknown } | null)?.message ?? data
+  const message = messageOf({ status: response.status, errors: {}, data }, response.statusText)
 
-  return new ApiError(response.status, typeof text === 'string' && text !== '' ? text : response.statusText, data)
+  return new ApiError(response.status, message, data, { '': message })
 }
 
 // An event stream read as it arrives, through `request`; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is; with `retryRefused`, a response that is not ok is tried again after the backoff too, as a stream across a restart needs.
@@ -309,6 +309,10 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
       if (!response.ok || !response.body) {
         const refusal = await refusalOf(response)
 
+        // Superseded or closed while the body was read: the run that took over owns the state.
+        if (controller.signal.aborted)
+          return
+
         if (!retryRefused) {
           link.fail(refusal)
 
@@ -324,7 +328,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
       }
     }
     catch (thrown) {
-      failure = apiErrorOf(thrown)
+      failure = thrown instanceof ApiError ? thrown : unreachable(thrown)
     }
 
     if (controller.signal.aborted || ended === 'failed')
@@ -333,7 +337,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
     if (ended)
       link.set(ended)
     else
-      link.lost(failure)
+      link.lost(failure ?? (reconnect ? undefined : new ApiError(0, 'The connection was lost')))
   }
 
   return {

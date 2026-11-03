@@ -177,6 +177,9 @@ interface CardPageContext<Params extends Record<string, unknown> = Record<string
 [.] Component
 type Component<Props = object> = (props: Props) => JSX.Element
 
+[.] ConnectionStatus
+type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'done' | 'failed' | 'closed'
+
 [.] context
 function context<T>(fallback: T): Context<T>
 
@@ -430,6 +433,9 @@ interface LiveOptions<Ttl extends Duration = Duration>
 interface LiveOwn<T>
   delete: (user: string) => void
   set: (user: string, next: T | ((current: T) => T)) => void
+
+[.] LoadStatus
+type LoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
 
 [.] local
 function local<Row extends object, const Key extends keyof Row & string>(options: LocalOptions<Row, Key>): Local<Row, Key>
@@ -1025,6 +1031,13 @@ type SocketPath<Module> = Extract<Nodes<RoutesOf<Module>>, { node: { subscribe: 
 
 [.] SocketStatus
 type SocketStatus = 'connecting' | 'open' | 'failed' | 'closed'
+
+[.] Source
+interface Source<S extends LoadStatus | ConnectionStatus = LoadStatus | ConnectionStatus>
+  error: () => ApiError<unknown> | undefined
+  pending: () => boolean
+  retry: () => void
+  status: () => S
 
 [.] Static
 type Static<Type extends TSchema, Params extends unknown[] = [], Result = (Type & {

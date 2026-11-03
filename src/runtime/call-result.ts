@@ -34,6 +34,8 @@ export function trackCalls<Args extends unknown[]>(
   call: (...args: Args) => Promise<unknown>,
   refused: (error: unknown) => CallResult<never, unknown> | undefined,
   holds?: (data: unknown, release: () => void) => boolean,
+  // An error that is no failure of the call, such as a redirect, which `status()`, `error()` and `retry()` leave alone (a retry would post a login or a checkout again).
+  aside?: (error: unknown) => boolean,
 ): ((...args: Args) => Promise<CallResult<unknown, unknown>>) & Source<LoadStatus> & { settled: () => Promise<void> } {
   const [inFlight, setInFlight] = ownSignal(0)
   const [outcome, setOutcome] = ownSignal<LoadStatus>('idle')
@@ -60,7 +62,7 @@ export function trackCalls<Args extends unknown[]>(
       return { ok: true, data }
     }
     catch (failure) {
-      if (!args.some(arg => (arg as { signal?: AbortSignal } | undefined)?.signal?.aborted === true)) {
+      if (aside?.(failure) !== true && !args.some(arg => (arg as { signal?: AbortSignal } | undefined)?.signal?.aborted === true)) {
         failedWith = args
         setOutcome('failed')
         setError(apiErrorOf(failure))

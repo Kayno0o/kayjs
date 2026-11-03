@@ -194,6 +194,7 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
     call as (input: unknown, options?: CallOptions) => Promise<unknown>,
     error => !(error instanceof ActionError) || error instanceof ActionRedirectError || refusedAt.get(error) !== url() ? undefined : { ok: false, status: error.status, message: error.message, errors: error.errors, data: error.data },
     (data, release) => onStreamEnd(data, release),
+    error => error instanceof ActionRedirectError,
   )
 }
 

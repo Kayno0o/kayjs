@@ -1,5 +1,5 @@
 import type { LoadStatus, Source } from '../src/runtime/live'
-import { afterAll, beforeAll, describe, expect, it, jest, spyOn } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, jest, mock, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { flush, root } from '../src/runtime'
 import { actionStub } from '../src/runtime/action'
@@ -557,6 +557,117 @@ describe('an action\'s track()', () => {
       expect([save.status(), save.error()]).toEqual(['ready', undefined])
       expect(fetched).toHaveBeenCalledTimes(3)
       expect(String(fetched.mock.calls[2]![1]?.body)).toContain('7')
+    }
+    finally {
+      fetched.mockRestore()
+    }
+  })
+})
+
+describe('the shared shape, further cases', () => {
+  it('is importable from kay', async () => {
+    const kay = await import('../src/runtime') as Record<string, unknown>
+    const types: [LoadStatus, import('../src/runtime').ConnectionStatus, import('../src/runtime').Source] = ['idle', 'done', { status: () => 'idle', pending: () => false, error: () => undefined, retry: () => undefined }]
+
+    expect(types[0]).toBe('idle')
+    expect(typeof kay.resource).toBe('function')
+  })
+
+  it('reads a quiet reload as pending with the status kept, and a quiet failure leaves status and error alone', async () => {
+    let refetch: (() => unknown) | undefined
+
+    await mock.module('../src/runtime/live-cache', () => ({ followRoute: (_owner: object, _proof: string | null, again: () => unknown) => {
+      refetch = again
+    } }))
+    globalThis.document = { querySelector: () => null } as unknown as Document
+
+    const answers: (Response | Error)[] = [new Response('"one"', { headers: { 'content-type': 'application/json', 'x-kay-live': 'proof' } }), new Response('"two"', { headers: { 'content-type': 'application/json', 'x-kay-live': 'proof' } }), new TypeError('offline')]
+    const release: (() => void)[] = []
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => {
+      const next = answers.shift()!
+
+      if (answers.length === 1)
+        await new Promise<void>(resolve => release.push(resolve))
+
+      if (next instanceof Error)
+        throw next
+
+      return next
+    }) as unknown as typeof fetch)
+
+    try {
+      const read = root(() => resource(mounted as never, '/' as never)) as ReturnType<typeof resource<string>>
+
+      await eventually(() => expect(read.status()).toBe('ready'))
+      await eventually(() => expect(refetch).toBeDefined())
+      expect(read.pending()).toBe(false)
+
+      const again = refetch!()
+
+      expect([read.status(), read.pending()]).toEqual(['ready', true])
+      release[0]?.()
+      await again
+      expect([read.value(), read.pending()]).toEqual(['two', false])
+
+      const failing = refetch!()
+
+      await failing
+      expect([read.status(), read.pending(), read.error(), read.value()]).toEqual(['ready', false, undefined, 'two'])
+    }
+    finally {
+      fetched.mockRestore()
+      Reflect.deleteProperty(globalThis, 'document')
+    }
+  })
+
+  it('fails a refused stream with the status text, or HTTP and the status when it is empty', async () => {
+    const empty = readEvents<number>(async () => Object.defineProperty(new Response('', { status: 502 }), 'statusText', { value: '' }), false)
+
+    empty.start()
+    await eventually(() => expect(empty.status()).toBe('failed'))
+    expect(empty.error()).toMatchObject({ status: 502, message: 'HTTP 502', errors: { '': 'HTTP 502' } })
+  })
+
+  it('wraps a rejected fetch in kay\'s own wording with the browser\'s as the cause', async () => {
+    const cause = new TypeError('Failed to fetch')
+    const reader = readEvents<number>(async () => Promise.reject(cause), false)
+
+    reader.start()
+    await eventually(() => expect(reader.status()).toBe('failed'))
+    expect(reader.error()).toMatchObject({ status: 0, message: 'The server could not be reached' })
+    expect(reader.error()?.cause).toBe(cause)
+  })
+
+  it('lets a superseded run neither fail nor retry the one that took over', async () => {
+    const bodies: ((response: Response) => void)[] = []
+    let calls = 0
+    const reader = readEvents<number>(async () => {
+      calls++
+
+      return calls === 1 ? new Promise<Response>(resolve => bodies.push(resolve)) : sse(value(2))
+    }, false, true)
+
+    reader.start()
+    reader.start(async () => sse(value(2), 'event: end\n\n'))
+    await eventually(() => expect(reader.last()).toBe(2))
+    bodies[0]?.(new Response('no', { status: 500 }))
+    await turn()
+    await turn()
+    expect([reader.error(), reader.status()]).toEqual([undefined, 'done'])
+  })
+
+  it('leaves a redirected track call out of status, error and retry', async () => {
+    const { ActionRedirectError } = await import('../src/runtime/action')
+    const move = actionStub('/_kay/action/test/redirects') as unknown as import('../src/runtime').Action<{ id: number }, string>
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => new Response(stringify({}), { status: 303, headers: { 'location': '/done', 'x-kay-redirect': '1' } })) as unknown as typeof fetch)
+
+    try {
+      const save = move.track()
+
+      await expect(save({ id: 1 })).rejects.toBeInstanceOf(ActionRedirectError)
+      expect([save.status(), save.error()]).toEqual(['idle', undefined])
+      save.retry()
+      expect(fetched.mock.calls.length).toBeLessThanOrEqual(1)
     }
     finally {
       fetched.mockRestore()

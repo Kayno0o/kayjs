@@ -197,6 +197,20 @@ ul
 
 Options given as a function are reactive. When `search` changes, the route is asked again. Call `refresh()` to ask again by hand.
 
+Every source an island reads, a resource, a stream, a socket and the handle `track()` gives, answers the same four questions. `status()` says where it stands, `pending()` whether it is loading or connecting, `error()` gives the last failure as an `ApiError` until the next success, and `retry()` tries again now, skipping any wait. `retry()` does nothing unless the source failed or waits to reconnect, where `refresh()` asks again even when the resource is ready.
+
+```kay
+---
+import { resource } from 'kay'
+import notes from '../api/notes'
+
+const list = resource(notes, '/')
+---
+if list.error() as error
+  p {error.message}
+  button(onClick={list.retry} disabled={list.pending()}) Retry
+```
+
 A resource opens once the island is in the page, never on the server. There it renders as `loading`.
 
 To send data, call a route from an event handler. See [API routes](/guides/api-routes#calling-a-route-from-an-event-handler).
@@ -252,7 +266,7 @@ const answer = stream(chat, '/answer', {
 p {answer.last()}
 ```
 
-`last()` is the latest event, `on()` gets each one, and `status()` tells whether the stream is open, done or failed.
+`last()` is the latest event, `on()` gets each one, and `status()` tells whether the stream is open, done or failed. A failed stream has its reason in `error()`, and `retry()` starts it again.
 
 ### Starting a stream by hand
 
@@ -312,11 +326,11 @@ input(bind:value={text})
 button(onClick={() => messages.send({ text: text() })}) Send
 ```
 
-`status()` is `connecting`, `open` or `closed`. `on(listener)` gets each message, and `close()` closes the socket for good.
+`status()` is `connecting`, `open`, `failed` or `closed`. `on(listener)` gets each message, and `close()` closes the socket for good.
 
 A dropped connection reconnects by itself. It waits while the tab is hidden or offline, though a visible tab still tries each minute, in case the browser is wrong about being offline.
 
-A socket a guard refuses keeps retrying, shown as `connecting`.
+A socket a guard refuses keeps retrying, shown as `connecting`. A route that wants a client to stop closes with a code from 4000 to 4999, such as `ws.close(4403, 'Not yours')`. The socket is then `failed` and does not reconnect, `error().status` is the code minus 4000 (403 here, and 0 for 4000) and `error().message` is the reason you gave. Codes 4001 to 4099 give a status below 100, which is no HTTP status, so use 4400 and up for a refusal. Call `retry()` to open it again.
 
 A route takes 1 MB a message and 100 messages a second from one socket. A socket over either is closed, with code 1009 for a message too big and 1008 for too many. A route sets its own in `detail.messages`, counted for each socket:
 

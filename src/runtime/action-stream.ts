@@ -20,6 +20,7 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
   let early: T[] | undefined = []
   let ended: StreamStatus | undefined
   let latest: T | undefined
+  let failed: Error | undefined
   const waiting: ((status: StreamStatus) => void)[] = []
 
   const onEnd = (then: (status: StreamStatus) => void) => {
@@ -70,7 +71,7 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
     last,
     status,
     pending: () => false,
-    error: () => status() === 'failed' ? failure() as ApiError : undefined,
+    error: () => status() === 'failed' ? (failed ??= failure()) as ApiError : undefined,
     on: (listener) => {
       const missed = early ?? []
 
@@ -88,7 +89,7 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
       if (final === 'done')
         resolve(latest)
       else
-        reject(final === 'failed' ? failure() : new DOMException('The stream was closed before its end', 'AbortError'))
+        reject(final === 'failed' ? failed ??= failure() : new DOMException('The stream was closed before its end', 'AbortError'))
     })),
     [settled]: onEnd,
   }

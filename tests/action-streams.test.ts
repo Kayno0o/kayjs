@@ -5,6 +5,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { action, ActionError, ActionRedirectError, encodeCall, readActionResponse, SETTLED } from '../src/runtime/action'
 import { actionStream } from '../src/runtime/action-stream'
+import { ApiError } from '../src/runtime/api-error'
 import { browserPath, testSite } from '../src/test'
 import { untilHolds } from './helpers/until-holds'
 
@@ -373,6 +374,18 @@ describe('the stream an island reads', () => {
     expect(status).toBe('failed')
     expect(stream.last()).toBe(0)
     expect(cancelled()).toBe(true)
+  })
+
+  it('is never pending, and reads one error once it failed', async () => {
+    const { response } = answer('data: [0]\n\ndata: {broken\n\n')
+    const broken = new ApiError(500, 'It broke')
+    const stream = actionStream<number>(response, SETTLED, () => broken)
+
+    expect([stream.pending(), stream.error()]).toEqual([false, undefined])
+    await new Promise(resolve => stream[SETTLED](resolve))
+    expect(stream.error()).toBe(broken)
+    expect(stream.error()).toBe(stream.error())
+    await expect(stream.ended()).rejects.toBe(broken)
   })
 
   it('reads an answer a proxy rewrote with CRLF line breaks', async () => {

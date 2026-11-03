@@ -28,6 +28,8 @@ function fakeStream() {
   const stream: ActionStream<string | Progress> = {
     last: () => last,
     status,
+    pending: () => false,
+    error: () => undefined,
     on: (listener) => {
       listeners.add(listener)
 

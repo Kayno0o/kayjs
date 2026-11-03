@@ -264,16 +264,18 @@ export async function sourceTypes(root: string, options: CheckOptions): Promise<
           const message = `\`${old}\` is renamed \`${next}\` since 1.87, and the old name works until 1.90`
           const help = `rename it to \`${next}\``
           const importEdit = { start: base + specifier.imported.start, end: base + specifier.imported.start + old.length, text: next }
+          // `LoadStatus` also has `idle` and `ApiError` is a class with more members, so those two renames can need a code change.
+          const safe = old === 'StreamStatus'
 
           if (aliased) {
-            report(importEdit.start, importEdit.end, message, help, [importEdit])
+            report(importEdit.start, importEdit.end, message, help, [importEdit], safe)
 
             continue
           }
 
           const edits = mentions(parsed.map(one => one.ast), next) || new RegExp(`\\b${old}\\b`).test(unparsed) ? undefined : uses(ast, old, next)
 
-          report(importEdit.start, importEdit.end, message, help, edits ? [importEdit, ...edits.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))] : null)
+          report(importEdit.start, importEdit.end, message, help, edits ? [importEdit, ...edits.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))] : null, safe)
         }
       }
     }

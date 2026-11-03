@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from 'bun:test'
+import { ApiError } from '../src/runtime/api-error'
 import { connection, listenerSet, retryLater } from '../src/runtime/connection'
 
 const sleep = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -72,7 +73,7 @@ describe('connection', () => {
 
     const once = connection<string>(() => undefined, false)
 
-    once.lost()
+    once.lost(new ApiError(0, 'Dropped'))
     expect(once.status()).toBe('failed')
     expect(connection<string>(() => undefined, false, true).status()).toBe('idle')
   })
