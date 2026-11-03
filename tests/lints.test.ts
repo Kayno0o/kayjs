@@ -1148,6 +1148,10 @@ describe('deprecated-ui-callbacks', () => {
     expect(found('Timeline(label="x" entries={[]} onSelect={b})')).toHaveLength(1)
   })
 
+  it('writes the shorthand as onSelectedChange={onSelect}', () => {
+    expect(found('Table(columns={[]} rows={[]} rowKey="id" {onSelect})')).toEqual([{ at: 'onSelect', fix: ['{onSelect}->onSelectedChange={onSelect}'] }])
+  })
+
   it('leaves a press, the new name and other tags alone', () => {
     expect(found('BarList(rows={[]} onSelect={pick})')).toEqual([])
     expect(found('Timeline(label="x" entries={[]} onSelectedChange={b})')).toEqual([])

@@ -57,7 +57,7 @@ const look = recipe({
   },
 })
 
-const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, expandable = false, expanded, onToggle, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle'> & {
+const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, expandable = false, expanded, onToggle, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle'> & {
   columns: Column<Row>[]
   // The rows to draw. Left out when `list` holds them: one of the two is required.
   rows?: Row[] | undefined
@@ -99,6 +99,8 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   selected?: RowKeyValue<Row, Key>[] | undefined
   // Called with the keys picked, as `selected` takes them, and the rows they stand for, both in the rows' order, each time the selection changes, a row leaving `rows` included.
   onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined
+  // The name before 1.87, called beside `onSelectedChange` until 1.90; `kay check` reports it as `deprecated-ui-callbacks`.
+  onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined
   // Drawn beside the count while something is picked, with the keys and a function emptying the selection: the page's bulk actions.
   bulk?: Snippet<[keys: RowKeyValue<Row, Key>[], clear: () => void]> | undefined
   // Names the select-all box, and the column's header for screen readers.
@@ -242,12 +244,14 @@ effect(() => {
 function commit(keys: RowKeyValue<Row, Key>[]) {
   picked = keys
 
-  if (!onSelectedChange)
+  if (!onSelectedChange && !onSelect)
     return
 
   const wanted = new Set(keys)
+  const chosen = rows().filter(row => wanted.has(rowKeyOf(row, rowKey)))
 
-  onSelectedChange(keys, rows().filter(row => wanted.has(rowKeyOf(row, rowKey))))
+  onSelectedChange?.(keys, chosen)
+  onSelect?.(keys, chosen)
 }
 
 function toggleRow(key: RowKeyValue<Row, Key>) {

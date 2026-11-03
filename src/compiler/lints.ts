@@ -730,7 +730,7 @@ export const LINTS = {
     level: 'warn',
     group: 'deprecated',
     since: '1.87',
-    summary: 'A kayjs-ui callback under its name before 1.87: `onSelect` on a Table, TreeView or Timeline, the components with a `selected` prop, is `onSelectedChange` now, so state a prop can hold reports through `on<Prop>Change` and `onSelect` stays a press of an item. The old name is no prop any more and does nothing. The fix renames the attribute.',
+    summary: 'A kayjs-ui callback under its name before 1.87: `onSelect` on a Table, TreeView or Timeline, the components with a `selected` prop, is `onSelectedChange` now, so state a prop can hold reports through `on<Prop>Change` and `onSelect` stays a press of an item. The old name still works until 1.90. The fix renames the attribute.',
     wrong: '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n---\nTimeline(label="Day" entries={entries} selected={picked()} onSelect={picked.set})',
     right: '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n---\nTimeline(label="Day" entries={entries} selected={picked()} onSelectedChange={picked.set})',
   },

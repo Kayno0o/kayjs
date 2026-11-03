@@ -837,7 +837,7 @@ class Validator {
       const name = this.text(attribute.name)
 
       if (SELECTED_TAGS.has(file) && name === 'onSelect') {
-        const edit = { start: attribute.name.start, end: attribute.name.end, text: 'onSelectedChange' }
+        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'onSelectedChange={onSelect}' } : { start: attribute.name.start, end: attribute.name.end, text: 'onSelectedChange' }
 
         this.lint(attribute.name, 'deprecated-ui-callbacks', `\`onSelect\` on \`${element.name}\` is \`onSelectedChange\` since kayjs-ui 1.87, beside the \`selected\` it reports`, { help: 'Write `onSelectedChange`', fixes: [{ title: 'Write `onSelectedChange`', edits: [edit], safe: true }] })
 

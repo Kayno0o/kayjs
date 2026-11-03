@@ -11,7 +11,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-tree-view', item: 'kui-tree-view-item', toggle: 'kui-tree-view-toggle', spinner: 'kui-tree-view-spinner animate-spin motion-reduce:animate-none', icon: 'kui-tree-view-icon', label: 'kui-tree-view-label', link: 'kui-tree-view-link', failed: 'kui-tree-view-failed', retry: 'kui-tree-view-retry', trailing: 'kui-tree-view-trailing' } })
 
-const { nodes, label, selected, expanded = [], onSelectedChange, onToggle, trailing, failureLabel = wording('ui.treeView.failure', 'Could not load.'), retryLabel = wording('ui.treeView.retry', 'Try again'), ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect' | 'onToggle'> & {
+const { nodes, label, selected, expanded = [], onSelectedChange, onSelect, onToggle, trailing, failureLabel = wording('ui.treeView.failure', 'Could not load.'), retryLabel = wording('ui.treeView.retry', 'Try again'), ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect' | 'onToggle'> & {
   nodes: readonly TreeNode<Id>[]
   // Names the tree for screen readers.
   label: string
@@ -26,6 +26,8 @@ const { nodes, label, selected, expanded = [], onSelectedChange, onToggle, trail
   retryLabel?: string | undefined
   // Runs on a click on a row, or Enter or Space on the focused one, with the id `selected` takes and the node picked.
   onSelectedChange?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
+  // The name before 1.87, called beside `onSelectedChange` until 1.90; `kay check` reports it as `deprecated-ui-callbacks`.
+  onSelect?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
   // Controls at the end of a row, such as a star or a count, dimmed away until the row is hovered or holds focus: `@trailing(node)`.
   trailing?: Snippet<[TreeNode<Id>]> | undefined
 }>()
@@ -156,6 +158,7 @@ function pick(row: TreeRow<Id>) {
   current = row.node.id
   focused = row.node.id
   onSelectedChange?.(row.node.id, row.node)
+  onSelect?.(row.node.id, row.node)
 }
 
 // A branch's chevron opens or closes it, the rest of the row selects it, the row's own controls excepted; the keyboard does both through the row itself.

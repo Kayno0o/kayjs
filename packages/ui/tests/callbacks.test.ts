@@ -41,24 +41,24 @@ test('every on<Prop>Change callback sits beside the prop it reports', async () =
   expect(broken).toEqual([])
 })
 
-test('onSelect is the press of an item, never the change of a selected prop', async () => {
+test('onSelect is the press of an item: beside a selected prop it is only the pre-1.87 fallback of onSelectedChange', async () => {
   const broken: string[] = []
 
   for (const [file, { callbacks, props }] of await declared()) {
-    if (callbacks.includes('onSelect') && props.has('selected'))
+    if (callbacks.includes('onSelect') && props.has('selected') && !callbacks.includes('onSelectedChange'))
       broken.push(`${file}: onSelect beside \`selected\` is onSelectedChange`)
   }
 
   expect(broken).toEqual([])
 })
 
-test('a component with a selected prop reports it through onSelectedChange', async () => {
-  const found: string[] = []
+test('onSelectedChange only reports a selected prop', async () => {
+  const broken: string[] = []
 
   for (const [file, { callbacks, props }] of await declared()) {
-    if (props.has('selected') && callbacks.includes('onSelectedChange'))
-      found.push(file)
+    if (callbacks.includes('onSelectedChange') && !props.has('selected'))
+      broken.push(`${file}: onSelectedChange has no \`selected\` prop`)
   }
 
-  expect(found).toEqual(['table.kay', 'timeline.kay', 'tree-view.kay'])
+  expect(broken).toEqual([])
 })
