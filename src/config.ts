@@ -331,8 +331,8 @@ export interface SecurityConfig {
   permissions?: Record<string, string | string[] | false> | undefined
   // Headers merged over kay's, one given `false` not sent: `{ 'strict-transport-security': 'max-age=63072000; includeSubDomains' }`.
   headers?: Record<string, string | false> | undefined
-  // Production answers 421 to a request whose `Host` is not the site's, one of the `i18n` locale hosts or listed here, against DNS rebinding: `true` allows those alone. Localhost and IP addresses always pass, as a health check reaches the server by them. Off by default, and under `kay dev`, which has `KAY_DEV_HOSTS`.
-  hosts?: string[] | true | undefined
+  // Production answers 421 to a request whose `Host` is not the site's, one of the `i18n` locale hosts or listed here, against DNS rebinding and a link built from `ctx.url.origin` poisoned by the header: `true` allows those alone, which is the default once `site` is set, and `false` trusts every `Host`. Localhost and IP addresses always pass, as a health check reaches the server by them. Under `kay dev` it is `KAY_DEV_HOSTS` instead.
+  hosts?: string[] | boolean | undefined
 }
 
 // `hops` or `header`, not both, and with `key` alone one proxy is in front: read only from a request coming from this machine or a private network, so a client reaching the server directly cannot forge it.

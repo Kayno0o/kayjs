@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { pages } from './shared-pages'
@@ -50,9 +51,47 @@ describe('security.hosts', () => {
     expect((await answer(await served({ security: { hosts: ['shop.example'] } }), 'shop.example')).status).toBe(200)
   })
 
-  it('is off unless asked for', async () => {
+  it('is on by default in production once `site` is set', async () => {
     const app = await served({ site: 'https://shop.example' })
 
+    expect((await answer(app, 'shop.example')).status).toBe(200)
+    expect((await answer(app, 'rebound.example')).status).toBe(421)
+    expect((await answer(app, 'www.shop.example')).status).toBe(421)
+
+    for (const host of ['localhost:3000', '127.0.0.1', '10.0.0.4:3000', '[::1]:3000', undefined])
+      expect((await answer(app, host)).status).toBe(200)
+  })
+
+  it('keeps `www` and a CDN host when they are listed, and `hosts: true` alone does the default', async () => {
+    const listed = await served({ site: 'https://shop.example', security: { hosts: ['www.shop.example', 'cdn.example'] } })
+
+    expect((await answer(listed, 'www.shop.example')).status).toBe(200)
+    expect((await answer(listed, 'cdn.example')).status).toBe(200)
+    expect((await answer(listed, 'rebound.example')).status).toBe(421)
+    expect((await answer(await served({ site: 'https://shop.example', security: { csp: false } }), 'rebound.example')).status).toBe(421)
+  })
+
+  it('opts out with `hosts: false` or `security: false`', async () => {
+    expect((await answer(await served({ site: 'https://shop.example', security: { hosts: false } }), 'rebound.example')).status).toBe(200)
+    expect((await answer(await served({ site: 'https://shop.example', security: false }), 'rebound.example')).status).toBe(200)
+  })
+
+  it('trusts every host with no `site`, and outside production', async () => {
+    expect((await answer(await served({}), 'rebound.example')).status).toBe(200)
+    process.env.NODE_ENV = 'test'
+
+    const app = await pages({ root: PRODUCTION, prebuilt: false, site: 'https://shop.example' })
+
     expect((await answer(app, 'rebound.example')).status).toBe(200)
+  })
+
+  it('answers the hosts of `i18n.domains` by default', async () => {
+    process.env.NODE_ENV = 'production'
+
+    const app = await pages({ root: 'tests/fixtures/i18n', prebuilt: false, site: 'https://x.fr', i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages'), domains: { fr: 'x.fr', en: 'x.com' } } })
+    const asked = async (host: string) => (await app.handle(new Request('http://localhost/about', { headers: { host } }))).status
+
+    expect(await asked('x.com')).toBe(200)
+    expect(await asked('rebound.example')).toBe(421)
   })
 })

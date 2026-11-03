@@ -1,5 +1,5 @@
 import type { Elysia as App } from 'elysia'
-import type { TrailingSlash } from '../config'
+import type { SecurityConfig, TrailingSlash } from '../config'
 import type { Mode, Project } from '../project'
 import type { GuardContext } from '../runtime'
 import type { ActionOptions } from './actions'
@@ -262,6 +262,16 @@ export function inlinePageStyles(client: ClientBuild): string[] {
   return [...client.pageStyles?.values() ?? []].flatMap(({ inline }) => inline)
 }
 
+// The host names a server answers to: the ones `security.hosts` sets, or in production with `site` known the site's own and the locale hosts, so the `Host` header is not trusted by default. `hosts: false` and `security: false` opt out.
+function hostsToAnswer(security: SecurityConfig | false | undefined, site: string | undefined, env: ServerMode): string[] | true | undefined {
+  if (!env.serving || security === false)
+    return undefined
+
+  const hosts = security?.hosts
+
+  return hosts === false ? undefined : hosts ?? (env.production && site !== undefined ? true : undefined)
+}
+
 // Who the request is from and whether it may come: the proxy it came through, the server's own mark, the proxy key, the hosts, then the security headers on every answer.
 export function trustRequests({ app, env, options, served, security, filePaths, setup, mcpAt, mcpKey, metrics, log }: Boot): void {
   setRequestIdHeader(options.observe?.requestIdHeader)
@@ -273,8 +283,10 @@ export function trustRequests({ app, env, options, served, security, filePaths, 
   requireProxyKey(app, checkProxy(options.proxy), { dev: env.dev, exported: env.exported, base: env.base, health: options.health === false ? undefined : options.health?.path ?? HEALTH_PATH, endpoint: mcpKey === undefined ? undefined : mcpAt, metrics: () => metrics && served.holds(metrics) ? metrics.path : undefined, logRefused: requestRefusalLogger(log), security })
   refuseForeignHosts(app, setup.site, security)
 
-  if (typeof options.security === 'object' && options.security.hosts !== undefined && env.serving)
-    refuseUnknownHosts(app, { site: setup.site, hosts: options.security.hosts, localeHosts: Object.values(setup.i18n?.settings.hosts ?? {}), security })
+  const hosts = hostsToAnswer(options.security, setup.site, env)
+
+  if (hosts !== undefined)
+    refuseUnknownHosts(app, { site: setup.site, hosts, localeHosts: Object.values(setup.i18n?.settings.hosts ?? {}), security })
 
   if (security)
     sendSecurityHeaders(app, security, filePaths)

@@ -356,16 +356,16 @@ An SVG `data:` image passes on `src` and `poster` only, where the browser draws 
 
 ## Answer only to your own host
 
-A page of another site can point its own domain at your server's address and have a visitor's browser talk to it (DNS rebinding). In production, `security.hosts` refuses a request whose `Host` is not yours with a 421.
+A page of another site can point its own domain at your server's address and have a visitor's browser talk to it (DNS rebinding), and a forged `Host` header would end up in any link you build from `ctx.url.origin`. In production, once `site` is set, kay refuses a request whose `Host` is not yours with a 421.
 
 ```ts
 export default defineConfig({
   site: 'https://www.example.com',
-  security: { hosts: true },
+  security: { hosts: ['example.com'] },
 })
 ```
 
-`true` allows the host of `site` and the hosts of `i18n` alone. List more names in an array: `hosts: ['example.com']`. Localhost and IP addresses always pass, so a health check or a collector reaching the server by address works.
+By default only the host of `site` and the hosts of `i18n` are answered. List more names in an array, as above for the apex beside `www`, a tunnel or a CDN host. Localhost and IP addresses always pass, so a health check or a collector reaching the server by address works. `hosts: false` turns the check off, and with no `site` nothing is refused.
 
 ## A post from another site
 
