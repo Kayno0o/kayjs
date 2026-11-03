@@ -4919,3 +4919,19 @@ describe('kay check, deprecated-ui-tone', () => {
     }
   })
 })
+
+describe('kay check, deprecated-ui-callbacks', () => {
+  it('reports onSelect on a Timeline and --fix writes onSelectedChange', async () => {
+    const head = '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\nlet picked: string | undefined\n---\n'
+    const root = await scratchProject({ 'src/a.kay': `${head}Timeline(label="Day" entries={[]} selected={picked} onSelect={key => picked = key})\n` })
+
+    try {
+      expect((await runCheck(root)).output.match(/deprecated-ui-callbacks/g)).toHaveLength(1)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/a.kay')).text()).toBe(`${head}Timeline(label="Day" entries={[]} selected={picked} onSelectedChange={key => picked = key})\n`)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})

@@ -43,4 +43,4 @@
 
 ## Reference
 
-- The shape every component of the library follows: state the app can hold is a prop followed when it changes plus a callback on each transition (`open`/`onOpenChange` as Popover, `value`/`onChange` as the pickers), a data source is a list or a function returning a promise, and each visible part can be replaced by a block.
+- The shape every component of the library follows: state the app can hold is a prop followed when it changes plus a callback on each transition (`open`/`onOpenChange` as Popover, `selected`/`onSelectedChange` as Table, TreeView and Timeline, `value`/`onChange` as the pickers), a press of an item with no prop behind it is `onSelect` handing back the item (BarList, the charts, Steps, Menu; `tests/callbacks.test.ts` holds it), a data source is a list or a function returning a promise, and each visible part can be replaced by a block.

@@ -41,7 +41,7 @@ How kay and its libraries name the same idea, written before the renames land: a
 
 **Methods and props**
 - A library's methods: `list<Things>()` for a collection, `get<Thing>(id)` for one, `revoke<Thing>` for a credential (a token, a session, a passkey), `delete<Thing>` for a record, and `{ ok }` as the result of anything that can be refused (#1688).
-- kayjs-ui props: `variant`, `tone` and `size` are enums (no `solid` or `compact` booleans); `busy` shows a pending state; open state is `open` with `onOpenChange(open)`; `onSelect` gives the thing selected and its payload is documented; callbacks return `unknown`; `current` is `string | URL` everywhere (#1695).
+- kayjs-ui props: `variant`, `tone` and `size` are enums (no `solid` or `compact` booleans); `busy` shows a pending state; open state is `open` with `onOpenChange(open)`; state a prop can hold reports through `on<Prop>Change` (`onSelectedChange` for `selected`), a press of an item is `onSelect` and its payload is documented (#2852); callbacks return `unknown`; `current` is `string | URL` everywhere (#1695).
 - Results say `ok`, never `failed`, and `errors` hold messages the user can read (#1696).
 
 **CLI and environment**

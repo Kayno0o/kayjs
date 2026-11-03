@@ -12,6 +12,6 @@ Each entry has a `key`, a `time` (a time or a range, worded as you like), a `tex
 
 ## Picking an entry
 
-With `onSelect` or `selected`, every entry becomes a button. One is picked at a time and marked with `aria-pressed`, and pressing it again clears the pick. `selected` is the picked key, so `selected={picked()} onSelect={picked.set}` binds it. `onSelect` gets the key, or `undefined` when the pick was cleared, then the entry.
+With `onSelectedChange` or `selected`, every entry becomes a button. One is picked at a time and marked with `aria-pressed`, and pressing it again clears the pick. `selected` is the picked key, so `selected={picked()} onSelectedChange={picked.set}` binds it. `onSelectedChange` gets the key, or `undefined` when the pick was cleared, then the entry.
 
 An entry with `pickable: false` stays plain text, such as a gap with nothing to show elsewhere.

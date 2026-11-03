@@ -16,14 +16,14 @@ const look = recipe({
   },
 })
 
-const { entries, selected, onSelect, label, ...rest } = props<Omit<JSX.IntrinsicElements['ol'], 'class' | 'children' | 'onSelect'> & {
+const { entries, selected, onSelectedChange, label, ...rest } = props<Omit<JSX.IntrinsicElements['ol'], 'class' | 'children' | 'onSelect'> & {
   // In the order they are shown, which is the time order: the timeline never sorts them.
   entries: readonly TimelineEntry<Key>[]
   // The key of the picked entry, if any; a new one from the parent is followed.
   selected?: Key | undefined
   // Makes the entries buttons, one picked at a time; with `selected` alone they stay buttons too. Gets the picked key, or undefined when the picked entry is pressed again, and the entry pressed.
-  // The shape `selected` takes first, so `onSelect={picked.set}` round-trips.
-  onSelect?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
+  // The shape `selected` takes first, so `onSelectedChange={picked.set}` round-trips.
+  onSelectedChange?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
   // Names the list for screen readers.
   label: string
 }>()
@@ -33,13 +33,13 @@ const picked = signal<string | number | undefined>(selected)
 
 effect(() => picked = selected)
 
-const selectable = () => onSelect !== undefined || selected !== undefined
+const selectable = () => onSelectedChange !== undefined || selected !== undefined
 
 function pick(entry: TimelineEntry<Key>) {
   const next = picked() === entry.key ? undefined : entry.key
 
   picked = next
-  onSelect?.(next, entry)
+  onSelectedChange?.(next, entry)
 }
 ---
 ol(part="root" {...rest} aria-label={label})

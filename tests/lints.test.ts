@@ -1132,3 +1132,25 @@ describe('deprecated-ui-tone', () => {
     expect(found('// kay-allow deprecated-ui-tone\nSparkline(label="x" values={[1]} tone="muted")')).toEqual([])
   })
 })
+
+describe('deprecated-ui-callbacks', () => {
+  const imports = 'import Table from \'@kaynooo/kayjs-ui/table.kay\'\nimport TreeView from \'@kaynooo/kayjs-ui/tree-view.kay\'\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\nimport BarList from \'@kaynooo/kayjs-ui/bar-list.kay\'\n'
+  const found = (template: string) => {
+    const source = `---\n${imports}---\n${template}\n`
+    const result = compileKay(source, 'callbacks.kay', { check: true })
+
+    return result.diagnostics.filter(d => d.code === 'deprecated-ui-callbacks').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
+  }
+
+  it('renames onSelect on the components with a selected prop', () => {
+    expect(found('Table(columns={[]} rows={[]} rowKey="id" selectable onSelect={pick})')).toEqual([{ at: 'onSelect', fix: ['onSelect->onSelectedChange'] }])
+    expect(found('TreeView(nodes={[]} label="x" selected={a} onSelect={b})')).toHaveLength(1)
+    expect(found('Timeline(label="x" entries={[]} onSelect={b})')).toHaveLength(1)
+  })
+
+  it('leaves a press, the new name and other tags alone', () => {
+    expect(found('BarList(rows={[]} onSelect={pick})')).toEqual([])
+    expect(found('Timeline(label="x" entries={[]} onSelectedChange={b})')).toEqual([])
+    expect(found('Other(onSelect={b})')).toEqual([])
+  })
+})

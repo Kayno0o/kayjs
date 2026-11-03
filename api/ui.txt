@@ -2301,7 +2301,7 @@ component default
   detailRow?: string | undefined;
   detailCell?: string | undefined;
   emptyCell?: string | undefined;
-} | undefined; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: string | boolean | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list?: undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; rowKey: Key; rows: Row[]; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
+} | undefined; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: string | boolean | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list?: undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; rowKey: Key; rows: Row[]; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
   | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: string | {
   root?: string | undefined;
   filter?: string | undefined;
@@ -2339,7 +2339,7 @@ component default
   detailRow?: string | undefined;
   detailCell?: string | undefined;
   emptyCell?: string | undefined;
-} | undefined; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: string | boolean | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list: InfiniteList<Row>; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
+} | undefined; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: string | boolean | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list: InfiniteList<Row>; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
 
 [./tabs.kay] default
 component default
@@ -2401,7 +2401,7 @@ component default
 } | undefined
   entries: readonly TimelineEntry<Key>[]
   label: string
-  onSelect?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
+  onSelectedChange?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
   selected?: Key | undefined
 
 [./toaster.kay] default
@@ -2478,7 +2478,7 @@ component default
   failureLabel?: string | undefined
   label: string
   nodes: readonly TreeNode<Id>[]
-  onSelect?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
+  onSelectedChange?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
   onToggle?: ((id: Id, open: boolean, node: TreeNode<Id>) => unknown) | undefined
   retryLabel?: string | undefined
   selected?: Id | undefined

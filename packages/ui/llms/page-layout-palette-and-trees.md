@@ -70,11 +70,11 @@ header
 ### TreeView
 
 ```kay
-TreeView(nodes={[{ id: 'work', label: 'Work', children: [{ id: 'specs', label: 'Specs' }] }, { id: 'inbox', label: 'Inbox', icon: 'info' }]} label="Folders" selected={folder()} onSelect={folder.set})
+TreeView(nodes={[{ id: 'work', label: 'Work', children: [{ id: 'specs', label: 'Specs' }] }, { id: 'inbox', label: 'Inbox', icon: 'info' }]} label="Folders" selected={folder()} onSelectedChange={folder.set})
 ```
 
 - Nested nodes, such as folders: a `TreeNode` (from the package) has an `id`, a `label`, an optional `icon`, and `children` when it is a branch, even an empty one; ids are strings, or numbers in a `TreeNode<number>[]`. `label` names the tree for screen readers.
-- `selected` marks a node, drawn with the branches holding it open from the server's HTML on, and a tree whose parent passes another follows it, opening those branches; `expanded` lists the branches open and is followed when it changes; lazy `children` and `onToggle`: [Open state and data sources](open-state-and-sources.md). `onSelect(id, node)` runs, with the id `selected` takes and the node picked, on a click on a row, or Enter or Space on the focused one, and the chevron opens or closes its branch alone.
+- `selected` marks a node, drawn with the branches holding it open from the server's HTML on, and a tree whose parent passes another follows it, opening those branches; `expanded` lists the branches open and is followed when it changes; lazy `children` and `onToggle`: [Open state and data sources](open-state-and-sources.md). `onSelectedChange(id, node)` runs, with the id `selected` takes and the node picked, on a click on a row, or Enter or Space on the focused one, and the chevron opens or closes its branch alone.
 - `href` on a node makes its row a real link (new tab, page swap), the whole row stretched over by the anchor with the chevron and the controls above it; Enter or Space on the focused row follows it. With no `selected`, the node whose `href` is the page's address (TabNav's rule: the same path, every param the `href` sets present in the address, the `href` setting the most params winning; the hash is ignored) is the selected one, server HTML included, following the page as it changes, and its link has `aria-current="page"`. A page rendered once at build time has no address to follow, so pass `selected` there. The page's address is compared as the app wrote the `href`, so on a site with a locale prefix pass `selected`.
 - `@trailing(node)` draws a block at the end of each row, such as a star or a count, hidden until the row is hovered or holds focus and always shown with a coarse pointer (parts `trailing`, `link`); a click or key inside it never selects the row nor moves in the tree.
 - `menu` on a node is its context menu, `MenuEntry[]` as `Menu`'s `items` and named by the node's label: a right click opens it at the pointer, Shift+F10 and the Menu key under the focused row, and focus returns to the row on close. A node without one keeps the browser's menu.
@@ -83,11 +83,11 @@ TreeView(nodes={[{ id: 'work', label: 'Work', children: [{ id: 'specs', label: '
 ### Timeline
 
 ```kay
-Timeline(entries={[{ key: 'home', time: '08:00 - 09:10', text: 'At home', icon: 'info' }, { key: 'gap', time: '09:10 - 09:40', text: 'No data', tone: 'neutral', pickable: false }]} label="Today" selected={picked()} onSelect={picked.set})
+Timeline(entries={[{ key: 'home', time: '08:00 - 09:10', text: 'At home', icon: 'info' }, { key: 'gap', time: '09:10 - 09:40', text: 'No data', tone: 'neutral', pickable: false }]} label="Today" selected={picked()} onSelectedChange={picked.set})
 ```
 
 - Entries in time order, as given (the timeline never sorts): a `TimelineEntry` (from the package) has a `key`, a `time` (the time or range as the app words it), a `text`, an optional `icon` and `tone`, and `pickable`. `tone: 'neutral'` greys a gap; the other `Tone`s colour the icon. `label` names the list for screen readers.
-- With `onSelect` or `selected` every entry is a button marked `aria-pressed`, one picked at a time, reachable with Tab; pressing the picked one again clears it. `selected` is the bindable key, a new one from the parent is followed, and `onSelect(key, entry)` gets the key as `selected` takes it (`undefined` when cleared), so `onSelect={picked.set}` round-trips. `pickable: false` keeps an entry plain text. Hover, picked and muted looks follow the theme and every skin; the parts are `root`, `item`, `entry`, `time`, `icon` and `text` ([Restyle a component](restyle.md)).
+- With `onSelectedChange` or `selected` every entry is a button marked `aria-pressed`, one picked at a time, reachable with Tab; pressing the picked one again clears it. `selected` is the bindable key, a new one from the parent is followed, and `onSelectedChange(key, entry)` gets the key as `selected` takes it (`undefined` when cleared), so `onSelectedChange={picked.set}` round-trips. `pickable: false` keeps an entry plain text. Hover, picked and muted looks follow the theme and every skin; the parts are `root`, `item`, `entry`, `time`, `icon` and `text` ([Restyle a component](restyle.md)).
 
 ### DescriptionList
 

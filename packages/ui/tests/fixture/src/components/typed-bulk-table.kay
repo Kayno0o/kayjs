@@ -17,7 +17,7 @@ const { sites, disable, enable } = props<{
 const columns: Column<Site>[] = [{ key: 'name', header: 'Name' }]
 const picked: string[] = ['io']
 ---
-Table(columns={columns} rows={sites} rowKey="name" selectable selected={picked} onSelect={disable})
+Table(columns={columns} rows={sites} rowKey="name" selectable selected={picked} onSelectedChange={disable})
   @bulk(names, clear)
     Button(label="Disable" onClick={() => { disable(names); clear() }})
 Table(columns={columns} rows={sites} rowKey="port" selectable)

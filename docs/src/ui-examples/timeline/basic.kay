@@ -10,5 +10,5 @@ const entries: TimelineEntry[] = [
 ]
 ---
 .flex.flex-col.gap-2.max-w-md
-  Timeline(entries={entries} label="Today" selected={picked()} onSelect={picked.set})
+  Timeline(entries={entries} label="Today" selected={picked()} onSelectedChange={picked.set})
   p Picked: {picked() ?? 'nothing'}.

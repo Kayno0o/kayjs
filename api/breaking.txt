@@ -14,8 +14,11 @@ ui [./select.kay] default
 ui [./slider.kay] default
 ui [./sparkline.kay] default
 ui [./status-strip.kay] default
+ui [./table.kay] default
 ui [./text-input.kay] default
 ui [./textarea.kay] default
 ui [./time-input.kay] default
+ui [./timeline.kay] default
+ui [./tree-view.kay] default
 ui [.] SparkTone
 ui [.] TimelineEntry

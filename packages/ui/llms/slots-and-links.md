@@ -13,7 +13,7 @@
 
 - `href` on `Avatar`, `Badge`, `Card`, `CardRow` and a `Timeline` entry (`entries[].href`) renders an `a` with the same parts, so middle-click and a new tab work. An `Avatar` link is named by `label`, else by `name`.
 - `Card(href)` needs a `title`, which is the link's text, and `CardRow(href)` links its body. The link covers the whole card or row, and every button, input and link inside it, `actions` and `head` included, is lifted above the link and stays clickable; the card or row has `data-linked`.
-- A `Timeline` entry with an `href` is no button: `onSelect` is not called, and the entry whose key is `selected` gets `aria-current="true"` in place of `aria-pressed`.
+- A `Timeline` entry with an `href` is no button: `onSelectedChange` is not called, and the entry whose key is `selected` gets `aria-current="true"` in place of `aria-pressed`.
 - A `Carousel` slide with `href` draws its picture inside a link; with a `@slide` block the block draws the whole content, link included.
 
 ### Icon, badge, disabled and nesting in navigation
