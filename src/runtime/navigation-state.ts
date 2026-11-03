@@ -89,7 +89,7 @@ async function askBefore(url: URL): Promise<boolean> {
   const event = { url, from: new URL(location.href) }
 
   for (const run of befores.values()) {
-    if (await logged(async () => run(event)) === false)
+    if (await logged(run, event) === false)
       return false
   }
 
@@ -97,9 +97,9 @@ async function askBefore(url: URL): Promise<boolean> {
 }
 
 // What `fn` answers, a failure logged and answered with nothing.
-async function logged<T>(fn: () => T): Promise<Awaited<T> | undefined> {
+async function logged<A, T>(fn: (argument: A) => T, argument: A): Promise<Awaited<T> | undefined> {
   try {
-    return await fn()
+    return await fn(argument)
   }
   catch (error) {
     console.error(error)
@@ -114,7 +114,7 @@ export function onNavigate(fn: (event: NavigateEvent) => unknown): () => void {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return () => undefined
 
-  const listener = (event: Event) => void logged(() => fn({ url: new URL((event as CustomEvent<{ url: string }>).detail.url) }))
+  const listener = (event: Event) => void logged((shown: Event) => fn({ url: new URL((shown as CustomEvent<{ url: string }>).detail.url) }), event)
   const stop = () => document.removeEventListener('kay:navigate', listener)
 
   document.addEventListener('kay:navigate', listener)

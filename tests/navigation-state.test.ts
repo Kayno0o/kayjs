@@ -57,6 +57,22 @@ describe('onBeforeNavigate', () => {
     later()
   })
 
+  it('asks nothing for a page kay does not swap in place: another origin or kay\'s own route', async () => {
+    const asked: string[] = []
+    const dispose = island(() => {
+      state.onBeforeNavigate(({ url }) => {
+        asked.push(url.href)
+
+        return false
+      })
+    })
+
+    expect(await navigation.mayLeave(new URL('https://other.example/'))).toBe(true)
+    expect(await navigation.mayLeave(new URL('http://localhost/_kay/x'))).toBe(true)
+    expect(asked).toEqual([])
+    dispose()
+  })
+
   it('lets the visit go on for no answer, true or a promise of nothing', async () => {
     const dispose = island(() => {
       state.onBeforeNavigate(() => undefined)

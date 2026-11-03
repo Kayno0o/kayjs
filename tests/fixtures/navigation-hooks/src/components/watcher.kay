@@ -1,5 +1,7 @@
 ---
 import { navigate, onBeforeNavigate } from 'kay'
+import * as kay from 'kay'
+import { goSecond } from './go'
 
 onBeforeNavigate(({ url }) => {
   sessionStorage.setItem('asked', `${sessionStorage.getItem('asked') ?? ''}${url.pathname};`)
@@ -7,6 +9,8 @@ onBeforeNavigate(({ url }) => {
 ---
 .targets
   button.go(onClick={() => navigate('/second')}) Go
+  button.member(onClick={() => kay.navigate('/second')}) Member
+  button.helper(onClick={goSecond}) Helper
   button.query(onClick={() => navigate('/second?x=1#top')}) Query
   button.prefixed(onClick={() => navigate('/fr/second')}) Prefixed
   button.other(onClick={() => navigate('/en/second')}) Other

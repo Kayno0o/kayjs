@@ -31,7 +31,7 @@ const WRITE_NAMES: Record<keyof typeof WRITE_HELPERS, KayHelper> = { to: 'writeT
 
 const WORD = /[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*/gu
 const KEY_COLON = /^\s*:/
-const NAVIGATE_CALL = /(?<![\w$.])navigate\s*\(/
+
 const TEXT_ATTRIBUTE = /\bwith\s*\{\s*type\s*:\s*(['"])text\1/
 
 export interface GenerateOptions {
@@ -616,12 +616,17 @@ class ModuleShell {
 
       dom.block(visible)
       b.add('\n}\n')
-      b.add(dom.declarations(NAVIGATE_CALL.test(src)))
+      b.add(dom.declarations(this.navigates()))
     }
     else {
       this.jsx.emitRoot(rooted)
       b.add('\n}\n')
     }
+  }
+
+  // Whether the script has `navigate` from `kay`, by import under any name, as a member of a namespace import or unimported.
+  private navigates(): boolean {
+    return this.script.implicit.includes('navigate') || this.script.imports.some(binding => binding.source === 'kay' && !binding.typeOnly && (binding.imported === 'navigate' || binding.imported === '*'))
   }
 
   // Whether the `@name` blocks at the root of the template stand for the calls keeping them: only a page or a layout writes them, which a compile of one file alone cannot tell, so type checking says which files are not and reports them.

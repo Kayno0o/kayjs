@@ -101,7 +101,10 @@ describe('translations', () => {
 
     expect(dom('const go = () => navigate(\'/second\')')).toContain(links)
     expect(dom('import { navigate } from \'kay\'\nconst go = () => navigate(\'/second\')')).toContain(links)
+    expect(dom('import { navigate as go } from \'kay\'\nconst again = () => go(\'/second\')')).toContain(links)
+    expect(dom('import * as kay from \'kay\'\nconst go = () => kay.navigate(\'/second\')')).toContain(links)
     expect(dom('const go = () => router.navigate(\'/second\')')).not.toContain(links)
+    expect(dom('import { refresh } from \'kay\'\nconst go = () => refresh()')).not.toContain(links)
   })
 })
 

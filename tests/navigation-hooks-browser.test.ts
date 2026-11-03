@@ -45,6 +45,8 @@ const I18N = { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('te
 // Where `navigate()` from a button goes, by the path it is given: the current locale's prefix is put on a path with none, and a prefixed one stays as written.
 const LOCALE_TARGETS = [
   { name: 'a plain path on a prefixed page', options: { i18n: I18N }, start: '/fr', button: 'go', path: '/fr/second' },
+  { name: 'a namespace import of kay', options: { i18n: I18N }, start: '/fr', button: 'member', path: '/fr/second' },
+  { name: 'a plain .ts module an island imports', options: { i18n: I18N }, start: '/fr', button: 'helper', path: '/fr/second' },
   { name: 'a query and a hash', options: { i18n: I18N }, start: '/fr', button: 'query', path: '/fr/second?x=1' },
   { name: 'a path already prefixed', options: { i18n: I18N }, start: '/fr', button: 'prefixed', path: '/fr/second' },
   { name: 'another locale path', options: { i18n: { ...I18N, prefixDefault: true } }, start: '/fr', button: 'other', path: '/en/second' },
@@ -54,11 +56,28 @@ const LOCALE_TARGETS = [
   { name: 'trailingSlash always', options: { i18n: I18N, trailingSlash: 'always' as const }, start: '/fr', button: 'go', path: '/fr/second/' },
 ]
 
+// One site for each distinct set of options, as a build is the slow part of a case.
+const shared = new Map<string, Promise<TestSite>>()
+
+async function siteFor(options: object): Promise<TestSite> {
+  const key = JSON.stringify(options)
+  const known = shared.get(key)
+
+  if (known)
+    return known
+
+  const site = testSite({ root: ROOT, browser: { path: chrome }, ...options })
+
+  shared.set(key, site)
+  sites.push(await site)
+
+  return site
+}
+
 describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('navigate() under a locale', () => {
   it.each(LOCALE_TARGETS)('reaches $path for $name', async ({ options, start, button, path }) => {
-    const site = await testSite({ root: ROOT, browser: { path: chrome }, ...options })
+    const site = await siteFor(options)
 
-    sites.push(site)
     await using page = await site.open(start)
 
     await page.click(`button.${button}`)
