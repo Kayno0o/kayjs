@@ -1,5 +1,5 @@
 import type { CallResult } from './call-result'
-import { ApiError } from './api-error'
+import { ApiError, fieldsOf, messageOf } from './api-error'
 import { withBase } from './base'
 import { trackCalls } from './call-result'
 import { effect, onCleanup, onMount, ownSignal } from './reactive'
@@ -692,7 +692,7 @@ export async function readAnswer(response: Response, signal?: AbortSignal): Prom
     if (signal?.aborted === true)
       throw failure
 
-    throw new ApiError(0, failure instanceof Error ? failure.message : String(failure))
+    throw unreachable(failure)
   }
 
   if (!JSON_TYPE.test(type) || text === '')
@@ -709,14 +709,17 @@ export async function readAnswer(response: Response, signal?: AbortSignal): Prom
   }
 }
 
-// Why a route refused: the text it answered, the message of a JSON error such as a validation failure, else its status text.
-function refusal(answer: unknown, response: Response): string {
-  if (typeof answer === 'string' && answer !== '')
-    return answer
+// What a call that got no answer throws: kay's wording, with what the browser said as the cause.
+function unreachable(failure: unknown): ApiError {
+  return new ApiError(0, 'The server could not be reached', undefined, {}, { cause: failure })
+}
 
-  const message = typeof answer === 'object' && answer !== null && 'message' in answer ? answer.message : undefined
+// A route's refusal: its message is read off the answer, `errors` holds the fields a validation failure names, else the message under ''.
+function refused(response: Response, answer: unknown): ApiError {
+  const fields = fieldsOf(answer)
+  const message = messageOf({ status: response.status, errors: fields, data: answer }, response.statusText)
 
-  return typeof message === 'string' ? message : response.statusText || `HTTP ${response.status}`
+  return new ApiError(response.status, message, answer, Object.keys(fields).length === 0 ? { '': message } : fields)
 }
 
 // Reads a GET route of a module under `src/api` from an island, once it is in the page, typed from the route. Options given as a function are read reactively: the route is asked again when a signal they read changes, and an answer a newer request overtook is dropped.
@@ -786,7 +789,7 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
         const answer = await readAnswer(response, signal)
 
         if (!response.ok && !signal.aborted)
-          throw new ApiError(response.status, refusal(answer, response), answer)
+          throw refused(response, answer)
 
         const proof = response.headers.get('x-kay-live')
 
@@ -811,13 +814,13 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
 
 export { ApiError }
 
-// The text of a refusal a visitor can read: the message of an `ApiError` the route answered, else `fallback` for an error that came with no answer (status 0, whose message is the browser's) or is no `ApiError`. An action's refusal (an `ActionError`, which carries `errors`) gives its form-wide message, else `fallback`.
+/** @deprecated Every `ApiError` has a `message` safe to show since 1.87: write `error instanceof ApiError ? error.message : fallback`. The old name works until 1.90. */
 // kept: free
 export function refusalMessage(error: unknown, fallback: string): string {
   if (!(error instanceof ApiError) || error.status === 0)
     return fallback
 
-  return 'errors' in error ? (error.errors as Record<string, string>)[''] ?? fallback : error.message
+  return 'body' in error ? error.errors[''] ?? fallback : error.message
 }
 
 // The methods a node answers over HTTP, a websocket's left out.
@@ -861,13 +864,13 @@ async function callApi<Module, const Path extends CallPath<Module>, const M exte
     if (signal?.aborted === true)
       throw failure
 
-    throw new ApiError(0, failure instanceof Error ? failure.message : String(failure))
+    throw unreachable(failure)
   }
 
   const answer = await readAnswer(response, signal)
 
   if (!response.ok)
-    throw new ApiError(response.status, refusal(answer, response), answer)
+    throw refused(response, answer)
 
   return answer as ApiAnswer<Module, Path, M>
 }
@@ -882,36 +885,13 @@ export interface TrackedApi<Module, Path> {
 function track<Module, const Path extends CallPath<Module>>(module: Module, path: Path): TrackedApi<Module, Path> {
   return trackCalls(
     async (options: unknown) => (callApi as unknown as (module: unknown, path: string, options: unknown) => Promise<unknown>)(module, path, options),
-    error => error instanceof ApiError && error.status >= 400 ? { ok: false, status: error.status, errors: refusedFields(error), data: error.answer } : undefined,
+    error => error instanceof ApiError && error.status >= 400 ? { ok: false, status: error.status, message: error.message, errors: error.errors, data: error.data } : undefined,
   ) as unknown as TrackedApi<Module, Path>
 }
 
 // `call` with `track` on it, built in its declaration and marked pure so a bundle dropping `call` drops `track` and the tracker too.
 // kept: request
 export const call = /* @__PURE__ */ Object.assign(callApi, { track })
-
-// The first segment of a validation path: `/title` and `title.0` name `title`.
-const FIRST_SEGMENT = /^\/?([^/.]*)/
-
-// A refusal as a message per field: the fields of an Elysia validation failure (all of them where it lists them, else the one it names), else the whole message under ''.
-function refusedFields(error: ApiError): Record<string, string> {
-  const answer = error.answer as { type?: unknown, property?: unknown, message?: unknown, errors?: unknown } | null
-  const errors: Record<string, string> = {}
-
-  if (typeof answer !== 'object' || answer === null || answer.type !== 'validation')
-    return { '': error.message }
-
-  const issues = Array.isArray(answer.errors) ? answer.errors as { path?: unknown, message?: unknown, summary?: unknown }[] : [{ path: answer.property, message: answer.message }]
-
-  for (const issue of issues) {
-    const text = [issue.message, issue.summary, answer.message].find(found => typeof found === 'string')
-    const named = typeof issue.path === 'string' ? FIRST_SEGMENT.exec(issue.path)?.[1] : undefined
-
-    errors[named === undefined || named === 'root' ? '' : named] ??= text ?? error.message
-  }
-
-  return Object.keys(errors).length === 0 ? { '': error.message } : errors
-}
 
 // A body carrying files goes as a form, its other fields as text, which Elysia reads against the route's schema; anything else goes as JSON.
 export function callBody(body: unknown): { body?: BodyInit | undefined, headers?: Record<string, string> } {

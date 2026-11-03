@@ -71,7 +71,7 @@ describe('an action prop typed with the success output', () => {
   })
 
   it('keeps the failure data a page reads from the action outcome', () => {
-    const failure: FailureOf<typeof claim> = { status: 409, values: {}, errors: {}, data: { reason: 'taken' } }
+    const failure: FailureOf<typeof claim> = { status: 409, message: 'Taken', values: {}, errors: {}, data: { reason: 'taken' } }
     const success: SuccessOf<typeof claim> = { data: 'ok' }
 
     // @ts-expect-error the data is the reason ctx.fail gave

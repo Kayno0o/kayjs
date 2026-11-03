@@ -1,5 +1,6 @@
 import type { Action } from './action'
 import { encodeCall } from './action'
+import { messageOf } from './api-error'
 import { withBase } from './base'
 import { MOST_FAULTS, MOST_WAIT_MS, RETRY_LATER } from './local-status'
 import { createSignal, getOwner, onCleanup } from './reactive'
@@ -17,7 +18,10 @@ export interface LocalIssue<Row> {
   kind: 'rejected' | 'conflict'
   key: string
   op: 'put' | 'remove'
+  // The status the server refused with; 409 for a conflict, whose `data` is the server's row.
   status?: number | undefined
+  // The text to show for the issue, as an `ApiError`'s message reads.
+  message: string
   errors?: Record<string, string> | undefined
   data?: unknown
   mine?: Row | undefined
@@ -429,13 +433,13 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     const [rows, queued, issues] = await Promise.all([
       request(tx.objectStore('rows').index('c').getAll(only)) as Promise<RowRecord[]>,
       request(tx.objectStore('outbox').index('c').count(only)),
-      request(tx.objectStore('issues').index('c').getAll(only)) as Promise<(LocalIssue<Row> & { c: string })[]>,
+      request(tx.objectStore('issues').index('c').getAll(only)) as Promise<(Omit<LocalIssue<Row>, 'message'> & { c: string, message?: string })[]>,
     ])
     const live = rows.filter(record => !record.gone)
 
     this.view[1]({ list: live.map(record => record.row as Row), byKey: new Map(live.map(record => [record.k, record.row as Row])) })
     this.count[1](queued)
-    this.problems[1](issues.map(({ c: _, ...issue }) => issue))
+    this.problems[1](issues.map(({ c: _, ...issue }) => ({ ...issue, message: issue.message ?? messageOf({ status: issue.status ?? 0, errors: issue.errors ?? {}, data: issue.data }, 'Not saved') })))
     this.show(queued)
   }
 
@@ -692,7 +696,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     else
       rows.delete([this.c, entry.k])
 
-    issues.add({ c: this.c, kind: 'rejected', key: entry.k, op: entry.op, status: answer.status, errors: failed.errors, data: failed.data, mine: entry.op === 'put' ? entry.row : undefined, at: Date.now() })
+    issues.add({ c: this.c, kind: 'rejected', key: entry.k, op: entry.op, status: answer.status, message: messageOf({ status: answer.status, errors: failed.errors ?? {}, data: failed.data }, 'Not saved'), errors: failed.errors, data: failed.data, mine: entry.op === 'put' ? entry.row : undefined, at: Date.now() })
     await this.trim(issues)
     await finished(tx)
 
@@ -705,7 +709,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     const base = current?.base as Row | undefined
     const detail = { key: entry.k, base, mine, theirs }
     const kept = this.options.conflict === undefined ? merged(base, mine, theirs) : this.options.conflict(detail)
-    const issue = { c: this.c, kind: 'conflict', key: entry.k, op: entry.op, mine, theirs, kept: kept === undefined || same(kept, theirs) ? undefined : kept, at: Date.now() }
+    const issue = { c: this.c, kind: 'conflict', key: entry.k, op: entry.op, status: 409, message: 'The row changed on the server', data: theirs, mine, theirs, kept: kept === undefined || same(kept, theirs) ? undefined : kept, at: Date.now() }
 
     tx.objectStore('issues').add(issue)
 

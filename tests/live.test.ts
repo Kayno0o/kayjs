@@ -851,11 +851,11 @@ describe('call()', () => {
     const missing = call(notes, '/:id', { method: 'patch', params: { id: 404 }, body: { title: 'x' } })
 
     await expect(missing).rejects.toBeInstanceOf(ApiError)
-    await expect(missing).rejects.toMatchObject({ status: 404, message: 'No such note', answer: 'No such note' })
+    await expect(missing).rejects.toMatchObject({ status: 404, message: 'No such note', data: 'No such note', errors: { '': 'No such note' } })
     await expect(call(notes, '/', { method: 'post', body: { title: '' } })).rejects.toMatchObject({ status: 422 })
 
     served.mockImplementationOnce((async () => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch)
-    await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'Failed to fetch' })
+    await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'The server could not be reached', cause: expect.objectContaining({ message: 'Failed to fetch' }) })
   })
 
   it('track() resolves a route\'s answer or refusal as the result an action\'s track() gives', async () => {
@@ -867,7 +867,7 @@ describe('call()', () => {
 
     const missing = await edit({ method: 'patch', params: { id: 404 }, body: { title: 'x' } })
 
-    expect(missing).toEqual({ ok: false, status: 404, errors: { '': 'No such note' }, data: 'No such note' })
+    expect(missing).toEqual({ ok: false, status: 404, message: 'No such note', errors: { '': 'No such note' }, data: 'No such note' })
 
     const invalid = await save({ method: 'post', body: { title: '' } })
 
@@ -957,7 +957,7 @@ describe('call()', () => {
     const refused = new ActionError(422, 'bad', { title: 'Too short' })
 
     expect(refused).toBeInstanceOf(ApiError)
-    expect(refused).toMatchObject({ status: 422, answer: 'bad', errors: { title: 'Too short' } })
+    expect(refused).toMatchObject({ status: 422, body: 'bad', errors: { title: 'Too short' } })
     expect(refusalMessage(refused, 'Try again')).toBe('Try again')
     expect(refusalMessage(new ActionError(409, 'x', { '': 'Taken' }), 'Try again')).toBe('Taken')
     expect(refusalMessage(new ActionRedirectError(302, '/'), 'Try again')).toBe('Try again')
@@ -1010,7 +1010,7 @@ describe('call()', () => {
     })
 
     answer(cut, { headers: { 'content-type': 'application/json' } })
-    await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'ECONNRESET' })
+    await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'The server could not be reached', cause: expect.objectContaining({ message: 'ECONNRESET' }) })
     answer('{oops', { status: 500, headers: { 'content-type': 'application/json' } })
     await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 500, message: '{oops', answer: '{oops' })
     answer('<p>Down</p>', { status: 502, headers: { 'content-type': 'text/html' } })

@@ -189,6 +189,8 @@ export type FailureData<Output> = unknown extends Output ? unknown : [Extract<Ou
 // What a page reads back through `action.failed()` after a plain form post failed.
 export interface FormFailure<Input, Data, Honeypot extends string = never> {
   status: number
+  // The text to show for the whole failure: the form's message, else the field messages joined, else the handler's data message.
+  message: string
   // What the form posted, so its fields can show it again; fields named like a password or a secret are left out.
   values: Partial<Record<Extract<keyof Input, string>, string>>
   // A message per field the schema refused or the honeypot caught, and under '' one for the whole form, as a rate limit's refusal.

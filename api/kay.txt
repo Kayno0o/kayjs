@@ -35,9 +35,9 @@ interface ActionContext<Params extends Readonly<Record<string, unknown>> = Route
 [.] ActionError
 class ActionError
   new <Data = unknown>(status: number, body: string, errors?: Record<string, string>, data?: Data | undefined, message?: string): ActionError<Data>
-  answer?: unknown
+  answer: Data | undefined
   body: string
-  data?: Data | undefined
+  data: Data | undefined
   errors: Record<string, string>
   name: string
   status: number
@@ -70,9 +70,9 @@ interface ActionRateLimit extends RateLimit
 [.] ActionRedirectError
 class ActionRedirectError
   new (status: number, location: string): ActionRedirectError
-  answer?: unknown
+  answer: unknown
   body: string
-  data?: unknown
+  data: unknown
   errors: Record<string, string>
   location: string
   name: string
@@ -101,8 +101,10 @@ type ApiCallOptions<Module, Path, M> = ApiRequest<Module, Path, M> & {
 
 [.] ApiError
 class ApiError
-  new (status: number, message: string, answer?: unknown): ApiError
-  answer?: unknown
+  new <Data = unknown>(status: number, message: string, data?: Data | undefined, errors?: Record<string, string>, options?: ErrorOptions | undefined): ApiError<Data>
+  answer: Data | undefined
+  data: Data | undefined
+  errors: Record<string, string>
   name: string
   status: number
 
@@ -152,7 +154,7 @@ type CallPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found exte
 } ? [CallMethod<Node>] extends [never] ? never : Path : never : never
 
 [.] CallResult
-type CallResult<Data, Failed> = | { ok: true, data: Data } | { ok: false, status: number, errors: Record<string, string>, data: Failed | undefined }
+type CallResult<Data, Failed> = | { ok: true, data: Data } | ({ ok: false } & ErrorShape<Failed>)
 
 [.] CardPageContext
 interface CardPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params>
@@ -326,6 +328,7 @@ interface FollowLogOptions
 interface FormFailure<Input, Data, Honeypot extends string = never>
   data?: Data
   errors: Partial<Record<"" | Honeypot | Extract<keyof Input, string>, string>>
+  message: string
   status: number
   values: Partial<Record<Extract<keyof Input, string>, string>>
 
@@ -455,6 +458,7 @@ interface LocalIssue<Row>
   kept?: Row | undefined
   key: string
   kind: "rejected" | "conflict"
+  message: string
   mine?: Row | undefined
   op: "put" | "remove"
   status?: number | undefined

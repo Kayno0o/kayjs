@@ -239,7 +239,7 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     await page.waitUntil(() => document.querySelector('li.note')?.textContent === 'mine 6')
 
     expect(await server()).toMatchObject({ saves: 2, rows: [{ id: 'a', title: 'mine', rev: 6 }] })
-    expect(await page.text('li.issue')).toBe('conflict a ')
+    expect(await page.text('li.issue')).toBe('conflict a 409')
   }, 60_000)
 
   it('takes the app\'s rule over the default', async () => {
@@ -254,7 +254,7 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0' && document.querySelector('li.note')?.textContent === 'theirs 5')
 
     expect(await server()).toMatchObject({ saves: 1, rows: [{ id: 'a', title: 'theirs', rev: 5 }] })
-    expect(await page.text('li.issue')).toBe('conflict a ')
+    expect(await page.text('li.issue')).toBe('conflict a 409')
   }, 60_000)
 
   it('shows one tab\'s write in another, here a frame of the same page', async () => {
@@ -487,7 +487,7 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     await page.waitUntil(() => document.querySelector('li.note')?.textContent === 'mine+theirs 6')
 
     expect(await server()).toMatchObject({ saves: 2, rows: [{ id: 'a', title: 'mine+theirs', rev: 6 }] })
-    expect(await page.text('li.issue')).toBe('conflict a ')
+    expect(await page.text('li.issue')).toBe('conflict a 409')
   }, 60_000)
 
   it('keeps the server\'s row when a row made here meets one it never saw', async () => {
@@ -500,7 +500,7 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0' && document.querySelector('li.note')?.textContent === 'theirs 5')
 
     expect(await server()).toMatchObject({ saves: 0, rows: [{ id: 'a', title: 'theirs', rev: 5 }] })
-    expect(await page.text('li.issue')).toBe('conflict a ')
+    expect(await page.text('li.issue')).toBe('conflict a 409')
   }, 60_000)
 
   it('forgets the rows held, and keeps the queue, when the version changes', async () => {

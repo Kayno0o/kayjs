@@ -36,6 +36,7 @@ import { deprecatedCollectionLinks } from './deprecated-collection-links'
 import { deprecatedConfigKeys } from './deprecated-config-keys'
 import { ownFile } from './diagnose'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
+import { apiErrorAnswers, refusalMessages } from './error-shape'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
 import { islandOnlyComponents } from './island-only'
@@ -142,6 +143,8 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => authMethods(root, options),
   async ({ root, options }) => sessionStores(root, options),
   async ({ root, options }) => safeRedirects(root, options),
+  async ({ root, options }) => apiErrorAnswers(root, options),
+  async ({ root, options }) => refusalMessages(root, options),
   async ({ root, options }) => deprecatedConfigKeys(root, options),
   async ({ root, options }) => deprecatedCollectionLinks(root, options),
 ]

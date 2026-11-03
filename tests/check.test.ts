@@ -4832,6 +4832,22 @@ describe('kay check, deprecated-safe-redirect', () => {
   })
 })
 
+describe('kay check, deprecated-api-error-answer and deprecated-refusal-message', () => {
+  it('reports .answer of an ApiError with a fix, and refusalMessage with a fix that is not safe', async () => {
+    const root = await scratchProject({ 'src/errors.ts': 'import { ApiError, refusalMessage } from \'kay\'\n\nexport const a = (error: unknown) => error instanceof ApiError ? error.answer : refusalMessage(error, \'No\')\n' })
+
+    try {
+      const found = await check(root)
+
+      expect(found.filter(d => d.code === 'deprecated-api-error-answer').map(d => [d.fixes?.[0]?.title, d.fixes?.[0]?.safe])).toEqual([['Read `data`', true]])
+      expect(found.filter(d => d.code === 'deprecated-refusal-message').map(d => d.fixes?.[0]?.safe)).toEqual([false])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('kay check, missing-captcha', () => {
   const page = '--- server\nconst auth = { password: { register: async (_input: unknown) => 1 } }\n\nawait auth.password.register({})\n---\np x\n'
   const found = async (files: Record<string, string>, options?: Parameters<typeof check>[1]) => (await check(await scratchProject({ 'src/routes/index.kay': page, ...files }), options)).filter(d => d.code === 'missing-captcha').length

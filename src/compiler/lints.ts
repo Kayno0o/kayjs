@@ -699,6 +699,24 @@ export const LINTS = {
     wrong: '---\nimport Sparkline from \'@kaynooo/kayjs-ui/sparkline.kay\'\n---\nSparkline(label="Load" values={[1, 2]} tone="muted")',
     right: '---\nimport Sparkline from \'@kaynooo/kayjs-ui/sparkline.kay\'\n---\nSparkline(label="Load" values={[1, 2]} tone="neutral")',
   },
+  'deprecated-api-error-answer': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.87',
+    site: true,
+    summary: 'A read of `.answer` on an `ApiError` or `ActionError`, `data` since 1.87, when every failure came to carry `status`, `message`, `errors` and `data`. The old name works until 1.90. Found in the TypeScript files and `.kay` fences importing either class from `kay`; the fix reads `data` where an `instanceof` of the class narrows the receiver in the same function, and a receiver only a `catch` or a cast says is an error is reported with no fix. An `ActionError`\'s `answer` was its response body text, and its `data` is what `ctx.fail` passed.',
+    wrong: '--- server\nconst read = (error: unknown) => error instanceof ApiError ? error.answer : undefined\n---\np x',
+    right: '--- server\nconst read = (error: unknown) => error instanceof ApiError ? error.data : undefined\n---\np x',
+  },
+  'deprecated-refusal-message': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.87',
+    site: true,
+    summary: 'A call of `refusalMessage(error, fallback)`, deprecated since 1.87: the `message` of every `ApiError` is the text to show, an `ActionError`\'s included, and status 0 has kay\'s own wording. The old name works until 1.90. Found in the TypeScript files and `.kay` fences reading it from `kay`; the fix writes `error instanceof ApiError && error.status !== 0 ? error.message : fallback`, offered but never applied by `kay upgrade`, because an `ActionError`\'s message now also reads its field messages and `data.message` where `refusalMessage` gave the fallback. A call whose first argument is no plain name is reported with no fix.',
+    wrong: '--- server\nconst show = (error: unknown) => refusalMessage(error, \'Try again\')\n---\np x',
+    right: '--- server\nconst show = (error: unknown) => error instanceof ApiError && error.status !== 0 ? error.message : \'Try again\'\n---\np x',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

@@ -1,9 +1,10 @@
+import type { ErrorShape } from './api-error'
 import { ownSignal, untrack } from './reactive'
 
-// How a tracked call went, for an action and for a route alike: what it answered, or the refusal. `errors` holds a message per field, the form-wide one under ''; `data` is what the handler passed to `ctx.fail` for an action, the answer a route refused with for a route.
+// How a tracked call went, for an action and for a route alike: what it answered, or the refusal. `message` is the text to show; `errors` holds a message per field, the form-wide one under ''; `data` is what the handler passed to `ctx.fail` for an action, the answer a route refused with for a route.
 export type CallResult<Data, Failed>
   = | { ok: true, data: Data }
-    | { ok: false, status: number, errors: Record<string, string>, data: Failed | undefined }
+    | ({ ok: false } & ErrorShape<Failed>)
 
 // What `settled()` waits on: callers resolved as the count of calls in flight reaches 0.
 export function whenIdle(): { wait: (count: number) => Promise<void>, check: (count: number) => void } {

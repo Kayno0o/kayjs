@@ -1303,8 +1303,8 @@ describe('a tracked action call', () => {
 
       // The refusal's data is typed as the handler passes it to ctx.fail.
       expect(refused.ok ? undefined : refused.data?.reason).toBe('locked')
-      expect(refused).toEqual({ ok: false, status: 409, errors: { id: 'Taken' }, data: { reason: 'locked' } })
-      expect(await call({ id: 2 })).toEqual({ ok: false, status: 422, errors: { id: 'Bad id' }, data: undefined })
+      expect(refused).toEqual({ ok: false, status: 409, message: 'Taken', errors: { id: 'Taken' }, data: { reason: 'locked' } })
+      expect(await call({ id: 2 })).toEqual({ ok: false, status: 422, message: 'Bad id', errors: { id: 'Bad id' }, data: undefined })
       expect(call.pending()).toBe(false)
       // The action's own reading of its last call stays as it was.
       expect(saved.error('id')).toBe('Bad id')

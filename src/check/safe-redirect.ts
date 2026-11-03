@@ -68,7 +68,7 @@ export async function safeRedirects(root: string, options: CheckOptions): Promis
 }
 
 // The specifier out of its import, the whole import when it was alone.
-function dropSpecifier(declaration: ImportDeclaration, specifier: ImportSpecifier, text: string): Edit {
+export function dropSpecifier(declaration: ImportDeclaration, specifier: ImportSpecifier, text: string): Edit {
   if (declaration.specifiers.length === 1)
     return { start: declaration.start, end: declaration.end + (NEWLINE.exec(text.slice(declaration.end))?.[0].length ?? 0), text: '' }
 

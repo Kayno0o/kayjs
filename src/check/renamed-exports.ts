@@ -25,7 +25,8 @@ export interface Found {
   // The file's text outside the parsed spans, such as a template, where a name is read in ways no edit here covers.
   unparsed: string
   // Reports at `start`; `edits` empty or `null` reports without a fix.
-  report: (start: number, end: number, message: string, help: string, edits: Edit[] | null) => void
+  // The fix is applied by `kay upgrade` and `kay check --fix` unless `safe` is false.
+  report: (start: number, end: number, message: string, help: string, edits: Edit[] | null, safe?: boolean) => void
 }
 
 // The session stores kay named for the store before 1.84 and the name each has now, like `memoryJobs` and `sqliteRates`; the old names work until 1.87.
@@ -62,13 +63,13 @@ export async function scan(root: string, options: CheckOptions, lint: LintName, 
       file,
       parsed,
       unparsed,
-      report(start, end, message, help, edits) {
+      report(start, end, message, help, edits, safe = true) {
         const level = levelAt(lint, start)
 
         if (level === 'allow')
           return
 
-        found.push({ file, ...positionAt(source, start), end, message, help, code: lint, severity: level === 'warn' ? 'warning' : 'error', ...edits && edits.length > 0 && { fixes: [{ title: help[0]!.toUpperCase() + help.slice(1), edits, safe: true }] } })
+        found.push({ file, ...positionAt(source, start), end, message, help, code: lint, severity: level === 'warn' ? 'warning' : 'error', ...edits && edits.length > 0 && { fixes: [{ title: help[0]!.toUpperCase() + help.slice(1), edits, safe }] } })
       },
     })
   }

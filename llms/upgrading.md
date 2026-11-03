@@ -32,6 +32,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kay/compiler: `compileKay` gives `cause` instead of `why`
 
 - A tool reading `compileKay(...).why`, the sentence saying what makes a component an island, reads `cause` now: `{ kind, name, span, line }`, with `kind` one of `client`, `attribute`, `value`, `live`, `prop`, `spread` and `block`, and `span` the offsets in the source that decide it. `kay build --format json` keeps `why` on each island and adds `cause` beside it.
+### Every failure carries `status`, `message`, `errors` and `data`
+
+- `ApiError.answer` is `data`, and `ApiError` gains `errors`. The old name works until 1.90; `kay upgrade` renames it where an `instanceof ApiError` or `ActionError` narrows the receiver in the same function, and reports a receiver only a `catch` or a cast says is an error (`deprecated-api-error-answer`). An `ActionError`'s `answer` was its response body text, and its `data` is what `ctx.fail` passed, so read `body` where the text was meant.
+- `refusalMessage(error, fallback)` is deprecated: an `ApiError`'s `message` is always safe to show, a status 0 one reading `The server could not be reached` with the browser's error as `cause`. `kay check` offers `error instanceof ApiError && error.status !== 0 ? error.message : fallback` but `kay upgrade` does not apply it, as an `ActionError`'s message now also reads its field messages and `data.message` where `refusalMessage` gave the fallback (`deprecated-refusal-message`).
+- The failed branch of a `track()` result, `FormFailure` and `LocalIssue` gain `message`; an object built by hand to satisfy one of these types needs the field. A route's refusal now reads its `message` as `errors['']`, else the field messages, else `data.message`, else the text it answered.
 
 ## 1.86.0
 
