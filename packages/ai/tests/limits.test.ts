@@ -2,7 +2,7 @@ import type { Piece, Provider } from '../src'
 import { existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, setDefaultTimeout, setSystemTime, spyOn } from 'bun:test'
 import { nameUser } from 'kay/library'
 import { files, memoryRates, sqliteRates } from 'kay/server'
 import { setupStore } from '../../../src/server/app-store'
@@ -12,6 +12,9 @@ import { ai, AiError, ask, fakeAi, storedFile } from '../src'
 import { forgetCounts, storeTimeout } from '../src/limits'
 
 const REFUSED = Symbol.for('kay.refused')
+
+// A worker of `bun test --parallel` ignores the preloaded timeout, and a test Bun's 5 s abandons leaves its asks running into the next one.
+setDefaultTimeout(20_000)
 
 beforeEach(() => forgetCounts())
 

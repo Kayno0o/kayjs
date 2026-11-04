@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { parsePartial, partialParser } from '../src/partial-json'
 
@@ -161,21 +162,39 @@ describe('partialParser', () => {
   })
 
   it('reads a long answer piece by piece in time linear in its size', () => {
-    const body = Array.from({ length: 4000 }, (_, index) => `{"n":${index},"label":"item ${index}"}`).join(',')
-    const full = `{"items":[${body}]}`
-    const parser = partialParser()
-    const started = performance.now()
-    let changes = 0
+    // The cost of an answer 8 times as long against the short one, each the best of a few reads, in the CPU time of the process, so a busy host slows both alike: 8 times as long when linear, 64 when quadratic. A snapshot copies the open array, so the measure takes none until the answer is whole.
+    function read(length: number): { changes: number, items: number, time: number } {
+      const body = Array.from({ length }, (_, index) => `{"n":${index},"label":"item ${index}"}`).join(',')
+      const full = `{"items":[${body}]}`
+      let best = Infinity
+      let changes = 0
+      let items = 0
 
-    for (let at = 0; at < full.length; at += 4) {
-      if (parser.push(full.slice(at, at + 4))) {
-        changes++
-        parser.value()
+      for (let run = 0; run < 3; run++) {
+        const parser = partialParser()
+        const started = process.cpuUsage()
+
+        changes = 0
+
+        for (let at = 0; at < full.length; at += 16) {
+          if (parser.push(full.slice(at, at + 16)))
+            changes++
+        }
+
+        const used = process.cpuUsage(started)
+
+        best = Math.min(best, used.user + used.system)
+        items = (parser.value() as { items: unknown[] }).items.length
       }
+
+      return { changes, items, time: best }
     }
 
-    expect(changes).toBeGreaterThan(1000)
-    expect((parser.value() as { items: unknown[] }).items).toHaveLength(4000)
-    expect(performance.now() - started).toBeLessThan(1000)
+    const short = read(2000)
+    const long = read(16_000)
+
+    expect(long.changes).toBeGreaterThan(1000)
+    expect(long.items).toBe(16_000)
+    expect(long.time / short.time).toBeLessThan(24)
   })
 })

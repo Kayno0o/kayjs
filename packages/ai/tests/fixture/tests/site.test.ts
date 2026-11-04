@@ -1,12 +1,16 @@
 import { join } from 'node:path'
 import process from 'node:process'
 import { ai, fakeAi } from '@kaynooo/kayjs-ai'
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, expect, setDefaultTimeout, test } from 'bun:test'
 import { testSite } from 'kay/test'
 import { reply } from '../src/routes/chat.kay'
 
 // The fixture is an app installing the library, linked back to it by the repository root's scripts/link-fixture.ts.
 const ROOT = join(import.meta.dir, '..')
+
+// A worker of `bun test --parallel` ignores the preloaded timeout, so Bun's 5 s fails a browser test whenever the host is busy.
+setDefaultTimeout(120_000)
+
 const CLEAN = /^(?:checked with no problems in \d+ ms\n)?$/
 const site = await testSite({ root: ROOT })
 

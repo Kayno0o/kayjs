@@ -1,12 +1,15 @@
 import { join } from 'node:path'
 import { fakeAi } from '@kaynooo/kayjs-ai'
-import { afterEach, beforeAll, describe, expect, test } from 'bun:test'
+import { afterEach, beforeAll, describe, expect, setDefaultTimeout, test } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
 import { done, refusals, testing } from '../src/testing'
 import { markdownDrawn, replied } from './replied'
 
 const ROOT = join(import.meta.dir, '..')
 const path = browserPath()
+
+// A worker of `bun test --parallel` ignores the preloaded timeout, so Bun's 5 s fails a browser test whenever the host is busy.
+setDefaultTimeout(120_000)
 
 let site: Awaited<ReturnType<typeof testSite>>
 
