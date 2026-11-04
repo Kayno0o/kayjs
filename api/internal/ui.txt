@@ -494,10 +494,10 @@ interface Look
   busy?: boolean | undefined
   icon?: IconProps | IconSlot | undefined
   label?: string | undefined
-  size?: "xs" | "sm" | "md" | "lg" | undefined
+  size?: "lg" | "md" | "sm" | "xs" | undefined
   spinner?: boolean | undefined
   tone?: Tone | undefined
-  variant?: "solid" | "ghost" | "inline" | undefined
+  variant?: "ghost" | "inline" | "solid" | undefined
 
 [./lib/button-props] TagAttributes
 type TagAttributes = Omit<AsButton, keyof Look> | Omit<AsLink, keyof Look>
@@ -574,7 +574,7 @@ function activeMarks(options: {
 interface ChartMark
   index: number
   label: string
-  values: (number | null)[]
+  values: (null | number)[]
 
 [./lib/chart-marks] chartTooltip
 function chartTooltip(): { place(at: { clientX: number; clientY: number; }): string; watch(element: HTMLElement): void; stop(): void; }
@@ -588,7 +588,7 @@ type MarkKind = 'link' | 'button' | 'image'
 [./lib/chart-marks] SparkMark
 interface SparkMark
   index: number
-  value: number | null
+  value: null | number
 
 [./lib/chart-marks] TOOLTIP_LOOK
 const TOOLTIP_LOOK: "pointer-events-none fixed top-0 left-0 z-50 flex w-max max-w-full flex-col gap-0.5 border-solid border-[length:var(--border-width)] border-border-strong bg-surface-strong px-3 py-2 text-xs"
@@ -766,7 +766,7 @@ interface UiSettings
 interface DescriptionItem
   key?: string | undefined
   label: string
-  value?: string | number | undefined
+  value?: number | string | undefined
 
 [./lib/diff-command] default
 const default: KayCommand
@@ -1082,39 +1082,39 @@ interface AxisTick
 interface BarListRow
   display?: string
   href?: string
-  key: string | number
+  key: number | string
   label: string
   value: number
 
 [./lib/index] BarSeries
 interface BarSeries extends ChartSeries
   color?: string
-  colors?: (string | null | undefined)[]
+  colors?: (null | string | undefined)[]
   name: string
-  notes?: (string | null | undefined)[]
-  values: (number | null)[]
+  notes?: (null | string | undefined)[]
+  values: (null | number)[]
 
 [./lib/index] ChartMark
 interface ChartMark
   index: number
   label: string
-  values: (number | null)[]
+  values: (null | number)[]
 
 [./lib/index] ChartSeries
 interface ChartSeries
   color?: string
   name: string
-  values: (number | null)[]
+  values: (null | number)[]
 
 [./lib/index] Column
 interface Column<Row>
-  align?: "start" | "center" | "end"
+  align?: "center" | "end" | "start"
   cell?: boolean
   defaultDirection?: SortDirection
   header: string
   key: string
   numeric?: true
-  sortValue?: true | ((row: Row) => string | number)
+  sortValue?: ((row: Row) => number | string) | true
 
 [./lib/index] ComboboxOption
 interface ComboboxOption<Value extends string = string>
@@ -1149,7 +1149,7 @@ function dateRangeFrom(from: string, to: string): DateRange
 interface DescriptionItem
   key?: string | undefined
   label: string
-  value?: string | number | undefined
+  value?: number | string | undefined
 
 [./lib/index] dismissToast
 function dismissToast(id: number): void
@@ -1240,7 +1240,7 @@ type MapPoint = readonly number[]
 interface MediaItem
   captions?: string
   full?: string
-  key: string | number
+  key: number | string
   kind: "image" | "video"
   preview: string
   src?: string
@@ -1332,7 +1332,7 @@ type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
 
 [./lib/index] PopoverTriggerProps
 interface PopoverTriggerProps
-  aria-expanded: "true" | "false"
+  aria-expanded: "false" | "true"
   popovertarget: string
   style: string
 
@@ -1363,7 +1363,7 @@ interface ScatterAxis
 
 [./lib/index] ScatterPoint
 interface ScatterPoint
-  key: string | number
+  key: number | string
   label: string
   tooltip?: string
   weight?: number
@@ -1381,29 +1381,29 @@ interface SortState
 [./lib/index] SparkMark
 interface SparkMark
   index: number
-  value: number | null
+  value: null | number
 
 [./lib/index] SparkTone
 type SparkTone = Tone
 
 [./lib/index] StatDelta
 interface StatDelta
-  direction?: "up" | "down" | "flat" | undefined
+  direction?: "down" | "flat" | "up" | undefined
   label?: string | undefined
   tone?: Tone | undefined
   value: string
 
 [./lib/index] StepCookies
 interface StepCookies
-  delete: (name: string, options?: { path?: string; } | undefined) => void
-  get: (name: string) => string | null | undefined
-  set: (name: string, value: string, options?: {
+  delete: (name: string, options?: undefined | { path?: string; }) => void
+  get: (name: string) => null | string | undefined
+  set: (name: string, value: string, options?: undefined | {
   path?: string;
   httpOnly?: boolean;
-  sameSite?: "lax" | "strict" | "none";
+  sameSite?: "lax" | "none" | "strict";
   maxAge?: number;
   secure?: boolean;
-} | undefined) => void
+}) => void
 
 [./lib/index] stepDraft
 function stepDraft(cookies: StepCookies, name: string, { check, maxAge, path, request, secure }: StepDraftOptions): StepDraft
@@ -1419,7 +1419,7 @@ interface StepDraft
 [./lib/index] StepDraftOptions
 interface StepDraftOptions
   check: (step: string, values: Values) => boolean
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   path?: string | undefined
   request?: Request | undefined
   secure?: boolean | undefined
@@ -1482,7 +1482,7 @@ type ToastHold = 'pointer' | 'focus'
 [./lib/index] ToastOptions
 interface ToastOptions
   action?: ToastAction | undefined
-  duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   tone?: Tone | undefined
 
 [./lib/index] toasts
@@ -1616,18 +1616,18 @@ interface LeafletApi
 
 [./lib/map-view] LeafletGroup
 interface LeafletGroup extends LeafletLayer
-  addTo: (target: LeafletView | LeafletGroup) => LeafletGroup
+  addTo: (target: LeafletGroup | LeafletView) => LeafletGroup
   clearLayers: () => LeafletGroup
   remove: () => LeafletGroup
 
 [./lib/map-view] LeafletLayer
 interface LeafletLayer
-  addTo: (target: LeafletView | LeafletGroup) => LeafletLayer
+  addTo: (target: LeafletGroup | LeafletView) => LeafletLayer
   remove: () => LeafletLayer
 
 [./lib/map-view] LeafletPath
 interface LeafletPath extends LeafletLayer
-  addTo: (target: LeafletView | LeafletGroup) => LeafletPath
+  addTo: (target: LeafletGroup | LeafletView) => LeafletPath
   bindPopup: (content: HTMLElement) => LeafletPath
   bindTooltip: (content: HTMLElement) => LeafletPath
   closePopup: () => LeafletPath
@@ -1749,7 +1749,7 @@ function isPlayable(item: MediaItem): item is MediaItem & { src: string; }
 interface MediaItem
   captions?: string
   full?: string
-  key: string | number
+  key: number | string
   kind: "image" | "video"
   preview: string
   src?: string
@@ -1811,7 +1811,7 @@ function toggledValue<Value extends string>(options: readonly MultiSelectOption<
 
 [./lib/nav-item] NavItem
 interface NavItem
-  badge?: string | number | undefined
+  badge?: number | string | undefined
   disabled?: boolean | undefined
   icon?: IconProps | IconSlot | undefined
   label: string
@@ -1967,7 +1967,7 @@ interface AxisTick
 interface BarListRow
   display?: string
   href?: string
-  key: string | number
+  key: number | string
   label: string
   value: number
 
@@ -1977,16 +1977,16 @@ function barRatios(values: readonly (readonly (number | null)[])[], stacked: boo
 [./lib/plot] BarSeries
 interface BarSeries extends ChartSeries
   color?: string
-  colors?: (string | null | undefined)[]
+  colors?: (null | string | undefined)[]
   name: string
-  notes?: (string | null | undefined)[]
-  values: (number | null)[]
+  notes?: (null | string | undefined)[]
+  values: (null | number)[]
 
 [./lib/plot] ChartSeries
 interface ChartSeries
   color?: string
   name: string
-  values: (number | null)[]
+  values: (null | number)[]
 
 [./lib/plot] dashSample
 function dashSample(color: string, dash: string): string
@@ -2006,7 +2006,7 @@ interface ScatterAxis
 
 [./lib/plot] ScatterPoint
 interface ScatterPoint
-  key: string | number
+  key: number | string
   label: string
   tooltip?: string
   weight?: number
@@ -2033,7 +2033,7 @@ type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
 
 [./lib/popover] PopoverTriggerProps
 interface PopoverTriggerProps
-  aria-expanded: "true" | "false"
+  aria-expanded: "false" | "true"
   popovertarget: string
   style: string
 
@@ -2050,7 +2050,7 @@ const rangeTrack: "h-4 w-full cursor-pointer appearance-none bg-transparent [&::
 function elapsed(total: number): string
 
 [./lib/record] RECORD_LIMIT
-const RECORD_LIMIT: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+const RECORD_LIMIT: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [./lib/record] recorder
 function recorder(options: RecorderOptions): Recorder
@@ -2063,7 +2063,7 @@ interface Recorder
   said: Signal<string>
   seconds: Signal<number>
   start: () => Promise<void>
-  state: Signal<"idle" | "asking" | "recording" | "sending">
+  state: Signal<"asking" | "idle" | "recording" | "sending">
   stop: () => void
 
 [./lib/record] RecorderOptions
@@ -2121,7 +2121,7 @@ function deltaIcon({ value, direction }: StatDelta): IconSlot
 
 [./lib/stat] StatDelta
 interface StatDelta
-  direction?: "up" | "down" | "flat" | undefined
+  direction?: "down" | "flat" | "up" | undefined
   label?: string | undefined
   tone?: Tone | undefined
   value: string
@@ -2131,15 +2131,15 @@ function currentStep<Key extends string>(url: string | URL, keys: readonly Key[]
 
 [./lib/steps] StepCookies
 interface StepCookies
-  delete: (name: string, options?: { path?: string; } | undefined) => void
-  get: (name: string) => string | null | undefined
-  set: (name: string, value: string, options?: {
+  delete: (name: string, options?: undefined | { path?: string; }) => void
+  get: (name: string) => null | string | undefined
+  set: (name: string, value: string, options?: undefined | {
   path?: string;
   httpOnly?: boolean;
-  sameSite?: "lax" | "strict" | "none";
+  sameSite?: "lax" | "none" | "strict";
   maxAge?: number;
   secure?: boolean;
-} | undefined) => void
+}) => void
 
 [./lib/steps] stepDraft
 function stepDraft(cookies: StepCookies, name: string, { check, maxAge, path, request, secure }: StepDraftOptions): StepDraft
@@ -2155,7 +2155,7 @@ interface StepDraft
 [./lib/steps] StepDraftOptions
 interface StepDraftOptions
   check: (step: string, values: Values) => boolean
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   path?: string | undefined
   request?: Request | undefined
   secure?: boolean | undefined
@@ -2185,12 +2185,12 @@ const ORIGIN: "http://kay.invalid"
 
 [./lib/tab-nav] TabEntry
 interface TabEntry extends NavItem
-  badge?: string | number | undefined
+  badge?: number | string | undefined
   disabled?: boolean | undefined
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   label: string
-  value?: string | number | undefined
+  value?: number | string | undefined
 
 [./lib/tab-nav] TabLink
 interface TabLink
@@ -2203,13 +2203,13 @@ function cellText<Row>(row: Row, column: Column<Row>): string
 
 [./lib/table] Column
 interface Column<Row>
-  align?: "start" | "center" | "end"
+  align?: "center" | "end" | "start"
   cell?: boolean
   defaultDirection?: SortDirection
   header: string
   key: string
   numeric?: true
-  sortValue?: true | ((row: Row) => string | number)
+  sortValue?: ((row: Row) => number | string) | true
 
 [./lib/table] compareValues
 function compareValues(a: string | number, b: string | number): number
@@ -2333,7 +2333,7 @@ type ToastHold = 'pointer' | 'focus'
 [./lib/toast] ToastOptions
 interface ToastOptions
   action?: ToastAction | undefined
-  duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   tone?: Tone | undefined
 
 [./lib/toast] toasts

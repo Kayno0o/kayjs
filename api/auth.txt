@@ -26,16 +26,16 @@ interface ApprovedClient
   id: string
   lastUsedAt: Date | null
   name: string
-  scopes: string[] | null
+  scopes: null | string[]
 
 [.] AuditCursor
 type AuditCursor = Date | Pick<AuditRecord, 'at' | 'id'>
 
 [.] AuditEntry
 interface AuditEntry
-  actorId: string | null
+  actorId: null | string
   at: Date
-  detail: string | null
+  detail: null | string
   event: AuthEvent
   id: string
   ip: string
@@ -47,9 +47,9 @@ type AuditPhrase = string | ((detail: string | null) => string)
 
 [.] AuditRecord
 interface AuditRecord
-  actorId: string | null
+  actorId: null | string
   at: Date
-  detail: string | null
+  detail: null | string
   event: string
   id: string
   ip: string
@@ -168,7 +168,7 @@ class Auth
   admin: AdminMethods<Role>
   audit: AuditMethods
   bareUser: () => Promise<BareUser<UserData> | null>
-  captchaChallenge: (action: CaptchaAction) => Promise<string | null>
+  captchaChallenge: (action: CaptchaAction) => Promise<null | string>
   captchaRequired: (action: CaptchaAction) => Promise<boolean>
   changeUsername: (username: string) => Promise<ChangeUsernameResult>
   cookies: string[]
@@ -184,16 +184,16 @@ class Auth
   guarded: (ctx: GuardContext, options: {
   redirect?: string | undefined;
   require?: Requirement<BareUser<Record<string, unknown>>, string> | undefined;
-  scope?: string | false | string[] | undefined;
+  scope?: false | string | string[] | undefined;
   twoFactor?: true | undefined;
 }) => Promise<void>
   hasScope: (scope: Scope) => Promise<boolean>
   impersonator: () => Promise<User<Record<string, unknown>> | null>
-  known?: { record: Promise<UserRecord | null>; at: number; } | undefined
+  known?: undefined | { record: Promise<UserRecord | null>; at: number; }
   leave: () => Promise<void>
-  linkProvider: (provider: string, proof: Proof, options?: { redirect?: string; } | undefined) => Promise<LinkProviderResult>
+  linkProvider: (provider: string, proof: Proof, options?: undefined | { redirect?: string; }) => Promise<LinkProviderResult>
   linked: WeakMap<UserRecord, Promise<Record<string, { id: string; }>>>
-  listAuditLog: (options?: { before?: AuditCursorInput; limit?: number; } | undefined) => Promise<AuditEntry[]>
+  listAuditLog: (options?: undefined | { before?: AuditCursorInput; limit?: number; }) => Promise<AuditEntry[]>
   listIdentities: () => Promise<string[]>
   live: (signedIn: SignedIn, record: UserRecord, stored: SessionRecord | undefined) => Promise<boolean>
   magicLink: MagicLinkMethods
@@ -208,7 +208,7 @@ class Auth
   password: PasswordMethods
   profile: (locale?: string | undefined) => Promise<ProfileFieldView[] | null>
   provedLately: () => Promise<boolean>
-  providerToken: (provider: string) => Promise<string | null>
+  providerToken: (provider: string) => Promise<null | string>
   providersOf: (record: UserRecord) => Promise<Record<string, { id: string; }>>
   record: () => Promise<UserRecord | null>
   reprove: (proof: Proof) => Promise<ReproveResult>
@@ -225,7 +225,7 @@ class Auth
   resolve: () => Promise<UserRecord | null>
   resolving: Promise<UserRecord | null> | undefined
   saveProfile: (values: Record<string, unknown>) => Promise<SaveProfileResult>
-  scopes: () => Promise<string[] | null>
+  scopes: () => Promise<null | string[]>
   session: Session<AuthSessionData>
   sessions: SessionMethods
   signIn: (user: Pick<User<Record<string, unknown>>, "id">, options?: { remember?: boolean | undefined; }) => Promise<void>
@@ -234,15 +234,15 @@ class Auth
   signInUrl: (back?: string | undefined) => string
   signOut: () => Promise<void>
   signOutEverywhere: (options?: { keepThisOne?: boolean; }) => Promise<void>
-  source: "session" | "bearer" | null
-  tokenScopes: string[] | null
+  source: "bearer" | "session" | null
+  tokenScopes: null | string[]
   tokens: TokenMethods<Scope>
   twoFactor: TwoFactorMethods
   unlink: (provider: string, proof: Proof) => Promise<UnlinkResult>
   updateLocale: (locale: string) => Promise<UpdateLocaleResult>
   user: () => Promise<User<UserData> | null>
   userIdsHolding: (role: string) => Promise<string[]>
-  via: () => Promise<"session" | "bearer" | null>
+  via: () => Promise<"bearer" | "session" | null>
 
 [.] AuthEvent
 type AuthEvent = SecurityEvent | ActivityEvent
@@ -264,13 +264,13 @@ interface AuthExtensionOptions extends AuthPagesOptions
 interface AuthFeatures
   admin: boolean
   audit: boolean
-  captcha: CaptchaWidget | "proof-of-work" | null
+  captcha: "proof-of-work" | CaptchaWidget | null
   codes: Record<CodedLink, CodeMode> | null
   email: boolean
   magicLink: boolean
   oauthServer: boolean
-  organizations: { roles: string[]; owner: string; manage: string; grants: Record<string, string[]>; } | null
-  pages: { prefix: string; home: string; remember: RememberMode; main: boolean; } | null
+  organizations: null | { roles: string[]; owner: string; manage: string; grants: Record<string, string[]>; }
+  pages: null | { prefix: string; home: string; remember: RememberMode; main: boolean; }
   passkeys: boolean
   password: boolean
   prefix: string
@@ -298,7 +298,7 @@ interface AuthMailMessage extends MailContent
   html: string
   kind: AuthMailKind
   locale: string
-  maxAge?: { link?: number; code?: number; } | undefined
+  maxAge?: undefined | { link?: number; code?: number; }
   name: string
   subject: string
   text: string
@@ -311,41 +311,41 @@ type AuthModule = { auth: { plugin: AnyElysia } } | { default: { plugin: AnyElys
 [.] AuthOptions
 interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>
   admin?: AuthRequirement<NoInfer<Role>> | undefined
-  allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
-  audit?: boolean | { maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; ip?: "full" | "truncated"; } | undefined
+  allow?: ((profile: Profile) => Promise<boolean> | boolean) | undefined
+  audit?: boolean | undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; ip?: "full" | "truncated"; }
   authorize?: ((user: BareUser<Record<string, unknown>> | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
-  breachedPasswords?: boolean | ((password: string) => boolean | Promise<boolean>) | undefined
-  captcha?: false | CaptchaOptions | undefined
+  breachedPasswords?: ((password: string) => Promise<boolean> | boolean) | boolean | undefined
+  captcha?: CaptchaOptions | false | undefined
   defaultRoles?: NoInfer<Role>[] | undefined
   email?: EmailOptions | undefined
   exportData?: ((event: { user: User<Record<string, unknown>>; }) => unknown) | undefined
   failurePage?: string | undefined
-  forwardAuth?: ForwardDomains | ForwardAuthOptions | undefined
-  guests?: { maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; } | undefined
-  locate?: ((ip: string) => string | Promise<string | null | undefined> | null | undefined) | undefined
+  forwardAuth?: ForwardAuthOptions | ForwardDomains | undefined
+  guests?: undefined | { maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; }
+  locate?: ((ip: string) => Promise<null | string | undefined> | null | string | undefined) | undefined
   magicLink?: boolean | undefined
   name?: string | undefined
   oauth?: Record<string, OAuthApp> | undefined
-  oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined; defaultScopes?: readonly Scope[] | undefined; } | undefined
-  onAuthEvent?: ((info: AuthEventInfo) => void | Promise<void>) | undefined
-  onDelete?: ((event: { user: User<Record<string, unknown>>; }) => void | Promise<void>) | undefined
-  onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; }) => void | Promise<void>) | undefined
+  oauthServer?: boolean | undefined | { fetch?: ((url: string) => Promise<Response>) | undefined; defaultScopes?: readonly Scope[] | undefined; }
+  onAuthEvent?: ((info: AuthEventInfo) => Promise<void> | void) | undefined
+  onDelete?: ((event: { user: User<Record<string, unknown>>; }) => Promise<void> | void) | undefined
+  onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; }) => Promise<void> | void) | undefined
   organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
-  pages?: boolean | AuthPagesConfig | undefined
-  passkeys?: false | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "required" | "preferred" | "discouraged"; } | undefined
+  pages?: AuthPagesConfig | boolean | undefined
+  passkeys?: false | undefined | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "discouraged" | "preferred" | "required"; }
   password?: boolean | undefined
   prefix?: Prefix | undefined
   profileFields?: ((event: {
   user: User<UserData>;
   profile: Profile;
-}) => void | {
+}) => Promise<void | {
   [Field in keyof UserData]?: UserData[Field] | undefined;
-} | Promise<void | {
+}> | void | {
   [Field in keyof UserData]?: UserData[Field] | undefined;
-}>) | undefined
-  proxy?: number | boolean | ProxyConfig | undefined
-  rateLimit?: Partial<Record<"signIn" | "signInAccount" | "signInAccountAll" | "register" | "resend" | "resendAccount" | "forgot" | "forgotAccount" | "magicLink" | "magicLinkAccount" | "emailChange" | "emailChangeAccount" | "twoFactor" | "twoFactorAccount" | "reprove" | "emailCode" | "emailCodeAccount" | "invite" | "inviteAddress" | "organization" | "export" | "oauthRegister" | "oauthDocument" | "oauthToken" | "link" | "oauthRegisterAll", Limit>> | undefined
-  remember?: { maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+}) | undefined
+  proxy?: ProxyConfig | boolean | number | undefined
+  rateLimit?: Partial<Record<"emailChange" | "emailChangeAccount" | "emailCode" | "emailCodeAccount" | "export" | "forgot" | "forgotAccount" | "invite" | "inviteAddress" | "link" | "magicLink" | "magicLinkAccount" | "oauthDocument" | "oauthRegister" | "oauthRegisterAll" | "oauthToken" | "organization" | "register" | "reprove" | "resend" | "resendAccount" | "signIn" | "signInAccount" | "signInAccountAll" | "twoFactor" | "twoFactorAccount", Limit>> | undefined
+  remember?: undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   roles?: Record<Role, NoInfer<Role>[]> | undefined
   rules?: CredentialRules | undefined
   scopes?: readonly Scope[] | undefined
@@ -357,7 +357,7 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   signUp?: boolean | undefined
   site?: string | undefined
   store: AuthStore
-  twoFactor?: boolean | { require?: AuthRequirement<Role> | undefined; } | undefined
+  twoFactor?: boolean | undefined | { require?: AuthRequirement<Role> | undefined; }
   twoFactorPage?: string | undefined
   user?: (TSchema & { static: UserData; }) | undefined
 
@@ -430,10 +430,10 @@ interface AuthStore
   bearerTokens: {
   create: (token: BearerTokenRecord) => MaybePromise<void>;
   findByDigest: (digest: string) => MaybePromise<BearerTokenRecord | undefined>;
-  findByDigestWithUser?: (digest: string) => MaybePromise<{
+  findByDigestWithUser?: (digest: string) => MaybePromise<undefined | {
     token: BearerTokenRecord;
     user: UserRecord;
-  } | undefined>;
+  }>;
   listByUser: (userId: string) => MaybePromise<BearerTokenRecord[]>;
   touch: (id: string, at: Date) => MaybePromise<void>;
   delete: (userId: string, id: string) => MaybePromise<boolean>;
@@ -477,18 +477,18 @@ interface AuthStore
   codes: {
     create: (code: OAuthCodeRecord) => MaybePromise<void>;
     get?: (digest: string) => MaybePromise<OAuthCodeRecord | undefined>;
-    use: (digest: string, at: Date) => MaybePromise<{
+    use: (digest: string, at: Date) => MaybePromise<undefined | {
       code: OAuthCodeRecord;
       reused: boolean;
-    } | undefined>;
+    }>;
   };
   refresh: {
     create: (token: OAuthRefreshRecord) => MaybePromise<void>;
     get?: (digest: string) => MaybePromise<OAuthRefreshRecord | undefined>;
-    use: (digest: string, at: Date) => MaybePromise<{
+    use: (digest: string, at: Date) => MaybePromise<undefined | {
       token: OAuthRefreshRecord;
       reused: boolean;
-    } | undefined>;
+    }>;
     revokeFamily: (userId: string, family: string) => MaybePromise<void>;
     deleteForUser: (userId: string) => MaybePromise<void>;
   };
@@ -505,7 +505,7 @@ interface AuthStore
   create: (passkey: PasskeyRecord) => MaybePromise<void>;
   get: (id: string) => MaybePromise<PasskeyRecord | undefined>;
   listByUser: (userId: string) => MaybePromise<PasskeyRecord[]>;
-  update: (id: string, patch: Partial<Pick<PasskeyRecord, "name" | "counter" | "backedUp" | "userVerified" | "lastUsedAt">>) => MaybePromise<void>;
+  update: (id: string, patch: Partial<Pick<PasskeyRecord, "backedUp" | "counter" | "lastUsedAt" | "name" | "userVerified">>) => MaybePromise<void>;
   delete: (userId: string, id: string) => MaybePromise<boolean>;
 }
   prune?: (limits: PruneLimits) => MaybePromise<void>
@@ -519,7 +519,7 @@ interface AuthStore
   create: (session: SessionRecord) => MaybePromise<void>;
   get: (id: string) => MaybePromise<SessionRecord | undefined>;
   listByUser: (userId: string) => MaybePromise<SessionRecord[]>;
-  update: (id: string, patch: Partial<Pick<SessionRecord, "version" | "ip" | "lastSeenAt">>) => MaybePromise<void>;
+  update: (id: string, patch: Partial<Pick<SessionRecord, "ip" | "lastSeenAt" | "version">>) => MaybePromise<void>;
   delete: (userId: string, id: string) => MaybePromise<boolean>;
 }
   tokens: {
@@ -532,8 +532,8 @@ interface AuthStore
   getMany?: (ids: string[]) => MaybePromise<UserRecord[]>;
   findByEmail: (email: string) => MaybePromise<UserRecord | undefined>;
   findByUsername: (username: string) => MaybePromise<UserRecord | undefined>;
-  create: (user: UserRecord) => MaybePromise<void | UserRecord>;
-  update: (id: string, patch: Partial<Omit<UserRecord, "id" | "createdAt">>) => MaybePromise<UserRecord | undefined>;
+  create: (user: UserRecord) => MaybePromise<UserRecord | void>;
+  update: (id: string, patch: Partial<Omit<UserRecord, "createdAt" | "id">>) => MaybePromise<UserRecord | undefined>;
   delete: (id: string) => MaybePromise<void>;
   staleGuests?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>;
   staleUnverified?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>;
@@ -555,15 +555,15 @@ type BanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChan
 [.] BareUser
 interface BareUser<Data extends object = Record<string, unknown>>
   data: Data
-  email: string | null
+  email: null | string
   emailVerified: boolean
   guest: boolean
   hasPassword: boolean
   id: string
-  locale: string | null
+  locale: null | string
   roles: string[]
   twoFactor: boolean
-  username: string | null
+  username: null | string
 
 [.] BearerToken
 interface BearerToken
@@ -573,7 +573,7 @@ interface BearerToken
   id: string
   label: string
   lastUsedAt: Date | null
-  scopes: string[] | null
+  scopes: null | string[]
 
 [.] BearerTokenRecord
 interface BearerTokenRecord
@@ -583,8 +583,8 @@ interface BearerTokenRecord
   id: string
   label: string
   lastUsedAt: Date | null
-  oauth?: { clientId: string; family: string; resource?: string | null | undefined; } | null | undefined
-  scopes: string[] | null
+  oauth?: null | undefined | { clientId: string; family: string; resource?: null | string | undefined; }
+  scopes: null | string[]
   userId: string
 
 [.] CaptchaAction
@@ -592,8 +592,8 @@ type CaptchaAction = 'register' | 'guest' | 'sign-in' | 'reset' | 'magic-link'
 
 [.] CaptchaCheck
 interface CaptchaCheck
-  on?: Partial<Record<CaptchaAction, number | false | "always">> | undefined
-  verify: (token: string, action: CaptchaAction, context?: CaptchaContext | undefined) => boolean | Promise<boolean>
+  on?: Partial<Record<CaptchaAction, "always" | false | number>> | undefined
+  verify: (token: string, action: CaptchaAction, context?: CaptchaContext | undefined) => Promise<boolean> | boolean
   widget?: CaptchaWidget | undefined
 
 [.] CaptchaContext
@@ -842,14 +842,14 @@ function createWsAuthStore<T>(verify: (token: string, ws: Ws) => T | Promise<T |
 
 [.] CredentialRules
 interface CredentialRules
-  password?: { min?: number | undefined; max?: number | undefined; check?: ((password: string) => string | undefined) | undefined; } | undefined
-  username?: { min?: number | undefined; max?: number | undefined; } | undefined
+  password?: undefined | { min?: number | undefined; max?: number | undefined; check?: ((password: string) => string | undefined) | undefined; }
+  username?: undefined | { min?: number | undefined; max?: number | undefined; }
 
 [.] DataExport
 interface DataExport
   app: unknown
   audit: AuditEntry[]
-  ban: { at: Date; until: Date | null; reason: string | null; } | null
+  ban: null | { at: Date; until: Date | null; reason: null | string; }
   exportedAt: Date
   grants: ApprovedClient[]
   identities: { provider: string; providerId: string; createdAt: Date; }[]
@@ -982,9 +982,9 @@ function describeAuditEntry(entry: Pick<AuditEntry, "detail" | "event">, options
 
 [.] Device
 interface Device
-  browser: string | null
+  browser: null | string
   mobile: boolean
-  os: string | null
+  os: null | string
 
 [.] DisableTwoFactorResult
 type DisableTwoFactorResult = { ok: true } | { ok: false, error: ProofFailure }
@@ -998,11 +998,11 @@ interface EmailOptions
   links?: Partial<Record<LinkType, string>> | undefined
   locales?: string[] | undefined
   mailer: AuthMailer
-  maxAge?: Partial<Record<TokenType, `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>> | undefined
+  maxAge?: Partial<Record<TokenType, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`>> | undefined
   requireVerified?: boolean | undefined
   templates?: Partial<Templates> | undefined
   translations?: Record<string, Partial<Templates>> | undefined
-  unverifiedMaxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  unverifiedMaxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [.] emailProblem
 function emailProblem(email: string): "invalid" | undefined
@@ -1068,7 +1068,7 @@ interface GateDeps<P, G extends string, S extends string = string>
   defaultScope?: ScopeRequirement<S> | undefined
   principal: (ctx: object) => Promise<P | null>
   refuse?: ((ctx: object, principal: P) => Promise<boolean>) | undefined
-  scopes?: ((ctx: object) => Promise<readonly string[] | null>) | undefined
+  scopes?: ((ctx: object) => Promise<null | readonly string[]>) | undefined
 
 [.] GetUserResult
 type GetUserResult = { ok: true, user: ManagedUser, admin: boolean } | { ok: false, error: AdminFailure }
@@ -1084,7 +1084,7 @@ function googleProvider(opts?: OpenIdOptions): OAuthProvider<OpenIdClaims, OAuth
 
 [.] GrantStore
 interface GrantStore<P, G extends string>
-  getPermission: (subjectId: string, type: G, resourceId?: number | null | undefined) => Promise<Level | null>
+  getPermission: (subjectId: string, type: G, resourceId?: null | number | undefined) => Promise<Level | null>
   hasCredential: (principal: P) => boolean
   subjectId: (principal: P) => string
 
@@ -1095,7 +1095,7 @@ function guard(options?: GuardOptions): Guard
 interface GuardOptions
   redirect?: string | undefined
   require?: AuthRequirement<string> | undefined
-  scope?: string | false | string[] | undefined
+  scope?: false | string | string[] | undefined
   twoFactor?: true | undefined
 
 [.] GuestSignInResult
@@ -1109,11 +1109,11 @@ function hcaptchaWidget(siteKey: string): CaptchaWidget
 
 [.] IdentityRecord
 interface IdentityRecord
-  accessToken: string | null
+  accessToken: null | string
   createdAt: Date
   provider: string
   providerId: string
-  refreshToken: string | null
+  refreshToken: null | string
   tokenExpiresAt: Date | null
   userId: string
 
@@ -1126,7 +1126,7 @@ interface Invitation<Role extends string = string>
   email: string
   expiresAt: Date
   id: string
-  invitedBy: string | null
+  invitedBy: null | string
   organization: Organization
   roles: Role[]
 
@@ -1136,7 +1136,7 @@ interface InvitationRecord
   email: string
   expiresAt: Date
   id: string
-  invitedBy: string | null
+  invitedBy: null | string
   organizationId: string
   roles: string[]
 
@@ -1159,7 +1159,7 @@ function lifetime(seconds: number, locale: string): string
 [.] Limit
 interface Limit
   max: number
-  window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] LimitOption
 type LimitOption = Limit
@@ -1202,7 +1202,7 @@ interface MailingSubscription
   askedAt: Date
   confirmedAt: Date | null
   list: string
-  status: "pending" | "confirmed"
+  status: "confirmed" | "pending"
 
 [.] MailKind
 type MailKind = AuthMailKind
@@ -1212,18 +1212,18 @@ type MailRequestResult = { ok: true } | { ok: false, error: 'limited' | 'captcha
 
 [.] ManagedUser
 interface ManagedUser extends BareUser
-  ban: { at: Date; until: Date | null; reason: string | null; } | null
+  ban: null | { at: Date; until: Date | null; reason: null | string; }
   createdAt: Date
   data: Record<string, unknown>
-  email: string | null
+  email: null | string
   emailVerified: boolean
   guest: boolean
   hasPassword: boolean
   id: string
-  locale: string | null
+  locale: null | string
   roles: string[]
   twoFactor: boolean
-  username: string | null
+  username: null | string
 
 [.] MaybePromise
 type MaybePromise<T> = T | Promise<T>
@@ -1232,7 +1232,7 @@ type MaybePromise<T> = T | Promise<T>
 interface Member<Role extends string = string>
   joinedAt: Date
   roles: Role[]
-  user: { id: string; email: string | null; username: string | null; }
+  user: { id: string; email: null | string; username: null | string; }
 
 [.] MemberRecord
 interface MemberRecord
@@ -1295,8 +1295,8 @@ interface OAuthCodeRecord
   expiresAt: Date
   family: string
   redirectUri: string
-  resource?: string | null | undefined
-  scopes: string[] | null
+  resource?: null | string | undefined
+  scopes: null | string[]
   usedAt: Date | null
   userId: string
 
@@ -1324,7 +1324,7 @@ interface OAuthGrantRecord
   clientName: string
   createdAt: Date
   lastUsedAt: Date | null
-  scopes: string[] | null
+  scopes: null | string[]
   userId: string
 
 [.] OAuthProvider
@@ -1344,7 +1344,7 @@ interface OAuthProvider<Raw = any, User = OAuthUser> extends OAuthEndpoints
   revokeUrl?: string | undefined
   scopeSeparator?: string
   scopes: string[]
-  tokenAccept?: "json" | "form"
+  tokenAccept?: "form" | "json"
   tokenUrl?: string | undefined
   userUrl?: string | undefined
 
@@ -1355,8 +1355,8 @@ interface OAuthRefreshRecord
   digest: string
   expiresAt: Date
   family: string
-  resource?: string | null | undefined
-  scopes: string[] | null
+  resource?: null | string | undefined
+  scopes: null | string[]
   usedAt: Date | null
   userId: string
 
@@ -1364,7 +1364,7 @@ interface OAuthRefreshRecord
 interface OAuthTokenRefresherDeps<K, S>
   key: (subject: S) => K
   load: (subject: S) => StoredCredential
-  margin?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  margin?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   oauth: RefreshableOAuthClient
   onError?: ((error: unknown, stage: RefreshStage) => void) | undefined
   save: (subject: S, tokens: OAuthTokens | null) => Promise<void>
@@ -1380,10 +1380,10 @@ interface OAuthTokens
 
 [.] OAuthUser
 interface OAuthUser
-  avatar?: string | null | undefined
-  banner?: string | null | undefined
+  avatar?: null | string | undefined
+  banner?: null | string | undefined
   displayName?: string | undefined
-  email?: string | null | undefined
+  email?: null | string | undefined
   providerId: string
   username: string
 
@@ -1398,13 +1398,13 @@ function oidcProvider(opts: OpenIdOptions & { issuer: string; name?: string; }):
 [.] OpenIdCheck
 interface OpenIdCheck
   algorithms?: string[] | undefined
-  issuer: string | string[] | ((claims: Record<string, unknown>) => boolean)
+  issuer: ((claims: Record<string, unknown>) => boolean) | string | string[]
   jwksUrl: string
 
 [.] OpenIdClaims
 interface OpenIdClaims
   email?: string
-  email_verified?: string | boolean
+  email_verified?: boolean | string
   name?: string
   nickname?: string
   picture?: string
@@ -1422,7 +1422,7 @@ interface Organization
   createdAt: Date
   id: string
   name: string
-  slug: string | null
+  slug: null | string
 
 [.] OrganizationFailure
 type OrganizationFailure = 'signed-out' | 'not-found' | 'forbidden'
@@ -1432,14 +1432,14 @@ interface OrganizationRecord
   createdAt: Date
   id: string
   name: string
-  slug: string | null
+  slug: null | string
 
 [.] OrganizationsOptions
 interface OrganizationsOptions<OrgRole extends string, Role extends string>
   create?: Requirement<BareUser<Record<string, unknown>>, NoInfer<Role>> | undefined
   defaultRoles?: NoInfer<OrgRole>[] | undefined
   invitationPage?: string | undefined
-  invitations?: { maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+  invitations?: undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   manage?: NoInfer<OrgRole> | undefined
   owner: NoInfer<OrgRole>
   param?: string | undefined
@@ -1448,48 +1448,48 @@ interface OrganizationsOptions<OrgRole extends string, Role extends string>
 [.] OwnOptions
 interface OwnOptions<Role extends string = string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>> extends Omit<AuthOptions<AuthSessionData, Role, Prefix, Scope, OrgRole, UserData>, Inherited>, AuthPagesOptions
   admin?: AuthRequirement<NoInfer<Role>> | undefined
-  allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
-  audit?: boolean | { maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; ip?: "full" | "truncated"; } | undefined
+  allow?: ((profile: Profile) => Promise<boolean> | boolean) | undefined
+  audit?: boolean | undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; ip?: "full" | "truncated"; }
   authorize?: ((user: BareUser<Record<string, unknown>> | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
-  breachedPasswords?: boolean | ((password: string) => boolean | Promise<boolean>) | undefined
-  captcha?: false | CaptchaOptions | undefined
+  breachedPasswords?: ((password: string) => Promise<boolean> | boolean) | boolean | undefined
+  captcha?: CaptchaOptions | false | undefined
   cookie?: string | undefined
   defaultRoles?: NoInfer<Role>[] | undefined
-  email?: false | EmailOptions | undefined
+  email?: EmailOptions | false | undefined
   exportData?: ((event: { user: User<Record<string, unknown>>; }) => unknown) | undefined
   failurePage?: string | undefined
-  forwardAuth?: ForwardDomains | ForwardAuthOptions | undefined
-  guests?: { maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; } | undefined
+  forwardAuth?: ForwardAuthOptions | ForwardDomains | undefined
+  guests?: undefined | { maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; }
   home?: string | undefined
   hooks?: (() => Promise<{
-  hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "allow" | "onSignUp" | "profileFields" | "onDelete" | "exportData" | "onAuthEvent" | "locate" | "authorize">>;
+  hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "allow" | "authorize" | "exportData" | "locate" | "onAuthEvent" | "onDelete" | "onSignUp" | "profileFields">>;
 }>) | undefined
-  locate?: ((ip: string) => string | Promise<string | null | undefined> | null | undefined) | undefined
+  locate?: ((ip: string) => Promise<null | string | undefined> | null | string | undefined) | undefined
   magicLink?: boolean | undefined
   module?: undefined
   name?: string | undefined
-  oauth?: Record<string, true | OAuthApp | PresetApp> | undefined
-  oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined; defaultScopes?: readonly Scope[] | undefined; } | undefined
-  onAuthEvent?: ((info: AuthEventInfo) => void | Promise<void>) | undefined
-  onDelete?: ((event: { user: User<Record<string, unknown>>; }) => void | Promise<void>) | undefined
-  onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; }) => void | Promise<void>) | undefined
+  oauth?: Record<string, OAuthApp | PresetApp | true> | undefined
+  oauthServer?: boolean | undefined | { fetch?: ((url: string) => Promise<Response>) | undefined; defaultScopes?: readonly Scope[] | undefined; }
+  onAuthEvent?: ((info: AuthEventInfo) => Promise<void> | void) | undefined
+  onDelete?: ((event: { user: User<Record<string, unknown>>; }) => Promise<void> | void) | undefined
+  onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; }) => Promise<void> | void) | undefined
   organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
-  pages?: boolean | Pick<AuthPagesConfig, "remember" | "profile" | "main"> | undefined
-  passkeys?: false | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "required" | "preferred" | "discouraged"; } | undefined
+  pages?: Pick<AuthPagesConfig, "main" | "profile" | "remember"> | boolean | undefined
+  passkeys?: false | undefined | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "discouraged" | "preferred" | "required"; }
   password?: boolean | undefined
   plugin?: undefined
   prefix?: Prefix | undefined
   profileFields?: ((event: {
   user: User<UserData>;
   profile: Profile;
-}) => void | {
+}) => Promise<void | {
   [Field in keyof UserData]?: UserData[Field] | undefined;
-} | Promise<void | {
+}> | void | {
   [Field in keyof UserData]?: UserData[Field] | undefined;
-}>) | undefined
-  proxy?: number | boolean | ProxyConfig | undefined
-  rateLimit?: Partial<Record<"signIn" | "signInAccount" | "signInAccountAll" | "register" | "resend" | "resendAccount" | "forgot" | "forgotAccount" | "magicLink" | "magicLinkAccount" | "emailChange" | "emailChangeAccount" | "twoFactor" | "twoFactorAccount" | "reprove" | "emailCode" | "emailCodeAccount" | "invite" | "inviteAddress" | "organization" | "export" | "oauthRegister" | "oauthDocument" | "oauthToken" | "link" | "oauthRegisterAll", Limit>> | undefined
-  remember?: { maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+}) | undefined
+  proxy?: ProxyConfig | boolean | number | undefined
+  rateLimit?: Partial<Record<"emailChange" | "emailChangeAccount" | "emailCode" | "emailCodeAccount" | "export" | "forgot" | "forgotAccount" | "invite" | "inviteAddress" | "link" | "magicLink" | "magicLinkAccount" | "oauthDocument" | "oauthRegister" | "oauthRegisterAll" | "oauthToken" | "organization" | "register" | "reprove" | "resend" | "resendAccount" | "signIn" | "signInAccount" | "signInAccountAll" | "twoFactor" | "twoFactorAccount", Limit>> | undefined
+  remember?: undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   roles?: Record<Role, NoInfer<Role>[]> | undefined
   rules?: CredentialRules | undefined
   scopes?: readonly Scope[] | undefined
@@ -1501,7 +1501,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   signUp?: boolean | undefined
   site?: string | undefined
   store?: StoreOption | undefined
-  twoFactor?: boolean | { require?: AuthRequirement<Role> | undefined; } | undefined
+  twoFactor?: boolean | undefined | { require?: AuthRequirement<Role> | undefined; }
   twoFactorPage?: string | undefined
   user?: (TSchema & { static: UserData; }) | undefined
   viewer?: boolean | undefined
@@ -1610,10 +1610,10 @@ type Principal<P> = P | null
 
 [.] Profile
 interface Profile extends OAuthUser
-  avatar?: string | null | undefined
-  banner?: string | null | undefined
+  avatar?: null | string | undefined
+  banner?: null | string | undefined
   displayName?: string | undefined
-  email?: string | null | undefined
+  email?: null | string | undefined
   provider: string
   providerId: string
   username: string
@@ -1624,10 +1624,10 @@ const PROFILE_MAX_LENGTH: 500
 [.] ProfileField
 interface ProfileField
   autocomplete?: string | undefined
-  label: string | Record<string, string>
+  label: Record<string, string> | string
   maxLength?: number | undefined
   required?: boolean | undefined
-  type?: "email" | "url" | "text" | "textarea" | "tel" | undefined
+  type?: "email" | "tel" | "text" | "textarea" | "url" | undefined
 
 [.] ProfileFieldView
 interface ProfileFieldView extends Omit<ProfileField, 'label'>
@@ -1636,18 +1636,18 @@ interface ProfileFieldView extends Omit<ProfileField, 'label'>
   maxLength: number
   name: string
   required?: boolean | undefined
-  type?: "email" | "url" | "text" | "textarea" | "tel" | undefined
+  type?: "email" | "tel" | "text" | "textarea" | "url" | undefined
   value: string
 
 [.] ProfileOptions
 interface ProfileOptions<Field extends string = string>
   fields: Record<Field, ProfileField>
-  load: (user: BareUser<Record<string, unknown>>) => Partial<Record<Field, string | null | undefined>> | Promise<Partial<Record<Field, string | null | undefined>>>
-  save: (user: BareUser<Record<string, unknown>>, values: Record<Field, string>) => void | {
+  load: (user: BareUser<Record<string, unknown>>) => Partial<Record<Field, null | string | undefined>> | Promise<Partial<Record<Field, null | string | undefined>>>
+  save: (user: BareUser<Record<string, unknown>>, values: Record<Field, string>) => Promise<void | {
   errors: Partial<Record<Field, string>>;
-} | Promise<void | {
+}> | void | {
   errors: Partial<Record<Field, string>>;
-}>
+}
 
 [.] ProfileProblem
 type ProfileProblem = 'required' | 'too-long' | { message: string }
@@ -1666,14 +1666,14 @@ function proofOfWork(options?: ProofOfWorkOptions): ProofOfWorkCaptcha
 
 [.] ProofOfWorkCaptcha
 interface ProofOfWorkCaptcha
-  on: Partial<Record<CaptchaAction, number | false | "always">>
-  proofOfWork: { difficulty: number; maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; store: RateStore | undefined; }
+  on: Partial<Record<CaptchaAction, "always" | false | number>>
+  proofOfWork: { difficulty: number; maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; store: RateStore | undefined; }
 
 [.] ProofOfWorkOptions
 interface ProofOfWorkOptions
   difficulty?: number | undefined
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  on?: Partial<Record<CaptchaAction, number | false | "always">> | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  on?: Partial<Record<CaptchaAction, "always" | false | number>> | undefined
   store?: RateStore | undefined
 
 [.] ProviderOptions
@@ -1686,8 +1686,8 @@ interface ProviderOptions
 interface PruneLimits
   bearerExpiredBefore: Date
   now: Date
-  sessionAbsoluteMaxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
-  sessionMaxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  sessionAbsoluteMaxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+  sessionMaxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] pwnedPassword
 function pwnedPassword(password: string): Promise<boolean>
@@ -1704,8 +1704,8 @@ type RefreshStage = 'refresh' | 'persist' | 'revoke'
 
 [.] RegisterErrors
 interface RegisterErrors
-  email?: "taken" | "invalid" | undefined
-  password?: PasswordProblem | "breached" | undefined
+  email?: "invalid" | "taken" | undefined
+  password?: "breached" | PasswordProblem | undefined
   username?: "taken" | UsernameProblem | undefined
 
 [.] RegisterInput
@@ -1814,7 +1814,7 @@ interface SessionRecord
   id: string
   ip: string
   lastSeenAt: Date
-  maxAge: number | null
+  maxAge: null | number
   userAgent: string
   userId: string
   version: number
@@ -1833,9 +1833,9 @@ interface SignInOptions
 
 [.] StoredCredential
 interface StoredCredential
-  accessToken?: string | null | undefined
-  expiresAt?: number | null | undefined
-  refreshToken?: string | null | undefined
+  accessToken?: null | string | undefined
+  expiresAt?: null | number | undefined
+  refreshToken?: null | string | undefined
 
 [.] StoreUrl
 interface StoreUrl
@@ -1846,7 +1846,7 @@ type Templates = Record<MailKind, (data: MailData) => MailContent>
 
 [.] TokenOptions
 interface TokenOptions<Scope extends string = string>
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | null | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | null | undefined
   scopes?: Scope[] | undefined
 
 [.] TokenRecord
@@ -1854,16 +1854,16 @@ interface TokenRecord
   digest: string
   email: string
   expiresAt: Date
-  redirect: string | null
+  redirect: null | string
   type: TokenType
   userId: string
 
 [.] TokenRefresherDeps
 interface TokenRefresherDeps<K, S>
-  exchange: (subject: S) => Promise<{ accessToken: string; expiresAt?: number | undefined; } | null>
+  exchange: (subject: S) => Promise<null | { accessToken: string; expiresAt?: number | undefined; }>
   key: (subject: S) => K
   load: (subject: S) => StoredCredential
-  margin?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  margin?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [.] TokenType
 type TokenType = LinkType | CodeType
@@ -1907,16 +1907,16 @@ type UpdateOrganizationResult = {
 [.] User
 interface User<Data extends object = Record<string, unknown>> extends BareUser<Data>
   data: Data
-  email: string | null
+  email: null | string
   emailVerified: boolean
   guest: boolean
   hasPassword: boolean
   id: string
-  locale: string | null
+  locale: null | string
   providers: Record<string, { id: string; }>
   roles: string[]
   twoFactor: boolean
-  username: string | null
+  username: null | string
 
 [.] USERNAME_MAX_LENGTH
 const USERNAME_MAX_LENGTH: 32
@@ -1932,24 +1932,24 @@ type UsernameProblem = 'length' | 'characters' | 'mixed-scripts'
 
 [.] UserRecord
 interface UserRecord
-  banReason: string | null
+  banReason: null | string
   bannedAt: Date | null
   bannedUntil: Date | null
   createdAt: Date
   data?: Record<string, unknown> | undefined
-  email: string | null
+  email: null | string
   emailVerifiedAt: Date | null
   guest: boolean
   id: string
-  lastSignIn: string | null
-  locale: string | null
-  passwordHash: string | null
+  lastSignIn: null | string
+  locale: null | string
+  passwordHash: null | string
   roles: string[]
   sessionVersion: number
   totpEnabledAt: Date | null
   totpLastStep: number
-  totpSecret: string | null
-  username: string | null
+  totpSecret: null | string
+  username: null | string
 
 [.] UserSession
 interface UserSession
@@ -1959,7 +1959,7 @@ interface UserSession
   id: string
   ip: string
   lastSeenAt: Date
-  place: string | null
+  place: null | string
   userAgent: string
 
 [.] VerifyEmailResult
@@ -1968,7 +1968,7 @@ type VerifyEmailResult = LinkResult | { ok: false, error: 'confirm' }
 [.] Ws
 interface Ws extends WsSender
   close: () => void
-  id: string | number
+  id: number | string
   send: (msg: string) => void
 
 [.] WsSender
@@ -2658,8 +2658,8 @@ function pgStore(db: Database): AuthStore
 
 [./rules] CredentialRules
 interface CredentialRules
-  password?: { min?: number | undefined; max?: number | undefined; check?: ((password: string) => string | undefined) | undefined; } | undefined
-  username?: { min?: number | undefined; max?: number | undefined; } | undefined
+  password?: undefined | { min?: number | undefined; max?: number | undefined; check?: ((password: string) => string | undefined) | undefined; }
+  username?: undefined | { min?: number | undefined; max?: number | undefined; }
 
 [./rules] DEFAULT_RULES
 const DEFAULT_RULES: ResolvedRules
@@ -2721,7 +2721,7 @@ function authTest(site: OAuthSite): AuthTest
 interface AuthTest
   enrollTotp: (userId: string) => Promise<TotpEnrolment>
   oauth: OAuthTest
-  sessionCookie: (userId: string, options?: { secure?: boolean; } | undefined) => Promise<string>
+  sessionCookie: (userId: string, options?: undefined | { secure?: boolean; }) => Promise<string>
   signInAs: (who: Omit<CreateUserInput, "roles"> & { roles?: string[] | undefined; data?: object | undefined; }) => Promise<BareUser<Record<string, unknown>>>
   signOut: () => void
 

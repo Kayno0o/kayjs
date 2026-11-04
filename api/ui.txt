@@ -42,39 +42,39 @@ interface AxisTick
 interface BarListRow
   display?: string
   href?: string
-  key: string | number
+  key: number | string
   label: string
   value: number
 
 [.] BarSeries
 interface BarSeries extends ChartSeries
   color?: string
-  colors?: (string | null | undefined)[]
+  colors?: (null | string | undefined)[]
   name: string
-  notes?: (string | null | undefined)[]
-  values: (number | null)[]
+  notes?: (null | string | undefined)[]
+  values: (null | number)[]
 
 [.] ChartMark
 interface ChartMark
   index: number
   label: string
-  values: (number | null)[]
+  values: (null | number)[]
 
 [.] ChartSeries
 interface ChartSeries
   color?: string
   name: string
-  values: (number | null)[]
+  values: (null | number)[]
 
 [.] Column
 interface Column<Row>
-  align?: "start" | "center" | "end"
+  align?: "center" | "end" | "start"
   cell?: boolean
   defaultDirection?: SortDirection
   header: string
   key: string
   numeric?: true
-  sortValue?: true | ((row: Row) => string | number)
+  sortValue?: ((row: Row) => number | string) | true
 
 [.] ComboboxOption
 interface ComboboxOption<Value extends string = string>
@@ -109,7 +109,7 @@ function dateRangeFrom(from: string, to: string): DateRange
 interface DescriptionItem
   key?: string | undefined
   label: string
-  value?: string | number | undefined
+  value?: number | string | undefined
 
 [.] dismissToast
 function dismissToast(id: number): void
@@ -200,7 +200,7 @@ type MapPoint = readonly number[]
 interface MediaItem
   captions?: string
   full?: string
-  key: string | number
+  key: number | string
   kind: "image" | "video"
   preview: string
   src?: string
@@ -292,7 +292,7 @@ type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
 
 [.] PopoverTriggerProps
 interface PopoverTriggerProps
-  aria-expanded: "true" | "false"
+  aria-expanded: "false" | "true"
   popovertarget: string
   style: string
 
@@ -323,7 +323,7 @@ interface ScatterAxis
 
 [.] ScatterPoint
 interface ScatterPoint
-  key: string | number
+  key: number | string
   label: string
   tooltip?: string
   weight?: number
@@ -341,29 +341,29 @@ interface SortState
 [.] SparkMark
 interface SparkMark
   index: number
-  value: number | null
+  value: null | number
 
 [.] SparkTone
 type SparkTone = Tone
 
 [.] StatDelta
 interface StatDelta
-  direction?: "up" | "down" | "flat" | undefined
+  direction?: "down" | "flat" | "up" | undefined
   label?: string | undefined
   tone?: Tone | undefined
   value: string
 
 [.] StepCookies
 interface StepCookies
-  delete: (name: string, options?: { path?: string; } | undefined) => void
-  get: (name: string) => string | null | undefined
-  set: (name: string, value: string, options?: {
+  delete: (name: string, options?: undefined | { path?: string; }) => void
+  get: (name: string) => null | string | undefined
+  set: (name: string, value: string, options?: undefined | {
   path?: string;
   httpOnly?: boolean;
-  sameSite?: "lax" | "strict" | "none";
+  sameSite?: "lax" | "none" | "strict";
   maxAge?: number;
   secure?: boolean;
-} | undefined) => void
+}) => void
 
 [.] stepDraft
 function stepDraft(cookies: StepCookies, name: string, { check, maxAge, path, request, secure }: StepDraftOptions): StepDraft
@@ -379,7 +379,7 @@ interface StepDraft
 [.] StepDraftOptions
 interface StepDraftOptions
   check: (step: string, values: Values) => boolean
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   path?: string | undefined
   request?: Request | undefined
   secure?: boolean | undefined
@@ -442,7 +442,7 @@ type ToastHold = 'pointer' | 'focus'
 [.] ToastOptions
 interface ToastOptions
   action?: ToastAction | undefined
-  duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   tone?: Tone | undefined
 
 [.] toasts
@@ -500,14 +500,14 @@ interface UiSettings
 [./accordion.kay] default
 component default
   boxed?: boolean | undefined
-  class?: string | { root?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; }
   items: readonly { value: string; title: string; open?: boolean | undefined; disabled?: boolean | undefined; meta?: string | undefined; }[]
   meta?: ((value: string) => Element) | undefined
   multiple?: boolean | undefined
   onChange?: ((value: string[]) => unknown) | undefined
   panel: (value: string) => Element
   title?: ((value: string) => Element) | undefined
-  value?: string | readonly string[] | undefined
+  value?: readonly string[] | string | undefined
 
 [./add] default
 const default: { description: string; extension: { import: string; expression: string; }; notes: string[]; }
@@ -518,33 +518,33 @@ function announce(message: string, from?: Element | null): void
 [./app-header.kay] default
 component default
   brand?: Element
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   brand?: string | undefined;
-  nav?: string | {
+  nav?: string | undefined | {
     root?: string | undefined;
     link?: string | undefined;
-    icon?: string | {
+    icon?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
+    };
     toggle?: string | undefined;
-    menuIcon?: string | {
+    menuIcon?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-    closeIcon?: string | {
+    };
+    closeIcon?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
+    };
     list?: string | undefined;
     item?: string | undefined;
     expand?: string | undefined;
-    expandIcon?: string | {
+    expandIcon?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
+    };
     children?: string | undefined;
-  } | undefined;
+  };
   end?: string | undefined;
-} | undefined
-  current: string | URL
+}
+  current: URL | string
   end?: Element
   expandLabel?: string | undefined
   label: string
@@ -558,24 +558,24 @@ component default
 [./app-switcher.kay] default
 component default
   apps: readonly SwitcherApp[]
-  class?: string | {
-  root?: string | {
-    root?: string | {
+  class?: string | undefined | {
+  root?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
-  menu?: string | {
+    };
+  };
+  menu?: string | undefined | {
     root?: string | undefined;
     anchor?: string | undefined;
-  } | undefined;
+  };
   grid?: string | undefined;
   tile?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   initial?: string | undefined;
   name?: string | undefined;
-} | undefined
+}
   current?: string | undefined
   icon?: IconProps | IconSlot | undefined
   id?: string | undefined
@@ -595,20 +595,20 @@ component default
   artwork?: string | undefined
   chapters?: readonly AudioChapter[] | undefined
   chaptersLabel?: string | undefined
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   audio?: string | undefined;
   bar?: string | undefined;
-  step?: string | {
-    root?: string | {
+  step?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
-  play?: string | {
-    root?: string | {
+    };
+  };
+  play?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
+    };
+  };
   time?: string | undefined;
   seek?: string | undefined;
   marks?: string | undefined;
@@ -626,21 +626,21 @@ component default
   groupTitle?: string | undefined;
   cues?: string | undefined;
   cue?: string | undefined;
-} | undefined
+}
   cues?: readonly AudioCue[] | undefined
   failure?: string | undefined
   linkLabel?: string | undefined
   nextLabel?: string | undefined
   onChapterChange?: ((index: number) => unknown) | undefined
   onEnded?: (() => unknown) | undefined
-  onError?: ((error: MediaError | DOMException | null) => unknown) | undefined
+  onError?: ((error: DOMException | MediaError | null) => unknown) | undefined
   onPause?: (() => unknown) | undefined
   onPlay?: (() => unknown) | undefined
   onPositionChange?: ((seconds: number) => unknown) | undefined
   pauseLabel?: string | undefined
   playLabel?: string | undefined
   position?: number | undefined
-  preload?: "none" | "metadata" | "auto" | undefined
+  preload?: "auto" | "metadata" | "none" | undefined
   previousLabel?: string | undefined
   seekLabel?: string | undefined
   src: string
@@ -649,30 +649,30 @@ component default
 
 [./avatar.kay] default
 component default
-  class?: string | { root?: string | undefined; image?: string | undefined; initial?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; image?: string | undefined; initial?: string | undefined; }
   fallback?: Element
   href?: string | undefined
   label?: string | undefined
   name: string
   onError?: ((event: Event) => unknown) | undefined
   onLoad?: ((event: Event) => unknown) | undefined
-  size?: "xs" | "sm" | "md" | "lg" | undefined
-  src?: string | null | undefined
+  size?: "lg" | "md" | "sm" | "xs" | undefined
+  src?: null | string | undefined
 
 [./badge.kay] default
 component default
   children?: Element
-  class?: string | { root?: string | undefined; icon?: string | { root?: string | undefined; } | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; icon?: string | undefined | { root?: string | undefined; }; }
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
-  label?: string | number | undefined
-  tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined
+  label?: number | string | undefined
+  tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
   variant?: "outline" | "solid" | "stamp" | undefined
 
 [./bar-chart.kay] default
 component default
-  active?: number | null | undefined
-  class?: string | {
+  active?: null | number | undefined
+  class?: string | undefined | {
   root?: string | undefined;
   bar?: string | undefined;
   plot?: string | undefined;
@@ -686,7 +686,7 @@ component default
   legend?: string | undefined;
   legendItem?: string | undefined;
   key?: string | undefined;
-} | undefined
+}
   emptyLabel?: string | undefined
   formatLabel?: LabelFormat | undefined
   formatValue?: ((value: number) => string) | undefined
@@ -694,7 +694,7 @@ component default
   label: string
   labels: string[]
   legend?: boolean | undefined
-  onActive?: ((index: number | null) => unknown) | undefined
+  onActive?: ((index: null | number) => unknown) | undefined
   onSelect?: ((mark: ChartMark) => unknown) | undefined
   series: BarSeries[]
   stacked?: boolean | undefined
@@ -704,7 +704,7 @@ component default
 
 [./bar-list.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   item?: string | undefined;
   row?: string | undefined;
@@ -712,7 +712,7 @@ component default
   value?: string | undefined;
   track?: string | undefined;
   fill?: string | undefined;
-} | undefined
+}
   emptyLabel?: string | undefined
   onSelect?: ((row: Row) => unknown) | undefined
   rows: Row[]
@@ -720,22 +720,22 @@ component default
 [./bare-icon-button.kay] default
 component default
   children?: Element
-  class?: string | { root?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; }
   href?: string | undefined
   label: string
-  size?: "xs" | "sm" | "md" | "lg" | undefined
+  size?: "lg" | "md" | "sm" | "xs" | undefined
   tone?: Tone | undefined
-  type?: "reset" | "submit" | "button" | undefined
-  variant?: "solid" | "ghost" | "inline" | undefined
+  type?: "button" | "reset" | "submit" | undefined
+  variant?: "ghost" | "inline" | "solid" | undefined
 
 [./bell-inbox.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
-  menu?: string | {
+  menu?: string | undefined | {
     root?: string | undefined;
     anchor?: string | undefined;
-  } | undefined;
+  };
   list?: string | undefined;
   empty?: string | undefined;
   item?: string | undefined;
@@ -745,7 +745,7 @@ component default
   all?: string | undefined;
   announce?: string | undefined;
   count?: string | undefined;
-} | undefined
+}
   item?: ((note: Item) => Element) | undefined
   items?: BellItems<Item> | undefined
   label?: string | undefined
@@ -765,104 +765,104 @@ component default
 
 [./breadcrumb.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   list?: string | undefined;
   more?: string | undefined;
   item?: string | undefined;
   link?: string | undefined;
   text?: string | undefined;
-} | undefined
-  item?: ((item: Pick<NavItem, "label" | "icon"> & { href?: string | undefined; }) => Element) | undefined
-  items: readonly (Pick<NavItem, "label" | "icon"> & { href?: string | undefined; })[]
+}
+  item?: ((item: Pick<NavItem, "icon" | "label"> & { href?: string | undefined; }) => Element) | undefined
+  items: readonly (Pick<NavItem, "icon" | "label"> & { href?: string | undefined; })[]
   label: string
   structured?: boolean | undefined
 
 [./button.kay] default
 component default
-  | { busy?: boolean | undefined; children?: Element; class?: string | { root?: any; spinner?: any; } | undefined; expanded?: boolean | undefined; href?: undefined; icon?: IconProps | IconSlot | undefined; label?: string | undefined; pressed?: boolean | undefined; size?: "xs" | "sm" | "md" | "lg" | undefined; spinner?: boolean | undefined; tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined; type?: "reset" | "submit" | "button" | undefined; variant?: "solid" | "ghost" | "inline" | undefined }
-  | { busy?: boolean | undefined; children?: Element; class?: string | { root?: any; spinner?: any; } | undefined; href: string; icon?: IconProps | IconSlot | undefined; label?: string | undefined; size?: "xs" | "sm" | "md" | "lg" | undefined; spinner?: boolean | undefined; tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined; variant?: "solid" | "ghost" | "inline" | undefined }
+  | { busy?: boolean | undefined; children?: Element; class?: string | undefined | { root?: any; spinner?: any; }; expanded?: boolean | undefined; href?: undefined; icon?: IconProps | IconSlot | undefined; label?: string | undefined; pressed?: boolean | undefined; size?: "lg" | "md" | "sm" | "xs" | undefined; spinner?: boolean | undefined; tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined; type?: "button" | "reset" | "submit" | undefined; variant?: "ghost" | "inline" | "solid" | undefined }
+  | { busy?: boolean | undefined; children?: Element; class?: string | undefined | { root?: any; spinner?: any; }; href: string; icon?: IconProps | IconSlot | undefined; label?: string | undefined; size?: "lg" | "md" | "sm" | "xs" | undefined; spinner?: boolean | undefined; tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined; variant?: "ghost" | "inline" | "solid" | undefined }
 
 [./card-row.kay] default
 component default
   actions?: Element
   children?: Element
-  class?: string | { root?: string | undefined; body?: string | undefined; link?: string | undefined; actions?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; body?: string | undefined; link?: string | undefined; actions?: string | undefined; }
   href?: string | undefined
   left?: Element
   right?: Element
 
 [./card.kay] default
 component default
-  | { bare?: boolean | undefined; children?: Element; class?: string | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; } | undefined; head?: Element; href?: undefined; level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined; title?: Element }
-  | { bare?: boolean | undefined; children?: Element; class?: string | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; } | undefined; head?: Element; href: string; level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined; title: Element }
+  | { bare?: boolean | undefined; children?: Element; class?: string | undefined | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; }; head?: Element; href?: undefined; level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined; title?: Element }
+  | { bare?: boolean | undefined; children?: Element; class?: string | undefined | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; }; head?: Element; href: string; level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined; title: Element }
 
 [./carousel.kay] default
 component default
-  | { autoplay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; class?: string | {
+  | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: string | undefined | {
   root?: string | undefined;
   viewport?: string | undefined;
   slide?: string | undefined;
   link?: string | undefined;
   image?: string | undefined;
   controls?: string | undefined;
-  step?: string | {
-    root?: string | {
+  step?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
+    };
+  };
   dot?: string | undefined;
-  pause?: string | {
-    root?: string | {
+  pause?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
-} | undefined; dotLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides: readonly Slide[] }
-  | { autoplay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; class?: string | {
+    };
+  };
+}; dotLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides: readonly Slide[] }
+  | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: string | undefined | {
   root?: string | undefined;
   viewport?: string | undefined;
   slide?: string | undefined;
   link?: string | undefined;
   image?: string | undefined;
   controls?: string | undefined;
-  step?: string | {
-    root?: string | {
+  step?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
+    };
+  };
   dot?: string | undefined;
-  pause?: string | {
-    root?: string | {
+  pause?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
-} | undefined; dotLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list: InfiniteList<Slide>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides?: undefined }
+    };
+  };
+}; dotLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list: InfiniteList<Slide>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides?: undefined }
 
 [./checkbox.kay] default
 component default
   checked?: boolean | undefined
-  class?: string | { root?: string | undefined; input?: string | undefined; label?: string | undefined; hint?: string | undefined; } | undefined
-  hint?: string | number | undefined
+  class?: string | undefined | { root?: string | undefined; input?: string | undefined; label?: string | undefined; hint?: string | undefined; }
+  hint?: number | string | undefined
   indeterminate?: boolean | undefined
   label?: string | undefined
   onChange?: ((checked: boolean) => unknown) | undefined
 
 [./chip-group.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   chip?: string | undefined;
   input?: string | undefined;
   label?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   field?: string | undefined;
   heading?: string | undefined;
-} | undefined
+}
   disabled?: boolean | undefined
   label: string
   name?: string | undefined
@@ -876,16 +876,16 @@ component default
 component default
   boxed?: boolean | undefined
   children?: Element
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   summary?: string | undefined;
   title?: string | undefined;
   meta?: string | undefined;
-  chevron?: string | {
+  chevron?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   body?: string | undefined;
-} | undefined
+}
   disabled?: boolean | undefined
   meta?: Element
   onOpenChange?: ((open: boolean) => unknown) | undefined
@@ -894,14 +894,14 @@ component default
 
 [./color-input.kay] default
 component default
-  class?: string | { root?: string | undefined; input?: string | undefined; label?: string | undefined; value?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; input?: string | undefined; label?: string | undefined; value?: string | undefined; }
   label: string
   onChange?: ((value: string) => unknown) | undefined
   value: string
 
 [./combobox.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   input?: string | undefined;
   list?: string | undefined;
@@ -909,7 +909,7 @@ component default
   optionLabel?: string | undefined;
   optionDescription?: string | undefined;
   status?: string | undefined;
-} | undefined
+}
   create?: boolean | undefined
   createLabel?: ((text: string) => string) | undefined
   disabled?: boolean | undefined
@@ -936,12 +936,12 @@ component default
 
 [./command-palette.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   search?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   input?: string | undefined;
   list?: string | undefined;
   section?: string | undefined;
@@ -955,11 +955,11 @@ component default
   group?: string | undefined;
   empty?: string | undefined;
   count?: string | undefined;
-} | undefined
+}
   emptyLabel?: string | undefined
   entries: PaletteEntry[]
   groups?: string[] | undefined
-  hotkey?: string | null | undefined
+  hotkey?: null | string | undefined
   label?: string | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   onRecentChange?: ((recent: string[]) => unknown) | undefined
@@ -971,29 +971,29 @@ component default
   search?: ((query: string) => PromiseLike<PaletteEntry[]>) | undefined
   searchError?: string | undefined
   searchLabel?: string | undefined
-  siteSearch?: boolean | { limit?: number | undefined; } | undefined
+  siteSearch?: boolean | undefined | { limit?: number | undefined; }
   siteSearchError?: string | undefined
   siteSearchLabel?: string | undefined
   siteSearchMore?: ((count: number) => string) | undefined
-  size?: "sm" | "md" | "lg" | "full" | undefined
+  size?: "full" | "lg" | "md" | "sm" | undefined
 
 [./confirm-delete.kay] default
 component default
   ask?: "dialog" | "inline" | undefined
   cancelLabel?: string | undefined
-  class?: string | {
-  root?: string | {
-    root?: string | {
-      root?: string | undefined;
-    } | undefined;
-  } | {
+  class?: string | undefined | {
+  root?: string | undefined | {
     root?: any;
     spinner?: any;
-  } | undefined;
+  } | {
+    root?: string | undefined | {
+      root?: string | undefined;
+    };
+  };
   armed?: string | undefined;
   message?: string | undefined;
   details?: string | undefined;
-} | undefined
+}
   confirmLabel?: string | undefined
   details?: Element
   disabled?: boolean | undefined
@@ -1005,25 +1005,25 @@ component default
   open?: boolean | undefined
   pendingLabel?: string | undefined
   refused?: ((data: Data) => string | undefined) | undefined
-  size?: "xs" | "sm" | "md" | "lg" | undefined
+  size?: "lg" | "md" | "sm" | "xs" | undefined
   success?: string | undefined
   title?: string | undefined
   tone?: Tone | undefined
-  trigger?: "none" | "link" | "button" | "icon" | undefined
-  variant?: "solid" | "ghost" | "inline" | undefined
+  trigger?: "button" | "icon" | "link" | "none" | undefined
+  variant?: "ghost" | "inline" | "solid" | undefined
 
 [./contact-form.kay] default
 component default
   action: Action<never, unknown, never>
   children?: Element
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   consent?: string | undefined;
   link?: string | undefined;
   issues?: string | undefined;
   issue?: string | undefined;
   privacy?: string | undefined;
-} | undefined
+}
   consent?: boolean | undefined
   consentLabel?: string | undefined
   emailLabel?: string | undefined
@@ -1040,49 +1040,49 @@ component default
 
 [./contribution-graph.kay] default
 component default
-  active?: number | null | undefined
-  class?: string | { root?: string | undefined; month?: string | undefined; cell?: string | undefined; } | undefined
+  active?: null | number | undefined
+  class?: string | undefined | { root?: string | undefined; month?: string | undefined; cell?: string | undefined; }
   color: string
   days: readonly ContributionDay[]
   href?: ((day: ContributionDay) => string | undefined) | undefined
   label?: string | undefined
   months?: boolean | undefined
-  onActive?: ((index: number | null) => unknown) | undefined
+  onActive?: ((index: null | number) => unknown) | undefined
   onSelect?: ((day: ContributionDay) => unknown) | undefined
   today: string
 
 [./copy-button.kay] default
 component default
-  class?: string | { root?: string | undefined; text?: string | undefined; live?: string | undefined; } | undefined
-  copiedFor?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  class?: string | undefined | { root?: string | undefined; text?: string | undefined; live?: string | undefined; }
+  copiedFor?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   copiedLabel?: string | undefined
   failure?: string | undefined
   html?: string | undefined
   label: string
   onCopy?: ((text: string) => unknown) | undefined
   onFail?: ((error: unknown) => unknown) | undefined
-  size?: "xs" | "sm" | "md" | "lg" | undefined
-  text: string | (() => string | Promise<string>)
-  tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined
-  variant?: "solid" | "ghost" | "inline" | undefined
+  size?: "lg" | "md" | "sm" | "xs" | undefined
+  text: (() => Promise<string> | string) | string
+  tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
+  variant?: "ghost" | "inline" | "solid" | undefined
 
 [./date-input.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
-  input?: string | {
+  input?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
-  panel?: string | {
+  };
+  panel?: string | undefined | {
     root?: string | undefined;
     anchor?: string | undefined;
-  } | undefined;
+  };
   trigger?: string | undefined;
   head?: string | undefined;
   step?: string | undefined;
-  stepIcon?: string | {
+  stepIcon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   title?: string | undefined;
   grid?: string | undefined;
   weekdayRow?: string | undefined;
@@ -1091,9 +1091,9 @@ component default
   cell?: string | undefined;
   day?: string | undefined;
   today?: string | undefined;
-} | undefined
+}
   day?: ((iso: string, state: { selected: boolean; today: boolean; outside: boolean; disabled: boolean; }) => Element) | undefined
-  firstDay?: 0 | 2 | 1 | 3 | 4 | 5 | 6 | undefined
+  firstDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | undefined
   invalid?: boolean | undefined
   isDisabled?: ((iso: string) => boolean) | undefined
   max?: string | undefined
@@ -1112,10 +1112,10 @@ component default
 
 [./date-range-input.kay] default
 component default
-  class?: string | { root?: string | undefined; separator?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; separator?: string | undefined; }
   day?: ((iso: string, state: { selected: boolean; today: boolean; outside: boolean; disabled: boolean; }) => Element) | undefined
   disabled?: boolean | undefined
-  firstDay?: 0 | 2 | 1 | 3 | 4 | 5 | 6 | undefined
+  firstDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | undefined
   fromLabel?: string | undefined
   fromName?: string | undefined
   invalid?: boolean | undefined
@@ -1126,7 +1126,7 @@ component default
   onChange?: ((value: DateRange) => unknown) | undefined
   onMonthChange?: ((month: string, box: "from" | "to") => unknown) | undefined
   onOpenChange?: ((open: boolean, box: "from" | "to") => unknown) | undefined
-  open?: false | "from" | "to" | undefined
+  open?: "from" | "to" | false | undefined
   size?: FieldSize | undefined
   toLabel?: string | undefined
   toName?: string | undefined
@@ -1134,39 +1134,39 @@ component default
 
 [./date-time-input.kay] default
 component default
-  class?: string | { root?: string | undefined; input?: string | { root?: string | undefined; } | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; input?: string | undefined | { root?: string | undefined; }; }
   disabled?: boolean | undefined
   form?: string | undefined
   invalid?: boolean | undefined
-  max?: string | Date | undefined
-  min?: string | Date | undefined
+  max?: Date | string | undefined
+  min?: Date | string | undefined
   name?: string | undefined
   onChange?: ((value: string) => unknown) | undefined
-  size?: "sm" | "md" | "lg" | undefined
+  size?: "lg" | "md" | "sm" | undefined
   value?: string | undefined
 
 [./description-list.kay] default
 component default
-  class?: string | { root?: string | undefined; item?: string | undefined; term?: string | undefined; detail?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; item?: string | undefined; term?: string | undefined; detail?: string | undefined; }
   items: readonly Item[]
   value?: ((item: Item) => Element) | undefined
 
 [./dialog.kay] default
 component default
-  | { actions?: Element; bare?: boolean | undefined; children?: Element; class?: string | {
+  | { actions?: Element; bare?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   head?: string | undefined;
   title?: string | undefined;
   body?: string | undefined;
   footer?: string | undefined;
-} | undefined; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; footer?: Element; header?: Element; heading?: Element; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; open: boolean; size?: "sm" | "md" | "lg" | "full" | undefined; title: string }
-  | { actions?: Element; bare?: boolean | undefined; children?: Element; class?: string | {
+}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; footer?: Element; header?: Element; heading?: Element; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; open: boolean; size?: "full" | "lg" | "md" | "sm" | undefined; title: string }
+  | { actions?: Element; bare?: boolean | undefined; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   head?: string | undefined;
   title?: string | undefined;
   body?: string | undefined;
   footer?: string | undefined;
-} | undefined; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; footer?: Element; header?: Element; heading?: Element; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; open: boolean; size?: "sm" | "md" | "lg" | "full" | undefined; title: string }
+}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; footer?: Element; header?: Element; heading?: Element; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; open: boolean; size?: "full" | "lg" | "md" | "sm" | undefined; title: string }
 
 [./dnd] Bar
 interface Bar
@@ -1265,9 +1265,9 @@ interface SortableOptions
 [./empty-state.kay] default
 component default
   actions?: Element
-  class?: string | { root?: string | undefined; title?: string | undefined; description?: string | undefined; actions?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; title?: string | undefined; description?: string | undefined; actions?: string | undefined; }
   description?: Element
-  level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined
+  level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   title: Element
 
 [./extension] ui
@@ -1276,14 +1276,14 @@ function ui(): KayExtension<AnyElysia>
 [./file-drop.kay] default
 component default
   accept?: string | undefined
-  class?: string | { root?: string | undefined; input?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; input?: string | undefined; }
   content: (zone: { open: () => void; dragging: () => boolean; }) => Element
   disabled?: boolean | undefined
   multiple?: boolean | undefined
   onFiles: (files: File[]) => unknown
   onReject?: ((files: File[]) => unknown) | undefined
   paste?: boolean | undefined
-  size?: "sm" | "md" | undefined
+  size?: "md" | "sm" | undefined
 
 [./form-dialog.kay] default
 component default
@@ -1291,18 +1291,18 @@ component default
   actions?: Element
   cancelLabel?: string | undefined
   children?: Element
-  class?: string | {
-  root?: string | {
+  class?: string | undefined | {
+  root?: string | undefined | {
     root?: string | undefined;
     head?: string | undefined;
     title?: string | undefined;
     body?: string | undefined;
     footer?: string | undefined;
-  } | undefined;
+  };
   footer?: string | undefined;
   actions?: string | undefined;
   form?: string | undefined;
-} | undefined
+}
   close?: Element
   closeHref?: string | undefined
   closeLabel?: string | undefined
@@ -1317,7 +1317,7 @@ component default
   onOpenChange: (open: boolean) => unknown
   onSaved?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
   open: boolean
-  refused?: ((data: FailureData<Output>) => string | Record<string, string> | undefined) | undefined
+  refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   savingLabel?: string | undefined
   size?: OverlaySize | undefined
   submitLabel: string
@@ -1327,7 +1327,7 @@ component default
 component default
   action?: Element
   children?: Element
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   head?: string | undefined;
   text?: string | undefined;
@@ -1337,20 +1337,20 @@ component default
   issues?: string | undefined;
   issue?: string | undefined;
   label?: string | undefined;
-} | undefined
+}
   group?: boolean | undefined
   hint?: string | undefined
   issue?: string | undefined
   label: string
   name?: string | undefined
   required?: boolean | undefined
-  size?: "sm" | "md" | undefined
+  size?: "md" | "sm" | undefined
 
 [./hover-card.kay] default
 component default
   anchor?: Element | null | undefined
   children?: Element
-  class?: string | { root?: string | undefined; stand?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; stand?: string | undefined; }
   id?: string | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   placement?: HoverCardPlacement | undefined
@@ -1358,18 +1358,18 @@ component default
 
 [./icon-button.kay] default
 component default
-  class?: string | { root?: string | { root?: string | undefined; } | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined | { root?: string | undefined; }; }
   href?: string | undefined
-  icon: string | number | bigint | boolean | IconProps | Node | Range | Html | readonly Element[] | (() => Element) | null | undefined
+  icon: (() => Element) | Html | IconProps | Node | Range | bigint | boolean | null | number | readonly Element[] | string | undefined
   label: string
-  size?: "xs" | "sm" | "md" | "lg" | undefined
+  size?: "lg" | "md" | "sm" | "xs" | undefined
   tone?: Tone | undefined
-  type?: "reset" | "submit" | "button" | undefined
-  variant?: "solid" | "ghost" | "inline" | undefined
+  type?: "button" | "reset" | "submit" | undefined
+  variant?: "ghost" | "inline" | "solid" | undefined
 
 [./icon-picker.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   search?: string | undefined;
   grid?: string | undefined;
@@ -1378,14 +1378,14 @@ component default
   empty?: string | undefined;
   bar?: string | undefined;
   selection?: string | undefined;
-  clear?: string | {
-    root?: string | {
+  clear?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
+    };
+  };
   error?: string | undefined;
   more?: string | undefined;
-} | undefined
+}
   clearLabel?: string | undefined
   emptyLabel?: string | undefined
   errorLabel?: string | undefined
@@ -1404,14 +1404,14 @@ component default
 
 [./icon.kay] default
 component default
-  class?: string | { root?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; }
   icon: IconProps | IconSlot
   label?: string | undefined
 
 [./image-cropper.kay] default
 component default
   alt?: string | undefined
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   stage?: string | undefined;
   image?: string | undefined;
@@ -1420,7 +1420,7 @@ component default
   gridCols?: string | undefined;
   gridRows?: string | undefined;
   handle?: string | undefined;
-} | undefined
+}
   crop?: CropRect | undefined
   cropLabel?: string | undefined
   cropText?: string | undefined
@@ -1438,9 +1438,9 @@ component default
 
 [./line-chart.kay] default
 component default
-  active?: number | null | undefined
+  active?: null | number | undefined
   animate?: boolean | undefined
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   frame?: string | undefined;
   plot?: string | undefined;
@@ -1459,17 +1459,17 @@ component default
   legend?: string | undefined;
   legendItem?: string | undefined;
   key?: string | undefined;
-} | undefined
+}
   formatLabel?: ((label: string, context: LabelContext) => string) | undefined
   formatValue?: ((value: number) => string) | undefined
   label: string
   labels: string[]
   legend?: boolean | undefined
-  onActive?: ((index: number | null) => unknown) | undefined
+  onActive?: ((index: null | number) => unknown) | undefined
   onRange?: ((from: number, to: number) => unknown) | undefined
   onSelect?: ((mark: ChartMark) => unknown) | undefined
   options?: LineChartPresetOptions | undefined
-  pointKey?: "label" | "index" | ((point: { series: number; index: number; label: string; }) => string | number) | undefined
+  pointKey?: "index" | "label" | ((point: { series: number; index: number; label: string; }) => number | string) | undefined
   rangeHint?: string | undefined
   series: ChartSeries[]
   stacked?: boolean | undefined
@@ -1479,14 +1479,14 @@ component default
 [./load-more.kay] default
 component default
   button?: boolean | undefined
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   failed?: string | undefined;
   message?: string | undefined;
   loading?: string | undefined;
   text?: string | undefined;
   announced?: string | undefined;
-} | undefined
+}
   failureLabel?: string | undefined
   list: InfiniteList<unknown>
   loadedLabel?: ((count: number) => string) | undefined
@@ -1499,14 +1499,14 @@ component default
 component default
   attribution?: string | undefined
   center?: MapPoint | undefined
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   canvas?: string | undefined;
   surface?: string | undefined;
   list?: string | undefined;
   item?: string | undefined;
   popup?: string | undefined;
-} | undefined
+}
   darkAttribution?: string | undefined
   darkTiles?: string | undefined
   highlight?: readonly MapPoint[] | undefined
@@ -1522,14 +1522,14 @@ component default
 
 [./markdown-editor.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   wrap?: string | undefined;
   grid?: string | undefined;
   bar?: string | undefined;
   barFailed?: string | undefined;
   extra?: string | undefined;
-} | undefined
+}
   keysHint?: string | undefined
   onImage?: ((file: File) => Promise<string>) | undefined
   onImageError?: ((file: File, error: unknown) => unknown) | undefined
@@ -1539,112 +1539,112 @@ component default
   previewClass?: string | undefined
   previewTrusted?: boolean | undefined
   previewing?: boolean | undefined
-  toolbar?: boolean | readonly ("image" | "bold" | "italic" | "heading" | "bulletList" | "numberedList" | "link")[] | undefined
+  toolbar?: boolean | readonly ("bold" | "bulletList" | "heading" | "image" | "italic" | "link" | "numberedList")[] | undefined
   toolbarExtra?: ((tools: ToolbarTools) => Element) | undefined
   uploadFailure?: string | undefined
   value?: string | undefined
 
 [./masonry.kay] default
 component default
-  | { class?: string | { root?: string | undefined; tile?: string | undefined; } | undefined; gap?: number | undefined; items: readonly Item[]; key: (item: Item) => Key; list?: undefined; minWidth?: number | undefined; style?: string | undefined; tile: (item: Item) => Element }
-  | { class?: string | { root?: string | undefined; tile?: string | undefined; } | undefined; gap?: number | undefined; items?: undefined; key: (item: Item) => Key; list: InfiniteList<Item>; minWidth?: number | undefined; style?: string | undefined; tile: (item: Item) => Element }
+  | { class?: string | undefined | { root?: string | undefined; tile?: string | undefined; }; gap?: number | undefined; items: readonly Item[]; key: (item: Item) => Key; list?: undefined; minWidth?: number | undefined; style?: string | undefined; tile: (item: Item) => Element }
+  | { class?: string | undefined | { root?: string | undefined; tile?: string | undefined; }; gap?: number | undefined; items?: undefined; key: (item: Item) => Key; list: InfiniteList<Item>; minWidth?: number | undefined; style?: string | undefined; tile: (item: Item) => Element }
 
 [./media-gallery.kay] default
 component default
-  | { caption?: ((item: Item, index: number) => Element) | undefined; class?: string | {
+  | { caption?: ((item: Item, index: number) => Element) | undefined; class?: string | undefined | {
   root?: string | undefined;
   stage?: string | undefined;
   frame?: string | undefined;
   zoom?: string | undefined;
-  step?: string | {
-    root?: string | {
+  step?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
+    };
+  };
   counter?: string | undefined;
   caption?: string | undefined;
   strip?: string | undefined;
   thumb?: string | undefined;
   thumbImage?: string | undefined;
-  play?: string | {
+  play?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   lightbox?: string | undefined;
   full?: string | undefined;
-  close?: string | {
-    root?: string | {
+  close?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
-} | undefined; closeLabel?: string | undefined; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items: Item[]; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; onOpenChange?: ((open: boolean, index: number) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
-  | { caption?: ((item: Item, index: number) => Element) | undefined; class?: string | {
+    };
+  };
+}; closeLabel?: string | undefined; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items: Item[]; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; onOpenChange?: ((open: boolean, index: number) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
+  | { caption?: ((item: Item, index: number) => Element) | undefined; class?: string | undefined | {
   root?: string | undefined;
   stage?: string | undefined;
   frame?: string | undefined;
   zoom?: string | undefined;
-  step?: string | {
-    root?: string | {
+  step?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
+    };
+  };
   counter?: string | undefined;
   caption?: string | undefined;
   strip?: string | undefined;
   thumb?: string | undefined;
   thumbImage?: string | undefined;
-  play?: string | {
+  play?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   lightbox?: string | undefined;
   full?: string | undefined;
-  close?: string | {
-    root?: string | {
+  close?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
-} | undefined; closeLabel?: string | undefined; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items?: undefined; list: InfiniteList<Item>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; onOpenChange?: ((open: boolean, index: number) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
+    };
+  };
+}; closeLabel?: string | undefined; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items?: undefined; list: InfiniteList<Item>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; onOpenChange?: ((open: boolean, index: number) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
 
 [./menu.kay] default
 component default
-  at?: { x: number; y: number; } | undefined
-  class?: string | {
-  root?: string | {
-    root?: string | {
+  at?: undefined | { x: number; y: number; }
+  class?: string | undefined | {
+  root?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
-  menu?: string | {
+    };
+  };
+  menu?: string | undefined | {
     root?: string | undefined;
     anchor?: string | undefined;
-  } | undefined;
+  };
   list?: string | undefined;
   status?: string | undefined;
   item?: string | undefined;
   separator?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
-} | undefined
+  };
+}
   failureLabel?: string | undefined
   icon?: IconProps | IconSlot | undefined
   id?: string | undefined
   item?: ((entry: MenuAction) => Element) | undefined
-  items: MenuEntry[] | (() => MenuEntry[] | Promise<MenuEntry[]>) | Promise<MenuEntry[]>
+  items: (() => MenuEntry[] | Promise<MenuEntry[]>) | MenuEntry[] | Promise<MenuEntry[]>
   label: string
   loadingLabel?: string | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
   placement?: PopoverPlacement | undefined
   retryLabel?: string | undefined
-  size?: "xs" | "sm" | "md" | "lg" | undefined
+  size?: "lg" | "md" | "sm" | "xs" | undefined
   style?: string | undefined
   tone?: Tone | undefined
   trigger?: ((attributes: MenuTriggerProps) => Element) | undefined
-  variant?: "solid" | "ghost" | "inline" | undefined
+  variant?: "ghost" | "inline" | "solid" | undefined
 
 [./meter.kay] default
 component default
-  class?: string | { root?: string | undefined; fill?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; fill?: string | undefined; }
   fillClass?: string | undefined
   label: string
   max?: number | undefined
@@ -1653,17 +1653,17 @@ component default
 [./multi-select.kay] default
 component default
   allLabel?: string | undefined
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
-  panel?: string | {
+  panel?: string | undefined | {
     root?: string | undefined;
     anchor?: string | undefined;
-  } | undefined;
+  };
   trigger?: string | undefined;
   summary?: string | undefined;
-  chevron?: string | {
+  chevron?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   search?: string | undefined;
   bar?: string | undefined;
   action?: string | undefined;
@@ -1671,11 +1671,11 @@ component default
   option?: string | undefined;
   checkbox?: string | undefined;
   label?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   empty?: string | undefined;
-} | undefined
+}
   disabled?: boolean | undefined
   emptyLabel?: string | undefined
   failureLabel?: string | undefined
@@ -1692,7 +1692,7 @@ component default
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
   option?: ((option: MultiSelectOption<Value>) => Element) | undefined
-  options: readonly MultiSelectOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly MultiSelectOption<Value>[]>)
+  options: ((input: ComboboxQuery) => PromiseLike<readonly MultiSelectOption<Value>[]>) | readonly MultiSelectOption<Value>[]
   placeholder?: string | undefined
   placement?: PopoverPlacement | undefined
   search?: boolean | undefined
@@ -1706,36 +1706,36 @@ component default
 component default
   actions?: Element
   children?: Element
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   body?: string | undefined;
   actions?: string | undefined;
   dismiss?: any;
-} | undefined
+}
   dismissLabel?: string | undefined
   dismissible?: boolean | undefined
-  icon?: boolean | IconProps | IconSlot | undefined
+  icon?: IconProps | IconSlot | boolean | undefined
   label?: string | undefined
   onDismiss?: (() => unknown) | undefined
   open?: boolean | undefined
-  size?: "sm" | "md" | undefined
-  tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined
+  size?: "md" | "sm" | undefined
+  tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
 
 [./page-header.kay] default
 component default
   actions?: Element
   children?: Element
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   head?: string | undefined;
   title?: string | undefined;
   meta?: string | undefined;
   actions?: string | undefined;
   description?: string | undefined;
-} | undefined
+}
   description?: Element
   meta?: Element
   title: Element
@@ -1744,30 +1744,30 @@ component default
 component default
   actions?: Element
   children?: Element
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   head?: string | undefined;
   heading?: string | undefined;
   title?: string | undefined;
   subtitle?: string | undefined;
-} | undefined
-  level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined
+}
+  level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   sticky?: boolean | undefined
   subtitle?: string | undefined
   title: Element
 
 [./pagination.kay] default
 component default
-  | { class?: string | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; } | undefined; label?: string | undefined; limit?: never; more?: never; nextLabel?: string | undefined; of: PagedList; offset?: never; page?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "previous" | "next") => Element) | undefined; url?: never }
-  | { class?: string | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; } | undefined; label?: string | undefined; limit?: never; more?: never; nextLabel?: string | undefined; of?: never; offset?: never; page: number; pages: number; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "previous" | "next") => Element) | undefined; url?: string | URL | undefined }
-  | { class?: string | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; } | undefined; label?: string | undefined; limit?: never; more: boolean; nextLabel?: string | undefined; of?: never; offset?: never; page: number; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "previous" | "next") => Element) | undefined; url?: string | URL | undefined }
-  | { class?: string | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; } | undefined; label?: string | undefined; limit: number; more: boolean; nextLabel?: string | undefined; of?: never; offset: number; page?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "previous" | "next") => Element) | undefined; url?: string | URL | undefined }
+  | { class?: string | undefined | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; }; label?: string | undefined; limit?: never; more?: never; nextLabel?: string | undefined; of: PagedList; offset?: never; page?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; url?: never }
+  | { class?: string | undefined | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; }; label?: string | undefined; limit?: never; more?: never; nextLabel?: string | undefined; of?: never; offset?: never; page: number; pages: number; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; url?: URL | string | undefined }
+  | { class?: string | undefined | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; }; label?: string | undefined; limit?: never; more: boolean; nextLabel?: string | undefined; of?: never; offset?: never; page: number; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; url?: URL | string | undefined }
+  | { class?: string | undefined | { root?: string | undefined; step?: string | undefined; gap?: string | undefined; page?: string | undefined; }; label?: string | undefined; limit: number; more: boolean; nextLabel?: string | undefined; of?: never; offset: number; page?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; step?: ((direction: "next" | "previous") => Element) | undefined; url?: URL | string | undefined }
 
 [./popover.kay] default
 component default
-  at?: { x: number; y: number; } | undefined
+  at?: undefined | { x: number; y: number; }
   children?: Element
-  class?: string | { root?: string | undefined; anchor?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; anchor?: string | undefined; }
   id?: string | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
@@ -1777,42 +1777,42 @@ component default
 
 [./progress.kay] default
 component default
-  class?: string | { root?: string | undefined; fill?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; fill?: string | undefined; }
   label: string
   max?: number | undefined
   value?: number | undefined
 
 [./qr-code.kay] default
 component default
-  class?: string | { root?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; }
   inline?: boolean | undefined
   label?: string | undefined
-  options?: Omit<QrCodeSvgOptions, "title" | "ariaLabel" | "size"> | undefined
+  options?: Omit<QrCodeSvgOptions, "ariaLabel" | "size" | "title"> | undefined
   pixels?: number | undefined
   style?: string | undefined
   value: string
 
 [./radio-group.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   radio?: string | undefined;
   choice?: string | undefined;
   input?: string | undefined;
   label?: string | undefined;
   description?: string | undefined;
-} | undefined
+}
   disabled?: boolean | undefined
   label?: string | undefined
   name?: string | undefined
-  onChange?: ((value: Value | (null extends Held ? Held & null : never)) => unknown) | undefined
+  onChange?: ((value: (null extends Held ? Held & null : never) | Value) => unknown) | undefined
   option?: ((option: { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: readonly { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }[] & NullOption<Value, Held>
   value: Held
 
 [./range-input.kay] default
 component default
-  class?: string | { root?: string | undefined; box?: string | undefined; separator?: string | undefined; unit?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; box?: string | undefined; separator?: string | undefined; unit?: string | undefined; }
   fromLabel?: string | undefined
   invalid?: boolean | undefined
   label: string
@@ -1828,47 +1828,47 @@ component default
 [./rating.kay] default
 component default
   allowClear?: boolean | undefined
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   star?: string | undefined;
   input?: string | undefined;
-  glyph?: string | {
+  glyph?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   stars?: string | undefined;
   fill?: string | undefined;
-} | undefined
+}
   disabled?: boolean | undefined
   icon?: IconProps | IconSlot | undefined
   label: string
   max?: number | undefined
   name?: string | undefined
-  onChange?: ((value: number | null) => unknown) | undefined
+  onChange?: ((value: null | number) => unknown) | undefined
   value: number
 
 [./record-button.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
-  button?: string | {
+  button?: string | undefined | {
     root?: any;
     spinner?: any;
-  } | undefined;
+  };
   time?: string | undefined;
   live?: string | undefined;
-  problem?: string | {
+  problem?: string | undefined | {
     root?: string | undefined;
-    icon?: string | {
+    icon?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
+    };
     body?: string | undefined;
     actions?: string | undefined;
     dismiss?: any;
-  } | undefined;
-} | undefined
+  };
+}
   failure?: string | undefined
   label?: string | undefined
-  maxDuration?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  maxDuration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   onCancel?: (() => unknown) | undefined
   onError?: ((problem: "send" | RecordProblem, cause?: unknown) => unknown) | undefined
   onRecord: (audio: File) => unknown
@@ -1876,14 +1876,14 @@ component default
   onStart?: (() => unknown) | undefined
   onStop?: ((reason: RecordStop) => unknown) | undefined
   recording?: boolean | undefined
-  size?: "xs" | "sm" | "md" | "lg" | undefined
-  tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined
-  variant?: "solid" | "ghost" | "inline" | undefined
+  size?: "lg" | "md" | "sm" | "xs" | undefined
+  tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
+  variant?: "ghost" | "inline" | "solid" | undefined
 
 [./relative-time.kay] default
 component default
-  class?: string | { root?: string | undefined; } | undefined
-  date: string | number | Date
+  class?: string | undefined | { root?: string | undefined; }
+  date: Date | number | string
   dateOptions?: DateTimeFormatOptions | undefined
   focusable?: boolean | undefined
   options?: RelativeTimeFormatOptions | undefined
@@ -1892,29 +1892,29 @@ component default
 component default
   addLabel?: string | undefined
   cell?: ((column: { key: string; label: string; name: string | undefined; }, row: Row, index: number, set: (value: string) => void) => Element) | undefined
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   head?: string | undefined;
   heading?: string | undefined;
   row?: string | undefined;
-  input?: string | {
+  input?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
-  remove?: string | {
-    root?: string | {
+  };
+  remove?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
-  add?: string | {
+    };
+  };
+  add?: string | undefined | {
     root?: any;
     spinner?: any;
-  } | undefined;
-} | undefined
+  };
+}
   columns: readonly {
   key: string;
   label: string;
   placeholder?: string | undefined;
-  type?: "number" | "search" | "text" | "email" | "tel" | "url" | undefined;
+  type?: "email" | "number" | "search" | "tel" | "text" | "url" | undefined;
   name?: string | undefined;
   cell?: boolean | undefined;
 }[]
@@ -1935,14 +1935,14 @@ component default
   cancelHref?: string | undefined
   cancelLabel?: string | undefined
   children?: Element
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   grid?: string | undefined;
   bar?: string | undefined;
   status?: string | undefined;
   actions?: string | undefined;
   confirm?: string | undefined;
-} | undefined
+}
   cleanLabel?: string | undefined
   confirm?: string | undefined
   confirmLabel?: string | undefined
@@ -1954,18 +1954,18 @@ component default
   onError?: ((error: unknown) => unknown) | undefined
   onSave?: (() => Promise<unknown>) | undefined
   onSaved?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
-  refused?: ((data: FailureData<Output>) => string | Record<string, string> | undefined) | undefined
-  saveDisabled?: string | boolean | undefined
+  refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
+  saveDisabled?: boolean | string | undefined
   saveLabel?: string | undefined
   saved?: string | undefined
   savingLabel?: string | undefined
-  shortcut?: string | false | undefined
+  shortcut?: false | string | undefined
   status?: string | undefined
 
 [./scatter-chart.kay] default
 component default
-  active?: number | null | undefined
-  class?: string | {
+  active?: null | number | undefined
+  class?: string | undefined | {
   root?: string | undefined;
   axisLabel?: string | undefined;
   plot?: string | undefined;
@@ -1975,66 +1975,66 @@ component default
   corner?: string | undefined;
   dot?: string | undefined;
   tooltip?: string | undefined;
-} | undefined
-  corners?: { topLeft?: string; topRight?: string; bottomLeft?: string; bottomRight?: string; } | undefined
+}
+  corners?: undefined | { topLeft?: string; topRight?: string; bottomLeft?: string; bottomRight?: string; }
   emptyLabel?: string | undefined
   href?: ((point: Point) => string | undefined) | undefined
   label: string
-  onActive?: ((index: number | null) => unknown) | undefined
+  onActive?: ((index: null | number) => unknown) | undefined
   onSelect?: ((point: Point) => unknown) | undefined
   points: Point[]
-  quadrant?: { x: number; y: number; } | undefined
+  quadrant?: undefined | { x: number; y: number; }
   tooltip?: ((point: Point) => Element) | undefined
   x?: ScatterAxis | undefined
   y?: ScatterAxis | undefined
 
 [./segmented.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   option?: string | undefined;
   input?: string | undefined;
   label?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   link?: string | undefined;
   field?: string | undefined;
   heading?: string | undefined;
-} | undefined
+}
   disabled?: boolean | undefined
   label: string
   name?: string | undefined
-  onChange?: ((value: Value | (null extends Held ? Held & null : never)) => unknown) | undefined
+  onChange?: ((value: (null extends Held ? Held & null : never) | Value) => unknown) | undefined
   option?: ((option: { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[] & NullOption<Value, Held>
   orientation?: "horizontal" | "vertical" | undefined
   param?: string | undefined
-  paramDefault?: string | number | undefined
+  paramDefault?: number | string | undefined
   showLabel?: boolean | undefined
   value: Held
 
 [./select.kay] default
 component default
   busy?: boolean | undefined
-  class?: string | { root?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; }
   emptyOption?: Empty
   failureLabel?: string | undefined
   invalid?: boolean | undefined
   loadingLabel?: string | undefined
-  onChange?: ((value: Value | (Empty extends string | true ? "" : never)) => unknown) | undefined
+  onChange?: ((value: (Empty extends string | true ? "" : never) | Value) => unknown) | undefined
   onError?: ((error: unknown) => unknown) | undefined
   onLoad?: ((options: readonly SelectOption<Value>[]) => unknown) | undefined
-  options: readonly SelectOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly SelectOption<Value>[]>)
+  options: ((input: ComboboxQuery) => PromiseLike<readonly SelectOption<Value>[]>) | readonly SelectOption<Value>[]
   param?: string | undefined
-  paramDefault?: string | number | undefined
+  paramDefault?: number | string | undefined
   size?: FieldSize | undefined
   submit?: boolean | undefined
-  value: Value | (Empty extends string | true ? "" : never)
+  value: (Empty extends string | true ? "" : never) | Value
 
 [./side-panel.kay] default
 component default
-  | { actions?: Element; children?: Element; class?: string | {
+  | { actions?: Element; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   grip?: string | undefined;
   line?: string | undefined;
@@ -2042,13 +2042,13 @@ component default
   title?: string | undefined;
   body?: string | undefined;
   footer?: string | undefined;
-  launcher?: string | {
-    root?: string | {
+  launcher?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
-} | undefined; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; launcher?: undefined; launcherHref?: undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: string | number | undefined; size?: number | OverlaySize | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
-  | { actions?: Element; children?: Element; class?: string | {
+    };
+  };
+}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; launcher?: undefined; launcherHref?: undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
+  | { actions?: Element; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   grip?: string | undefined;
   line?: string | undefined;
@@ -2056,13 +2056,13 @@ component default
   title?: string | undefined;
   body?: string | undefined;
   footer?: string | undefined;
-  launcher?: string | {
-    root?: string | {
+  launcher?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
-} | undefined; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; launcher: string; launcherHref: string; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: string | number | undefined; size?: number | OverlaySize | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
-  | { actions?: Element; children?: Element; class?: string | {
+    };
+  };
+}; close?: Element; closeHref: string; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; launcher: string; launcherHref: string; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
+  | { actions?: Element; children?: Element; class?: string | undefined | {
   root?: string | undefined;
   grip?: string | undefined;
   line?: string | undefined;
@@ -2070,46 +2070,46 @@ component default
   title?: string | undefined;
   body?: string | undefined;
   footer?: string | undefined;
-  launcher?: string | {
-    root?: string | {
+  launcher?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
-} | undefined; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; launcher?: string | undefined; launcherHref?: string | undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: string | number | undefined; size?: number | OverlaySize | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
+    };
+  };
+}; close?: Element; closeHref?: string | undefined; closeLabel?: string | undefined; dirty?: boolean | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; header?: Element; heading?: Element; launcher?: string | undefined; launcherHref?: string | undefined; launcherLayer?: number | undefined; level?: 2 | 3 | 4 | 5 | 6 | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: number | string | undefined; size?: OverlaySize | number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
 
 [./site-favicon.kay] default
 component default
-  class?: string | { root?: string | undefined; img?: string | undefined; icon?: string | { root?: string | undefined; } | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; img?: string | undefined; icon?: string | undefined | { root?: string | undefined; }; }
   fallback?: Element
   name: string
   onError?: ((event: Event) => unknown) | undefined
   onLoad?: ((event: Event) => unknown) | undefined
-  src?: string | null | undefined
+  src?: null | string | undefined
 
 [./site-nav.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   link?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   toggle?: string | undefined;
-  menuIcon?: string | {
+  menuIcon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
-  closeIcon?: string | {
+  };
+  closeIcon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   list?: string | undefined;
   item?: string | undefined;
   expand?: string | undefined;
-  expandIcon?: string | {
+  expandIcon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   children?: string | undefined;
-} | undefined
-  current: string | URL
+}
+  current: URL | string
   expandLabel?: string | undefined
   id?: string | undefined
   label: string
@@ -2121,17 +2121,17 @@ component default
 
 [./skeleton.kay] default
 component default
-  class?: string | { root?: string | undefined; block?: string | undefined; label?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; block?: string | undefined; label?: string | undefined; }
   height?: string | undefined
   label?: string | undefined
   lines?: number | undefined
-  shape?: "text" | "avatar" | "card" | undefined
+  shape?: "avatar" | "card" | "text" | undefined
   style?: string | undefined
   width?: string | undefined
 
 [./slider.kay] default
 component default
-  class?: string | { root?: string | undefined; label?: string | undefined; input?: string | undefined; value?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; label?: string | undefined; input?: string | undefined; value?: string | undefined; }
   formatValue?: ((value: number) => string) | undefined
   invalid?: boolean | undefined
   label: string
@@ -2146,21 +2146,21 @@ component default
 
 [./sparkline.kay] default
 component default
-  active?: number | null | undefined
-  class?: string | { root?: string | undefined; bar?: string | undefined; item?: string | undefined; } | undefined
+  active?: null | number | undefined
+  class?: string | undefined | { root?: string | undefined; bar?: string | undefined; item?: string | undefined; }
   hints?: readonly (string | undefined)[] | undefined
   href?: ((mark: SparkMark) => string | undefined) | undefined
   label: string
-  onActive?: ((index: number | null) => unknown) | undefined
+  onActive?: ((index: null | number) => unknown) | undefined
   onSelect?: ((mark: SparkMark) => unknown) | undefined
   tone?: Tone | undefined
   tones?: readonly (Tone | undefined)[] | undefined
-  values: readonly (number | null)[]
+  values: readonly (null | number)[]
 
 [./split-layout.kay] default
 component default
   backLabel?: string | undefined
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   sidebar?: string | undefined;
   sidebarHead?: string | undefined;
@@ -2171,7 +2171,7 @@ component default
   resizer?: string | undefined;
   detail?: string | undefined;
   detailHead?: string | undefined;
-} | undefined
+}
   detail: Element
   detailHead?: Element
   detailOpen?: boolean | undefined
@@ -2188,49 +2188,49 @@ component default
 
 [./stat.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   value?: string | undefined;
   label?: string | undefined;
   delta?: string | undefined;
-  deltaIcon?: string | {
+  deltaIcon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   deltaValue?: string | undefined;
   deltaLabel?: string | undefined;
-} | undefined
+}
   delta?: StatDelta | undefined
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   label?: string | undefined
-  tone?: "info" | "success" | "neutral" | "accent" | "warning" | "danger" | undefined
-  value: string | number
-  variant?: "tile" | "inline" | undefined
+  tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
+  value: number | string
+  variant?: "inline" | "tile" | undefined
 
 [./status-strip.kay] default
 component default
   cells: readonly (Tone | undefined)[]
-  class?: string | { root?: string | undefined; cell?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; cell?: string | undefined; }
   hints?: readonly (string | undefined)[] | undefined
   label: string
 
 [./steps.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   marker?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   label?: string | undefined;
   state?: string | undefined;
   list?: string | undefined;
   item?: string | undefined;
   link?: string | undefined;
-} | undefined
+}
   current: string
   done?: readonly string[] | undefined
   doneLabel?: string | undefined
@@ -2241,13 +2241,13 @@ component default
   skippedLabel?: string | undefined
   stepLabel?: ((step: StepItem<string>, state: "current" | "done" | "upcoming") => Element) | undefined
   steps: readonly StepItem<string>[]
-  url?: string | URL | undefined
+  url?: URL | string | undefined
 
 [./subscribe-form.kay] default
 component default
   action: Action<never, unknown, never>
   children?: Element
-  class?: string | { root?: string | undefined; notice?: string | undefined; link?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; notice?: string | undefined; link?: string | undefined; }
   label?: string | undefined
   noticeText?: string | undefined
   onError?: ((failure: FormFailure<never, unknown, never>) => unknown) | undefined
@@ -2261,26 +2261,26 @@ component default
 
 [./tab-nav.kay] default
 component default
-  | { class?: string | {
+  | { class?: string | undefined | {
   root?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   badge?: string | undefined;
   link?: string | undefined;
-} | undefined; current: string | URL; keep?: readonly string[] | undefined; label: string; links: readonly ({ href: string; } & NavItem & Omit<TabLink, "href">)[]; param?: undefined; paramDefault?: undefined; tab?: ((tab: TabEntry) => Element) | undefined; tabs?: undefined }
-  | { class?: string | {
+}; current: URL | string; keep?: readonly string[] | undefined; label: string; links: readonly ({ href: string; } & NavItem & Omit<TabLink, "href">)[]; param?: undefined; paramDefault?: undefined; tab?: ((tab: TabEntry) => Element) | undefined; tabs?: undefined }
+  | { class?: string | undefined | {
   root?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   badge?: string | undefined;
   link?: string | undefined;
-} | undefined; current?: undefined; keep?: undefined; label: string; links?: undefined; param: string; paramDefault?: string | number | undefined; tab?: ((tab: TabEntry) => Element) | undefined; tabs: readonly ({ value: string | number; } & NavItem)[] }
+}; current?: undefined; keep?: undefined; label: string; links?: undefined; param: string; paramDefault?: number | string | undefined; tab?: ((tab: TabEntry) => Element) | undefined; tabs: readonly ({ value: number | string; } & NavItem)[] }
 
 [./table.kay] default
 component default
-  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: string | {
+  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: string | undefined | {
   root?: string | undefined;
   filter?: string | undefined;
   field?: string | undefined;
@@ -2298,18 +2298,18 @@ component default
   selectHead?: string | undefined;
   headCell?: string | undefined;
   sortButton?: string | undefined;
-  sortIcon?: string | {
+  sortIcon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   body?: string | undefined;
   spacer?: string | undefined;
   row?: string | undefined;
   toggleCell?: string | undefined;
-  toggle?: string | {
-    root?: string | {
+  toggle?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
+    };
+  };
   selectCell?: string | undefined;
   cellBody?: string | undefined;
   cell?: string | undefined;
@@ -2317,8 +2317,8 @@ component default
   detailRow?: string | undefined;
   detailCell?: string | undefined;
   emptyCell?: string | undefined;
-} | undefined; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: string | boolean | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list?: undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; rowKey: Key; rows: Row[]; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
-  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: string | {
+}; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list?: undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; rowKey: Key; rows: Row[]; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
+  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: string | undefined | {
   root?: string | undefined;
   filter?: string | undefined;
   field?: string | undefined;
@@ -2336,18 +2336,18 @@ component default
   selectHead?: string | undefined;
   headCell?: string | undefined;
   sortButton?: string | undefined;
-  sortIcon?: string | {
+  sortIcon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   body?: string | undefined;
   spacer?: string | undefined;
   row?: string | undefined;
   toggleCell?: string | undefined;
-  toggle?: string | {
-    root?: string | {
+  toggle?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
+    };
+  };
   selectCell?: string | undefined;
   cellBody?: string | undefined;
   cell?: string | undefined;
@@ -2355,39 +2355,39 @@ component default
   detailRow?: string | undefined;
   detailCell?: string | undefined;
   emptyCell?: string | undefined;
-} | undefined; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: string | boolean | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list: InfiniteList<Row>; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
+}; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list: InfiniteList<Row>; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
 
 [./tabs.kay] default
 component default
-  | { class?: string | {
+  | { class?: string | undefined | {
   root?: string | undefined;
   list?: string | undefined;
   tab?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   badge?: string | undefined;
   panel?: string | undefined;
-} | undefined; label: string; onChange?: ((value: Value) => unknown) | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: readonly ({ value: Value; } & NavItem)[]; value: Value }
-  | { class?: string | {
+}; label: string; onChange?: ((value: Value) => unknown) | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: readonly ({ value: Value; } & NavItem)[]; value: Value }
+  | { class?: string | undefined | {
   root?: string | undefined;
   list?: string | undefined;
   tab?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   badge?: string | undefined;
   panel?: string | undefined;
-} | undefined; label: string; onChange?: ((value: Value) => unknown) | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: readonly ({ value: Value; } & NavItem)[]; value?: undefined }
+}; label: string; onChange?: ((value: Value) => unknown) | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: readonly ({ value: Value; } & NavItem)[]; value?: undefined }
 
 [./text-input.kay] default
 component default
-  | { class?: string | { root?: string | undefined; } | undefined; invalid?: boolean | undefined; onChange?: ((value: string) => unknown) | undefined; onInput?: ((value: string) => unknown) | undefined; size?: FieldSize | undefined; type?: "search" | "time" | "text" | "password" | "email" | "tel" | "month" | "url" | "date" | "datetime-local" | "week" | undefined; value?: string | undefined }
-  | { class?: string | { root?: string | undefined; } | undefined; invalid?: boolean | undefined; onChange?: ((value: number | null) => unknown) | undefined; onInput?: ((value: number | null) => unknown) | undefined; size?: FieldSize | undefined; type: "number"; value?: string | number | null | undefined }
+  | { class?: string | undefined | { root?: string | undefined; }; invalid?: boolean | undefined; onChange?: ((value: string) => unknown) | undefined; onInput?: ((value: string) => unknown) | undefined; size?: FieldSize | undefined; type?: "date" | "datetime-local" | "email" | "month" | "password" | "search" | "tel" | "text" | "time" | "url" | "week" | undefined; value?: string | undefined }
+  | { class?: string | undefined | { root?: string | undefined; }; invalid?: boolean | undefined; onChange?: ((value: null | number) => unknown) | undefined; onInput?: ((value: null | number) => unknown) | undefined; size?: FieldSize | undefined; type: "number"; value?: null | number | string | undefined }
 
 [./textarea.kay] default
 component default
-  class?: string | { root?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; }
   invalid?: boolean | undefined
   onChange?: ((value: string) => unknown) | undefined
   onInput?: ((value: string) => unknown) | undefined
@@ -2397,7 +2397,7 @@ component default
 
 [./time-input.kay] default
 component default
-  class?: string | { root?: string | { root?: string | undefined; } | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined | { root?: string | undefined; }; }
   invalid?: boolean | undefined
   onChange?: ((value: string) => unknown) | undefined
   size?: FieldSize | undefined
@@ -2405,16 +2405,16 @@ component default
 
 [./timeline.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   item?: string | undefined;
   entry?: string | undefined;
   time?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   text?: string | undefined;
-} | undefined
+}
   entries: readonly TimelineEntry<Key>[]
   label: string
   onSelect?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
@@ -2423,31 +2423,31 @@ component default
 
 [./toaster.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   live?: string | undefined;
   toast?: string | undefined;
-  icon?: string | {
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   message?: string | undefined;
-  action?: string | {
+  action?: string | undefined | {
     root?: any;
     spinner?: any;
-  } | undefined;
-  dismiss?: string | {
-    root?: string | {
+  };
+  dismiss?: string | undefined | {
+    root?: string | undefined | {
       root?: string | undefined;
-    } | undefined;
-  } | undefined;
-} | undefined
+    };
+  };
+}
   dismissLabel?: string | undefined
-  hotkey?: string | null | undefined
+  hotkey?: null | string | undefined
 
 [./toggle.kay] default
 component default
   checked?: boolean | undefined
-  class?: string | { root?: string | undefined; input?: string | undefined; track?: string | undefined; label?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; input?: string | undefined; track?: string | undefined; label?: string | undefined; }
   label?: string | undefined
   onChange?: ((checked: boolean) => unknown) | undefined
 
@@ -2455,42 +2455,42 @@ component default
 component default
   caption?: string | undefined
   children?: Element
-  class?: string | { root?: string | undefined; caption?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; caption?: string | undefined; }
   floating?: boolean | undefined
   label: string
   role?: "group" | "toolbar" | undefined
 
 [./tooltip-host.kay] default
 component default
-  class?: string | { root?: string | undefined; } | undefined
-  hideDelay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  showDelay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  class?: string | undefined | { root?: string | undefined; }
+  hideDelay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  showDelay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./tooltip.kay] default
 component default
   children?: Element
-  class?: string | { root?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; }
   placement?: string | undefined
   text?: string | undefined
 
 [./tree-view.kay] default
 component default
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   item?: string | undefined;
   toggle?: string | undefined;
-  spinner?: string | {
+  spinner?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
-  icon?: string | {
+  };
+  icon?: string | undefined | {
     root?: string | undefined;
-  } | undefined;
+  };
   link?: string | undefined;
   label?: string | undefined;
   failed?: string | undefined;
   retry?: string | undefined;
   trailing?: string | undefined;
-} | undefined
+}
   expanded?: readonly Id[] | undefined
   failureLabel?: string | undefined
   label: string
@@ -2504,12 +2504,12 @@ component default
 
 [./virtual-list.kay] default
 component default
-  | { class?: string | { root?: string | undefined; content?: string | undefined; item?: string | undefined; } | undefined; estimate?: number | undefined; item: (args_0: Item, args_1: number) => Element; itemKey?: ((item: Item, index: number) => unknown) | undefined; items: Item[]; label: string; list?: undefined; overscan?: number | undefined }
-  | { class?: string | { root?: string | undefined; content?: string | undefined; item?: string | undefined; } | undefined; estimate?: number | undefined; item: (args_0: Item, args_1: number) => Element; itemKey?: ((item: Item, index: number) => unknown) | undefined; items?: undefined; label: string; list: InfiniteList<Item>; overscan?: number | undefined }
+  | { class?: string | undefined | { root?: string | undefined; content?: string | undefined; item?: string | undefined; }; estimate?: number | undefined; item: (args_0: Item, args_1: number) => Element; itemKey?: ((item: Item, index: number) => unknown) | undefined; items: Item[]; label: string; list?: undefined; overscan?: number | undefined }
+  | { class?: string | undefined | { root?: string | undefined; content?: string | undefined; item?: string | undefined; }; estimate?: number | undefined; item: (args_0: Item, args_1: number) => Element; itemKey?: ((item: Item, index: number) => unknown) | undefined; items?: undefined; label: string; list: InfiniteList<Item>; overscan?: number | undefined }
 
 [./when-visible.kay] default
 component default
-  class?: string | { root?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; }
   margin?: number | undefined
   onVisible: () => unknown
 
@@ -2517,17 +2517,17 @@ component default
 component default
   actions?: Element
   children?: Element
-  class?: string | { root?: string | undefined; head?: string | undefined; title?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; head?: string | undefined; title?: string | undefined; }
   empty?: Element
   icon?: IconProps | IconSlot | undefined
   isEmpty?: boolean | undefined
-  level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined
+  level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   title?: Element
 
 [./zoom-pane.kay] default
 component default
   children?: Element
-  class?: string | { root?: string | undefined; plate?: string | undefined; tools?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; plate?: string | undefined; tools?: string | undefined; }
   fitLabel?: string | undefined
   label: string
   least?: number | undefined

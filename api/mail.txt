@@ -4,7 +4,7 @@ type Address = string | { name: string, address: string }
 [.] Attachment
 interface Attachment
   cid?: string | undefined
-  content: string | Uint8Array<ArrayBufferLike>
+  content: Uint8Array<ArrayBufferLike> | string
   contentType?: string | undefined
   filename: string
 
@@ -96,13 +96,13 @@ interface ContactMailProps
 [.] ContactOptions
 interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, TSchema>, Honeypot extends string = 'website', Consent extends boolean = false>
   consent?: Consent | undefined
-  errors?: Partial<Record<"email" | "name" | "message" | "consent", string | (() => string)>> | undefined
+  errors?: Partial<Record<"consent" | "email" | "message" | "name", (() => string) | string>> | undefined
   fields?: Extra | undefined
   honeypot?: Honeypot | undefined
   labels?: Partial<Record<keyof Extra & string, string>> | undefined
   maxLength?: number | undefined
   maxLinks?: number | undefined
-  protection?: (Omit<ActionProtect<Honeypot>, "honeypot"> & Pick<ActionProtection<never>, "tool" | "maxSize">) | undefined
+  protection?: (Omit<ActionProtect<Honeypot>, "honeypot"> & Pick<ActionProtection<never>, "maxSize" | "tool">) | undefined
   reach?: string | undefined
   subject?: ((input: ContactInput<Extra, Consent>) => string) | undefined
   to?: Address | Address[] | undefined
@@ -141,7 +141,7 @@ interface Envelope
   replyTo?: Address | undefined
   subject: string
   to?: Address | Address[] | undefined
-  unsubscribe?: string | { url: string; address: string; } | undefined
+  unsubscribe?: string | undefined | { url: string; address: string; }
 
 [.] EventSecrets
 interface EventSecrets
@@ -175,9 +175,9 @@ type ListMessage<P extends object = object> = MailMessage<P> extends infer M ? M
 interface ListOptions
   file?: string | undefined
   honeypot?: string | undefined
-  pace?: { batch?: number | undefined; every?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+  pace?: undefined | { batch?: number | undefined; every?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   privacy?: string | undefined
-  protection?: (Omit<ActionProtect<string>, "honeypot"> & Pick<ActionProtection<never>, "tool" | "maxSize">) | undefined
+  protection?: (Omit<ActionProtect<string>, "honeypot"> & Pick<ActionProtection<never>, "maxSize" | "tool">) | undefined
   store?: ListStore | undefined
   title?: string | undefined
   view?: ((props: ListConfirmProps) => Element) | undefined
@@ -241,7 +241,7 @@ interface MailerOptions
   events?: EventSecrets | undefined
   from?: Address | undefined
   fromName?: string | undefined
-  inbound?: ((reply: Reply) => void | Promise<void>) | undefined
+  inbound?: ((reply: Reply) => Promise<void> | void) | undefined
   listStore?: ListStore | undefined
   locale?: string | undefined
   logRecipients?: boolean | undefined
@@ -258,7 +258,7 @@ interface MailExtensionOptions extends MailerOptions
   events?: EventSecrets | undefined
   from?: Address | undefined
   fromName?: string | undefined
-  inbound?: ((reply: Reply) => void | Promise<void>) | undefined
+  inbound?: ((reply: Reply) => Promise<void> | void) | undefined
   listStore?: ListStore | undefined
   locale?: string | undefined
   logRecipients?: boolean | undefined
@@ -331,12 +331,12 @@ interface Outbox extends Transport
   find: (id: string) => SentMail | undefined
   keep: (mail: Mail, relayed?: Relayed | undefined) => Promise<Delivery>
   last: () => SentMail | undefined
-  link: (mail: Mail, match?: string | RegExp | undefined) => string
+  link: (mail: Mail, match?: RegExp | string | undefined) => string
   links: (mail: Mail) => string[]
   mails: readonly SentMail[]
   send: (mail: Mail, signal?: AbortSignal | undefined) => Promise<Delivery>
   to: (address: string) => SentMail[]
-  token: (mail: Mail, match?: string | RegExp | undefined) => string
+  token: (mail: Mail, match?: RegExp | string | undefined) => string
   verify?: (() => Promise<void>) | undefined
   waitFor: (address: string, options?: WaitOptions | undefined) => Promise<SentMail>
   watch: (listener: (mail: SentMail) => void) => () => void
@@ -412,9 +412,9 @@ interface SmtpSettings
   name?: string | undefined
   pass?: string | undefined
   port?: number | undefined
-  rateLimit?: { max: number; window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; } | undefined
+  rateLimit?: undefined | { max: number; window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; }
   secure?: boolean | undefined
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   user?: string | undefined
 
 [.] sqliteSuppressions
@@ -429,7 +429,7 @@ interface Subscriber
   list: string
   locale: string
   source: string | undefined
-  status: "pending" | "confirmed"
+  status: "confirmed" | "pending"
   wording: string | undefined
 
 [.] Subscription
@@ -437,7 +437,7 @@ interface Subscription
   askedAt: Date
   confirmedAt: Date | null
   list: string
-  status: "pending" | "confirmed"
+  status: "confirmed" | "pending"
 
 [.] Suppression
 interface Suppression
@@ -472,8 +472,8 @@ type ViewContent<P extends object> = { view: (props: P) => JSX.Element, text?: s
 [.] WaitOptions
 interface WaitOptions
   find?: ((mail: SentMail) => boolean) | undefined
-  site?: { runJobs: () => Promise<number>; } | undefined
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  site?: undefined | { runJobs: () => Promise<number>; }
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./add] default
 const default: { description: string; files: {}; extension: { import: string; expression: string; }; notes: string[]; }
@@ -534,7 +534,7 @@ component default
 [./heading.kay] default
 component default
   children?: Element
-  level?: 3 | 1 | 2 | undefined
+  level?: 1 | 2 | 3 | undefined
 
 [./image.kay] default
 component default
@@ -570,8 +570,8 @@ component default
 [./list-page.kay] default
 component default
   action?: string | undefined
-  kind: "confirmed" | "invalid" | "expired" | "later" | "ask" | "askConfirm" | "unsubscribed"
-  part?: "title" | "body"
+  kind: "ask" | "askConfirm" | "confirmed" | "expired" | "invalid" | "later" | "unsubscribed"
+  part?: "body" | "title"
 
 [./paragraph.kay] default
 component default
@@ -604,9 +604,9 @@ function mailTest(site: Pick<TestSite, "runJobs">): MailTest
 interface MailTest extends Pick<Outbox, 'last' | 'to' | 'find' | 'links' | 'link' | 'token'>
   find: (id: string) => SentMail | undefined
   last: () => SentMail | undefined
-  link: (mail: Mail, match?: string | RegExp | undefined) => string
+  link: (mail: Mail, match?: RegExp | string | undefined) => string
   links: (mail: Mail) => string[]
   mails: readonly SentMail[]
   to: (address: string) => SentMail[]
-  token: (mail: Mail, match?: string | RegExp | undefined) => string
+  token: (mail: Mail, match?: RegExp | string | undefined) => string
   waitFor: (address: string, options?: Omit<WaitOptions, "site"> | undefined) => Promise<SentMail>

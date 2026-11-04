@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { Glob } from 'bun'
 import { expect, it } from 'bun:test'
-import { breakingKeys, changesOf, INTERNAL, isInternal, isInternalPath, lineDiff, recordBreaking, snapshots, wrap } from '../scripts/api'
+import { breakingKeys, changesOf, INTERNAL, isInternal, isInternalPath, lineDiff, recordBreaking, snapshots, sortUnions, wrap } from '../scripts/api'
 
 const root = process.cwd()
 
@@ -105,4 +105,12 @@ it('summarises the members past the first lines of a huge type', () => {
 
   expect(before.split('\n').length).toBeLessThan(200)
   expect(lineDiff(before, after).length).toBe(2)
+})
+
+it('prints the members of a union in one order whichever way it was written', () => {
+  expect(sortUnions('"warn" | "error"')).toBe(sortUnions('"error" | "warn"'))
+  expect(sortUnions('{ count: "warn" | "error"; tone?: B | A }')).toBe('{ count: "error" | "warn"; tone?: A | B }')
+  expect(sortUnions('(a: Y | X, b?: string | undefined) => B | A')).toBe(sortUnions('(a: X | Y, b?: undefined | string) => A | B'))
+  expect(sortUnions('Array<"b" | "a"> | undefined')).toBe('Array<"a" | "b"> | undefined')
+  expect(sortUnions('{ "a | b": 1; c: (() => void) | null }')).toBe('{ "a | b": 1; c: (() => void) | null }')
 })

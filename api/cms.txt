@@ -23,21 +23,21 @@ interface CmsOptions
   files?: FileSaver | undefined
   fourEyes?: boolean | undefined
   guard?: Guard | LazyGuard | undefined
-  history?: false | {
+  history?: false | undefined | {
   revisions?: number | undefined;
-  trash?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
-  maxAge?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
-} | undefined
+  trash?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined;
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined;
+}
   member?: ((ctx: GuardContext) => MemberInfo | Promise<MemberInfo | undefined> | undefined) | undefined
   newsletter?: Record<string, NewsletterOptions> | undefined
-  onSave?: ((event: SaveEvent) => void | Promise<void>) | undefined
+  onSave?: ((event: SaveEvent) => Promise<void> | void) | undefined
   pageLink?: false | undefined
   pageSize?: number | undefined
   prefix?: string | undefined
   rawHtml?: string[] | undefined
   role?: string | undefined
-  roles?: Record<string, readonly ("publish" | "review" | "delete" | "upload" | "redirects")[]> | undefined
-  uploads?: string[] | UploadOptions | undefined
+  roles?: Record<string, readonly ("delete" | "publish" | "redirects" | "review" | "upload")[]> | undefined
+  uploads?: UploadOptions | string[] | undefined
 
 [.] CollectionInfo
 interface CollectionInfo
@@ -132,7 +132,7 @@ type Drafts = ReturnType<typeof createDrafts>
 
 [.] DraftsOptions
 interface DraftsOptions
-  delay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  delay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   keep?: DraftKeeper | undefined
   show: (entries: DraftEntry[]) => Promise<DraftResult>
 
@@ -146,7 +146,7 @@ interface EntryForm extends FormScope
   canSave: () => boolean
   clearEnd: () => Promise<void>
   collection: ScreenCollection
-  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
+  denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>> | undefined
   dirty: () => boolean
   drafts: {
   open(entry: DraftEntry, version?: string | undefined): void;
@@ -237,7 +237,7 @@ interface EntryRow
   locale?: string | undefined
   missing?: string[] | undefined
   modifiedAt?: number | undefined
-  move?: { up: boolean; down: boolean; } | undefined
+  move?: undefined | { up: boolean; down: boolean; }
   problem?: string | undefined
   review?: "review" | "sent-back" | undefined
   scheduledAt?: number | undefined
@@ -305,7 +305,7 @@ function fieldsOf(schema: JsonSchema): Field[]
 interface FileChange
   absolute: string
   author?: Identity | undefined
-  base?: string | null | undefined
+  base?: null | string | undefined
   message: string
   repoPath: string
   text: string | undefined
@@ -345,7 +345,7 @@ interface ForgejoOptions extends ForgejoSettings
   branch?: string | undefined
   fetch?: typeof fetch | undefined
   repo: string
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   token: string
 
 [.] forgetEditor
@@ -356,16 +356,16 @@ function formatMarker(marker: FieldMarker): string
 
 [.] FormLayout
 interface FormLayout
-  body?: { label?: string | undefined; hint?: string | undefined; } | undefined
+  body?: undefined | { label?: string | undefined; hint?: string | undefined; }
   fields?: (string | string[])[] | undefined
   hide?: string[] | undefined
   previewClass?: string | undefined
-  toolbar?: boolean | ToolbarAction[] | undefined
+  toolbar?: ToolbarAction[] | boolean | undefined
 
 [.] FormScope
 interface FormScope
   collection: ScreenCollection
-  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
+  denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>> | undefined
   drafts: {
   open(entry: DraftEntry, version?: string | undefined): void;
   entry(ref: EntryRef): DraftEntry | undefined;
@@ -414,7 +414,7 @@ interface GithubOptions
   branch?: string | undefined
   fetch?: typeof fetch | undefined
   repo: string
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   token: string
 
 [.] gitlab
@@ -426,7 +426,7 @@ interface GitlabOptions
   branch?: string | undefined
   fetch?: typeof fetch | undefined
   repo: string
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   token: string
 
 [.] GivenLayout
@@ -516,7 +516,7 @@ function passwordGuard(passwords: string | Record<string, string>, { maxAge, sec
 
 [.] PasswordOptions
 interface PasswordOptions
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   secret?: string | undefined
   store?: RateStore | undefined
 
@@ -527,7 +527,7 @@ interface Recovery
 
 [.] Refusal
 interface Refusal
-  conflict?: { version: string | null; } | undefined
+  conflict?: undefined | { version: null | string; }
   message: string
 
 [.] RowAction
@@ -539,7 +539,7 @@ class SaveConflictError
   at?: string | undefined
   code: "save-conflict"
   creating: boolean
-  current?: string | null | undefined
+  current?: null | string | undefined
   name: "SaveConflictError"
 
 [.] SaveEvent
@@ -550,7 +550,7 @@ interface SaveEvent
   from?: string | undefined
   locale?: string | undefined
   slug: string
-  verb: "publish" | "delete" | "move" | "unpublish" | "duplicate" | "rename" | "add" | "update" | "restore"
+  verb: "add" | "delete" | "duplicate" | "move" | "publish" | "rename" | "restore" | "unpublish" | "update"
 
 [.] ScreenCollection
 type ScreenCollection = CollectionInfo & {
@@ -584,7 +584,7 @@ const default: { description: string; extension: { import: string; expression: s
 
 [./entry-actions.kay] default
 component default
-  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>>
+  denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>>
   form: EntryForm
 
 [./entry-body.kay] default
@@ -595,7 +595,7 @@ component default
 component default
   collection: ScreenCollection
   copy?: PairedEntry | undefined
-  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
+  denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>> | undefined
   entry?: StoredEntry | undefined
   locale?: string | undefined
   prefix: string
@@ -639,7 +639,7 @@ component default
 [./entry-table.kay] default
 component default
   collection: ScreenCollection
-  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>>
+  denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>>
   prefix: string
   rows: EntryRow[]
   searched: boolean
@@ -693,7 +693,7 @@ component default
 
 [./file-input.kay] default
 component default
-  alt?: { id: string; value: string; issue?: string | undefined; required: boolean; } | undefined
+  alt?: undefined | { id: string; value: string; issue?: string | undefined; required: boolean; }
   collection: string
   disabled?: boolean
   image: boolean
@@ -728,7 +728,7 @@ interface EntryForm extends FormScope
   canSave: () => boolean
   clearEnd: () => Promise<void>
   collection: ScreenCollection
-  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
+  denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>> | undefined
   dirty: () => boolean
   drafts: {
   open(entry: DraftEntry, version?: string | undefined): void;
@@ -840,7 +840,7 @@ function formScope(drafts: {
 [./form] FormScope
 interface FormScope
   collection: ScreenCollection
-  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
+  denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>> | undefined
   drafts: {
   open(entry: DraftEntry, version?: string | undefined): void;
   entry(ref: EntryRef): DraftEntry | undefined;
@@ -887,16 +887,16 @@ interface Shown
 
 [./form] Stranded
 interface Stranded
-  kind: "deleted" | "renamed" | "created"
+  kind: "created" | "deleted" | "renamed"
   to: string
 
 [./pg] LoaderOptions
 interface LoaderOptions
   name: string
-  seed?: readonly SeedEntry[] | (() => readonly SeedEntry[] | Promise<readonly SeedEntry[]>) | undefined
+  seed?: (() => Promise<readonly SeedEntry[]> | readonly SeedEntry[]) | readonly SeedEntry[] | undefined
   table?: string | undefined
-  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  watch?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
 
 [./pg] pgLoader
 function pgLoader(options: PgLoaderOptions): ContentLoader<unknown>
@@ -904,11 +904,11 @@ function pgLoader(options: PgLoaderOptions): ContentLoader<unknown>
 [./pg] PgLoaderOptions
 interface PgLoaderOptions extends LoaderOptions
   name: string
-  seed?: readonly SeedEntry[] | (() => readonly SeedEntry[] | Promise<readonly SeedEntry[]>) | undefined
-  sql: string | SQL
+  seed?: (() => Promise<readonly SeedEntry[]> | readonly SeedEntry[]) | readonly SeedEntry[] | undefined
+  sql: SQL | string
   table?: string | undefined
-  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  watch?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
 
 [./pg] SeedEntry
 interface SeedEntry
@@ -937,10 +937,10 @@ interface Member
 [./sqlite] LoaderOptions
 interface LoaderOptions
   name: string
-  seed?: readonly SeedEntry[] | (() => readonly SeedEntry[] | Promise<readonly SeedEntry[]>) | undefined
+  seed?: (() => Promise<readonly SeedEntry[]> | readonly SeedEntry[]) | readonly SeedEntry[] | undefined
   table?: string | undefined
-  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  watch?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
 
 [./sqlite] SeedEntry
 interface SeedEntry
@@ -954,12 +954,12 @@ function sqliteLoader(options: SqliteLoaderOptions): ContentLoader<unknown>
 
 [./sqlite] SqliteLoaderOptions
 interface SqliteLoaderOptions extends LoaderOptions
-  database: string | Database
+  database: Database | string
   name: string
-  seed?: readonly SeedEntry[] | (() => readonly SeedEntry[] | Promise<readonly SeedEntry[]>) | undefined
+  seed?: (() => Promise<readonly SeedEntry[]> | readonly SeedEntry[]) | readonly SeedEntry[] | undefined
   table?: string | undefined
-  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  watch?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
 
 [./test] CmsEntryOptions
 interface CmsEntryOptions
@@ -992,7 +992,7 @@ function cmsTest(site: Pick<TestSite, "cookies" | "fetch">): CmsTest
 interface CmsTest
   delete: (collection: string, slug: string, options?: CmsEntryOptions | undefined) => Promise<SaveOutcome>
   entry: (collection: string, slug: string, options?: Pick<EntryRef, "locale"> | undefined) => Promise<StoredEntry | undefined>
-  move: (collection: string, slug: string, direction: "up" | "down", options?: Pick<EntryRef, "locale"> | undefined) => Promise<SaveOutcome>
+  move: (collection: string, slug: string, direction: "down" | "up", options?: Pick<EntryRef, "locale"> | undefined) => Promise<SaveOutcome>
   rename: (collection: string, slug: string, to: string, options?: CmsEntryOptions | undefined) => Promise<SaveOutcome & { slug?: string; }>
   save: (collection: string, slug: string, data: Record<string, unknown>, options?: CmsSaveOptions | undefined) => Promise<SaveOutcome>
   signInAs: (role?: string | undefined) => Promise<string>

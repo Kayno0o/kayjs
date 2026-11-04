@@ -125,7 +125,7 @@ async function snapshotOf(dir: string, root: string, packageName: string): Promi
   const blocks: string[] = []
   const internalBlocks: string[] = []
   const short = (text: string) => wrap(text)
-  const show = (type: ts.Type) => short(checker.typeToString(type, undefined, FLAGS))
+  const show = (type: ts.Type) => short(sortUnions(checker.typeToString(type, undefined, FLAGS)))
   const sign = (signature: ts.Signature) => short(checker.signatureToString(signature, undefined, FLAGS))
   // A symbol key is named after its id in the program, which changes with any edit. Members declared by kay or the platform (the attributes of an element a component spreads) are not the package's own API.
   const own = (symbol: ts.Symbol) => !symbol.name.startsWith('__@') && (symbol.declarations ?? []).some((declaration) => {
@@ -281,6 +281,93 @@ function layout(text: string): string {
   }
 
   return out
+}
+
+const CLOSERS: Record<string, string> = { '(': ')', '[': ']', '{': '}', '<': '>' }
+
+// A type's text with the members of every union sorted: TypeScript prints them in the order of their type ids, which follows the order the checker met them in, so an unrelated change flips `"warn" | "error"`.
+// A stretch between `;` or `,` is one union, a `key: ` ahead of it stays in place, and an arrow's return type, which reaches to the end of the stretch, is sorted as its own.
+export function sortUnions(text: string): string {
+  let at = 0
+
+  const level = (close: string | undefined, arrow: boolean): string => {
+    let out = ''
+    let prefix = ''
+    let members: string[] = []
+    let member = ''
+    let quote = ''
+
+    const flush = () => {
+      const trimmed = member.trimEnd()
+
+      members.push(trimmed)
+      out += prefix + members.sort().join(' | ') + member.slice(trimmed.length)
+      prefix = member = ''
+      members = []
+    }
+
+    while (at < text.length) {
+      const char = text[at]!
+
+      if (quote !== '') {
+        member += char
+        at++
+
+        if (char === quote && text[at - 2] !== '\\')
+          quote = ''
+
+        continue
+      }
+
+      if (char === '"' || char === '\'' || char === '`') {
+        quote = char
+        member += char
+        at++
+      }
+      else if (text.startsWith('=>', at)) {
+        member += '=>'
+        at += 2
+        member += level(close, true)
+      }
+      else if (char === close || (arrow && (char === ';' || char === ','))) {
+        break
+      }
+      else if (char === ' ' && member === '' && prefix === '' && members.length === 0) {
+        out += char
+        at++
+      }
+      else if (char in CLOSERS) {
+        at++
+        member += char + level(CLOSERS[char], false) + (text[at] ?? '')
+        at++
+      }
+      else if (char === ';' || char === ',') {
+        flush()
+        out += char
+        at++
+      }
+      else if (text.startsWith(' | ', at)) {
+        members.push(member)
+        member = ''
+        at += 3
+      }
+      else if (text.startsWith(': ', at) && members.length === 0 && prefix === '') {
+        prefix = `${member}: `
+        member = ''
+        at += 2
+      }
+      else {
+        member += char
+        at++
+      }
+    }
+
+    flush()
+
+    return out
+  }
+
+  return level(undefined, false)
 }
 
 // The snapshot of every public package, by file name.
