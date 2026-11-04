@@ -143,8 +143,11 @@ function setsGuardsFalse(page: string): boolean {
   try {
     const stats = statSync(page, { throwIfNoEntry: false })
 
-    if (stats === undefined)
+    if (stats === undefined) {
+      OPEN_PAGES.delete(page)
+
       return false
+    }
 
     const stamp = `${stats.mtimeMs}:${stats.size}`
     const known = OPEN_PAGES.get(page)
@@ -160,6 +163,8 @@ function setsGuardsFalse(page: string): boolean {
   }
   // A page deleted between the listing and the read is no page.
   catch {
+    OPEN_PAGES.delete(page)
+
     return false
   }
 }

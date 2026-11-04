@@ -138,7 +138,7 @@ describe('what a guard hands on', () => {
     app.listen({ port: 0, hostname: '127.0.0.1' })
 
     try {
-      const socket = new WebSocket(`ws://127.0.0.1:${app.server?.port}/api/sock`, { headers: { 'x-who': 'dee' } } as never)
+      const socket = new WebSocket(`ws://127.0.0.1:${app.server?.port}/api/sock`, { headers: { 'x-who': 'dee' } })
       const reply = new Promise<string>((resolve, reject) => {
         socket.addEventListener('message', event => resolve(String(event.data)))
         socket.addEventListener('error', () => reject(new Error('the socket failed')))
