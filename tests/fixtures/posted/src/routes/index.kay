@@ -12,8 +12,7 @@ const schema = t.Object({
 
 export const first = action(schema, () => undefined, { protect: { honeypot: 'nectar' } })
 export const second = action(schema, () => undefined)
----
----
+--- script
 import Echo from '../components/echo.kay'
 ---
 main

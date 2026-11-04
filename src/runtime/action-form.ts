@@ -129,6 +129,7 @@ function claimedValue(fields: Element[]): string | undefined {
 }
 
 // What a refused post sent for the field `name` of the form being rendered, for a component drawing a field to start from; undefined outside a form posting to an action, without a refusal, for a password or a secret, and in the browser, where the server's markup is claimed as it is.
+// kept: free, a refused post's values come with its flash cookie, and a page rendered with one is never kept.
 export function postedValue(name: unknown, fallback?: unknown): string | undefined {
   if (typeof name !== 'string' || name === '')
     return undefined
@@ -143,6 +144,7 @@ export function postedValue(name: unknown, fallback?: unknown): string | undefin
 }
 
 // Whether a checkbox or radio button named `name` was ticked in the refused post, `value` being the one it posts when ticked; undefined as `postedValue` is.
+// kept: free, as `postedValue` is.
 export function postedChecked(name: unknown, value?: string | number, fallback = false): boolean | undefined {
   if (typeof name !== 'string' || name === '')
     return undefined
@@ -173,6 +175,7 @@ function postedList(posted: Partial<Record<string, string>>, name: string): stri
 }
 
 // Every value a refused post sent for the field `name` of the form being rendered, such as the choices of a group of checkboxes, none when it sent none; undefined as `postedValue` is.
+// kept: free, as `postedValue` is.
 export function postedValues(name: unknown, fallback?: readonly unknown[]): string[] | undefined {
   const target = enclosing.at(-1)
 
