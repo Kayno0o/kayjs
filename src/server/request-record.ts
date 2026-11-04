@@ -5,6 +5,7 @@ import type { RouteParams } from '../runtime'
 import type { LocaleState } from '../runtime/locale-state'
 import type { GuardedRequest } from './actions'
 import type { ContextProvider, LoadedContexts } from './context-values'
+import type { ResolvedCookieDefaults } from './cookies'
 import type { CacheReads } from './live'
 import type { ToolCall } from './mcp'
 import type { RefundableStore } from './protection'
@@ -27,6 +28,8 @@ export class RequestRecord {
   // Its URL and cookies, parsed once however many of kay's routes, hooks and scopes read them; shared, so never changed.
   url: URL | undefined = undefined
   cookies: CookieMap | undefined = undefined
+  // What the app's `security.cookies` gives the cookies it sets, undefined for an app that sets none.
+  cookieDefaults: ResolvedCookieDefaults | undefined = undefined
   // The path the browser asked for and the socket address, for a request kay rewrote or `kay/test` sent.
   askedPath: string | undefined = undefined
   address: string | undefined = undefined

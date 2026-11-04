@@ -96,6 +96,7 @@ export async function archive(scan: File) {
 
 ### Cookies
 
+- A cookie the app sets with `ctx.cookies.set` is `Path=/`, `SameSite=Lax`, neither `HttpOnly` nor `Secure` unless it says so; `security: { cookies: {} }` in kay.config.ts makes `HttpOnly`, `SameSite=Lax`, `Secure` over https and `Path` the `base` the default of each, a call's own option winning: [cookie defaults](server.md#sessions).
 - `kay_session` (`__Host-kay_session` over https): the session's sealed data or id, set once the app writes to a session; necessary, `maxAge` unused, `'30d'` by default, never past `absoluteMaxAge`, `'90d'`.
 - `kay_flash`: the message an action's redirect shows on the next page, read once, by the page it goes back to alone (a request for another page, such as a prefetch, leaves it); necessary, 60 seconds. Over https `__Host-kay_flash`, and `__Secure-kay_flash` under a `base`; `kay_locale` and `kay_preview` go by the same rule.
 - `kay_locale`: the locale a visitor picked, on a site with locales; necessary, a year. Named `kay-locale` before 1.52, which is still read.

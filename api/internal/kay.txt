@@ -55,13 +55,13 @@ interface TemplateHelpers
   Dynamic: <Tag>(props: { component: Tag; } & PropsOf<Tag>) => Element
   For: {
   <T>(props: {
-    each: false | null | readonly T[] | undefined;
+    each: Iterable<T> | false | null | undefined;
     keyed: (item: T) => unknown;
     fallback?: Element;
     children: Element;
   }): Element;
   <T>(props: {
-    each: false | null | readonly T[] | undefined;
+    each: Iterable<T> | false | null | undefined;
     keyed: false;
     fallback?: Element;
     children: Element;
@@ -75,7 +75,7 @@ interface TemplateHelpers
   partClass: (props: unknown, part: string) => unknown
   partHanded: (part: string, list: readonly unknown[]) => unknown
   partsClass: (list: readonly unknown[]) => unknown
-  staticFor: <T>(each: false | null | readonly T[] | undefined, rendered: Element, fallback?: Element) => Element
+  staticFor: <T>(each: Iterable<T> | false | null | undefined, rendered: Element, fallback?: Element) => Element
 
 [.] TemplateValues
 interface TemplateValues
@@ -383,7 +383,7 @@ function awaited(element: Node | null, start: Node | null, end: Node | null, val
 function image(element: Element, src: unknown, sized: boolean, sizes?: unknown): void
 
 [./dom-loop] loop
-function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => false | null | readonly T[] | undefined, key: ((item: T) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: (() => unknown) | undefined): void
+function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => Iterable<T> | false | null | undefined, key: ((item: T) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: (() => unknown) | undefined): void
 
 [./dom-loop] rowKey
 function rowKey(item: unknown): unknown
@@ -484,7 +484,7 @@ function localHref(href: unknown): unknown
 function localLinks(markup: string): string
 
 [./html] loop
-function loop<T>(each: false | null | readonly T[] | undefined, render: (item: (() => T) | T, index: (() => number) | number) => string, fallback?: (() => string) | undefined, accessors?: "keyed" | "positional" | undefined): string
+function loop<T>(each: Iterable<T> | false | null | undefined, render: (item: (() => T) | T, index: (() => number) | number) => string, fallback?: (() => string) | undefined, accessors?: "keyed" | "positional" | undefined): string
 
 [./html] memo
 function memo<T>(fn: () => T, options?: SignalOptions<T> | undefined): () => T
@@ -707,7 +707,7 @@ function collectIslands<T>(render: () => T, salt?: string | undefined, chunks?: 
 function insideIsland(): boolean
 
 [./island] island
-function island<P extends object>(id: string, component: ((props: P) => Element) | undefined, messages?: readonly string[], client?: boolean, why?: string, lives?: readonly unknown[], cause?: string | undefined): IslandComponent<P>
+function island<P extends object>(id: string, component: ((props: P) => Element) | undefined, messages?: readonly string[], client?: boolean, why?: string, lives?: readonly unknown[], cause?: string | undefined, ownFallback?: (() => Element) | undefined): IslandComponent<P>
 
 [./island] islandCheckpoint
 function islandCheckpoint(): (() => void) | undefined

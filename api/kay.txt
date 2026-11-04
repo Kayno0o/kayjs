@@ -409,6 +409,7 @@ type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Element) & 
 
 [.] IslandOptions
 interface IslandOptions
+  fallback?: Element
   hydrate?: HydrateWhen | undefined
   persist?: boolean | string | undefined
 

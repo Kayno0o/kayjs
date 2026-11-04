@@ -28,7 +28,7 @@ The fence's `ctx` holds the request.
 | `ctx.params` | Route params, typed from the file name |
 | `ctx.url` | The request URL |
 | `ctx.query` | Search params, typed by the `query` schemas of the page and its layouts |
-| `ctx.cookies` | A `Bun.CookieMap`, whose changes are sent back |
+| `ctx.cookies` | A `Bun.CookieMap`, whose changes are sent back. `security: { cookies: {} }` in `kay.config.ts` makes the cookies it sets `HttpOnly`, `SameSite=Lax` and `Secure` over https, under the `base` |
 | `ctx.locals` | What the app's Elysia `derive` adds, such as the signed-in user |
 
 ```kay

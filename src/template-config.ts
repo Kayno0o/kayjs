@@ -23,6 +23,8 @@ export function config({ has, settings }: Setup): string {
     settings.fonts !== undefined && settings.fonts.length > 0 && `  fonts: [${settings.fonts.map(font => `{ fontsource: ${quote(font.fontsource)}${font.weights ? `, weights: [${font.weights.join(', ')}]` : ''}${font.styles ? `, styles: [${font.styles.map(quote).join(', ')}]` : ''}${font.subsets ? `, subsets: [${font.subsets.map(quote).join(', ')}]` : ''} }`).join(', ')}],`,
     server && has('docker') && '  // The compose file binds 127.0.0.1 for a reverse proxy: with this the visitor\'s address, which rate limits count, is the one the proxy passes on and not the proxy\'s. It trusts private-range peers, so a dev server bound to 0.0.0.0 believes a LAN client\'s X-Forwarded-For.',
     server && has('docker') && '  proxy: true,',
+    server && '  // Cookies set with ctx.cookies.set are HttpOnly, SameSite=Lax, Secure over https and under the base unless a call says otherwise.',
+    server && '  security: { cookies: {} },',
     settings.seo !== false && '  seo: { name: \'__NAME__\', titleTemplate: \'%s | __NAME__\', description: \'__NAME__, made with kay\' },',
     '})',
   )

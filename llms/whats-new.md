@@ -8,6 +8,10 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A call of an action takes `queue` (`'parallel'`, `'serial'`, `'latest'`, also `add.track({ queue })`), `timeout`, `retry`, the hooks `onStart`, `onSuccess`, `onError` and `onSettled`, and `refresh` a `resource()` or a list of them; optimistic changes of calls in flight roll back to where they began whichever fails first, and a form posting in place fires `kay:action-start`, `kay:action-success` and `kay:action-error`: [calling actions from islands](actions-from-islands.md).
 - A call of an action takes `queue` (`'parallel'`, `'serial'`, `'latest'`, also `add.track({ queue })`), `timeout`, `retry`, the hooks `onStart`, `onSuccess`, `onError` and `onSettled`, and `refresh` a `resource()` or a list of them; optimistic changes of calls in flight roll back to where they began whichever fails first, a call that retries sends one `Idempotency-Key` header on every try, `optimistic(change)` gives `{ undo, keep }`, and a form posting in place fires `kay:action-start`, `kay:action-success` and `kay:action-error` (with `status` and `errors`): [calling actions from islands](actions-from-islands.md).
 - `ctx.fail(status, data, errors)` puts a message on a named field of the action's schema (or on the form under `''`), so `error <field>`, `aria-invalid`, `add.error('field')`, the value re-fill, `ActionError.errors` and kayjs-ui `FormField` follow it with and without JavaScript: [actions](actions.md#refused-posts).
+- `for` takes any iterable: [templates](templates.md#render-a-list).
+- A client-only island shows an `@fallback` until it renders: [browser-only](browser-only.md#fallback-while-the-browser-renders).
+- A `method="get"` form swaps in place: [navigation](navigation-from-code.md#full-loads-and-prefetching).
+- `security: { cookies: {} }` hardens `ctx.cookies.set`: [sessions](server.md#sessions).
 
 ## 1.87.0
 

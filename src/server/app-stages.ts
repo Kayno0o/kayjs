@@ -40,6 +40,7 @@ import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { remoteLimits } from './config-limits'
+import { cookieDefaults, defaultCookies } from './cookies'
 import { DEV_A11Y, DEV_AXE, DEV_DATA, DEV_DATA_QUERY, DEV_DATA_ROWS, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_JOBS, DEV_JOBS_CANCEL, DEV_JOBS_DELETE, DEV_JOBS_RETRY, DEV_JOBS_SEND, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TAB, DEV_TABS, DEV_TOOL, DEV_UI, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStack, devStyles, devTab, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, refuseRemoteDevTools, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
 import { servedDictionary } from './dictionary'
@@ -276,6 +277,7 @@ function hostsToAnswer(security: SecurityConfig | false | undefined, site: strin
 export function trustRequests({ app, env, options, served, security, filePaths, setup, mcpAt, mcpKey, metrics, log, health }: Boot): void {
   setRequestIdHeader(options.observe?.requestIdHeader)
   trustProxy(app, options.proxy)
+  defaultCookies(app, cookieDefaults(typeof options.security === 'object' ? options.security.cookies : undefined, env.base))
   // Before the key check reads the mark, and dropped from the request there, so no handler reads it.
   app.onRequest(({ request }) => {
     receiveInternal(request)

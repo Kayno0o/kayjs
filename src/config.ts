@@ -333,6 +333,19 @@ export interface SecurityConfig {
   headers?: Record<string, string | false> | undefined
   // Production answers 421 to a request whose `Host` is not the site's, one of the `i18n` locale hosts or listed here, against DNS rebinding and a link built from `ctx.url.origin` poisoned by the header: `true` allows those alone, which is the default once `site` is set, and `false` trusts every `Host`. Localhost and IP addresses always pass, as a health check reaches the server by them. Under `kay dev` it is `KAY_DEV_HOSTS` instead.
   hosts?: string[] | boolean | undefined
+  // What a cookie set with `ctx.cookies.set` gets for an option it does not give, so an app's cookies are as hardened as kay's own: `{}` is `HttpOnly`, `SameSite=Lax`, `Secure` over https and `Path` the `base`, and a call's own option wins. Unset, Bun's plain defaults apply (`SameSite=Lax`, `Path=/`, neither `HttpOnly` nor `Secure`).
+  cookies?: CookieDefaults | false | undefined
+}
+
+export interface CookieDefaults {
+  // Defaults to `true`.
+  httpOnly?: boolean | undefined
+  // Defaults to `'lax'`; `'none'` is always `Secure`.
+  sameSite?: 'lax' | 'strict' | 'none' | undefined
+  // `'auto'`, the default, follows the scheme the request came over (its URL, or `X-Forwarded-Proto` behind a proxy), so a plain-http localhost keeps working.
+  secure?: boolean | 'auto' | undefined
+  // Defaults to the `base`, else `/`. A cookie deleted without a path takes it too.
+  path?: string | undefined
 }
 
 // `hops` or `header`, not both, and with `key` alone one proxy is in front: read only from a request coming from this machine or a private network, so a client reaching the server directly cannot forge it.
