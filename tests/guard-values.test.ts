@@ -46,8 +46,11 @@ describe('what a guard hands on', () => {
       // Loads of the layout and the page, which run at once, share one keyed load.
       Bun.write(join(dir, 'routes/memo/_layout.kay'), `--- server\n${COUNT}const org = await ctx.once('org', async () => { counts.org = (counts.org ?? 0) + 1; await Bun.sleep(20); return { name: ctx.request.headers.get('x-org') ?? 'none' } })\n---\nheader\n  p.layout {org.name}\nslot\n`),
       Bun.write(join(dir, 'routes/memo/index.kay'), `--- server\n${COUNT}const org = await ctx.once('org', async () => { counts.org = (counts.org ?? 0) + 1; return { name: 'second' } })\nconst other = await ctx.once('other', () => { throw new Error('boom') }).catch(() => 'failed')\nconst again = await ctx.once('other', () => 'never').catch(() => 'failed again')\n---\np.page {org.name} {other} {again} {counts.org}\n`),
+      Bun.write(join(dir, 'api/_guard.ts'), GUARD('({ request }) => ({ who: request.headers.get(\'x-who\') ?? \'nobody\' })')),
+      Bun.write(join(dir, 'api/me.ts'), 'import { api } from \'kay/server\'\n\nexport default api<{ who: string }>()\n  .get(\'/\', async ({ guard, once }) => ({ who: guard.who, again: await once(\'k\', () => guard.who) === await once(\'k\', () => \'other\') }))\n'),
+      Bun.write(join(dir, 'api/open.ts'), 'import { api } from \'kay/server\'\n\nexport default api({ guards: false })\n  .get(\'/\', ({ guard }) => ({ keys: Object.keys(guard) }))\n'),
     ])
-    app = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false })
+    app = await pages({ root: dir, dirs: { routes: 'routes' }, api: 'api', prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -124,6 +127,11 @@ describe('what a guard hands on', () => {
     expect(await text('/ends.json', { 'x-who': 'bob' })).toBe('{"who":"bob","shared":"outer"}')
   })
 
+  it('reaches an API route as ctx.guard and ctx.once, empty on a module with guards: false', async () => {
+    expect(await (await get('/api/me', { 'x-who': 'cy' })).json()).toEqual({ who: 'cy', again: true })
+    expect(await (await get('/api/open', { 'x-who': 'cy' })).json()).toEqual({ keys: [] })
+  })
+
   it('shares a keyed load between the layout and the page of one request, and across none', async () => {
     const counts = (globalThis as { loads?: Record<string, number> }).loads ??= {}
 
@@ -169,6 +177,17 @@ describe('kay check on ctx.guard', () => {
       'src/routes/orgs/[org]/_guard.ts': ORG,
       'src/routes/orgs/[org]/_layout.kay': '--- server\nconst name: string = ctx.guard.org.name\n---\nh1 {name}\nslot\n',
       'src/routes/orgs/[org]/index.kay': '--- server\nimport { action } from \'kay\'\n\nconst id: string = ctx.guard.org.id\nexport const rename = action((ctx) => ctx.guard.org.name)\n---\np {id}\n',
+    })
+
+    expect(output).toMatch(/checked with no problems in \d+ ms/)
+    expect(code).toBe(0)
+  }, TIMEOUT)
+
+  it('types an API route from the guards named by api<...>()', async () => {
+    const { code, output } = await check({
+      'src/api/_guard.ts': ORG,
+      'src/api/org.ts': 'import { api } from \'kay/server\'\n\nexport default api<{ org: { name: string } }>().get(\'/\', ({ guard, once }) => once(\'name\', () => guard.org.name))\n',
+      'src/routes/index.kay': 'p Home\n',
     })
 
     expect(output).toMatch(/checked with no problems in \d+ ms/)

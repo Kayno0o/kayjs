@@ -3,6 +3,7 @@ import type { ExtensionApp } from '../config'
 import type { Locals } from '../runtime'
 import type { ActionTool } from '../runtime/action'
 import type { ByteSize } from '../runtime/byte-size'
+import type { Once } from '../runtime/core'
 import type { Duration } from '../runtime/duration'
 import type { ActionOptions } from './actions'
 import type { ApiModule } from './api-modules'
@@ -34,6 +35,7 @@ import { apiLimitWait, checkApiLimit, requestId, tooManyRequests } from './prote
 import { sharedContext } from './render'
 import { isUncaught, reportServerError } from './report'
 import { recordOf, requestRecord } from './request-record'
+import { guardValues, onceOf } from './request-scope'
 import { requestSignal, RequestTimeoutError, timedOutResponse, withTimeout } from './request-timeout'
 import { requestUrl } from './request-url'
 import { apiRoutePath, withoutSlash } from './routes'
@@ -737,9 +739,25 @@ export interface ApiOptions {
   errorShape?: 'kay' | 'elysia' | undefined
 }
 
-// An Elysia instance for a module under `src/api` whose handlers read what the app's `derive` and `resolve` add, typed through `Register` as `ctx.locals` is.
-export function api(options: ApiOptions = {}): Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }> {
+// What a route of an `api()` module reads besides the app's locals: the values the `_guard.ts` files above it handed on, and `ctx.once`.
+type ApiRequest<Guarded extends object> = ApiLocals & { guard: Guarded, once: Once }
+
+// An Elysia instance for a module under `src/api` whose handlers read what the app's `derive` and `resolve` add, typed through `Register` as `ctx.locals` is, and `ctx.guard` and `ctx.once` as a page does.
+// `Guarded` names what the guards above the module return, `api<{ org: Org }>()`; it is an assertion kay does not check, as a library guard's locals are.
+export function api<Guarded extends object = object>(options: ApiOptions = {}): Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiRequest<Guarded> }> {
   const instance = new Elysia()
+
+  // Read when the handler asks, once the module's guards have run: Elysia copies what a derive returns, so a getter is defined on the context itself.
+  instance.derive((context) => {
+    const { request } = context
+
+    Object.defineProperties(context, {
+      guard: { get: () => guardValues(request), enumerable: true, configurable: true },
+      once: { value: onceOf(request), enumerable: true, configurable: true },
+    })
+
+    return {}
+  })
 
   const maxSize = options.maxSize
 
@@ -763,7 +781,7 @@ export function api(options: ApiOptions = {}): Elysia<'', { decorator: Empty, st
   // `.ws()` returns the instance, so the chain goes on as it was written.
   instance.ws = ((path: string, socketOptions: SocketOptions) => socketRoute(path, decoded(instance, path, socketOptions))) as typeof instance.ws
 
-  return instance as unknown as Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }>
+  return instance as unknown as Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiRequest<Guarded> }>
 }
 
 // The first thing a schema finds wrong with a value, as text.

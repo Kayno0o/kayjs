@@ -44,9 +44,11 @@ export default guard(async ({ params, deny }) => {
 })
 ```
 
-The object names what the guard hands on. Only a plain object counts: an array, a class instance or a primitive is ignored. A page, a layout and the actions of a page read `ctx.guard.org`, and `kay check` types it from the guards above the file. The objects of several guards are merged, outermost first, and a guard below wins a key it shares. A guard reads what the ones above returned in its own `ctx.guard`.
+The object names what the guard hands on. Only a plain object counts: an array, a class instance or a primitive is ignored. A page, a layout and the actions of a page or a layout read `ctx.guard.org`, and `kay check` types it from the guards above the file. A layout with a page under it that sets `guards: false` is left untyped, since it renders for that page with no guard values. The objects of several guards are merged, outermost first, and a guard below wins a key it shares. A guard reads what the ones above returned in its own `ctx.guard`.
 
 `ctx.guard` is empty on a page that sets `guards: false`, and a prerendered page has none, since its guards run when it is served. `ctx.locals` stays what the app's Elysia plugins add.
+
+An API route reads `guard` and `once` from its handler's context, the same values. The module names the type of what its guards return, `api<{ org: Org }>()`, which `kay check` does not verify against the guards.
 
 ## Sharing a load
 

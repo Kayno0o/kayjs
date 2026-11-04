@@ -2369,11 +2369,11 @@ function siteOrigin(): string
 function siteUrl(path?: string): string
 
 [./server] api
-function api(options?: ApiOptions): Elysia<"", {
+function api<Guarded extends object = object>(options?: ApiOptions): Elysia<"", {
   decorator: Empty;
   store: Empty;
   derive: Empty;
-  resolve: ApiLocals;
+  resolve: ApiRequest<Guarded>;
 }, {
   typebox: {};
   error: {};
