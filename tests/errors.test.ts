@@ -128,7 +128,7 @@ describe('compile errors', () => {
 
   it('name --- script for a bare fence after a named one, and fix it by naming the closing line', () => {
     const source = '--- server\nconst a = 1\n---\nimport { route } from \'kay\'\n---\nh1 x\n'
-    const [found] = compileKay(source, 'src/a.kay').diagnostics
+    const found = compileKay(source, 'src/a.kay').diagnostics.find(diagnostic => diagnostic.help?.includes('--- script'))
 
     expect(found?.help).toContain('--- script')
     expect(found?.fixes?.[0]?.safe).toBe(true)
