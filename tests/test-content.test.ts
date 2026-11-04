@@ -7,7 +7,7 @@ import { cms } from './fixtures/cms/src/cms'
 import { notes } from './fixtures/cms/src/content.config'
 
 const FIXTURE = 'tests/fixtures/cms/src'
-const site = await testSite({ routes: `${FIXTURE}/routes`, content: `${FIXTURE}/content.config.ts`, islands: false })
+const site = await testSite({ routesDir: `${FIXTURE}/routes`, contentConfig: `${FIXTURE}/content.config.ts`, islands: false })
 const REAL = join(import.meta.dir, 'fixtures/cms/src/content/articles')
 
 afterAll(async () => site.close())

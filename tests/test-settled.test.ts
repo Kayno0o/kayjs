@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { persistedCookie, testSite } from '../src/test'
 import { settledHtml } from '../src/test/page'
 
-const site = await testSite({ routes: 'tests/fixtures/settled/src/routes', islands: false })
+const site = await testSite({ routesDir: 'tests/fixtures/settled/src/routes', islands: false })
 
 afterAll(async () => {
   await site.close()

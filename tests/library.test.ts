@@ -31,7 +31,7 @@ const LIBRARY: Record<string, string> = {
 const PROJECT: Record<string, string> = {
   'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'kay-lib': '1.0.0' } }),
   'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM', 'DOM.Iterable'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
-  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ settings: { \'kay-lib\': \'./src/ui-settings.ts\' } })\n',
+  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ librarySettings: { \'kay-lib\': \'./src/ui-settings.ts\' } })\n',
   // The app extends the defaults, keeping their tone.
   'src/ui-settings.ts': 'import type { Settings } from \'kay-lib\'\nimport { defaults } from \'kay-lib\'\n\nconst settings: Settings = { ...defaults, icon: name => `app:${name}` }\n\nexport default settings\n',
   'src/routes/index.kay': '---\nimport Badge from \'kay-lib/badge.kay\'\nimport Counter from \'kay-lib/counter.kay\'\n---\nmain\n  Badge(label="hi")\n  Counter(start={2})\n',
@@ -387,7 +387,7 @@ describe('kay libraries', () => {
     await write(project, {
       'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'mail-lib': '1.0.0' } }),
       'tsconfig.json': PROJECT['tsconfig.json']!,
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ settings: { \'mail-lib\': \'./src/mail-settings.ts\' } })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ librarySettings: { \'mail-lib\': \'./src/mail-settings.ts\' } })\n',
       'src/mail-settings.ts': 'import { defaults } from \'mail-lib\'\n\nexport default { ...defaults, accent: \'red\' }\n',
       'src/routes/index.kay': '---\nimport Notice from \'mail-lib/notice.kay\'\n---\nmain\n  Notice(kind="link")\n',
     })

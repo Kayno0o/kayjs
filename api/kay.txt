@@ -2658,7 +2658,6 @@ const jobTables: readonly ["kay_jobs", "kay_locks"]
 
 [./server] KayConfig
 interface KayConfig
-  api?: string | undefined
   apiDir?: string | undefined
   apiPath?: string | undefined
   base?: string | undefined
@@ -2667,7 +2666,6 @@ interface KayConfig
   client?: ClientConfig | undefined
   compress?: boolean | undefined
   compressionDictionary?: boolean | undefined
-  content?: string | undefined
   contentConfig?: string | undefined
   cors?: CorsOptions | undefined
   dirs?: DirsConfig | undefined
@@ -2696,7 +2694,6 @@ interface KayConfig
   markdown?: MarkdownConfig | undefined
   maxSize?: ByteSize | undefined
   maxSizeByPath?: Record<string, ByteSize> | undefined
-  maxSizes?: Record<string, ByteSize> | undefined
   mcp?: McpConfig | boolean | undefined
   metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
@@ -2716,7 +2713,6 @@ interface KayConfig
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
   robots?: RobotsConfig | false | undefined
-  routes?: string | undefined
   routesDir?: string | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
   saveData?: boolean | undefined
@@ -2726,11 +2722,9 @@ interface KayConfig
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
   serverTiming?: boolean | undefined
-  settings?: Record<string, string> | undefined
   shutdownTimeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   site?: string | undefined
   sitemap?: SitemapConfig | undefined
-  storage?: FileStore | undefined
   store?: AppStore | undefined
   timeZone?: string | undefined
   tracer?: Tracer | undefined
@@ -2831,9 +2825,6 @@ function memoryRooms(): RoomStore
 [./server] memorySessions
 function memorySessions(): DeletableSessionStore
 
-[./server] memoryStore
-function memoryStore(): DeletableSessionStore
-
 [./server] MessageEntry
 interface MessageEntry
   error?: { name: string; message: string; stack?: string; }
@@ -2924,7 +2915,6 @@ function pages(options?: PagesOptions): Promise<Elysia<"", {
 
 [./server] PagesOptions
 interface PagesOptions extends KayConfig
-  api?: string | undefined
   apiDir?: string | undefined
   apiPath?: string | undefined
   base?: string | undefined
@@ -2933,7 +2923,6 @@ interface PagesOptions extends KayConfig
   client?: ClientConfig | undefined
   compress?: boolean | undefined
   compressionDictionary?: boolean | undefined
-  content?: string | undefined
   contentConfig?: string | undefined
   cors?: CorsOptions | undefined
   dev?: boolean | undefined
@@ -2963,7 +2952,6 @@ interface PagesOptions extends KayConfig
   markdown?: MarkdownConfig | undefined
   maxSize?: ByteSize | undefined
   maxSizeByPath?: Record<string, ByteSize> | undefined
-  maxSizes?: Record<string, ByteSize> | undefined
   mcp?: McpConfig | boolean | undefined
   metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
@@ -2985,7 +2973,6 @@ interface PagesOptions extends KayConfig
   rewrite?: Rewrite | undefined
   robots?: RobotsConfig | false | undefined
   root?: string | undefined
-  routes?: string | undefined
   routesDir?: string | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
   saveData?: boolean | undefined
@@ -2995,11 +2982,9 @@ interface PagesOptions extends KayConfig
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
   serverTiming?: boolean | undefined
-  settings?: Record<string, string> | undefined
   shutdownTimeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   site?: string | undefined
   sitemap?: SitemapConfig | undefined
-  storage?: FileStore | undefined
   store?: AppStore | undefined
   timeZone?: string | undefined
   tracer?: Tracer | undefined
@@ -3550,9 +3535,6 @@ function sqliteRooms(path: string, { poll }?: { poll?: `${number}d` | `${number}
 [./server] sqliteSessions
 function sqliteSessions(path: string): DeletableSessionStore
 
-[./server] sqliteStore
-function sqliteStore(path: string): DeletableSessionStore
-
 [./server] StartOptions
 interface StartOptions
   delay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
@@ -3924,7 +3906,6 @@ interface TestContent
 
 [./test] TestOptions
 interface TestOptions extends PagesOptions
-  api?: string | undefined
   apiDir?: string | undefined
   apiPath?: string | undefined
   base?: string | undefined
@@ -3934,7 +3915,6 @@ interface TestOptions extends PagesOptions
   client?: ClientConfig | undefined
   compress?: boolean | undefined
   compressionDictionary?: boolean | undefined
-  content?: string | undefined
   contentConfig?: string | undefined
   cors?: CorsOptions | undefined
   dev?: boolean | undefined
@@ -3967,7 +3947,6 @@ interface TestOptions extends PagesOptions
   markdown?: MarkdownConfig | undefined
   maxSize?: ByteSize | undefined
   maxSizeByPath?: Record<string, ByteSize> | undefined
-  maxSizes?: Record<string, ByteSize> | undefined
   mcp?: McpConfig | boolean | undefined
   mcpKey?: string | undefined
   metrics?: MetricsConfig | boolean | undefined
@@ -3991,7 +3970,6 @@ interface TestOptions extends PagesOptions
   rewrite?: Rewrite | undefined
   robots?: RobotsConfig | false | undefined
   root?: string | undefined
-  routes?: string | undefined
   routesDir?: string | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
   saveData?: boolean | undefined
@@ -4001,11 +3979,9 @@ interface TestOptions extends PagesOptions
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
   serverTiming?: boolean | undefined
-  settings?: Record<string, string> | undefined
   shutdownTimeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   site?: string | undefined
   sitemap?: SitemapConfig | undefined
-  storage?: FileStore | undefined
   store?: AppStore | undefined
   styles?: boolean | undefined
   timeZone?: string | undefined

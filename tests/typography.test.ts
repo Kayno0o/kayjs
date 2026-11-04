@@ -341,16 +341,16 @@ describe('a French page served', () => {
   })
 
   it('writes the spaces into a page prerendered at build time, served from its file', async () => {
-    const build = await scratchBuild({ routes, content, lang: 'fr', inlineStyles: false })
+    const build = await scratchBuild({ routesDir: routes, contentConfig: content, lang: 'fr', inlineStyles: false })
 
     try {
-      await build.prerender({ routes, content, lang: 'fr', inlineStyles: false })
+      await build.prerender({ routesDir: routes, contentConfig: content, lang: 'fr', inlineStyles: false })
 
       const written = await Bun.file(join(build.pages, 'index.html')).text()
 
       expectSpaced(written)
 
-      const served = await build.serve({ routes, content, security: false, lang: 'fr' })
+      const served = await build.serve({ routesDir: routes, contentConfig: content, security: false, lang: 'fr' })
       const { html } = await get(served, '/')
 
       expect(html).toBe(written)
@@ -361,17 +361,17 @@ describe('a French page served', () => {
   })
 
   it('writes the spaces of a server island, rendered when the page is requested and when the browser fetches it', async () => {
-    const build = await scratchBuild({ routes, content, lang: 'fr', inlineStyles: false })
+    const build = await scratchBuild({ routesDir: routes, contentConfig: content, lang: 'fr', inlineStyles: false })
 
     try {
-      await build.prerender({ routes, content, lang: 'fr', inlineStyles: false })
+      await build.prerender({ routesDir: routes, contentConfig: content, lang: 'fr', inlineStyles: false })
 
       const built = await Bun.file(join(build.pages, 'island.html')).text()
 
       expect(built).toContain(`<h1>Îles${N}!</h1>`)
       expect(built).toContain(`Île${N}: différée`)
 
-      const served = await build.serve({ routes, content, security: false, lang: 'fr' })
+      const served = await build.serve({ routesDir: routes, contentConfig: content, security: false, lang: 'fr' })
       const { html } = await get(served, '/island')
 
       expect(html).toContain(`<p class="prop">Île${N}: serveur</p>`)
@@ -380,7 +380,7 @@ describe('a French page served', () => {
 
       expect(fetched.html).toContain(`<p class="prop">Île${N}: différée</p>`)
 
-      const plain = await build.serve({ routes, content, security: false, lang: 'fr', typography: false })
+      const plain = await build.serve({ routesDir: routes, contentConfig: content, security: false, lang: 'fr', typography: false })
 
       expect((await get(plain, '/island?kay_island=1', { [ISLAND_HEADER]: '1' })).html).toContain('<p class="prop">Île : différée</p>')
     }
@@ -403,10 +403,10 @@ describe('a French page served', () => {
   })
 
   it('writes the spaces of a page prerendered in a locale only', async () => {
-    const build = await scratchBuild({ routes, content, inlineStyles: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages } })
+    const build = await scratchBuild({ routesDir: routes, contentConfig: content, inlineStyles: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages } })
 
     try {
-      await build.prerender({ routes, content, inlineStyles: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages } })
+      await build.prerender({ routesDir: routes, contentConfig: content, inlineStyles: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages } })
 
       expectPlain(await Bun.file(join(build.pages, 'index.html')).text())
       expectSpaced(await Bun.file(join(build.pages, 'fr.html')).text())

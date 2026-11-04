@@ -1,3 +1,4 @@
+import type { ImportDeclaration, ImportSpecifier } from 'oxc-parser'
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { Node, Program } from '../compiler/estree'
 import type { LintName } from '../compiler/lints'
@@ -8,7 +9,7 @@ import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
 import { importedName, walk } from './ast'
 
-const OLD_NAME = /memoryStore|sqliteStore/
+const NEWLINE = /^\r?\n/
 const SOURCE_FILE = /(?:(?<!\.d)\.tsx?|\.kay)$/
 
 export interface Edit { start: number, end: number, text: string }
@@ -28,9 +29,6 @@ export interface Found {
   // The fix is applied by `kay upgrade` and `kay check --fix` unless `safe` is false.
   report: (start: number, end: number, message: string, help: string, edits: Edit[] | null, safe?: boolean) => void
 }
-
-// The session stores kay named for the store before 1.84 and the name each has now, like `memoryJobs` and `sqliteRates`; the old names work until 1.87.
-export const SESSION_STORES: Readonly<Record<string, string>> = { memoryStore: 'memorySessions', sqliteStore: 'sqliteSessions' }
 
 // Calls `visit` on each project source file matching `needle`, its script, server and module spans parsed.
 export async function scan(root: string, options: CheckOptions, lint: LintName, needle: RegExp, visit: (found: Found) => void): Promise<CheckDiagnostic[]> {
@@ -77,6 +75,17 @@ export async function scan(root: string, options: CheckOptions, lint: LintName, 
   return found
 }
 
+// The specifier out of its import, the whole import when it was alone.
+export function dropSpecifier(declaration: ImportDeclaration, specifier: ImportSpecifier, text: string): Edit {
+  if (declaration.specifiers.length === 1)
+    return { start: declaration.start, end: declaration.end + (NEWLINE.exec(text.slice(declaration.end))?.[0].length ?? 0), text: '' }
+
+  const index = declaration.specifiers.indexOf(specifier)
+  const next = declaration.specifiers[index + 1]
+
+  return next ? { start: specifier.start, end: next.start, text: '' } : { start: declaration.specifiers[index - 1]!.end, end: specifier.end, text: '' }
+}
+
 // Whether `name` is an identifier anywhere under the nodes, as a binding, an import, a key or a read.
 export function mentions(nodes: Node[], name: string): boolean {
   let seen = false
@@ -89,65 +98,6 @@ export function mentions(nodes: Node[], name: string): boolean {
   }
 
   return seen
-}
-
-// `memoryStore` and `sqliteStore` of `kay/server`, the session stores before 1.84: the fix renames the import and every use of it, or the member of a namespace import.
-// A file where the new name is taken, the old one is declared again, exported, read in a template or a use the rename could change gets the report with no fix.
-export async function sessionStores(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  if (lintLevel('deprecated-session-stores', options.lints) === 'allow')
-    return []
-
-  return scan(root, options, 'deprecated-session-stores', OLD_NAME, ({ parsed, unparsed, report }) => {
-    for (const { ast, base } of parsed) {
-      const namespaces = new Set<string>()
-
-      for (const statement of ast.body) {
-        if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || statement.source.value !== 'kay/server')
-          continue
-
-        for (const specifier of statement.specifiers) {
-          if (specifier.type === 'ImportNamespaceSpecifier') {
-            namespaces.add(specifier.local.name)
-
-            continue
-          }
-
-          if (specifier.type !== 'ImportSpecifier' || specifier.importKind === 'type' || !Object.hasOwn(SESSION_STORES, importedName(specifier)))
-            continue
-
-          const old = importedName(specifier)
-          const next = SESSION_STORES[old]!
-          const aliased = specifier.local.name !== old || specifier.imported.start !== specifier.local.start
-          const message = `\`${old}\` is the session store's name before 1.84, kept until 1.87: it is \`${next}\``
-          const help = `rename it to \`${next}\``
-          const importEdit = { start: base + specifier.imported.start, end: base + specifier.imported.start + old.length, text: next }
-
-          if (aliased) {
-            report(importEdit.start, importEdit.end, message, help, [importEdit])
-
-            continue
-          }
-
-          const edits = mentions(parsed.map(one => one.ast), next) || new RegExp(`\\b${old}\\b`).test(unparsed) ? undefined : uses(ast, old, next)
-
-          report(importEdit.start, importEdit.end, message, help, edits ? [importEdit, ...edits.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))] : null)
-        }
-      }
-
-      if (namespaces.size === 0)
-        continue
-
-      walk(ast, (node) => {
-        if (node.type !== 'MemberExpression' || node.computed || node.object.type !== 'Identifier' || !namespaces.has(node.object.name) || node.property.type !== 'Identifier' || !Object.hasOwn(SESSION_STORES, node.property.name))
-          return
-
-        const next = SESSION_STORES[node.property.name]!
-        const start = base + node.property.start
-
-        report(start, start + node.property.name.length, `\`${node.property.name}\` is the session store's name before 1.84, kept until 1.87: it is \`${next}\``, `rename it to \`${next}\``, [{ start, end: start + node.property.name.length, text: next }])
-      })
-    }
-  })
 }
 
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'TSDeclareFunction', 'TSEmptyBodyFunctionExpression'])

@@ -30,7 +30,7 @@ function feedXml<Data>(entries: Entry<Data>[], options: ResolvedFeed<Data>, orig
 const FIXTURE = 'tests/fixtures/content'
 const content = 'src/content.config.ts'
 const SITE = 'https://blog.example'
-const app = new Elysia().use(await pages({ root: FIXTURE, content, prebuilt: false, security: false, site: SITE }))
+const app = new Elysia().use(await pages({ root: FIXTURE, contentConfig: content, prebuilt: false, security: false, site: SITE }))
 
 async function get(path: string): Promise<{ status: number, html: string, type: string | null }> {
   const response = await app.handle(new Request(`http://localhost${path}`))
@@ -74,7 +74,7 @@ describe('Markdown entries', () => {
     const previous = process.env.NODE_ENV
     const draftStatus = async (env: string, dev: boolean) => {
       process.env.NODE_ENV = env
-      const served = await pages({ root: FIXTURE, content, prebuilt: false, dev, security: false, site: SITE })
+      const served = await pages({ root: FIXTURE, contentConfig: content, prebuilt: false, dev, security: false, site: SITE })
 
       return (await served.handle(new Request('http://localhost/blog/draft'))).status
     }
@@ -118,7 +118,7 @@ describe('the content mode', () => {
       setContentMode({ dev: false, prebuilt: true })
       expect(await authors()).toEqual(['Built'])
 
-      const served = await pages({ root: FIXTURE, content, prebuilt: false, dev: true, security: false, log: false, site: SITE })
+      const served = await pages({ root: FIXTURE, contentConfig: content, prebuilt: false, dev: true, security: false, log: false, site: SITE })
 
       expect(contentMode().dev).toBe(true)
       served.listen(0)
@@ -425,18 +425,18 @@ describe('feeds', () => {
   })
 
   it('need the site\'s URL, and a content config kay.config.ts names must exist', async () => {
-    await expect(pages({ root: FIXTURE, content: 'src/missing.config.ts', prebuilt: false })).rejects.toThrow('names src/missing.config.ts as the content config, and there is no such file')
-    await expect(pages({ root: FIXTURE, content, prebuilt: false })).rejects.toThrow('has a feed, whose links need the site\'s URL')
+    await expect(pages({ root: FIXTURE, contentConfig: 'src/missing.config.ts', prebuilt: false })).rejects.toThrow('names src/missing.config.ts as the content config, and there is no such file')
+    await expect(pages({ root: FIXTURE, contentConfig: content, prebuilt: false })).rejects.toThrow('has a feed, whose links need the site\'s URL')
   })
 })
 
 describe('prerendering a collection', () => {
   it('renders a page for every entry of the collection it exports as prerender, from what kay build compiled', async () => {
-    const build = await scratchBuild({ content }, false, resolve(FIXTURE))
+    const build = await scratchBuild({ contentConfig: content }, false, resolve(FIXTURE))
 
     try {
       expect(await writeContentManifests(resolve(FIXTURE), build.dir, content)).toBe(5)
-      expect(await build.prerender({ content })).toBe(2)
+      expect(await build.prerender({ contentConfig: content })).toBe(2)
       expect(await Bun.file(join(build.pages, 'blog/hello.html')).text()).toContain('<h1 class="title">Hello world</h1>')
       expect(await Bun.file(join(build.pages, 'blog/draft.html')).exists()).toBe(false)
     }

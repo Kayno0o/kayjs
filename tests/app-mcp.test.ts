@@ -15,34 +15,34 @@ const BEARER = { authorization: 'Bearer open' }
 // The key the app's own session would read from the bearer token, as a `derive` does.
 const locals = (request: Request) => ({ key: request.headers.get('authorization') === 'Bearer open' ? 'open' : undefined })
 
-const site = await testSite({ routes, api, mcp: true, islands: false, locals })
-const off = await testSite({ routes, api, islands: false })
-const throttled = await testSite({ routes, api, mcp: { rateLimit: 3 }, islands: false })
-const unthrottled = await testSite({ routes, api, mcp: { rateLimit: false }, islands: false })
-const mounted = await testSite({ routes, api, mcp: true, islands: false, base: '/shop', trailingSlash: 'always', locals })
-const openapi = await testSite({ routes, api, mcp: true, openapi: true, islands: false, locals })
+const site = await testSite({ routesDir: routes, apiDir: api, mcp: true, islands: false, locals })
+const off = await testSite({ routesDir: routes, apiDir: api, islands: false })
+const throttled = await testSite({ routesDir: routes, apiDir: api, mcp: { rateLimit: 3 }, islands: false })
+const unthrottled = await testSite({ routesDir: routes, apiDir: api, mcp: { rateLimit: false }, islands: false })
+const mounted = await testSite({ routesDir: routes, apiDir: api, mcp: true, islands: false, base: '/shop', trailingSlash: 'always', locals })
+const openapi = await testSite({ routesDir: routes, apiDir: api, mcp: true, openapi: true, islands: false, locals })
 const guardedApi = 'tests/fixtures/mcp-guarded/src/api'
-const guarded = await testSite({ routes, api: guardedApi, mcp: true, islands: false })
-const limited = await testSite({ routes, api: 'tests/fixtures/mcp-limited/src/api', mcp: true, islands: false, base: '/shop' })
-const names = await testSite({ routes: 'tests/fixtures/mcp-names/src/routes', api: 'tests/fixtures/mcp-names/src/api', mcp: true, openapi: true, islands: false })
-const longNames = await testSite({ routes: 'tests/fixtures/mcp-long-names/src/routes', api: 'tests/fixtures/mcp-long-names/src/api', mcp: true, openapi: true, islands: false })
-const guardedMounted = await testSite({ routes, api: guardedApi, mcp: true, islands: false, base: '/shop' })
+const guarded = await testSite({ routesDir: routes, apiDir: guardedApi, mcp: true, islands: false })
+const limited = await testSite({ routesDir: routes, apiDir: 'tests/fixtures/mcp-limited/src/api', mcp: true, islands: false, base: '/shop' })
+const names = await testSite({ routesDir: 'tests/fixtures/mcp-names/src/routes', apiDir: 'tests/fixtures/mcp-names/src/api', mcp: true, openapi: true, islands: false })
+const longNames = await testSite({ routesDir: 'tests/fixtures/mcp-long-names/src/routes', apiDir: 'tests/fixtures/mcp-long-names/src/api', mcp: true, openapi: true, islands: false })
+const guardedMounted = await testSite({ routesDir: routes, apiDir: guardedApi, mcp: true, islands: false, base: '/shop' })
 // Guards that cover every module, and guards that cover only one of them.
-const strict = await testSite({ routes, api: guardedApi, mcp: true, islands: false, requireGuards: true })
-const uncovered = await testSite({ routes, api, mcp: true, islands: false, requireGuards: true })
+const strict = await testSite({ routesDir: routes, apiDir: guardedApi, mcp: true, islands: false, requireGuards: true })
+const uncovered = await testSite({ routesDir: routes, apiDir: api, mcp: true, islands: false, requireGuards: true })
 // A site with tool actions and no API module has no guard to add, so requireGuards leaves its list open, while its OpenAPI document stays refused.
-const noApi = await testSite({ routes, api: 'tests/fixtures/mcp/src/none', mcp: true, openapi: true, islands: false, requireGuards: true })
-const documentOnly = await testSite({ routes, api: guardedApi, openapi: true, islands: false })
+const noApi = await testSite({ routesDir: routes, apiDir: 'tests/fixtures/mcp/src/none', mcp: true, openapi: true, islands: false, requireGuards: true })
+const documentOnly = await testSite({ routesDir: routes, apiDir: guardedApi, openapi: true, islands: false })
 // Behind a proxy sharing a key: the site's own requests, such as a tool call dispatched through the app, carry none.
 const PROXY_KEY = 'k'.repeat(40)
 
 process.env.KAY_PROXY_KEY = PROXY_KEY
-const keyed = await testSite({ routes, api, mcp: true, islands: false, locals, proxy: { key: 'x-upstream-key' }, headers: { 'x-upstream-key': PROXY_KEY } })
+const keyed = await testSite({ routesDir: routes, apiDir: api, mcp: true, islands: false, locals, proxy: { key: 'x-upstream-key' }, headers: { 'x-upstream-key': PROXY_KEY } })
 // A rewrite sends the dispatched call through the app again, still as the server's own.
-const keyedRewritten = await testSite({ routes, api, mcp: true, islands: false, locals, proxy: { key: 'x-upstream-key' }, headers: { 'x-upstream-key': PROXY_KEY }, rewrite: url => url.pathname === '/api/notes/who' ? '/api/notes/who?rewritten=1' : undefined })
+const keyedRewritten = await testSite({ routesDir: routes, apiDir: api, mcp: true, islands: false, locals, proxy: { key: 'x-upstream-key' }, headers: { 'x-upstream-key': PROXY_KEY }, rewrite: url => url.pathname === '/api/notes/who' ? '/api/notes/who?rewritten=1' : undefined })
 
 delete process.env.KAY_PROXY_KEY
-const localized = await testSite({ routes, api, mcp: true, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
+const localized = await testSite({ routesDir: routes, apiDir: api, mcp: true, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
 
 afterAll(async () => {
   await Promise.all([throttled.close(), unthrottled.close(), site.close(), keyed.close(), keyedRewritten.close(), off.close(), mounted.close(), localized.close(), openapi.close(), guarded.close(), guardedMounted.close(), strict.close(), uncovered.close(), noApi.close(), documentOnly.close(), limited.close(), names.close()])
@@ -76,7 +76,7 @@ describe('the endpoint', () => {
       expect((await rpc(unthrottled, 'ping')).response.status).toBe(200)
 
     for (const rateLimit of [0, -1, 1.5, Number.NaN])
-      await expect(testSite({ routes, api, mcp: { rateLimit }, islands: false })).rejects.toThrow('mcp.rateLimit')
+      await expect(testSite({ routesDir: routes, apiDir: api, mcp: { rateLimit }, islands: false })).rejects.toThrow('mcp.rateLimit')
   })
 
   it('is not served without mcp', async () => {
@@ -175,7 +175,7 @@ describe('the endpoint', () => {
   })
 
   it('stops the boot when a page serves its path', async () => {
-    await expect(testSite({ routes: 'tests/fixtures/mcp-clash/src/routes', api, mcp: true, islands: false })).rejects.toThrow('`mcp` both serve /mcp')
+    await expect(testSite({ routesDir: 'tests/fixtures/mcp-clash/src/routes', apiDir: api, mcp: true, islands: false })).rejects.toThrow('`mcp` both serve /mcp')
   })
 })
 
@@ -374,7 +374,7 @@ describe('sign-in metadata', () => {
 
   it('is what the auth of the context answers for the endpoint, at the root path and the endpoint\'s', async () => {
     const asked: string[][] = []
-    const oauth = await testSite({ routes, api, mcp: true, islands: false, locals: () => ({ auth: { oauthResource: (path: string, name: string) => {
+    const oauth = await testSite({ routesDir: routes, apiDir: api, mcp: true, islands: false, locals: () => ({ auth: { oauthResource: (path: string, name: string) => {
       asked.push([path, name])
 
       return { resource: `https://app.example${path}`, authorization_servers: ['https://app.example'] }
@@ -397,7 +397,7 @@ describe('sign-in metadata', () => {
 describe('sign-in metadata of an app with no site set', () => {
   it('is kept by no shared cache, and the 401 points to the origin the auth library serves its documents at', async () => {
     const auth = (fixed: boolean) => ({ oauthResource: (path: string) => ({ resource: `https://app.example${path}`, authorization_servers: ['https://app.example'] }), oauthOrigin: () => 'https://app.example', oauthFixed: () => fixed })
-    const withAuth = async (fixed: boolean) => testSite({ routes, api, mcp: true, islands: false, locals: request => ({ ...locals(request), auth: auth(fixed) }) })
+    const withAuth = async (fixed: boolean) => testSite({ routesDir: routes, apiDir: api, mcp: true, islands: false, locals: request => ({ ...locals(request), auth: auth(fixed) }) })
     const [open, fixed] = await Promise.all([withAuth(false), withAuth(true)])
     const before = configuredSite()
 
@@ -425,7 +425,7 @@ describe('sign-in metadata of an app with no site set', () => {
 
 describe('an auth library that cannot name its origin', () => {
   it('still answers 401 with a pointer built from the request, as kayjs-auth does in production with no site set', async () => {
-    const unnamed = await testSite({ routes, api, mcp: true, islands: false, locals: request => ({ ...locals(request), auth: { oauthResource: () => null, oauthOrigin: () => undefined, oauthFixed: () => false } }) })
+    const unnamed = await testSite({ routesDir: routes, apiDir: api, mcp: true, islands: false, locals: request => ({ ...locals(request), auth: { oauthResource: () => null, oauthOrigin: () => undefined, oauthFixed: () => false } }) })
     const before = configuredSite()
 
     try {
@@ -446,7 +446,7 @@ describe('an auth library that cannot name its origin', () => {
 
 describe('sign-in metadata an app serves itself', () => {
   it('gives way to the app\'s own route at that path instead of stopping the boot', async () => {
-    const own = await testSite({ routes, api, mcp: true, islands: false, redirects: { '/.well-known/oauth-protected-resource': '/elsewhere' } })
+    const own = await testSite({ routesDir: routes, apiDir: api, mcp: true, islands: false, redirects: { '/.well-known/oauth-protected-resource': '/elsewhere' } })
     const response = await own.fetch('/.well-known/oauth-protected-resource')
 
     expect(response.status).toBe(308)
@@ -583,7 +583,7 @@ describe('the OpenAPI document', () => {
   })
 
   it('lists them without mcp too, as the document and the tools say the same', async () => {
-    const only = await testSite({ routes, api, openapi: true, islands: false, locals })
+    const only = await testSite({ routesDir: routes, apiDir: api, openapi: true, islands: false, locals })
     const document = await (await only.fetch('/api/openapi.json', { headers: BEARER })).json() as { paths: Record<string, unknown> }
 
     expect(Object.keys(document.paths)).toContain('/_kay/action/tests/fixtures/mcp/src/routes/index.kay/signup')
@@ -871,7 +871,7 @@ describe('routes opt in to being tools', () => {
   })
 
   it('names each method of an .all() route after the tool name it sets', async () => {
-    const all = await testSite({ routes: 'tests/fixtures/mcp-names/src/routes', api: 'tests/fixtures/mcp-names/src/api', mcp: true, islands: false })
+    const all = await testSite({ routesDir: 'tests/fixtures/mcp-names/src/routes', apiDir: 'tests/fixtures/mcp-names/src/api', mcp: true, islands: false })
 
     expect((await all.mcp.tools()).map(tool => tool.name).sort()).toEqual(['a_b', 'a_b_2'])
     await all.close()
@@ -884,7 +884,7 @@ describe('a tool call an app can tell', () => {
     if (new URL(request.url).pathname !== '/mcp')
       calls.push(toolCall(request))
   })
-  const front = testSite({ routes: 'tests/fixtures/mcp-seen/src/routes', api: 'tests/fixtures/mcp-seen/src/api', mcp: true, islands: false, use: [seen] })
+  const front = testSite({ routesDir: 'tests/fixtures/mcp-seen/src/routes', apiDir: 'tests/fixtures/mcp-seen/src/api', mcp: true, islands: false, use: [seen] })
   const KEY = { authorization: 'Bearer key' }
   const ACTION = '/_kay/action/tests/fixtures/mcp-seen/src/routes/index.kay/ping'
 

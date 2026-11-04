@@ -3,9 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { deprecatedConfigKeys } from '../src/check/deprecated-config-keys'
 import { applySafeFixes } from '../src/check/fixes'
-import { currentKeys, GROUPED_KEYS, groupedKeys, mergeBags, RENAMED_KEYS, renamedKeys, unknownConfigKeys } from '../src/config-shape'
-import { localizedEntry, writeDraftEntry } from '../src/server/entry-drafts'
-import { missingTranslations } from '../src/server/translations'
+import { GROUPED_KEYS, groupedKeys, mergeBags, unknownConfigKeys } from '../src/config-shape'
 import { scratchDir } from './scratch'
 
 async function project(files: Record<string, string>): Promise<string> {
@@ -16,57 +14,15 @@ async function project(files: Record<string, string>): Promise<string> {
   return root
 }
 
-describe('the renamed config keys', () => {
-  it('moves each old key to its new name, the new name winning when both are set', () => {
-    expect(renamedKeys<object>({ routes: 'a', api: 'b', content: 'c', storage: 'd', maxSizes: { '/x': 1 }, settings: { lib: 'e' }, lang: 'en' })).toEqual({ routesDir: 'a', apiDir: 'b', contentConfig: 'c', fileStore: 'd', maxSizeByPath: { '/x': 1 }, librarySettings: { lib: 'e' }, lang: 'en' })
-    expect(renamedKeys<object>({ routes: 'old', routesDir: 'new' })).toEqual({ routesDir: 'new' })
-    expect(renamedKeys<object>({ routes: undefined, routesDir: 'new' })).toEqual({ routesDir: 'new' })
-
-    const untouched = { lang: 'en' }
-
-    expect(renamedKeys(untouched)).toBe(untouched)
+describe('the config keys of before 1.88', () => {
+  it('names the key that replaced a removed one', () => {
+    expect(unknownConfigKeys({ routes: 'a', api: 'b', content: 'c', storage: 'd', maxSizes: {}, settings: {} })).toEqual(['`routes`, did you mean `dirs.routes`?', '`api`, did you mean `dirs.api`?', '`content`, did you mean `contentConfig`?', '`storage`, did you mean `store.files`?', '`maxSizes`, did you mean `limits.byPath`?', '`settings`, did you mean `librarySettings`?'])
+    expect(unknownConfigKeys({ routesDir: 'a', apiDir: 'b' })).toEqual([])
+    expect(unknownConfigKeys({ routsDir: 'a', setting: {}, maxSize: 1, contnt: 'x' })).toEqual(['`routsDir`, did you mean `dirs.routes`?', '`setting`', '`contnt`'])
   })
 
-  it('knows the old names as keys, and suggests the new ones only', () => {
-    expect(unknownConfigKeys({ routes: 'a', apiDir: 'b' })).toEqual([])
-    expect(unknownConfigKeys({ routsDir: 'a', storag: 'b' })).toEqual(['`routsDir`, did you mean `dirs.routes`?', '`storag`, did you mean `fileStore`?'])
-    expect(unknownConfigKeys({ routs: 'a', setting: {}, maxSize: 1, contnt: 'x' })).toEqual(['`routs`, did you mean `dirs.routes`?', '`setting`, did you mean `librarySettings`?', '`contnt`, did you mean `contentConfig`?'])
-    expect(Object.values(RENAMED_KEYS).every(name => !Object.hasOwn(RENAMED_KEYS, name))).toBe(true)
-  })
-})
-
-describe('deprecated-config-keys', () => {
-  it('reports an old key in kay.config.ts and in the options of pages() and testSite(), and --fix writes the new one', async () => {
-    const config = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  content: \'src/pages\',\n  \'settings\': {},\n  lang: \'en\',\n  storage: undefined,\n})\n'
-    const server = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst content = \'src/c.ts\'\nexport const app = new Elysia().use(await pages({ content, settings: {} }))\n'
-    const test = 'import { testSite } from \'kay/test\'\n\nexport const site = testSite({ content: \'a\', contentConfig: \'b\' })\n'
-    const other = 'import { pages } from \'./mine\'\n\nexport const x = pages({ content: 1 })\nexport const routes = { content: 1 }\n'
-    const root = await project({ 'kay.config.ts': config, 'src/server.ts': server, 'src/site.ts': test, 'src/other.ts': other })
-
-    try {
-      const found = (await deprecatedConfigKeys(root, {})).filter(diagnostic => diagnostic.code !== 'deprecated-config-groups')
-
-      expect(found.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.line, diagnostic.severity, diagnostic.fixes === undefined]).sort()).toEqual([
-        ['kay.config.ts', 4, 'warning', false],
-        ['kay.config.ts', 5, 'warning', false],
-        ['kay.config.ts', 7, 'warning', false],
-        ['src/server.ts', 5, 'warning', false],
-        ['src/server.ts', 5, 'warning', false],
-        ['src/site.ts', 3, 'warning', true],
-      ])
-      expect(found.find(diagnostic => diagnostic.line === 4)!.message).toBe('`content` is now `contentConfig` in the config, so every directory key ends in `Dir` and no two keys differ by a letter; the old name works until 1.87')
-
-      await applySafeFixes(root, found)
-      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe(config.replace('content:', 'contentConfig:').replace('\'settings\':', 'librarySettings:').replace('storage: undefined', 'store: { files: undefined }'))
-      expect(await Bun.file(join(root, 'src/server.ts')).text()).toBe(server.replace('{ content, settings', '{ contentConfig: content, settings').replace('settings: {}', 'librarySettings: {}'))
-      expect(await Bun.file(join(root, 'src/site.ts')).text()).toBe(test)
-      expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe(other)
-      expect((await deprecatedConfigKeys(root, {})).filter(diagnostic => diagnostic.code === 'deprecated-config-keys').map(diagnostic => diagnostic.file.slice(root.length + 1))).toEqual(['src/site.ts'])
-      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-config-keys': 'allow', 'deprecated-file-store': 'allow', 'deprecated-config-groups': 'allow' } })).toEqual([])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
+  it('reads no removed key', () => {
+    expect(groupedKeys<object>({ routes: 'a', storage: 'b' })).toEqual({ routes: 'a', storage: 'b' })
   })
 })
 
@@ -76,7 +32,7 @@ describe('deprecated-file-store', () => {
     const shorthand = 'import { testSite } from \'kay/test\'\n\nconst fileStore = undefined\nexport const site = testSite({ fileStore })\n'
     const beside = 'import { pages, sqliteData } from \'kay/server\'\n\nexport const app = pages({ store: sqliteData(\'data/app.sqlite\'), fileStore: undefined })\n'
     const other = 'import { pages } from \'./mine\'\n\nexport const x = pages({ fileStore: 1 })\nexport const files = { fileStore: 1 }\n'
-    const spread = 'import { pages } from \'kay/server\'\n\nconst base = {}\nexport const a = pages({ ...base, fileStore: undefined })\nexport const b = pages({ [\'store\']: undefined, fileStore: undefined, storage: undefined })\n'
+    const spread = 'import { pages } from \'kay/server\'\n\nconst base = {}\nexport const a = pages({ ...base, fileStore: undefined })\nexport const b = pages({ [\'store\']: undefined, fileStore: undefined })\n'
     const root = await project({ 'kay.config.ts': config, 'src/site.ts': shorthand, 'src/server.ts': beside, 'src/other.ts': other, 'src/spread.ts': spread })
 
     try {
@@ -86,7 +42,6 @@ describe('deprecated-file-store', () => {
         ['kay.config.ts', 'deprecated-file-store', false],
         ['src/server.ts', 'deprecated-file-store', true],
         ['src/site.ts', 'deprecated-file-store', false],
-        ['src/spread.ts', 'deprecated-config-keys', true],
         ['src/spread.ts', 'deprecated-file-store', true],
         ['src/spread.ts', 'deprecated-file-store', true],
       ])
@@ -98,7 +53,7 @@ describe('deprecated-file-store', () => {
       expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe(other)
       expect(await Bun.file(join(root, 'src/spread.ts')).text()).toBe(spread)
       expect((await deprecatedConfigKeys(root, {})).map(diagnostic => diagnostic.file.slice(root.length + 1)).filter(file => file !== 'src/spread.ts')).toEqual(['src/server.ts'])
-      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-config-keys': 'allow', 'deprecated-file-store': 'allow', 'deprecated-config-groups': 'allow' } })).toEqual([])
+      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-file-store': 'allow', 'deprecated-config-groups': 'allow' } })).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -106,40 +61,22 @@ describe('deprecated-file-store', () => {
   })
 })
 
-describe('the library functions taking the config', () => {
-  const i18n = { locales: ['en', 'fr'], defaultLocale: 'en' }
-
-  it('read the content config under its old name', async () => {
-    const messages = 'import { defineMessages } from \'kay\'\n\nexport default defineMessages({})\n'
-    const root = await project({ 'src/messages/en.ts': messages, 'src/messages/fr.ts': messages })
-
-    try {
-      await expect(missingTranslations(root, { i18n, content: 'src/nope.ts' } as never)).rejects.toThrow('names src/nope.ts as the content config')
-      await expect(localizedEntry(root, { i18n, content: 'src/nope.ts' } as never, 'news', 'a')).rejects.toThrow('names src/nope.ts as the content config')
-      await expect(writeDraftEntry(root, { i18n, content: 'src/nope.ts' } as never, 'news', 'fr', 'a', { data: {} })).rejects.toThrow('names src/nope.ts as the content config')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-})
-
-describe('deprecated-config-keys beyond pages() and testSite() by name', () => {
+describe('the deprecated keys beyond pages() and testSite() by name', () => {
   it('follows an import under another name or a namespace, and reads an extension\'s config', async () => {
-    const aliased = 'import { pages as serve } from \'kay/server\'\n\nexport const a = serve({ content: \'x\' })\n'
-    const namespaced = 'import * as kay from \'kay/server\'\n\nexport const b = kay.pages({ settings: {} })\n'
-    const extension = 'import type { KayExtension } from \'kay/server\'\n\nexport const lib: KayExtension = { name: \'lib\', config: { storage: undefined, lang: \'en\' } }\n'
-    const unrelated = 'export const c = { config: { routes: 1 } }\nexport const d = { name: \'x\', other: { routes: 1 } }\nexport const e = { name: \'job\', config: { settings: {}, routes: 1 } }\n'
+    const aliased = 'import { pages as serve } from \'kay/server\'\n\nexport const a = serve({ compress: false })\n'
+    const namespaced = 'import * as kay from \'kay/server\'\n\nexport const b = kay.pages({ fileStore: undefined })\n'
+    const extension = 'import type { KayExtension } from \'kay/server\'\n\nexport const lib: KayExtension = { name: \'lib\', config: { log: false, lang: \'en\' } }\n'
+    const unrelated = 'export const c = { config: { compress: 1 } }\nexport const d = { name: \'x\', other: { compress: 1 } }\nexport const e = { name: \'job\', config: { fileStore: {}, compress: 1 } }\n'
     const root = await project({ 'src/a.ts': aliased, 'src/b.ts': namespaced, 'src/lib.ts': extension, 'src/c.ts': unrelated })
 
     try {
       const found = await deprecatedConfigKeys(root, {})
 
-      expect(found.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.message.slice(0, diagnostic.message.indexOf(' '))]).sort()).toEqual([['src/a.ts', '`content`'], ['src/b.ts', '`settings`'], ['src/lib.ts', '`storage`']])
+      expect(found.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.code]).sort()).toEqual([['src/a.ts', 'deprecated-config-groups'], ['src/b.ts', 'deprecated-file-store'], ['src/lib.ts', 'deprecated-config-groups']])
 
       await applySafeFixes(root, found)
-      expect(await Bun.file(join(root, 'src/a.ts')).text()).toBe(aliased.replace('content', 'contentConfig'))
-      expect(await Bun.file(join(root, 'src/lib.ts')).text()).toBe(extension.replace('storage: undefined', 'store: { files: undefined }'))
+      expect(await Bun.file(join(root, 'src/a.ts')).text()).toBe(aliased.replace('{ compress: false }', '{ serve: { compress: false } }'))
+      expect(await Bun.file(join(root, 'src/lib.ts')).text()).toBe(extension.replace('log: false', 'observe: { log: false }'))
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -164,10 +101,6 @@ describe('the grouped config keys', () => {
     const untouched = { lang: 'en', dirs: { routes: 'a' } }
 
     expect(groupedKeys(untouched)).toBe(untouched)
-  })
-
-  it('reads the 1.84 names into the bags too', () => {
-    expect(currentKeys<object>({ routes: 'a', api: 'b', maxSizes: { '/x': 1 } })).toEqual({ dirs: { routes: 'a', api: 'b' }, limits: { byPath: { '/x': 1 } } })
   })
 
   it('names every flat key once, in a bag that takes it', () => {
@@ -220,7 +153,7 @@ describe('deprecated-config-groups', () => {
       expect(await Bun.file(join(root, 'src/spread.ts')).text()).toBe(spread)
       expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe(other)
       expect((await deprecatedConfigKeys(root, {})).filter(diagnostic => diagnostic.code === 'deprecated-config-groups').map(diagnostic => diagnostic.file.slice(root.length + 1)).sort()).toEqual(['src/beside.ts', 'src/spread.ts'])
-      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-config-groups': 'allow', 'deprecated-config-keys': 'allow', 'deprecated-file-store': 'allow' } })).toEqual([])
+      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-config-groups': 'allow', 'deprecated-file-store': 'allow' } })).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -278,27 +211,6 @@ describe('deprecated-config-groups', () => {
         '})',
         '',
       ].join('\n'))
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('writes the final form of a key renamed in 1.84 in one pass, also beside a key of 1.88', async () => {
-    const config = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  routes: \'x\',\n  apiDir: \'y\',\n  maxSizes: { \'/up\': \'8mb\' },\n  maxSize: \'2mb\',\n})\n'
-    const alone = 'import { pages } from \'kay/server\'\n\nexport const app = pages({ api: \'z\' })\n'
-    const clash = 'import { pages } from \'kay/server\'\n\nexport const app = pages({ routes: \'a\', routesDir: \'b\' })\n'
-    const root = await project({ 'kay.config.ts': config, 'src/clash.ts': clash, 'src/alone.ts': alone })
-
-    try {
-      const found = await deprecatedConfigKeys(root, {})
-
-      expect(found.filter(diagnostic => diagnostic.code === 'deprecated-config-keys')).toEqual([])
-      expect(found.find(diagnostic => diagnostic.file.endsWith('clash.ts'))!.fixes).toBeUndefined()
-
-      await applySafeFixes(root, found)
-      expect(await Bun.file(join(root, 'src/alone.ts')).text()).toBe(alone.replace('{ api: \'z\' }', '{ dirs: { api: \'z\' } }'))
-      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  dirs: { routes: \'x\', api: \'y\' },\n  limits: { byPath: { \'/up\': \'8mb\' }, body: \'2mb\' },\n})\n')
     }
     finally {
       await rm(root, { recursive: true, force: true })

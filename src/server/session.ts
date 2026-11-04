@@ -490,16 +490,6 @@ export function sqliteSessions(path: string): SqliteSessionStore {
   return sqliteStoreAt(process.env.NODE_ENV === 'test' ? ':memory:' : path)
 }
 
-/** @deprecated since 1.84: `memorySessions`, named for what it holds like the other stores; kept until 1.87. */
-export function memoryStore(): DeletableSessionStore {
-  return memorySessions()
-}
-
-/** @deprecated since 1.84: `sqliteSessions`, named for what it holds like the other stores; kept until 1.87. */
-export function sqliteStore(path: string): SqliteSessionStore {
-  return sqliteSessions(path)
-}
-
 // One store per file, so a config read again, as in development, opens no second database and sweep timer; a file deleted or replaced at the same path is opened afresh, by a running server too.
 // Kay's own tests of the file call this, as `sqliteSessions` would keep it in memory.
 export function sqliteStoreAt(path: string): SqliteSessionStore {

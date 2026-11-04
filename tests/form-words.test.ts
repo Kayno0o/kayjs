@@ -13,7 +13,7 @@ const FIXTURE = 'tests/fixtures/form-words'
 const FORMS = /<script type="application\/json" data-kay-forms>(.*?)<\/script>/
 const client: ClientBuild = { entry: '/_kay/entry.js', entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(process.cwd()), navigation: true }
 const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: `${FIXTURE}/src/messages` }
-const app = await servePages(resolveProject(process.cwd(), { routes: `${FIXTURE}/src/routes`, security: false, i18n }), async () => client)
+const app = await servePages(resolveProject(process.cwd(), { routesDir: `${FIXTURE}/src/routes`, security: false, i18n }), async () => client)
 
 async function rules(path: string): Promise<Rules[string]> {
   const html = await (await app.handle(new Request(`http://localhost${path}`))).text()
@@ -33,7 +33,7 @@ describe('a field error written as a function', () => {
   })
 
   it('refuses the post in the page\'s language, and a function giving no text leaves Elysia\'s wording', async () => {
-    const site = await testSite({ routes: `${FIXTURE}/src/routes`, i18n })
+    const site = await testSite({ routesDir: `${FIXTURE}/src/routes`, i18n })
     const { rename } = await import(`${import.meta.dir}/fixtures/form-words/src/routes/index.kay`) as { rename: Parameters<typeof site.submit>[0] }
     const input = { name: 'A', nickname: 'B', note: 'C' }
     const english = await site.submit(rename, input, { from: '/' })
@@ -47,7 +47,7 @@ describe('a field error written as a function', () => {
   })
 
   it('words a file of the wrong type and a refused union branch in the page\'s language', async () => {
-    const site = await testSite({ routes: `${FIXTURE}/src/routes`, i18n })
+    const site = await testSite({ routesDir: `${FIXTURE}/src/routes`, i18n })
     const { attach } = await import(`${import.meta.dir}/fixtures/form-words/src/routes/index.kay`) as { attach: Parameters<typeof site.submit>[0] }
     const input = { photo: new File(['text'], 'a.png', { type: 'image/png' }), contact: 'nope' }
     const french = await site.submit(attach, input, { from: '/fr' })

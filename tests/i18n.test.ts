@@ -403,7 +403,7 @@ describe('translated paths', () => {
 describe('localized content', () => {
   const site = 'tests/fixtures/i18n-content'
   const content = `${site}/src/content.config.ts`
-  const config = { root: site, content: resolve(content), prebuilt: false, security: false as const, site: SITE, i18n: { ...i18n, messages: resolve(`${site}/src/messages`) } }
+  const config = { root: site, contentConfig: resolve(content), prebuilt: false, security: false as const, site: SITE, i18n: { ...i18n, messages: resolve(`${site}/src/messages`) } }
   const contentSite = once(async () => new Elysia().use(await pages(config)))
 
   it('reads the request\'s locale\'s entry, the default locale\'s standing in for one it lacks', async () => {
@@ -464,7 +464,7 @@ describe('localized content', () => {
 
   it('points the head alternates of an entry at each translation\'s own url', async () => {
     const copy = await fixtureCopy('i18n-content')
-    const paired = async (trailingSlash?: 'always', domains?: Record<string, string>) => pages({ ...config, root: copy, content: resolve(`${copy}/src/content.config.ts`), trailingSlash, i18n: { ...config.i18n, messages: resolve(`${copy}/src/messages`), ...domains && { domains } } })
+    const paired = async (trailingSlash?: 'always', domains?: Record<string, string>) => pages({ ...config, root: copy, contentConfig: resolve(`${copy}/src/content.config.ts`), trailingSlash, i18n: { ...config.i18n, messages: resolve(`${copy}/src/messages`), ...domains && { domains } } })
 
     try {
       const configFile = join(copy, 'src/content.config.ts')
@@ -1031,7 +1031,7 @@ describe('localized seo defaults', () => {
   })
 
   it('titles the one OpenAPI document with the default locale\'s name, whatever locale asked', async () => {
-    const server = new Elysia().use(await pages({ root: FIXTURE, api: resolve('tests/fixtures/openapi/src/api'), prebuilt: false, security: false, site: SITE, i18n, openapi: true, seo: { name: { en: 'The site', fr: 'Le site' } } }))
+    const server = new Elysia().use(await pages({ root: FIXTURE, apiDir: resolve('tests/fixtures/openapi/src/api'), prebuilt: false, security: false, site: SITE, i18n, openapi: true, seo: { name: { en: 'The site', fr: 'Le site' } } }))
 
     const response = await server.handle(new Request('http://localhost/api/openapi.json', { headers: { 'x-key': 'open', 'accept-language': 'en' } }))
 

@@ -189,7 +189,7 @@ describe('a server starting with a pgData store', () => {
   async function start(options: { dev?: boolean, live: LiveStore }) {
     const root = await project()
 
-    return pages({ root, routes: join(root, 'src/routes'), prebuilt: false, security: false, dev: options.dev, store: { live: options.live } })
+    return pages({ root, routesDir: join(root, 'src/routes'), prebuilt: false, security: false, dev: options.dev, store: { live: options.live } })
   }
 
   it('reads the live values before serving, in production', async () => {
@@ -218,7 +218,7 @@ pgDescribe('a server starting against Postgres', () => {
     await withDatabase(async (database, tables) => {
       const root = await project()
 
-      await pages({ root, routes: join(root, 'src/routes'), prebuilt: false, security: false, store: openStore(database) })
+      await pages({ root, routesDir: join(root, 'src/routes'), prebuilt: false, security: false, store: openStore(database) })
       expect(await tables()).toContain('kay_live')
     })
   }, 60_000)
@@ -286,7 +286,7 @@ pgDescribe('a pgData role that may not alter tables', () => {
       await Bun.write(join(first, 'package.json'), JSON.stringify({ name: 'shop' }))
       await Bun.write(join(second, 'package.json'), JSON.stringify({ name: 'blog' }))
 
-      const boot = async (root: string) => pages({ root, routes: join(root, 'src/routes'), prebuilt: false, security: false, store: openStore(database) })
+      const boot = async (root: string) => pages({ root, routesDir: join(root, 'src/routes'), prebuilt: false, security: false, store: openStore(database) })
 
       await boot(first)
       await boot(first)

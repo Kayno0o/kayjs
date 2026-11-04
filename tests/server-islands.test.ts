@@ -39,14 +39,14 @@ function stamps(html: string): string[] {
 describe('server islands', () => {
   // Boots the site, which builds the browser bundle and manifest the tests read: a worker of `bun test --parallel` has its own, which no file before this one may have built.
   beforeAll(async () => {
-    await pages({ routes, prebuilt: false })
+    await pages({ routesDir: routes, prebuilt: false })
   }, 60_000)
 
   it('prerenders a page reaching one, and renders each per request: spliced in, or fetched by the browser', async () => {
-    const build = await scratchBuild({ routes })
+    const build = await scratchBuild({ routesDir: routes })
 
     try {
-      await build.prerender({ routes })
+      await build.prerender({ routesDir: routes })
 
       const written = (await readManifest(process.cwd(), build.dir))!.pages!
 
@@ -73,9 +73,9 @@ describe('server islands', () => {
       expect(await Bun.file(join(build.pages, 'deferred.html')).text()).toMatch(WHEN)
       expect(await Bun.file(join(build.pages, 'plain.html')).text()).not.toMatch(WHEN)
 
-      const app = await build.serve({ routes, security: false })
+      const app = await build.serve({ routesDir: routes, security: false })
       // Its loads run per request, so they are timed as a page rendered afresh is.
-      const timed = await build.serve({ routes, security: false, serverTiming: true })
+      const timed = await build.serve({ routesDir: routes, security: false, serverTiming: true })
 
       expect((await timed.handle(new Request('http://localhost/'))).headers.get('server-timing')).toMatch(/render;dur=/)
       const visit = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers }))
@@ -169,9 +169,9 @@ describe('server islands', () => {
     await Bun.write(join(copied, 'reply.kay'), '--- script\nimport Reply from \'../components/reply.kay\'\n---\nh1 Reply\nReply(server)\n')
 
     try {
-      await build.prerender({ routes: copied })
+      await build.prerender({ routesDir: copied })
 
-      const app = await build.serve({ routes: copied, security: false })
+      const app = await build.serve({ routesDir: copied, security: false })
       const html = await (await app.handle(new Request('http://localhost/reply'))).text()
 
       // In place of the island, not only in what the prerendered stream left after it.
@@ -210,9 +210,9 @@ describe('server islands', () => {
           await Bun.write(join(copy, 'src/messages/fr.ts'), messages(FRENCH))
 
           try {
-            await build.prerender({ routes: copied, ...site, ...i18n })
+            await build.prerender({ routesDir: copied, ...site, ...i18n })
 
-            const app = await build.serve({ routes: copied, security: false, ...site, ...i18n })
+            const app = await build.serve({ routesDir: copied, security: false, ...site, ...i18n })
             const slash = site.base === undefined ? '' : '/'
             const visit = async (path: string, headers: Record<string, string> = {}) => (await app.handle(new Request(`http://localhost${french ? '/fr' : ''}${path.replace('?', `${slash}?`)}`, { headers }))).text()
             const checked = (html: string) => ({
@@ -260,10 +260,10 @@ describe('server islands', () => {
   }
 
   it('keeps a page holding one out of a static export, naming it', async () => {
-    const build = await scratchBuild({ routes })
+    const build = await scratchBuild({ routesDir: routes })
 
     try {
-      const exporting = build.prerender({ routes }, { exportAll: true })
+      const exporting = build.prerender({ routesDir: routes }, { exportAll: true })
 
       await expect(exporting).rejects.toThrow(ExportError)
       await expect(exporting).rejects.toThrow('deferred.kay: it holds a server island, which only a server renders per request')

@@ -122,9 +122,9 @@ describe('basicAuth as a guard of a directory', () => {
       Bun.write(join(dir, 'api/track/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().post(\'/\', () => \'stored\')\n'),
       Bun.write(join(dir, 'api/open.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => \'open\')\n'),
     ])
-    plain = await pages({ root: dir, routes: 'routes', api: 'api', prebuilt: false })
-    mounted = await pages({ root: dir, routes: 'routes', api: 'api', prebuilt: false, base: '/blog', trailingSlash: 'always' })
-    localized = await pages({ root: dir, routes: 'routes', api: 'api', prebuilt: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
+    plain = await pages({ root: dir, routesDir: 'routes', apiDir: 'api', prebuilt: false })
+    mounted = await pages({ root: dir, routesDir: 'routes', apiDir: 'api', prebuilt: false, base: '/blog', trailingSlash: 'always' })
+    localized = await pages({ root: dir, routesDir: 'routes', apiDir: 'api', prebuilt: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

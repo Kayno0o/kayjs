@@ -92,7 +92,7 @@ async function copyOfFixture(): Promise<string> {
 // The heads a server writes are kept per `styles` map, so each server gets a map of its own.
 async function serve(options: PagesOptions & { dev?: boolean } = {}, built = client): Promise<App> {
   const mode = modeOf({ dev: options.dev ?? false, prebuilt: options.dev !== true })
-  const config = { routes: 'src/routes', compress: false, ...options }
+  const config = { routesDir: 'src/routes', compress: false, ...options }
 
   return servePages(resolveProject(root, config, mode), () => ({ ...built, styles: new Map(built.styles), inlineStyles: undefined, inlineSizes: undefined, pageStyles: undefined }))
 }
@@ -484,7 +484,7 @@ describe('a page\'s head', () => {
   })
 
   it('is written into a page kept at build time, its hash known to the server that serves it', async () => {
-    expect(await prerenderPages(resolveProject(root, { routes: 'src/routes' }, PRODUCTION), client)).toBeGreaterThan(0)
+    expect(await prerenderPages(resolveProject(root, { routesDir: 'src/routes' }, PRODUCTION), client)).toBeGreaterThan(0)
 
     const file = await Bun.file(join(outputDir(root), 'pages/prerendered.html')).text()
     const styles = [...file.matchAll(STYLE)].map(match => match[1]!).join('\n')
@@ -494,7 +494,7 @@ describe('a page\'s head', () => {
     expect(hasRule(styles, 'underline')).toBe(true)
     expect(hasRule(styles, 'bg-lime-300')).toBe(false)
 
-    const served = await servePages(resolveProject(root, { routes: 'src/routes', security: { csp: { 'style-src': ['\'self\''] } } }, PRODUCTION), async () => (await readClient(root))!)
+    const served = await servePages(resolveProject(root, { routesDir: 'src/routes', security: { csp: { 'style-src': ['\'self\''] } } }, PRODUCTION), async () => (await readClient(root))!)
     const response = await served.handle(new Request('http://localhost/prerendered'))
     const body = await response.text()
 
@@ -557,7 +557,7 @@ describe('a class a server builds from data', () => {
   async function prerendered(): Promise<Route[]> {
     const routes: Route[] = []
 
-    expect(await prerenderPages(resolveProject(root, { routes: 'src/routes' }, PRODUCTION), client, { routes })).toBeGreaterThan(0)
+    expect(await prerenderPages(resolveProject(root, { routesDir: 'src/routes' }, PRODUCTION), client, { routes })).toBeGreaterThan(0)
 
     return routes
   }
@@ -646,7 +646,7 @@ describe('a page kept at build time under a mount point', () => {
   it('carries its rules inline and links no stylesheet', async () => {
     const built = await builtUnder('/docs')
 
-    expect(await prerenderPages(resolveProject(root, { routes: 'src/routes', base: '/docs' }, PRODUCTION), built)).toBeGreaterThan(0)
+    expect(await prerenderPages(resolveProject(root, { routesDir: 'src/routes', base: '/docs' }, PRODUCTION), built)).toBeGreaterThan(0)
 
     const file = await Bun.file(join(outputDir(root), 'pages/prerendered.html')).text()
 

@@ -36,14 +36,6 @@ What each minor release before 1.85 broke, and what an app changed to move to it
 
 - An island no longer needs `Action` imported to be handed an action, so `island-action` is removed: delete a `// kay-allow island-action` comment or a `lints` entry naming it, which `kay check` now reports as an unknown lint; no `deprecated` lint announces it, as an island still importing `Action` compiles and works as before. `island()` and `promote()` from `kay/island`, which compiled components call, lose their trailing `takesActions` argument, and the `PlainIslandProp` type lets an island's prop hold an action without a type for it.
 
-### The session stores are `memorySessions` and `sqliteSessions`
-
-- `memoryStore()` and `sqliteStore(path)` of `kay/server` are `memorySessions()` and `sqliteSessions(path)`, named for what they hold like `memoryJobs` and `sqliteRates`. The old names still work until 1.87; `kay upgrade` renames the imports and their uses (`deprecated-session-stores`).
-
-### kayjs-auth: `safeRedirect` is kay's `localPath`
-
-- `safeRedirect(path, fallback?)` of kayjs-auth is `localPath(path, fallback)` from `kay`, with `'/'` as the fallback `safeRedirect` defaulted to. It works until 1.87; `kay upgrade` rewrites the calls and the import (`deprecated-safe-redirect`), a fallback that is no string literal or a `safeRedirect` read as a value by hand.
-
 ### `session.settings` holds durations
 
 - `session.settings.maxAge`, `absoluteMaxAge` and `browserMaxAge` are durations in whole seconds such as `'2592000s'`, where they were bare numbers of seconds. Code reading one as a number gets a type error from `kay check`; `durationMs(settings.maxAge)` from `kay` gives milliseconds. No `deprecated` lint can carry a type change.
@@ -55,10 +47,6 @@ What each minor release before 1.85 broke, and what an app changed to move to it
 ### A misspelled config key is refused
 
 - A key kay does not know in `kay.config.ts` (or in an extension's `config`), at its top level or in `security`, `i18n`, `seo`, `offline`, `health` and `proxy`, now stops every command with the nearest known name, where it used to leave kay's default in place. An app whose config already carries a typo starts failing: correct the key, or drop it.
-
-### Config keys are named by what they hold
-
-- `routes`, `api`, `content`, `storage`, `maxSizes` and `settings` in `kay.config.ts`, in the options of `pages()` and `testSite()` and in an extension's `config`, are `routesDir`, `apiDir`, `contentConfig`, `fileStore`, `maxSizeByPath` and `librarySettings`: a key naming a directory ends in `Dir`, one naming a file or module is `...Config`, and no two keys are a letter apart. The old names work until 1.87 and `kay check` reports them as `deprecated-config-keys`; `kay upgrade` renames them.
 
 ## 1.82.0
 

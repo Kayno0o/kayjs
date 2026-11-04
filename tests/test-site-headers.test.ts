@@ -8,8 +8,8 @@ const routes = 'tests/fixtures/base-site/src/routes'
 const api = 'tests/fixtures/base-site/src/api'
 const seen: Request[] = []
 const recorder = new Elysia().onRequest(({ request }) => void seen.push(request))
-const site = await testSite({ routes, api, base: '/blog', mcp: true, islands: false, use: [recorder], headers: { 'x-test': 'default' } })
-const strict = await testSite({ routes, api, base: '/blog', trailingSlash: 'always', islands: false })
+const site = await testSite({ routesDir: routes, apiDir: api, base: '/blog', mcp: true, islands: false, use: [recorder], headers: { 'x-test': 'default' } })
+const strict = await testSite({ routesDir: routes, apiDir: api, base: '/blog', trailingSlash: 'always', islands: false })
 const { enter } = await import(join(import.meta.dir, 'fixtures/base-site/src/routes/index.kay')) as { enter: Action<{ name: string }, unknown> }
 const { default: cookies } = await import(join(import.meta.dir, 'fixtures/base-site/src/api/cookies')) as typeof import('./fixtures/base-site/src/api/cookies')
 
@@ -44,7 +44,7 @@ describe('testSite({ headers }) reaches every method', () => {
   })
 
   it('never lets a default origin replace the one a call and a submit send', async () => {
-    const foreign = await testSite({ routes, api, base: '/blog', islands: false, use: [recorder], headers: { origin: 'https://default.test' } })
+    const foreign = await testSite({ routesDir: routes, apiDir: api, base: '/blog', islands: false, use: [recorder], headers: { origin: 'https://default.test' } })
 
     try {
       await foreign.submit(enter, { name: 'Ada' })
@@ -75,7 +75,7 @@ describe('testSite({ headers }) reaches every method', () => {
   })
 
   it('leaves an accept the site sets over the api\'s own', async () => {
-    const wanted = await testSite({ routes, api, base: '/blog', islands: false, headers: { accept: 'text/plain' } })
+    const wanted = await testSite({ routesDir: routes, apiDir: api, base: '/blog', islands: false, headers: { accept: 'text/plain' } })
 
     try {
       expect((await echoed(wanted.api(cookies, '/headers'))).accept).toBe('text/plain')

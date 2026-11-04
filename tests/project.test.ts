@@ -60,7 +60,7 @@ describe('setupPages', () => {
     // The build it reads, where the share cards' key goes, is a scratch one; the loader is the checkout's, one per process.
     const scratch = await scratchDir('setup-pages')
     const client = { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: join(scratch, 'dist') }
-    const project = resolveProject(process.cwd(), { routes: 'tests/fixtures/site/src/routes', site: 'https://x.example', base: '/docs/', images: { resolve: () => undefined } })
+    const project = resolveProject(process.cwd(), { routesDir: 'tests/fixtures/site/src/routes', site: 'https://x.example', base: '/docs/', images: { resolve: () => undefined } })
 
     try {
       const setup = await setupPages(project, async () => client, true)

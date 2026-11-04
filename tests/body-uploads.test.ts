@@ -4,8 +4,8 @@ import { testSite } from '../src/test'
 const MB = 1024 * 1024
 const APP = 'https://app.example.com'
 const site = await testSite({ root: 'tests/fixtures/body-uploads', islands: false })
-const overridden = await testSite({ root: 'tests/fixtures/body-uploads', islands: false, cors: { origins: [APP] }, maxSizes: { '/api/uploads': '8mb', '/api/uploads/small': '1kb' } })
-const lowered = await testSite({ root: 'tests/fixtures/body-uploads', islands: false, maxSizes: { '/api/uploads': '1kb' } })
+const overridden = await testSite({ root: 'tests/fixtures/body-uploads', islands: false, cors: { origins: [APP] }, maxSizeByPath: { '/api/uploads': '8mb', '/api/uploads/small': '1kb' } })
+const lowered = await testSite({ root: 'tests/fixtures/body-uploads', islands: false, maxSizeByPath: { '/api/uploads': '1kb' } })
 
 afterAll(async () => {
   await Promise.all([site, overridden, lowered].map(async open => open.close()))
@@ -29,7 +29,7 @@ describe('a module raising its body limit above the app\'s', () => {
   })
 })
 
-describe('a maxSizes entry at the path of an API module', () => {
+describe('a maxSizeByPath entry at the path of an API module', () => {
   it('wins over the module\'s own maxSize, raising or lowering it', async () => {
     expect((await upload(6 * MB, overridden)).status).toBe(200)
     expect((await upload(9 * MB, overridden)).status).toBe(413)

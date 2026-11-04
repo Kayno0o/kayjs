@@ -967,7 +967,7 @@ describe('kay check --fix on raw environment reads', () => {
   it('follows a `.js` import, a `.kay` import, an entry outside src with --cwd, and a custom content path', async () => {
     const root = await project({
       ...config,
-      'kay.config.ts': 'export default { favicon: false, content: \'app/collections.ts\', env: { example: \'.env.example\' } }\n',
+      'kay.config.ts': 'export default { favicon: false, contentConfig: \'app/collections.ts\', env: { example: \'.env.example\' } }\n',
       'package.json': '{ "scripts": { "a": "bun build --compile scripts/a.ts --outfile out/a.js", "b": "bun build --cwd tools --target bun b.ts --outdir dist" } }\n',
       'scripts/a.ts': 'import { one } from \'../src/one.js\'\nimport two from \'../src/two.kay\'\n\nexport const a = [one, two]\n',
       'src/one.ts': 'export const one = process.env.VIA_JS\n',

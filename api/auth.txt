@@ -1783,9 +1783,6 @@ type RoleHierarchy<R extends string> = Record<R, R[]>
 [.] RoleResult
 type RoleResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'unknown-role' | 'self' | 'last-admin' }
 
-[.] safeRedirect
-function safeRedirect(path: null | string | undefined, fallback?: string): string
-
 [.] SaveProfileResult
 type SaveProfileResult = { ok: true } | { ok: false, error: 'signed-out' } | { ok: false, errors: Record<string, ProfileProblem> }
 

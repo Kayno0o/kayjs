@@ -7,11 +7,11 @@ import { lintLevel, lintLevels } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { constBindings, exportedObject, keyName, unwrapped } from '../compiler/object-literal'
 import { CONFIG_FILE } from '../config'
-import { GROUPED_KEYS, RENAMED_KEYS } from '../config-shape'
+import { GROUPED_KEYS } from '../config-shape'
 import { importsOf, walk } from './ast'
 
 const SOURCE_FILE = /(?<!\.d)\.tsx?$/
-const OLD_KEY = new RegExp(`\\b(?:${[...Object.keys(RENAMED_KEYS), ...Object.keys(GROUPED_KEYS), 'fileStore'].join('|')})\\b`)
+const OLD_KEY = new RegExp(`\\b(?:${[...Object.keys(GROUPED_KEYS), 'fileStore'].join('|')})\\b`)
 // The options of `pages()` and `testSite()` are the config's own, so they carry the same keys, as the `config` of an extension does.
 // A file that can hold options of the config or an extension's: it imports kay or one of its libraries.
 const CONFIG_HOLDER = /\bfrom\s+['"](?:kay|kayjs-[\w-]+)(?:\/[^'"]*)?['"]/
@@ -44,13 +44,9 @@ function isOptionCall(callee: CallExpression['callee'], callees: Set<string>, im
   return imported.some(({ name, namespaces }) => name === property.name && namespaces.has(object.name))
 }
 
-const renamed = (name: string): string | undefined => Object.hasOwn(RENAMED_KEYS, name) ? RENAMED_KEYS[name as keyof typeof RENAMED_KEYS] : undefined
-
-// Where a key lives now: a 1.84 rename is followed first, so `routes` is `dirs.routes` in one step.
+// Where a key lives now.
 function grouped(name: string): readonly [string, string] | undefined {
-  const current = renamed(name) ?? name
-
-  return Object.hasOwn(GROUPED_KEYS, current) ? GROUPED_KEYS[current as keyof typeof GROUPED_KEYS] : undefined
+  return Object.hasOwn(GROUPED_KEYS, name) ? GROUPED_KEYS[name as keyof typeof GROUPED_KEYS] : undefined
 }
 
 interface MovedEntry { inner: string, value: string, comment: string }
@@ -119,11 +115,10 @@ function groupEdits(source: string, properties: ObjectProperty[], moved: Set<Obj
   return edits
 }
 
-// A key of the config under the name it had before 1.84, in `kay.config.ts` or in the options handed to `pages()` and `testSite()`: the fix writes the new name.
-// A property written beside the new name is reported with no fix, as the old one is ignored there.
+// A key of the config written flat that 1.88 grouped, in `kay.config.ts` or in the options handed to `pages()` and `testSite()`: the fix writes it in its bag.
 // `fileStore`, which 1.87 moved under `store` as `files`, is reported as `deprecated-file-store` by the same walk: the fix writes `store: { files: <value> }`, unless the object has a `store` of its own to merge into.
 export async function deprecatedConfigKeys(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  if (lintLevel('deprecated-config-keys', options.lints) === 'allow' && lintLevel('deprecated-file-store', options.lints) === 'allow' && lintLevel('deprecated-config-groups', options.lints) === 'allow')
+  if (lintLevel('deprecated-file-store', options.lints) === 'allow' && lintLevel('deprecated-config-groups', options.lints) === 'allow')
     return []
 
   const found: CheckDiagnostic[] = []
@@ -217,80 +212,26 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
       }
 
       for (const property of object.properties) {
-        if (!isPlain(property))
+        if (!isPlain(property) || keyName(property) !== 'fileStore')
           continue
 
-        const old = keyName(property)
-
-        if (old === 'fileStore') {
-          const level = levelAt('deprecated-file-store', property.key.start)
-
-          if (level === 'allow')
-            continue
-
-          const start = property.key.start
-          const end = property.value.end
-
-          found.push({
-            file,
-            ...positionAt(source, start),
-            end: property.key.end,
-            message: '`fileStore` is `store.files` in the config since 1.87, so every kind of store is named in one place; the old key works until 1.90',
-            help: names.has('store') ? 'move it into the `files` of the `store` beside it' : 'write `store: { files: ... }`, in the `store` a spread or computed key may give this object if it has one',
-            code: 'deprecated-file-store',
-            severity: level === 'warn' ? 'warning' : 'error',
-            ...!mayHoldStore && { fixes: [{ title: 'Move fileStore under store.files', edits: [{ start, end, text: filesMove(property, 'fileStore') }], safe: true }] },
-          })
-
-          continue
-        }
-
-        const name = old === undefined ? undefined : renamed(old)
-
-        // The grouping reports a renamed key that moved into a bag, and its fix writes the final form.
-        if (old !== undefined && name !== undefined && grouped(old) !== undefined && groupLevel !== 'allow')
-          continue
-
-        if (old === undefined || name === undefined)
-          continue
-
-        if (lintLevel('deprecated-config-keys', options.lints) === 'allow')
-          continue
-
-        const level = levelAt('deprecated-config-keys', property.key.start)
+        const level = levelAt('deprecated-file-store', property.key.start)
 
         if (level === 'allow')
           continue
 
         const start = property.key.start
-        const end = property.key.end
-        const clash = names.has(name)
-
-        // `storage` went to `fileStore` in 1.84 and to `store.files` in 1.87: one fix goes all the way.
-        if (old === 'storage' && !clash && !mayHoldStore) {
-          found.push({
-            file,
-            ...positionAt(source, start),
-            end,
-            message: '`storage` is `store.files` in the config, which every store is named in; the old name works until 1.87',
-            help: 'write `store: { files: ... }`',
-            code: 'deprecated-config-keys',
-            severity: level === 'warn' ? 'warning' : 'error',
-            fixes: [{ title: 'Move storage under store.files', edits: [{ start, end: property.value.end, text: filesMove(property, 'storage') }], safe: true }],
-          })
-
-          continue
-        }
+        const end = property.value.end
 
         found.push({
           file,
           ...positionAt(source, start),
-          end,
-          message: `\`${old}\` is now \`${name}\` in the config, so every directory key ends in \`Dir\` and no two keys differ by a letter; the old name works until 1.87`,
-          help: clash ? `\`${name}\` is set beside it, which wins: drop \`${old}\`` : `write \`${name}\``,
-          code: 'deprecated-config-keys',
+          end: property.key.end,
+          message: '`fileStore` is `store.files` in the config since 1.87, so every kind of store is named in one place; the old key works until 1.90',
+          help: names.has('store') ? 'move it into the `files` of the `store` beside it' : 'write `store: { files: ... }`, in the `store` a spread or computed key may give this object if it has one',
+          code: 'deprecated-file-store',
           severity: level === 'warn' ? 'warning' : 'error',
-          ...!clash && { fixes: [{ title: `Rename ${old} to ${name}`, edits: [{ start, end: property.shorthand ? property.value.end : end, text: property.shorthand ? `${name}: ${old}` : name }], safe: true }] },
+          ...!mayHoldStore && { fixes: [{ title: 'Move fileStore under store.files', edits: [{ start, end, text: filesMove(property, 'fileStore') }], safe: true }] },
         })
       }
     }

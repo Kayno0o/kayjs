@@ -705,8 +705,8 @@ function adjacent(node: NodeOfType<'TemplateLiteral'>): Node[] {
   return found
 }
 
-// The checkers that turn any value into a path of this site: kay's `localPath` and the auth library's `safeRedirect`.
-const SITE_CHECKERS = new Set(['localPath', 'safeRedirect'])
+// The checkers that turn any value into a path of this site: kay's `localPath`.
+const SITE_CHECKERS = new Set(['localPath'])
 
 // Whether a redirect target is written as a path of this site: a literal starting with one slash, a template or a concatenation whose text before the first value is `/` and a name (`/posts/`) or whose first value is itself a site path, a call to a checker, `localize(...)` of a site path, or a `const` holding one.
 function isSitePath(node: Node, constants: Scope, seen = new Set<readonly Node[]>()): boolean {

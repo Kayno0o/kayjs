@@ -4852,32 +4852,6 @@ describe.concurrent('kay check, s.Public fields', () => {
   })
 })
 
-describe('kay check, deprecated-session-stores', () => {
-  it('reports the old session store names with a fix renaming them', async () => {
-    const root = await scratchProject({ 'src/sessions.ts': 'import { memoryStore, session } from \'kay/server\'\n\nexport const sessions = session({ store: memoryStore() })\n' })
-
-    try {
-      expect((await check(root)).filter(d => d.code === 'deprecated-session-stores').map(d => d.fixes?.[0]?.title)).toEqual(['Rename it to `memorySessions`'])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-})
-
-describe('kay check, deprecated-safe-redirect', () => {
-  it('reports a safeRedirect call with a fix calling localPath', async () => {
-    const root = await scratchProject({ 'src/next.ts': 'import { safeRedirect } from \'@kaynooo/kayjs-auth\'\n\nexport const next = (value: unknown) => safeRedirect(value)\n' })
-
-    try {
-      expect((await check(root)).filter(d => d.code === 'deprecated-safe-redirect').map(d => d.fixes?.[0]?.title)).toEqual(['Call `localPath(path, \'/\')` from kay'])
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-})
-
 describe('kay check, deprecated-api-error-answer and deprecated-refusal-message', () => {
   it('reports .answer of an ApiError with a fix, and refusalMessage with a fix that is not safe', async () => {
     const root = await scratchProject({ 'src/errors.ts': 'import { ApiError, refusalMessage } from \'kay\'\n\nexport const a = (error: unknown) => error instanceof ApiError ? error.answer : refusalMessage(error, \'No\')\n' })

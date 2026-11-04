@@ -670,7 +670,7 @@ describe('Markdown images in a static export', () => {
       await Bun.write(join(root, 'src/content/posts/pic.md'), '---\ntitle: Pic\ndate: 2026-09-02\n---\n\n![A cat](./cat.png) ![A ghost](./ghost.png)\n')
       await Bun.write(join(root, 'src/content/posts/cat.png'), opaque(200, 100, 50))
       await Bun.write(join(root, 'src/content/posts/ghost.png'), Bun.file(HERO))
-      await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ site: 'https://x.example', base: '/repo', content: 'src/content.config.ts' })\n`)
+      await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ site: 'https://x.example', base: '/repo', contentConfig: 'src//content.config.ts' })\n`)
 
       const { output: errors, code } = await kayBuild([root, '--no-check', '--static', '--outdir', out], { NODE_ENV: 'development' })
 
@@ -695,7 +695,7 @@ describe('Markdown images in a static export', () => {
     try {
       await Bun.write(join(root, 'src/content/posts/pic.md'), '---\ntitle: Pic\ndate: 2026-09-02\n---\n\n![A cat](./cat.png)\n')
       await Bun.write(join(root, 'src/content/posts/cat.png'), Bun.file(HERO))
-      await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ site: 'https://x.example', base: '/repo', trailingSlash: '${trailingSlash}', content: 'src/content.config.ts', images: { widths: [400, 800] } })\n`)
+      await Bun.write(join(root, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ site: 'https://x.example', base: '/repo', trailingSlash: '${trailingSlash}', contentConfig: 'src/content.config.ts', images: { widths: [400, 800] } })\n`)
 
       const { output: errors, code } = await kayBuild([root, '--no-check', '--static', '--outdir', out], { NODE_ENV: 'development' })
 

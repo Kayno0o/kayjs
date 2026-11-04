@@ -80,7 +80,7 @@ describe('served paths', () => {
       Bun.write(join(publicDir, 'about'), 'about file'),
     ])
 
-    const app = await pages({ root: dir, routes: 'routes', publicDir, prebuilt: false, redirects: { '/old': '/' }, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages'), paths: { '/about': { fr: '/a-propos' } } } })
+    const app = await pages({ root: dir, routesDir: 'routes', publicDir, prebuilt: false, redirects: { '/old': '/' }, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages'), paths: { '/about': { fr: '/a-propos' } } } })
     const visit = async (path: string) => app.handle(new Request(`http://localhost${path}`))
 
     expect((await visit('/old')).headers.get('location')).toBe('/')

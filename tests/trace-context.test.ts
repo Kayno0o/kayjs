@@ -225,7 +225,7 @@ describe('an incoming traceparent', () => {
       expect(started.at(-1)).toMatchObject({ name: 'POST /api/echo', parent: { traceId: TRACE } })
       expect(echoed.headers.get('traceresponse')).toMatch(new RegExp(`^00-${TRACE}-\\d{16}-01$`))
 
-      const bare = await pages({ routes: 'tests/fixtures/bare/src/routes', prebuilt: true, tracer: recording })
+      const bare = await pages({ routesDir: 'tests/fixtures/bare/src/routes', prebuilt: true, tracer: recording })
       const url = '/_kay/action/tests/fixtures/bare/src/routes/survey.kay/answer'
       const answered = await bare.handle(new Request(`http://localhost${url}`, { method: 'POST', headers: { traceparent: INCOMING, referer: 'http://localhost/survey' }, body: new URLSearchParams('tags=a&count=3') }))
 

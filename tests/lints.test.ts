@@ -317,7 +317,7 @@ describe('external-redirect', () => {
   })
 
   it('leaves alone a target a checker or a helper made, and a const holding one', () => {
-    expect(found('redirect(safeRedirect(ctx.query.next, "/"))')).toEqual([])
+    expect(found('redirect(localPath(ctx.query.next, "/"))')).toEqual([])
     expect(found('const to = localPath(ctx.query.next, "/a")\nredirect(to)')).toEqual([])
     expect(found('const to = localPath(ctx.query.next, "/a")\nredirect(`${to}#top`)')).toEqual([])
     expect(found('redirect(localize(localPath(ctx.query.next, "/a")))')).toEqual([])
@@ -387,7 +387,7 @@ describe('external-redirect', () => {
     expect(found('const redirect = localPath(ctx.url.searchParams.get("r"), "/")\nconst result = await go(1)\nctx.redirect(localize(result.redirect))')).toEqual([])
     expect(found('const back = localPath(ctx.url.searchParams.get("r"), "/")\nredirect(signInTarget(ctx, back) ?? "/in")')).toEqual([])
     expect(found('const result = await signIn(input.email)\nredirect(localize(result.redirect))')).toEqual([])
-    expect(found('redirect(safeRedirect(ctx.query.next, "/"))')).toEqual([])
+    expect(found('redirect(localPath(ctx.query.next, "/"))')).toEqual([])
     expect(found('redirect(input.next)')).toHaveLength(1)
     expect(found('redirect(`${"/"}${ctx.query.x}`)')).toHaveLength(1)
     expect(found('const signIn = localize(page)\nredirect(`${signIn}x=${encodeURIComponent(ctx.params.id)}`)')).toEqual([])

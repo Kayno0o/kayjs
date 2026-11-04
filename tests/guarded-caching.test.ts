@@ -41,11 +41,11 @@ describe('a guarded route is private', () => {
     const routes = 'routes'
     const api = 'api'
 
-    servers.production = await pages({ root: dir, routes, api, prebuilt: false, security: false })
-    servers.dev = await pages({ root: dir, routes, api, prebuilt: false, security: false, dev: true })
-    servers.documented = await pages({ root: dir, routes, api: 'documented', prebuilt: false, security: false, openapi: { reference: true } })
-    servers.compressed = await pages({ root: dir, routes, api, prebuilt: false, security: false, compress: true })
-    servers.mounted = await pages({ root: dir, routes, api, prebuilt: false, security: false, base: '/app' })
+    servers.production = await pages({ root: dir, routesDir: routes, apiDir: api, prebuilt: false, security: false })
+    servers.dev = await pages({ root: dir, routesDir: routes, apiDir: api, prebuilt: false, security: false, dev: true })
+    servers.documented = await pages({ root: dir, routesDir: routes, apiDir: 'documented', prebuilt: false, security: false, openapi: { reference: true } })
+    servers.compressed = await pages({ root: dir, routesDir: routes, apiDir: api, prebuilt: false, security: false, compress: true })
+    servers.mounted = await pages({ root: dir, routesDir: routes, apiDir: api, prebuilt: false, security: false, base: '/app' })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

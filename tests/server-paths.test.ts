@@ -6,11 +6,11 @@ const routes = 'tests/fixtures/mcp/src/routes'
 const api = 'tests/fixtures/mcp/src/api'
 const KEY = { 'x-key': 'open' }
 const locals = (request: Request) => ({ key: request.headers.get('x-key') ?? undefined })
-const settings = { routes, api, islands: false, locals, mcp: { path: '/tools' }, openapi: { path: '/spec.json', reference: true, referencePath: '/docs/api' } }
+const settings = { routesDir: routes, apiDir: api, islands: false, locals, mcp: { path: '/tools' }, openapi: { path: '/spec.json', reference: true, referencePath: '/docs/api' } }
 
 const root = await testSite(settings)
 const mounted = await testSite({ ...settings, base: '/shop', trailingSlash: 'always' })
-const defaults = await testSite({ routes, api, islands: false, locals, mcp: true, openapi: { reference: true } })
+const defaults = await testSite({ routesDir: routes, apiDir: api, islands: false, locals, mcp: true, openapi: { reference: true } })
 
 afterAll(async () => {
   await Promise.all([root.close(), mounted.close(), defaults.close()])
@@ -53,7 +53,7 @@ describe('the default paths', () => {
 })
 
 describe('a path that cannot be served', () => {
-  const boot = async (extra: object) => pages({ routes, api, prebuilt: false, security: false, ...extra })
+  const boot = async (extra: object) => pages({ routesDir: routes, apiDir: api, prebuilt: false, security: false, ...extra })
 
   it.each([
     ['mcp', { mcp: { path: 'tools' } }, 'mcp({ path })'],

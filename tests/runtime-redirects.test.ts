@@ -368,7 +368,7 @@ describe('a page that answers 404 itself', () => {
     await Bun.write(join(root, 'src/routes/_404.kay'), 'main Gone\n')
     await Bun.write(join(root, 'src/routes/post/[slug].kay'), '--- server\nif (ctx.params.slug !== \'here\') ctx.notFound()\n---\nmain Here\n')
 
-    const served = new Elysia().use(await pages({ routes: join(root, 'src/routes'), prebuilt: false, security: false, base: '/app' }))
+    const served = new Elysia().use(await pages({ routesDir: join(root, 'src/routes'), prebuilt: false, security: false, base: '/app' }))
 
     addRuntimeRedirect('/post/old', '/new')
     addRuntimeRedirect('/nowhere', '/new', { status: 302 })

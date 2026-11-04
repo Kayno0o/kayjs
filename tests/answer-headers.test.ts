@@ -54,7 +54,7 @@ describe('the headers of every kind of answer', () => {
   beforeAll(async () => {
     dir = await fixtureCopy('answers')
 
-    app = await pages({ root: dir, prebuilt: false, log: false, compress: true, storage: memoryFiles() })
+    app = await pages({ root: dir, prebuilt: false, log: false, compress: true, store: { files: memoryFiles() } })
     key = await files.put(new File([new Uint8Array(2000)], 'a.png', { type: 'image/png' }))
 
     const first = await app.handle(new Request(`${ORIGIN}/`))
@@ -176,7 +176,7 @@ describe('the headers of every kind of answer', () => {
 
   it('hands Elysia the response the route made, with no copy of it', async () => {
     let made = Promise.withResolvers<unknown>()
-    const inner = await pages({ root: dir, prebuilt: false, log: false, compress: false, storage: memoryFiles() })
+    const inner = await pages({ root: dir, prebuilt: false, log: false, compress: false, store: { files: memoryFiles() } })
     const stored = await files.put(new File([new Uint8Array(2000)], 'b.png', { type: 'image/png' }))
     const outer = new Elysia().onAfterResponse({ as: 'global' }, ({ responseValue }) => {
       made.resolve(responseValue)
@@ -209,9 +209,9 @@ describe('the headers of every kind of answer', () => {
 
   it('keeps them on a file route whose store throws', async () => {
     const store = memoryFiles()
-    const broken = await pages({ root: await fixtureCopy('answers'), prebuilt: false, log: false, storage: { ...store, read: async () => {
+    const broken = await pages({ root: await fixtureCopy('answers'), prebuilt: false, log: false, store: { files: { ...store, read: async () => {
       throw new Error('store down')
-    } } })
+    } } } })
     const response = await broken.handle(new Request(`${ORIGIN}/_kay/files/0123456789abcdef0123.png`))
 
     expect(response.status).toBe(500)
@@ -224,7 +224,7 @@ describe('the headers of every kind of answer', () => {
 describe('HSTS on every kind of answer of an https site', () => {
   it('reaches the pages, build assets, stored files, their errors and the API', async () => {
     const dir = await fixtureCopy('answers')
-    const app = await pages({ root: dir, prebuilt: false, log: false, site: 'https://shop.example', dev: false, storage: memoryFiles() })
+    const app = await pages({ root: dir, prebuilt: false, log: false, site: 'https://shop.example', dev: false, store: { files: memoryFiles() } })
     const key = await files.put(new File([new Uint8Array(2000)], 'a.png', { type: 'image/png' }))
     const html = await (await app.handle(new Request(`${ORIGIN}/`))).text()
     const asset = (/\/_kay\/nav-[^"]+\.js/).exec(html)![0]

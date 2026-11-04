@@ -4,8 +4,7 @@ import type { Node, Program } from '../compiler/estree'
 import type { Edit } from './renamed-exports'
 import { lintLevel } from '../compiler/lints'
 import { childrenOf, importedName } from './ast'
-import { mentions, scan } from './renamed-exports'
-import { dropSpecifier } from './safe-redirect'
+import { dropSpecifier, mentions, scan } from './renamed-exports'
 
 const ANSWER = /\.answer\b/
 const REFUSAL_MESSAGE = /\brefusalMessage\b/

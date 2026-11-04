@@ -20,7 +20,7 @@ async function site(files: Record<string, string> = {}) {
 
   await Promise.all(Object.entries({ 'routes/index.kay': 'h1 Home\n', ...files }).map(async ([name, text]) => Bun.write(join(dir, name), text)))
 
-  return { root: dir, routes: 'routes', publicDir: 'public' }
+  return { root: dir, routesDir: 'routes', publicDir: 'public' }
 }
 
 async function listed(options: Parameters<typeof pages>[0]): Promise<DevRoutes> {

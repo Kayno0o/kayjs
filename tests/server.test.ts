@@ -44,9 +44,9 @@ import { prerendered, refusedPrerender, scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
-const app = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
+const app = await pages({ routesDir: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public' })
 // No _404.kay nor _error.kay: failures answer in plain text.
-const bare = await pages({ routes: 'tests/fixtures/bare/src/routes', prebuilt: true })
+const bare = await pages({ routesDir: 'tests/fixtures/bare/src/routes', prebuilt: true })
 // Any page style block but the new-tab cue, which a page with islands carries whatever its stylesheets do.
 const PAGE_STYLE = /<style>(?!a\[data-new-tab\])/
 const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/
@@ -88,7 +88,7 @@ async function waitFor(done: () => boolean): Promise<void> {
 }
 
 // The stylesheets linked, as `inlineStyles: false` serves them.
-const linked = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', inlineStyles: false })
+const linked = await pages({ routesDir: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', inlineStyles: false })
 
 async function get(path: string, served: typeof app = app): Promise<{ status: number, html: string, headers: Headers }> {
   const response = await served.handle(new Request(`http://localhost${path}`))
@@ -164,7 +164,7 @@ describe('pages', () => {
     expect((await get('/about')).html).not.toContain('modulepreload')
 
     const built = manifestFile.lastModified
-    const prebuilt = await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: true })
+    const prebuilt = await pages({ routesDir: 'tests/fixtures/site/src/routes', prebuilt: true })
 
     expect(await (await prebuilt.handle(new Request('http://localhost/'))).text()).toContain(`src="${manifest.entry}"`)
     expect(Bun.file(manifestFile.name!).lastModified).toBe(built)
@@ -185,7 +185,7 @@ describe('pages', () => {
 
   it('inlines the stylesheets by default while a page keeps them small, each let through a strict style-src by its hash, `false` linking them', async () => {
     for (const base of [undefined, '/docs']) {
-      const small = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', prebuilt: true, base, security: { csp: { 'style-src': ['\'self\''] } } })
+      const small = await pages({ routesDir: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', prebuilt: true, base, security: { csp: { 'style-src': ['\'self\''] } } })
       const response = await small.handle(new Request('http://localhost/'))
       const html = await response.text()
       const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]!).filter(style => !style.startsWith('a[data-new-tab]'))
@@ -317,7 +317,7 @@ describe('pages', () => {
 
   it('writes the stylesheets into the head with inlineStyles, each let through a strict style-src by its hash under the mount point', async () => {
     for (const base of [undefined, '/docs']) {
-      const inline = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', prebuilt: true, inlineStyles: true, base, security: { csp: { 'style-src': ['\'self\''] } } })
+      const inline = await pages({ routesDir: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', prebuilt: true, inlineStyles: true, base, security: { csp: { 'style-src': ['\'self\''] } } })
       const response = await inline.handle(new Request('http://localhost/'))
       const html = await response.text()
       const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]!).filter(style => !style.startsWith('a[data-new-tab]'))
@@ -334,7 +334,7 @@ describe('pages', () => {
 
   it('compresses only what lies around the inlined stylesheets, as gzip even to a browser taking brotli, the page decoding as it was', async () => {
     for (const base of [undefined, '/docs']) {
-      const inline = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', prebuilt: true, inlineStyles: true, compress: true, base })
+      const inline = await pages({ routesDir: 'tests/fixtures/site/src/routes', publicDir: 'tests/fixtures/site/public', prebuilt: true, inlineStyles: true, compress: true, base })
       const page = async (accept?: string) => inline.handle(new Request('http://localhost/', { headers: accept === undefined ? {} : { 'accept-encoding': accept } }))
       const plain = await (await page()).text()
       const spliced = await page('br, gzip')
@@ -488,7 +488,7 @@ describe('pages', () => {
     try {
       await Bun.write(join(dir, '[...path].kay'), '--- server\nconst path = ctx.params.path\n---\np {path}\n')
       // Prebuilt, so the shared client build the other tests read stays as it is.
-      const site = new Elysia().use(await pages({ routes: dir, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
+      const site = new Elysia().use(await pages({ routesDir: dir, publicDir: 'tests/fixtures/site/public', prebuilt: true }))
       const response = await site.handle(new Request('http://localhost//evil.example/'))
 
       expect([response.status, response.headers.get('location')]).toEqual([308, '/evil.example'])
@@ -814,7 +814,7 @@ describe('route params in guards and actions', () => {
     await Bun.write(join(dir, 'routes/orgs/[org]/report.kay'), '--- server\nexport const page = { prerender: [{ org: \'acme\' }, { org: \'other\' }] }\n---\nh1 Report\n')
     await Bun.write(join(dir, 'api/orgs/_guard.ts'), GUARD)
     await Bun.write(join(dir, 'api/orgs/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/:org\', ({ params }) => params.org)\n')
-    served = await pages({ routes: join(dir, 'routes'), api: join(dir, 'api'), prebuilt: true })
+    served = await pages({ routesDir: join(dir, 'routes'), apiDir: join(dir, 'api'), prebuilt: true })
     dir = join(dir, 'routes')
   })
 
@@ -846,12 +846,12 @@ describe('route params in guards and actions', () => {
   })
 
   it('gives a prerendered page\'s guards its params', async () => {
-    const build = await scratchBuild({ routes: dir }, false, dirname(dir))
+    const build = await scratchBuild({ routesDir: dir }, false, dirname(dir))
 
     try {
-      await build.prerender({ routes: dir })
+      await build.prerender({ routesDir: dir })
       const file = await Bun.file(join(build.pages, 'orgs/acme/report.html')).text()
-      const prerendered = await build.serve({ routes: dir })
+      const prerendered = await build.serve({ routesDir: dir })
       const acme = await prerendered.handle(new NativeRequest('http://localhost/orgs/acme/report'))
       const other = await prerendered.handle(new NativeRequest('http://localhost/orgs/other/report'))
 
@@ -902,7 +902,7 @@ describe('route params in guards and actions', () => {
   })
 
   it('reads the page under the mount point the site is served at', async () => {
-    const mounted = await pages({ routes: dir, prebuilt: true, base: '/repo' })
+    const mounted = await pages({ routesDir: dir, prebuilt: true, base: '/repo' })
     const response = await mounted.handle(new NativeRequest(`http://localhost/_kay/action/${dir.slice(root.length + 1)}/orgs/_org_/index.kay/rename`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'http://localhost/repo/orgs/acme' },
@@ -974,10 +974,10 @@ describe('the url an action\'s guards see', () => {
     await Bun.write(join(dir, 'routes/blog/[slug].kay'), `${ACTION}p Post\n`)
     await Bun.write(join(dir, 'routes/[...path].kay'), `${ACTION}p Page\n`)
     await Bun.write(join(dir, 'routes/docs/[...rest].kay'), `${ACTION}p Doc\n`)
-    served = await pages({ routes: join(dir, 'routes'), prebuilt: true })
-    shop = await pages({ routes: join(dir, 'routes'), prebuilt: true, base: '/shop' })
-    slashed = await pages({ routes: join(dir, 'routes'), prebuilt: true, trailingSlash: 'always' })
-    ignored = await pages({ routes: join(dir, 'routes'), prebuilt: true, trailingSlash: 'ignore' })
+    served = await pages({ routesDir: join(dir, 'routes'), prebuilt: true })
+    shop = await pages({ routesDir: join(dir, 'routes'), prebuilt: true, base: '/shop' })
+    slashed = await pages({ routesDir: join(dir, 'routes'), prebuilt: true, trailingSlash: 'always' })
+    ignored = await pages({ routesDir: join(dir, 'routes'), prebuilt: true, trailingSlash: 'ignore' })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -1346,7 +1346,7 @@ describe('prerendering', () => {
         await Promise.all(Object.entries(files).map(async ([file, source]) => Bun.write(join(dir, file), source)))
 
         // The one render that goes through writes the manifest, so it is put back after; a refused one throws before.
-        const rendering = typeof outcome === 'number' ? build.keeping(async () => build.prerender({ routes: dir, ...config })) : refusedPrerender({ routes: dir, ...config }, await build.client(), undefined, root)
+        const rendering = typeof outcome === 'number' ? build.keeping(async () => build.prerender({ routesDir: dir, ...config })) : refusedPrerender({ routesDir: dir, ...config }, await build.client(), undefined, root)
 
         if (typeof outcome === 'number')
           expect(await rendering).toBe(outcome)
@@ -1414,7 +1414,7 @@ describe('prefetch', () => {
     expect(speculationRules('eager')).toContain('"eagerness":"eager"')
     expect(speculationRules(false)).toBe('')
 
-    const quiet = await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: true, prefetch: false })
+    const quiet = await pages({ routesDir: 'tests/fixtures/site/src/routes', prebuilt: true, prefetch: false })
 
     expect(await (await quiet.handle(new Request('http://localhost/about'))).text()).not.toContain('speculationrules')
   })
@@ -1438,7 +1438,7 @@ describe('without special pages', () => {
       expect(await visit('/?missing')).toMatchObject({ status: 404, text: 'Not Found', cookie: expect.stringMatching(/^visited=yes;/) })
       expect(await visit('/?deny')).toMatchObject({ status: 403, text: 'Members only', cookie: expect.stringMatching(/^visited=yes;/) })
 
-      const dev = await visit('/?fail', await pages({ routes: 'tests/fixtures/bare/src/routes', prebuilt: true, dev: true }))
+      const dev = await visit('/?fail', await pages({ routesDir: 'tests/fixtures/bare/src/routes', prebuilt: true, dev: true }))
 
       expect(dev).toMatchObject({ status: 500, text: expect.stringContaining('Kaboom'), cookie: expect.stringMatching(/^visited=yes;/), type: 'text/html; charset=utf-8' })
       expect(dev.headers.get('x-page')).toBe('index')
@@ -1495,7 +1495,7 @@ describe('route scan', () => {
       await Bun.write(join(dir, 'about.kay'), '')
       await Bun.write(join(dir, 'about/index.kay'), '')
       expect(await scanRoutes(dir)).toHaveLength(2)
-      await expect(pages({ routes: dir, prebuilt: true })).rejects.toThrow('both serve /about')
+      await expect(pages({ routesDir: dir, prebuilt: true })).rejects.toThrow('both serve /about')
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -1744,7 +1744,7 @@ describe('public files', () => {
       for (const name of ['logo@2x.png', 'a+b,c;d=e&f$[1]|.txt', 'it\'s.txt', 'c:d.txt', 'star*.txt', 'sp ace é%.txt'])
         await Bun.write(join(dir, name), name)
 
-      const served = await pages({ routes: 'tests/fixtures/bare/src/routes', publicDir: dir, prebuilt: true })
+      const served = await pages({ routesDir: 'tests/fixtures/bare/src/routes', publicDir: dir, prebuilt: true })
       const visit = async (path: string) => {
         const response = await served.handle(new Request(`http://localhost${path}`))
 
@@ -1775,7 +1775,7 @@ describe('public files', () => {
       for (const [name, body] of Object.entries(files))
         await Bun.write(join(dir, name), body)
 
-      const served = await pages({ routes: 'tests/fixtures/site/src/routes', publicDir: dir, prebuilt: true })
+      const served = await pages({ routesDir: 'tests/fixtures/site/src/routes', publicDir: dir, prebuilt: true })
       const visit = async (path: string) => (await served.handle(new Request(`http://localhost${path}`))).text()
 
       expect(await visit('/books')).toBe('books')
@@ -1801,7 +1801,7 @@ describe('public files', () => {
 
     try {
       await Bun.write(join(dir, 'about'), 'shadowed')
-      await expect(pages({ routes: 'tests/fixtures/site/src/routes', publicDir: dir, prebuilt: true })).rejects.toThrow('and a page both serve /about')
+      await expect(pages({ routesDir: 'tests/fixtures/site/src/routes', publicDir: dir, prebuilt: true })).rejects.toThrow('and a page both serve /about')
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -1846,7 +1846,7 @@ describe('special pages', () => {
 
   it('hands every error it logs to onError with its request, and logs a reporter that throws', async () => {
     const reported: string[] = []
-    const watched = await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: true, onError: ({ error, request }) => {
+    const watched = await pages({ routesDir: 'tests/fixtures/site/src/routes', prebuilt: true, onError: ({ error, request }) => {
       reported.push(`${new URL(request!.url).pathname}${new URL(request!.url).search}: ${(error as Error).message}`)
 
       if (reported.length === 1)
@@ -1875,7 +1875,7 @@ describe('special pages', () => {
     try {
       await Bun.write(join(dir, 'api/items.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api()\n  .get(\'/broken\', () => { throw new Error(\'Secret detail\') })\n  .get(\'/teapot\', ({ status }) => { throw status(418, \'Short and stout\') })\n  .post(\'/\', ({ body }) => body, { body: t.Object({ name: t.String() }) })\n')
       await Bun.write(join(dir, 'api/own.ts'), 'import { api } from \'kay/server\'\n\nexport default api().onError(() => \'Answered by the module\').get(\'/\', () => { throw new Error(\'Handled\') })\n')
-      const served = await pages({ routes: 'tests/fixtures/bare/src/routes', api: join(dir, 'api'), prebuilt: true, onError: ({ error, request }) => void reported.push(`${new URL(request!.url).pathname}: ${(error as Error).message}`) })
+      const served = await pages({ routesDir: 'tests/fixtures/bare/src/routes', apiDir: join(dir, 'api'), prebuilt: true, onError: ({ error, request }) => void reported.push(`${new URL(request!.url).pathname}: ${(error as Error).message}`) })
       const broken = await served.handle(new Request('http://localhost/api/items/broken'))
 
       expect(broken.status).toBe(500)
@@ -1887,7 +1887,7 @@ describe('special pages', () => {
       expect(logged).toHaveBeenCalledTimes(1)
       expect(logged).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^kay: GET /api/items/broken, request ${broken.headers.get('x-request-id')}\nError: Secret detail\n`)))
 
-      const dev = await pages({ routes: 'tests/fixtures/bare/src/routes', api: join(dir, 'api'), prebuilt: true, dev: true })
+      const dev = await pages({ routesDir: 'tests/fixtures/bare/src/routes', apiDir: join(dir, 'api'), prebuilt: true, dev: true })
 
       expect(await (await dev.handle(new Request('http://localhost/api/items/broken'))).text()).toBe('Secret detail')
     }
@@ -2056,7 +2056,7 @@ describe('tracing and timing in production', () => {
 
   it('hands it a span per action call', async () => {
     const { tracer, ended } = recordingTracer()
-    const traced = await pages({ routes: 'tests/fixtures/bare/src/routes', prebuilt: true, tracer })
+    const traced = await pages({ routesDir: 'tests/fixtures/bare/src/routes', prebuilt: true, tracer })
     const url = '/_kay/action/tests/fixtures/bare/src/routes/survey.kay/answer'
     const response = await traced.handle(new Request(`http://localhost${url}`, { method: 'POST', headers: { referer: 'http://localhost/survey' }, body: new URLSearchParams('tags=a&count=3') }))
 
@@ -2225,7 +2225,7 @@ describe('action input', () => {
       await Bun.write(join(dir, 'inner/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ deny }) => deny(403, \'Inner only\'))\n')
       await Bun.write(join(dir, 'inner/index.kay'), 'p Inner\n')
 
-      const served = await pages({ routes: dir, prebuilt: true })
+      const served = await pages({ routesDir: dir, prebuilt: true })
       const call = async (file: string) => {
         const response = await served.handle(new Request(`http://localhost/_kay/action/${id}/${file}/leave`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1' }, body: stringify({}) }))
 
@@ -2253,7 +2253,7 @@ describe('action input', () => {
       await Bun.write(join(dir, 'orgs/[org]/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(({ params, deny }) => params.org === \'acme\' ? undefined : deny(403, \'Not yours\'))\n')
       await Bun.write(join(dir, 'orgs/[org]/index.kay'), 'p Org\n')
 
-      const served = await pages({ routes: dir, prebuilt: true })
+      const served = await pages({ routesDir: dir, prebuilt: true })
       const call = async (file: string, name: string, from?: string) => {
         const response = await served.handle(new Request(`http://localhost/_kay/action/${id}/${file}/${name}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', ...from === undefined ? {} : { referer: `http://localhost${from}` } }, body: stringify({}) }))
 
@@ -2292,7 +2292,7 @@ describe('action input', () => {
       const query = '?kay_with=id%3D3%26to%3D2%26tags%3Da%26tags%3Db%26done%3Dfalse'
 
       for (const base of [undefined, '/shop']) {
-        const served = await pages({ routes: dir, prebuilt: true, base })
+        const served = await pages({ routesDir: dir, prebuilt: true, base })
         const html = await (await served.handle(new Request('http://localhost/'))).text()
         const post = async (path: string, body = new URLSearchParams(), headers: Record<string, string> = {}) => served.handle(new Request(`http://localhost${path}`, { method: 'POST', headers: { referer: `http://localhost${base ?? ''}/`, ...headers }, body }))
         const got = (response: Response) => [response.status, response.headers.get('x-got')]
@@ -2331,7 +2331,7 @@ describe('action input', () => {
     try {
       await Bun.write(join(dir, 'a b.kay'), action)
       await Bun.write(join(dir, 'a_b.kay'), action)
-      await expect(pages({ routes: dir, prebuilt: true })).rejects.toThrow(`kay: ${join(dir, 'a b.kay')} and ${join(dir, 'a_b.kay')} both export an action served at /_kay/action/${dir.slice(root.length + 1)}/a_b.kay/go; rename one of the files`)
+      await expect(pages({ routesDir: dir, prebuilt: true })).rejects.toThrow(`kay: ${join(dir, 'a b.kay')} and ${join(dir, 'a_b.kay')} both export an action served at /_kay/action/${dir.slice(root.length + 1)}/a_b.kay/go; rename one of the files`)
     }
     finally {
       await rm(dir, { recursive: true, force: true })

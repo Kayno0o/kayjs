@@ -14,7 +14,7 @@ const ENDING = '2026-10-19T13:00:00Z'
 const servers: Awaited<ReturnType<ScratchBuild['serve']>>[] = []
 
 function optionsFor(base: string, redirects: Record<string, string> = {}, trailingSlash?: 'always') {
-  return { routes: `${FIXTURE}/routes`, content: `${FIXTURE}/content.config.ts`, security: false as const, site: 'https://talks.example', log: false as const, base, redirects, ...trailingSlash && { trailingSlash } }
+  return { routesDir: `${FIXTURE}/routes`, contentConfig: `${FIXTURE}/content.config.ts`, security: false as const, site: 'https://talks.example', log: false as const, base, redirects, ...trailingSlash && { trailingSlash } }
 }
 
 // The app answers paths with the base already stripped, as a proxy under it passes them, and writes it into the locations it sends.

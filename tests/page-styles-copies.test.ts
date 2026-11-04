@@ -69,7 +69,7 @@ async function build(...args: string[]): Promise<void> {
 
 describe('the copies of a stylesheet a build writes', () => {
   it('keep the 32 saving the most when more routes qualify, the others linking the shared stylesheet', async () => {
-    const app = await servePages(resolveProject(root, { routes: 'src/routes', compress: false }, modeOf({ dev: false, prebuilt: true })), () => ({ ...client, styles: new Map(client.styles), inlineStyles: undefined, inlineSizes: undefined, pageStyles: undefined }))
+    const app = await servePages(resolveProject(root, { routesDir: 'src/routes', compress: false }, modeOf({ dev: false, prebuilt: true })), () => ({ ...client, styles: new Map(client.styles), inlineStyles: undefined, inlineSizes: undefined, pageStyles: undefined }))
     const html = async (index: number) => (await app.handle(new Request(`http://localhost/many-${index}`))).text()
     const heads = await Promise.all(Array.from({ length: ROUTES }, async (_, index) => html(index)))
     const written = await copiesIn(client.dir)
@@ -129,7 +129,7 @@ describe('the copies of a stylesheet a build writes', () => {
 
       expect(links.size).toBe(FEW)
 
-      const built = resolveProject(few, { routes: 'src/routes' }, modeOf({ dev: false, prebuilt: true })).paths.client
+      const built = resolveProject(few, { routesDir: 'src/routes' }, modeOf({ dev: false, prebuilt: true })).paths.client
 
       for (const copy of links) {
         const answer = await fetch(`${origin}/_kay/${copy}`)

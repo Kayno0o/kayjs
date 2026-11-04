@@ -16,7 +16,7 @@ afterAll(async () => { console.log('STATES ' + JSON.stringify(await (globalThis 
 
 // A test file that opens a socket and a stream on its site and never closes it, the site made at the top of the file, in a hook or in a test.
 function leaking(where: 'top' | 'beforeAll' | 'test', ending = ''): string {
-  const body = `const site = await testSite({ api: ${JSON.stringify(join(fixture, 'src/api'))}, islands: false })
+  const body = `const site = await testSite({ apiDir: ${JSON.stringify(join(fixture, 'src/api'))}, islands: false })
   const room = site.socket(chat, '/:room', { params: { room: 'left' } })
   const ticks = site.stream(chat, '/forever')
 
@@ -41,7 +41,7 @@ function browsing(navigation: string): string {
   return `import { it } from 'bun:test'
 import { testSite } from ${JSON.stringify(join(SRC, 'test'))}
 
-const site = await testSite({ routes: ${JSON.stringify(join(navigation, 'src/routes'))}, browser: { path: ${JSON.stringify(browserPath())} }, onError: () => undefined })
+const site = await testSite({ routesDir: ${JSON.stringify(join(navigation, 'src/routes'))}, browser: { path: ${JSON.stringify(browserPath())} }, onError: () => undefined })
 const page = await site.open('/')
 
 ;(globalThis as { states?: () => unknown }).states = async () => {

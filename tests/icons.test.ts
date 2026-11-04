@@ -258,7 +258,7 @@ describe('icons', () => {
 
       expect(await check(copy)).toEqual([])
 
-      const app = await pages({ routes: join(copy, 'src/routes'), prebuilt: false })
+      const app = await pages({ routesDir: join(copy, 'src/routes'), prebuilt: false })
       const html = await (await app.handle(new Request('http://localhost/chosen'))).text()
 
       expect(html).toContain('<svg')

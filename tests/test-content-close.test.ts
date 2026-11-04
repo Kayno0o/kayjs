@@ -6,7 +6,7 @@ import { news } from './fixtures/cms/src/content.config'
 const FIXTURE = 'tests/fixtures/cms/src'
 
 it('gives loaders and folders back to the project when the last site closes', async () => {
-  const site = await testSite({ routes: `${FIXTURE}/routes`, content: `${FIXTURE}/content.config.ts`, islands: false })
+  const site = await testSite({ routesDir: `${FIXTURE}/routes`, contentConfig: `${FIXTURE}/content.config.ts`, islands: false })
 
   await site.content.seed('news', [{ slug: 'seeded', data: { title: 'Seeded', published: true, tags: [] } }])
   expect((await news.loader?.load({ preview: false }))?.map(entry => entry.slug)).toEqual(['seeded'])

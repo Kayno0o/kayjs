@@ -110,7 +110,7 @@ describe('route() in a page', () => {
 
       for (const options of sites) {
         for (const locale of [undefined, i18n, { ...i18n, prefixDefault: true }]) {
-          const app = new Elysia().use(await pages({ root: routes, routes: '.', prebuilt: false, security: false, ...options, ...locale && { i18n: locale } }))
+          const app = new Elysia().use(await pages({ root: routes, routesDir: '.', prebuilt: false, security: false, ...options, ...locale && { i18n: locale } }))
 
           for (const prefix of locale === undefined ? [''] : ['', '/en']) {
             const html = await (await app.handle(new Request(`http://localhost${prefix}${prefix === '' && (locale !== undefined && 'prefixDefault' in locale) ? '/fr' : ''}/links${options.trailingSlash === 'always' ? '/' : ''}`))).text()
@@ -122,7 +122,7 @@ describe('route() in a page', () => {
         }
       }
 
-      const plain = new Elysia().use(await pages({ root: routes, routes: '.', prebuilt: false, security: false, base: '/shop', i18n }))
+      const plain = new Elysia().use(await pages({ root: routes, routesDir: '.', prebuilt: false, security: false, base: '/shop', i18n }))
       const english = await (await plain.handle(new Request('http://localhost/en/links'))).text()
 
       expect(english).toContain('<a class="made" href="/shop/en/articles/caf%C3%A9?x=1#top">')

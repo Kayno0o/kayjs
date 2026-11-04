@@ -231,7 +231,7 @@ describe('security headers', () => {
     const dev = { dev: true, prebuilt: false, underKayDev: false, devRoutes: true }
 
     expect(await scriptSources(await pages({ root: SEO, prebuilt: false, dev: true }))).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])
-    expect(await scriptSources(await servePages(resolveProject(SEO, { routes: 'src/routes' }, dev), async () => (await readClient(SEO))!))).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])
+    expect(await scriptSources(await servePages(resolveProject(SEO, { routesDir: 'src/routes' }, dev), async () => (await readClient(SEO))!))).toEqual(['\'self\'', ...inlineScriptHashes({ dev: true })])
   })
 
   it('merges the app\'s directives and headers over kay\'s, false leaving one out', async () => {
@@ -276,7 +276,7 @@ describe('security headers', () => {
         Bun.write(join(dir, 'games/emulator.kay'), `${settings('{ security: { headers: { \'cross-origin-embedder-policy\': \'require-corp\', \'x-frame-options\': false }, csp: { \'worker-src\': [\'blob:\'], \'frame-src\': [\'https://player.example.com\'], \'object-src\': false } } }')}h1 Emulator\n`),
         Bun.write(join(dir, 'player.kay'), `${settings('{ reload: true }')}h1 Player\n`),
       ])
-      const app = await pages({ root: dir, routes: '.', prebuilt: false, security: { csp: { 'script-src': ['\'self\'', 'https://site.example.com'] } } })
+      const app = await pages({ root: dir, routesDir: '.', prebuilt: false, security: { csp: { 'script-src': ['\'self\'', 'https://site.example.com'] } } })
       const get = async (path: string) => app.handle(new Request(`http://localhost${path}`))
       const [home, games, emulator, player] = await Promise.all(['/', '/games', '/games/emulator', '/player'].map(get))
       const policy = directives(emulator!.headers.get('content-security-policy'))
@@ -299,7 +299,7 @@ describe('security headers', () => {
       expect(home!.headers.has('x-kay-reload')).toBe(false)
 
       // A site sending no security headers still sends what a page asks for.
-      const bare = await (await pages({ root: dir, routes: '.', prebuilt: false, security: false })).handle(new Request('http://localhost/games/emulator'))
+      const bare = await (await pages({ root: dir, routesDir: '.', prebuilt: false, security: false })).handle(new Request('http://localhost/games/emulator'))
 
       expect(bare.headers.get('cross-origin-embedder-policy')).toBe('require-corp')
       expect(bare.headers.has('content-security-policy')).toBe(false)
@@ -695,7 +695,7 @@ describe('revalidation', () => {
 
     // Mounts the fixture's API modules, which kept the last app they were mounted in (kaynooo/kayjs#1895).
     const dropped = await (async () => {
-      const app = await build.serve({ prebuilt: true, security: false, log: false, api: resolve(PRODUCTION, 'src/api') })
+      const app = await build.serve({ prebuilt: true, security: false, log: false, apiDir: resolve(PRODUCTION, 'src/api') })
 
       await app.handle(new Request('http://localhost/news'))
 
@@ -739,13 +739,13 @@ describe('revalidation', () => {
   it('keeps an API module answering for the app it is mounted in once a collection ran', async () => {
     const { default: echo } = await import('./fixtures/production/src/api/echo') as unknown as { default: { getParent: () => unknown, getGlobalRoutes: () => unknown[] } }
     // A throwaway app mounts the same modules first; once it is collected a collection certainly ran, whatever the engine skipped before.
-    const thrown = await (async () => new WeakRef(await build.serve({ api: resolve(PRODUCTION, 'src/api'), prebuilt: true, security: false, log: false })))()
+    const thrown = await (async () => new WeakRef(await build.serve({ apiDir: resolve(PRODUCTION, 'src/api'), prebuilt: true, security: false, log: false })))()
 
     await collectUntil(() => thrown.deref() === undefined)
 
     expect(thrown.deref()).toBeUndefined()
 
-    const app = await build.serve({ api: resolve(PRODUCTION, 'src/api'), prebuilt: true, security: false, log: false })
+    const app = await build.serve({ apiDir: resolve(PRODUCTION, 'src/api'), prebuilt: true, security: false, log: false })
 
     Bun.gc(true)
     expect(echo.getParent()).not.toBeNull()
@@ -961,7 +961,7 @@ describe('revalidation', () => {
     try {
       await Bun.write(join(copy, 'src/routes/broken.kay'), '--- server\nexport const page = { prerender: true, ttl: \'hourly\' }\n---\np Broken\n')
 
-      await expect(refusedPrerender({ routes: resolve(copy, 'src/routes') }, await build.client(), undefined, resolve(PRODUCTION))).rejects.toThrow('broken.kay\'s ttl is \'hourly\'; it takes a positive duration')
+      await expect(refusedPrerender({ routesDir: resolve(copy, 'src/routes') }, await build.client(), undefined, resolve(PRODUCTION))).rejects.toThrow('broken.kay\'s ttl is \'hourly\'; it takes a positive duration')
     }
     finally {
       await rm(copy, { recursive: true, force: true })
@@ -975,7 +975,7 @@ describe('revalidation', () => {
       try {
         await Bun.write(join(copy, 'src/routes/broken.kay'), `--- server\nexport const page = { prerender: true, ttl: '1h', cacheControl: ${value} }\n---\np Broken\n`)
 
-        await expect(refusedPrerender({ routes: resolve(copy, 'src/routes') }, await build.client(), undefined, resolve(PRODUCTION))).rejects.toMatchObject({ code: 'page-settings-invalid' })
+        await expect(refusedPrerender({ routesDir: resolve(copy, 'src/routes') }, await build.client(), undefined, resolve(PRODUCTION))).rejects.toMatchObject({ code: 'page-settings-invalid' })
       }
       finally {
         await rm(copy, { recursive: true, force: true })
@@ -2190,7 +2190,7 @@ describe('request logging', () => {
         Bun.write(join(dir, 'api/_guard.ts'), `import { guard } from 'kay'\n\n${logging}export default guard(() => {\n  log.info('api guarded')\n})\n`),
         Bun.write(join(dir, 'api/notes.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => [])\n'),
       ])
-      const app = await pages({ root: dir, routes: 'routes', api: 'api', prebuilt: false, log: entry => void entries.push(entry) })
+      const app = await pages({ root: dir, routesDir: 'routes', apiDir: 'api', prebuilt: false, log: entry => void entries.push(entry) })
 
       await app.handle(new Request('http://localhost/feed.txt'))
       await app.handle(new Request('http://localhost/api/notes'))

@@ -31,7 +31,7 @@ result.property = await renderToString(await load<{ data: { comments: Promise<st
 result.island = await renderToString(await load('islandpage.kay'), {})
 result.made = await renderToString(await load('made.kay'), {})
 
-const app = await pages({ routes: 'tests/fixtures/early/routes', prebuilt: true })
+const app = await pages({ routesDir: 'tests/fixtures/early/routes', prebuilt: true })
 
 result.page = await (await app.handle(new Request('http://localhost/wrapped'))).text()
 

@@ -778,8 +778,8 @@ describe('kay.config.ts', () => {
 
   it('keeps the config\'s value for an option pages() is given as undefined', async () => {
     // A process serves one project, so the server runs in its own.
-    const serve = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ root: import.meta.dir, dev: true, routes: undefined }))\nconst response = await app.handle(new Request(\'http://localhost/\'))\n\nconsole.log(response.status, (await response.text()).includes(\'Home\'))\nprocess.exit(0)\n'
-    const root = await scratchProject({ 'kay.config.ts': 'export default { routes: \'pages\' }\n', 'pages/index.kay': 'p Home\n', 'serve.ts': serve })
+    const serve = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ root: import.meta.dir, dev: true, routesDir: undefined }))\nconst response = await app.handle(new Request(\'http://localhost/\'))\n\nconsole.log(response.status, (await response.text()).includes(\'Home\'))\nprocess.exit(0)\n'
+    const root = await scratchProject({ 'kay.config.ts': 'export default { routesDir: \'pages\' }\n', 'pages/index.kay': 'p Home\n', 'serve.ts': serve })
 
     const child = Bun.spawn([process.execPath, 'serve.ts'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
     const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited])

@@ -28,7 +28,7 @@ afterAll(async () => {
 })
 
 async function serve(store: FileStore) {
-  const app = await pages({ root: ROOT, prebuilt: false, security: false, storage: store })
+  const app = await pages({ root: ROOT, prebuilt: false, security: false, store: { files: store } })
 
   return async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers }))
 }
@@ -396,7 +396,7 @@ describe('stored images', () => {
 
   it('drop the social card drawn on a stored image once it is deleted', async () => {
     const store = memoryFiles()
-    const app = await pages({ site: 'https://storage.example', root: ROOT, fonts: [{ family: 'Archivo Black', src: resolve('tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2') }], prebuilt: false, security: false, storage: store })
+    const app = await pages({ site: 'https://storage.example', root: ROOT, fonts: [{ family: 'Archivo Black', src: resolve('tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2') }], prebuilt: false, security: false, store: { files: store } })
     const key = await files.put(await hero())
     const html = await (await app.handle(new Request(`http://localhost/card?key=${encodeURIComponent(key)}`))).text()
     const card = (/<meta property="og:image" content="https:\/\/storage\.example([^"]+)">/).exec(html)![1]!.replaceAll('&amp;', '&')
@@ -787,7 +787,7 @@ describe('a script signing a private link', () => {
   it('signs with `secret` in the kay.config.ts beside it once the script reads its store', async () => {
     const root = await scratchDir('storage-script-')
 
-    await Bun.write(join(root, 'kay.config.ts'), `import { memoryFiles } from ${JSON.stringify(SERVER)}\nexport default { secret: ${JSON.stringify(SECRET)}, storage: memoryFiles() }\n`)
+    await Bun.write(join(root, 'kay.config.ts'), `import { memoryFiles } from ${JSON.stringify(SERVER)}\nexport default { secret: ${JSON.stringify(SECRET)}, store: { files: memoryFiles() } }\n`)
 
     expect(await run(url(true), {}, root)).toBe(await run(url(false), { KAY_SECRET: SECRET }))
   })

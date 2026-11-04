@@ -2,7 +2,7 @@ import type { ClientConfig, CookieDefaults, DirsConfig, HealthConfig, I18nConfig
 import { nearest } from './nearest'
 
 // Every key the config and its nested bags take, written as records so the compiler refuses a key added to a type and missing here, or listed here and gone from the type.
-const CONFIG: Record<keyof KayConfig, true> = { dirs: true, limits: true, serve: true, observe: true, client: true, routes: true, api: true, maxSizes: true, content: true, settings: true, storage: true, i18n: true, routesDir: true, apiDir: true, apiPath: true, publicDir: true, publicCache: true, minify: true, lang: true, site: true, seo: true, robots: true, sitemap: true, head: true, images: true, budget: true, favicon: true, manifest: true, entry: true, offline: true, search: true, fonts: true, security: true, proxy: true, maxSize: true, maxSizeByPath: true, requireGuards: true, cors: true, openapi: true, mcp: true, compress: true, compressionDictionary: true, health: true, metrics: true, jobs: true, log: true, serverTiming: true, tracer: true, rewrite: true, redirects: true, runtimeRedirects: true, live: true, requestIdHeader: true, timeZone: true, base: true, links: true, trailingSlash: true, contentConfig: true, markdown: true, shutdownTimeout: true, navigation: true, inlineStyles: true, lateStyles: true, typography: true, hydration: true, prefetch: true, saveData: true, plugins: true, librarySettings: true, lints: true, secret: true, preview: true, fileStore: true, store: true, onError: true, env: true, checks: true, extensions: true }
+const CONFIG: Record<keyof KayConfig, true> = { dirs: true, limits: true, serve: true, observe: true, client: true, i18n: true, routesDir: true, apiDir: true, apiPath: true, publicDir: true, publicCache: true, minify: true, lang: true, site: true, seo: true, robots: true, sitemap: true, head: true, images: true, budget: true, favicon: true, manifest: true, entry: true, offline: true, search: true, fonts: true, security: true, proxy: true, maxSize: true, maxSizeByPath: true, requireGuards: true, cors: true, openapi: true, mcp: true, compress: true, compressionDictionary: true, health: true, metrics: true, jobs: true, log: true, serverTiming: true, tracer: true, rewrite: true, redirects: true, runtimeRedirects: true, live: true, requestIdHeader: true, timeZone: true, base: true, links: true, trailingSlash: true, contentConfig: true, markdown: true, shutdownTimeout: true, navigation: true, inlineStyles: true, lateStyles: true, typography: true, hydration: true, prefetch: true, saveData: true, plugins: true, librarySettings: true, lints: true, secret: true, preview: true, fileStore: true, store: true, onError: true, env: true, checks: true, extensions: true }
 const SECURITY: Record<keyof SecurityConfig, true> = { csp: true, reportOnly: true, reports: true, permissions: true, headers: true, hosts: true, cookies: true }
 const I18N: Record<keyof I18nConfig, true> = { locales: true, defaultLocale: true, prefixDefault: true, domains: true, paths: true, messages: true }
 const SEO: Record<keyof SeoConfig, true> = { name: true, titleTemplate: true, description: true, image: true, imageAlt: true, twitter: true, locale: true, themeColor: true, jsonLd: true }
@@ -16,28 +16,8 @@ const HEALTH: Record<keyof HealthConfig, true> = { path: true, timeout: true, ch
 const PROXY: Record<keyof ProxyConfig, true> = { hops: true, header: true, trusted: true, trustPrivate: true, key: true, open: true }
 const SITEMAP: Record<keyof SitemapConfig, true> = { ttl: true }
 
-// The keys 1.84 renamed so that every directory ends in `Dir` and no two keys differ by a letter, each with the key that replaces it: still read until 1.87, and reported by `deprecated-config-keys`.
-export const RENAMED_KEYS = { routes: 'routesDir', api: 'apiDir', content: 'contentConfig', storage: 'fileStore', maxSizes: 'maxSizeByPath', settings: 'librarySettings' } as const satisfies Partial<Record<keyof KayConfig, keyof KayConfig>>
-
-// The config with each key of `RENAMED_KEYS` under its new name, unless the new name is set already, in which case it wins.
-export function renamedKeys<Config extends object>(config: Config): Config {
-  const given = config as Record<string, unknown>
-
-  if (!Object.keys(RENAMED_KEYS).some(old => Object.hasOwn(given, old)))
-    return config
-
-  const renamed: Record<string, unknown> = { ...given }
-
-  for (const [old, name] of Object.entries(RENAMED_KEYS)) {
-    if (!Object.hasOwn(given, old))
-      continue
-
-    delete renamed[old]
-    renamed[name] ??= given[old]
-  }
-
-  return renamed as Config
-}
+// The names a config key had before 1.88 and no longer has, each with where it lives now: one is reported as an unknown key naming its replacement.
+const REMOVED_KEYS: Record<string, string> = { routes: 'dirs.routes', api: 'dirs.api', content: 'contentConfig', storage: 'store.files', maxSizes: 'limits.byPath', settings: 'librarySettings' }
 
 // The flat keys 1.88 grouped by concern, each with the bag that holds it now and its name there: still read until 1.91, and reported by `deprecated-config-groups`.
 export const GROUPED_KEYS = {
@@ -97,11 +77,6 @@ export function groupedKeys<Config extends object>(config: Config): Config {
   return grouped as Config
 }
 
-// The config as the current release reads it: the 1.84 names renamed, then every flat key in its bag.
-export function currentKeys<Config extends object>(config: Config): Config {
-  return groupedKeys(renamedKeys(config))
-}
-
 const defined = (given: Record<string, unknown>): [string, unknown][] => Object.entries(given).filter(([, value]) => value !== undefined)
 
 // The options of a code call laid over the config, each bag one level deep: `testSite({ client: { navigation: false } })` keeps the config's other `client` keys. An option left `undefined` leaves the config's value alone.
@@ -134,12 +109,11 @@ export function unknownConfigKeys(config: object): string[] {
       if (Object.hasOwn(known, key))
         continue
 
-      // An old name is offered as the name that replaced it.
       const found = nearest(key, Object.keys(known))
-      const renamed = found !== undefined && known === CONFIG && Object.hasOwn(RENAMED_KEYS, found) ? RENAMED_KEYS[found as keyof typeof RENAMED_KEYS] : found
+      const removed = known === CONFIG && Object.hasOwn(REMOVED_KEYS, key) ? REMOVED_KEYS[key] : undefined
       // A key that moved into a bag is offered where it lives now.
-      const grouped = renamed !== undefined && known === CONFIG && Object.hasOwn(GROUPED_KEYS, renamed) ? GROUPED_KEYS[renamed as keyof typeof GROUPED_KEYS] : undefined
-      const near = grouped === undefined ? renamed : `${grouped[0]}.${grouped[1]}`
+      const grouped = found !== undefined && known === CONFIG && Object.hasOwn(GROUPED_KEYS, found) ? GROUPED_KEYS[found as keyof typeof GROUPED_KEYS] : undefined
+      const near = removed ?? (grouped === undefined ? found : `${grouped[0]}.${grouped[1]}`)
 
       problems.push(`\`${path}${key}\`${near === undefined ? '' : `, did you mean \`${path}${near}\`?`}`)
     }

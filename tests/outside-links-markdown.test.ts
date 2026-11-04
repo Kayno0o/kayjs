@@ -73,7 +73,7 @@ describe('a collection entry\'s body', () => {
   beforeAll(async () => {
     copy = await fixtureCopy('content')
     await Bun.write(join(copy, 'src/content/posts/outside.md'), `---\ntitle: Outside\ndate: 2026-09-16\n---\n\n${BODY}`)
-    app = new Elysia().use(await pages({ routes: `${copy}/src/routes`, content: `${copy}/src/content.config.ts`, prebuilt: false, security: false, site: 'https://x.example', base: '/blog-root', trailingSlash: 'always' }))
+    app = new Elysia().use(await pages({ routesDir: `${copy}/src/routes`, contentConfig: `${copy}/src/content.config.ts`, prebuilt: false, security: false, site: 'https://x.example', base: '/blog-root', trailingSlash: 'always' }))
   }, 60_000)
 
   afterAll(async () => {

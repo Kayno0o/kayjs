@@ -20,7 +20,7 @@ async function project(name: string, icon?: string): Promise<string> {
   const root = await scratchDir(`loader-${name}-`)
   const files: Record<string, string> = {
     'package.json': JSON.stringify({ name, private: true }),
-    'kay.config.ts': icon === undefined ? 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({})\n' : 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ settings: { \'kay-lib\': \'./src/ui-settings.ts\' } })\n',
+    'kay.config.ts': icon === undefined ? 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({})\n' : 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ librarySettings: { \'kay-lib\': \'./src/ui-settings.ts\' } })\n',
     'src/own.kay': `p ${name}\n`,
     ...Object.fromEntries(Object.entries(LIBRARY).map(([file, text]) => [`node_modules/kay-lib/${file}`, text])),
   }

@@ -30,7 +30,7 @@ async function app(options: Parameters<typeof pages>[0] = {}) {
 }
 
 async function build(options: Parameters<typeof pages>[0]) {
-  return pages({ routes: join(root, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', onError: ({ error, request }) => void errors.push([error, request]), ...options })
+  return pages({ routesDir: join(root, 'src/routes'), prebuilt: false, security: false, site: 'https://x.example', onError: ({ error, request }) => void errors.push([error, request]), ...options })
 }
 
 async function read(served: Awaited<ReturnType<typeof app>>, path: string, host = 'localhost') {
@@ -146,7 +146,7 @@ describe('a sitemap past its limits', () => {
   })
 
   it('is one plain sitemap again for the same site under the limit', async () => {
-    const served = await app({ routes: 'tests/fixtures/site-output/src/routes' })
+    const served = await app({ routesDir: 'tests/fixtures/site-output/src/routes' })
     const plain = await read(served, '/sitemap.xml')
 
     expect(plain.text).toContain('<urlset')

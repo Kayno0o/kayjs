@@ -27,7 +27,7 @@ async function app(options: { jobs?: unknown, dev?: boolean, base?: string } = {
 
   await Bun.write(join(dir, 'routes/index.kay'), 'h1 Home\n')
 
-  return pages({ root: dir, routes: 'routes', prebuilt: false, security: false, dev: false, ...options } as Parameters<typeof pages>[0])
+  return pages({ root: dir, routesDir: 'routes', prebuilt: false, security: false, dev: false, ...options } as Parameters<typeof pages>[0])
 }
 
 const get = async (site: Awaited<ReturnType<typeof app>>, path: string, headers: Record<string, string> = {}) => site.handle(new Request(`http://localhost${path}`, { headers }))

@@ -39,7 +39,7 @@ describe('a class passed to a component', () => {
   })
 
   it('overrides the class the component sets, on the server', async () => {
-    const app = await servePages(resolveProject(root, { routes: 'src/routes', compress: false }, modeOf({ dev: false, prebuilt: true })), () => client)
+    const app = await servePages(resolveProject(root, { routesDir: 'src/routes', compress: false }, modeOf({ dev: false, prebuilt: true })), () => client)
     const html = await (await app.handle(new Request('http://localhost/'))).text()
 
     expect(html).toContain('class="box text-red-500 p-6 text-lg"')
@@ -115,7 +115,7 @@ describe('literal classes written together in one template', () => {
   })
 
   it('resolve while rendering on the server, as the island does', async () => {
-    const app = await servePages(resolveProject(root, { routes: 'src/routes', compress: false }, modeOf({ dev: false, prebuilt: true })), () => client)
+    const app = await servePages(resolveProject(root, { routesDir: 'src/routes', compress: false }, modeOf({ dev: false, prebuilt: true })), () => client)
     const html = await (await app.handle(new Request('http://localhost/'))).text()
 
     expect(html).toContain('class="literal p-6"')

@@ -1,11 +1,9 @@
 import { Buffer } from 'node:buffer'
 import { createHmac, hkdfSync } from 'node:crypto'
 import { describe, expect, test } from 'bun:test'
-import { localPath } from 'kay'
 import { describeAuditEntry } from '../src/auditWording'
 import { deriveKeys, digest } from '../src/keys'
 import { createPkcePair } from '../src/oauth/pkce'
-import { safeRedirect } from '../src/oauth/redirect'
 import { createRoleHierarchy } from '../src/roles'
 import { emailProblem, normalizeEmail, normalizeUsername, passwordProblem, usernameProblem } from '../src/rules'
 
@@ -101,40 +99,6 @@ describe('describeAuditEntry', () => {
 
   test('reads a sign-out everywhere logged before it was its own event', () => {
     expect(describeAuditEntry({ event: 'signed-out', detail: 'everywhere-else' })).toBe(describeAuditEntry({ event: 'signed-out-everywhere', detail: 'this-one-kept' }))
-  })
-})
-
-describe('safeRedirect', () => {
-  test('allows same-origin absolute paths', () => {
-    expect(safeRedirect('/dashboard')).toBe('/dashboard')
-    expect(safeRedirect('/a/b?x=1')).toBe('/a/b?x=1')
-  })
-
-  test('rejects open-redirect targets, falling back', () => {
-    expect(safeRedirect('//evil.com')).toBe('/')
-    expect(safeRedirect('/\\evil.com')).toBe('/')
-    expect(safeRedirect('/\t//evil.com')).toBe('/')
-    expect(safeRedirect('https://evil.com')).toBe('/')
-    expect(safeRedirect(null)).toBe('/')
-    expect(safeRedirect(undefined, '/home')).toBe('/home')
-  })
-
-  test('rejects a path that normalises to another host, and answers the others normalised', () => {
-    for (const path of ['/.//evil.com', '/./\\evil.com', '/%2e//evil.com', '/a/../..//evil.com', '/%2F%2Fevil.com', '/%2fevil.com', '/./%5Cevil.com'])
-      expect([path, safeRedirect(path)]).toEqual([path, '/'])
-
-    for (const path of ['/.%2f/evil.com', '/a/..%2f/evil.com', '/%2e%2e%2f%2e%2e%2f/evil.com', '/%252F/evil.com', '/%E0%A4%A'])
-      expect([path, safeRedirect(path)]).toEqual([path, '/'])
-
-    expect(safeRedirect('/a/./b/../c?next=//x#top')).toBe('/a/c?next=//x#top')
-    expect(safeRedirect('/a/%2F')).toBe('/a/%2F')
-    expect(['/../x', '/a?', '/é?q=é', '/a b'].map(path => safeRedirect(path))).toEqual(['/x', '/a', '/%C3%A9?q=%C3%A9', '/a%20b'])
-    expect(safeRedirect(safeRedirect('/a/./é'))).toBe(safeRedirect('/a/./é'))
-  })
-
-  test('is kay\'s localPath, which holds the cases of a value leaving the site once decoded', () => {
-    for (const path of ['/%09/evil.com', '/%2F/evil.com', '/%2509/evil.com'])
-      expect([path, safeRedirect(path, '/home')]).toEqual([path, localPath(path, '/home')])
   })
 })
 

@@ -116,7 +116,7 @@ describe('client registration', () => {
     try {
       await Bun.write(join(root, 'routes/index.kay'), 'h1 Home\n')
 
-      const site = await pages({ root, routes: 'routes', prebuilt: false, security: false, dev: false, extensions: [{ name: 'auth', server: server().auth.plugin as never }] })
+      const site = await pages({ root, routesDir: 'routes', prebuilt: false, security: false, dev: false, extensions: [{ name: 'auth', server: server().auth.plugin as never }] })
 
       for (const path of ['token', 'revoke', 'register']) {
         const response = await site.handle(new Request(`http://localhost/auth/oauth/${path}`, { method: 'POST', headers: { 'origin': 'https://client.example', 'content-type': 'application/x-www-form-urlencoded' }, body: 'x'.repeat(2 * 1024 * 1024) }))
