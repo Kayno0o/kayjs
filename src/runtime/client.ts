@@ -224,20 +224,24 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   // Counted again from where the server's were, so the ids it rendered are claimed as they are.
   const ids = element.dataset.uid ?? freshPrefix()
 
-  // A client-only island has no server markup to claim, only the fallback it renders over.
-  if (element.dataset.client !== undefined) {
-    const fallback = [...element.childNodes]
+  // Rendered over the server's markup rather than claiming it, which is left in place when the component itself throws.
+  const renderAfresh = (): void => {
+    const markup = [...element.childNodes]
+
+    element.textContent = ''
 
     try {
       disposers.set(element, noted(element, () => render(() => withIds(ids, () => component(props)), element)))
+    }
+    catch (failure) {
+      element.replaceChildren(...markup)
+      reportError(failure, id)
+    }
+  }
 
-      // Kept while the component throws, and gone once it has rendered beside it.
-      for (const node of fallback)
-        node.remove()
-    }
-    catch (error) {
-      reportError(error, id)
-    }
+  // A client-only island has no server markup to claim, only the fallback it renders over.
+  if (element.dataset.client !== undefined) {
+    renderAfresh()
   }
   else {
     root((dispose) => {
@@ -250,19 +254,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
         // Markup the island would not build, such as one a browser extension changed, can fail anywhere along the way: rendered afresh rather than left dead.
         console.error(`[kay] island ${id} did not match its server markup, rendering it again: ${error instanceof Error ? error.message : String(error)}`)
         dispose()
-
-        const markup = [...element.childNodes]
-
-        element.textContent = ''
-
-        try {
-          disposers.set(element, noted(element, () => render(() => withIds(ids, () => component(props)), element)))
-        }
-        catch (failure) {
-          // An error of the component itself, thrown again: the server's markup stays, lifeless, rather than nothing.
-          element.replaceChildren(...markup)
-          reportError(failure, id)
-        }
+        renderAfresh()
       }
     })
   }

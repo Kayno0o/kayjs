@@ -19,6 +19,8 @@ export function rowKey(item: unknown): unknown {
   return typeof item === 'object' && item !== null && 'id' in item ? item.id : item
 }
 
+const entryKey = (entry: unknown) => (entry as [unknown, unknown])[0]
+
 // A `for`: one row per item, matched to the rows of the last render by key, or by position when `keyed` is false.
 // A row reads its item through a function, and its index through one too when keyed, so a row kept across renders follows the new values.
 export function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => Iterable<T> | null | undefined | false, key: ((item: T) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: () => unknown): void {
@@ -66,9 +68,9 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
 
   renderEffect(() => {
     const items = each()
-    const list = items === false || items == null ? [] : listed(items)
+    const list = items === false || items == null ? [] : [...items]
     // A Map's entries are fresh pairs on every run, so with no key written they are matched by their own key.
-    const keyed = items instanceof Map && key === rowKey ? (entry: T) => (entry as [unknown, unknown])[0] : key
+    const keyed = items instanceof Map && key === rowKey ? entryKey : key
 
     untrack(() => {
       const entering = empty.rendered
@@ -98,11 +100,6 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
       empty.rendered = true
     })
   })
-}
-
-// An array as it is, any other iterable read once.
-function listed<T>(items: Iterable<T>): readonly T[] {
-  return Array.isArray(items) ? items as readonly T[] : Array.from(items)
 }
 
 function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], key: ((item: T) => unknown) | false, makeRow: (item: T, index: number, key: unknown) => Row): Row[] {
