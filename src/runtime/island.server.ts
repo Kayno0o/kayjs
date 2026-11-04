@@ -112,17 +112,17 @@ export function noteMessage(key: string): void {
 }
 
 // On the server an interactive component renders inside a `<slot>` the browser hydrates, its props serialized for the client.
-// A client-only one, `client` or rendered with `hydrate="client"`, leaves the slot empty for the browser to render into, and inside another island renders nothing.
+// A client-only one, `client` or rendered with `hydrate="client"`, holds only its fallback in the slot, the use's `@fallback` block else the component's own, until the browser renders into it, and inside another island renders nothing.
 // Browsers lay a slot out as `display: contents`, so the island sits in a flex or grid parent as its own markup would, with no stylesheet to ship.
 // `messages` are the keys its source passes `t()` as they are written, which it may only look up once in the browser. `lives` are the live values it imports, which the page proves though only the browser may read them.
 // `cause` is only passed under `kay dev`, which writes it as the `data-why` the dev tool's Islands tab shows, so production markup is the same with or without it.
-export function island<P extends object>(id: string, component: ((props: P) => JSX.Element) | undefined, messages: readonly string[] = [], client = false, why = 'is interactive', lives: readonly unknown[] = [], cause?: string): IslandComponent<P> {
+export function island<P extends object>(id: string, component: ((props: P) => JSX.Element) | undefined, messages: readonly string[] = [], client = false, why = 'is interactive', lives: readonly unknown[] = [], cause?: string, ownFallback?: () => JSX.Element): IslandComponent<P> {
   const render = (props: P & IslandOptions) => {
     const when = props.hydrate
     const kept = props.persist === false || props.persist === '' || props.persist === true ? undefined : props.persist
     const persist = props.persist === true ? id : kept
-    const own = 'hydrate' in props || 'persist' in props ? omit(props, 'hydrate', 'persist') as P : props
     const browserOnly = client || when === 'client'
+    const own = 'hydrate' in props || 'persist' in props || (browserOnly && 'fallback' in props) ? omit(props, 'hydrate', 'persist', ...browserOnly ? ['fallback'] : []) as P : props
 
     // A key no catalog has is sent nothing: a library's `wording` falls back to its English.
     const state = localeState()
@@ -170,7 +170,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 
     try {
       // Detached, as in the browser, where an island reads nothing the page's components provide.
-      const { result: html, count } = browserOnly ? { result: '', count: 0 } : withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(prefix, () => child(component!(given))), true)))
+      const { result: html, count } = browserOnly ? { result: placeholder(props.fallback, ownFallback), count: 0 } : withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(prefix, () => child(component!(given))), true)))
       const shipped = slots.length === 0 ? '' : ` data-slots=${quotedAttribute(slotsValue(slots, html))}`
       // Marks an island whose title the page shows, so the browser leaves it alone while a later one has not hydrated.
       const titled = setsIslandTitle(mark) ? ` ${TITLED_ATTRIBUTE}` : ''
@@ -187,6 +187,13 @@ export function island<P extends object>(id: string, component: ((props: P) => J
   }
 
   return render as IslandComponent<P>
+}
+
+// The markup standing where a client-only island will render, on the server's side of its own page: no ids or islands of its own, as the browser throws it away.
+function placeholder(given: JSX.Element | undefined, own: (() => JSX.Element) | undefined): string {
+  const fallback = given ?? own?.()
+
+  return fallback === undefined ? '' : withFieldMarks(undefined, () => child(fallback))
 }
 
 // A static component that passes an island what only an island sends, a function, a block taking parameters or an instance of a class, renders as an island itself, sending its own props instead; one passing only data stays static.

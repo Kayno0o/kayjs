@@ -224,8 +224,10 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   // Counted again from where the server's were, so the ids it rendered are claimed as they are.
   const ids = element.dataset.uid ?? freshPrefix()
 
-  // A client-only island has no server markup to claim.
+  // A client-only island has no server markup to claim, only the fallback it renders over.
   if (element.dataset.client !== undefined) {
+    element.textContent = ''
+
     try {
       disposers.set(element, noted(element, () => render(() => withIds(ids, () => component(props)), element)))
     }

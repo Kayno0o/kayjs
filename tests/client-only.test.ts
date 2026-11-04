@@ -30,7 +30,8 @@ const FILES: Record<string, string> = {
   'panel.kay': '---\nimport { signal } from \'kay\'\nimport Width from \'./width.kay\'\n\nconst open = signal(0)\n---\nsection\n  button.toggle(onClick={() => open.set(o => o + 1)}) {open()}\n  Width(unit="px")\n  p.after after\n',
   'bad.kay': '---\nconst { unit } = props<{ unit: string }>()\nconst width = window.innerWidth\n---\np {width}{unit}\n',
   'plain.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\n---\nb.plain {n()}\n',
-  'page.kay': '---\nimport Chart from \'./chart.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Width from \'./width.kay\'\n---\nmain\n  Chart(label="sales")\n  Panel\n  Width(unit="em")\n  Plain(hydrate="client")\n',
+  'skeleton.kay': '--- client\nconst { n } = props<{ n: number }>()\nconst width = window.innerWidth\n---\nb.real {n}:{width}\n@fallback\n  b.skeleton waiting\n',
+  'page.kay': '---\nimport Chart from \'./chart.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Skeleton from \'./skeleton.kay\'\nimport Width from \'./width.kay\'\n---\nmain\n  Chart(label="sales")\n  Panel\n  Width(unit="em")\n  Plain(hydrate="client")\n  Plain(hydrate="client")\n    @fallback\n      i.hold held\n  Skeleton(n={2})\n  Skeleton(n={3})\n    @fallback\n      i.own mine\n',
 }
 
 let dir: string
@@ -40,7 +41,7 @@ let ids: Record<string, string>
 beforeAll(async () => {
   dir = await scratchDir('dom-')
   await Promise.all(Object.entries(FILES).map(async ([name, text]) => Bun.write(join(dir, name), text)))
-  ids = Object.fromEntries(['chart', 'panel', 'plain', 'width'].map(name => [name, relative(process.cwd(), join(dir, `${name}.kay`))]))
+  ids = Object.fromEntries(['chart', 'panel', 'plain', 'skeleton', 'width'].map(name => [name, relative(process.cwd(), join(dir, `${name}.kay`))]))
 
   const { default: Page } = await import(join(dir, 'page.kay')) as { default: () => unknown }
 
@@ -63,6 +64,12 @@ describe('client-only islands', () => {
 
   it('renders an island the browser only with `hydrate="client"`', () => {
     expect(html).toContain(`<slot data-component="${ids.plain}" data-props="[{}]" data-client></slot>`)
+  })
+
+  it('shows a fallback in the slot of a client-only use or component, the use\'s own block winning, without sending it as a prop', () => {
+    expect(html).toContain(`<slot data-component="${ids.plain}" data-props="[{}]" data-client><i class="hold">held</i></slot>`)
+    expect(html).toContain(`<slot data-component="${ids.skeleton}" data-props='[{"n":1},2]' data-client><b class="skeleton">waiting</b></slot>`)
+    expect(html).toContain(`<slot data-component="${ids.skeleton}" data-props='[{"n":1},3]' data-client><i class="own">mine</i></slot>`)
   })
 
   it('renders each one in the browser, the nested one where the server left its part, and hydrates the rest', async () => {
@@ -97,6 +104,8 @@ describe('client-only islands', () => {
 
       expect(document.querySelector(`slot[data-component="${ids.width}"]`)!.textContent).toBe(`${window.innerWidth}em`)
       expect(document.querySelector('b.plain')!.textContent).toBe('1')
+      expect([...document.querySelectorAll('b.real')].map(element => element.textContent)).toEqual([`2:${window.innerWidth}`, `3:${window.innerWidth}`])
+      expect(document.querySelector('.skeleton, .own, .hold')).toBeNull()
     }
     finally {
       await GlobalRegistrator.unregister()

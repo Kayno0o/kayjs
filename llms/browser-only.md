@@ -22,7 +22,7 @@ onMount(() => drawMap(center))
 ### Browser-only components
 
 - Some components cannot render on the server: a package that touches `window` as it loads, such as CodeMirror or hls.js, or code reading `localStorage` while rendering.
-- Such a component renders in the browser only: the server sends its island as an empty `<slot>`, props included, and the browser renders it there as soon as the page loads, instead of hydrating it.
+- Such a component renders in the browser only: the server sends its island as a `<slot>` holding only its fallback (empty without one), props included, and the browser clears the slot and renders the island there as soon as the page loads, instead of hydrating it.
 - Inside another island it renders nothing on the server and is built in place as its parent hydrates.
 - An island importing a package that throws on a browser-only global as it loads renders in the browser only, with nothing to write.
 - Each package is imported once, in a Bun process of its own, and the answer is kept per package version in `.kay/cache`.
@@ -30,6 +30,14 @@ onMount(() => drawMap(center))
 - A component whose script fence is `--- client` always renders in the browser only, and is an island even without state.
 - Pages, layouts and special pages render on the server, so they cannot be `--- client`.
 - `hydrate="client"` renders one use of an island in the browser only: `Map(center={center} hydrate="client")`.
+
+### Fallback while the browser renders
+
+- A map or an editor that renders late shifts the layout and flashes. A fallback is the markup the server sends in the island's slot, which the browser replaces when the island renders.
+- A use writes it as an `@fallback` block: `Map(center={center} hydrate="client")` with an `@fallback` block under it holding the skeleton (`.map-skeleton` say). It reaches only that use, and is not a prop of the component.
+- A `--- client` component declares its own for every use with an `@fallback` block at the root of its template, beside the markup it renders. A use's block wins over it.
+- A component's own fallback renders on the server without the script, so it is static markup: it reads no prop, `const` or import of the script, and takes the place the island fills.
+- The fallback is for the first paint: give it the island's size, so nothing moves when the island replaces it. An island inside another one renders nothing on the server, as before.
 
 ### Browser globals on the server
 

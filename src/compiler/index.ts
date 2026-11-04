@@ -250,6 +250,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   // Pages, layouts and special pages render on the server: a package they import never switches them.
   const routeFile = file.server !== undefined || ROUTE_FILES.has(basename(filename))
   const client = file.client !== undefined || (options.clientOnly === true && !routeFile)
+  const fallback = client ? takeFallback(file, filename, options) : undefined
   const live = routeFile ? undefined : liveImport(script, options.importedSignals)
   const island = client || isInteractive(file, script) || live !== undefined ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
@@ -332,7 +333,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const lives = liveBindings(script, options.importedSignals)
     const imports = lives.map(binding => `import { ${binding.imported} as ${binding.local} } from ${JSON.stringify(binding.source)}\n`).join('')
 
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local))})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, cause, why: cause && describeCause(cause), classes, actionForm: facts.actionForm, diagnostics: reported }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}${fallback?.code ?? ''}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), undefined, fallback !== undefined)})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, cause, why: cause && describeCause(cause), classes, actionForm: facts.actionForm, diagnostics: reported }
   }
 
   return {
@@ -376,6 +377,28 @@ function spelledOut(diagnostic: Diagnostic, shorthands: Shorthand[], source: str
 }
 
 // A compile error names the group of messages it belongs to, for `kay explain` to look up; a lint keeps its own name.
+const FALLBACK_COMPONENT = /^export default function \w+\(/m
+
+// The `@fallback` block at the root of a client-only component, which the server shows where the island will render: taken out of the template, and compiled alone, as the server never runs the script it would read.
+function takeFallback(file: KayFile, filename: string, options: CompileOptions): { code: string } | undefined {
+  const index = file.template.findIndex(node => node.kind === 'slot' && file.source.slice(node.name.start, node.name.end) === 'fallback')
+  const block = file.template[index]
+
+  if (block?.kind !== 'slot')
+    return undefined
+
+  file.template.splice(index, 1)
+
+  const lines = file.source.slice(block.start, block.end).split('\n').slice(1).filter(line => line.trim() !== '')
+  const indent = Math.min(...lines.map(line => line.length - line.trimStart().length))
+  const compiled = compileKay(lines.map(line => line.slice(indent)).join('\n'), filename, { output: 'html', root: options.root, component: true })
+
+  for (const diagnostic of compiled.diagnostics)
+    file.diagnostics.push({ ...diagnostic, start: block.name.start, end: block.name.end })
+
+  return { code: compiled.tsx.replace(FALLBACK_COMPONENT, 'function KayFallback(') }
+}
+
 function coded(diagnostics: Diagnostic[], code: ErrorName): Diagnostic[] {
   return diagnostics.map(diagnostic => diagnostic.code === undefined ? { ...diagnostic, code } : diagnostic)
 }

@@ -1266,8 +1266,11 @@ function messageKeys(source: string): string[] {
 
 // The message keys an island's source names, as the third argument to `island()`, or nothing for an island naming none; the live values it imports go last.
 // Under `kay dev` the cause goes last, as the `data-why` the dev tool shows.
-export function islandMessages(source: string, client = false, lives: string[] = [], cause?: string): string {
+export function islandMessages(source: string, client = false, lives: string[] = [], cause?: string, fallback = false): string {
   const keys = messageKeys(source)
+
+  if (fallback)
+    return `, ${JSON.stringify(keys)}, true, undefined, [${lives.join(', ')}], ${cause === undefined ? 'undefined' : JSON.stringify(cause)}, KayFallback`
 
   if (lives.length > 0 || cause !== undefined)
     return `, ${JSON.stringify(keys)}, ${client}, undefined, [${lives.join(', ')}]${cause === undefined ? '' : `, ${JSON.stringify(cause)}`}`

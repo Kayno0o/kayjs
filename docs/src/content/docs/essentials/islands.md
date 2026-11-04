@@ -319,6 +319,8 @@ What a script appends to `<body>` goes with the next swap, as the next page neve
 
 A link with `data-reload` loads its page fully. So does every link to a page setting `reload: true` in its `page`.
 
+A form with `method="get"` swaps the page in place as a link does, with its fields in the query, so a search or a filter keeps your persisted islands, the scroll and the focus. `data-reload` on the form loads the page fully.
+
 ### Ask before leaving unsaved changes
 
 `guardLeave` from `kay` asks before the page is left while its function returns true.
@@ -391,6 +393,22 @@ const { center } = props<{ center: [number, number] }>()
 onMount(() => drawMap(center))
 ---
 .map
+```
+
+The server sends an empty slot for it, which shifts the layout when the map appears. Give it a fallback to show in the meantime: an `@fallback` block at the root of the component's template for every use, or one written under a use, `Map(center={center} hydrate="client")`, for that use alone. The browser replaces it when the island renders. A component's own fallback is static markup: it cannot read the script's values.
+
+```kay
+--- client
+import { drawMap } from './map'
+
+const { center } = props<{ center: [number, number] }>()
+
+onMount(() => drawMap(center))
+---
+.map
+
+@fallback
+  .map.animate-pulse
 ```
 
 `watch(source, (next, previous) => ...)` from `kay` runs whenever `source` changes, but not on its first read. You need no variable holding the old value.
