@@ -2,12 +2,19 @@
 
 A prerendered page with a `ttl` tells a shared cache how long to keep it, so a CDN in front of the server serves it without reaching the origin. For everything the server caches and for how long, see [what is cached](rendering.md#what-is-cached-and-for-how-long).
 
+## Common tasks
+
+- Let a CDN keep a page an hour: `ttl: '1h'` in its `page` export.
+- Send a header of your own: `cacheControl: 'public, max-age=300'`, or `false` to keep the page out of shared caches.
+
 ```kay
 --- server
 export const page = { prerender: true, ttl: '1h' }
 ---
 h1 Blog
 ```
+
+## Reference
 
 - A public page with a `ttl` of T answers `cache-control: public, max-age=0, s-maxage=T, stale-while-revalidate=T`: the browser asks each time, a CDN keeps the page T and serves it up to T more while the server renders it again. A change reaches the CDN after its `s-maxage` at the latest, or at its own purge.
 - `revalidate` is the name `ttl` had before 1.87 and is still read; `kay check` flags it with `deprecated-lifetimes`.
