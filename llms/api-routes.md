@@ -148,12 +148,12 @@ export default api()
 - `resource()` types such a field as a `string`.
 - A string in a route's `body` with no `maxLength`, `enum`, `const` or date format is refused past 10,000 characters, as an action's is (see [actions](actions.md)); declare a `maxLength` on a field that takes more. A model registered by name, another library's validator and a `.ws()` route's messages are left as written.
 - A route answering `null` gives the JSON `null` with `content-type: application/json`, which `response.json()` reads, and `undefined` an empty body.
-- A route answers a plain object or array as JSON, and a string, a number, a `Date`, a `Response`, a `Blob`, bytes or a stream as Elysia does.
+- A route answers a plain object or array as JSON, and a string, `Date`, `Response`, `Blob`, bytes or stream as Elysia does.
 - A class instance without its own `toString`, or a `Map`, such as an ORM row returned as is, answers 500 and is logged with the route and its class, as a throw is, where Elysia would send `[object Object]`.
 - A class instance without its own `toString`, or a `Map`, passed to `status()` answers 500 the same way.
 - On an `api()` chain, a `.ws()` route's refused `body` message is dropped, not answered (see [API from islands](live-values.md#chat-over-a-websocket)).
 - A `.ws()` route takes 1 MB a message and 100 messages a second from one socket; a socket over either is closed, with 1009 for a message too big and 1008 for too many. `detail: { messages: { maxSize: '4mb', rateLimit: { max: 30, window: '10s' } } }` sets the route's own, counted per socket in memory. Bun's own 16 MB frame cap holds over `maxSize`.
-- `api()` is a `new Elysia()` whose handlers read the app's locals, typed as `ctx.locals` is (see [Locals](server.md#locals)): `({ user })`, `ws.data.user`.
+- `api()` is a `new Elysia()` whose handlers read the app's locals, typed as `ctx.locals` is (see [Locals](server.md#locals)): `({ user })`, `ws.data.user`, `guard`, `once` ([Guards](server.md#guards)).
 - A plain `new Elysia()` is mounted the same way.
 - A handler, and the `onError` of its module or route, runs in the request's locale as the guards do, so `t()`, `wording()` and `locale()` read it: the locale of the page the call came from by its `Referer`, else the browser's `Accept-Language`, the site's one language without `i18n`. An `eventStream` source is read in it too; your own `Response` stream and a websocket's `open` and `message` are not.
 - A `_guard.ts` in `src/api/` or below runs before every route of the modules in its directory and below, outermost first, a websocket upgrade included, as it does for pages and actions.

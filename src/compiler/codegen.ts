@@ -202,7 +202,7 @@ class ModuleShell {
   private readonly styled: boolean
   private typedParts: { type?: string, helper: boolean, recipe: boolean } | undefined
   private readonly params: string
-  // An action declared in a page reads the params of that page's route, so its `action` is read as the one taking them; a layout's or a shared file's has no single route.
+  // An action declared in a page reads the params of that page's route, so its `action` is read as the one taking them; a layout's has no single route, so it is typed with the guards above it and untyped params.
   private readonly actionsTyped: boolean
 
   constructor(private readonly file: KayFile, private readonly script: ScriptAnalysis, private readonly server: ServerAnalysis | undefined, private readonly options: GenerateOptions) {

@@ -739,6 +739,16 @@ export interface ApiOptions {
   errorShape?: 'kay' | 'elysia' | undefined
 }
 
+// `guard` and `once` of an API route's context, read from its request.
+const REQUEST_VALUES = {
+  guard: { get(this: { request: Request }) {
+    return guardValues(this.request)
+  }, enumerable: true, configurable: true },
+  once: { get(this: { request: Request }) {
+    return onceOf(this.request)
+  }, enumerable: true, configurable: true },
+}
+
 // What a route of an `api()` module reads besides the app's locals: the values the `_guard.ts` files above it handed on, and `ctx.once`.
 type ApiRequest<Guarded extends object> = ApiLocals & { guard: Guarded, once: Once }
 
@@ -747,14 +757,10 @@ type ApiRequest<Guarded extends object> = ApiLocals & { guard: Guarded, once: On
 export function api<Guarded extends object = object>(options: ApiOptions = {}): Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiRequest<Guarded> }> {
   const instance = new Elysia()
 
-  // Read when the handler asks, once the module's guards have run: Elysia copies what a derive returns, so a getter is defined on the context itself.
+  // Read when the handler asks, once the module's guards have run: Elysia copies what a derive returns, so the getters are defined on the context itself.
+  // A `derive` or `resolve` of the module's own runs before its guards, so `guard` is empty there.
   instance.derive((context) => {
-    const { request } = context
-
-    Object.defineProperties(context, {
-      guard: { get: () => guardValues(request), enumerable: true, configurable: true },
-      once: { value: onceOf(request), enumerable: true, configurable: true },
-    })
+    Object.defineProperties(context, REQUEST_VALUES)
 
     return {}
   })

@@ -1181,7 +1181,7 @@ describe('kay lsp on a save', () => {
   })
 
   // The texts of the open page the server hands tsgo again as `saves` are made one after another, each as a change of `layout` on disk, a save of `sibling` first when it names one.
-  async function compiledAfter(dir: string, { page, layout, saves, files = {}, project = dir, sibling }: { page: string, layout: string, saves: string[], files?: Record<string, string>, project?: string, sibling?: string }): Promise<{ compiled: string[], layoutReads: number }> {
+  async function compiledAfter(dir: string, { page, layout, saves, files = {}, project = dir, sibling, removing = false }: { page: string, layout: string, saves: string[], files?: Record<string, string>, project?: string, sibling?: string, removing?: boolean }): Promise<{ compiled: string[], layoutReads: number }> {
     const source = '--- server\nconst query = ctx.query\n---\np {String(query)}\n'
     // The disk holds another text than the editor, so a read of the open page's text is the server's own.
     const encoder = new TextEncoder()
@@ -1223,8 +1223,12 @@ describe('kay lsp on a save', () => {
       const save = async (file: string, text: string) => {
         const before = writes.mock.calls.length
 
-        await Bun.write(file, text)
-        client.notify('workspace/didChangeWatchedFiles', { changes: [{ uri: pathToFileURL(file).href, type: 2 }] })
+        if (removing)
+          await rm(file)
+        else
+          await Bun.write(file, text)
+
+        client.notify('workspace/didChangeWatchedFiles', { changes: [{ uri: pathToFileURL(file).href, type: removing ? 3 : 2 }] })
 
         const deadline = Date.now() + 20_000
 
@@ -1306,6 +1310,23 @@ describe('kay lsp on a save', () => {
     }
     finally {
       await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('compiles an open page again when a _guard.ts above it is created or deleted, and not for a module that is no guard', async () => {
+    const guard = 'src/routes/_guard.ts'
+
+    for (const [sibling, files, removing, compiled] of [[guard, {}, false, 1], ['src/routes/util.ts', {}, false, 0], [guard, { [guard]: 'export default () => undefined\n' }, true, 1]] as const) {
+      const dir = await scratchDir('lsp-guard-files-')
+
+      try {
+        const made = Object.fromEntries(Object.entries(files).map(([path, text]) => [join(dir, path), text]))
+
+        expect((await compiledAfter(dir, { page: 'src/routes/a.kay', layout: join(dir, 'src/routes/b.kay'), saves: [], files: made, sibling, removing })).compiled).toHaveLength(compiled)
+      }
+      finally {
+        await rm(dir, { recursive: true, force: true })
+      }
     }
   })
 

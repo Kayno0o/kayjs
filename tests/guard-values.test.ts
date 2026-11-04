@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { stringify } from 'devalue'
+import { shutdown } from '../src/server/lifecycle'
 import { forgetOnces, onceForRequest } from '../src/server/request-scope'
 import { kayCheck } from './check-helper'
 import { scratchDir } from './scratch'
@@ -48,6 +49,7 @@ describe('what a guard hands on', () => {
       Bun.write(join(dir, 'routes/memo/index.kay'), `--- server\n${COUNT}const org = await ctx.once('org', async () => { counts.org = (counts.org ?? 0) + 1; return { name: 'second' } })\nconst other = await ctx.once('other', () => { throw new Error('boom') }).catch(() => 'failed')\nconst again = await ctx.once('other', () => 'never').catch(() => 'failed again')\n---\np.page {org.name} {other} {again} {counts.org}\n`),
       Bun.write(join(dir, 'api/_guard.ts'), GUARD('({ request }) => ({ who: request.headers.get(\'x-who\') ?? \'nobody\' })')),
       Bun.write(join(dir, 'api/me.ts'), 'import { api } from \'kay/server\'\n\nexport default api<{ who: string }>()\n  .get(\'/\', async ({ guard, once }) => ({ who: guard.who, again: await once(\'k\', () => guard.who) === await once(\'k\', () => \'other\') }))\n'),
+      Bun.write(join(dir, 'api/sock.ts'), 'import { api } from \'kay/server\'\n\nexport default api<{ who: string }>().ws(\'/\', { message(ws) {\n  ws.send(JSON.stringify(ws.data.guard))\n} })\n'),
       Bun.write(join(dir, 'api/open.ts'), 'import { api } from \'kay/server\'\n\nexport default api({ guards: false })\n  .get(\'/\', ({ guard }) => ({ keys: Object.keys(guard) }))\n'),
     ])
     app = await pages({ root: dir, dirs: { routes: 'routes' }, api: 'api', prebuilt: false })
@@ -130,6 +132,25 @@ describe('what a guard hands on', () => {
   it('reaches an API route as ctx.guard and ctx.once, empty on a module with guards: false', async () => {
     expect(await (await get('/api/me', { 'x-who': 'cy' })).json()).toEqual({ who: 'cy', again: true })
     expect(await (await get('/api/open', { 'x-who': 'cy' })).json()).toEqual({ keys: [] })
+  })
+
+  it('reaches a websocket route as ws.data.guard', async () => {
+    app.listen({ port: 0, hostname: '127.0.0.1' })
+
+    try {
+      const socket = new WebSocket(`ws://127.0.0.1:${app.server?.port}/api/sock`, { headers: { 'x-who': 'dee' } } as never)
+      const reply = new Promise<string>((resolve, reject) => {
+        socket.addEventListener('message', event => resolve(String(event.data)))
+        socket.addEventListener('error', () => reject(new Error('the socket failed')))
+        socket.addEventListener('open', () => socket.send('hi'))
+      })
+
+      expect(await reply).toBe('{"who":"dee"}')
+      socket.close()
+    }
+    finally {
+      await shutdown(app, true)
+    }
   })
 
   it('shares a keyed load between the layout and the page of one request, and across none', async () => {
@@ -226,6 +247,17 @@ describe('kay check on ctx.guard', () => {
 
     expect(output).toMatch(/checked with no problems in \d+ ms/)
     expect(code).toBe(0)
+  }, TIMEOUT)
+
+  it('reports guard.org on an API route that names nothing', async () => {
+    const { code, output } = await check({
+      'src/api/_guard.ts': ORG,
+      'src/api/org.ts': 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', ({ guard }) => guard.org)\n',
+      'src/routes/index.kay': 'p Home\n',
+    })
+
+    expect(output).toContain('org')
+    expect(code).not.toBe(0)
   }, TIMEOUT)
 
   it('reports a field no guard returns', async () => {

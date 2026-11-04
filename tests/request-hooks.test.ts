@@ -5,10 +5,19 @@ import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { refuse } from '../src/runtime/refuse'
 import { shutdown } from '../src/server/lifecycle'
+import { RequestTimeoutError } from '../src/server/request-timeout'
 import { nameUser } from '../src/server/request-user'
 import { scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
+
+// Waits for a hook told after the answer, up to 5 s.
+async function until(done: () => boolean): Promise<void> {
+  const end = Date.now() + 5000
+
+  while (!done() && Date.now() < end)
+    await Bun.sleep(5)
+}
 
 const GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny }) => {\n  if (request.headers.has(\'x-blocked\'))\n    deny(403, \'Blocked\')\n})\n'
 
@@ -327,7 +336,8 @@ describe('the request hooks in every corner', () => {
 describe('the request hooks on refusals, timeouts, re-renders and sign-ins', () => {
   const answers: { path: string, status: number, userId: string | undefined }[] = []
   const calls: string[] = []
-  const state = globalThis as { onceRuns?: number, signedIn?: string }
+  const state = globalThis as { onceRuns?: number, touched?: number, signedIn?: string }
+  const hooked: number[] = []
   let dir = ''
   let app: Awaited<ReturnType<typeof pages>>
 
@@ -341,7 +351,7 @@ describe('the request hooks on refusals, timeouts, re-renders and sign-ins', () 
 import { t } from 'elysia'
 import { action } from 'kay'
 
-const runs = globalThis as { onceRuns?: number, signedIn?: string }
+const runs = globalThis as { onceRuns?: number, touched?: number, signedIn?: string }
 const bump = () => (runs.onceRuns = (runs.onceRuns ?? 0) + 1)
 const n = await ctx.once('n', bump)
 
@@ -349,6 +359,14 @@ export const fail = action(t.Object({}), async (_input, ctx) => {
   await ctx.once('n', bump)
 
   return ctx.fail(422, 'No')
+})
+export const touch = action(async (ctx) => {
+  await ctx.once('t', () => ++runs.touched!)
+})
+export const touchAndCrash = action(async (ctx) => {
+  await ctx.once('t', () => ++runs.touched!)
+
+  throw new Error('crash')
 })
 export const signIn = action(t.Object({}), () => {
   runs.signedIn = 'ada'
@@ -359,6 +377,7 @@ export const signIn = action(t.Object({}), () => {
 p.n {n}
 `),
       Bun.write(join(dir, 'routes/slow.kay'), '--- server\nawait Bun.sleep(400)\n---\np late\n'),
+      Bun.write(join(dir, 'routes/quick.kay'), '--- server\nconst later = Bun.sleep(10).then(() => \'in time\')\n---\np first\nawait later then text\n  p.comments {text}\n'),
       Bun.write(join(dir, 'routes/streamed.kay'), '--- server\nconst later = Bun.sleep(400).then(() => \'late comments\')\n---\np first\nawait later then text\n  p.comments {text}\n'),
       Bun.write(join(dir, 'api/items.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api({ guards: false }).post(\'/\', ({ body }) => body.n, { body: t.Object({ n: t.Number() }) })\n'),
     ])
@@ -384,6 +403,10 @@ p.n {n}
         return request.headers.has('x-refuse') ? false : undefined
       },
       onResponse: ({ url, status, context }) => void answers.push({ path: url.pathname, status, userId: context.userId }),
+      actions: {
+        onSuccess: async ({ action, ctx }) => void (action === 'touch' && hooked.push(await ctx.once('t', () => ++state.touched!))),
+        onError: async ({ action, ctx }) => void (action === 'touchAndCrash' && hooked.push(await ctx.once('t', () => ++state.touched!))),
+      },
     })
   })
 
@@ -407,7 +430,20 @@ p.n {n}
     expect([refused.status, await refused.text()]).toEqual([403, 'Refused'])
   })
 
-  it('loads the ctx.once values of a page again when it renders after a failed action', async () => {
+  it('forgets what ctx.once loaded before an action changed things, for the rest of the same request', async () => {
+    for (const name of ['touch', 'touchAndCrash']) {
+      hooked.length = 0
+      state.touched = 0
+
+      const action = app.routes.find(route => route.method === 'POST' && route.path.endsWith(`/${name}`))?.path ?? ''
+
+      await post(action)
+      // The handler loaded once; the hook, run after it, loads again rather than read the stale answer.
+      expect([name, hooked, state.touched]).toEqual([name, [2], 2])
+    }
+  })
+
+  it('renders a page after a failed form post with its ctx.once values loaded again', async () => {
     state.onceRuns = 0
 
     expect(await (await get('/')).text()).toContain('<p class="n">1</p>')
@@ -431,10 +467,21 @@ p.n {n}
     const streamed = await get('/streamed')
 
     expect(streamed.status).toBe(200)
-    await expect(streamed.text()).rejects.toBeInstanceOf(Error)
-    await Bun.sleep(20)
+    await expect(streamed.text()).rejects.toBeInstanceOf(RequestTimeoutError)
+    await until(() => answers.some(entry => entry.path === '/streamed'))
     expect(answers.find(entry => entry.path === '/slow')?.status).toBe(504)
     expect(answers.find(entry => entry.path === '/streamed')?.status).toBe(200)
+  })
+
+  it('tells onResponse a streamed page that completes as a 200', async () => {
+    answers.length = 0
+
+    const quick = await get('/quick')
+
+    expect(quick.status).toBe(200)
+    expect(await quick.text()).toContain('<p class="comments">in time</p>')
+    await until(() => answers.some(entry => entry.path === '/quick'))
+    expect(answers.find(entry => entry.path === '/quick')?.status).toBe(200)
   })
 
   it('tells onResponse the user as the request began, not the one a sign-in action made', async () => {
@@ -445,7 +492,7 @@ p.n {n}
 
     expect((await post(action)).status).toBe(200)
     expect(state.signedIn as string | undefined).toBe('ada')
-    await Bun.sleep(20)
+    await until(() => answers.some(entry => entry.path === action))
     expect(answers.find(entry => entry.path === action)).toEqual({ path: action, status: 200, userId: undefined })
     delete state.signedIn
   })
@@ -481,7 +528,7 @@ describe('the request hooks under a locale prefix and on a prerendered page', ()
 
       expect((await get('/fr')).status).toBe(200)
       expect((await get('/fr', { 'x-refuse': '1' })).status).toBe(403)
-      await Bun.sleep(20)
+      await until(() => answered.length === 2)
       expect(seen).toEqual(['/fr', '/fr'])
       expect(answered.map(entry => entry.status)).toEqual([200, 403])
       expect(answered.every(entry => entry.path === '/fr')).toBe(true)
@@ -507,7 +554,7 @@ describe('the request hooks under a locale prefix and on a prerendered page', ()
 
       expect((await app.handle(new Request('http://localhost/news'))).status).toBe(200)
       expect((await app.handle(new Request('http://localhost/news', { headers: { 'x-refuse': '1' } }))).status).toBe(403)
-      await Bun.sleep(20)
+      await until(() => answered.length === 2)
       expect(seen).toEqual(['/news', '/news'])
       expect(answered).toEqual([200, 403])
     }

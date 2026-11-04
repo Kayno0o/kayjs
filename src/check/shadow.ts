@@ -4,7 +4,7 @@ import type { LintLevels } from '../compiler/lints'
 import type { ImportedSignals } from '../compiler/module-signals'
 import type { Route, RouteMount } from '../server/routes'
 import type { ServerFacts } from './layout-facts'
-import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { KAY_FILE, TS_FILE } from '../build/files'
 import { packageContextModule } from '../build/manifests'
@@ -136,9 +136,52 @@ function contextSpecifier(file: string, shadowDir: string): string | undefined {
   return module === undefined ? undefined : relativeSpecifier(shadowDir, module.replace(TS_FILE, ''))
 }
 
-// Whether a page under `dir` sets `guards: false`, so it runs none of the guards above it and the layout wrapping it reads no value of theirs.
-function opensPageBelow(dir: string): boolean {
-  return readdirSync(dir, { recursive: true, encoding: 'utf8' }).some(path => KAY_FILE.test(path) && !basename(path).startsWith('_') && falseKeys(readFileSync(join(dir, path), 'utf8')).has('guards'))
+// Whether each page file set `guards: false` when last read, by its modification time and size, so a layout checks the pages below it without parsing them again.
+const OPEN_PAGES = new Map<string, { stamp: string, open: boolean }>()
+
+function setsGuardsFalse(page: string): boolean {
+  try {
+    const stats = statSync(page, { throwIfNoEntry: false })
+
+    if (stats === undefined)
+      return false
+
+    const stamp = `${stats.mtimeMs}:${stats.size}`
+    const known = OPEN_PAGES.get(page)
+
+    if (known?.stamp === stamp)
+      return known.open
+
+    const open = falseKeys(readFileSync(page, 'utf8')).has('guards')
+
+    OPEN_PAGES.set(page, { stamp, open })
+
+    return open
+  }
+  // A page deleted between the listing and the read is no page.
+  catch {
+    return false
+  }
+}
+
+// Whether a page of the URL tree at `at`, whichever tree serves it, sets `guards: false`: it runs none of the guards above it, so the layout wrapping it reads no value of theirs. Folders and files starting with `_` hold no page.
+function opensPageBelow(trees: RouteMount[], at: string): boolean {
+  return trees.filter(tree => tree.outer === undefined).some(({ dir, prefix }) => {
+    // A layout above the tree's prefix wraps all of it; one inside it, the folder under it.
+    let below = ''
+
+    if (at !== '' && prefix !== at && !prefix.startsWith(`${at}/`)) {
+      if (!at.startsWith(`${prefix}/`))
+        return false
+
+      below = at.slice(prefix.length)
+    }
+
+    if (!existsSync(join(dir, below)))
+      return false
+
+    return readdirSync(join(dir, below), { recursive: true, encoding: 'utf8' }).some(path => KAY_FILE.test(path) && !path.split(sep).some(part => part.startsWith('_')) && setsGuardsFalse(join(dir, below, path)))
+  })
 }
 
 // The type of what each `_guard.ts` covering a page or a layout returns, outermost first, which its `ctx.guard` holds; none for a page that sets `guards: false`, nor for a layout with such a page under it, which renders with no guard values for that page.
@@ -149,7 +192,7 @@ export function guardTypes(file: string, source: string, routesDir: string, moun
   if ((!pageRoute(file, routesDir, mounts) && basename(file) !== LAYOUT) || !trees.some(({ dir }) => file.startsWith(dir + sep)) || falseKeys(source).has('guards'))
     return undefined
 
-  if (basename(file) === LAYOUT && opensPageBelow(dirname(file)))
+  if (basename(file) === LAYOUT && (trees.some(tree => tree.outer === file) || opensPageBelow(trees, virtualDir(trees, dirname(file)))))
     return undefined
 
   // An extension's outer layout sits outside every tree and wraps the root, as the router places it.
