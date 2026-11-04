@@ -18,7 +18,7 @@ type AdminChangeFailure = AdminFailure | 'stale'
 type AdminFailure = 'forbidden' | 'not-found' | 'two-factor-required'
 
 [.] appleProvider
-function appleProvider(opts: Pick<ProviderOptions, "scopes" | "params"> & { teamId: string; keyId: string; privateKey: string; }): OAuthProvider<OpenIdClaims, OAuthUser>
+function appleProvider(opts: Pick<ProviderOptions, "params" | "scopes"> & { teamId: string; keyId: string; privateKey: string; }): OAuthProvider<OpenIdClaims, OAuthUser>
 
 [.] ApprovedClient
 interface ApprovedClient
@@ -722,7 +722,7 @@ function createAuth<Data extends AuthSessionData, Role extends string = string, 
         readonly auth: Auth<Scope, Role, OrgRole, UserData>;
       }>;
     })["macro"] & Partial<{
-      readonly auth: false | Requirement<BareUser<Record<string, unknown>>, Role> | undefined;
+      readonly auth: Requirement<BareUser<Record<string, unknown>>, Role> | false | undefined;
       readonly scope: ScopeRequirement<Scope> | undefined;
     }>;
     macroFn: (Meta & {
@@ -735,7 +735,7 @@ function createAuth<Data extends AuthSessionData, Role extends string = string, 
         readonly auth: Auth<Scope, Role, OrgRole, UserData>;
       }>;
     })["macroFn"] & {
-      readonly auth: (requirement: false | Requirement<BareUser<Record<string, unknown>>, Role> | undefined) => {
+      readonly auth: (requirement: Requirement<BareUser<Record<string, unknown>>, Role> | false | undefined) => {
         readonly transform: (ctx: object) => void;
       };
       readonly scope: (scope: ScopeRequirement<Scope> | undefined) => {
@@ -745,7 +745,7 @@ function createAuth<Data extends AuthSessionData, Role extends string = string, 
     parser: (Meta & {
       schema: {}; ...#5fcbd34a (3890 lines)
   guard: (guardOptions?: RouteGuardOptions<Role, Scope>) => Guard;
-  test: (site: OAuthSite) => { ...#e872ca38 (9 lines)
+  test: (site: OAuthSite) => { ...#d43a5614 (9 lines)
   sessionCookie(userId: string, cookieOptions?: { ...#73ac2c57 (3 lines)
   signInAs(site: { ...#730c06b7 (3 lines)
   enrollTotp(userId: string): Promise<TotpEnrolment>;
@@ -764,11 +764,11 @@ function createGate<P, G extends string, S extends string = string>(deps: GateDe
   schema: Meta["schema"];
   standaloneSchema: Meta["standaloneSchema"];
   macro: Meta["macro"] & Partial<{
-    readonly auth: false | Requirement<P, G> | undefined;
+    readonly auth: Requirement<P, G> | false | undefined;
     readonly scope: ScopeRequirement<S> | undefined;
   }>;
   macroFn: Meta["macroFn"] & {
-    readonly auth: (requirement: false | Requirement<P, G> | undefined) => {
+    readonly auth: (requirement: Requirement<P, G> | false | undefined) => {
       readonly transform: (ctx: object) => void;
     };
     readonly scope: (scope: ScopeRequirement<S> | undefined) => {
@@ -797,7 +797,7 @@ function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuthProvide
 }
 
 [.] createOAuthTokenRefresher
-function createOAuthTokenRefresher<K, S>(deps: OAuthTokenRefresherDeps<K, S>): { getValidToken(subject: S): Promise<string | null>; }
+function createOAuthTokenRefresher<K, S>(deps: OAuthTokenRefresherDeps<K, S>): { getValidToken(subject: S): Promise<null | string>; }
 
 [.] CreateOrganizationResult
 type CreateOrganizationResult<Role extends string = string> = {
@@ -816,7 +816,7 @@ function createRoleHierarchy<P, R extends string>(hierarchy: RoleHierarchy<R>, g
 }
 
 [.] createTokenRefresher
-function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>): { getValidToken(subject: S): Promise<string | null>; }
+function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>): { getValidToken(subject: S): Promise<null | string>; }
 
 [.] CreateTokenResult
 type CreateTokenResult = { ok: true, token: string, id: string } | { ok: false, error: ProofFailure | TokenProblem }
@@ -834,7 +834,7 @@ interface CreateUserInput
 type CreateUserResult = { ok: true, user: BareUser } | { ok: false, errors: RegisterErrors }
 
 [.] createWsAuthStore
-function createWsAuthStore<T>(verify: (token: string, ws: Ws) => T | Promise<T | null> | null): {
+function createWsAuthStore<T>(verify: (token: string, ws: Ws) => Promise<T | null> | T | null): {
   handleAuth(ws: Ws, token: string): Promise<void>;
   get(ws: Ws): Promise<T | undefined>;
   forget: (ws: Ws) => boolean;
@@ -1102,7 +1102,7 @@ interface GuardOptions
 type GuestSignInResult = { ok: true, user: BareUser } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' | 'closed' }
 
 [.] hcaptcha
-function hcaptcha(secret: string): (token: string, action: CaptchaAction, context?: CaptchaContext | undefined) => boolean | Promise<boolean>
+function hcaptcha(secret: string): (token: string, action: CaptchaAction, context?: CaptchaContext | undefined) => Promise<boolean> | boolean
 
 [.] hcaptchaWidget
 function hcaptchaWidget(siteKey: string): CaptchaWidget
@@ -1254,7 +1254,7 @@ interface Membership<Role extends string = string>
 function memoryAuthStore(): AuthStore
 
 [.] microsoftProvider
-function microsoftProvider(opts?: OpenIdOptions & { tenant?: string; }): OAuthProvider<OpenIdClaims & { tid?: string; xms_edov?: string | number | boolean; }, OAuthUser>
+function microsoftProvider(opts?: OpenIdOptions & { tenant?: string; }): OAuthProvider<OpenIdClaims & { tid?: string; xms_edov?: boolean | number | string; }, OAuthUser>
 
 [.] mixesConfusableScripts
 function mixesConfusableScripts(value: string): boolean
@@ -1781,13 +1781,13 @@ type RoleHierarchy<R extends string> = Record<R, R[]>
 type RoleResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'unknown-role' | 'self' | 'last-admin' }
 
 [.] safeRedirect
-function safeRedirect(path: string | null | undefined, fallback?: string): string
+function safeRedirect(path: null | string | undefined, fallback?: string): string
 
 [.] SaveProfileResult
 type SaveProfileResult = { ok: true } | { ok: false, error: 'signed-out' } | { ok: false, errors: Record<string, ProfileProblem> }
 
 [.] scopeAllows
-function scopeAllows(scopes: readonly string[] | null, wanted: ScopeRequirement<string> | undefined): boolean
+function scopeAllows(scopes: null | readonly string[], wanted: ScopeRequirement<string> | undefined): boolean
 
 [.] ScopeRequirement
 type ScopeRequirement<S extends string> = S | S[] | false
@@ -1875,7 +1875,7 @@ interface TotpEnrolment
   secret: string
 
 [.] turnstile
-function turnstile(secret: string): (token: string, action: CaptchaAction, context?: CaptchaContext | undefined) => boolean | Promise<boolean>
+function turnstile(secret: string): (token: string, action: CaptchaAction, context?: CaptchaContext | undefined) => Promise<boolean> | boolean
 
 [.] turnstileWidget
 function turnstileWidget(siteKey: string): CaptchaWidget
@@ -2116,15 +2116,15 @@ function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, u
   }[];
   captcha: {
     shown: boolean;
-    challenge: string | null;
+    challenge: null | string;
   };
-  refused: {
-    readonly fields: any;
-    readonly error?: never;
-  } | {
+  refused: undefined | {
     readonly error: any;
     readonly fields?: never;
-  } | undefined;
+  } | {
+    readonly fields: any;
+    readonly error?: never;
+  };
   fields: any;
   error: string | undefined;
   verify: boolean;
@@ -2158,16 +2158,16 @@ function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, u
   token: string | undefined;
   captcha: {
     shown: boolean;
-    challenge: string | null;
+    challenge: null | string;
   };
   requestError: string | undefined;
-  refused: {
-    readonly password: any;
-    readonly error?: never;
-  } | {
+  refused: undefined | {
     readonly error: any;
     readonly password?: never;
-  } | undefined;
+  } | {
+    readonly password: any;
+    readonly error?: never;
+  };
   sent: boolean;
   landmark: boolean;
 }>
@@ -2205,11 +2205,11 @@ function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, u
   user: any;
   captchaSignIn: {
     shown: boolean;
-    challenge: string | null;
+    challenge: null | string;
   };
   captchaMagic: {
     shown: boolean;
-    challenge: string | null;
+    challenge: null | string;
   };
   pending: any;
   oauthError: string | undefined;

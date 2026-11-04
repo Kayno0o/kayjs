@@ -35,7 +35,7 @@ const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-labe
 const SLIDER_STATE: "aria-invalid:[&::-webkit-slider-thumb]:bg-danger aria-invalid:[&::-moz-range-thumb]:bg-danger data-[size=sm]:h-3 data-[size=sm]:[&::-webkit-slider-thumb]:-mt-1 data-[size=sm]:[&::-webkit-slider-thumb]:size-3 data-[size=sm]:[&::-moz-range-thumb]:size-3 data-[size=lg]:h-5 data-[size=lg]:[&::-webkit-slider-thumb]:-mt-2 data-[size=lg]:[&::-webkit-slider-thumb]:size-5 data-[size=lg]:[&::-moz-range-thumb]:size-5"
 
 [./lib/accept] acceptsFile
-function acceptsFile(accept: string | undefined, file: Pick<File, "type" | "name">): boolean
+function acceptsFile(accept: string | undefined, file: Pick<File, "name" | "type">): boolean
 
 [./lib/add] default
 const default: { description: string; extension: { import: string; expression: string; }; notes: string[]; }
@@ -111,11 +111,12 @@ type AsButton = Omit<JSX.IntrinsicElements['button'], 'type' | 'class'> & Look &
 type AsLink = Omit<JSX.IntrinsicElements['a'], 'class'> & Look & { href: string }
 
 [./lib/button-props] buttonOf
-function buttonOf(attributes: TagAttributes): {
-  disabled: undefined;
+function buttonOf(attributes: TagAttributes): undefined | {
   'aria-pressed'?: string;
   'aria-expanded'?: string;
-  command?: "close" | "show-modal" | "request-close" | "show-popover" | "hide-popover" | "toggle-popover" | `--${string}` | undefined;
+  type: "button" | "reset" | "submit";
+  disabled: Value;
+  command?: "close" | "hide-popover" | "request-close" | "show-modal" | "show-popover" | "toggle-popover" | `--${string}` | undefined;
   form?: Value;
   slot?: Value;
   style?: StyleValue;
@@ -260,7 +261,189 @@ function buttonOf(attributes: TagAttributes): {
   itemscope?: Value;
   itemtype?: Value;
   writingsuggestions?: Value;
-  transition?: string | TransitionClasses | undefined;
+  transition?: TransitionClasses | string | undefined;
+  'transition:enter'?: string | undefined;
+  'transition:enter-from'?: string | undefined;
+  'transition:enter-to'?: string | undefined;
+  'transition:leave'?: string | undefined;
+  'transition:leave-from'?: string | undefined;
+  'transition:leave-to'?: string | undefined;
+  commandForElement?: Value;
+  formAction?: Value;
+  formEnctype?: Value;
+  formMethod?: Value;
+  formNoValidate?: Value;
+  formTarget?: Value;
+  labels?: Value;
+  name?: Value;
+  validationMessage?: Value;
+  validity?: Value;
+  value?: Value;
+  willValidate?: Value;
+  popoverTargetAction?: Value;
+  popoverTargetElement?: Value;
+  commandforelement?: Value;
+  formaction?: Value;
+  formenctype?: Value;
+  formmethod?: Value;
+  formnovalidate?: Value;
+  formtarget?: Value;
+  validationmessage?: Value;
+  willvalidate?: Value;
+  popovertargetaction?: Value;
+  popovertargetelement?: Value;
+  popovertarget?: Value;
+  commandfor?: Value;
+  href?: undefined; ...#cb681d97 (2 lines)
+  disabled: undefined;
+  'aria-pressed'?: string;
+  'aria-expanded'?: string;
+  command?: "close" | "hide-popover" | "request-close" | "show-modal" | "show-popover" | "toggle-popover" | `--${string}` | undefined;
+  form?: Value;
+  slot?: Value;
+  style?: StyleValue;
+  title?: Value;
+  children?: Element;
+  onChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onFocus?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
+  onInput?: EventHandler<HTMLButtonElement, InputEvent> | undefined;
+  onLoad?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onClose?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onPause?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onPlay?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onError?: EventHandler<HTMLButtonElement, ErrorEvent> | undefined;
+  onFullscreenchange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onFullscreenerror?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onAbort?: EventHandler<HTMLButtonElement, UIEvent> | undefined;
+  onAnimationCancel?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
+  onAnimationEnd?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
+  onAnimationIteration?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
+  onAnimationStart?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
+  onAuxClick?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onBeforeInput?: EventHandler<HTMLButtonElement, InputEvent> | undefined;
+  onBeforematch?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onBeforeToggle?: EventHandler<HTMLButtonElement, ToggleEvent> | undefined;
+  onBlur?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
+  onCancel?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCanPlay?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCanPlayThrough?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onClick?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onCommand?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCompositionEnd?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
+  onCompositionStart?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
+  onCompositionUpdate?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
+  onContextLost?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onContextMenu?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onContextRestored?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCopy?: EventHandler<HTMLButtonElement, ClipboardEvent> | undefined;
+  onCuechange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCut?: EventHandler<HTMLButtonElement, ClipboardEvent> | undefined;
+  onDblClick?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onDrag?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragEnd?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragEnter?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragLeave?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragOver?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragStart?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDrop?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDurationChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onEmptied?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onEnded?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onFocusIn?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
+  onFocusOut?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
+  onFormdata?: EventHandler<HTMLButtonElement, FormDataEvent> | undefined;
+  onGotPointerCapture?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onInvalid?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onKeyDown?: EventHandler<HTMLButtonElement, KeyboardEvent> | undefined;
+  onKeyPress?: EventHandler<HTMLButtonElement, KeyboardEvent> | undefined;
+  onKeyUp?: EventHandler<HTMLButtonElement, KeyboardEvent> | undefined;
+  onLoadedData?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onLoadedMetadata?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onLoadStart?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onLostPointerCapture?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onMouseDown?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseEnter?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseLeave?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseMove?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseOut?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseOver?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseUp?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onPaste?: EventHandler<HTMLButtonElement, ClipboardEvent> | undefined;
+  onPlaying?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onPointerCancel?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerDown?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerEnter?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerLeave?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerMove?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerOut?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerOver?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerrawupdate?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onPointerUp?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onProgress?: EventHandler<HTMLButtonElement, ProgressEvent<EventTarget>> | undefined;
+  onRateChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onReset?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onResize?: EventHandler<HTMLButtonElement, UIEvent> | undefined;
+  onScroll?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onScrollend?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSecurityPolicyViolation?: EventHandler<HTMLButtonElement, SecurityPolicyViolationEvent> | undefined;
+  onSeeked?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSeeking?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSelect?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSelectionChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSelectStart?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSlotchange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onStalled?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSubmit?: EventHandler<HTMLButtonElement, SubmitEvent> | undefined;
+  onSuspend?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onTimeUpdate?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onToggle?: EventHandler<HTMLButtonElement, ToggleEvent> | undefined;
+  onTouchCancel?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
+  onTouchEnd?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
+  onTouchMove?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
+  onTouchStart?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
+  onTransitionCancel?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
+  onTransitionEnd?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
+  onTransitionRun?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
+  onTransitionStart?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
+  onVolumeChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWaiting?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWebkitanimationend?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWebkitanimationiteration?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWebkitanimationstart?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWebkittransitionend?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWheel?: EventHandler<HTMLButtonElement, WheelEvent> | undefined;
+  autocapitalize?: Value;
+  dir?: Value;
+  draggable?: Value;
+  hidden?: Value;
+  inert?: Value;
+  innerText?: string | undefined;
+  lang?: Value;
+  popover?: Value;
+  spellcheck?: Value;
+  translate?: Value;
+  id?: Value;
+  innerHTML?: string | undefined;
+  part?: Value;
+  textContent?: string | undefined;
+  role?: Value;
+  autofocus?: Value;
+  nonce?: Value;
+  ref?: ((element: HTMLButtonElement) => unknown) | undefined;
+  tabindex?: Value;
+  exportparts?: Value;
+  is?: Value;
+  contenteditable?: Value;
+  accesskey?: Value;
+  enterkeyhint?: Value;
+  inputmode?: Value;
+  itemid?: Value;
+  itemprop?: Value;
+  itemref?: Value;
+  itemscope?: Value;
+  itemtype?: Value;
+  writingsuggestions?: Value;
+  transition?: TransitionClasses | string | undefined;
   'transition:enter'?: string | undefined;
   'transition:enter-from'?: string | undefined;
   'transition:enter-to'?: string | undefined;
@@ -295,190 +478,7 @@ function buttonOf(attributes: TagAttributes): {
   commandfor?: Value;
   href?: undefined;
   type: "button";
-  'aria-disabled': "true"; ...#35e55001 (2 lines)
-  'aria-pressed'?: string;
-  'aria-expanded'?: string;
-  type: "reset" | "submit" | "button";
-  disabled: Value;
-  command?: "close" | "show-modal" | "request-close" | "show-popover" | "hide-popover" | "toggle-popover" | `--${string}` | undefined;
-  form?: Value;
-  slot?: Value;
-  style?: StyleValue;
-  title?: Value;
-  children?: Element;
-  onChange?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onFocus?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
-  onInput?: EventHandler<HTMLButtonElement, InputEvent> | undefined;
-  onLoad?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onClose?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onPause?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onPlay?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onError?: EventHandler<HTMLButtonElement, ErrorEvent> | undefined;
-  onFullscreenchange?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onFullscreenerror?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onAbort?: EventHandler<HTMLButtonElement, UIEvent> | undefined;
-  onAnimationCancel?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
-  onAnimationEnd?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
-  onAnimationIteration?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
-  onAnimationStart?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
-  onAuxClick?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
-  onBeforeInput?: EventHandler<HTMLButtonElement, InputEvent> | undefined;
-  onBeforematch?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onBeforeToggle?: EventHandler<HTMLButtonElement, ToggleEvent> | undefined;
-  onBlur?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
-  onCancel?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onCanPlay?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onCanPlayThrough?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onClick?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
-  onCommand?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onCompositionEnd?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
-  onCompositionStart?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
-  onCompositionUpdate?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
-  onContextLost?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onContextMenu?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
-  onContextRestored?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onCopy?: EventHandler<HTMLButtonElement, ClipboardEvent> | undefined;
-  onCuechange?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onCut?: EventHandler<HTMLButtonElement, ClipboardEvent> | undefined;
-  onDblClick?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
-  onDrag?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
-  onDragEnd?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
-  onDragEnter?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
-  onDragLeave?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
-  onDragOver?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
-  onDragStart?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
-  onDrop?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
-  onDurationChange?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onEmptied?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onEnded?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onFocusIn?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
-  onFocusOut?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
-  onFormdata?: EventHandler<HTMLButtonElement, FormDataEvent> | undefined;
-  onGotPointerCapture?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
-  onInvalid?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onKeyDown?: EventHandler<HTMLButtonElement, KeyboardEvent> | undefined;
-  onKeyPress?: EventHandler<HTMLButtonElement, KeyboardEvent> | undefined;
-  onKeyUp?: EventHandler<HTMLButtonElement, KeyboardEvent> | undefined;
-  onLoadedData?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onLoadedMetadata?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onLoadStart?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onLostPointerCapture?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
-  onMouseDown?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
-  onMouseEnter?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
-  onMouseLeave?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
-  onMouseMove?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
-  onMouseOut?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
-  onMouseOver?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
-  onMouseUp?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
-  onPaste?: EventHandler<HTMLButtonElement, ClipboardEvent> | undefined;
-  onPlaying?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onPointerCancel?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
-  onPointerDown?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
-  onPointerEnter?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
-  onPointerLeave?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
-  onPointerMove?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
-  onPointerOut?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
-  onPointerOver?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
-  onPointerrawupdate?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onPointerUp?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
-  onProgress?: EventHandler<HTMLButtonElement, ProgressEvent<EventTarget>> | undefined;
-  onRateChange?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onReset?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onResize?: EventHandler<HTMLButtonElement, UIEvent> | undefined;
-  onScroll?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onScrollend?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onSecurityPolicyViolation?: EventHandler<HTMLButtonElement, SecurityPolicyViolationEvent> | undefined;
-  onSeeked?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onSeeking?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onSelect?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onSelectionChange?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onSelectStart?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onSlotchange?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onStalled?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onSubmit?: EventHandler<HTMLButtonElement, SubmitEvent> | undefined;
-  onSuspend?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onTimeUpdate?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onToggle?: EventHandler<HTMLButtonElement, ToggleEvent> | undefined;
-  onTouchCancel?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
-  onTouchEnd?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
-  onTouchMove?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
-  onTouchStart?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
-  onTransitionCancel?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
-  onTransitionEnd?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
-  onTransitionRun?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
-  onTransitionStart?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
-  onVolumeChange?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onWaiting?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onWebkitanimationend?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onWebkitanimationiteration?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onWebkitanimationstart?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onWebkittransitionend?: EventHandler<HTMLButtonElement, Event> | undefined;
-  onWheel?: EventHandler<HTMLButtonElement, WheelEvent> | undefined;
-  autocapitalize?: Value;
-  dir?: Value;
-  draggable?: Value;
-  hidden?: Value;
-  inert?: Value;
-  innerText?: string | undefined;
-  lang?: Value;
-  popover?: Value;
-  spellcheck?: Value;
-  translate?: Value;
-  id?: Value;
-  innerHTML?: string | undefined;
-  part?: Value;
-  textContent?: string | undefined;
-  role?: Value;
-  autofocus?: Value;
-  nonce?: Value;
-  ref?: ((element: HTMLButtonElement) => unknown) | undefined;
-  tabindex?: Value;
-  exportparts?: Value;
-  is?: Value;
-  contenteditable?: Value;
-  accesskey?: Value;
-  enterkeyhint?: Value;
-  inputmode?: Value;
-  itemid?: Value;
-  itemprop?: Value;
-  itemref?: Value;
-  itemscope?: Value;
-  itemtype?: Value;
-  writingsuggestions?: Value;
-  transition?: string | TransitionClasses | undefined;
-  'transition:enter'?: string | undefined;
-  'transition:enter-from'?: string | undefined;
-  'transition:enter-to'?: string | undefined;
-  'transition:leave'?: string | undefined;
-  'transition:leave-from'?: string | undefined;
-  'transition:leave-to'?: string | undefined;
-  commandForElement?: Value;
-  formAction?: Value;
-  formEnctype?: Value;
-  formMethod?: Value;
-  formNoValidate?: Value;
-  formTarget?: Value;
-  labels?: Value;
-  name?: Value;
-  validationMessage?: Value;
-  validity?: Value;
-  value?: Value;
-  willValidate?: Value;
-  popoverTargetAction?: Value;
-  popoverTargetElement?: Value;
-  commandforelement?: Value;
-  formaction?: Value;
-  formenctype?: Value;
-  formmethod?: Value;
-  formnovalidate?: Value;
-  formtarget?: Value;
-  validationmessage?: Value;
-  willvalidate?: Value;
-  popovertargetaction?: Value;
-  popovertargetelement?: Value;
-  popovertarget?: Value;
-  commandfor?: Value;
-  href?: undefined; ...#1f3d701d (2 lines)
+  'aria-disabled': "true"; ...#36d9e3c0 (2 lines)
 
 [./lib/button-props] ButtonProps
 type ButtonProps = AsButton | AsLink
@@ -509,13 +509,13 @@ function changeAccepted(control: string, run: () => unknown, busy: (pending: boo
 function isPromiseLike(value: unknown): value is PromiseLike<unknown>
 
 [./lib/chart-axis] chartData
-function chartData(labels: string[], series: (number | null)[][], times: number[] | null): LineChartData
+function chartData(labels: string[], series: (null | number)[][], times: null | number[]): LineChartData
 
 [./lib/chart-axis] headings
-function headings(labels: string[], times: number[] | null, format?: LabelFormat | undefined): string[]
+function headings(labels: string[], times: null | number[], format?: LabelFormat | undefined): string[]
 
 [./lib/chart-axis] indexAt
-function indexAt(position: number, count: number, times: number[] | null): number
+function indexAt(position: number, count: number, times: null | number[]): number
 
 [./lib/chart-axis] LabelContext
 interface LabelContext
@@ -528,44 +528,44 @@ interface LabelContext
 type LabelFormat = (label: string, context: LabelContext) => string
 
 [./lib/chart-axis] labelTimes
-function labelTimes(labels: string[]): number[] | null
+function labelTimes(labels: string[]): null | number[]
 
 [./lib/chart-axis] positionOf
-function positionOf(index: number, count: number, times: number[] | null): number
+function positionOf(index: number, count: number, times: null | number[]): number
 
 [./lib/chart-axis] secondsApart
 function secondsApart(labels: string[]): boolean
 
 [./lib/chart-axis] spanOf
-function spanOf(times: number[] | null): number
+function spanOf(times: null | number[]): number
 
 [./lib/chart-axis] stackValues
-function stackValues(series: (number | null)[][]): number[][]
+function stackValues(series: (null | number)[][]): number[][]
 
 [./lib/chart-axis] tickIndices
 function tickIndices(total: number): number[]
 
 [./lib/chart-axis] tickTexts
-function tickTexts(labels: string[], times: number[] | null, format?: LabelFormat | undefined): string[]
+function tickTexts(labels: string[], times: null | number[], format?: LabelFormat | undefined): string[]
 
 [./lib/chart-axis] totalAt
-function totalAt(series: { values: (number | null)[]; }[], index: number): number
+function totalAt(series: { values: (null | number)[]; }[], index: number): number
 
 [./lib/chart-axis] xAxisOptions
-function xAxisOptions(labels: string[], times: number[] | null, showLabels: boolean, fixedScale: AxisFactory, format?: LabelFormat | undefined): Omit<AxisOptions, "type"> & {
+function xAxisOptions(labels: string[], times: null | number[], showLabels: boolean, fixedScale: AxisFactory, format?: LabelFormat | undefined): Omit<AxisOptions, "type"> & {
   readonly type?: AxisFactory | LegacyAxisClass;
 }
 
 [./lib/chart-marks] activeMarks
 function activeMarks(options: {
-  active: () => number | null | undefined;
-  onActive: () => ((index: number | null) => unknown) | undefined;
+  active: () => null | number | undefined;
+  onActive: () => ((index: null | number) => unknown) | undefined;
 }): {
-  current: () => number | null;
-  anchor: () => {
+  current: () => null | number;
+  anchor: () => null | {
     clientX: number;
     clientY: number;
-  } | null;
+  };
   enter: (index: number, element: Element) => void;
   leave: (index: number) => void;
 }
@@ -617,7 +617,7 @@ interface ComboboxQuery
   q: string
 
 [./lib/combobox] enabledIndex
-function enabledIndex(disabled: readonly boolean[], from: number, step: 1 | -1): number
+function enabledIndex(disabled: readonly boolean[], from: number, step: -1 | 1): number
 
 [./lib/combobox] exactOption
 function exactOption<Value extends string>(options: readonly ComboboxOption<Value>[], text: string): ComboboxOption<Value> | undefined
@@ -710,10 +710,10 @@ function dayName(iso: string, locale: string): string
 function firstDayOf(locale: string): number
 
 [./lib/date] isDate
-function isDate(text: string | null | undefined): text is string
+function isDate(text: null | string | undefined): text is string
 
 [./lib/date] localDateTime
-function localDateTime(instant: string | Date | null | undefined): string
+function localDateTime(instant: Date | null | string | undefined): string
 
 [./lib/date] monthTitle
 function monthTitle(iso: string, locale: string): string
@@ -1010,9 +1010,9 @@ function resetWhenIdle(busy: () => boolean, restore: () => void): { reset: () =>
 function startRef<Target extends Element>(first: (element: Target) => void, app?: unknown): (element: Target) => void
 
 [./lib/forms] callAction
-function callAction<Output>(form: HTMLFormElement, action: Action<never, Output, never>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => string | Record<string, string> | undefined) | undefined, onError?: ((error: unknown) => unknown) | undefined): Promise<{
+function callAction<Output>(form: HTMLFormElement, action: Action<never, Output, never>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined, onError?: ((error: unknown) => unknown) | undefined): Promise<undefined | {
   result: Answer<Success<Output>>;
-} | undefined>
+}>
 
 [./lib/forms] fieldLinks
 function fieldLinks(group: boolean, hint: boolean, messages: () => readonly unknown[], required?: boolean): FieldLinks
@@ -1045,7 +1045,7 @@ type ActionSource<Row, Target extends Action<never, unknown>> = {
 } & RowsOf<Row, Target>
 
 [./lib/index] attempt
-function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
+function attempt<T, Data = unknown>(run: () => Promise<T>, failure: AttemptOptions<Data> | string, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
 
 [./lib/index] Attempted
 type Attempted<T> = T extends void ? true : T
@@ -1137,7 +1137,7 @@ interface ContributionDay
   intensity: number
 
 [./lib/index] currentStep
-function currentStep<Key extends string>(url: string | URL, keys: readonly Key[], done?: readonly string[], param?: string): Key
+function currentStep<Key extends string>(url: URL | string, keys: readonly Key[], done?: readonly string[], param?: string): Key
 
 [./lib/index] DateRange
 type DateRange = [string | null, string | null]
@@ -1193,7 +1193,7 @@ interface IconChoice
 type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
 [./lib/index] infiniteList
-function infiniteList<Row, Target extends Action<never, unknown> = never>(given: Row[] | (() => Row[]), options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
+function infiniteList<Row, Target extends Action<never, unknown> = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
 
 [./lib/index] InfiniteList
 interface InfiniteList<Row>
@@ -1425,7 +1425,7 @@ interface StepDraftOptions
   secure?: boolean | undefined
 
 [./lib/index] stepHref
-function stepHref(url: string | URL, key: string, param?: string): string
+function stepHref(url: URL | string, key: string, param?: string): string
 
 [./lib/index] StepItem
 interface StepItem<Key extends string = string>
@@ -1544,7 +1544,7 @@ type ActionSource<Row, Target extends Action<never, unknown>> = {
 } & RowsOf<Row, Target>
 
 [./lib/infinite-list] infiniteList
-function infiniteList<Row, Target extends Action<never, unknown> = never>(given: Row[] | (() => Row[]), options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
+function infiniteList<Row, Target extends Action<never, unknown> = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
 
 [./lib/infinite-list] InfiniteList
 interface InfiniteList<Row>
@@ -1686,7 +1686,7 @@ function indentEdit(value: string, start: number, end: number, outdent: boolean)
 function linkEdit(value: string, start: number, end: number): TextEdit
 
 [./lib/markdown-edit] listContinuation
-function listContinuation(line: string): { next: string; clear: boolean; } | null
+function listContinuation(line: string): null | { next: string; clear: boolean; }
 
 [./lib/markdown-edit] listEdit
 function listEdit(value: string, start: number, end: number, ordered: boolean): TextEdit
@@ -1827,7 +1827,7 @@ type NullOption<Value, Held> = null extends Value ? null extends Held ? '' exten
 const OUTSIDE: { readonly target: "_blank"; readonly rel: "noopener noreferrer"; readonly 'data-new-tab': ""; }
 
 [./lib/overlay] closeWatcher
-function closeWatcher({ modal, docked, dirty, edited, footer }: CloseWatcherState): "none" | "any" | "closerequest"
+function closeWatcher({ modal, docked, dirty, edited, footer }: CloseWatcherState): "any" | "closerequest" | "none"
 
 [./lib/overlay] CloseWatcherState
 interface CloseWatcherState
@@ -1856,13 +1856,13 @@ function syncOpen(dialog: HTMLDialogElement, shown: boolean, modal: boolean, foc
 function currentPage(page: number, pages: number): number
 
 [./lib/pagination] offsetHref
-function offsetHref(url: string | URL, offset: number, param?: string): string
+function offsetHref(url: URL | string, offset: number, param?: string): string
 
 [./lib/pagination] OpenPosition
 type OpenPosition = { page: number, offset?: never, limit?: never } | { page?: never, offset: number, limit: number }
 
 [./lib/pagination] openSteps
-function openSteps(position: OpenPosition, more: boolean, url: string | URL, param?: string | undefined): { previous: string | undefined; next: string | undefined; }
+function openSteps(position: OpenPosition, more: boolean, url: URL | string, param?: string | undefined): { previous: string | undefined; next: string | undefined; }
 
 [./lib/pagination] PagedList
 interface PagedList
@@ -1874,10 +1874,10 @@ interface PagedList
 type PageGap = 'gap'
 
 [./lib/pagination] pageHref
-function pageHref(url: string | URL, page: number, param?: string): string
+function pageHref(url: URL | string, page: number, param?: string): string
 
 [./lib/pagination] pageItems
-function pageItems(page: number, pages: number, siblings?: number): (number | "gap")[]
+function pageItems(page: number, pages: number, siblings?: number): ("gap" | number)[]
 
 [./lib/paging] pageFields
 function pageFields(max?: number): { offset: TOptional<TInteger>; limit: TOptional<TInteger>; }
@@ -1927,7 +1927,7 @@ interface PaletteLink extends PaletteBase
 function paletteMatches(entries: PaletteEntry[], query: string, groups?: string[]): PaletteEntry[]
 
 [./lib/palette] paletteScore
-function paletteScore(entry: Pick<PaletteBase, "label" | "group" | "keywords">, query: string): number
+function paletteScore(entry: Pick<PaletteBase, "group" | "keywords" | "label">, query: string): number
 
 [./lib/palette] PaletteSection
 interface PaletteSection
@@ -1947,7 +1947,7 @@ function splitMatches(matches: PaletteEntry[], query: string): { strong: Palette
 function withRecent(recent: string[], href: string, limit?: number): string[]
 
 [./lib/param-change] paramChange
-function paramChange<Value extends string | number | null>(param: string | undefined, paramDefault: string | number | undefined, onChange: ((value: Value) => unknown) | undefined): ((value: Value) => unknown) | undefined
+function paramChange<Value extends string | null | number>(param: string | undefined, paramDefault: number | string | undefined, onChange: ((value: Value) => unknown) | undefined): ((value: Value) => unknown) | undefined
 
 [./lib/plot] axisExtent
 function axisExtent(values: readonly number[], axis: ScatterAxis): [number, number]
@@ -1972,7 +1972,7 @@ interface BarListRow
   value: number
 
 [./lib/plot] barRatios
-function barRatios(values: readonly (readonly (number | null)[])[], stacked: boolean, count: number): { heights: number[][]; top: number; }
+function barRatios(values: readonly (readonly (null | number)[])[], stacked: boolean, count: number): { heights: number[][]; top: number; }
 
 [./lib/plot] BarSeries
 interface BarSeries extends ChartSeries
@@ -2127,7 +2127,7 @@ interface StatDelta
   value: string
 
 [./lib/steps] currentStep
-function currentStep<Key extends string>(url: string | URL, keys: readonly Key[], done?: readonly string[], param?: string): Key
+function currentStep<Key extends string>(url: URL | string, keys: readonly Key[], done?: readonly string[], param?: string): Key
 
 [./lib/steps] StepCookies
 interface StepCookies
@@ -2161,7 +2161,7 @@ interface StepDraftOptions
   secure?: boolean | undefined
 
 [./lib/steps] stepHref
-function stepHref(url: string | URL, key: string, param?: string): string
+function stepHref(url: URL | string, key: string, param?: string): string
 
 [./lib/steps] StepItem
 interface StepItem<Key extends string = string>
@@ -2175,10 +2175,10 @@ interface StepItem<Key extends string = string>
 function addressHref(href: string): string
 
 [./lib/tab-nav] currentTab
-function currentTab(links: readonly TabLink[], current: string | URL): string | undefined
+function currentTab(links: readonly TabLink[], current: URL | string): string | undefined
 
 [./lib/tab-nav] keptHref
-function keptHref(href: string, current: string | URL, keep: readonly string[]): string
+function keptHref(href: string, current: URL | string, keep: readonly string[]): string
 
 [./lib/tab-nav] ORIGIN
 const ORIGIN: "http://kay.invalid"
@@ -2212,7 +2212,7 @@ interface Column<Row>
   sortValue?: ((row: Row) => number | string) | true
 
 [./lib/table] compareValues
-function compareValues(a: string | number, b: string | number): number
+function compareValues(a: number | string, b: number | string): number
 
 [./lib/table] csvField
 function csvField(value: unknown): string
@@ -2284,7 +2284,7 @@ interface TimelineEntry<Key extends string | number = string>
   tone?: Tone | undefined
 
 [./lib/toast] attempt
-function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
+function attempt<T, Data = unknown>(run: () => Promise<T>, failure: AttemptOptions<Data> | string, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
 
 [./lib/toast] Attempted
 type Attempted<T> = T extends void ? true : T
@@ -2419,7 +2419,7 @@ function windowOf(offsets: Float64Array<ArrayBufferLike>, top: number, viewport:
 function dayMonth(date: Date): string
 
 [./lib/words] fullDate
-function fullDate(date: Date, time: false | "minutes" | "seconds"): string
+function fullDate(date: Date, time: "minutes" | "seconds" | false): string
 
 [./lib/words] monthShort
 function monthShort(date: Date): string

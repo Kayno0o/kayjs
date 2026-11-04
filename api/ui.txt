@@ -5,7 +5,7 @@ type ActionSource<Row, Target extends Action<never, unknown>> = {
 } & RowsOf<Row, Target>
 
 [.] attempt
-function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
+function attempt<T, Data = unknown>(run: () => Promise<T>, failure: AttemptOptions<Data> | string, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
 
 [.] Attempted
 type Attempted<T> = T extends void ? true : T
@@ -97,7 +97,7 @@ interface ContributionDay
   intensity: number
 
 [.] currentStep
-function currentStep<Key extends string>(url: string | URL, keys: readonly Key[], done?: readonly string[], param?: string): Key
+function currentStep<Key extends string>(url: URL | string, keys: readonly Key[], done?: readonly string[], param?: string): Key
 
 [.] DateRange
 type DateRange = [string | null, string | null]
@@ -153,7 +153,7 @@ interface IconChoice
 type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
 [.] infiniteList
-function infiniteList<Row, Target extends Action<never, unknown> = never>(given: Row[] | (() => Row[]), options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
+function infiniteList<Row, Target extends Action<never, unknown> = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
 
 [.] InfiniteList
 interface InfiniteList<Row>
@@ -385,7 +385,7 @@ interface StepDraftOptions
   secure?: boolean | undefined
 
 [.] stepHref
-function stepHref(url: string | URL, key: string, param?: string): string
+function stepHref(url: URL | string, key: string, param?: string): string
 
 [.] StepItem
 interface StepItem<Key extends string = string>

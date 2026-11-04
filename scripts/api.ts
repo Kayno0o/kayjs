@@ -126,7 +126,7 @@ async function snapshotOf(dir: string, root: string, packageName: string): Promi
   const internalBlocks: string[] = []
   const short = (text: string) => wrap(text)
   const show = (type: ts.Type) => short(sortUnions(checker.typeToString(type, undefined, FLAGS)))
-  const sign = (signature: ts.Signature) => short(checker.signatureToString(signature, undefined, FLAGS))
+  const sign = (signature: ts.Signature) => short(sortUnions(checker.signatureToString(signature, undefined, FLAGS)))
   // A symbol key is named after its id in the program, which changes with any edit. Members declared by kay or the platform (the attributes of an element a component spreads) are not the package's own API.
   const own = (symbol: ts.Symbol) => !symbol.name.startsWith('__@') && (symbol.declarations ?? []).some((declaration) => {
     const file = declaration.getSourceFile().fileName
@@ -296,14 +296,18 @@ export function sortUnions(text: string): string {
     let members: string[] = []
     let member = ''
     let quote = ''
+    let from = at
+    let opaque = false
 
+    // A conditional or mapped type is left as TypeScript printed it.
     const flush = () => {
       const trimmed = member.trimEnd()
 
       members.push(trimmed)
-      out += prefix + members.sort().join(' | ') + member.slice(trimmed.length)
+      out += opaque ? text.slice(from, at) : prefix + members.sort().join(' | ') + member.slice(trimmed.length)
       prefix = member = ''
       members = []
+      opaque = false
     }
 
     while (at < text.length) {
@@ -335,15 +339,25 @@ export function sortUnions(text: string): string {
       else if (char === ' ' && member === '' && prefix === '' && members.length === 0) {
         out += char
         at++
+        from = at
       }
       else if (char in CLOSERS) {
         at++
-        member += char + level(CLOSERS[char], false) + (text[at] ?? '')
+        const inner = level(CLOSERS[char], false)
+
+        opaque ||= char === '[' && inner.includes(' in ')
+        member += char + inner + (text[at] ?? '')
         at++
       }
       else if (char === ';' || char === ',') {
         flush()
         out += char
+        at++
+        from = at
+      }
+      else if (text.startsWith(' ? ', at) || text.startsWith(' in ', at)) {
+        opaque = true
+        member += char
         at++
       }
       else if (text.startsWith(' | ', at)) {

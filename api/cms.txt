@@ -50,7 +50,7 @@ interface CollectionLayout
   order?: number | undefined
 
 [.] collectionScreen
-function collectionScreen(name: string): Promise<{ prefix: string; collection: ScreenCollection; } | undefined>
+function collectionScreen(name: string): Promise<undefined | { prefix: string; collection: ScreenCollection; }>
 
 [.] Commit
 interface Commit
@@ -290,7 +290,7 @@ interface FieldMarker extends EntryRef
   slug: string
 
 [.] fieldOf
-function fieldOf(key: string | number, schema: JsonSchema, required: boolean): Field
+function fieldOf(key: number | string, schema: JsonSchema, required: boolean): Field
 
 [.] FieldPath
 type FieldPath = string | typeof BODY
@@ -327,7 +327,7 @@ interface FileSaver
   together?: boolean | undefined
 
 [.] fileVersion
-function fileVersion(bytes: string | Uint8Array<ArrayBufferLike>): string
+function fileVersion(bytes: Uint8Array<ArrayBufferLike> | string): string
 
 [.] ForgeError
 class ForgeError
@@ -451,7 +451,7 @@ interface Issue extends EntryRef
   slug: string
 
 [.] joinPath
-function joinPath(parent: string, key: string | number): string
+function joinPath(parent: string, key: number | string): string
 
 [.] JsonSchema
 interface JsonSchema
@@ -512,7 +512,7 @@ interface MemberInfo
 function parseMarker(value: string, body?: boolean): FieldMarker | undefined
 
 [.] passwordGuard
-function passwordGuard(passwords: string | Record<string, string>, { maxAge, secret, store }?: PasswordOptions): Guard
+function passwordGuard(passwords: Record<string, string> | string, { maxAge, secret, store }?: PasswordOptions): Guard
 
 [.] PasswordOptions
 interface PasswordOptions
@@ -535,7 +535,7 @@ type RowAction = 'move' | 'publish' | 'unpublish' | 'duplicate' | 'rename' | 'ed
 
 [.] SaveConflictError
 class SaveConflictError
-  new (current?: string | null | undefined, creating?: boolean, at?: string | undefined): SaveConflictError
+  new (current?: null | string | undefined, creating?: boolean, at?: string | undefined): SaveConflictError
   at?: string | undefined
   code: "save-conflict"
   creating: boolean
@@ -709,10 +709,10 @@ function createEntryForm({
   prefix, collection, entry, locale, copy, source, denied, review: reviewed
 }: {
   review?: ReviewView | undefined;
-  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined;
+  denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>> | undefined;
   prefix: string;
   collection: ScreenCollection;
-  entry?: StoredEntry | (() => StoredEntry | undefined) | undefined;
+  entry?: (() => StoredEntry | undefined) | StoredEntry | undefined;
   locale?: string | undefined;
   copy?: PairedEntry | undefined;
   source?: PairedEntry | undefined;
@@ -835,7 +835,7 @@ function formScope(drafts: {
   failure: () => string | undefined;
   rendering: () => boolean;
   pending: () => boolean;
-}, entry: EntryRef, collection: ScreenCollection, problem?: string | undefined, source?: PairedEntry | undefined, denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined): FormScope
+}, entry: EntryRef, collection: ScreenCollection, problem?: string | undefined, source?: PairedEntry | undefined, denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>> | undefined): FormScope
 
 [./form] FormScope
 interface FormScope

@@ -44,8 +44,8 @@ interface AnthropicOptions
   model?: string | undefined
 
 [.] ask
-function ask<const Schema extends TSchema>(prompt: string | Message[], options: StructuredAskOptions<Schema>): ReplyOf<Schema>
-function ask(prompt: string | Message[], options?: AskOptions | undefined): Reply
+function ask<const Schema extends TSchema>(prompt: Message[] | string, options: StructuredAskOptions<Schema>): ReplyOf<Schema>
+function ask(prompt: Message[] | string, options?: AskOptions | undefined): Reply
 
 [.] Asked
 interface Asked

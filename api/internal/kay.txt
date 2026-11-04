@@ -383,7 +383,7 @@ function awaited(element: Node | null, start: Node | null, end: Node | null, val
 function image(element: Element, src: unknown, sized: boolean, sizes?: unknown): void
 
 [./dom-loop] loop
-function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => false | readonly T[] | null | undefined, key: false | ((item: T) => unknown), render: (item: () => T, index: number | (() => number)) => unknown, fallback?: (() => unknown) | undefined): void
+function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => false | null | readonly T[] | undefined, key: ((item: T) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: (() => unknown) | undefined): void
 
 [./dom-loop] rowKey
 function rowKey(item: unknown): unknown
@@ -484,7 +484,7 @@ function localHref(href: unknown): unknown
 function localLinks(markup: string): string
 
 [./html] loop
-function loop<T>(each: false | readonly T[] | null | undefined, render: (item: T | (() => T), index: number | (() => number)) => string, fallback?: (() => string) | undefined, accessors?: "keyed" | "positional" | undefined): string
+function loop<T>(each: false | null | readonly T[] | undefined, render: (item: (() => T) | T, index: (() => number) | number) => string, fallback?: (() => string) | undefined, accessors?: "keyed" | "positional" | undefined): string
 
 [./html] memo
 function memo<T>(fn: () => T, options?: SignalOptions<T> | undefined): () => T
@@ -603,7 +603,7 @@ function bindable<Props extends object>(props: Props, keys: readonly string[]): 
 function fill(name: string, block: () => unknown): string
 
 [./internal] formAction
-function formAction(target: string | Action<never, unknown, never>): string
+function formAction(target: Action<never, unknown, never> | string): string
 
 [./internal] formChecked
 function formChecked(target: unknown, name: string, value: unknown): boolean | undefined
@@ -648,13 +648,13 @@ function uiRecipe(config: RecipeConfig<Readonly<Record<string, Readonly<Record<s
 function updateBack<Current, Next = Current | Written<Current>>(current: Current, update: (current: Written<Current>) => Next): Kept<Current, Next>
 
 [./internal] updateTo
-function updateTo<Target, Key extends keyof Target, Next extends Written<Target[Key]> | Target[Key] = Written<Target[Key]>>(object: Target, key: Key, update: (current: Written<Target[Key]>) => Next, form?: "post" | "logical" | undefined, _probe?: Probe<Target, Key> | undefined): Next
+function updateTo<Target, Key extends keyof Target, Next extends Written<Target[Key]> | Target[Key] = Written<Target[Key]>>(object: Target, key: Key, update: (current: Written<Target[Key]>) => Next, form?: "logical" | "post" | undefined, _probe?: Probe<Target, Key> | undefined): Next
 
 [./internal] writeBack
 function writeBack<Current, Value extends BackValue<Current> = Current | Written<Current>>(current: Current, value: Value): Kept<Current, Value>
 
 [./internal] writeTo
-function writeTo<Target, Key extends keyof Target, Value extends Written<Target[Key]> | Target[Key]>(object: Target, key: Key, value: Value, _probe?: Probe<Target, Key> | undefined): Value
+function writeTo<Target, Key extends keyof Target, Target[Key] | Value extends Written<Target[Key]>>(object: Target, key: Key, value: Value, _probe?: Probe<Target, Key> | undefined): Value
 
 [./internal/server] buildingWithoutEnv
 function buildingWithoutEnv(): void
@@ -683,7 +683,7 @@ function listenIdleApps(): void
 function loadingWithoutEnv(): void
 
 [./internal/server] probeHealth
-function probeHealth(config: false | HealthConfig | undefined, port?: string, host?: string | undefined): Promise<number>
+function probeHealth(config: HealthConfig | false | undefined, port?: string, host?: string | undefined): Promise<number>
 
 [./internal/server] registerBundle
 function registerBundle(value: Bundle): void
@@ -755,7 +755,7 @@ interface AnswerIssue
   path: string
 
 [./library] appModules
-function appModules(root: string, { name, appFiles }: Pick<KayExtension<AnyElysia>, "name" | "appFiles">): Promise<Record<string, Record<string, unknown> | undefined>>
+function appModules(root: string, { name, appFiles }: Pick<KayExtension<AnyElysia>, "appFiles" | "name">): Promise<Record<string, Record<string, unknown> | undefined>>
 
 [./library] appSecrets
 function appSecrets(): string[] | undefined
@@ -813,7 +813,7 @@ function configuredHighlighter(): Promise<Highlighter | undefined>
 function configuredRedirects(): { from: string; to: string; status: RedirectStatus; }[]
 
 [./library] configuredSite
-function configuredSite(): { origin: string; slashed: boolean; } | undefined
+function configuredSite(): undefined | { origin: string; slashed: boolean; }
 
 [./library] connectionOf
 function connectionOf(source: PgJobsSource): SQL
@@ -840,7 +840,7 @@ function decide<E extends object, C extends object>(source: string, hooks: reado
 }>
 
 [./library] defineContext
-function defineContext<Values extends object>(load: (request: Request) => Values | Promise<Values>): ContextDefinition<Values>
+function defineContext<Values extends object>(load: (request: Request) => Promise<Values> | Values): ContextDefinition<Values>
 function defineContext<Loaders extends Record<string, (request: Request) => unknown>>(loaders: Loaders): ContextDefinition<{
   [Key in keyof Loaders]: Awaited<ReturnType<Loaders[Key]>>;
 }>
@@ -948,7 +948,7 @@ function keepCookiesPrivate(set: { headers: Record<string, unknown>; }, response
 function keyedDigest(use: string, text: string): string
 
 [./library] knownAddress
-function knownAddress(request: Request, server: Server<unknown> | null | undefined, setting?: number | boolean | ProxyConfig | undefined): string | undefined
+function knownAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | boolean | number | undefined): string | undefined
 
 [./library] lazily
 function lazily(guard: Guard | LazyGuard): Guard
@@ -973,7 +973,7 @@ interface LibraryTool
   readOnly?: boolean | undefined
 
 [./library] localizedEntry
-function localizedEntry(root: string, config: Pick<KayConfig, "i18n" | "contentConfig">, collection: string, slug: string): Promise<LocalizedEntry>
+function localizedEntry(root: string, config: Pick<KayConfig, "contentConfig" | "i18n">, collection: string, slug: string): Promise<LocalizedEntry>
 
 [./library] LocalizedEntry
 interface LocalizedEntry
@@ -1010,7 +1010,7 @@ interface MissingPath
   target?: string | undefined
 
 [./library] missingTranslations
-function missingTranslations(root: string, config: Pick<KayConfig, "i18n" | "contentConfig" | "extensions">): Promise<Record<string, MissingTranslations>>
+function missingTranslations(root: string, config: Pick<KayConfig, "contentConfig" | "extensions" | "i18n">): Promise<Record<string, MissingTranslations>>
 
 [./library] MissingTranslations
 interface MissingTranslations
@@ -1034,10 +1034,10 @@ function onKeysInvalidated(listener: KeyListener): () => void
 function openSqlite(path: string): Database
 
 [./library] openWith
-function openWith(keys: Uint8Array<ArrayBufferLike>[], value: string, context?: string | undefined): { text: string; key: number; } | undefined
+function openWith(keys: Uint8Array<ArrayBufferLike>[], value: string, context?: string | undefined): undefined | { text: string; key: number; }
 
 [./library] optionMs
-function optionMs(value: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, what: string): number
+function optionMs(value: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, what: string): number
 
 [./library] outsideRequest
 function outsideRequest<R, TArgs extends any[]>(fn: (...args: TArgs) => R, ...args: TArgs): R
@@ -1127,7 +1127,7 @@ function sealWith(key: Uint8Array<ArrayBufferLike>, text: string, context?: stri
 function serverRoot(): Promise<string>
 
 [./library] setSite
-function setSite(origin: string | undefined, trailingSlash?: "never" | "always" | "ignore" | undefined, prerendering?: boolean, keepSameTab?: boolean): void
+function setSite(origin: string | undefined, trailingSlash?: "always" | "ignore" | "never" | undefined, prerendering?: boolean, keepSameTab?: boolean): void
 
 [./library] sitePaths
 function sitePaths(): string[]
@@ -1139,7 +1139,7 @@ function siteWithBase(site: string | undefined, base: string | undefined): strin
 function sourceHash(text: string): string
 
 [./library] stoppers
-function stoppers(request: Request): Pick<RequestContext<Record<string, string>>, "redirect" | "notFound" | "deny">
+function stoppers(request: Request): Pick<RequestContext<Record<string, string>>, "deny" | "notFound" | "redirect">
 
 [./library] ToolResult
 interface ToolResult
@@ -1190,7 +1190,7 @@ function weakSecrets(secrets: string[]): boolean
 function writeCacheEntry(slot: CacheSlot, value: unknown): Promise<void>
 
 [./library] writeDraftEntry
-function writeDraftEntry(root: string, config: Pick<KayConfig, "i18n" | "contentConfig">, collection: string, locale: string, slug: string, entry: {
+function writeDraftEntry(root: string, config: Pick<KayConfig, "contentConfig" | "i18n">, collection: string, locale: string, slug: string, entry: {
   data: Record<string, DataValue>;
   body?: string | undefined;
 }): Promise<string>

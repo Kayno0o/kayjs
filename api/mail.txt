@@ -115,7 +115,7 @@ function createMailListTables(source: PgJobsSource): Promise<void>
 function createMailSuppressionTable(source: PgJobsSource): Promise<void>
 
 [.] cssColours
-function cssColours(stylesheet: string | URL, name?: string): (property: string) => string
+function cssColours(stylesheet: URL | string, name?: string): (property: string) => string
 
 [.] darkPalette
 function darkPalette(settings: MailSettings): Palette
