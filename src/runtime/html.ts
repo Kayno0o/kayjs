@@ -499,7 +499,7 @@ export function serverIsland<P>(fn: ((props: P) => unknown) & { kayFailed?: () =
   const inert = mode === 'defer' ? html.replace(POSTING_TAG, tag => tag.replace(POSTING_ATTRIBUTE, '')) : ''
   const block = mode === 'defer' ? failed ?? fn.kayFailed : undefined
   // A failed block cannot sit inside an inert island, whose button would not click, so the copy is inert on its own beside it.
-  const copy = block === undefined ? `<slot data-kay-server="${index}" inert>${inert}</slot>` : `<slot data-kay-server="${index}"><slot inert>${inert}</slot><slot data-kay-failure hidden>${child(block())}</slot></slot>`
+  const copy = block === undefined ? `<slot data-kay-server="${index}" inert>${inert}</slot>` : `<slot data-kay-server="${index}"><slot inert>${inert}</slot><slot data-kay-failure role="alert" hidden>${child(block())}</slot></slot>`
   const placeholder = mode === 'defer' ? `${copy}${noscript == null ? '' : `<noscript><a href="?${ISLAND_PARAM}" rel="nofollow">${child(noscript)}</a></noscript>`}` : ''
 
   return renderedHtml(`<!--kay-server:${index}-->${placeholder}<!--/kay-server:${index}-->`)

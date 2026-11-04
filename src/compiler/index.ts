@@ -9,7 +9,7 @@ import type { ImportedSignals, SignalKind } from './module-signals'
 import type { NameFindings } from './rewrite'
 import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
-import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
+import { drawIcons, elementsIn, serverIslandOf, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandCause, islandMessages, lineOf, promotionSite } from './codegen'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, openRedirects, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
@@ -259,10 +259,11 @@ export function compileKay(original: string, filename: string, options: CompileO
   // Pages, layouts and special pages render on the server: a package they import never switches them.
   const routeFile = file.server !== undefined || ROUTE_FILES.has(basename(filename))
   const client = file.client !== undefined || (options.clientOnly === true && !routeFile)
-  const fallback = client ? takeFallback(file, filename, options, script, scope) : undefined
+  const fallback = client ? takeBlock(file, filename, options, script, scope) : undefined
   // A component's own `@failed`, for a use deferring it as a server island: its function joins this module, the helpers and imports it needs being this module's.
-  const failed = !client && !routeFile && options.page !== true ? takeFallback(file, filename, options, script, scope, 'failed') : undefined
-  const failedCode = failed && options.output === 'html' ? failed.code.slice(failed.code.search(FAILED_FUNCTION)) : undefined
+  const failed = !client && !routeFile && options.page !== true ? takeBlock(file, filename, options, script, scope, 'failed') : undefined
+  const failedAt = failed?.code.search(FAILED_FUNCTION) ?? -1
+  const failedCode = failed && options.output === 'html' && failedAt >= 0 ? failed.code.slice(failedAt) : undefined
   const live = routeFile ? undefined : liveImport(script, options.importedSignals)
   const island = client || isInteractive(file, script) || live !== undefined ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
@@ -392,7 +393,7 @@ const FALLBACK_COMPONENT = /^export default function \w+\(/m
 
 // The `@fallback` block at the root of a client-only component, which the server shows where the island will render, or the `@failed` block of a component a use defers as a server island: taken out of the template, and compiled alone, as the server never runs the script it would read.
 // It keeps the script's imports it names and the component's scope attribute, and reports a script value or prop it reads, which the server does not have.
-function takeFallback(file: KayFile, filename: string, options: CompileOptions, script: ScriptAnalysis, scope: string | undefined, which: 'fallback' | 'failed' = 'fallback'): { code: string, classes: string[] } | undefined {
+function takeBlock(file: KayFile, filename: string, options: CompileOptions, script: ScriptAnalysis, scope: string | undefined, which: 'fallback' | 'failed' = 'fallback'): { code: string, classes: string[] } | undefined {
   const index = file.template.findIndex(node => node.kind === 'slot' && file.source.slice(node.name.start, node.name.end) === which)
   const block = file.template[index]
 
@@ -410,16 +411,36 @@ function takeFallback(file: KayFile, filename: string, options: CompileOptions, 
   const compiled = compileKay(header + body, filename, { output: 'html', root: options.root, component: true, scope })
   const own = new Set(script.imports.map(binding => binding.local))
   const declared = new Set([...script.props?.bindings.map(binding => file.source.slice(binding.local.start, binding.local.end)) ?? [], ...scriptNames(script)])
-  const reads = outerReads(parseExpanded(header + body).file).filter(name => declared.has(name) && !own.has(name))
+  const parsed = parseExpanded(header + body).file
+  const reads = outerReads(parsed).filter(name => declared.has(name) && !own.has(name))
 
   for (const diagnostic of compiled.diagnostics)
     file.diagnostics.push({ ...diagnostic, start: block.name.start, end: block.name.end })
 
-  for (const read of reads) {
-    const at = file.source.slice(block.start, block.end).search(new RegExp(`(?<![\\w$])${read.replaceAll('$', '\\$')}(?![\\w$])`, 'g'))
+  // The block is spliced into the page hidden and hydrates nothing, so what needs the browser or a request of its own has no place in it.
+  if (which === 'failed') {
+    const refused = (message: string) => file.diagnostics.push({ start: block.name.start, end: block.name.end, code: 'template-invalid', message, note: 'the block is rendered hidden with the server island, and nothing in it hydrates', help: 'keep static markup and links, and a control marked `data-kay-retry`' })
+    let island = false
+
+    visitNodes(parsed.template, (node) => {
+      island ||= node.kind === 'element' && serverIslandOf(node, parsed.source) !== undefined
+    })
+
+    if (island)
+      refused('`@failed` holds a server island')
+
+    if (compiled.island !== undefined)
+      refused('`@failed` holds something interactive')
+
+    if (compiled.actionForm)
+      refused('`@failed` holds a form posting to an action')
+  }
+
+  for (const name of reads) {
+    const at = file.source.slice(block.start, block.end).search(new RegExp(`(?<![\\w$])${name.replaceAll('$', '\\$')}(?![\\w$])`, 'g'))
     const start = at < 0 ? block.name.start : block.start + at
 
-    file.diagnostics.push({ start, end: at < 0 ? block.name.end : start + read.length, code: 'template-invalid', message: `\`@${which}\` of ${which === 'failed' ? 'a' : 'a `--- client`'} component reads \`${read}\`, which the server does not have`, note: 'the server renders it without running the script', help: 'write static markup, or import what it needs' })
+    file.diagnostics.push({ start, end: at < 0 ? block.name.end : start + name.length, code: 'template-invalid', message: `\`@${which}\` of ${which === 'failed' ? 'a' : 'a `--- client`'} component reads \`${name}\`, which the server does not have`, note: 'the server renders it without running the script', help: 'write static markup, or import what it needs' })
   }
 
   return { code: compiled.tsx.replace(FALLBACK_COMPONENT, which === 'failed' ? 'function KayFailed(' : 'function KayFallback('), classes: compiled.classes }

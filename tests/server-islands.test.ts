@@ -1,15 +1,19 @@
+import type { FetchedIsland } from '../src/runtime/fetch-island'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { gunzipSync } from 'node:zlib'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
-import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test'
+import { transformKay } from '../src/build/transform'
 import { compileKay } from '../src/compiler'
 import { ApiError } from '../src/runtime/api-error'
 import { hydrateIslands } from '../src/runtime/client'
+import { fetchServerIsland } from '../src/runtime/fetch-island'
 import { requestIsland } from '../src/runtime/island-request'
 import { refetchServerIsland } from '../src/runtime/refetch-island'
 import { ISLAND_HEADER } from '../src/runtime/server-islands'
+import { holdFetched } from '../src/runtime/swap-held'
 import { readManifest } from '../src/server/client'
 import { ExportError } from '../src/server/prerender'
 import { renders } from './fixtures/server-islands/src/renders'
@@ -283,10 +287,12 @@ describe('server islands', () => {
       const islands = [...failed.matchAll(/<!--kay-server:(\d)-->([\s\S]*?)<!--\/kay-server:\1-->/g)].map(match => match[2]!)
 
       // The component's own block, then the use's block winning over it, the copy inert on its own so a button in the block can be clicked.
-      expect(islands[0]).toBe('<slot data-kay-server="0"><slot inert><p class="own-count">1</p></slot><slot data-kay-failure hidden><p class="own-failure">Own failure</p><button type="button" data-kay-retry>Try again</button></slot></slot>')
-      expect(islands[1]).toBe('<slot data-kay-server="1"><slot inert><p class="own-count">2</p></slot><slot data-kay-failure hidden><p class="use-failure">Use failure</p></slot></slot>')
+      expect(islands[0]).toBe('<slot data-kay-server="0"><slot inert><p class="own-count">1</p></slot><slot data-kay-failure role="alert" hidden><p class="own-failure">Own failure</p><button type="button" data-kay-retry>Try again</button></slot></slot>')
+      expect(islands[1]).toBe('<slot data-kay-server="1"><slot inert><p class="own-count">2</p></slot><slot data-kay-failure role="alert" hidden><p class="use-failure">Use failure</p></slot></slot>')
       // An inline island arrives with the page, so it holds none.
       expect(islands[2]).toBe('')
+      // An interactive component carries its own block through the island wrapper too.
+      expect(islands[3]).toContain('<slot data-kay-failure role="alert" hidden><p class="live-failure">Live failure</p>')
 
       const app = await build.serve({ routes, security: false })
       const fetched = await (await app.handle(new Request('http://localhost/failed?kay_island=0', { headers: { [ISLAND_HEADER]: '1' } }))).text()
@@ -309,6 +315,34 @@ describe('server islands', () => {
     expect(messages('Card(server)\n  @failed\n    p No luck')).toContain('`@failed` only goes with `server="defer"`')
     expect(messages('Card(server="defer")\n  @failed\n    p No luck')).toEqual([])
     expect(messages('Card\n  @failed\n    p No luck')).toEqual([])
+  })
+
+  it('keeps a page\'s root `@failed` as the block it fills in a layout, and takes a component\'s as its own, through the build\'s compile', () => {
+    const root = join(process.cwd(), 'tests/fixtures/server-islands')
+    const source = 'p body\n@failed\n  p.fills Page block\n'
+    const page = transformKay(source, join(root, 'src/routes/about.kay'), { target: 'ssr', root })
+    const component = transformKay(source, join(root, 'src/components/about.kay'), { target: 'ssr', root })
+
+    expect(page).toContain('KayFill("failed"')
+    expect(page).not.toContain('kayFailed')
+    expect(component).toContain('.kayFailed = KayFailed')
+    expect(component).not.toContain('KayFill(')
+  })
+
+  it('refuses what cannot work inside a hidden, unhydrated `@failed` block', () => {
+    const compile = (block: string, use = '') => compileKay(`---\nimport Icon from './icon.kay'\n---\np.real\n@failed\n  ${block}\n${use}`, 'src/components/card.kay', { output: 'html', check: true })
+    const messages = (block: string) => compile(block).diagnostics.map(diagnostic => diagnostic.message)
+
+    expect(messages('Icon(server)')).toContain('`@failed` holds a server island')
+    expect(messages('button(onClick={() => {}}) Go')).toContain('`@failed` holds something interactive')
+    expect(messages('form(action="/x" method="post")\n    button Go')).toEqual([])
+    // A block naming an import keeps working with the imports of the module around it.
+    expect(compile('Icon').tsx).toContain('Card.kayFailed = KayFailed')
+    expect(compile('Icon').tsx.match(/^import Icon /gm)).toHaveLength(1)
+
+    const use = compileKay('---\nimport Card from \'./card.kay\'\nimport Icon from \'./icon.kay\'\n---\nCard(server="defer")\n  @failed\n    Icon(server)\n', 'src/routes/index.kay', { output: 'html', check: true })
+
+    expect(use.diagnostics.map(diagnostic => diagnostic.message)).toContain('`@failed` holds a server island')
   })
 
   it('reports a script value a component\'s own `@failed` reads, which the server does not have', () => {
@@ -500,6 +534,75 @@ describe('a deferred server island, in the browser', () => {
     finally {
       fetching.mockRestore()
     }
+  })
+
+  it('keeps the island\'s copy as the build wrote it through a failure, a failed retry and a success, and ignores a block in fetched content', async () => {
+    const { slot, events, fetching } = await deferred([new Response('no', { status: 404 }), new Response('no', { status: 404 }), new Response('<p data-kay-failure>content</p><button data-kay-retry>x</button>')])
+
+    slot.innerHTML = '<slot inert><p class="stamp">built</p></slot><slot data-kay-failure role="alert" hidden><button type="button" data-kay-retry>Try again</button></slot>'
+
+    const written = slot.innerHTML
+
+    try {
+      await hydrateIslands({})
+      await waitFor(() => events.length > 0)
+
+      const retry = slot.querySelector<HTMLElement>('[data-kay-retry]')!
+
+      retry.focus()
+      retry.click()
+      await waitFor(() => events.length > 1)
+
+      // The retry failed again for good: the block is back and the focus is on its control.
+      expect(slot.querySelector<HTMLElement>('[data-kay-failure]')!.hidden).toBe(false)
+      expect(document.activeElement).toBe(slot.querySelector('[data-kay-retry]'))
+
+      slot.querySelector<HTMLElement>('[data-kay-retry]')!.click()
+      await waitFor(() => events.length > 2)
+
+      expect((slot as unknown as { _$b: string })._$b).toBe(written)
+      expect(slot.innerHTML).toBe('<p data-kay-failure="">content</p><button data-kay-retry="">x</button>')
+
+      // The content's own control asks nothing: the island is not failed.
+      slot.querySelector<HTMLElement>('[data-kay-retry]')!.click()
+      await Bun.sleep(20)
+
+      expect(events).toHaveLength(3)
+    }
+    finally {
+      fetching.mockRestore()
+    }
+  })
+
+  it('keeps a held render inert while the next page\'s copy loads, and shows the block when that copy is lost', async () => {
+    const { events, fetching } = await deferred([new Response('no', { status: 404 })])
+    const copy = '<slot inert><p class="stamp">built</p></slot><slot data-kay-failure role="alert" hidden><button type="button" data-kay-retry>Try again</button></slot>'
+
+    document.body.innerHTML = '<slot data-kay-server="0"></slot>'
+
+    const live = document.querySelector<FetchedIsland>('slot[data-kay-server]')!
+
+    live.innerHTML = '<p class="stamp">fresh</p>'
+    const next = document.createElement('div')
+
+    next.innerHTML = `<slot data-kay-server="0">${copy}</slot>`
+    live._$b = next.querySelector('slot[data-kay-server]')!.innerHTML
+    holdFetched(document.body, next)
+
+    const held = next.querySelector<FetchedIsland>('slot[data-kay-server]')!
+
+    expect(held.innerHTML).toBe('<p class="stamp">fresh</p>')
+    document.body.replaceChildren(held)
+
+    const loading = fetchServerIsland(held, mock(), mock())
+
+    expect(held.hasAttribute('inert')).toBe(true)
+    expect(await loading).toBe(false)
+    // The copy is back with its block shown, and the island clickable.
+    expect(held.hasAttribute('inert')).toBe(false)
+    expect(held.querySelector<HTMLElement>('[data-kay-failure]')!.hidden).toBe(false)
+    expect(events).toHaveLength(1)
+    fetching.mockRestore()
   })
 
   it('hides the `@failed` block again while a retry loads', async () => {

@@ -579,16 +579,27 @@ class Validator {
   }
 
   private serverIsland({ attribute, mode, noscript }: ServerIslandMark, failed: SlotNode | undefined): void {
-    if (this.options.island !== undefined || this.options.insideIsland)
+    if (this.options.island !== undefined || this.options.insideIsland) {
       this.error(attribute.name, '`server` has no effect inside an island', { note: 'an island renders in the browser too, as a whole' })
-    else if (mode === undefined)
+    }
+    else if (mode === undefined) {
       this.error(attribute.name, '`server` takes no value, or "defer"', { help: '`server` renders it per request inside the prerendered page, `server="defer"` once the browser fetches it on approach' })
-    else if (noscript && mode !== 'defer')
+    }
+    else if (noscript && mode !== 'defer') {
       this.error(noscript.name, '`noscript` only goes with `server="defer"`', { note: 'an inline server island arrives with the page, so it needs no JavaScript' })
-    else if (noscript?.kind === 'boolean')
+    }
+    else if (noscript?.kind === 'boolean') {
       this.error(noscript.name, '`noscript` takes the text of its link', { help: 'such as `noscript="Show the contact form"`' })
-    else if (mode !== 'defer' && failed)
+    }
+    else if (mode !== 'defer' && failed) {
       this.error(failed.name, '`@failed` only goes with `server="defer"`', { note: 'an inline server island arrives with the page, so it cannot fail to load' })
+    }
+    else if (failed) {
+      visitNodes(failed.children, (node) => {
+        if (node.kind === 'element' && serverIslandOf(node, this.src) !== undefined)
+          this.error(node.tag, '`@failed` holds a server island', { note: 'the block is rendered hidden with the server island, and nothing in it hydrates' })
+      })
+    }
   }
 
   // Several parts on one component call: the first is the part the call is, the others are parts of this component whose entries it hands on to the called one, each named once and none of them `root`, which a call hands on by being the root.

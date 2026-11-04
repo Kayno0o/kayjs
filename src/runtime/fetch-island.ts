@@ -48,7 +48,10 @@ async function pause(ms: number, signal: AbortSignal): Promise<void> {
 // What the island's `@failed` block holds, rendered hidden beside the inert copy; a control inside it marked `data-kay-retry` asks again.
 const FAILURE = ':scope > [data-kay-failure]'
 const RETRY = '[data-kay-retry]'
-const retries = new WeakMap<HTMLElement, () => void>()
+// The block the server wrote, taken when the island fails (its children are the server's copy then), so a `data-kay-failure` in fetched content is not mistaken for it.
+const blocks = new WeakMap<HTMLElement, HTMLElement>()
+// The islands whose retry control was clicked, which get the focus back on that control if the retry fails again.
+const asked = new WeakSet<HTMLElement>()
 
 // Shows the block and wires its retry controls once per island, by delegation as the block comes back with the inert copy a page swap restores.
 function showFailure(element: HTMLElement, retry: () => void): void {
@@ -57,18 +60,27 @@ function showFailure(element: HTMLElement, retry: () => void): void {
   if (block === null)
     return
 
-  // The block cannot be clicked inside an inert island: the copy beside it is inert on its own.
+  // The block cannot be clicked inside an inert island, which a held render's wait made it: the copy beside it is inert on its own.
   element.removeAttribute('inert')
   block.hidden = false
 
-  if (retries.has(element))
+  if (asked.delete(element))
+    block.querySelector<HTMLElement>(RETRY)?.focus({ preventScroll: true })
+
+  const wired = blocks.has(element)
+
+  blocks.set(element, block)
+
+  if (wired)
     return
 
-  retries.set(element, retry)
   element.addEventListener('click', (event) => {
-    if (element.hasAttribute('data-kay-failed') && event.target instanceof Element && element.contains(event.target.closest(RETRY))) {
+    const control = event.target instanceof Element ? event.target.closest(RETRY) : null
+
+    if (element.hasAttribute('data-kay-failed') && control !== null && blocks.get(element)?.contains(control)) {
       event.preventDefault()
-      retries.get(element)?.()
+      asked.add(element)
+      retry()
     }
   })
 }
@@ -92,7 +104,15 @@ export async function fetchServerIsland(element: FetchedIsland, dispose: (root: 
   watch.observe(document, { childList: true, subtree: true })
   element.setAttribute('aria-busy', 'true')
   element.removeAttribute('data-kay-failed')
-  element.querySelector<HTMLElement>(FAILURE)?.setAttribute('hidden', '')
+
+  // A held render stays on screen, but inert, while the next page's copy is asked for.
+  if (held !== undefined)
+    element.setAttribute('inert', '')
+
+  const block = blocks.get(element)
+
+  if (block?.parentElement === element)
+    block.hidden = true
 
   try {
     let text: string | undefined

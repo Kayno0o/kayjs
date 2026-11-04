@@ -284,6 +284,8 @@ ContactForm(server="defer")
 
 A component can declare its own `@failed` at the root of its template, as a client-only one declares its `@fallback`, and a use's block wins over it. The block is rendered by the server without running the component's script, so it holds static markup and what it imports. While a retry loads, the block hides again.
 
+It is announced as an alert when it shows, and the focus returns to its retry control if a retry fails again. A use's `@failed` is always the block, even when the called component has a `failed` slot prop of its own. A server island or anything that hydrates has no place inside it.
+
 The page hears about it from two events on `document`: `kay:server-island` when the island is in, and `kay:server-island-error` when it is lost. The error event carries `detail.error` (an `ApiError`) and `detail.retry()`. Leaving the page cancels the request, and `aria-busy` marks the island while it loads.
 
 A layout that reads `ctx.locals`, `ctx.cookies` or `ctx.query` cannot be prerendered. A page holding a server island whose layout reads one is rendered on each request instead, and `kay build` lists it as `on request` with the file and line of the read. With `prerender: true`, or in a static export, the build fails with that file and line.

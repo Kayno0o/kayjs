@@ -6,7 +6,7 @@ import type { ImportedSignals } from '../compiler/module-signals'
 import type { ClassTable } from '../runtime/class-table'
 import type { CacheSlot } from './cache'
 import { realpathSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import process from 'node:process'
 import { compileKay, formatDiagnostic, iconSetsKey, ISLAND_TWIN, withoutTwin } from '../compiler'
 import { isInteractive } from '../compiler/codegen'
@@ -15,6 +15,7 @@ import { parseExpanded } from '../compiler/markdown-block'
 import { analyzeScript } from '../compiler/script'
 import { templateReads } from '../compiler/template-reads'
 import { usesTailwind } from '../format/tailwind'
+import { projectPaths } from '../project'
 import { countCache, pruneCache, readCacheEntry, writeCacheEntry } from './cache'
 import { compilerFingerprint } from './fingerprint'
 import { throughLinks } from './links'
@@ -248,7 +249,10 @@ function compile(source: string, filename: string, options: TransformOptions, si
   const file = withoutTwin(filename)
   const isTwin = file !== filename
   const hydratable = options.hydratable ?? false
-  const { tsx, map, diagnostics } = compileKay(source, throughLinks(options.root ?? process.cwd(), file), { root: options.root, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, classMerge: server ? options.classMerge : undefined, importedSignals: signals, ui: uiEntryOf(options.root ?? process.cwd(), file) })
+  const root = options.root ?? process.cwd()
+  // A page of the routes directory, whose root `@failed` fills a layout outlet rather than being a component's own block.
+  const page = file.startsWith(projectPaths(root).routes + sep) ? true : undefined
+  const { tsx, map, diagnostics } = compileKay(source, throughLinks(root, file), { root: options.root, page, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, classMerge: server ? options.classMerge : undefined, importedSignals: signals, ui: uiEntryOf(options.root ?? process.cwd(), file) })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))

@@ -1,4 +1,5 @@
 ---
+import LiveFailed from '../components/live-failed.kay'
 import OwnFailed from '../components/own-failed.kay'
 ---
 h1 Failed
@@ -7,3 +8,4 @@ OwnFailed(server="defer" n={2})
   @failed
     p.use-failure Use failure
 OwnFailed(server n={3})
+LiveFailed(server="defer" label="go")

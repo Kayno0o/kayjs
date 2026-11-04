@@ -1,0 +1,10 @@
+---
+import { signal } from 'kay'
+
+const { label } = props<{ label: string }>()
+const clicks = signal(0)
+---
+button.live(onClick={() => clicks.set(n => n + 1)}) {label} {clicks()}
+@failed
+  p.live-failure Live failure
+  button(type="button" data-kay-retry) Again
