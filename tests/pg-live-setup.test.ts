@@ -225,6 +225,31 @@ pgDescribe('a server starting against Postgres', () => {
 })
 
 pgDescribe('a pgData role that may not alter tables', () => {
+  pgIt('is told which table it lacks when a database predates kay_kv', async () => {
+    await withDatabase(async (database) => {
+      const role = `kay_kv_reader_${process.pid}`
+      const owner = new SQL(database, { max: 1 })
+      const admin = new SQL(Object.assign(new URL(url!.href), { pathname: '/postgres' }).href)
+      const restricted = new SQL(Object.assign(new URL(database), { username: role, password: 'readerpass0123' }).href, { max: 1 })
+
+      try {
+        await createDataTables(owner)
+        await owner.unsafe('DROP TABLE kay_kv')
+        await admin.unsafe(`DROP ROLE IF EXISTS ${role}`)
+        await admin.unsafe(`CREATE ROLE ${role} LOGIN PASSWORD 'readerpass0123'`)
+        await owner.unsafe(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${role}`)
+        await expect(pgHandle(restricted).db()).rejects.toThrow('kay: pgData needs the table kay_kv, and its role may not create them')
+      }
+      finally {
+        await restricted.close()
+        await owner.unsafe(`DROP OWNED BY ${role}`)
+        await admin.unsafe(`DROP ROLE IF EXISTS ${role}`)
+        await owner.close()
+        await admin.close()
+      }
+    })
+  }, 60_000)
+
   pgIt('is told to run createDataTables again when kay_live predates expires_at', async () => {
     await withDatabase(async (database) => {
       const role = `kay_live_reader_${process.pid}`

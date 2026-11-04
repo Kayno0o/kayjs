@@ -95,7 +95,7 @@ Under `bun test`, files stay in memory, each `testSite` with its own.
 
 ### Your own store
 
-`store.files` takes any object of `FileStore`, from `kay/server`. It reads, writes and deletes a file by key. Keys are never written twice, so it needs no locking.
+`store.files` takes any object of `FileStore`, from `kay/server`. It reads, writes and deletes a file by key, `delete` resolving with whether there was a file. Keys are never written twice, so it needs no locking.
 
 ```ts
 import type { FileStore } from 'kay/server'
@@ -103,7 +103,13 @@ import type { FileStore } from 'kay/server'
 const storage: FileStore = {
   write: async (key, data) => { await bucket.put(key, data) },
   read: async key => await bucket.get(key) ?? undefined,
-  delete: async (key) => { await bucket.remove(key) },
+  delete: async (key) => {
+    const existed = await bucket.has(key)
+
+    await bucket.remove(key)
+
+    return existed
+  },
 }
 ```
 

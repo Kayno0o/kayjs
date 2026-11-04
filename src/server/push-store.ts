@@ -1,4 +1,4 @@
-import type { StoreBase } from '../runtime/store-base'
+import type { MaybePromise, StoreBase } from '../runtime/store-base'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { inMemory } from './memory-mark'
@@ -17,13 +17,13 @@ export interface PushSubscriptionRecord {
 // What the app keeps of its people's push subscriptions, `store.push` of kay.config.ts: one row each, so replicas share them. A method may answer with a promise.
 export interface PushStore extends StoreBase {
   // Keeps a subscription for a person, replacing the one at the same endpoint (whoever it was kept for), and drops the person's oldest beyond `most`.
-  add: (user: string, subscription: PushSubscriptionRecord, most: number) => void | Promise<void>
+  add: (user: string, subscription: PushSubscriptionRecord, most: number) => MaybePromise<void>
   // A person's subscriptions, newest first.
-  list: (user: string) => PushSubscriptionRecord[] | Promise<PushSubscriptionRecord[]>
+  list: (user: string) => MaybePromise<PushSubscriptionRecord[]>
   // Deletes the subscription at an endpoint, only a person's own when `user` is given; false when none went.
-  delete: (endpoint: string, user?: string) => boolean | Promise<boolean>
+  delete: (endpoint: string, user?: string) => MaybePromise<boolean>
   // Deletes every subscription of a person, answering how many went.
-  erase: (user: string) => number | Promise<number>
+  erase: (user: string) => MaybePromise<number>
 
 }
 

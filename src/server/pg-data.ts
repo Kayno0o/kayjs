@@ -6,7 +6,7 @@ import type { DeletableSessionStore } from './session'
 import { kayLog } from '../runtime/log'
 import { appName, claimDatabase } from './app-identity'
 import { pgCache } from './pg-cache'
-import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobsAfter, jobTables, privilegeRefused, relationsMissing, withMissingIndexes } from './pg-jobs'
+import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobsAfter, jobTables, missingRelations, privilegeRefused, relationsMissing, withMissingIndexes } from './pg-jobs'
 import { pgLive } from './pg-live'
 import { pgRooms } from './pg-rooms'
 import { query } from './pg-sql'
@@ -103,6 +103,18 @@ async function addMissingColumns(db: SQL): Promise<void> {
   })
 }
 
+// The tables a refused role is missing, named, as `kay_kv` is the one a database made before 1.88 lacks.
+async function missingTables(db: SQL): Promise<string> {
+  try {
+    const names = await missingRelations(db, OWN_TABLES)
+
+    return names.length === 0 ? 'its kay_* tables' : `the table${names.length === 1 ? '' : 's'} ${names.join(', ')}`
+  }
+  catch {
+    return 'its kay_* tables'
+  }
+}
+
 // One connection and one table check for every store of a `pgData`.
 export function pgHandle(db: SQL): PgHandle & { close: () => Promise<void> } {
   const disposers: (() => unknown)[] = []
@@ -129,7 +141,7 @@ export function pgHandle(db: SQL): PgHandle & { close: () => Promise<void> } {
     }
     catch (error) {
       if (privilegeRefused(error))
-        throw new Error('kay: pgData needs its kay_* tables, and its role may not create them: run `await createDataTables(db)` from kay/server as the database\'s owner, and list `dataTables` from kay/server in pg-orm\'s `ignoreTables`', { cause: error })
+        throw new Error(`kay: pgData needs ${await missingTables(db)}, and its role may not create them: run \`await createDataTables(db)\` from kay/server as the database's owner, and list \`dataTables\` from kay/server in pg-orm's \`ignoreTables\``, { cause: error })
 
       throw error
     }
@@ -194,8 +206,8 @@ export function pgHandle(db: SQL): PgHandle & { close: () => Promise<void> } {
   }
 }
 
-// Sessions, cached values, jobs, rate counts, the members of presence rooms, the values of `live()` and the Web Vitals visitors reported and the notifications of a person in the app's Postgres, shared by every process of every replica opening it: `store: pgData(db)` in kay.config.ts, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgJobs` takes.
-// The `kay_*` tables are created when missing, which takes a role that may create tables: with one that may not, `createDataTables` run by the owner makes them. Replicas hear each other's invalidations, live values and room messages by polling, within about half a second, so nothing needs LISTEN and a pooler in front of Postgres is fine.
+// Sessions, cached values, jobs, rate counts, the members of presence rooms, the values of `live()`, the Web Vitals visitors reported, the notifications and push subscriptions of a person and the `store.kv` values in the app's Postgres, shared by every process of every replica opening it: `store: pgData(db)` in kay.config.ts, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgJobs` takes.
+// The `kay_*` tables are created when missing, which takes a role that may create tables: with one that may not, `createDataTables` run by the owner makes them (`kay_kv` included, which a database made before 1.88 lacks). Replicas hear each other's invalidations, live values and room messages by polling, within about half a second, so nothing needs LISTEN and a pooler in front of Postgres is fine.
 // A room's state is kept there too, so `rooms({ state, store: pgData(db).rooms })` keeps a room's state.
 export function pgData(source: PgJobsSource) {
   const db = connectionOf(source)

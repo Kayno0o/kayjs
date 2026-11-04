@@ -117,6 +117,47 @@ describe('files', () => {
   })
 })
 
+describe('FileStore.delete', () => {
+  it('resolves with whether there was a file, memory and disk alike, and an absent key is no error', async () => {
+    for (const store of [memoryFiles(), diskFiles(join(dir, 'deleted'))]) {
+      await store.write('a.txt', new Blob(['x']))
+      expect(await store.delete('a.txt')).toBe(true)
+      expect(await store.delete('a.txt')).toBe(false)
+      expect(await store.delete('never.txt')).toBe(false)
+    }
+  })
+
+  it('resolves with whether there was an object over s3', async () => {
+    const objects = new Set(['a.txt'])
+    const bucket = Bun.serve({
+      port: 0,
+      fetch(request) {
+        const key = decodeURIComponent(new URL(request.url).pathname.replace(/^\/site\//, ''))
+        const found = objects.has(key)
+
+        if (request.method === 'DELETE') {
+          objects.delete(key)
+
+          return new Response(null, { status: 204 })
+        }
+
+        return new Response(null, { status: found ? 200 : 404, headers: { 'content-length': '1' } })
+      },
+    })
+
+    try {
+      const store = s3Files({ bucket: 'site', endpoint: `http://localhost:${bucket.port}`, accessKeyId: 'id', secretAccessKey: 'secret', region: 'us-east-1' })
+
+      expect(await store.delete('a.txt')).toBe(true)
+      expect(await store.delete('a.txt')).toBe(false)
+      expect(await store.delete('never.txt')).toBe(false)
+    }
+    finally {
+      await bucket.stop(true)
+    }
+  })
+})
+
 describe('the file route', () => {
   it('serves a public file for good, with its type, and downloads one a browser would run or load as bytes of no type', async () => {
     const get = await serve(memoryFiles())

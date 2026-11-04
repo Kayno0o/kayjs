@@ -67,8 +67,9 @@ export class Passwords {
   private readonly memory = memoryRates()
   private readonly signedOut: Kv
   private lastIssued = 0
+  private told = false
 
-  constructor(passwords: Record<string, string>, maxAge: Duration, private readonly secret?: string, private readonly chosenStore?: RateStore, chosenKv?: KvStore) {
+  constructor(passwords: Record<string, string>, maxAge: Duration, private readonly secret?: string, private readonly chosenStore?: RateStore, private readonly chosenKv?: KvStore) {
     this.signedOut = kv('cms:revoked', chosenKv)
     this.seconds = durationSeconds(maxAge, '`passwordGuard({ maxAge })`')
 
@@ -220,6 +221,8 @@ export class Passwords {
 
     const signature = value?.split('.')[2] ?? ''
 
+    this.warnPerProcess()
+
     try {
       return await this.signedOut.get(keyedDigest('cms-session', signature)) === undefined ? role : undefined
     }
@@ -228,6 +231,15 @@ export class Passwords {
 
       return undefined
     }
+  }
+
+  // A guard given its own rate store and no kv, in an app with no store, signs a cookie out in this process only. An app store without a kv is told by `kv()` itself.
+  private warnPerProcess(): void {
+    if (this.told || this.chosenStore === undefined || this.chosenKv !== undefined || appStore() !== undefined)
+      return
+
+    this.told = true
+    log.warn('passwordGuard() has a rate store of its own and no kv, so a signed-out cookie is refused by this process only: pass passwordGuard(passwords, { kv }) or add kv to the app\'s store')
   }
 
   // Ends the sign-in a cookie holds in this process only, so a copy of it stops working here; a value that is not a live sign-in of this server changes nothing.

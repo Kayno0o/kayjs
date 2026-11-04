@@ -1,4 +1,4 @@
-import type { StoreBase } from '../runtime/store-base'
+import type { MaybePromise, StoreBase } from '../runtime/store-base'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { inMemory } from './memory-mark'
@@ -28,9 +28,9 @@ export interface VitalCount {
 // What the app keeps of the vitals visitors reported: a count per route, metric, bucket and day, so a replica adds its views to the others' with one increment and the store holds a fixed number of rows however many views come.
 export interface VitalsStore extends StoreBase {
   // Counts one view's readings for a route on a UTC day, the days since 1970.
-  add: (route: string, readings: VitalReading[], day: number) => void | Promise<void>
+  add: (route: string, readings: VitalReading[], day: number) => MaybePromise<void>
   // The counts of every day from `since` on, summed over the days, in every process sharing the store.
-  counts: (since: number) => VitalCount[] | Promise<VitalCount[]>
+  counts: (since: number) => MaybePromise<VitalCount[]>
 
 }
 

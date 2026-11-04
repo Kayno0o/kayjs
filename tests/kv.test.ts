@@ -1,5 +1,5 @@
 import type { KvStore } from '../src/server/kv'
-import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
+import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { setupStore } from '../src/server/app-store'
 import { kv, memoryKv, sqliteKv } from '../src/server/kv'
 import { pgData } from '../src/server/pg-data'
@@ -59,6 +59,66 @@ describe.each(kinds)('the %s kv store', (_name, open) => {
     expect(await store.once('a', 1000)).toBe(false)
     await store.delete('a')
     expect(await store.once('a', 1000)).toBe(true)
+  })
+})
+
+describe('the process memory fallback and a closed store', () => {
+  it('drops the oldest keys of a capped memory store, expired ones first', async () => {
+    const store = memoryKv(3)
+
+    await store.set('a', '1')
+    await store.set('b', '2', 1)
+    await store.set('c', '3')
+    await Bun.sleep(5)
+    await store.set('d', '4')
+    expect([await store.get('a'), await store.get('b'), await store.get('c'), await store.get('d')]).toEqual(['1', undefined, '3', '4'])
+    await store.set('e', '5')
+    expect([await store.get('a'), await store.get('c'), await store.get('d'), await store.get('e')]).toEqual([undefined, '3', '4', '5'])
+  })
+
+  it('holds 500 keys when no store is set up', async () => {
+    setupStore(undefined)
+
+    const flags = kv('cap')
+
+    for (let index = 0; index < 600; index++)
+      await flags.set(String(index), 'v')
+
+    expect(await flags.get('0')).toBeUndefined()
+    expect(await flags.get('99')).toBeUndefined()
+    expect(await flags.get('100')).toBe('v')
+    expect(await flags.get('599')).toBe('v')
+  })
+
+  it('warns once per namespace when the app names stores but no kv, and not when it names one or none', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const told = () => warn.mock.calls.filter(([message]) => String(message).includes('has no kv')).length
+
+    try {
+      setupStore({ rates: undefined })
+      await kv('warned').set('a', '1')
+      await kv('warned').get('a')
+      expect(told()).toBe(1)
+      await kv('other').get('a')
+      expect(told()).toBe(2)
+
+      setupStore({ kv: memoryKv() })
+      await kv('warned').get('a')
+      setupStore(undefined)
+      await kv('warned').get('a')
+      expect(told()).toBe(2)
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('throws a kay error from a sqlite store used after it was closed', async () => {
+    const store = sqliteKv(await sqlitePath())
+
+    await store.set('a', '1')
+    await store.close?.()
+    expect(async () => store.get('a')).toThrow('kay: the kv store was closed')
   })
 })
 

@@ -35,7 +35,7 @@ export interface Broadcast {
   message: string
 }
 
-// A store answers synchronously (SQLite) or with a promise (Postgres): callers await every call.
+// A store answers at once (SQLite) or with a promise (Postgres), as `MaybePromise` says: callers await every call.
 // What the mailing lists keep their data in; `openLists` is the SQLite one, `pgLists` the Postgres one, both with the same semantics: a delivery is claimed before its mail goes, and removing or erasing a subscriber takes its deliveries with it.
 export interface ListStore {
   // Whether the store was closed, which the sweep then leaves alone.

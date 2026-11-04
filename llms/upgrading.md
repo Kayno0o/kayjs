@@ -19,7 +19,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### `rooms()` state and `update` always resolve
 
-- `rooms()`'s `state(room)` and `update(room, change)` return promises whatever the store, as every other store answers: `await` them (`const { cells } = await games.update(room, ...)`, a `coalesce` `read` that reads `state` is `async`). `RoomStore.state` and `update` return promises too, so a hand-written store makes them `async`. `AsyncRoomStore`, `AsyncRooms` and `StoreRooms` stay as deprecated names. A refused room name now rejects instead of throwing. `kay check` cannot see a call that ignores the promise, so TypeScript and `no-floating-promises` find them.
+- `rooms()`'s `state(room)` and `update(room, change)` return promises whatever the store, as every other store answers: `await` them (`const { cells } = await games.update(room, ...)`, a `coalesce` `read` that reads `state` is `async`). `RoomStore.state` and `update` return promises too, so a hand-written store makes them `async`. `AsyncRoomStore`, `AsyncRooms` and `StoreRooms` stay as deprecated names until 1.91, and `kay upgrade` renames them to `RoomStore` and `Rooms` (`deprecated-room-types`). A refused room name now rejects instead of throwing. `kay check` cannot see a call that ignores the promise, so TypeScript and `no-floating-promises` find them.
 
 ### Checkbox and Toggle with a `name` or an `issue` sit in a wrapper
 
@@ -37,10 +37,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### Signed-out cookies and approval tickets move to `store.kv`
 
 - kayjs-cms's signed-out cookies and kayjs-ai's spent approval tickets are kept in `store.kv` (filled by `sqliteData` and `pgData`, else the process's memory), not `store.rates`: `passwordGuard({ store })` counts wrong passwords only and `passwordGuard({ kv })` names the cookies' store. An app on a hand-written `store.rates` shared between processes adds a `kv` of its own.
+- `pgData` keeps `store.kv` in a new `kay_kv` table: on a Postgres whose app role may not create tables, the owner runs `await createDataTables(db)` once (idempotent) before the app starts, as it does for the other `kay_` tables ([Queues](queues.md)), else `pgData` throws naming `kay_kv`.
 
 ### Durations and dates where a number stood
 
-- kayjs-auth's mail `maxAge` is `{ link: '24h', code: '10m' }`, durations where seconds stood: `lifetime(value, locale)` takes both until 1.91. OAuth `expiresAt` (`OAuthTokens`, `StoredCredential`, the `exchange` result) is a `Date`: a custom provider returns `new Date(...)`.
+- kayjs-auth's mail `maxAge` is `{ link: '24h', code: '10m' }`, durations where seconds stood: `lifetime(value, locale)` and `durationWords(value, locale)` take both until 1.91, and `kay upgrade` writes a number literal as `'86400s'` (`deprecated-duration-seconds`). OAuth `expiresAt` (`OAuthTokens`, `StoredCredential`, the `exchange` result) is a `Date`: a custom provider returns `new Date(...)`, though epoch milliseconds still read as a date.
 - kayjs-ai's provider `embed`, `speak` and `transcribe` get `timeout` as a `Duration`, not milliseconds.
 
 ## 1.87.0

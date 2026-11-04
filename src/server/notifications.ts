@@ -1,5 +1,5 @@
 import type { Duration } from '../runtime/duration'
-import type { StoreBase } from '../runtime/store-base'
+import type { MaybePromise, StoreBase } from '../runtime/store-base'
 import { cached, invalidate } from '../runtime/cache'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
@@ -33,19 +33,19 @@ export interface StoredNotification {
 // What the app keeps of its people's notifications, `store.notifications` of kay.config.ts: one row each, so replicas share them. A method may answer with a promise.
 export interface NotificationStore extends StoreBase {
   // Keeps one for a person, and drops the person's oldest beyond `most`.
-  add: (user: string, note: StoredNotification, most: number) => void | Promise<void>
+  add: (user: string, note: StoredNotification, most: number) => MaybePromise<void>
   // A person's notifications that have not expired, newest first.
-  list: (user: string, limit: number, now: number) => Notification[] | Promise<Notification[]>
+  list: (user: string, limit: number, now: number) => MaybePromise<Notification[]>
   // How many of them are unread.
-  unread: (user: string, now: number) => number | Promise<number>
+  unread: (user: string, now: number) => MaybePromise<number>
   // Marks one read; false when the person has no such notification.
-  markRead: (user: string, id: string, now: number) => boolean | Promise<boolean>
+  markRead: (user: string, id: string, now: number) => MaybePromise<boolean>
   // Marks every one read, answering how many were unread.
-  markAllRead: (user: string, now: number) => number | Promise<number>
+  markAllRead: (user: string, now: number) => MaybePromise<number>
   // Deletes every notification of a person, answering how many went.
-  erase: (user: string) => number | Promise<number>
+  erase: (user: string) => MaybePromise<number>
   // Deletes every expired one, answering how many went.
-  prune: (now: number) => number | Promise<number>
+  prune: (now: number) => MaybePromise<number>
 }
 
 export interface NotifyOptions {

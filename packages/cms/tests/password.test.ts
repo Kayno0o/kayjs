@@ -1,5 +1,5 @@
 import type { GuardContext } from 'kay'
-import { describe, expect, setSystemTime, test } from 'bun:test'
+import { describe, expect, setSystemTime, spyOn, test } from 'bun:test'
 import { memoryRates } from 'kay/library'
 import { memoryKv } from 'kay/server'
 import { HOST_SESSION_COOKIE, passwordGuard, Passwords, SESSION_COOKIE, sessionCookieOf, signedInBy } from '../src/password'
@@ -105,6 +105,29 @@ describe('the password guard\'s sign-in cookie', () => {
     expect(() => passwordGuard({})).toThrow('takes a password')
     expect(() => passwordGuard({ 'a.b': 'x' })).toThrow('letters, digits')
     expect(() => passwordGuard('x', { maxAge: 'soon' as never })).toThrow()
+  })
+
+  test('warns once that sign-outs are per process when the guard has a rate store of its own and no kv', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      const own = new Passwords({ editor: 'pw-editor' }, '1h', undefined, memoryRates())
+      const cookie = own.issue('editor', false).value
+
+      expect(await own.current(cookie)).toBe('editor')
+      expect(await own.current(cookie)).toBe('editor')
+      expect(warn.mock.calls.filter(([message]) => String(message).includes('signed-out cookie is refused by this process only'))).toHaveLength(1)
+
+      warn.mockClear()
+
+      const shared = new Passwords({ editor: 'pw-editor' }, '1h', undefined, memoryRates(), memoryKv())
+
+      expect(await shared.current(shared.issue('editor', false).value)).toBe('editor')
+      expect(warn).not.toHaveBeenCalled()
+    }
+    finally {
+      warn.mockRestore()
+    }
   })
 
   test('signing out ends the sign-in for a copy of the cookie too, and only that one', async () => {

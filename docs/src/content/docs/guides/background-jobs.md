@@ -227,7 +227,7 @@ A claim and its hold use the database's clock, so replicas need not keep their c
 
 #### The whole app store on Postgres
 
-`pgData(db)` is `sqliteData` on Postgres. It keeps the sessions, the cached values, the jobs, the schedule locks, the rate limit counts, the members of presence rooms, the live values and the Web Vitals in `kay_*` tables of the same database, so replicas on several machines share them.
+`pgData(db)` is `sqliteData` on Postgres. It keeps the sessions, the cached values, the jobs, the schedule locks, the rate limit counts, the members of presence rooms, the live values, the Web Vitals and the small flags and markers libraries keep (`store.kv`) in `kay_*` tables of the same database, so replicas on several machines share them.
 
 ```ts
 import { defineConfig, pgData } from 'kay/server'
@@ -255,7 +255,11 @@ If the database stops answering, a call of any of these stores fails after 8 sec
 
 `sqliteJobs` is the default store, one file shared by the processes of a machine. For replicas on several machines, `pgJobs(db)` keeps the jobs in Postgres: pass it a Bun `SQL`, a pg-orm `Database` or a connection URL. To keep jobs elsewhere, Redis say, pass `store` an object of `JobStore`, from `kay/server`. Every process of the app opens it, so it must hand each job to one process only.
 
-To put the sessions, the cached and live values, the jobs, the schedule locks, the rate limit counts and the members of presence rooms and the Web Vitals of the whole app in one place, set `store` in `kay.config.ts`: `store: sqliteData('data/app.sqlite')`, or `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications }` with stores of your own. A session, a `cached` call, a queue, a schedule or a limit naming its own `store` keeps it.
+To put the sessions, the cached and live values, the jobs, the schedule locks, the rate limit counts and the members of presence rooms and the Web Vitals of the whole app in one place, set `store` in `kay.config.ts`: `store: sqliteData('data/app.sqlite')`, or `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications, push, kv }` with stores of your own. A session, a `cached` call, a queue, a schedule or a limit naming its own `store` keeps it.
+
+A flag, a marker or a ticket spent once lives in `store.kv`: `const flags = kv('my-app')` from `kay/server` gives `get`, `set(key, value, ttlMs?)`, `delete` and `once(key, ttlMs)`, which resolves `true` for one caller only, however many processes ask at once.
+
+`sqliteData` and `pgData` fill it for every process of the app. Without them it is this process's memory, capped at 500 keys, and a store of your own is a `KvStore` with those four methods.
 
 | Method | Does |
 | --- | --- |
@@ -268,7 +272,7 @@ To put the sessions, the cached and live values, the jobs, the schedule locks, t
 | `nextRunAt(queue)` | When the next job may run, so a worker sleeps until then |
 | `lock(name, slot)` | True for the first caller of that name and slot, in any process, so a schedule runs once |
 
-`prune(queue, before)`, `jobs(queue)`, `revive(id, runAt)`, `release(id, until, runAt?)`, `progress(id, until, progress)` and `state(queue, ref, now)` are optional. Without `purge`, old failed jobs are listed and removed one by one. Without `jobs`, `remove` works by id only.
+`prune(queue, before)`, `jobs(queue)`, `revive(id, runAt)`, `release(id, until, runAt?)`, `progress(id, until, progress)` and `state(queue, ref, now)` are optional. Without `prune`, old failed jobs are listed and removed one by one. Without `jobs`, `remove` works by id only.
 
 `jobs` and `failed` list the jobs by when they are due, the earliest first, and may take a limit (and `jobs` a `failed` flag) to cut their result in the query: the dev tool and the jobs page ask for 101 jobs of each kind, so a long queue is never read whole, and a store that ignores it is cut after.
 

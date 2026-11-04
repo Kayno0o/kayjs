@@ -1,5 +1,6 @@
 import type { MaybePromise, StoreBase } from '../runtime/store-base'
 import { PURGE_STALE_MS } from '../runtime/cache'
+import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore, storeSetups } from './app-store'
 import { inMemory } from './memory-mark'
@@ -25,11 +26,13 @@ export interface Kv {
 }
 
 const SWEEP_EVERY = 500
+// The keys the process's own fallback holds, as many as the OAuth documents it once kept in a map of its own.
+const FALLBACK_KEYS = 500
 // The value `once` writes: nothing reads it.
 const TAKEN = '1'
 
-// Values kept in this process's memory.
-export function memoryKv(): KvStore {
+// Values kept in this process's memory; with `max`, a write past that many keys drops the expired ones, then the oldest written.
+export function memoryKv(max?: number): KvStore {
   const entries = new Map<string, { value: string, until: number | undefined }>()
   let writes = 0
   const live = (key: string, now: number) => {
@@ -45,7 +48,24 @@ export function memoryKv(): KvStore {
       }
     }
 
+    // Deleted first so a rewritten key counts as the newest.
+    entries.delete(key)
     entries.set(key, { value, until: ttlMs === undefined ? undefined : now + ttlMs })
+
+    if (max === undefined || entries.size <= max)
+      return
+
+    for (const [held, entry] of entries) {
+      if (entry.until !== undefined && entry.until <= now)
+        entries.delete(held)
+    }
+
+    for (const held of entries.keys()) {
+      if (entries.size <= max)
+        break
+
+      entries.delete(held)
+    }
   }
 
   return inMemory({
@@ -121,26 +141,49 @@ function openKv(path: string) {
 // The file is opened by the first call, so loading a config that names the store, to build or check, creates nothing.
 export function sqliteKv(path: string): KvStore {
   let opened: ReturnType<typeof openKv> | undefined
+  let closed = false
 
   // A reload closes the file for the module that named the store; the module running again names a store of its own.
   onReload(() => opened?.close())
 
-  const file = () => opened ??= openKv(path)
+  const file = () => {
+    if (closed)
+      throw new Error('kay: the kv store was closed')
+
+    return opened ??= openKv(path)
+  }
 
   return {
     get: key => file().get(key),
     set: (key, value, ttlMs) => file().set(key, value, ttlMs),
     delete: key => file().delete(key),
     once: (key, ttlMs) => file().once(key, ttlMs),
-    close: () => opened?.close(),
+    close() {
+      closed = true
+      opened?.close()
+    },
   }
 }
 
 let fallback: { store: KvStore, setups: number } | undefined
 
-function inMemoryKv(): KvStore {
+// The namespaces already told, in the store setup they were told for.
+let warned: { namespaces: Set<string>, setups: number } | undefined
+
+function inMemoryKv(namespace: string): KvStore {
   if (fallback?.setups !== storeSetups())
-    fallback = { store: memoryKv(), setups: storeSetups() }
+    fallback = { store: memoryKv(FALLBACK_KEYS), setups: storeSetups() }
+
+  // An app that names stores but no `kv` shares nothing between its processes through this one: a signed-out cookie or a single-use ticket is known to the process that took it only.
+  if (appStore() !== undefined) {
+    if (warned?.setups !== storeSetups())
+      warned = { namespaces: new Set(), setups: storeSetups() }
+
+    if (!warned.namespaces.has(namespace)) {
+      warned.namespaces.add(namespace)
+      kayLog('warn', `the app's store has no kv, so "${namespace}" (signed-out cookies, single-use tickets, fetched documents) is kept in this process only: add kv to the store, which sqliteData and pgData fill`)
+    }
+  }
 
   return fallback.store
 }
@@ -148,7 +191,7 @@ function inMemoryKv(): KvStore {
 // The app's `store.kv`, else this process's memory: a library keeping a value across requests asks for its own namespace, and an app on `sqliteData` or `pgData` shares it between processes with nothing to write.
 // `store` names the one to use instead, as a test or a library given its own does.
 export function kv(namespace: string, store?: KvStore): Kv {
-  const kept = () => store ?? appStore()?.kv ?? inMemoryKv()
+  const kept = () => store ?? appStore()?.kv ?? inMemoryKv(namespace)
   const keyed = (key: string) => `${namespace}\n${key}`
 
   return {

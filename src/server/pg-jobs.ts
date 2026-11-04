@@ -74,6 +74,13 @@ export async function relationsMissing(db: SQL, names: readonly string[]): Promi
   return found?.missing === true
 }
 
+// The names, among these relations, of the ones that do not exist.
+export async function missingRelations(db: SQL, names: readonly string[]): Promise<string[]> {
+  const rows = await rowsOf<{ name: string }>(db.unsafe(`SELECT name FROM unnest(ARRAY[${names.map(name => `'${name}'`).join(', ')}]) AS name WHERE to_regclass(name) IS NULL`))
+
+  return rows.map(row => row.name)
+}
+
 // Creates the indexes missing on tables that exist, each on its own and concurrently: a plain CREATE INDEX locks its table against writes, and inside a transaction with others it would deadlock with a replica writing several tables.
 // One replica at a time: two concurrent builds of one index deadlock each other, so a replica that finds another one at it leaves the indexes to it. Whoever built or not, it then waits for the unique ones to be valid, as a keyed job enqueued before kay_jobs_key is enforced could be enqueued twice. It waits at most INDEX_WAIT_MS, then warns and goes on: a build that failed is taken over by the next try of the lock.
 // The lock is a session one, held on the connection that builds. Behind a transaction-mode pooler it is not held across statements, so a replica that deadlocked (40P01) with another's build counts as having lost it, and the same wait applies; the lock only keeps builds apart on a direct or session-mode connection.
