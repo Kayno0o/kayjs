@@ -1160,7 +1160,7 @@ describe('kay build --compile', () => {
       'node_modules/build-stamp/index.d.ts': 'declare const stamp: () => import(\'bun\').BunPlugin\nexport default stamp\n',
       'node_modules/build-stamp/index.js': 'import { readFileSync } from \'node:fs\'\nimport { join } from \'node:path\'\n\nconst binding = readFileSync(join(import.meta.dir, \'binding.txt\'), \'utf8\')\n\nexport default () => ({ name: binding, setup() {} })\n',
       'node_modules/build-stamp/binding.txt': 'stamp',
-      'kay.config.ts': 'import stamp from \'build-stamp\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ plugins: [stamp()], lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }], settings: { \'kay-lib\': \'./src/ui-settings.ts\' }, images: { dirs: { \'/uploads/\': \'uploads\' } } })\n',
+      'kay.config.ts': 'import stamp from \'build-stamp\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ plugins: [stamp()], lang: \'en\', site: \'https://example.com\', favicon: \'src/favicon.png\', fonts: [{ family: \'Display\', src: \'src/display.woff2\' }], librarySettings: { \'kay-lib\': \'./src/ui-settings.ts\' }, images: { dirs: { \'/uploads/\': \'uploads\' } } })\n',
     }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
     // Images, the favicon and fonts are read from the project at build time only: the executable serves what the build made of them.
     await Promise.all([

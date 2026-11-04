@@ -44,7 +44,6 @@ function isOptionCall(callee: CallExpression['callee'], callees: Set<string>, im
   return imported.some(({ name, namespaces }) => name === property.name && namespaces.has(object.name))
 }
 
-// Where a key lives now.
 function grouped(name: string): readonly [string, string] | undefined {
   return Object.hasOwn(GROUPED_KEYS, name) ? GROUPED_KEYS[name as keyof typeof GROUPED_KEYS] : undefined
 }
@@ -169,7 +168,6 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
       const names = new Set(object.properties.flatMap(property => isPlain(property) ? [keyName(property)] : []))
       // A spread or a computed key may carry a `store`, which a `store` written beside it would shadow or be shadowed by.
       const mayHoldStore = names.has('store') || object.properties.some(property => !isPlain(property))
-      const filesMove = (property: ObjectProperty, shorthandName: string): string => `store: { files: ${property.shorthand ? shorthandName : source.slice(property.value.start, property.value.end)} }`
       const movedProperties = object.properties.filter(isPlain).filter(property => grouped(keyName(property) ?? '') !== undefined)
       const groupLevel = movedProperties[0] === undefined ? 'allow' : levelAt('deprecated-config-groups', movedProperties[0].key.start)
 
@@ -231,7 +229,7 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
           help: names.has('store') ? 'move it into the `files` of the `store` beside it' : 'write `store: { files: ... }`, in the `store` a spread or computed key may give this object if it has one',
           code: 'deprecated-file-store',
           severity: level === 'warn' ? 'warning' : 'error',
-          ...!mayHoldStore && { fixes: [{ title: 'Move fileStore under store.files', edits: [{ start, end, text: filesMove(property, 'fileStore') }], safe: true }] },
+          ...!mayHoldStore && { fixes: [{ title: 'Move fileStore under store.files', edits: [{ start, end, text: `store: { files: ${property.shorthand ? 'fileStore' : source.slice(property.value.start, property.value.end)} }` }], safe: true }] },
         })
       }
     }

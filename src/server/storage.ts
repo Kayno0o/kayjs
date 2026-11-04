@@ -319,7 +319,7 @@ export const files = {
     const store = await activeStore()
 
     if (!store.list)
-      throw new KayError('config-invalid', 'kay: files.list() needs a store with a list method; the one `storage` names has none')
+      throw new KayError('config-invalid', 'kay: files.list() needs a store with a list method; the one `store.files` names has none')
 
     const prefix = folder === undefined ? undefined : `${folder}/`
 

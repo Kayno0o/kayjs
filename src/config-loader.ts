@@ -6,7 +6,7 @@ import process from 'node:process'
 import { APP_DEPENDENCIES, dependencyNames, libraryMessageExtensions, readManifest } from './build/manifests'
 import { KayError } from './compiler/errors'
 import { CONFIG_FILE } from './config'
-import { CONFIG_GROUPS, groupedKeys, isBag, mergeBags, unknownConfigKeys } from './config-shape'
+import { CONFIG_GROUPS, groupedKeys, isBag, mergeBags, REMOVED_KEYS, unknownConfigKeys } from './config-shape'
 import { NATIVE_PLUGINS } from './native-plugins'
 import { publicEnvFiles } from './server/env-state'
 
@@ -287,5 +287,11 @@ export async function withConfig<Options extends KayConfig>(root: string, option
 
 // `config` is as `kay.config.ts` writes it, so the extensions the options name lie under it rather than the file's.
 export function mergeConfig<Options extends KayConfig>(config: KayConfig, options: Options): KayConfig & Options {
+  // Options carry keys of their own (`root`, `dev`, `prebuilt`), so only the names kay removed are refused here, as `kay.config.ts` refuses every unknown key.
+  const removed = Object.keys(options).filter(key => Object.hasOwn(REMOVED_KEYS, key))
+
+  if (removed.length > 0)
+    throw new KayError('config-invalid', `kay: the options have keys kay no longer reads: ${removed.map(key => `\`${key}\`, now \`${REMOVED_KEYS[key]}\``).join('; ')}`)
+
   return withSiteUrl(withExtensions(mergeBags(groupedKeys(config), groupedKeys(options)) as KayConfig & Options))
 }

@@ -238,7 +238,7 @@ describe('a production server started from disk', () => {
   }
 
   async function build(options: string): Promise<void> {
-    await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { extensions: options.extensions, security: false, inlineStyles: false, site: options.site, base: options.base, i18n: options.i18n, settings: options.settings }, { check: false })\nif (built.failed) throw built.failed.error\n`)
+    await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { extensions: options.extensions, security: false, inlineStyles: false, site: options.site, base: options.base, i18n: options.i18n, librarySettings: options.librarySettings }, { check: false })\nif (built.failed) throw built.failed.error\n`)
   }
 
   // The status and body of a page of the server, as a proxy stripping the base forwards it, started from the build in `options`.
@@ -615,7 +615,7 @@ describe('a production server started from disk', () => {
 
   it('serves a library with the settings the app replaces from the record', async () => {
     const { root, options: plain } = await project([EXTENSION])
-    const options = JSON.stringify({ ...JSON.parse(plain), settings: { 'kay-lib': './src/ui-settings.ts' } })
+    const options = JSON.stringify({ ...JSON.parse(plain), librarySettings: { 'kay-lib': './src/ui-settings.ts' } })
     const library = resolve(root, 'node_modules/kay-lib')
 
     await Bun.write(resolve(root, 'package.json'), JSON.stringify({ name: 'app', private: true, dependencies: { 'kay-lib': '*' } }))

@@ -17,7 +17,7 @@ const PROXY: Record<keyof ProxyConfig, true> = { hops: true, header: true, trust
 const SITEMAP: Record<keyof SitemapConfig, true> = { ttl: true }
 
 // The names a config key had before 1.88 and no longer has, each with where it lives now: one is reported as an unknown key naming its replacement.
-const REMOVED_KEYS: Record<string, string> = { routes: 'dirs.routes', api: 'dirs.api', content: 'contentConfig', storage: 'store.files', maxSizes: 'limits.byPath', settings: 'librarySettings' }
+export const REMOVED_KEYS: Record<string, string> = { routes: 'dirs.routes', api: 'dirs.api', content: 'contentConfig', storage: 'store.files', maxSizes: 'limits.byPath', settings: 'librarySettings' }
 
 // The flat keys 1.88 grouped by concern, each with the bag that holds it now and its name there: still read until 1.91, and reported by `deprecated-config-groups`.
 export const GROUPED_KEYS = {

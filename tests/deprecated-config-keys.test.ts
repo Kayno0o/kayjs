@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { deprecatedConfigKeys } from '../src/check/deprecated-config-keys'
 import { applySafeFixes } from '../src/check/fixes'
+import { mergeConfig } from '../src/config-loader'
 import { GROUPED_KEYS, groupedKeys, mergeBags, unknownConfigKeys } from '../src/config-shape'
 import { scratchDir } from './scratch'
 
@@ -215,5 +216,12 @@ describe('deprecated-config-groups', () => {
     finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('the options of pages() and testSite()', () => {
+  it('refuse a key kay removed, naming its replacement', () => {
+    expect(() => mergeConfig({}, { storage: undefined, routes: 'a' } as never)).toThrow('`storage`, now `store.files`; `routes`, now `dirs.routes`')
+    expect(mergeConfig({}, { dirs: { routes: 'a' } }).dirs).toEqual({ routes: 'a' })
   })
 })
