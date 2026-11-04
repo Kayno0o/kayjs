@@ -194,10 +194,10 @@ describe('the timeout of a call', () => {
 
     const save = stub()
     const first = save({}, { queue: 'serial' })
-    const second = save({}, { queue: 'serial', timeout: '40ms' })
+    const second = save({}, { queue: 'serial', timeout: '200ms' })
 
     await settle()
-    await Bun.sleep(80)
+    await Bun.sleep(300)
     server.answer(1, ok(1))
     await settle()
     expect(server.posts()).toBe(2)
@@ -588,52 +588,43 @@ describe('a latest call', () => {
 
 describe('optimistic changes of calls in flight', () => {
   it('end where they began whichever fails first', async () => {
-    const answers = [20, 5]
-    let post = 0
-
-    mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async () => {
-      await Bun.sleep(answers[post++]!)
-
-      return new Response('no', { status: 500 })
-    }) as unknown as typeof fetch))
-
+    const server = gated()
     const [value, setValue] = reactive.createSignal(0)
     const save = stub()
     const first = save({}, { optimistic: () => setValue(1) })
     const second = save({}, { optimistic: () => setValue(2) })
 
+    await settle()
+    server.answer(2, new Response('no', { status: 500 }))
     await expect(second).rejects.toThrow()
     expect(value()).toBe(1)
+    server.answer(1, new Response('no', { status: 500 }))
     await expect(first).rejects.toThrow()
     expect(value()).toBe(0)
   })
 
   it('end where they began when the earlier fails first, and keep the later one\'s value when it goes through', async () => {
-    const outcomes = [[5, 500], [20, 500], [5, 500], [20, 200]] as const
-    let post = 0
-
-    mocks.push(spyOn(globalThis, 'fetch').mockImplementation((async () => {
-      const [ms, status] = outcomes[post++]!
-
-      await Bun.sleep(ms)
-
-      return status === 200 ? ok(1) : new Response('no', { status })
-    }) as unknown as typeof fetch))
-
+    const server = gated()
     const [value, setValue] = reactive.createSignal(0)
     const save = stub()
     const first = save({}, { optimistic: () => setValue(1) })
     const second = save({}, { optimistic: () => setValue(2) })
 
+    await settle()
+    server.answer(1, new Response('no', { status: 500 }))
     await expect(first).rejects.toThrow()
     expect(value()).toBe(2)
+    server.answer(2, new Response('no', { status: 500 }))
     await expect(second).rejects.toThrow()
     expect(value()).toBe(0)
 
     const third = save({}, { optimistic: () => setValue(1) })
     const fourth = save({}, { optimistic: () => setValue(2) })
 
+    await settle()
+    server.answer(3, new Response('no', { status: 500 }))
     await expect(third).rejects.toThrow()
+    server.answer(4, ok(1))
     expect(await fourth).toBe(1)
     expect(value()).toBe(2)
   })
