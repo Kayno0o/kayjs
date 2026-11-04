@@ -57,6 +57,8 @@ export interface Document extends ShadowFile {
   queries: string
   // The named slots of the layouts above it, as compiled with: a layout declaring or dropping one compiles the file again.
   slots: string
+  // The `_guard.ts` files covering it, as compiled with: one created or deleted compiles the file again.
+  guards: string
 }
 
 // What the modules of the server read of it: the editor's and tsgo's connections, the open documents and the projects.

@@ -3,7 +3,7 @@ import type { CheckOptions } from '../check'
 import type { KayConfig } from '../config'
 import type { Document, LspHost, Project } from './host'
 import type { CodeActionParams, CodeLens, CompletionItem, Diagnostic, DidChangeTextDocumentParams, DocumentSymbol, FileEvent, FoldingRange, InitializeParams, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit } from './protocol'
-import { basename, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { KAY_DIR } from '../build/assets'
@@ -13,7 +13,7 @@ import { importedSignals } from '../build/signals'
 import { configCheckOptions, stopProbes, writeShadowTypes } from '../check'
 import { servedLocales } from '../check/diagnose'
 import { withoutMissingCaptcha } from '../check/project'
-import { compileShadow, layoutQueries, outerSlots, shadowOptionsFor } from '../check/shadow'
+import { compileShadow, guardTypes, layoutQueries, outerSlots, shadowOptionsFor } from '../check/shadow'
 import { programShadows } from '../check/shadow-types'
 import { formatKay } from '../compiler/format'
 import { nativeExe } from '../compiler/native-typescript'
@@ -329,6 +329,7 @@ export class KayLanguageServer implements LspHost {
     return (project?.islandOnly.has(file) ?? false) !== previous.insideIsland
       || (project !== undefined && project.options !== options.get(project.root))
       || (modulesChanged && JSON.stringify(importedSignals(file, previous.source)) !== previous.signals)
+      || (modulesChanged && project !== undefined && JSON.stringify(guardTypes(file, previous.source, project.routesDir, project.mounts, dirname(file))) !== previous.guards)
       || (layoutsChanged && project !== undefined && (JSON.stringify(layoutQueries(file, previous.source, project.routesDir, project.mounts)) !== previous.queries || JSON.stringify(outerSlots(file, previous.source, project.routesDir, project.mounts)) !== previous.slots))
   }
 
@@ -433,7 +434,7 @@ export class KayLanguageServer implements LspHost {
     const signals = importedSignals(file, source)
     const placed = this.placed(project, file)
     const { shadow, diagnostics, queries, slots } = compileShadow(project.root, placed.file, source, { ...compiling, signals, shadowOf: placed.shadowOf })
-    const document = { ...shadow, uri, shadowUri: pathToFileURL(placed.shadowOf(placed.file)).href, version, diagnostics, insideIsland, signals: JSON.stringify(signals), queries: JSON.stringify(queries), slots: JSON.stringify(slots) }
+    const document = { ...shadow, uri, shadowUri: pathToFileURL(placed.shadowOf(placed.file)).href, version, diagnostics, insideIsland, signals: JSON.stringify(signals), queries: JSON.stringify(queries), slots: JSON.stringify(slots), guards: JSON.stringify(guardTypes(file, source, project.routesDir, project.mounts, dirname(file))) }
 
     this.documents.set(uri, document)
 

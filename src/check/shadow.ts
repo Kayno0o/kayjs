@@ -4,7 +4,7 @@ import type { LintLevels } from '../compiler/lints'
 import type { ImportedSignals } from '../compiler/module-signals'
 import type { Route, RouteMount } from '../server/routes'
 import type { ServerFacts } from './layout-facts'
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { KAY_FILE, TS_FILE } from '../build/files'
 import { packageContextModule } from '../build/manifests'
@@ -136,12 +136,20 @@ function contextSpecifier(file: string, shadowDir: string): string | undefined {
   return module === undefined ? undefined : relativeSpecifier(shadowDir, module.replace(TS_FILE, ''))
 }
 
-// The type of what each `_guard.ts` covering a page or a layout returns, outermost first, which its `ctx.guard` holds; none for a page that sets `guards: false`.
+// Whether a page under `dir` sets `guards: false`, so it runs none of the guards above it and the layout wrapping it reads no value of theirs.
+function opensPageBelow(dir: string): boolean {
+  return readdirSync(dir, { recursive: true, encoding: 'utf8' }).some(path => KAY_FILE.test(path) && !basename(path).startsWith('_') && falseKeys(readFileSync(join(dir, path), 'utf8')).has('guards'))
+}
+
+// The type of what each `_guard.ts` covering a page or a layout returns, outermost first, which its `ctx.guard` holds; none for a page that sets `guards: false`, nor for a layout with such a page under it, which renders with no guard values for that page.
 // `from` is where the shadow imports them from.
 export function guardTypes(file: string, source: string, routesDir: string, mounts: RouteMount[], from: string): string[] | undefined {
   const trees = routeTrees(routesDir, mounts)
 
   if ((!pageRoute(file, routesDir, mounts) && basename(file) !== LAYOUT) || !trees.some(({ dir }) => file.startsWith(dir + sep)) || falseKeys(source).has('guards'))
+    return undefined
+
+  if (basename(file) === LAYOUT && opensPageBelow(dirname(file)))
     return undefined
 
   // An extension's outer layout sits outside every tree and wraps the root, as the router places it.

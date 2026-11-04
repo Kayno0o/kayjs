@@ -219,7 +219,7 @@ class ModuleShell {
     this.styled = this.facts.ui !== undefined && uiHasVariants(this.facts.ui)
     this.deferred = deferredData(this.facts, this.fence)
     this.params = paramsType(options)
-    this.actionsTyped = this.mode === 'check' && options.params !== undefined && (server?.actionCallees.length ?? 0) > 0
+    this.actionsTyped = this.mode === 'check' && (options.params !== undefined || (options.layoutFile === true && this.guardValues() !== undefined)) && (server?.actionCallees.length ?? 0) > 0
   }
 
   // The plain data the scripts write out, but for a name a block of the template binds again, which then stands for something else.
@@ -828,7 +828,7 @@ class ModuleShell {
 
       if (this.actionsTyped) {
         for (const callee of server.actionCallees.filter(callee => callee.start >= span.start && callee.end <= span.end))
-          cuts.push({ at: callee.start, text: '(' }, { at: callee.end, text: ` as KayActionFor<${this.params}${this.guardValues() !== undefined ? `, ${this.guardValues()}` : ''}>)` })
+          cuts.push({ at: callee.start, text: '(' }, { at: callee.end, text: ` as KayActionFor<${this.options.params === undefined ? 'Readonly<Record<string, unknown>>' : this.params}${this.guardValues() !== undefined ? `, ${this.guardValues()}` : ''}>)` })
       }
 
       let at = from

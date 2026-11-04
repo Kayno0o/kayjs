@@ -183,6 +183,40 @@ describe('kay check on ctx.guard', () => {
     expect(code).toBe(0)
   }, TIMEOUT)
 
+  it('types the actions of a layout from the guards above it', async () => {
+    const { code, output } = await check({
+      'src/routes/orgs/[org]/_guard.ts': ORG,
+      'src/routes/orgs/[org]/_layout.kay': '--- server\nimport { action } from \'kay\'\n\nexport const rename = action((ctx) => ctx.guard.org.name)\n---\nslot\n',
+      'src/routes/orgs/[org]/index.kay': 'p Org\n',
+    })
+
+    expect(output).toMatch(/checked with no problems in \d+ ms/)
+    expect(code).toBe(0)
+  }, TIMEOUT)
+
+  it('reports a field no guard returns in the actions of a layout', async () => {
+    const { code, output } = await check({
+      'src/routes/orgs/[org]/_guard.ts': ORG,
+      'src/routes/orgs/[org]/_layout.kay': '--- server\nimport { action } from \'kay\'\n\nexport const rename = action((ctx) => ctx.guard.team)\n---\nslot\n',
+      'src/routes/orgs/[org]/index.kay': 'p Org\n',
+    })
+
+    expect(output).toContain('team')
+    expect(code).not.toBe(0)
+  }, TIMEOUT)
+
+  it('leaves ctx.guard out of a layout with a page under it that sets guards: false', async () => {
+    const { code, output } = await check({
+      'src/routes/_guard.ts': ORG,
+      'src/routes/_layout.kay': '--- server\nconst name = ctx.guard.org.name\n---\nh1 {name}\nslot\n',
+      'src/routes/index.kay': 'p Home\n',
+      'src/routes/sign-in.kay': '--- server\nexport const page = { guards: false }\n---\np Sign in\n',
+    })
+
+    expect(output).toContain('org')
+    expect(code).not.toBe(0)
+  }, TIMEOUT)
+
   it('types an API route from the guards named by api<...>()', async () => {
     const { code, output } = await check({
       'src/api/_guard.ts': ORG,
