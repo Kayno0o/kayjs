@@ -1,7 +1,7 @@
 ---
 import type { FieldSize } from './field-look'
 import type { JSX } from 'kay'
-import { effect, onMount, recipe, signal, untrack } from 'kay'
+import { effect, onMount, postedValue, recipe, signal, untrack } from 'kay'
 import { localDateTime, sameInstant, zonedInstant } from './date'
 import { startRef } from './form-reset'
 import TextInput from './text-input.kay'
@@ -28,7 +28,9 @@ const { value, min, max, name, form, disabled, onChange, ...rest } = props<Omit<
 
 // The visitor's zone is only known once the island runs, so the server renders the empty box carrying the name, and the hidden field posting the instant takes the name over.
 const zoned = signal(false)
-const start = untrack(() => value ?? '')
+// A box with no callback is plain: a refused post of its form, which the server renders it for, gives its text back in place of its own.
+const sent = onChange ? undefined : postedValue(name, value)
+const start = untrack(() => value ?? (sent ? zonedInstant(sent) : ''))
 const current = signal(start)
 let box: HTMLInputElement | undefined
 
@@ -58,7 +60,7 @@ function heard(text: string) {
 }
 
 // A controlled box shows what its parent holds once the zone is known.
-const shown = () => zoned() && value !== undefined ? localDateTime(current()) : undefined
+const shown = () => zoned() && value !== undefined ? localDateTime(current()) : sent
 const bound = (limit: string | Date | undefined) => zoned() ? localDateTime(limit) || undefined : undefined
 ---
 div(part="root")

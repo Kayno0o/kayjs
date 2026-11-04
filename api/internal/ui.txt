@@ -1024,6 +1024,9 @@ interface FieldLinks
   hint: string
   issues: string
 
+[./lib/forms] fieldNamed
+const fieldNamed: Context<(() => string | undefined) | undefined>
+
 [./lib/forms] formIssues
 const formIssues: Context<(() => Record<string, string>) | undefined>
 
@@ -2036,6 +2039,9 @@ interface PopoverTriggerProps
   aria-expanded: "false" | "true"
   popovertarget: string
   style: string
+
+[./lib/props-without] without
+function without(props: object, ...keys: string[]): Record<string, unknown>
 
 [./lib/range] rangeFrom
 function rangeFrom(low: string, high: string): RangeValue

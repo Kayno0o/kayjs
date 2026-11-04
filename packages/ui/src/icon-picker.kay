@@ -1,7 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import type { IconChoice } from './icon-picker'
-import { batch, effect, flush, onCleanup, recipe, signal } from 'kay'
+import { batch, effect, flush, onCleanup, postedValue, recipe, signal } from 'kay'
 import { fieldInvalid, keepInvalid } from './field-look'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
@@ -44,7 +44,9 @@ const { search, icons: given, value = '', name, invalid, disabled = false, onCha
   moreLabel?: string | undefined
 }>()
 
-const picked = signal(value)
+// A picker with no callback is plain: a refused post of its form, which the server renders it for, gives its icon back in place of its own.
+const sent = onChange ? undefined : postedValue(name, value)
+const picked = signal(sent ?? value)
 const typed = signal('')
 const query = signal('')
 const icons = signal<IconChoice[]>([])
@@ -69,7 +71,17 @@ let request = 0
 let shownQuery = ''
 let nextOffset = 0
 
-effect(() => picked = value)
+// The first run leaves a start the server refilled alone, which the browser reads from its markup.
+let refilled = sent !== undefined
+
+effect(() => {
+  const next = value
+
+  if (refilled)
+    refilled = false
+  else
+    picked = next
+})
 
 effect(() => {
   const next = typed()

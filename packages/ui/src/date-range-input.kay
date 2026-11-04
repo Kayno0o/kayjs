@@ -2,7 +2,7 @@
 import type { FieldSize } from './field-look'
 import type { JSX, Snippet } from 'kay'
 import type { DateRange } from './date'
-import { effect, recipe, signal, untrack } from 'kay'
+import { effect, postedValue, recipe, signal, untrack } from 'kay'
 import DateInput from './date-input.kay'
 import { dateRangeFrom } from './date'
 import { defaultKept, onFormReset, startRef } from './form-reset'
@@ -49,7 +49,11 @@ const { size = 'md', invalid, value = [null, null], min, max, firstDay, label, f
   onChange?: ((value: DateRange) => unknown) | undefined
 }>()
 
-const pair = signal<DateRange>(untrack(() => value))
+// A range with no callback is plain: a refused post of its form, which the server renders it for, gives its two dates back in place of its own.
+const sentFrom = onChange ? undefined : postedValue(fromName, value[0])
+const sentTo = onChange ? undefined : postedValue(toName, value[1])
+const sent = sentFrom === undefined && sentTo === undefined ? undefined : dateRangeFrom(sentFrom ?? '', sentTo ?? '')
+const pair = signal<DateRange>(untrack(() => sent ?? value))
 
 effect(() => pair = value)
 

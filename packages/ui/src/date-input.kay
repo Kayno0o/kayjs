@@ -60,7 +60,7 @@ const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Cho
 }>()
 
 // A box with no callback is plain: a refused post of its form, which the server renders it for, gives its date back in place of its own.
-const sent = onChange ? undefined : postedValue(rest.name)
+const sent = onChange ? undefined : postedValue(rest.name, value)
 
 // The calendar is drawn once the island runs, so the server renders the plain date field alone and a form posts it without JavaScript.
 const ready = signal(false)

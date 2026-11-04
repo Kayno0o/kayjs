@@ -1,6 +1,7 @@
 import type { Action, HoneypotOf } from './action-shared'
 import { honeypotField, minTimeOf } from './action-protection'
 import { isAction } from './action-shared'
+import { claimedHost } from './claimed'
 import { escapeAttribute } from './escape'
 import { holdInvalid } from './invalid'
 import { KEPT_END, KEPT_START } from './markers'
@@ -102,41 +103,100 @@ export function formScope(target: unknown, render: () => string): string {
   }
 }
 
+const QUOTES = /["\\]/g
+
+// The fields named `name` in the markup the server wrote for the island being hydrated, none outside a hydration.
+function claimedFields(name: string): Element[] {
+  const host = claimedHost() as Element | undefined
+
+  return host?.querySelectorAll ? [...host.querySelectorAll(`[name="${name.replace(QUOTES, '\\// What a refused post sent for the field `name` of the form being rendered, for a component drawing a field to start from;')}"]`)] : []
+}
+
+// The text the server wrote into a field: a box's `value` attribute, a textarea's text, a select's chosen option, a group of radios' ticked one.
+function claimedValue(fields: Element[]): string | undefined {
+  const first = fields[0]
+
+  if (!first)
+    return undefined
+
+  if (first instanceof HTMLSelectElement)
+    return [...first.options].find(option => option.defaultSelected)?.value
+
+  if (first instanceof HTMLInputElement && first.type === 'radio')
+    return (fields as HTMLInputElement[]).find(radio => radio.defaultChecked)?.value
+
+  return (first as HTMLInputElement | HTMLTextAreaElement).defaultValue
+}
+
 // What a refused post sent for the field `name` of the form being rendered, for a component drawing a field to start from; undefined outside a form posting to an action, without a refusal, for a password or a secret, and in the browser, where the server's markup is claimed as it is.
-export function postedValue(name: unknown): string | undefined {
-  return typeof name !== 'string' || name === '' ? undefined : formValue(enclosing.at(-1), name)
+export function postedValue(name: unknown, fallback?: unknown): string | undefined {
+  if (typeof name !== 'string' || name === '')
+    return undefined
+
+  if (isAction(enclosing.at(-1)))
+    return formValue(enclosing.at(-1), name)
+
+  // Hydrating, the browser holds only the markup the server wrote from the refusal; the value counts when it is not the one the component starts with anyway.
+  const written = claimedValue(claimedFields(name))
+
+  return written === undefined || written === String(fallback ?? '') ? undefined : written
 }
 
 // Whether a checkbox or radio button named `name` was ticked in the refused post, `value` being the one it posts when ticked; undefined as `postedValue` is.
-export function postedChecked(name: unknown, value?: string | number): boolean | undefined {
-  return typeof name !== 'string' || name === '' ? undefined : formChecked(enclosing.at(-1), name, value)
+export function postedChecked(name: unknown, value?: string | number, fallback = false): boolean | undefined {
+  if (typeof name !== 'string' || name === '')
+    return undefined
+
+  if (isAction(enclosing.at(-1)))
+    return formChecked(enclosing.at(-1), name, value)
+
+  const box = (claimedFields(name) as HTMLInputElement[]).find(field => value === undefined || field.value === String(value))
+
+  return box === undefined || box.defaultChecked === fallback ? undefined : box.defaultChecked
+}
+
+// The values of a field a refused post sent more than once, flashed as a JSON list under `<name>[]`; undefined when it sent one value or none, an empty list when the list cannot be read.
+function postedList(posted: Partial<Record<string, string>>, name: string): string[] | undefined {
+  const list = posted[`${name}[]`]
+
+  if (list === undefined)
+    return undefined
+
+  try {
+    const parsed: unknown = JSON.parse(list)
+
+    return Array.isArray(parsed) ? parsed.map(String) : []
+  }
+  catch {
+    return []
+  }
 }
 
 // Every value a refused post sent for the field `name` of the form being rendered, such as the choices of a group of checkboxes, none when it sent none; undefined as `postedValue` is.
-export function postedValues(name: unknown): string[] | undefined {
+export function postedValues(name: unknown, fallback?: readonly unknown[]): string[] | undefined {
   const target = enclosing.at(-1)
+
+  if (!isAction(target)) {
+    const fields = typeof name === 'string' && name !== '' ? claimedFields(name) as HTMLInputElement[] : []
+    const written = fields.filter(field => field.type !== 'checkbox' || field.defaultChecked).map(field => field.type === 'checkbox' ? field.value : field.defaultValue)
+    const held = (fallback ?? []).map(String)
+
+    // A group posting nothing for none has no field to read: its root says it was refilled.
+    if (fields.length === 0)
+      return typeof name === 'string' && held.length > 0 && (claimedHost() as Element | undefined)?.querySelector?.(`[data-posted="${name.replace(QUOTES, '\\$&')}"]`) ? [] : undefined
+
+    return (written.length === held.length && written.every(item => held.includes(item))) ? undefined : written
+  }
+
   const posted = typeof name === 'string' && name !== '' && isAction(target) ? untrack((target as FormTarget).failed)?.values : undefined
 
   // A refusal that read no field, such as a body too large, has nothing to choose.
   if (!posted || Object.keys(posted).length === 0)
     return undefined
 
-  const list = posted[`${name as string}[]`]
-
-  if (list !== undefined) {
-    try {
-      const parsed: unknown = JSON.parse(list)
-
-      return Array.isArray(parsed) ? parsed.map(String) : []
-    }
-    catch {
-      return []
-    }
-  }
-
   const one = posted[name as string]
 
-  return one === undefined ? [] : [one]
+  return postedList(posted, name as string) ?? (one === undefined ? [] : [one])
 }
 
 // The field carrying when a form posting to an action with `minTime` rendered.
@@ -180,6 +240,11 @@ export function formChecked(target: unknown, name: string, value: unknown): bool
   // A refusal that read no field, such as a body too large, has nothing to tick or untick.
   if (!posted || Object.keys(posted).length === 0)
     return undefined
+
+  const list = posted[name] === undefined ? postedList(posted, name) : undefined
+
+  if (list)
+    return list.includes(value === undefined ? 'on' : String(value))
 
   return value === undefined ? posted[name] !== undefined && posted[name] !== 'false' : posted[name] === String(value)
 }

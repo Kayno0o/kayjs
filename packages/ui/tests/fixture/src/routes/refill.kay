@@ -10,9 +10,26 @@ export const signup = action(t.Object({
   tags: t.Optional(t.Array(t.String({ maxLength: 20 }), { maxItems: 10 })),
   terms: t.Optional(t.String({ maxLength: 10 })),
   news: t.Optional(t.String({ maxLength: 10 })),
+  nick: t.Optional(t.String({ maxLength: 40 })),
+  secret: t.Optional(t.String({ maxLength: 40 })),
+  view: t.String({ maxLength: 100 }),
+  stars: t.String({ maxLength: 10 }),
+  volume: t.String({ maxLength: 10 }),
+  colour: t.String({ maxLength: 10 }),
+  day: t.String({ maxLength: 20 }),
+  hour: t.String({ maxLength: 20 }),
+  areas: t.Optional(t.Array(t.String({ maxLength: 20 }), { maxItems: 10 })),
+  extras: t.Optional(t.Array(t.String({ maxLength: 20 }), { maxItems: 10 })),
 }), async () => 'ok')
 ---
 ---
+import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
+import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import Slider from '@kaynooo/kayjs-ui/slider.kay'
+import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
 import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
 import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
 import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
@@ -28,10 +45,20 @@ const tags = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }, { v
 main
   form#refill(action={signup})
     TextInput(name="name" aria-label="Name")
+    TextInput(name="nick" aria-label="Nick" onInput={() => undefined})
+    TextInput(name="secret" type="password" aria-label="Secret")
     Textarea(name="bio" aria-label="Bio")
     Select(name="plan" value="free" options={plans} aria-label="Plan")
     RadioGroup(name="size" value="s" options={sizes} aria-label="Size")
     ChipGroup(name="tags" options={tags} value={[]} label="Tags")
     Checkbox(name="terms" label="Terms")
     Toggle(name="news" label="News")
+    Segmented(name="view" value="s" label="View" options={sizes})
+    Rating(name="stars" value={1} label="Stars")
+    Slider(name="volume" value={10} label="Volume")
+    ColorInput(name="colour" value="#000000" label="Colour")
+    DateInput(name="day" aria-label="Day")
+    TimeInput(name="hour" aria-label="Hour")
+    MultiSelect(name="areas" value={['x']} options={tags} label="Areas")
+    ChipGroup(name="extras" options={tags} value={['a']} label="Extras")
     button Send

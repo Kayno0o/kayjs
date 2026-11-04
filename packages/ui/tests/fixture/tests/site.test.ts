@@ -1000,6 +1000,15 @@ describe('ContactForm', () => {
     expect(refused.html).toContain('class="text-xs text-danger" data-part="issue">Please tick the box to send your message.</span>')
   })
 
+  test('hands a ContactForm\'s issues and issue classes to the consent message, and consentBox to the box', async () => {
+    const { contact } = await import('../src/routes/contact-consent-parts.kay')
+    const refused = await site.submit(contact, { name: 'Ada', email: 'ada@example.com', message: 'Hi', consent: false } as never, { from: '/contact-consent-parts' })
+
+    expect(refused.find('[data-part="issues"].mine-issues [data-part="issue"].mine-issue').map(found => found.text)).toEqual(['Please tick the box to send your message.'])
+    expect(refused.find('.mine-box input[name="consent"]')).toHaveLength(1)
+    expect(refused.find('.mine-issues')).toHaveLength(1)
+  })
+
   test('links the privacy page of a form without a consent box too, on its own line', async () => {
     const { html } = await site.visit('/contact-privacy')
 
@@ -1377,22 +1386,51 @@ describe('the option snippet of the choice controls', () => {
 })
 
 describe('a refused no-JS post', () => {
+  const SENT = { name: 'A', nick: 'Zed', secret: 'hunter2', bio: 'Hello', plan: 'pro', size: 'l', tags: ['a', 'c'], terms: 'on', view: 'l', stars: '4', volume: '70', colour: '#ff0000', day: '2026-05-04', hour: '07:30', areas: ['b', 'c'], extras: ['b'] }
+
   test('is shown again by every control of the form, whatever its kind', async () => {
     const { signup } = await import('../src/routes/refill.kay')
-    const refused = await site.submit(signup, { name: 'A', bio: 'Hello', plan: 'pro', size: 'l', tags: ['a', 'c'], terms: 'on' } as never, { from: '/refill' })
+    const refused = await site.submit(signup, SENT as never, { from: '/refill' })
     const html = refused.html
+    const checked = (name: string) => refused.find(`input[name=${name}][checked]`).map(found => attr(found, 'value'))
 
     expect(refused.find('input[name=name]').map(found => attr(found, 'value'))).toEqual(['A'])
     expect(refused.find('textarea[name=bio]').map(found => found.text)).toEqual(['Hello'])
     expect(html).toMatch(/<option[^>]*value="pro"[^>]*selected|<option[^>]*selected[^>]*value="pro"/)
-    expect(refused.find('input[name=size][checked]').map(found => attr(found, 'value'))).toEqual(['l'])
-    expect(refused.find('input[name=tags][checked]').map(found => attr(found, 'value'))).toEqual(['a', 'c'])
-    expect(refused.find('input[name=terms][checked]')).toHaveLength(1)
-    expect(refused.find('input[name=news][checked]')).toHaveLength(0)
+    expect(checked('size')).toEqual(['l'])
+    expect(checked('tags')).toEqual(['a', 'c'])
+    expect(checked('terms')).toHaveLength(1)
+    expect(checked('news')).toHaveLength(0)
+    expect(checked('view')).toEqual(['l'])
+    expect(checked('stars')).toEqual(['4'])
+    expect(refused.find('input[name=volume]').map(found => attr(found, 'value'))).toEqual(['70'])
+    expect(refused.find('input[name=colour]').map(found => attr(found, 'value'))).toEqual(['#ff0000'])
+    expect(refused.find('input[name=day]').map(found => attr(found, 'value'))).toEqual(['2026-05-04'])
+    expect(refused.find('input[name=hour]').map(found => attr(found, 'value'))).toEqual(['07:30'])
+    expect(refused.find('input[type=hidden][name=areas]').map(found => attr(found, 'value'))).toEqual(['b', 'c'])
+    expect(checked('extras')).toEqual(['b'])
+
+    // A control with a callback of its own is controlled, and a password is never echoed.
+    expect(refused.find('input[name=nick]').map(found => attr(found, 'value'))).toEqual([null])
+    expect(refused.find('input[name=secret]').map(found => attr(found, 'value'))).toEqual([null])
+
+    const french = await site.submit(signup, SENT as never, { from: '/fr/refill' })
+
+    expect(french.find('input[name=name]').map(found => attr(found, 'value'))).toEqual(['A'])
 
     const fresh = await site.visit('/refill')
 
     expect(fresh.find('input[name=terms][checked]')).toHaveLength(0)
     expect(fresh.find('input[name=name]').map(found => attr(found, 'value'))).toEqual([null])
+    expect(fresh.find('input[name=extras][checked]').map(found => attr(found, 'value'))).toEqual(['a'])
+  })
+
+  test('shows a group the post picked nothing in as none, not as the starting choices', async () => {
+    const { signup } = await import('../src/routes/refill.kay')
+    const refused = await site.submit(signup, { name: 'A', bio: '', plan: 'free', size: 's', view: 's', stars: '1', volume: '10', colour: '#000000', day: '', hour: '' } as never, { from: '/refill' })
+
+    expect(refused.find('input[name=extras][checked]')).toHaveLength(0)
+    expect(refused.find('input[type=hidden][name=areas]')).toHaveLength(0)
+    expect(refused.find('input[name=tags][checked]')).toHaveLength(0)
   })
 })

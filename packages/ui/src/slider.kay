@@ -40,7 +40,7 @@ const { size = 'md', invalid, value, min = 0, max = 100, step, label, showValue 
 }>()
 
 // A slider with no callback is plain: a refused post of its form, which the server renders it for, gives its figure back in place of its own.
-const sent = onInput || onChange ? undefined : postedValue(rest.name)
+const sent = onInput || onChange ? undefined : postedValue(rest.name, value)
 const posted = Number(sent)
 
 const { shown, busy, ref: sliderRef, move, change: released } = controlledInput<number>({

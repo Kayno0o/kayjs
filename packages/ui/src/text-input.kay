@@ -37,7 +37,7 @@ type AsNumber = Field & {
 const { size = 'md', invalid, value, onInput, onChange, onBlur, type = 'text', ...rest } = props<AsText | AsNumber>()
 
 // A field with no callback is plain: a refused post of its form, which the server renders it for, gives its value back in place of its own, a password excepted.
-const sent = onInput || onChange || type === 'password' ? undefined : postedValue(rest.name)
+const sent = onInput || onChange || type === 'password' ? undefined : postedValue(rest.name, value)
 
 let box: HTMLInputElement | undefined
 
@@ -48,7 +48,7 @@ const spelled = (next: number | string | null) => next === null ? '' : String(ne
 
 // The value it starts with is what a reset goes back to; a client-rendered box has only set it as a property, which no reset reads.
 const ref = startRef<HTMLInputElement>((input) => {
-  const start = untrack(() => value)
+  const start = untrack(() => sent ?? value)
 
   box = input
   keepInvalid(input, () => invalid)

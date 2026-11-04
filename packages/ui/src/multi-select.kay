@@ -95,12 +95,22 @@ const { size = 'md', invalid, id, options, value = [], label, placeholder = word
 }>()
 
 // A control with no callback is plain: a refused post of its form, which the server renders it for, gives its choices back in place of its own; a function of options leaves them as the text they were posted as.
-const sent = onChange ? undefined : postedValues(name)
+const sent = onChange ? undefined : postedValues(name, value)
 const picked = signal<readonly Value[]>(sent === undefined ? value : typeof options === 'function' ? sent as Value[] : options.filter(one => sent.includes(String(one.value))).map(one => one.value))
 const query = signal('')
 let root: HTMLElement | undefined
 
-effect(() => picked = value)
+// The first run leaves a start the server refilled alone, which the browser reads from its markup.
+let refilled = sent !== undefined
+
+effect(() => {
+  const next = value
+
+  if (refilled)
+    refilled = false
+  else
+    picked = next
+})
 
 const remote = typeof options === 'function'
 const found = signal<readonly MultiSelectOption<Value>[]>([])
@@ -274,7 +284,7 @@ function focusLeft(event: FocusEvent) {
     panel.hidePopover()
 }
 ---
-div(part="root" {...rest} ref={ref})
+div(part="root" {...rest} ref={ref} data-posted={sent === undefined ? undefined : name})
   Popover(id={id} placement={placement} open={open} part="panel" role="group" aria-label={label} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft})
     @trigger(attributes)
       // Named by its label and what is picked, which a name of the label alone would hide; a count is described by the labels it stands for.

@@ -1,0 +1,32 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+const schema = t.Object({
+  x: t.String({ minLength: 5, maxLength: 200, error: 'Too short' }),
+  password: t.Optional(t.String({ maxLength: 40 })),
+  nectar: t.Optional(t.String({ maxLength: 40 })),
+  yes: t.Optional(t.Union([t.String({ maxLength: 10 }), t.Array(t.String({ maxLength: 10 }), { maxItems: 10 })])),
+  'foo[]': t.Optional(t.String({ maxLength: 40 })),
+})
+
+export const first = action(schema, () => undefined, { protect: { honeypot: 'nectar' } })
+export const second = action(schema, () => undefined)
+---
+---
+import Echo from '../components/echo.kay'
+---
+main
+  form#a(action={first})
+    Echo(id="a-x" name="x")
+    Echo(id="a-password" name="password")
+    Echo(id="a-nectar" name="nectar")
+    Echo(id="a-yes" name="yes")
+    form#inner(action={second})
+      Echo(id="inner-x" name="x")
+    Echo(id="a-after" name="x")
+  form#b(action={second})
+    Echo(id="b-x" name="x")
+  form#plain(action="/plain")
+    Echo(id="plain-x" name="x")
+  Echo(id="outside-x" name="x")

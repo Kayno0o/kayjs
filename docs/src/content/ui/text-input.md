@@ -19,4 +19,4 @@ description: A text field that reports each keystroke and the committed value.
 
 ## After a refused post
 
-Inside a form posting to an action, a field with no `value` and no `onInput` takes what a refused post sent, so a page working without JavaScript shows it again. So do Textarea, Select, RadioGroup, Segmented, ChipGroup and MultiSelect. Every field control takes `invalid`, which draws the danger line.
+Inside a form posting to an action, a field with no `value` and no `onInput` takes what a refused post sent, so a page working without JavaScript shows it again. So do Textarea, Select, RadioGroup, Segmented, ChipGroup, MultiSelect, Checkbox, Toggle, DateTimeInput, DateRangeInput, Combobox, RowsField and IconPicker. A field named like a secret is never refilled. Every field control takes `invalid`, which draws the danger line.

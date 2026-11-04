@@ -33,7 +33,7 @@ const HEX = /^#[\da-f]{6}$/i
 const normal = (colour: string) => HEX.test(colour) ? colour.toLowerCase() : '#000000'
 
 // A box with no callback is plain: a refused post of its form, which the server renders it for, gives its colour back in place of its own.
-const sent = onChange ? undefined : postedValue(rest.name)
+const sent = onChange ? undefined : postedValue(rest.name, value)
 
 const { shown, busy, ref: boxRef, move, change: chosen } = controlledInput<string>({
   control: 'ColorInput',

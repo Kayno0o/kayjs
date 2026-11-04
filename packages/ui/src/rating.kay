@@ -45,7 +45,7 @@ const filled = () => max > 0 && Number.isFinite(value) ? Math.min(Math.max(value
 const picker = onChange !== undefined || name !== undefined
 
 // A picker with no callback is plain: a refused post of its form, which the server renders it for, gives its stars back in place of its own.
-const sent = onChange ? undefined : postedValue(name)
+const sent = onChange ? undefined : postedValue(name, value)
 const posted = Number(sent)
 const held = () => sent !== undefined && Number.isFinite(posted) ? posted : value
 

@@ -521,4 +521,4 @@ Without one, a production server refuses to start, as it would sign with a key o
 
 ## Components that show a refused post
 
-A component inside a form reads the refused post with `postedValue(name)`, `postedChecked(name, value)` and `postedValues(name)` from `kay`, so a control of your own can show it again as the kayjs-ui ones do. They answer `undefined` outside a refused post, in the browser and for a password. A list field is posted back as `name[]`.
+A component inside a form reads the refused post with `postedValue(name)`, `postedChecked(name, value)` and `postedValues(name)` from `kay`, so a control of your own can show it again as the kayjs-ui ones do. They answer `undefined` outside a refused post and for a field named like a secret. In the browser they read what the server rendered. A list field is posted back as `name[]`. Forms posting to the same action share one refused post.

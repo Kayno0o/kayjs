@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import { announce } from './announce'
 import { defaultKept, onFormReset } from './form-reset'
-import { effect, flush, recipe, signal, untrack } from 'kay'
+import { effect, flush, postedValues, recipe, signal, untrack } from 'kay'
 import { wording } from 'kay/words'
 import Button from './button.kay'
 import IconButton from './icon-button.kay'
@@ -52,9 +52,26 @@ const { rows = NONE, style, columns, label, name, invalid, onChange, onAdd, onRe
 
 let root: HTMLElement | undefined
 let nextId = 0
-const current = signal<readonly Row[]>(rows)
+// A field with no callback is plain: a refused post of its form, which the server renders it for, gives its rows back, each column posting one value per row.
+function postedRows(): Row[] | undefined {
+  const lists = columns.map((column) => {
+    const held = rows.map(row => String(row[column.key] ?? ''))
+
+    return { key: column.key, held, values: postedValues(column.name ?? (name === undefined ? undefined : `${name}_${column.key}`), held) }
+  })
+
+  if (lists.every(list => list.values === undefined))
+    return undefined
+
+  const count = Math.max(0, ...lists.map(list => (list.values ?? list.held).length))
+
+  return Array.from({ length: count }, (_, at) => Object.fromEntries(lists.map(list => [list.key, (list.values ?? list.held)[at] ?? ''])) as Row)
+}
+
+const sent = onChange ? undefined : postedRows()
+const current = signal<readonly Row[]>(sent ?? rows)
 // One id per row, so a row removed from the middle leaves the boxes of the others as they are.
-const ids = signal<number[]>(untrack(() => rows.map(() => nextId++)))
+const ids = signal<number[]>(untrack(() => (sent ?? rows).map(() => nextId++)))
 
 // What the form goes back to on a reset: the rows it started with, or the ones last saved by a SaveForm.
 const initial = defaultKept(() => root, () => current(), untrack(() => rows))

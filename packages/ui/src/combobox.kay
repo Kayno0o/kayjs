@@ -75,7 +75,9 @@ const startOption = () => known().find(option => option.value === value)
 const fallbackLabel = (next: string) => valueLabel ?? (remote ? '' : next)
 const startLabel = () => startOption()?.label ?? fallbackLabel(value)
 
-const text = signal(startLabel())
+// Without JavaScript the input posts its text, which a refused post of its form gives back in place of the starting one.
+const sent = onChange ? undefined : postedValue(name, startLabel())
+const text = signal(sent ?? startLabel())
 const picked = signal<ComboboxOption<Value> | undefined>(startOption() ?? (value ? { value: value as Value, label: startLabel() } : undefined))
 const opened = signal(false)
 const active = signal(-1)

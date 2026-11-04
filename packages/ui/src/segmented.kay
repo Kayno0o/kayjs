@@ -54,7 +54,7 @@ const { options, value, label, showLabel = false, name, invalid, param, paramDef
 }>()
 
 // A group with no callback or param is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
-const sent = onChange || param !== undefined ? undefined : postedValue(name)
+const sent = onChange || param !== undefined ? undefined : postedValue(name, value)
 
 const { group, picked, busy, ref, pick } = controlledRadios({
   control: 'Segmented',
@@ -98,7 +98,7 @@ snippet radios()
   div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() ? 'true' : undefined})
     for option of options key={option.value}
       label(part="option")
-        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => pick(option.value)})
+        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, options, value))} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => pick(option.value)})
         span(part="label")
           if drawRow
             | {drawRow(option)}

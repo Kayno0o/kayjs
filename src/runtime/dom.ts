@@ -3,6 +3,7 @@
 
 import type { Owner } from './reactive'
 import { rebasedAttribute } from './base'
+import { claimedIn } from './claimed'
 import { frenchText, frenchTree } from './french'
 import { ISLAND, KEPT_END, KEPT_START, PART_END, PART_START } from './markers'
 import { place } from './move'
@@ -112,7 +113,7 @@ export function hydrate<T>(render: () => T, container: Node): T {
   hydrationStarted()
 
   try {
-    return untrack(render)
+    return claimedIn(container, () => untrack(render))
   }
   finally {
     for (const putBack of setAside)
@@ -132,7 +133,7 @@ export function fresh<T>(render: () => T): T {
   claim = undefined
 
   try {
-    return withIds(freshPrefix(), render)
+    return claimedIn(undefined, () => withIds(freshPrefix(), render))
   }
   finally {
     claim = previous

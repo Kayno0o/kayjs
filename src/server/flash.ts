@@ -126,7 +126,8 @@ export function submittedValues(body: unknown): Record<string, string> {
     return values
 
   for (const [name, value] of Object.entries(body)) {
-    if (isSecret(name))
+    // A field literally named `foo[]` is left out, as its name is how a list of `foo` is kept.
+    if (isSecret(name) || (name.endsWith('[]') && !Array.isArray(value)))
       continue
 
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')

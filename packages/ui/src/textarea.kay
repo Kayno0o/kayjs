@@ -25,7 +25,7 @@ const { size = 'md', invalid, value, onInput, onChange, onBlur, writeFocused = f
 }>()
 
 // A field with no callback is plain: a refused post of its form, which the server renders it for, gives its text back in place of its own.
-const sent = onInput || onChange ? undefined : postedValue(rest.name)
+const sent = onInput || onChange ? undefined : postedValue(rest.name, value)
 
 let box: HTMLTextAreaElement | undefined
 
@@ -42,7 +42,7 @@ const { heard, sync } = controlledValue({
 
 // The box starts once: its default is what it was first drawn with.
 const ref = startRef<HTMLTextAreaElement>((element) => {
-  const start = untrack(() => value)
+  const start = untrack(() => sent ?? value)
 
   box = element
   keepInvalid(element, () => invalid)

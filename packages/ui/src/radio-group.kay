@@ -40,7 +40,7 @@ const { options, value, label, name, invalid, disabled = false, onChange, option
 }>()
 
 // A group with no callback is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
-const sent = onChange ? undefined : postedValue(name)
+const sent = onChange ? undefined : postedValue(name, value)
 
 const { group, picked, busy, ref, pick } = controlledRadios({
   control: 'RadioGroup',
@@ -59,7 +59,7 @@ div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-in
   for option, index of options key={option.value}
     div(part="radio")
       label(part="choice")
-        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
+        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, options, value))} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
         span(part="label")
           if drawRow
             | {drawRow(option)}

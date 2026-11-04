@@ -1,0 +1,12 @@
+---
+import { postedChecked, postedValue, postedValues } from 'kay'
+
+const { name, id } = props<{ name: string, id: string }>()
+
+const text = postedValue(name)
+const list = postedValues(name)
+const ticked = postedChecked(name, 'yes')
+---
+span(id={id} data-text={text} data-list={list === undefined ? undefined : JSON.stringify(list)} data-ticked={ticked === undefined ? undefined : String(ticked)}) {text}
+textarea(id={`${id}-area`} name={name}) {text}
+input(id={`${id}-input`} name={name} value={text})
