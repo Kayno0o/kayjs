@@ -90,7 +90,7 @@ interface Row {
 
 const id = uid()
 const counted = (count: number) => resultsLabel === undefined ? wording('ui.commandPalette.results', count === 1 ? '1 result' : '{count} results', { count }) : labelText(resultsLabel, { count }, count)
-const countedMore = siteSearchMore ?? ((count: number) => wording('ui.commandPalette.siteSearchMore', count === 1 ? '1 more match' : '{count} more matches', { count }))
+const countedMore = (count: number) => (siteSearchMore ?? (found => wording('ui.commandPalette.siteSearchMore', found === 1 ? '1 more match' : '{count} more matches', { count: found })))(count)
 const shown = signal(open)
 const followedRecently = signal<string[]>(recent)
 const query = signal('')

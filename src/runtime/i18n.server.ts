@@ -117,14 +117,14 @@ export function formatRelativeTime(value: Date | number, unitOrOptions?: Intl.Re
 
 // A date relative to the page's render time, formatted as `formatRelativeTime` does; in the browser it goes on ticking, see the browser's.
 // kept: request, it reads the clock.
-export function relativeTime(value: () => Date | number, options?: RelativeFormatOptions): () => string {
+export function relativeTime(value: () => Date | number, options?: RelativeFormatOptions | (() => RelativeFormatOptions | undefined)): () => string {
   const state = current('relativeTime()')
 
   state.now ??= Date.now()
 
   const { locale, now } = state
 
-  return () => formatRelativeTimeIn(locale, value(), { ...options, now })
+  return () => formatRelativeTimeIn(locale, value(), { ...typeof options === 'function' ? options() : options, now })
 }
 
 // kept: free

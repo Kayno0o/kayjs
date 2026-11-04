@@ -2210,7 +2210,7 @@ type Plural = { readonly other: string } & Readonly<Partial<Record<Exclude<Plura
 type PluralCategory = 'zero' | 'one' | 'two' | 'few' | 'many' | 'other'
 
 [./i18n] relativeTime
-function relativeTime(value: () => Date | number, options?: RelativeFormatOptions | undefined): () => string
+function relativeTime(value: () => Date | number, options?: (() => RelativeFormatOptions | undefined) | RelativeFormatOptions | undefined): () => string
 
 [./i18n] RelativeTimeOptions
 interface RelativeTimeOptions extends Intl.RelativeTimeFormatOptions, LocaleOption

@@ -19,13 +19,7 @@ const { date, options, dateOptions = { dateStyle: 'long', timeStyle: 'short' }, 
 
 const moment = () => new Date(date)
 const valid = () => !Number.isNaN(moment().getTime())
-// `relativeTime` reads its options at each tick, so these stand for whatever `options` holds then, and a parent giving other ones is followed.
-const current = new Proxy({}, {
-  get: (_, key) => options?.[key as keyof Intl.RelativeTimeFormatOptions],
-  ownKeys: () => Reflect.ownKeys(options ?? {}),
-  getOwnPropertyDescriptor: (_, key) => options && key in options ? { value: options[key as keyof Intl.RelativeTimeFormatOptions], enumerable: true, configurable: true } : undefined,
-})
-const ago = relativeTime(moment, current)
+const ago = relativeTime(moment, () => options)
 ---
 // The text counts on from the page's render time on the server, so hydrating changes nothing, and keeps ticking in the browser.
 if valid()

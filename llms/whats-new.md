@@ -16,6 +16,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `escapeHtml` is exported from `kay` as well as `kay/library`, for the browser and the server alike, and `sameText` hashes both sides before comparing, so neither the content nor the length of a secret shows in the time a check takes; kay's libraries use both in place of their own copies: [component libraries](component-libraries.md).
 - kayjs-ui: Breadcrumb, Pagination, FormField (`hint`, `required`), PageSection (`sticky`) and RelativeTime (`options`) follow a prop the parent changes after render; a script read of a destructured prop runs once, as [components](components.md#props) says.
 - kayjs-ui: Breadcrumb, Pagination, FormField (`hint`, `required`), PageSection (`sticky`) and RelativeTime (`options`) follow a prop the parent changes after render; a script read of a destructured prop runs once, as [components](components.md#props) says; [the components](../packages/ui/llms/tables-navigation-and-layout.md) are unchanged to use.
+- kayjs-ui: [Breadcrumb, Pagination, FormField, PageSection and the other layout components](../packages/ui/llms/tables-navigation-and-layout.md), RelativeTime, SubscribeForm (`noticeText`, `privacy`, `wordingId`) and CommandPalette (`resultsLabel`, `siteSearchMore`) follow a prop the parent changes after render; a script read of a destructured prop runs once, as [components](components.md#props) says.
+- `relativeTime` in `kay/i18n` takes its options as a function too, read at each tick: [locales](locales.md).
 
 ## 1.88.0
 

@@ -106,3 +106,15 @@ test('relative time follows its options', async () => {
 
   expect(after).not.toBe(before)
 })
+
+test('subscribe form follows its notice, privacy link and the wording it records', async () => {
+  const { before, after } = await flip(root => ({ notice: root.querySelector('#subscribe [data-part="notice"]')?.textContent?.trim(), link: root.querySelector('#subscribe a')?.getAttribute('href') ?? null, wording: root.querySelector<HTMLInputElement>('#subscribe input[name="wording"]')?.value }))
+  const was = before as { notice: string, link: string | null, wording: string }
+  const now = after as { notice: string, link: string | null, wording: string }
+
+  expect(was.link).toBeNull()
+  expect(was.wording).toBe('stock')
+  expect(now.notice).toContain('Later notice')
+  expect(now.link).toBe('/privacy')
+  expect(now.wording).toBe('v2')
+})

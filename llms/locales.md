@@ -231,7 +231,7 @@ export default defineMessages({
 - A number fills a placeholder formatted for the locale, `1 234` in French, and a date with `dateStyle: 'medium'`.
 - An object of plural forms is picked by `count` through `Intl.PluralRules`, `zero` taking 0 whenever it is given.
 - A key no locale has renders as itself.
-- `const ago = relativeTime(() => post.date)`, its options `Intl.RelativeTimeFormat`'s, is a memo of that date relative to now, read as `{ago}` in the template, that goes on ticking: every second under a minute away, every minute under an hour, every hour past that, until the island ends, paused while the tab is hidden and caught up as it shows again.
+- `const ago = relativeTime(() => post.date)`, its options `Intl.RelativeTimeFormat`'s, is a memo of that date relative to now, read as `{ago}` in the template, that goes on ticking: every second under a minute away, every minute under an hour, every hour past that, until the island ends, paused while the tab is hidden and caught up as it shows again. The options may be a function too.
 - The server renders it relative to the moment the page is rendered at, which it writes into the page, and the island's first render in the browser reads that moment too, so hydrating changes nothing; it then moves to the browser's clock.
 - Using it makes the component an island.
 - `T` renders a message holding markup, such as a link mid-sentence: see [Messages holding markup](#messages-holding-markup).

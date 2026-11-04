@@ -143,7 +143,7 @@ export function formatRelativeTime(value: Date | number, unitOrOptions?: Intl.Re
 
 // A date relative to now, formatted as `formatRelativeTime` does, that goes on ticking while the island lives and the tab shows: every second under a minute away, every minute under an hour, every hour past that.
 // It renders first as relative to the page's render time, as the server did, so hydrating changes nothing.
-export function relativeTime(value: () => Date | number, options?: RelativeFormatOptions): () => string {
+export function relativeTime(value: () => Date | number, options?: RelativeFormatOptions | (() => RelativeFormatOptions | undefined)): () => string {
   load()
 
   const [now, setNow] = createSignal(renderedAt ?? Date.now())
@@ -161,7 +161,7 @@ export function relativeTime(value: () => Date | number, options?: RelativeForma
     onCleanup(onTick(pace(), () => setNow(Date.now())))
   })
 
-  return memo(() => formatRelativeTime(value(), { ...options, now: now() }))
+  return memo(() => formatRelativeTime(value(), { ...typeof options === 'function' ? options() : options, now: now() }))
 }
 
 const tickers = new Map<number, { listeners: Set<() => void>, timer: ReturnType<typeof setInterval> }>()
