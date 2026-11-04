@@ -836,20 +836,28 @@ component default
   newConversation?: string | undefined;
   conversationList?: string | undefined;
   conversation?: string | undefined;
-  renameField?: any;
+  renameField?: string | undefined | {
+    root?: string | undefined;
+  };
   deleteConfirm?: string | undefined;
   confirm?: string | undefined;
   cancel?: string | undefined;
   conversationLink?: string | undefined;
-  rename?: any;
-  delete?: any;
+  rename?: string | undefined | {
+    root?: string | undefined;
+  };
+  delete?: string | undefined | {
+    root?: string | undefined;
+  };
   empty?: string | undefined;
   greeting?: string | undefined;
   suggestions?: string | undefined;
   suggestion?: string | undefined;
   log?: string | undefined;
   turn?: string | undefined;
-  editField?: any;
+  editField?: string | undefined | {
+    root?: string | undefined;
+  };
   files?: string | undefined;
   file?: string | undefined;
   actions?: string | undefined;
@@ -862,20 +870,38 @@ component default
   reasoning?: string | undefined;
   reasoningText?: string | undefined;
   note?: string | undefined;
-  edit?: any;
-  regenerate?: any;
+  edit?: string | undefined | {
+    root?: string | undefined;
+  };
+  regenerate?: string | undefined | {
+    root?: string | undefined;
+  };
   thinking?: string | undefined;
   status?: string | undefined;
   retry?: string | undefined;
   disclosure?: string | undefined;
-  remove?: any;
+  remove?: string | undefined | {
+    root?: string | undefined;
+  };
   form?: string | undefined;
-  new?: any;
-  attach?: any;
-  field?: any;
-  record?: any;
-  recordSpinner?: any;
-  send?: any;
+  new?: string | undefined | {
+    root?: string | undefined;
+  };
+  attach?: string | undefined | {
+    root?: string | undefined;
+  };
+  field?: string | undefined | {
+    root?: string | undefined;
+  };
+  record?: string | undefined | {
+    root?: string | undefined;
+  };
+  recordSpinner?: string | undefined | {
+    root?: string | undefined;
+  };
+  send?: string | undefined | {
+    root?: string | undefined;
+  };
 }
   conflictLabel?: string | undefined
   conversationIn?: "address" | "browser" | undefined

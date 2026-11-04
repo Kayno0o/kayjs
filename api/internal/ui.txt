@@ -25,11 +25,17 @@ function fieldSize(size: FieldSize | undefined): FieldSize | undefined
 [./field-look] FieldSize
 type FieldSize = 'sm' | 'md' | 'lg'
 
+[./field-look] GROUP_INVALID
+const GROUP_INVALID: "aria-invalid:[--_control-line:var(--color-danger)] has-[input[aria-invalid=true]]:[--_control-line:var(--color-danger)]"
+
 [./field-look] keepInvalid
 function keepInvalid(box: Element, invalid: () => boolean | undefined): void
 
 [./field-look] LABEL_TEXT
 const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]"
+
+[./field-look] RADIO_INVALID
+const RADIO_INVALID: "aria-invalid:accent-danger aria-invalid:outline aria-invalid:outline-offset-2 aria-invalid:outline-danger group-aria-invalid/radios:accent-danger group-aria-invalid/radios:outline group-aria-invalid/radios:outline-offset-2 group-aria-invalid/radios:outline-danger"
 
 [./field-look] SLIDER_STATE
 const SLIDER_STATE: "aria-invalid:[&::-webkit-slider-thumb]:bg-danger aria-invalid:[&::-moz-range-thumb]:bg-danger data-[size=sm]:h-3 data-[size=sm]:[&::-webkit-slider-thumb]:-mt-1 data-[size=sm]:[&::-webkit-slider-thumb]:size-3 data-[size=sm]:[&::-moz-range-thumb]:size-3 data-[size=lg]:h-5 data-[size=lg]:[&::-webkit-slider-thumb]:-mt-2 data-[size=lg]:[&::-webkit-slider-thumb]:size-5 data-[size=lg]:[&::-moz-range-thumb]:size-5"
@@ -982,11 +988,17 @@ function fieldSize(size: FieldSize | undefined): FieldSize | undefined
 [./lib/field-look] FieldSize
 type FieldSize = 'sm' | 'md' | 'lg'
 
+[./lib/field-look] GROUP_INVALID
+const GROUP_INVALID: "aria-invalid:[--_control-line:var(--color-danger)] has-[input[aria-invalid=true]]:[--_control-line:var(--color-danger)]"
+
 [./lib/field-look] keepInvalid
 function keepInvalid(box: Element, invalid: () => boolean | undefined): void
 
 [./lib/field-look] LABEL_TEXT
 const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]"
+
+[./lib/field-look] RADIO_INVALID
+const RADIO_INVALID: "aria-invalid:accent-danger aria-invalid:outline aria-invalid:outline-offset-2 aria-invalid:outline-danger group-aria-invalid/radios:accent-danger group-aria-invalid/radios:outline group-aria-invalid/radios:outline-offset-2 group-aria-invalid/radios:outline-danger"
 
 [./lib/field-look] SLIDER_STATE
 const SLIDER_STATE: "aria-invalid:[&::-webkit-slider-thumb]:bg-danger aria-invalid:[&::-moz-range-thumb]:bg-danger data-[size=sm]:h-3 data-[size=sm]:[&::-webkit-slider-thumb]:-mt-1 data-[size=sm]:[&::-webkit-slider-thumb]:size-3 data-[size=sm]:[&::-moz-range-thumb]:size-3 data-[size=lg]:h-5 data-[size=lg]:[&::-webkit-slider-thumb]:-mt-2 data-[size=lg]:[&::-webkit-slider-thumb]:size-5 data-[size=lg]:[&::-moz-range-thumb]:size-5"
@@ -1013,6 +1025,9 @@ function startRef<Target extends Element>(first: (element: Target) => void, app?
 function callAction<Output>(form: HTMLFormElement, action: Action<never, Output, never>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined, onError?: ((error: unknown) => unknown) | undefined): Promise<undefined | {
   result: Answer<Success<Output>>;
 }>
+
+[./lib/forms] fieldIssues
+function fieldIssues(name: () => string | undefined, issue: () => string | undefined): () => string[]
 
 [./lib/forms] fieldLinks
 function fieldLinks(group: boolean, hint: boolean, messages: () => readonly unknown[], required?: boolean): FieldLinks
@@ -2112,6 +2127,9 @@ type RecordProblem = 'insecure' | 'unsupported' | 'denied' | 'missing' | 'taken'
 
 [./lib/recording] startRecording
 function startRecording(options: RecordOptions): Promise<RecordProblem | Recording>
+
+[./lib/refill] sentOption
+function sentOption<Choice extends string | null | number, Held>(sent: string | undefined, options: readonly { value: Choice; }[], fallback: Held): Choice | Held
 
 [./lib/settings] default
 const default: UiSettings

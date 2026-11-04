@@ -58,28 +58,6 @@ What each minor release before 1.82 broke, and what an app changed to move to it
 
 - kayjs-ui type-checks a null option against the group's `value`, so a wrapper whose option value is a type parameter (`<V>` passing `options: { value: V }[]` through) fails `kay check` on `options` and casts what it passes. A wrapper with concrete option types changes nothing ([Segmented](../packages/ui/llms/tables-navigation-and-layout.md)).
 
-## 1.77.0
-
-### kayjs-auth renames the `auth_*` tables again
-
-- A database still on the pre-1.71 `auth_*` tables moves straight here: the migration `db.sync()` or `bunx pg-orm generate` writes renames them with their rows and adds the columns since, where 1.74 to 1.76 created empty `kay_*` tables beside them.
-
-### kayjs-ui: stepDraft's maxAge is a duration only
-
-- `stepDraft(..., { maxAge: 3600 })` is a type error now: write `maxAge: '1h'`. The deprecated `deprecated-step-draft-max-age` lint is gone with the number form, so run `kay check --fix` on 1.74 to 1.76 before moving.
-
-## 1.76.0
-
-### A restricted-role Postgres app creates `kay_push_subscriptions` before listing `push()`
-
-- Nothing changes for an app that does not list `push()`. One that does, on a Postgres whose app role may not create tables, has the owner create `kay_push_subscriptions` once, as it does for the other `kay_` tables ([Queues](queues.md)).
-
-### A component generic in its option value casts the `options` it hands Segmented or RadioGroup
-
-- kayjs-ui type-checks a null option against the group's `value`, so a wrapper whose option value is a type parameter (`<V>` passing `options: { value: V }[]` through) fails `kay check` on `options` and casts what it passes. A wrapper with concrete option types changes nothing ([Segmented](../packages/ui/llms/tables-navigation-and-layout.md)).
-
-Releases before 1.76 are in [Upgrading, older releases](upgrading-archive.md).
-
 ## 1.75.0
 
 ### The forms deprecated in 1.72 are gone

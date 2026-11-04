@@ -646,7 +646,7 @@ interface PersistedOptions<T> extends SignalOptions<T>
 type PersistStorage = 'cookie' | 'local' | 'query'
 
 [.] postedChecked
-function postedChecked(name: unknown, value?: string | number | undefined, fallback?: boolean): boolean | undefined
+function postedChecked(name: unknown, value?: number | string | undefined, fallback?: boolean): boolean | undefined
 
 [.] postedValue
 function postedValue(name: unknown, fallback?: unknown): string | undefined

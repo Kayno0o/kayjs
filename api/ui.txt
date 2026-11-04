@@ -783,8 +783,28 @@ component default
 
 [./button.kay] default
 component default
-  | { busy?: boolean | undefined; children?: Element; class?: string | undefined | { root?: any; spinner?: any; }; expanded?: boolean | undefined; href?: undefined; icon?: IconProps | IconSlot | undefined; label?: string | undefined; pressed?: boolean | undefined; size?: "lg" | "md" | "sm" | "xs" | undefined; spinner?: boolean | undefined; tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined; type?: "button" | "reset" | "submit" | undefined; variant?: "ghost" | "inline" | "solid" | undefined }
-  | { busy?: boolean | undefined; children?: Element; class?: string | undefined | { root?: any; spinner?: any; }; href: string; icon?: IconProps | IconSlot | undefined; label?: string | undefined; size?: "lg" | "md" | "sm" | "xs" | undefined; spinner?: boolean | undefined; tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined; variant?: "ghost" | "inline" | "solid" | undefined }
+  | { busy?: boolean | undefined; children?: Element; class?: string | undefined | {
+  root?: string | undefined | {
+    root?: string | undefined;
+    spinner?: string | undefined | {
+      root?: string | undefined;
+    };
+  };
+  spinner?: string | undefined | {
+    root?: string | undefined;
+  };
+}; expanded?: boolean | undefined; href?: undefined; icon?: IconProps | IconSlot | undefined; label?: string | undefined; pressed?: boolean | undefined; size?: "lg" | "md" | "sm" | "xs" | undefined; spinner?: boolean | undefined; tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined; type?: "button" | "reset" | "submit" | undefined; variant?: "ghost" | "inline" | "solid" | undefined }
+  | { busy?: boolean | undefined; children?: Element; class?: string | undefined | {
+  root?: string | undefined | {
+    root?: string | undefined;
+    spinner?: string | undefined | {
+      root?: string | undefined;
+    };
+  };
+  spinner?: string | undefined | {
+    root?: string | undefined;
+  };
+}; href: string; icon?: IconProps | IconSlot | undefined; label?: string | undefined; size?: "lg" | "md" | "sm" | "xs" | undefined; spinner?: boolean | undefined; tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined; variant?: "ghost" | "inline" | "solid" | undefined }
 
 [./card-row.kay] default
 component default
@@ -844,10 +864,21 @@ component default
 [./checkbox.kay] default
 component default
   checked?: boolean | undefined
-  class?: string | undefined | { root?: string | undefined; input?: string | undefined; label?: string | undefined; hint?: string | undefined; }
+  class?: string | undefined | {
+  root?: string | undefined;
+  input?: string | undefined;
+  label?: string | undefined;
+  hint?: string | undefined;
+  field?: string | undefined;
+  issues?: string | undefined;
+  issue?: string | undefined;
+}
   hint?: number | string | undefined
   indeterminate?: boolean | undefined
+  invalid?: boolean | undefined
+  issue?: string | undefined
   label?: string | undefined
+  name?: string | undefined
   onChange?: ((checked: boolean) => unknown) | undefined
 
 [./chip-group.kay] default
@@ -864,6 +895,7 @@ component default
   heading?: string | undefined;
 }
   disabled?: boolean | undefined
+  invalid?: boolean | undefined
   label: string
   name?: string | undefined
   onChange?: ((value: Value[]) => unknown) | undefined
@@ -895,6 +927,7 @@ component default
 [./color-input.kay] default
 component default
   class?: string | undefined | { root?: string | undefined; input?: string | undefined; label?: string | undefined; value?: string | undefined; }
+  invalid?: boolean | undefined
   label: string
   onChange?: ((value: string) => unknown) | undefined
   value: string
@@ -983,8 +1016,15 @@ component default
   cancelLabel?: string | undefined
   class?: string | undefined | {
   root?: string | undefined | {
-    root?: any;
-    spinner?: any;
+    root?: string | undefined | {
+      root?: string | undefined;
+      spinner?: string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: string | undefined | {
+      root?: string | undefined;
+    };
   } | {
     root?: string | undefined | {
       root?: string | undefined;
@@ -1019,9 +1059,18 @@ component default
   class?: string | undefined | {
   root?: string | undefined;
   consent?: string | undefined;
-  link?: string | undefined;
+  consentBox?: string | undefined | {
+    root?: string | undefined;
+    input?: string | undefined;
+    label?: string | undefined;
+    hint?: string | undefined;
+    field?: string | undefined;
+    issues?: string | undefined;
+    issue?: string | undefined;
+  };
   issues?: string | undefined;
   issue?: string | undefined;
+  link?: string | undefined;
   privacy?: string | undefined;
 }
   consent?: boolean | undefined
@@ -1279,6 +1328,7 @@ component default
   class?: string | undefined | { root?: string | undefined; input?: string | undefined; }
   content: (zone: { open: () => void; dragging: () => boolean; }) => Element
   disabled?: boolean | undefined
+  invalid?: boolean | undefined
   multiple?: boolean | undefined
   onFiles: (files: File[]) => unknown
   onReject?: ((files: File[]) => unknown) | undefined
@@ -1387,10 +1437,12 @@ component default
   more?: string | undefined;
 }
   clearLabel?: string | undefined
+  disabled?: boolean | undefined
   emptyLabel?: string | undefined
   errorLabel?: string | undefined
   gridLabel?: string | undefined
   icons?: readonly IconChoice[] | undefined
+  invalid?: boolean | undefined
   moreLabel?: string | undefined
   name?: string | undefined
   onChange?: ((name: string) => unknown) | undefined
@@ -1530,6 +1582,7 @@ component default
   barFailed?: string | undefined;
   extra?: string | undefined;
 }
+  invalid?: boolean | undefined
   keysHint?: string | undefined
   onImage?: ((file: File) => Promise<string>) | undefined
   onImageError?: ((file: File, error: unknown) => unknown) | undefined
@@ -1713,7 +1766,13 @@ component default
   };
   body?: string | undefined;
   actions?: string | undefined;
-  dismiss?: any;
+  dismiss?: string | undefined | {
+    root?: string | undefined | {
+      root?: string | undefined | {
+        root?: string | undefined;
+      };
+    };
+  };
 }
   dismissLabel?: string | undefined
   dismissible?: boolean | undefined
@@ -1803,6 +1862,7 @@ component default
   description?: string | undefined;
 }
   disabled?: boolean | undefined
+  invalid?: boolean | undefined
   label?: string | undefined
   name?: string | undefined
   onChange?: ((value: (null extends Held ? Held & null : never) | Value) => unknown) | undefined
@@ -1840,6 +1900,7 @@ component default
 }
   disabled?: boolean | undefined
   icon?: IconProps | IconSlot | undefined
+  invalid?: boolean | undefined
   label: string
   max?: number | undefined
   name?: string | undefined
@@ -1851,8 +1912,15 @@ component default
   class?: string | undefined | {
   root?: string | undefined;
   button?: string | undefined | {
-    root?: any;
-    spinner?: any;
+    root?: string | undefined | {
+      root?: string | undefined;
+      spinner?: string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: string | undefined | {
+      root?: string | undefined;
+    };
   };
   time?: string | undefined;
   live?: string | undefined;
@@ -1863,7 +1931,13 @@ component default
     };
     body?: string | undefined;
     actions?: string | undefined;
-    dismiss?: any;
+    dismiss?: string | undefined | {
+      root?: string | undefined | {
+        root?: string | undefined | {
+          root?: string | undefined;
+        };
+      };
+    };
   };
 }
   failure?: string | undefined
@@ -1906,8 +1980,15 @@ component default
     };
   };
   add?: string | undefined | {
-    root?: any;
-    spinner?: any;
+    root?: string | undefined | {
+      root?: string | undefined;
+      spinner?: string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: string | undefined | {
+      root?: string | undefined;
+    };
   };
 }
   columns: readonly {
@@ -1918,6 +1999,7 @@ component default
   name?: string | undefined;
   cell?: boolean | undefined;
 }[]
+  invalid?: boolean | undefined
   label: string
   max?: number | undefined
   min?: number | undefined
@@ -2003,6 +2085,7 @@ component default
   heading?: string | undefined;
 }
   disabled?: boolean | undefined
+  invalid?: boolean | undefined
   label: string
   name?: string | undefined
   onChange?: ((value: (null extends Held ? Held & null : never) | Value) => unknown) | undefined
@@ -2432,8 +2515,15 @@ component default
   };
   message?: string | undefined;
   action?: string | undefined | {
-    root?: any;
-    spinner?: any;
+    root?: string | undefined | {
+      root?: string | undefined;
+      spinner?: string | undefined | {
+        root?: string | undefined;
+      };
+    };
+    spinner?: string | undefined | {
+      root?: string | undefined;
+    };
   };
   dismiss?: string | undefined | {
     root?: string | undefined | {
@@ -2447,8 +2537,21 @@ component default
 [./toggle.kay] default
 component default
   checked?: boolean | undefined
-  class?: string | undefined | { root?: string | undefined; input?: string | undefined; track?: string | undefined; label?: string | undefined; }
+  class?: string | undefined | {
+  root?: string | undefined;
+  input?: string | undefined;
+  track?: string | undefined;
+  label?: string | undefined;
+  hint?: string | undefined;
+  field?: string | undefined;
+  issues?: string | undefined;
+  issue?: string | undefined;
+}
+  hint?: number | string | undefined
+  invalid?: boolean | undefined
+  issue?: string | undefined
   label?: string | undefined
+  name?: string | undefined
   onChange?: ((checked: boolean) => unknown) | undefined
 
 [./toolbar.kay] default
