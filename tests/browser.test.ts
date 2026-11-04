@@ -408,6 +408,13 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
           location.hash = ''
         })
       }
+
+      // A field that appears after the call is filled once it does.
+      await own.evaluate(() => {
+        setTimeout(() => document.body.insertAdjacentHTML('afterbegin', '<input id="late">'), 150)
+      })
+      await own.fill('#late', 'typed')
+      expect(await own.evaluate(() => (document.getElementById('late') as HTMLInputElement).value)).toBe('typed')
     }
     finally {
       own.close()

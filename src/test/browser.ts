@@ -605,14 +605,27 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   }
 
   // The middle of the element, two frames on when scripts run, once a scroll or a transition settled.
-  const center = async (selector: string) => inView<[number, number]>(script(async (target: string, frames: boolean) => {
-    if (frames)
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  const center = async (selector: string): Promise<[number, number]> => {
+    const point = await inView<[number, number] | null>(script(async (target: string, frames: boolean) => {
+      if (frames)
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 
-    const { left, top, width, height } = document.querySelector(target)!.getBoundingClientRect()
+      const element = document.querySelector(target)
 
-    return [left + width / 2, top + height / 2]
-  }, [selector, options.javaScript !== false]))
+      if (element === null)
+        return null
+
+      const { left, top, width, height } = element.getBoundingClientRect()
+
+      return [left + width / 2, top + height / 2]
+    }, [selector, options.javaScript !== false]))
+
+    // Gone since the call found it, as a list's bar goes with its hover or a render replaces the node.
+    if (point === null)
+      throw new Error(`kay: ${selector} is not found, waiting for it to be actionable`)
+
+    return point
+  }
 
   // The point `at` of the element, scrolled so it is in the view, in viewport pixels.
   const pointAt = async (selector: string, at: { x: number, y: number }): Promise<[number, number]> => {
@@ -866,13 +879,18 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       }
     }),
     fill: async (selector, text) => serial(async () => {
-      await poll(`!!document.querySelector(${JSON.stringify(selector)})`, selector)
-      await inView(script((css: string) => {
-        const field = document.querySelector<HTMLInputElement>(css)!
+      // The field is waited on and focused in one script, as a render can replace it between two.
+      await poll(script((css: string) => {
+        const field = document.querySelector<HTMLInputElement>(css)
+
+        if (field === null)
+          return false
 
         field.focus()
         field.select()
-      }, [selector]))
+
+        return true
+      }, [selector]), selector)
 
       await live(async () => text === '' ? view.press('Delete') : view.type(text))
     }),
