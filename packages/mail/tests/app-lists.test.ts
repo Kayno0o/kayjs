@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Database } from 'bun:sqlite'
@@ -9,6 +9,8 @@ import { listsHome, warnLocalLists } from '../src/app-lists'
 import { createLists } from '../src/list'
 import { LIST_FILE } from '../src/list-store'
 import { logged } from './fixture/tests/logged'
+
+interface Closing { close: () => Promise<void> }
 
 afterEach(() => setupStore(undefined))
 
@@ -54,6 +56,30 @@ describe('where the lists live by default', () => {
     writeFileSync(join(root, LIST_FILE), '')
     setupStore({ database: 'sqlite:///srv/app/data/app.sqlite' })
     expect(listsHome(root)).toMatchObject({ file: LIST_FILE, local: true })
+  })
+
+  it('notices the legacy file appearing or going, and a closed Postgres store', async () => {
+    const root = await scratchDir('mail-home-moves')
+
+    setupStore({ database: 'postgres://user@127.0.0.1:1/app' })
+
+    const first = listsHome(root)
+
+    expect(first.local).toBe(false)
+
+    mkdirSync(join(root, 'data'))
+    writeFileSync(join(root, LIST_FILE), '')
+    expect(listsHome(root)).toMatchObject({ file: LIST_FILE, local: true })
+    rmSync(join(root, LIST_FILE))
+    expect(listsHome(root).store).toBe(first.store)
+
+    await (first.store as unknown as Closing).close()
+
+    const reopened = listsHome(root)
+
+    expect(reopened.store).not.toBe(first.store)
+    expect(reopened.store!.closed).toBe(false)
+    await (reopened.store as unknown as Closing).close()
   })
 })
 

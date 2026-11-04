@@ -15,20 +15,22 @@ export interface ListsHome {
   local: boolean
 }
 
-const pgBySource = new Map<SQL | string, ListStore>()
+// A connection URL is a string, kept by value; a `SQL` is held weakly, so a store the app dropped is not kept alive here.
+const pgByUrl = new Map<string, ListStore>()
+const pgBySql = new WeakMap<SQL, ListStore>()
 let warned = false
-let last: { store: unknown, root: string, home: ListsHome } | undefined
+let last: { store: unknown, root: string, old: boolean, home: ListsHome } | undefined
 
 // Where the lists and suppressions of a mailer with no store of its own live: the database of the app's `store` (the Postgres connection of `pgData`, or the SQLite file of `sqliteData`), else `data/mail-list.sqlite`.
-// A `data/mail-list.sqlite` that exists keeps being read, so an app upgrading loses no subscriber. Worked out once per store setup.
+// A `data/mail-list.sqlite` that exists keeps being read, so an app upgrading loses no subscriber. Worked out again when the store setup, that file's existence or the closing of the Postgres store changes.
 export function listsHome(root: string = process.cwd()): ListsHome {
   const store = appStore()
+  const old = existsSync(`${root}/${LIST_FILE}`)
 
-  if (last !== undefined && last.store === store && last.root === root)
+  if (last !== undefined && last.store === store && last.root === root && last.old === old && last.home.store?.closed !== true)
     return last.home
 
   const database = appDatabase()
-  const old = existsSync(`${root}/${LIST_FILE}`)
   let home: ListsHome = { file: LIST_FILE, local: true }
 
   if (database !== undefined && !old) {
@@ -36,19 +38,23 @@ export function listsHome(root: string = process.cwd()): ListsHome {
       home = { file: database.path, local: false }
     }
     else {
-      let kept = pgBySource.get(database.source)
+      const { source } = database
+      let kept = typeof source === 'string' ? pgByUrl.get(source) : pgBySql.get(source)
 
-      if (kept?.closed === true)
-        kept = undefined
+      if (kept === undefined || kept.closed === true) {
+        kept = pgLists(source)
 
-      if (kept === undefined)
-        pgBySource.set(database.source, kept = pgLists(database.source))
+        if (typeof source === 'string')
+          pgByUrl.set(source, kept)
+        else
+          pgBySql.set(source, kept)
+      }
 
       home = { store: kept, local: false }
     }
   }
 
-  last = { store, root, home }
+  last = { store, root, old, home }
 
   return home
 }

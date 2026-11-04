@@ -329,6 +329,30 @@ describe('a loader watching its database', () => {
     other.close()
   })
 
+  test('sqlite sees a row moved to another collection leave the first, and a write made before the triggers existed', async () => {
+    const path = join(await scratchDir('loader-'), 'moved.db')
+    const posts = collection(sqliteLoader({ name: 'moved-from', database: path, watch: '40ms', seed: [{ slug: 'a', data: { title: 'A' } }, { slug: 'b', data: { title: 'B' } }] }), { schema })
+
+    expect((await posts.all()).map(post => post.data.title).toSorted()).toEqual(['A', 'B'])
+
+    const other = new Database(path)
+
+    other.run(`UPDATE kay_content SET collection = 'moved-to' WHERE collection = 'moved-from' AND place = 'a'`)
+    expect(await titlesBecome(posts, ['B'])).toEqual(['B'])
+
+    // What an older kay left: no triggers, and a row written while none existed.
+    for (const name of ['insert', 'change', 'delete'])
+      other.run(`DROP TRIGGER kay_content_changes_${name}`)
+
+    other.run(`INSERT INTO kay_content (collection, place, data) VALUES ('moved-from', 'c', '{"title":"C"}')`)
+    expect(await titlesBecome(posts, ['B'])).toEqual(['B'])
+
+    // A newer kay process opens the file and installs the triggers again.
+    expect(await sqliteLoader({ name: 'moved-from', database: path, watch: false }).count!({ preview: false })).toBe(2)
+    expect(await titlesBecome(posts, ['B', 'C'])).toEqual(['B', 'C'])
+    other.close()
+  })
+
   test('a write to another collection of the file invalidates nothing', async () => {
     const path = join(await scratchDir('loader-'), 'two.db')
     const pages = sqliteLoader({ name: 'two-pages', database: path, watch: '40ms' })

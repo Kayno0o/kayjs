@@ -19,9 +19,34 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
   const key = seededKey(name)
   let opened: Database | undefined
   let ready: Promise<Database> | undefined
-  const counter = `${table.slice(0, -1)}_changes"`
+  // The counter table and the triggers are named after the table, quoted like it.
+  const named = (suffix: string) => `"${table.slice(1, -1)}${suffix}"`
+  const counter = named('_changes')
   // Triggers on the table count the writes of each collection, whoever made them, a process or the `sqlite3` tool; the signature is that count alone, so the other writes of a file shared with the app's sessions, rates and jobs cost the watcher nothing.
   const watching = watcher(name, `${scopeOf(options.database ?? 'the app\'s store')}/${table}`, options.watch, '1s', () => String(opened!.query<{ n: number }, [string]>(`SELECT n FROM ${counter} WHERE collection = ?`).get(name)?.n ?? 0))
+
+  const bump = (collection: string, only = '') => `INSERT INTO ${counter} (collection, n) ${only === '' ? `VALUES (${collection}, 1)` : `SELECT ${collection}, 1 WHERE ${only}`} ON CONFLICT (collection) DO UPDATE SET n = n + 1`
+
+  // A row moved to another collection counts for both. When the triggers are installed or replaced, every collection is counted once, so a watcher that read the rows earlier, and missed a write made while no trigger existed (a process of an older kay), sees a change.
+  const installTriggers = (db: Database) => {
+    const triggers = [
+      [named('_changes_insert'), 'INSERT', bump('NEW.collection')],
+      [named('_changes_change'), 'UPDATE', `${bump('NEW.collection')}; ${bump('OLD.collection', 'OLD.collection IS NOT NEW.collection')}`],
+      [named('_changes_delete'), 'DELETE', bump('OLD.collection')],
+    ] as const
+
+    if (triggers.every(([trigger]) => db.query('SELECT 1 FROM sqlite_master WHERE type = \'trigger\' AND name = ?').get(trigger.slice(1, -1)) !== null))
+      return
+
+    db.transaction(() => {
+      db.run(`DROP TRIGGER IF EXISTS ${named('_changes_update')}`)
+
+      for (const [trigger, event, body] of triggers)
+        db.run(`CREATE TRIGGER IF NOT EXISTS ${trigger} AFTER ${event} ON ${table} BEGIN ${body}; END`)
+
+      db.run(`INSERT INTO ${counter} (collection, n) SELECT collection, 1 FROM ${table} GROUP BY collection ON CONFLICT (collection) DO UPDATE SET n = n + 1`)
+    })()
+  }
 
   const open = async (): Promise<Database> => {
     if (opened !== undefined)
@@ -33,8 +58,7 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
     db.run(`CREATE TABLE IF NOT EXISTS ${table} (collection TEXT NOT NULL, place TEXT NOT NULL, data TEXT NOT NULL, body TEXT, PRIMARY KEY (collection, place))`)
     db.run(`CREATE TABLE IF NOT EXISTS ${counter} (collection TEXT PRIMARY KEY, n INTEGER NOT NULL)`)
 
-    for (const [event, row] of [['INSERT', 'NEW'], ['UPDATE', 'NEW'], ['DELETE', 'OLD']] as const)
-      db.run(`CREATE TRIGGER IF NOT EXISTS ${table.slice(0, -1)}_changes_${event.toLowerCase()}" AFTER ${event} ON ${table} BEGIN INSERT INTO ${counter} (collection, n) VALUES (${row}.collection, 1) ON CONFLICT (collection) DO UPDATE SET n = n + 1; END`)
+    installTriggers(db)
 
     if (options.seed !== undefined && db.query(`SELECT 1 FROM ${table} WHERE collection = ?`).get(key) === null) {
       const seed = await seedEntries(options.seed)
