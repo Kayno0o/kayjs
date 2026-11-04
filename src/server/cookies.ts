@@ -50,17 +50,21 @@ const defined = (given: object): [string, unknown][] => Object.entries(given).fi
 
 // The cookies of a request, a cookie set without an option taking the app's default for it, `secure: 'auto'` following the scheme the request came over, as kay's own cookies do.
 // A `Bun.Cookie` is the app's own whole cookie and goes as it is.
+// With no defaults, a set is Bun's own, and a delete is too unless it names an attribute of its own.
 class DefaultedCookies extends Bun.CookieMap {
-  readonly #defaults: ResolvedCookieDefaults
+  readonly #defaults: ResolvedCookieDefaults | undefined
   readonly #request: Request
 
-  constructor(header: string, defaults: ResolvedCookieDefaults, request: Request) {
+  constructor(header: string, defaults: ResolvedCookieDefaults | undefined, request: Request) {
     super(header)
     this.#defaults = defaults
     this.#request = request
   }
 
   #given(options: CookieInit | undefined): CookieInit {
+    if (this.#defaults === undefined)
+      return Object.fromEntries(defined(options ?? {}))
+
     const { secure, ...rest } = this.#defaults
     const merged: CookieInit = { ...rest, ...Object.fromEntries(defined(options ?? {})) }
 
@@ -85,11 +89,17 @@ class DefaultedCookies extends Bun.CookieMap {
       super.set(this.#given(first) as CookieInit & { name: string, value: string })
   }
 
-  override delete(name: string): void
+  override delete(name: string, options?: Omit<CookieDeleteOptions, 'name'>): void
   override delete(options: CookieDeleteOptions): void
   // Written as an expired cookie with the attributes a set would carry, as a `__Host-` or `__Secure-` cookie, or a `Secure` one, is only cleared by a header that is `Secure` too; the options of the set that wrote it, as `secure: false`, say how it was.
-  override delete(first: string | CookieDeleteOptions): void {
-    const { name, domain, path, ...attributes } = typeof first === 'string' ? { name: first, domain: undefined, path: undefined } : first
+  override delete(first: string | CookieDeleteOptions, options?: Omit<CookieDeleteOptions, 'name'>): void {
+    const { name, domain, path, ...attributes } = typeof first === 'string' ? { ...options, name: first } : first
+
+    if (this.#defaults === undefined && Object.keys(defined(attributes)).length === 0) {
+      super.delete({ name, ...domain == null ? {} : { domain }, ...path === undefined ? {} : { path } })
+
+      return
+    }
 
     super.set(this.#given({ ...Object.fromEntries(defined(attributes)), name, value: '', expires: new Date(0), ...domain == null ? {} : { domain }, ...path === undefined ? {} : { path } }) as CookieInit & { name: string, value: string })
   }
@@ -110,9 +120,7 @@ export function cookieJar(request: Request): CookieJar {
       if (map)
         return map
 
-      const defaults = requestRecord(request).cookieDefaults
-
-      return map = defaults === undefined ? new Bun.CookieMap(request.headers.get('cookie') ?? '') : new DefaultedCookies(request.headers.get('cookie') ?? '', defaults, request)
+      return map = new DefaultedCookies(request.headers.get('cookie') ?? '', requestRecord(request).cookieDefaults, request)
     },
     writeTo(headers) {
       for (const cookie of map?.toSetCookieHeaders() ?? [])

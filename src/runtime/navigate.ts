@@ -12,7 +12,6 @@ declare const KAY_NAV_ENTRY: true | undefined
 const PREFETCH = 'meta[name="kay-prefetch"]'
 // An action's path, before any query or fragment.
 const ACTION_PATH = /^[^?#]*\/_kay\/action\//
-const OTHER_SITE = /^(?:\w+:)?\/\//
 
 let swapModule: Promise<typeof import('./page-swap')> | undefined
 let formsModule: Promise<typeof import('./form-submits')> | undefined
@@ -116,15 +115,30 @@ async function wakeForms(form?: HTMLFormElement, posted?: { submitter: HTMLEleme
   }
 }
 
+// Whether a GET to this address is one the swap takes, as a link to it would be.
+function pageOfApp(action: string): boolean {
+  try {
+    return swappable(new URL(action, location.href))
+  }
+  catch {
+    return false
+  }
+}
+
 // A post to an action, or a GET to an address of this site, before the forms' listener runs, as from a form an island rendered that nothing focused, held until the listener loads.
 function onEarlySubmit(event: SubmitEvent): void {
   const form = event.target as HTMLFormElement
   const { submitter } = event
   const action = submitter?.getAttribute('formaction') ?? form.getAttribute('action') ?? ''
   const method = (submitter?.getAttribute('formmethod') ?? form.getAttribute('method') ?? 'get').toLowerCase()
+  const target = submitter?.getAttribute('formtarget') ?? form.getAttribute('target') ?? ''
+  const opted = form.closest('[data-reload]') !== null || submitter?.hasAttribute('data-reload') === true || (target !== '' && target !== '_self')
 
-  // A cheaper test than the forms' listener's: a post to another site naming an action's path, or a GET to one, still reaches the browser, its submit event fired again. A submit button pressed with a key held is the browser's, as a link is.
-  if (formsListen || event.defaultPrevented || !(method === 'post' ? ACTION_PATH.test(action) : !OTHER_SITE.test(action) && !(navigation.modified && submitter)) || form.closest('[data-reload]') || submitter?.hasAttribute('data-reload') || !['', '_self'].includes(submitter?.getAttribute('formtarget') ?? form.getAttribute('target') ?? ''))
+  if (formsListen || event.defaultPrevented || opted)
+    return
+
+  // A cheaper test than the forms' listener's: what it leaves to the browser, such as a post to another site naming an action's path, still reaches it, its submit event fired again. A submit button pressed with a key held is the browser's, as a link is.
+  if (method === 'post' ? !ACTION_PATH.test(action) : method === 'dialog' || (navigation.modified === true && submitter !== null) || !pageOfApp(action))
     return
 
   event.preventDefault()

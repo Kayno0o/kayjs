@@ -426,6 +426,9 @@ function scriptNames(script: ScriptAnalysis): string[] {
     if (declaration?.type === 'VariableDeclaration')
       return declaration.declarations.flatMap(declarator => patternNames(declarator.id))
 
+    if (declaration?.type === 'TSEnumDeclaration')
+      return [declaration.id.name]
+
     return (declaration?.type === 'FunctionDeclaration' || declaration?.type === 'ClassDeclaration') && declaration.id ? [declaration.id.name] : []
   })
 }

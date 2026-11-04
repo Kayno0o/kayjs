@@ -878,6 +878,31 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
+  it('gives a held GET form to the browser when the forms\' listener cannot load', async () => {
+    const fresh = await open('/kept')
+
+    try {
+      await settled(fresh)
+      await fresh.route(/\/form-submits-[^/]*\.js$/, async request => request.abort())
+      await fresh.evaluate(() => {
+        const state = window as { kayPrevented?: boolean[] }
+
+        state.kayPrevented = []
+        window.addEventListener('submit', (event) => {
+          state.kayPrevented!.push(event.defaultPrevented)
+          event.preventDefault()
+        })
+        document.body.insertAdjacentHTML('beforeend', '<form class="late" action="/plain"><button>Go</button></form>')
+        document.querySelector<HTMLFormElement>('form.late')!.requestSubmit()
+      })
+      await fresh.waitUntil(() => (window as { kayPrevented?: boolean[] }).kayPrevented!.length === 2)
+      expect(await fresh.evaluate(() => (window as { kayPrevented?: boolean[] }).kayPrevented)).toEqual([true, false])
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
   it('does not carry the modifier of a click into a later requestSubmit(button) that had none', async () => {
     const fresh = await open('/get-form')
 
@@ -976,7 +1001,15 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     ['target="_blank"', '<form method="post" action="/_kay/action/x" target="_blank"><button>Send</button></form>', false],
     ['formtarget="_blank"', '<form method="post" action="/_kay/action/x"><button formtarget="_blank">Send</button></form>', false],
     ['a get of the app', '<form action="/plain"><button>Send</button></form>', true],
-    ['formmethod="get"', '<form method="post" action="/_kay/action/x"><button formmethod="get">Send</button></form>', true],
+    ['formmethod="get" to a page of the app', '<form method="post" action="/_kay/action/x"><button formmethod="get" formaction="/plain">Send</button></form>', true],
+    ['formmethod="get" to an action', '<form method="post" action="/_kay/action/x"><button formmethod="get">Send</button></form>', false],
+    ['a get to the api', '<form action="/api/items"><button>Send</button></form>', false],
+    ['a get with a formaction to the api', '<form action="/plain"><button formaction="/api/items">Send</button></form>', false],
+    ['a get with a formaction to a kay path', '<form action="/plain"><button formaction="/_kay/x">Send</button></form>', false],
+    ['method="dialog"', '<form method="dialog"><button>Send</button></form>', false],
+    ['a get with target="_blank"', '<form action="/plain" target="_blank"><button>Send</button></form>', false],
+    ['a get to a mailto address', '<form action="mailto:a@example.com"><button>Send</button></form>', false],
+    ['a get to an address that does not parse', '<form action="http://[x"><button>Send</button></form>', false],
     ['a get to another site', '<form action="https://example.com/search"><button>Send</button></form>', false],
     ['a get to a protocol-relative address', '<form action="//example.com/search"><button>Send</button></form>', false],
     ['a get with data-reload', '<form action="/plain" data-reload><button>Send</button></form>', false],

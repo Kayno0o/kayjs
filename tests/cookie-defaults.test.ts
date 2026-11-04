@@ -6,7 +6,7 @@ import { setSite } from '../src/runtime/site'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
-const PAGE = '--- server\nctx.cookies.set(\'theme\', \'dark\')\nctx.cookies.set(\'loose\', \'1\', { httpOnly: false, secure: false, sameSite: \'strict\', path: \'/x\' })\nctx.cookies.set({ name: \'init\', value: \'v\' })\nctx.cookies.delete(\'old\')\nctx.cookies.delete({ name: \'older\', path: \'/o\' })\nctx.cookies.set(new Bun.Cookie(\'whole\', \'w\'))\nctx.cookies.delete({ name: \'loosed\', path: \'/x\', secure: false, sameSite: \'strict\' })\nctx.headers.set(\'cache-control\', \'public, max-age=60\')\n---\nh1 Cookie\n'
+const PAGE = '--- server\nctx.cookies.set(\'theme\', \'dark\')\nctx.cookies.set(\'loose\', \'1\', { httpOnly: false, secure: false, sameSite: \'strict\', path: \'/x\' })\nctx.cookies.set({ name: \'init\', value: \'v\' })\nctx.cookies.delete(\'old\')\nctx.cookies.delete({ name: \'older\', path: \'/o\' })\nctx.cookies.set(new Bun.Cookie(\'whole\', \'w\'))\nctx.cookies.delete({ name: \'loosed\', path: \'/x\', secure: false, sameSite: \'strict\' })\nctx.cookies.delete(\'named\', { path: \'/y\', secure: true })\nctx.cookies.delete({ name: \'__Secure-a\', secure: true, partitioned: true })\nctx.headers.set(\'cache-control\', \'public, max-age=60\')\n---\nh1 Cookie\n'
 const ENDPOINT = 'export function GET({ cookies }) {\n  cookies.set(\'theme\', \'dark\')\n\n  return \'ok\'\n}\n'
 
 const ACTION = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const act = action(t.Object({}), ({}, { cookies, redirect, request }) => {\n  cookies.set(\'seen\', \'1\')\n  cookies.delete(\'old\')\n\n  if (request.headers.has(\'x-do\'))\n    redirect(\'/elsewhere\')\n\n  return \'ok\'\n})\n---\nform(action={act})\n  button Go\n'
@@ -72,6 +72,19 @@ describe('cookie defaults', () => {
   it('deletes a cookie with the attributes it was set with, an explicit secure false clearing it without Secure', async () => {
     expect((await cookies('always', '/cookie')).set[6]).toBe('loosed=; Path=/x; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict')
     expect((await cookies('safe', '/cookie', {}, 'https://localhost')).set[6]).toBe('loosed=; Path=/x; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict')
+  })
+
+  it('passes a delete\'s own name and options on, with defaults on or off', async () => {
+    const on = (await cookies('safe', '/cookie')).set
+    const off = (await cookies('plain', '/cookie')).set
+
+    expect(on[7]).toBe('named=; Path=/y; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; HttpOnly; SameSite=Lax')
+    expect(on[8]).toMatch(/^__Secure-a=; Path=\/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; HttpOnly; Partitioned; SameSite=Lax$/)
+    expect(off.find(line => line.startsWith('named='))).toMatch(/^named=; Path=\/y; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; SameSite=Lax$/)
+    expect(off.find(line => line.startsWith('__Secure-a='))).toMatch(/Secure/)
+    expect(off.find(line => line.startsWith('__Secure-a='))).toMatch(/Partitioned/)
+    expect(off.find(line => line.startsWith('loosed='))).not.toMatch(/Secure/)
+    expect(off.find(line => line.startsWith('loosed='))).toMatch(/SameSite=Strict/)
   })
 
   it('follows the scheme the request came over for secure auto', async () => {

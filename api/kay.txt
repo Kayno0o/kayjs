@@ -21,7 +21,7 @@ interface Action<Input, Output, Honeypot extends string = never>
 
 [.] ActionContext
 interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string> extends RequestContext<Params>
-  cookies: CookieMap & { delete: (options: CookieDeleteOptions) => void; }
+  cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
   deny: (status?: number | undefined, message?: string | undefined) => never
   fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data | undefined, errors?: Partial<Record<"" | Field, string>> | undefined) => Failure<Data>
   headers: Headers
@@ -188,7 +188,7 @@ type CallResult<Data, Failed> = | { ok: true, data: Data } | ({ ok: false } & Er
 [.] CardPageContext
 interface CardPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params>
   card: { title: string; image?: string | undefined; name?: string | undefined; }
-  cookies: CookieMap & { delete: (options: CookieDeleteOptions) => void; }
+  cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
   deny: (status?: number | undefined, message?: string | undefined) => never
   headers: Headers
   locale: string
@@ -217,6 +217,9 @@ interface Context<T>
 
 [.] ContextOfModule
 type ContextOfModule<Module> = Module extends { default: ContextDefinition<infer Values> } ? Values : object
+
+[.] CookieDeleteOptions
+type CookieDeleteOptions = CookieStoreDeleteOptions & Pick<CookieInit, 'secure' | 'sameSite' | 'partitioned'>
 
 [.] ctx
 const ctx: object
@@ -278,7 +281,7 @@ type EndpointContext<Params extends Record<string, unknown> = Record<string, str
 
 [.] ErrorPageContext
 interface ErrorPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params>
-  cookies: CookieMap & { delete: (options: CookieDeleteOptions) => void; }
+  cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
   deny: (status?: number | undefined, message?: string | undefined) => never
   error: PageError
   headers: Headers
@@ -600,7 +603,7 @@ function optimistic(change: () => void): { undo: () => void; keep: () => void; }
 
 [.] PageContext
 interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>> extends RequestContext<Params>
-  cookies: CookieMap & { delete: (options: CookieDeleteOptions) => void; }
+  cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
   deny: (status?: number | undefined, message?: string | undefined) => never
   headers: Headers
   locale: string
@@ -852,7 +855,7 @@ interface Register
 
 [.] RequestContext
 interface RequestContext<Params extends Record<string, unknown> = Record<string, string>>
-  cookies: CookieMap & { delete: (options: CookieDeleteOptions) => void; }
+  cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
   deny: (status?: number | undefined, message?: string | undefined) => never
   headers: Headers
   locale: string

@@ -236,6 +236,20 @@ describe('the fallback of a client-only component', () => {
     expect(reported('const width = 1', 'const width = 2\n  b {width}')).toEqual([])
     expect(reported('const width = 1', 'b {Math.max.width}')).toEqual([])
     expect(reported('const width = 1', 'b {width}')).toHaveLength(1)
+    expect(reported('const width = 1', 'b {(function width() { return 1 })()}')).toEqual([])
+    expect(reported('const width = 1', 'b {[1].map((n) => { const width = n; return width })}')).toEqual([])
+  })
+
+  it('reports a script name read as a shorthand, a spread, a template part, a chain or beside a shadowing parameter, and an enum declared by the script', () => {
+    const reported = (script: string, fallback: string) => compile(`--- client\n${script}\n---\np.real\n@fallback\n  ${fallback}\n`).diagnostics.map(diagnostic => diagnostic.message.match(/reads `(\w+)`/)?.[1])
+
+    expect(reported('const width = 1', 'b {JSON.stringify({ width })}')).toEqual(['width'])
+    expect(reported('const rest = {}', 'b({...rest})')).toEqual(['rest'])
+    expect(reported('const rest = {}', 'b {JSON.stringify({ ...rest })}')).toEqual(['rest'])
+    expect(reported('const width = 1', 'b {`w${width}`}')).toEqual(['width'])
+    expect(reported('const width = {} as { x?: number }', 'b {width?.x}')).toEqual(['width'])
+    expect(reported('const width = 1', 'b {width + [1].map(width => width).length}')).toEqual(['width'])
+    expect(reported('enum Mode { A }', 'b {Mode.A}')).toEqual(['Mode'])
   })
 
   it('compiles an empty block', () => {

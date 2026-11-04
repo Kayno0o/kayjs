@@ -276,7 +276,7 @@ export interface RequestContext<Params extends Record<string, unknown> = Record<
   locale: Locale
   params: Params
   // Read on demand; what is set or deleted goes out as Set-Cookie headers, redirects included. A delete takes the `secure`, `sameSite` and `partitioned` the cookie was set with.
-  cookies: CookieMap & { delete: (options: CookieDeleteOptions) => void }
+  cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, 'name'>): void, (options: CookieDeleteOptions): void } }
   // What the app's Elysia `derive`, `resolve` and `decorate` add, typed through `Register`.
   locals: Locals
   // Added to the response, whichever way the request ends.

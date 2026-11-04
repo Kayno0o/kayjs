@@ -1,4 +1,5 @@
 export { s } from '#schema'
+export type { CookieDeleteOptions } from '../server/cookies'
 export type { Action, ActionContext, ActionErrorDetail, ActionFor, ActionProtect, ActionProtection, ActionRateLimit, ActionStartDetail, ActionStream, ActionSuccessDetail, Answer, CallOptions, CallQueue, CallResult, Failure, FailureData, FailureOf, FieldErrors, FieldName, FormFailure, FormSuccess, HoneypotOptions, InputOf, MinTimeOptions, MinTimeRefusal, NoInputAction, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, Refreshable, ResolvedProtection, RetryOptions, ServerAction, Success, SuccessOf, TrackedCall } from './action'
 export { action, ActionError, ActionRedirectError, postedChecked, postedValue, postedValues } from './action'
 export type { ErrorShape } from './api-error'

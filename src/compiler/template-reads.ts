@@ -2,7 +2,7 @@ import type { Attribute, KayFile, Node, Span } from './ast'
 import type { Node as EstreeNode, Expression } from './estree'
 import { childBlocks, nodeExpressions, visitNodes } from './ast'
 import { parseExpression, VISITOR_KEYS } from './estree'
-import { parsedBindingNames } from './pattern-names'
+import { parsedBindingNames, patternNames } from './pattern-names'
 import { codeOf, KAY_NAME } from './script'
 
 const WORD = /[\w$]+/g
@@ -78,7 +78,24 @@ function parameters(code: string): Set<string> | undefined {
 const TYPED_VALUES = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion'])
 const IDENTIFIER = /(?<![\w$.])[A-Z_$][\w$]*/gi
 
-// The names an expression reads: not a member after a dot, an object key, a type or a name a function in it declares. Every word of the code when it does not parse.
+// The nodes that open a scope for the names their parameters and declarations bind.
+const FUNCTIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'FunctionDeclaration'])
+
+// The names a function body declares itself, not those of the functions inside it.
+function declaredIn(value: unknown): string[] {
+  if (Array.isArray(value))
+    return value.flatMap(child => declaredIn(child))
+
+  if (typeof value !== 'object' || value === null || typeof (value as { type?: unknown }).type !== 'string')
+    return []
+
+  const node = value as EstreeNode & { id?: EstreeNode | null }
+  const own = node.type === 'VariableDeclarator' || node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration' ? patternNames(node.id) : []
+
+  return FUNCTIONS.has(node.type) ? own : [...own, ...(VISITOR_KEYS[node.type] ?? []).flatMap(key => declaredIn((node as unknown as Record<string, unknown>)[key]))]
+}
+
+// The names an expression reads: not a member after a dot, an object key, a type, or a name a function in it declares inside that function. Every word of the code when it does not parse.
 function readNames(code: string): Set<string> {
   let expression: Expression
 
@@ -90,10 +107,10 @@ function readNames(code: string): Set<string> {
   }
 
   const names = new Set<string>()
-  const walk = (value: unknown): void => {
+  const walk = (value: unknown, scope: ReadonlySet<string>): void => {
     if (Array.isArray(value)) {
       for (const child of value)
-        walk(child)
+        walk(child, scope)
 
       return
     }
@@ -101,16 +118,24 @@ function readNames(code: string): Set<string> {
     if (typeof value !== 'object' || value === null || typeof (value as { type?: unknown }).type !== 'string')
       return
 
-    const node = value as EstreeNode & { computed?: boolean }
+    const node = value as EstreeNode & { computed?: boolean, id?: EstreeNode | null, params?: EstreeNode[], param?: EstreeNode | null, body?: unknown }
 
     if (node.type === 'Identifier') {
-      names.add(node.name)
+      if (!scope.has(node.name))
+        names.add(node.name)
 
       return
     }
 
     if (node.type.startsWith('TS') && !TYPED_VALUES.has(node.type))
       return
+
+    let inner = scope
+
+    if (FUNCTIONS.has(node.type))
+      inner = new Set([...scope, ...(node.params ?? []).flatMap(param => patternNames(param)), ...patternNames(node.id), ...declaredIn(node.body)])
+    else if (node.type === 'CatchClause')
+      inner = new Set([...scope, ...patternNames(node.param)])
 
     for (const child of VISITOR_KEYS[node.type] ?? []) {
       // A name written after a dot or as an object key reads nothing, unless computed.
@@ -123,15 +148,13 @@ function readNames(code: string): Set<string> {
       if (child === 'typeAnnotation' || child === 'typeArguments' || child === 'typeParameters')
         continue
 
-      walk((node as unknown as Record<string, unknown>)[child])
+      walk((node as unknown as Record<string, unknown>)[child], inner)
     }
   }
 
-  walk(expression)
+  walk(expression, new Set())
 
-  const shadowed = parameters(code)
-
-  return shadowed ? new Set([...names].filter(name => !shadowed.has(name))) : names
+  return names
 }
 
 // The names the template's expressions read that nothing in the template declares where they stand: a loop item, a snippet parameter, a `const` or a branch alias hides a script's name only inside its own block.
