@@ -22,6 +22,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   editing: 'request',
   effect: 'free',
   elementSize: 'free',
+  escapeHtml: 'free',
   every: 'free',
   flush: 'free',
   focusInvalid: 'free',

@@ -15,6 +15,7 @@ export function escape(text: string): string {
 }
 
 // Text safe anywhere in markup, in content and in an attribute however it is quoted, as HTML written by hand, a mail's say, wants it.
+// kept: free
 export function escapeHtml(text: string): string {
   return text.replace(ESCAPE_HTML, entity)
 }
