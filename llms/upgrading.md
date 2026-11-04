@@ -16,13 +16,6 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - A value of the wrong kind in `kay.config.ts`, in the options of `pages()` or `testSite()` or in an extension's `config` (`trailingSlash: 'sometimes'`, `compress: 7`, `lang: 5`) stops every command with `config-invalid`, naming the key path, what it accepts and the nearest match; it left kay's default in place or died with a `TypeError` before. A key kay does not know is refused in every option bag now, not only six of them.
 - `auth()`, `cms()`, `mail()` and `ai()` throw for an option they do not take, with the nearest one: remove a mistyped or stale option.
 
-## 1.88.0
-
-### The names of 1.84 are gone
-
-- `routes`, `api`, `content`, `storage`, `maxSizes` and `settings` are no longer read in `kay.config.ts`, in the options of `pages()` and `testSite()` or in an extension's `config`: a config still naming one stops every command with the unknown key, naming its replacement (`dirs.routes`, `dirs.api`, `contentConfig`, `store.files`, `limits.byPath`, `librarySettings`). `deprecated-config-keys` is gone with them.
-- `memoryStore()` and `sqliteStore(path)` of `kay/server` are gone: `memorySessions()` and `sqliteSessions(path)` (`deprecated-session-stores` is gone).
-- kayjs-auth's `safeRedirect(path, fallback?)` is gone: kay's `localPath(path, fallback)`, with `'/'` as the fallback `safeRedirect` defaulted to (`deprecated-safe-redirect` is gone). An app on 1.83 or older runs `kay upgrade`, which installs the last release that still rewrites them.
 ### An API route refuses input as an action does
 
 - A route whose `body`, `query`, `params` or `headers` refuses a request answers `{ errors, status: 422 }`, a message per field in the request's locale (the schema's own `error`, else the `kay.invalid.*` text), where Elysia's `{ type: 'validation', ... }` body went before. A client parsing that body (`type`, `on`, `found`, `errors[].path`) reads `errors` instead; `ApiError.errors` of `call()` reads it already.
@@ -30,6 +23,12 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - The island client no longer reads Elysia's validation body into `ApiError.errors`: a route kept on `errorShape: 'elysia'` gives `errors['']` with its message.
 
 ## 1.88.0
+
+### The names of 1.84 are gone
+
+- `routes`, `api`, `content`, `storage`, `maxSizes` and `settings` are no longer read in `kay.config.ts`, in the options of `pages()` and `testSite()` or in an extension's `config`: a config still naming one stops every command with the unknown key, naming its replacement (`dirs.routes`, `dirs.api`, `contentConfig`, `store.files`, `limits.byPath`, `librarySettings`). `deprecated-config-keys` is gone with them.
+- `memoryStore()` and `sqliteStore(path)` of `kay/server` are gone: `memorySessions()` and `sqliteSessions(path)` (`deprecated-session-stores` is gone).
+- kayjs-auth's `safeRedirect(path, fallback?)` is gone: kay's `localPath(path, fallback)`, with `'/'` as the fallback `safeRedirect` defaulted to (`deprecated-safe-redirect` is gone). An app on 1.83 or older runs `kay upgrade`, which installs the last release that still rewrites them.
 
 ### The config keys are grouped by concern
 
