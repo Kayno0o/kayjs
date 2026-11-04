@@ -145,11 +145,11 @@ jobs:
         env:
           PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
 
-      # cli-changelog is on the Forgejo registry only, and bun x in CI resolves the scope from npmjs unless ~/.npmrc points it at Forgejo; no token needed to read.
+      # cli-changelog is on the Forgejo registry only, and bun x in CI resolves the scope from npmjs unless ~/.npmrc points it at Forgejo; no token needed to read. It is named `release`, as a bare `changelog` prints its help and exits 0.
       - name: Generate changelog
         run: |
           echo "@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/" > ~/.npmrc
-          bun x @kaynooo/cli-changelog@2.0.0
+          bun x @kaynooo/cli-changelog@2.0.0 release
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
           DISCORD_WEBHOOK: ${{secrets.DISCORD_WEBHOOK}}
