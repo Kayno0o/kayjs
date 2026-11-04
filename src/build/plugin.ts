@@ -30,6 +30,8 @@ export interface KayPluginOptions {
   hydratable?: boolean | undefined
   // Island ids are relative to this directory, and imported assets are written under its `.kay/client`; defaults to the working directory.
   root?: string | undefined
+  // The directories holding the project's pages, whose root `@failed` fills a layout outlet; the default routes directory when unset.
+  pages?: readonly string[] | undefined
   // Keeps compiled files here between runs; off when unset.
   cacheDir?: string | undefined
   // `false` reads no imported image for the color its box shows until it loads: `images.placeholder`.
@@ -228,7 +230,7 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       const load = async (file: string, twin = false) => {
         const source = await Bun.file(withoutTwin(file)).text()
 
-        const code = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, cacheDir: options.cacheDir, inspect: options.inspect, classTable: options.classTable })
+        const code = await transformKayCached(source, file, { target, hydratable: options.hydratable ?? true, root: options.root, pages: options.pages, cacheDir: options.cacheDir, inspect: options.inspect, classTable: options.classTable })
         const contents = await pointed(await shippingFiles(expandGlobs(code, withoutTwin(file), root, 'ts'), withoutTwin(file), 'ts'))
 
         const anchored = options.anchor !== undefined && options.anchor !== '' ? `${contents}\nimport ${JSON.stringify(options.anchor)}\n` : contents

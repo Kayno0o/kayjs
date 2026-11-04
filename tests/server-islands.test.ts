@@ -1,5 +1,5 @@
 import type { FetchedIsland } from '../src/runtime/fetch-island'
-import { rm } from 'node:fs/promises'
+import { rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { gunzipSync } from 'node:zlib'
@@ -18,7 +18,7 @@ import { readManifest } from '../src/server/client'
 import { ExportError } from '../src/server/prerender'
 import { renders } from './fixtures/server-islands/src/renders'
 import { scratchBuild } from './prerendered'
-import { fixtureCopy } from './scratch'
+import { fixtureCopy, scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const routes = 'tests/fixtures/server-islands/src/routes'
@@ -345,6 +345,37 @@ describe('server islands', () => {
     expect(use.diagnostics.map(diagnostic => diagnostic.message)).toContain('`@failed` holds a server island')
   })
 
+  it('points each `@failed` refusal at the node it refuses, the server island once with its own help', () => {
+    const source = '---\nimport Icon from \'./icon.kay\'\n---\np.real\n@failed\n  p static\n  Icon(server)\n  button(onClick={() => {}}) Go\n'
+    const found = compileKay(source, 'src/components/card.kay', { output: 'html', check: true }).diagnostics.filter(diagnostic => diagnostic.message.includes('@failed') || diagnostic.message.includes('`server`'))
+    const at = (message: string) => found.filter(diagnostic => diagnostic.message === message).map(diagnostic => source.slice(diagnostic.start, diagnostic.end))
+
+    expect(at('`@failed` holds a server island')).toEqual(['Icon'])
+    expect(found.filter(diagnostic => diagnostic.message.includes('server island'))[0]!.help).toBe('render it outside the block, or leave it out')
+    expect(found.filter(diagnostic => diagnostic.message.includes('`server`'))).toEqual([])
+
+    const handler = compileKay('---\n---\np.real\n@failed\n  p static\n  button(onClick={() => {}}) Go\n', 'src/components/card.kay', { output: 'html', check: true }).diagnostics.find(diagnostic => diagnostic.message === '`@failed` holds something interactive')!
+
+    expect('---\n---\np.real\n@failed\n  p static\n  button(onClick={() => {}}) Go\n'.slice(handler.start, handler.end)).toBe('onClick')
+  })
+
+  it('keeps a page\'s root `@failed` under a configured routes directory, a linked one included', async () => {
+    const root = await scratchDir('failed-pages')
+    const source = 'p body\n@failed\n  p.fills Page block\n'
+
+    await Bun.write(join(root, 'real/pages/about.kay'), source)
+    await symlink(join(root, 'real'), join(root, 'src'))
+
+    const compile = (file: string, pages?: string[]) => transformKay(source, join(root, file), { target: 'ssr', root, pages })
+
+    // Not under the default routes directory: only the configured one says it is a page.
+    expect(compile('src/pages/about.kay')).toContain('.kayFailed = KayFailed')
+    expect(compile('src/pages/about.kay', [join(root, 'src/pages')])).toContain('KayFill("failed"')
+    expect(compile('src/pages/about.kay', [join(root, 'real/pages')])).toContain('KayFill("failed"')
+    expect(compile('real/pages/about.kay', [join(root, 'src/pages')])).toContain('KayFill("failed"')
+    expect(compile('src/components/about.kay', [join(root, 'src/pages')])).toContain('.kayFailed = KayFailed')
+  })
+
   it('reports a script value a component\'s own `@failed` reads, which the server does not have', () => {
     const compile = (script: string, block: string) => compileKay(`---\n${script}\n---\np.real\n@failed\n  ${block}\n`, 'src/components/card.kay', { output: 'html', check: true })
 
@@ -603,6 +634,30 @@ describe('a deferred server island, in the browser', () => {
     expect(held.querySelector<HTMLElement>('[data-kay-failure]')!.hidden).toBe(false)
     expect(events).toHaveLength(1)
     fetching.mockRestore()
+  })
+
+  it('gives a block island its clicks back when the swap of the fetched content faults', async () => {
+    const { events, fetching } = await deferred([new Response('<p>fresh</p>')])
+    const copy = '<slot inert><p class="stamp">built</p></slot><slot data-kay-failure role="alert" hidden><button type="button" data-kay-retry>Try again</button></slot>'
+
+    document.body.innerHTML = `<slot data-kay-server="0">${copy}</slot>`
+
+    const held = document.querySelector<FetchedIsland>('slot[data-kay-server]')!
+
+    held._$b = held.innerHTML
+    held.innerHTML = '<p>last render</p>'
+
+    try {
+      await expect(fetchServerIsland(held, () => {
+        throw new Error('dispose faulted')
+      }, mock())).rejects.toThrow('dispose faulted')
+      expect(held.innerHTML).toBe(held._$b)
+      expect(held.hasAttribute('inert')).toBe(false)
+      expect(events).toHaveLength(0)
+    }
+    finally {
+      fetching.mockRestore()
+    }
   })
 
   it('hides the `@failed` block again while a retry loads', async () => {

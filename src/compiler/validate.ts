@@ -597,7 +597,7 @@ class Validator {
     else if (failed) {
       visitNodes(failed.children, (node) => {
         if (node.kind === 'element' && serverIslandOf(node, this.src) !== undefined)
-          this.error(node.tag, '`@failed` holds a server island', { note: 'the block is rendered hidden with the server island, and nothing in it hydrates' })
+          this.error(node.tag, '`@failed` holds a server island', { note: 'the block is rendered hidden with the server island, and nothing in it hydrates', help: 'render it outside the block, or leave it out' })
       })
     }
   }

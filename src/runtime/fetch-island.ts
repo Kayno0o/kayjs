@@ -164,8 +164,13 @@ export async function fetchServerIsland(element: FetchedIsland, dispose: (root: 
       focused?.()
     }
     catch (error) {
-      if (held !== undefined)
+      if (held !== undefined) {
         element.innerHTML = held
+
+        // With a block the copy is inert on its own, so the island clicks again as it did before the wait.
+        if (element.querySelector(FAILURE) !== null)
+          element.removeAttribute('inert')
+      }
 
       throw error
     }

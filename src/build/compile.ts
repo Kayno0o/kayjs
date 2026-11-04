@@ -18,6 +18,7 @@ import { matcherFile } from '../server/params'
 import { refuseClashes } from '../server/route-table'
 import { extensionEditor, routeMounts, routeTrees, scanEndpoints, scanRoutes, specialPagesOf } from '../server/routes'
 import { installedDependencies, NOTICES_FILE, thirdPartyNotices } from './licenses'
+import { pageDirs } from './page-dirs'
 import { kay } from './plugin'
 import { withoutPlugins, withProjectPaths } from './runtime-config'
 import { withoutStyles } from './styles'
@@ -186,7 +187,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     // The production code of the app and its packages, as `NODE_ENV=production` gives a server started with Bun.
     define: { 'process.env.NODE_ENV': JSON.stringify('production') },
     // Stylesheets reach pages through the client build, already embedded.
-    plugins: [withoutStyles(), withoutCompiler(), compressedWasm(), kay({ target: 'ssr', root, cacheDir: paths.cache, settings: config.librarySettings, placeholder: config.images?.placeholder, embedMaps: true, rewrite }), ...config.plugins ?? []],
+    plugins: [withoutStyles(), withoutCompiler(), compressedWasm(), kay({ target: 'ssr', root, pages: pageDirs(root, config), cacheDir: paths.cache, settings: config.librarySettings, placeholder: config.images?.placeholder, embedMaps: true, rewrite }), ...config.plugins ?? []],
   })
 
   if (!build.success)

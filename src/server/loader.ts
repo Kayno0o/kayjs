@@ -144,7 +144,7 @@ export async function registerLoader(root: string, settings?: Record<string, str
     const project: Project = { root: at, prefixes: prefixesOf(at), settings: key, early: false, ready: Promise.resolve(), loads: [] }
 
     projects.set(at, project)
-    project.ready = register(project, chosen, config.images?.placeholder)
+    project.ready = register(project, chosen, config.images?.placeholder, (await import('../build/page-dirs')).pageDirs(root, config))
   }
 
   current = projects.get(at)
@@ -171,8 +171,8 @@ export async function registerEarlyLoader(root: string): Promise<void> {
   projects.get(resolve(root))!.early = true
 }
 
-async function register(project: Project, settings: Record<string, string>, placeholder: false | undefined): Promise<void> {
+async function register(project: Project, settings: Record<string, string>, placeholder: false | undefined, pages: readonly string[]): Promise<void> {
   const { kay } = await import('../build/plugin')
 
-  await plugin(scoped(project, kay({ target: 'ssr', root: project.root, cacheDir: projectPaths(project.root).cache, settings, placeholder, inspect: inspecting(), componentFiles: process.env.NODE_ENV === 'test' })))
+  await plugin(scoped(project, kay({ target: 'ssr', root: project.root, pages, cacheDir: projectPaths(project.root).cache, settings, placeholder, inspect: inspecting(), componentFiles: process.env.NODE_ENV === 'test' })))
 }

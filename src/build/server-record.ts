@@ -10,6 +10,7 @@ import { capturedLoads } from './captured-loads'
 import { serverParts } from './compile'
 import { KAY_MODULE, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { findKayLibraries, libraryOf, settingsReplacements } from './libraries'
+import { pageDirs } from './page-dirs'
 import { kay } from './plugin'
 import { splitEmbeddedMap } from './sourcemap'
 
@@ -49,7 +50,7 @@ export async function writeServerRecord(project: Project): Promise<void> {
   const settings = config.librarySettings ?? {}
   const placeholder = config.images?.placeholder
   const { modules } = await serverParts(project)
-  const { loads, modules: virtual, resolves } = await capturedLoads(kay({ target: 'ssr', root, cacheDir: paths.cache, settings, placeholder, embedMaps: true, mapName: file => file }))
+  const { loads, modules: virtual, resolves } = await capturedLoads(kay({ target: 'ssr', root, pages: pageDirs(root, config), cacheDir: paths.cache, settings, placeholder, embedMaps: true, mapName: file => file }))
   const libraries = await findKayLibraries(root)
   const replaced = settingsReplacements(root, settings).flatMap(({ paths: found }) => found.map(path => realpathSync(path)))
   const files: ServerRecord['files'] = {}
