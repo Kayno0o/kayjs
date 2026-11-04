@@ -180,11 +180,11 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         await ready()
 
         const failing = /kay_island=1/
-        const done = page.waitForResponse(`${path('/deferred')}?kay_island=1`)
 
-        await page.route(failing, async request => request.fulfill({ status: 500, headers: { 'content-type': 'text/html' }, body: '' }))
+        // A 404 is not asked again, so the island fails for good at the first answer.
+        await page.route(failing, async request => request.fulfill({ status: 404, headers: { 'content-type': 'text/html' }, body: '' }))
         await page.click('slot[data-kay-server="0"] button.send')
-        await done
+        await page.waitUntil(() => document.querySelector('slot[data-kay-server="1"][data-kay-failed]') !== null)
         await settled(page)
         await page.unroute(failing)
 

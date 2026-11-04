@@ -262,7 +262,7 @@ export const ERRORS = {
   'export-server-render': {
     group: 'export',
     summary: 'A page with something only a server renders per request: a server island, a form stamp or work challenge, a live value, a deferred island with no browser entry.',
-    fix: { file: 'llms/prerendering.md', heading: 'Server islands' },
+    fix: { file: 'llms/server-islands.md', heading: 'Server islands' },
   },
   'export-guard': {
     group: 'export',

@@ -50,7 +50,7 @@ function announce(element: HTMLElement, type: string, detail: object): void {
 }
 
 // A deferred server island rendered for this visitor in place of the inert copy standing in for it, asked again after a failure and a wait; resolves false when it failed for good or was aborted, true once the content is in.
-// A failure leaves the inert copy (or, for one a page swap held, the last render), marks the island `data-kay-failed` and dispatches `kay:server-island-error` with an `ApiError` and a `retry()`; success dispatches `kay:server-island`. `aria-busy` is set while it loads.
+// A failure for good leaves the inert copy (one a page swap held, shown inert with its last render while asked again, gets its inert copy back), marks the island `data-kay-failed` and dispatches `kay:server-island-error` with an `ApiError` and a `retry()`; success dispatches `kay:server-island`. `aria-busy` is set while it loads.
 // `dispose` ends the islands of the copy it replaces, which may have hydrated; an island taken out of the document (a page swap) aborts the request.
 export async function fetchServerIsland(element: FetchedIsland, dispose: (root: ParentNode) => void, retry: () => void): Promise<boolean> {
   const controller = new AbortController()
@@ -90,6 +90,9 @@ export async function fetchServerIsland(element: FetchedIsland, dispose: (root: 
     }
     catch (error) {
       if (!signal.aborted) {
+        if (held !== undefined)
+          element.innerHTML = held
+
         element.setAttribute('data-kay-failed', '')
         // Written out rather than through kayLog, whose import would hoist log.ts into every page's eager chunk.
         console.warn(`[kay] the server island ${element.dataset.kayServer} of ${location.pathname} was not loaded`, error)
