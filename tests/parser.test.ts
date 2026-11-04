@@ -300,6 +300,11 @@ describe('elements', () => {
     expect(diagnosticsAt(source, 40)).toEqual([[keyword, `\`${keyword}\` is pug syntax kay does not have`.slice(0, 40)]])
   })
 
+
+  it('reads a backslash before a brace in a quoted attribute as the brace', () => {
+    expect(element(parse('a(title="Hi \\{name} {x}")').template[0]).attributes[0]).toMatchObject({ kind: 'static', text: 'Hi {name} {x}' })
+  })
+
   it('leaves pug words inside text alone and points `each` at `for`', () => {
     expect(parse('each x in xs\n  p {x}').diagnostics[0]?.help).toBe('kay loops with `for item of list`')
     expect(diagnosticsAt('blockquote each one\np while\n')).toEqual([])

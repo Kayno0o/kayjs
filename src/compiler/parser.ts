@@ -71,6 +71,9 @@ const PUG_HINTS: Record<string, string> = {
   mixin: 'kay reuses markup through a component: import a `.kay` file and use its tag, or declare a `snippet` for markup used in one file',
   doctype: 'kay writes the doctype of every page itself',
 }
+
+// `\{name}` in a quoted attribute value, a literal brace that `brace-in-attribute` leaves alone.
+const ESCAPED_BRACE = /\\\{(?=[a-z_$])/gi
 // `then list` closing the `await` line, or a bare `then`.
 const INLINE_THEN = /\s+then(?:\s+([a-z_$][\w$]*))?\s*$/d
 const BRANCH_NAME = /[a-z_$][\w$]*/iy
@@ -311,6 +314,7 @@ class TemplateParser {
     [keyword('then|catch'), 'tc', (parser, indent, siblings, head) => parser.attachAwaitBranch(indent, siblings.at(-1), head[0] as 'then' | 'catch')],
     [keyword('else[ \\t]+if|else'), 'e', (parser, indent, siblings, head) => parser.attachElse(indent, siblings.at(-1), head[0] !== 'else')],
     [PUG_KEYWORD, 'ewucibmd', (parser, indent, _, head) => parser.skipLine(indent, { length: head[0].length, message: `\`${head[0]}\` is pug syntax kay does not have`, help: PUG_HINTS[head[0]] })],
+
     [keyword('snippet'), 's', (parser, indent, siblings) => {
       const node = parser.parseSnippet(indent)
 
@@ -1268,7 +1272,7 @@ class TemplateParser {
 
       this.pos = end + 1
 
-      return { kind: 'static', name, value, text: spansLines && text.includes('\n') ? text.trim().replaceAll(WHITESPACE_RUN, ' ') : text }
+      return { kind: 'static', name, value, text: (spansLines && text.includes('\n') ? text.trim().replaceAll(WHITESPACE_RUN, ' ') : text).replaceAll(ESCAPED_BRACE, '{') }
     }
 
     if (quote === '{') {

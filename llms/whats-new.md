@@ -21,6 +21,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `relativeTime` in `kay/i18n` takes its options as a function too, read at each tick: [locales](locales.md).
 - `queryParam` and a `persisted` signal kept in the query take `history: 'push'`, adding a history entry per write that Back and Forward step through: [state](islands-state-to-ids.md).
 - `persisted` calls of one name share one signal in a page and follow other tabs (`storage` event, BroadcastChannel), `sync: false` opts out: [state](islands-state-to-ids.md).
+- The `brace-in-attribute` lint finds `title="Hello {name}"`, a quoted attribute that ships its braces as written, and `kay check --fix` writes `title={name}` or a template literal; `\{` keeps a literal brace: [lints](lints.md).
 
 ## 1.88.0
 

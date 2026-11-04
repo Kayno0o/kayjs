@@ -1,4 +1,4 @@
-import type { Diagnostic, ForNode, KayFile, Node, TextChunk } from './ast'
+import type { Diagnostic, ElementNode, ForNode, KayFile, Node, TextChunk } from './ast'
 import { accessibilityLints } from './a11y'
 import { keyedByPosition, someNode, walkNodes } from './ast'
 import { positionAt } from './mapping'
@@ -363,6 +363,15 @@ export const LINTS = {
     summary: 'Template text holding what reads as an HTML tag: kay escapes text, so readers see the tag as written rather than the element.',
     wrong: 'p Press <kbd>Ctrl</kbd> K to search',
     right: 'p Press #[kbd Ctrl] K to search',
+  },
+  'brace-in-attribute': {
+    level: 'warn',
+    group: 'code',
+    // eslint-disable-next-line no-template-curly-in-string
+    summary: 'A quoted attribute value holding `{name}`: only text interpolates, so the braces ship as written. `{name}` or a template literal, `title={`Hello ${name}`}`, is the attribute that reads the value; `\\{` keeps a literal brace. `kay check --fix` writes it.',
+    wrong: '---\nconst { name } = props<{ name: string }>()\n---\na(href="/users" title="Hello {name}") Profile',
+    // eslint-disable-next-line no-template-curly-in-string
+    right: '---\nconst { name } = props<{ name: string }>()\n---\na(href="/users" title={`Hello ${name}`}) Profile',
   },
   'unguarded-route': {
     level: 'deny',
@@ -793,6 +802,10 @@ const MINOR = /^(\d+)\.(\d+)(?:\.\d+)?$/
 const IDENTIFIER = /^[a-z_$][\w$]*$/i
 // An opening, closing or self-closing tag, with what it holds after its name.
 const TAG = /<(\/?)([a-z][a-z\d]*)(?=[\s/>])([^<>]*)>/gi
+// `{name}`, `{user.name}` or `{count(1)}` inside a quoted attribute value, not after a backslash.
+const BRACED = /(?<!\\)\{([a-z_$][\w$]*(?:\??\.[\w$]+)*(?:\([^(){}]*\))?)\}/gi
+// What a template literal would read differently than the attribute text does.
+const UNQUOTABLE = /[`\\&]|\$\{/
 const SELF_CLOSING = /\s*\/$/
 // What `#[...]` cannot hold as written: another tag, or a bracket ending it early.
 const INLINE_UNSAFE = /[[\]<]/
@@ -943,6 +956,8 @@ export function templateLints(file: KayFile): Diagnostic[] {
       }
     }
     else if (node.kind === 'element') {
+      bracesInAttributes(file.source, node, found)
+
       return literal || LITERAL_TEXT.has(node.name)
     }
     else if (node.kind === 'for') {
@@ -956,6 +971,36 @@ export function templateLints(file: KayFile): Diagnostic[] {
   })
 
   return [...found, ...accessibilityLints(file)]
+}
+
+// `title="Hello {name}"`: a quoted value is literal, so the braces would reach the page.
+function bracesInAttributes(source: string, element: ElementNode, found: Diagnostic[]) {
+  for (const attribute of element.attributes) {
+    if (attribute.kind !== 'static')
+      continue
+
+    const text = source.slice(attribute.value.start, attribute.value.end)
+    const first = text.matchAll(BRACED).next().value
+
+    if (!first)
+      continue
+
+    const whole = first[0] === text
+    const replacement = whole ? `{${first[1]}}` : `{\`${text.replaceAll(BRACED, (_, expression: string) => `\${${expression}}`)}\`}`
+    const start = attribute.value.start - 1
+    const end = attribute.value.end + 1
+
+    found.push({
+      start: attribute.value.start + first.index,
+      end: attribute.value.start + first.index + first[0].length,
+      code: 'brace-in-attribute',
+      message: `\`${first[0]}\` in a quoted attribute shows as written, not as the value`,
+      note: 'only template text interpolates; a quoted attribute value is a literal string',
+      help: `write the attribute as ${whole || !UNQUOTABLE.test(text) ? `\`${source.slice(attribute.name.start, attribute.name.end)}=${replacement}\`` : 'an expression, `{`...`}` with a template literal'}, or \`\\{\` for a literal brace`,
+      ...whole || !UNQUOTABLE.test(text) ? { fixes: [{ title: `Write \`${replacement}\``, safe: true, edits: [{ start, end, text: replacement }] }] } : {},
+      checkOnly: true,
+    })
+  }
 }
 
 // `<kbd>Ctrl</kbd>` in text; `&lt;kbd&gt;` is the tag meant as written, and `Array<string>` names no element.

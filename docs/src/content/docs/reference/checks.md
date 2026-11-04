@@ -87,6 +87,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unreturned-fail` | warn | code | A `ctx.fail(...)` in an action's handler that is not returned, so it does nothing |
 | `missing-captcha` | warn | forms | A kayjs-auth call that asks a CAPTCHA by default (`password.register`, `password.requestReset`, `magicLink.request`, `password.signIn`) written with no `captcha` option, unless a module's `createAuth` sets `captcha: false`, which silences it project-wide, in the editor too |
 | `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
+| `brace-in-attribute` | warn | code | A quoted attribute value holding `{name}`, which ships as written: write `title={name}` or a template literal |
 | `over-budget` | warn | code | A page loading more JavaScript, CSS or weight than `budget` allows, or with a worse EcoIndex grade |
 | `uncaught-await` | warn | code | An `await` block with no `catch` and no `try` around it |
 | `public-env-outside-src` | warn | code | An `s.Public` field in a `.ts` file outside `src`, which kay does not read, so an island types it as a string |

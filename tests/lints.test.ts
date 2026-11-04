@@ -718,6 +718,34 @@ describe('uncaught-await', () => {
   })
 })
 
+describe('brace-in-attribute', () => {
+  const head = '---\nconst name = "a"\nconst user = { name: "a" }\n---\n'
+
+  it('reports a quoted attribute holding a braced name, a path or a call', () => {
+    expect(lints(`${head}a(href="/x" title="Hello {name}" alt="{user.name}" data-x="{user.name.slice(1)}") go\nCard(title="Hi {name}")\n`)).toEqual([
+      { code: 'brace-in-attribute', severity: 'warning', at: '{name}' },
+      { code: 'brace-in-attribute', severity: 'warning', at: '{user.name}' },
+      { code: 'brace-in-attribute', severity: 'warning', at: '{user.name.slice(1)}' },
+      { code: 'brace-in-attribute', severity: 'warning', at: '{name}' },
+    ])
+  })
+
+  it('leaves an escaped brace, JSON, an object, an expression attribute and element text alone', () => {
+    expect(lints(`${head}a(title="Hello \\{name}" data-x='{"a":1}' x-data="{ open: false }" y="{open: false}" z={name}) {name}\n`)).toEqual([])
+  })
+
+  it('writes the expression for a value that is all braces and a template literal for mixed text', () => {
+    expect(fixed(`${head}a(title="{name}") go\na(title="Hello {name}, {user.name}") go\n`)).toEqual([
+      `${head}a(title={name}) go\na(title="Hello {name}, {user.name}") go\n`,
+      `${head}a(title="{name}") go\na(title={\`Hello \${name}, \${user.name}\`}) go\n`,
+    ])
+  })
+
+  it('offers no fix where a template literal would read the text differently', () => {
+    expect(fixed(`${head}a(title="Tom &amp; {name}") go\na(title="a\`b {name}") go\n`)).toEqual([])
+  })
+})
+
 describe('literal-tag', () => {
   it('reports an HTML tag written in template text, a pair once, a closing tag left alone too', () => {
     expect(lints('p Press <kbd>Ctrl</kbd> K\n| Line<br>next\np(title="a") <em>a <b>b</b></em> </p>\n')).toEqual([
