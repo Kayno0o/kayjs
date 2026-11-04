@@ -8,6 +8,7 @@ import { dependenciesOnly } from '../scripts/dependency-change'
 import { librariesToTest, libraryDependencies } from '../scripts/library-dependents'
 import { addedMarkers } from '../scripts/merge-markers'
 import { FIXTURE_WALK, FIXTURE_WALKERS, READERS, readersOf, SOURCE_CHANGE, SOURCE_FILE_READ, SOURCE_FILE_READERS, SOURCE_READERS, SOURCE_SCAN, sourcesRead, UI_THEME_USE, WHOLE_SUITE } from '../scripts/source-readers'
+import { stepCommand } from '../scripts/step-command'
 import { subprocessTests } from '../scripts/subprocess-tests'
 import { scratchDir } from './scratch'
 
@@ -48,6 +49,26 @@ async function branch(work: string, name: string, change: (text: string) => stri
 
   await git(work, 'commit', '-qam', name)
 }
+
+describe('the command of a landing step', () => {
+  const both = (name: string) => `/usr/bin/${name}`
+  const only = (found: string) => (name: string) => name === found ? `/usr/bin/${name}` : null
+
+  it('runs behind slot and under nice when both are installed', () => {
+    expect(stepCommand(['bun', 'run', 'lint'], both, {})).toEqual(['slot', '--', 'nice', '-n', '10', 'bun', 'run', 'lint'])
+  })
+
+  it('leaves out what the host lacks', () => {
+    expect(stepCommand(['bun', 'test'], only('nice'), {})).toEqual(['nice', '-n', '10', 'bun', 'test'])
+    expect(stepCommand(['bun', 'test'], only('slot'), {})).toEqual(['slot', '--', 'bun', 'test'])
+    expect(stepCommand(['bun', 'test'], () => null, {})).toEqual(['bun', 'test'])
+  })
+
+  it('takes KAY_LAND_NICE as the niceness and KAY_LAND_SLOT=0 or KAY_LAND_NICE=0 as off', () => {
+    expect(stepCommand(['bun', 'test'], both, { KAY_LAND_NICE: '5' })).toEqual(['slot', '--', 'nice', '-n', '5', 'bun', 'test'])
+    expect(stepCommand(['bun', 'test'], both, { KAY_LAND_NICE: '0', KAY_LAND_SLOT: '0' })).toEqual(['bun', 'test'])
+  })
+})
 
 describe('merge markers', () => {
   it('finds an added marker line with its file and line, and nothing else', () => {

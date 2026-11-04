@@ -8,6 +8,7 @@ import { librariesToTest, libraryDependencies } from './library-dependents'
 import { addedMarkers } from './merge-markers'
 import { describeSamples, describeScope, sampleScope, scopeMemory } from './scope-memory'
 import { readersOf, WHOLE_SUITE } from './source-readers'
+import { stepCommand } from './step-command'
 import { subprocessTests } from './subprocess-tests'
 import { crashedWorkers, failedTests } from './test-failures'
 
@@ -111,7 +112,7 @@ async function step(label: string, argv: string[], cwd = '.') {
   await appendFile(LOG, `$ ${label}\n`)
 
   // Its stderr into its stdout, so one pipe keeps their lines in the order they were written, the shell's own included, which says why a command could not start.
-  const child = Bun.spawn(['sh', '-c', 'exec 2>&1; exec "$@"', 'sh', ...argv], { cwd, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit', detached: true })
+  const child = Bun.spawn(['sh', '-c', 'exec 2>&1; exec "$@"', 'sh', ...stepCommand(argv)], { cwd, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit', detached: true })
   let output = ''
   let hung = false
   const limit = setTimeout(() => {
