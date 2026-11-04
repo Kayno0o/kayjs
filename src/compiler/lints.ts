@@ -744,8 +744,8 @@ export const LINTS = {
   'deprecated-ui-props': {
     level: 'warn',
     group: 'deprecated',
-    since: '1.88',
-    summary: 'A kayjs-ui prop under its name before 1.88: `isDisabled` on a DateInput or DateRangeInput, the per-day predicate, is `disabledDay` now, so `disabled` alone is the boolean every other control takes. The old name works until 1.91. The fix renames the attribute.',
+    since: '1.89',
+    summary: 'A kayjs-ui prop under its name before 1.89: `isDisabled` on a DateInput or DateRangeInput, the per-day predicate, is `disabledDay` now, so `disabled` alone is the boolean every other control takes. The old name works until 1.92. The fix renames the attribute.',
     wrong: '---\nimport DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\n---\nDateInput(aria-label="Day" isDisabled={iso => iso.endsWith("-25")})',
     right: '---\nimport DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\n---\nDateInput(aria-label="Day" disabledDay={iso => iso.endsWith("-25")})',
   },
@@ -825,6 +825,7 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.84', removedIn: '1.88' },
   { since: '1.87' },
   { since: '1.88' },
+  { since: '1.89' },
 ]
 
 // The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.

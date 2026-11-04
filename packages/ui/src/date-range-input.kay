@@ -38,7 +38,7 @@ const { size = 'md', invalid, value = [null, null], min, max, firstDay, label, f
   disabled?: boolean | undefined
   // Whether a single day cannot be chosen, and the block drawing the inside of a day's button, as on a DateInput; both boxes share them.
   disabledDay?: ((iso: string) => boolean) | undefined
-  // The name `disabledDay` replaced in 1.88, which `kay upgrade` renames; it works until 1.91.
+  // The name `disabledDay` replaced in 1.89, which `kay upgrade` renames; it works until 1.92.
   isDisabled?: ((iso: string) => boolean) | undefined
   day?: Snippet<[iso: string, state: { selected: boolean, today: boolean, outside: boolean, disabled: boolean }]> | undefined
   // Shows the calendar of that box when the page sets it, and none for `false`; left out, the buttons, a click outside and Escape work on their own. `onOpenChange` reports each change, so a page driving `open` can set it back.

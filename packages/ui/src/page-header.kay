@@ -14,7 +14,7 @@ const look = recipe({
 })
 
 const { title, level = 1, meta, description, actions, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'title'> & {
-  // The page's one `h1`. A `@title` block draws markup inside it instead of the string.
+  // The page's title, its `h1` unless `level` says otherwise. A `@title` block draws markup inside it instead of the string.
   title: string | Snippet
   // The title's heading level, `1` by default; a header over a section of the page, not the page itself, passes the level under its own.
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined

@@ -509,3 +509,11 @@ test('a remote answer keeps its descriptions, which are plain data an action can
 
   expect(root.querySelector('[data-part="optionDescription"]')?.textContent).toBe('Ada · 1a2b3c4')
 })
+
+test('createLabel as a string fills {text}', async () => {
+  const { input, rows } = await combobox(PLANETS, undefined, true, { createLabel: 'Add {text}' })
+
+  type(input, 'Pluto')
+  await settle()
+  expect(rows()).toEqual(['Add Pluto'])
+})

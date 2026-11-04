@@ -23,7 +23,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - The French lives in `src/messages/fr.ts` of the package, declared by `"kay": { "messages": "./src/messages" }` in its package.json; an app overrides any key in its own `src/messages/fr.ts`, which lays over it key by key.
 - `kay check` leaves `ui.*` keys out of its comparison between locales, so a French block needs no English twin; a key a locale lacks reads the English.
 - A `*Label` prop is text: a string, or where the text depends on what it names (a count, a typed text, a row), a function of it, `createLabel(text)`, `resultsLabel(count)`, `selectedLabel(count)`, `removeLabel(index)`, `loadedLabel(count)`. A string fills the placeholders the English shows (`{count}`, `{text}`, `{n}`); markup goes in a block (Steps' `@step`), never in a `*Label`.
-- BellInbox's announcement is `ui.bellInbox.announce` and SubscribeForm's email label `ui.subscribeForm.label`; a catalog still wording `ui.bell.new` or `ui.subscribeForm.email` is read first until 1.91.
+- BellInbox's announcement is `ui.bellInbox.announce` and SubscribeForm's email label `ui.subscribeForm.label`; a catalog still wording `ui.bell.new` or `ui.subscribeForm.email` is read first until 1.92.
 - CommandPalette's `recentLabel` names the heading the recently followed links sit under.
 - ContributionGraph's month names and the day and month a LineChart draws on its axis follow the page's locale; `en` keeps `5 Jan`.
 - RangeInput's and DateRangeInput's `{label}` fill the messages of the same name.

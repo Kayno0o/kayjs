@@ -41,7 +41,7 @@ const { steps, current, url, done = [], param = 'step', label, doneLabel = wordi
   onSelect?: ((key: string) => unknown) | undefined
   // Draws a step in place of its `label`: `@step(step, state)`; the number, the state words and the link around it stay.
   step?: Snippet<[step: StepItem, state: 'current' | 'done' | 'upcoming']> | undefined
-  // The text of a step in place of its `label`, from the step and its state. A block drawing markup is `@step`; `@stepLabel` as a block works until 1.91.
+  // The text of a step in place of its `label`, from the step and its state. A block drawing markup is `@step`; `@stepLabel` as a block works until 1.92.
   stepLabel?: ((step: StepItem, state: 'current' | 'done' | 'upcoming') => string) | Snippet<[step: StepItem, state: 'current' | 'done' | 'upcoming']> | undefined
 }>()
 

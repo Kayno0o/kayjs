@@ -48,7 +48,7 @@ const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Cho
   unavailableLabel?: string | undefined
   // Whether a single day cannot be chosen, such as a closed day or a booked one: its button is disabled, the arrow keys skip it, a click cannot pick it, and a typed date it refuses is flagged as invalid and not reported to `onChange`, as one outside `min` and `max` is flagged. The earliest and latest date stay `min` and `max`.
   disabledDay?: ((iso: string) => boolean) | undefined
-  // The name `disabledDay` replaced in 1.88, which `kay upgrade` renames; it works until 1.91.
+  // The name `disabledDay` replaced in 1.89, which `kay upgrade` renames; it works until 1.92.
   isDisabled?: ((iso: string) => boolean) | undefined
   // Draws the inside of a day's button in place of its number, which the block writes itself (`{Number(iso.slice(8))}`), for a price or a dot under it; the button, its `aria-label` and the selection stay.
   day?: Snippet<[iso: string, state: { selected: boolean, today: boolean, outside: boolean, disabled: boolean }]> | undefined

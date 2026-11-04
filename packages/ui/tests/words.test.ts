@@ -6,7 +6,7 @@ const WORD = /\bwording\('ui\.([\w.]+)'/g
 const LISTED = /`ui\.(\w+)\.\*`: (.*)/g
 const PROP = /`(\w+)` \(/g
 
-// Keys read first for the apps whose catalogs still word them, until 1.91; the library words and lists their replacements.
+// Keys read first for the apps whose catalogs still word them, until 1.92; the library words and lists their replacements.
 const LEGACY = new Set(['bell.new', 'subscribeForm.email'])
 
 // Every `ui.*` key the components look up, from their sources.

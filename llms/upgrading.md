@@ -21,6 +21,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - A route whose `body`, `query`, `params` or `headers` refuses a request answers `{ errors, status: 422 }`, a message per field in the request's locale (the schema's own `error`, else the `kay.invalid.*` text), where Elysia's `{ type: 'validation', ... }` body went before. A client parsing that body (`type`, `on`, `found`, `errors[].path`) reads `errors` instead; `ApiError.errors` of `call()` reads it already.
 - `kay check` cannot see a client's parsing, so `api({ errorShape: 'elysia' })` keeps the old body on a module until 1.90, when the option goes.
 - The island client no longer reads Elysia's validation body into `ApiError.errors`: a route kept on `errorShape: 'elysia'` gives `errors['']` with its message.
+### kayjs-ui: DateInput and DateRangeInput `isDisabled` is `disabledDay`
+
+- The per-day predicate keeps the bare-adjective `disabled` for the boolean that disables the whole input. `isDisabled={iso => closed.has(iso)}` is `disabledDay={iso => closed.has(iso)}`; the old name works until 1.92 and `kay check` flags it as `deprecated-ui-props`, with a safe fix that `kay upgrade` applies.
 
 ## 1.88.0
 
@@ -78,9 +81,6 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - kayjs-auth's mail `maxAge` is `{ link: '24h', code: '10m' }`: `lifetime(value, locale)` and `durationWords(value, locale)` take both until 1.91, and `kay upgrade` writes a number literal as `'86400s'` (`deprecated-duration-seconds`). OAuth `expiresAt` (`OAuthTokens`, `StoredCredential`, the `exchange` result) is a `Date`: a custom provider returns `new Date(...)`.
 - kayjs-ai's provider `embed`, `speak` and `transcribe` get `timeout` as a `Duration`, not milliseconds.
 
-### kayjs-ui: DateInput and DateRangeInput `isDisabled` is `disabledDay`
-
-- The per-day predicate keeps the bare-adjective `disabled` for the boolean that disables the whole input. `isDisabled={iso => closed.has(iso)}` is `disabledDay={iso => closed.has(iso)}`; the old name works until 1.91 and `kay check` flags it as `deprecated-ui-props`, with a safe fix that `kay upgrade` applies.
 
 ## 1.87.0
 
