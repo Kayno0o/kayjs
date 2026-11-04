@@ -2154,7 +2154,7 @@ interface AsyncRows<Row>
   failed: () => boolean
   loading: () => boolean
   retry: () => void
-  retryable: boolean
+  retryable: () => boolean
   rows: () => Row[]
 
 [./lib/source] AsyncRowsHooks

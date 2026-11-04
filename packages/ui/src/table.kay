@@ -29,16 +29,16 @@ const look = recipe({
     selection: 'sticky left-0 flex flex-wrap items-center gap-3 border-solid border-b-[length:var(--border-width)] border-border px-3 py-2 text-sm [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6',
     selected: 'm-0',
     bulk: 'flex flex-wrap items-center gap-2',
-    table: 'w-full border-collapse text-sm group-data-[narrow=stack]/table:[overflow-wrap:anywhere] @max-[30rem]/table:block',
+    table: 'aria-busy:opacity-60 w-full border-collapse text-sm group-data-[narrow=stack]/table:[overflow-wrap:anywhere] @max-[30rem]/table:block',
     // Below 30rem of width the rows of a stacked table become cards and its headers one row of sort buttons, the only part of the head that stays. Each card draws its own top line instead of the row's bottom border, so an app dropping the row borders of the wide table still sees the cards apart.
-    head: '@max-[30rem]/table:has-[[data-part=sortButton]]:block @max-[30rem]/table:group-data-virtual/table:sticky @max-[30rem]/table:group-data-virtual/table:top-0 @max-[30rem]/table:group-data-virtual/table:z-1 @max-[30rem]/table:group-data-virtual/table:bg-surface @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden',
+    head: '@max-[30rem]/table:has-[[data-part=sortButton]]:block @max-[30rem]/table:group-data-virtual/table:sticky @max-[30rem]/table:group-data-virtual/table:top-0 @max-[30rem]/table:group-data-virtual/table:z-2 @max-[30rem]/table:group-data-virtual/table:bg-surface @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden',
     headRow: '@max-[30rem]/table:flex @max-[30rem]/table:flex-wrap @max-[30rem]/table:gap-2 @max-[30rem]/table:border-solid @max-[30rem]/table:border-b-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
     body: '@max-[30rem]/table:block',
-    headCell: 'border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-accent aria-[sort=descending]:text-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:bg-surface @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden',
-    selectHead: 'border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-accent aria-[sort=descending]:text-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:bg-surface @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden w-0 @max-[30rem]/table:w-auto',
+    headCell: 'border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-accent aria-[sort=descending]:text-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:z-2 group-data-virtual/table:bg-surface @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden',
+    selectHead: 'border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-accent aria-[sort=descending]:text-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:z-2 group-data-virtual/table:bg-surface @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden w-0 @max-[30rem]/table:w-auto',
     selectText: 'sr-only',
     toggleHead: 'border-b border-border px-3 py-2 text-left text-xs w-0 @max-[30rem]/table:hidden',
-    toggleCell: 'relative z-1 px-3 py-1.5 w-0 @max-[30rem]/table:w-auto @max-[30rem]/table:col-span-full @max-[30rem]/table:px-0 @max-[30rem]/table:py-1',
+    toggleCell: 'px-3 py-1.5 w-0 @max-[30rem]/table:w-auto @max-[30rem]/table:col-span-full @max-[30rem]/table:px-0 @max-[30rem]/table:py-1',
     // The chevron turns over while the row is open.
     toggle: 'aria-expanded:[&_svg]:rotate-180',
     // The detail stands under its row across every column, and under its card in the narrow form.
@@ -46,10 +46,10 @@ const look = recipe({
     detailCell: 'px-3 py-3 text-foreground @max-[30rem]/table:block @max-[30rem]/table:px-3 @max-[30rem]/table:pt-0',
     sortButton: 'group/sort inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-inherit [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] @max-[30rem]/table:min-h-8 @max-[30rem]/table:border-solid @max-[30rem]/table:border-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-2 @max-[30rem]/table:py-0.5',
     sortIcon: 'size-3.5 group-data-[direction=asc]/sort:rotate-180',
-    row: 'border-b border-border @max-[30rem]/table:border-b-0 @max-[30rem]/table:[:is([data-part=row],[data-part=detailRow])+&]:border-t hover:bg-hover aria-selected:bg-hover data-linked:relative group-aria-busy/table:opacity-60 @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-[fit-content(40%)_minmax(0,1fr)] @max-[30rem]/table:gap-x-4 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
-    cell: '[&_a:not([data-part=rowLink])]:relative [&_a:not([data-part=rowLink])]:z-1 [&_button:not([data-part=rowButton])]:relative [&_button:not([data-part=rowButton])]:z-1 px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left',
+    row: 'border-b border-border @max-[30rem]/table:border-b-0 @max-[30rem]/table:[:is([data-part=row],[data-part=detailRow])+&]:border-t hover:bg-hover aria-selected:bg-hover data-linked:relative data-linked:isolate data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=rowLink],[data-part=rowButton])]:relative data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=rowLink],[data-part=rowButton])]:z-1 @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-[fit-content(40%)_minmax(0,1fr)] @max-[30rem]/table:gap-x-4 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
+    cell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left',
     // The box is 1rem, so its label grows to the 1.5rem a finger needs.
-    selectCell: 'relative z-1 px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-0 @max-[30rem]/table:w-auto [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6 [&_.kui-checkbox]:justify-center',
+    selectCell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-0 @max-[30rem]/table:w-auto [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6 [&_.kui-checkbox]:justify-center',
     // Outside a narrow table a cell holds its content alone: the column header names it.
     cellLabel: 'hidden @max-[30rem]/table:block @max-[30rem]/table:text-left [font-size:var(--text-2xs)] [line-height:var(--text-2xs--line-height)] [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     cellBody: 'contents @max-[30rem]/table:block @max-[30rem]/table:min-w-0 @max-[30rem]/table:[overflow-wrap:anywhere] @max-[30rem]/table:first:col-span-full',
@@ -61,7 +61,8 @@ const look = recipe({
     // A row that is a link or a button: the first cell holds an anchor or a button stretched over the whole row.
     rowLink: 'absolute inset-0 z-0 m-0 block h-full w-full cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
     rowButton: 'absolute inset-0 z-0 m-0 block h-full w-full cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-    failure: 'm-0 mb-2',
+    failure: 'flex flex-wrap items-center justify-center gap-3 px-3 py-4 text-sm',
+    message: 'm-0',
     // The rows standing for those a virtual table does not draw.
     spacer: '@max-[30rem]/table:block',
     emptyCell: 'px-3 py-8 text-center text-xs text-muted @max-[30rem]/table:block',
@@ -70,7 +71,7 @@ const look = recipe({
 
 const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, virtual = false, expandable = false, expanded, onToggle, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
   columns: Column<Row>[]
-  // The rows to draw: an array, a function returning them, or a promise of them. A function returning an array stays reactive and is drawn by the server; a promise, or a function returning one, loads in the browser with skeleton rows meanwhile, then a failure row with a retry (a function is called again) if it rejects. Left out when `list` holds them: one of the two is required.
+  // The rows to draw: an array, a function returning them, or a promise of them. An array is drawn by the server; a function is called in the browser only (it may touch `window`, and the server draws the skeleton), and so is a promise's answer, skeleton rows standing in meanwhile; a refresh keeps the rows shown, then a failure row with a retry (a function is called again) if it rejects. Left out when `list` holds them: one of the two is required.
   rows?: RowsSource<Row> | undefined
   // Rows loaded page by page, from `infiniteList`: the table draws its rows with `LoadMore` after them, and a header click sorts on the server, the list starting over from offset 0 with the sort passed to its `load` (and to `onSort` too). The columns to sort by carry a `sortValue` (`numeric` ones have it), which only marks them sortable here. The table's own sort, from `sort` or the URL, is sent to the list too. A sort restarts the list, so a selected row outside the first page leaves the selection. The list loads again from offset 0 when the table's sort differs from the `sort` the list was made with, on mount included, so give `infiniteList` the same `sort` the table starts from to keep the first page. `exportable` as `true` exports the rows loaded so far; give it an endpoint to export them all.
   list?: InfiniteList<Row> | undefined
@@ -308,6 +309,7 @@ const skeleton = () => waiting() && shown().length === 0
 const skeletonIndexes = () => Array.from({ length: Math.max(1, Math.floor(skeletonRows)) }, (_, index) => index)
 const skeletonCells = () => Array.from({ length: columnCount() }, (_, index) => index)
 const openLabel = (row: Row) => (openRowLabel ?? (item => wording('ui.table.openRow', 'Open {row}', { row: rowLabel(item, columns(), rowKey) })))(row)
+const broke = () => list ? list.failed() : source.failed()
 const linked = () => rowHref !== undefined || onRowClick !== undefined
 const sorting = (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key
 
@@ -378,11 +380,16 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
           div(part="bulk")
             | {bulk(chosen(), () => commit([]))}
       if exportable
-        if endpoint() as address
+        if (waiting() ? undefined : endpoint()) as address
           Button(href={exportHref(address, current(), filterParam ?? 'q', typed(), fieldsNow())} download={exportName} label={exportLabel} variant="ghost" size="sm")
         else
-          Button(label={exportLabel} variant="ghost" size="sm" onClick={download})
-  p(part="status" role="status") {skeleton() ? loadingLabel : ''}
+          Button(label={exportLabel} variant="ghost" size="sm" disabled={waiting()} onClick={endpoint() ? undefined : download})
+  p(part="status" role="status") {skeleton() && (!list || !list.pending()) ? loadingLabel : ''}
+  if source.failed()
+    div(part="failure" role="alert")
+      p(part="message") {failureLabel}
+      if source.retryable()
+        Button(label={retryLabel} variant="ghost" size="sm" onClick={source.retry})
   table(part="table" aria-busy={waiting() ? 'true' : undefined} aria-rowcount={virtual ? shown().length + 1 : undefined})
     thead(part="head")
       tr(part="headRow" aria-rowindex={virtual ? 1 : undefined})
@@ -416,11 +423,6 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 Checkbox(checked={chosenSet().has(rowKeyOf(row, rowKey))} aria-label={(selectRowLabel ?? (item => wording('ui.table.selectRow', 'Select {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} onChange={on => pick(rowKeyOf(row, rowKey), on)})
           for column, columnIndex of columns() key={column.key}
             td(part="cell" data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined})
-              if columnIndex === 0 && linked()
-                if rowHref?.(row) as href
-                  a(part="rowLink" href={href} aria-label={openLabel(row)} onClick={event => onRowClick?.(row, event)})
-                else if onRowClick
-                  button(part="rowButton" type="button" aria-label={openLabel(row)} onClick={event => onRowClick?.(row, event)})
               if narrow === 'stack' && column.header
                 span(part="cellLabel") {column.header}
               div(part="cellBody")
@@ -428,28 +430,27 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                   | {cell(row, column)}
                 else
                   | {cellText(row, column)}
+              if columnIndex === 0 && linked()
+                if rowHref?.(row) as href
+                  a(part="rowLink" href={href} aria-label={openLabel(row)} onClick={event => onRowClick?.(row, event)})
+                else if onRowClick
+                  button(part="rowButton" type="button" aria-label={openLabel(row)} onClick={event => onRowClick?.(row, event)})
         if expandable && detail && openSet().has(rowKeyOf(row, rowKey))
           tr(part="detailRow" id={detailId(row)})
             td(part="detailCell" colspan={columnCount()})
               | {detail(row)}
       else
-        if source.failed()
-          tr(part="failureRow")
-            td(part="emptyCell" colspan={columnCount()} role="alert")
-              p(part="failure") {failureLabel}
-              if source.retryable
-                Button(label={retryLabel} variant="ghost" size="sm" onClick={source.retry})
-        else if skeleton()
+        if skeleton()
           for index of skeletonIndexes() key={index}
             tr(part="skeletonRow" aria-hidden="true")
               for cellIndex of skeletonCells() key={cellIndex}
                 td(part="skeletonCell")
                   span(part="skeletonBar")
-        else if (list ? filtering() : rows().length > 0) && noMatch
+        else if !broke() && (list ? filtering() : rows().length > 0) && noMatch
           tr
             td(part="emptyCell" colspan={columnCount()})
               | {noMatch}
-        else if empty
+        else if empty && !broke()
           tr
             td(part="emptyCell" colspan={columnCount()})
               | {empty}

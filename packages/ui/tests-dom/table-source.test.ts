@@ -96,10 +96,18 @@ describe('Table rows from a source', () => {
     quiet.mockRestore()
   })
 
-  test('keeps a synchronous function reactive and draws it at once', async () => {
-    mounted = await mountComponent(Table, { columns: COLUMNS, rows: () => PLANETS, rowKey: 'id' })
+  test('calls a function that answers an array in the browser, onLoad hearing it', async () => {
+    const calls: number[] = []
+
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: () => {
+      calls.push(1)
+
+      return PLANETS
+    }, rowKey: 'id', onLoad: (rows: Planet[]) => calls.push(rows.length) })
+    await settle()
 
     expect(names(mounted.root)).toEqual(['Mars', 'Earth'])
+    expect(calls).toEqual([1, 2])
     expect(skeletons(mounted.root)).toBe(0)
   })
 
@@ -231,5 +239,117 @@ describe('Table over a list', () => {
 
     expect(skeletons(mounted.root)).toBe(0)
     expect(names(mounted.root)).toEqual(['Mars', 'Earth'])
+  })
+
+  test('a failed first page shows LoadMore\'s alert alone, without the empty block, and one loading status', async () => {
+    const quiet = spyOn(console, 'error').mockImplementation(() => undefined)
+    const feed = infiniteList<Planet>([], { pageSize: 2, load: async () => {
+      throw new Error('down')
+    } })
+
+    mounted = await mountComponent(Table, { columns: [{ key: 'name', header: 'Name', sortValue: true }], list: feed, rowKey: 'id', sort: { key: 'name', direction: 'asc' } })
+    await settle()
+
+    expect(mounted.root.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    expect(mounted.root.querySelector('[data-part="emptyCell"]')).toBeNull()
+    expect(skeletons(mounted.root)).toBe(0)
+    quiet.mockRestore()
+  })
+})
+
+describe('Table source races and refreshes', () => {
+  test('a slow older answer never lands over a newer one, retry racing included', async () => {
+    const quiet = spyOn(console, 'error').mockImplementation(() => undefined)
+    const waits = [deferred<Planet[]>(), deferred<Planet[]>()]
+    const loaded: number[] = []
+    let call = 0
+
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: async () => waits[call++]!.promise, rowKey: 'id', onLoad: (rows: Planet[]) => loaded.push(rows.length) })
+    await settle()
+
+    waits[0]!.reject(new Error('first failed'))
+    await settle()
+
+    expect(mounted.root.querySelector('[role="alert"]')).not.toBeNull()
+
+    click(mounted.root.querySelector('[role="alert"] button'))
+    await settle()
+    waits[1]!.resolve(PLANETS)
+    await settle()
+
+    expect(names(mounted.root)).toEqual(['Mars', 'Earth'])
+    expect(mounted.root.querySelector('[role="alert"]')).toBeNull()
+    expect(loaded).toEqual([2])
+    quiet.mockRestore()
+  })
+
+  test('an older promise resolving after the app passed a newer one is dropped', async () => {
+    const slow = deferred<Planet[]>()
+    const fast = deferred<Planet[]>()
+
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: slow.promise, rowKey: 'id' })
+    await mounted.setProps({ rows: fast.promise })
+    fast.resolve([{ id: 9, name: 'Pluto' }])
+    await settle()
+    slow.resolve(PLANETS)
+    await settle()
+
+    expect(names(mounted.root)).toEqual(['Pluto'])
+  })
+
+  test('an array replacing a pending promise draws at once and the promise is dropped', async () => {
+    const wait = deferred<Planet[]>()
+
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: wait.promise, rowKey: 'id' })
+    expect(skeletons(mounted.root)).toBe(5)
+
+    await mounted.setProps({ rows: [{ id: 5, name: 'Mercury' }] })
+    wait.resolve(PLANETS)
+    await settle()
+
+    expect(skeletons(mounted.root)).toBe(0)
+    expect(names(mounted.root)).toEqual(['Mercury'])
+  })
+
+  test('a refresh keeps the rows shown and dims them, and a failed refresh keeps them beside the failure with its retry', async () => {
+    const quiet = spyOn(console, 'error').mockImplementation(() => undefined)
+    const refresh = deferred<Planet[]>()
+
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: () => PLANETS, rowKey: 'id' })
+    await settle()
+    await mounted.setProps({ rows: async () => refresh.promise })
+
+    const table = mounted.root.querySelector('table')!
+
+    expect(table.getAttribute('aria-busy')).toBe('true')
+    expect(table.className).toContain('aria-busy:opacity-60')
+    expect(names(mounted.root)).toEqual(['Mars', 'Earth'])
+    expect(skeletons(mounted.root)).toBe(0)
+
+    refresh.reject(new Error('down'))
+    await settle()
+
+    expect(names(mounted.root)).toEqual(['Mars', 'Earth'])
+    expect(mounted.root.querySelector('[role="alert"] button')).not.toBeNull()
+    expect(mounted.root.querySelector('[data-part="emptyCell"]')).toBeNull()
+    quiet.mockRestore()
+  })
+
+  test('the export button is disabled while the rows are on their way', async () => {
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: [], rowKey: 'id', exportable: true, busy: true })
+
+    expect(mounted.root.querySelector('[data-part="selection"] button')?.hasAttribute('disabled')).toBe(true)
+  })
+
+  test('a linked row only raises its own controls: no row link, no raising', async () => {
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: PLANETS, rowKey: 'id' })
+    const plain = mounted.root.querySelector('[data-part="row"]')?.className ?? ''
+
+    mounted.unmount()
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: PLANETS, rowKey: 'id', rowHref: () => '/x' })
+
+    expect(plain).toContain('data-linked:isolate')
+    expect(mounted.root.querySelector('[data-part="row"]')?.hasAttribute('data-linked')).toBe(true)
+    expect(mounted.root.querySelector('[data-part="cell"]')?.className).not.toContain('z-1')
   })
 })

@@ -13,18 +13,19 @@ const look = recipe({
   parts: {
     root: 'kui-virtual-list',
     // An item that is a link or a button: the anchor or the button is stretched over it, the links and buttons the item draws sitting above.
-    item: 'data-linked:relative [&_a:not([data-part=itemLink])]:relative [&_a:not([data-part=itemLink])]:z-1 [&_button:not([data-part=itemButton])]:relative [&_button:not([data-part=itemButton])]:z-1',
+    item: 'data-linked:relative data-linked:isolate data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=itemLink],[data-part=itemButton])]:relative data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=itemLink],[data-part=itemButton])]:z-1',
     itemLink: 'absolute inset-0 z-0 m-0 block h-full w-full cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
     itemButton: 'absolute inset-0 z-0 m-0 block h-full w-full cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
     skeleton: 'px-3 py-2.5',
     skeletonBar: 'block h-[1em] w-full animate-pulse bg-surface-strong motion-reduce:animate-none',
     status: 'sr-only',
-    failure: 'px-3 py-4 text-center',
+    failure: 'flex flex-wrap items-center justify-center gap-3 px-3 py-4 text-sm',
+    message: 'm-0',
   },
 })
 
 const { items: given, list: source, item, itemKey, estimate = 48, overscan = 4, label, busy = false, skeletonItems = 5, loadingLabel = wording('ui.virtualList.loading', 'Loading…'), failureLabel = wording('ui.virtualList.failure', 'Could not load the items.'), retryLabel = wording('ui.virtualList.retry', 'Try again'), onLoad, onError, itemHref, onItemClick, itemLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'tabindex' | 'onLoad' | 'onError'> & {
-  // The items to draw: an array, a function returning them, or a promise of them. A function returning an array stays reactive and is drawn by the server; a promise, or a function returning one, loads in the browser with skeleton items meanwhile, then a failure with a retry (a function is called again) if it rejects. Left out when `list` holds them: one of the two is required.
+  // The items to draw: an array, a function returning them, or a promise of them. An array is drawn by the server; a function is called in the browser only (it may touch `window`, and the server draws the skeleton), and so is a promise's answer, skeleton items standing in meanwhile; a refresh keeps the items shown, then a failure with a retry (a function is called again) if it rejects. Left out when `list` holds them: one of the two is required.
   items?: RowsSource<Item> | undefined
   // Items loaded page by page, from `infiniteList`: `LoadMore` follows the rows inside the box, loading the next page as the reader nears the end and showing a failed page's alert with its retry.
   list?: InfiniteList<Item> | undefined
@@ -79,25 +80,26 @@ onMount(() => {
 ---
 // Only the rows in view are drawn, between two stretches of room standing for the others. The box takes the focus to scroll by keyboard; find-in-page sees the drawn rows alone, and a focused row that scrolls out of the window is gone with its focus.
 div(part="root" {...rest} ref={element => box = element} role="list" tabindex="0" aria-label={label} aria-busy={waiting() ? 'true' : undefined})
-  p(part="status" role="status") {skeleton() ? loadingLabel : ''}
   if loaded.failed()
-    div(part="failure" role="alert")
-      p(part="message") {failureLabel}
-      if loaded.retryable
-        Button(label={retryLabel} variant="ghost" size="sm" onClick={loaded.retry})
+    div(part="failureItem" role="listitem")
+      div(part="failure" role="alert")
+        p(part="message") {failureLabel}
+        if loaded.retryable()
+          Button(label={retryLabel} variant="ghost" size="sm" onClick={loaded.retry})
   if skeleton()
-    div(part="skeletons" role="presentation")
+    div(part="skeletons" role="listitem")
+      p(part="status" role="status") {loadingLabel}
       for index of skeletonIndexes() key={index}
         div(part="skeleton" aria-hidden="true")
           span(part="skeletonBar")
   div(part="content" ref={element => content = element} role="presentation" style={`padding-block: ${list.before()}px ${list.after()}px`})
     for entry of entries() key={keyOf(entry.row, entry.index)}
       div(part="item" role="listitem" data-linked={linked() ? '' : undefined} data-virtual-index={entry.index} aria-posinset={entry.index + 1} aria-setsize={list.count()})
+        | {item(entry.row, entry.index)}
         if linked()
           if itemHref?.(entry.row, entry.index) as href
             a(part="itemLink" href={href} aria-label={openLabel(entry.row, entry.index)} onClick={event => onItemClick?.(entry.row, entry.index, event)})
           else if onItemClick
             button(part="itemButton" type="button" aria-label={openLabel(entry.row, entry.index)} onClick={event => onItemClick?.(entry.row, entry.index, event)})
-        | {item(entry.row, entry.index)}
   if source
     LoadMore(list={source})
