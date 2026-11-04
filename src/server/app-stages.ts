@@ -273,8 +273,8 @@ function hostsToAnswer(security: SecurityConfig | false | undefined, site: strin
 }
 
 // Who the request is from and whether it may come: the proxy it came through, the server's own mark, the proxy key, the hosts, then the security headers on every answer.
-export function trustRequests({ app, env, options, served, security, filePaths, setup, mcpAt, mcpKey, metrics, log }: Boot): void {
-  const healthPath = options.health === false ? undefined : options.health?.path ?? HEALTH_PATH
+export function trustRequests({ app, env, options, served, security, filePaths, setup, mcpAt, mcpKey, metrics, log, health }: Boot): void {
+  const healthPath = health?.path
 
   setRequestIdHeader(options.observe?.requestIdHeader)
   trustProxy(app, options.proxy)
@@ -328,11 +328,11 @@ export function compressAnswers({ app, env, options, setup: { client }, compress
 }
 
 // kay's own messages go out whether requests are logged or not; one line per request when they are.
-export function logAnswers({ app, options, log }: Boot): void {
+export function logAnswers({ app, options, log, health }: Boot): void {
   useLogger(typeof log === 'boolean' || log)
 
   if (log !== false)
-    logRequests(app, log, options.health === false ? undefined : options.health?.path ?? HEALTH_PATH, kayApiPrefixes(options.extensions))
+    logRequests(app, log, health?.path, kayApiPrefixes(options.extensions))
 }
 
 // The app's rewrite, with the API paths a library moved; returns the mounts it reads, which the API modules fill once they are served.
