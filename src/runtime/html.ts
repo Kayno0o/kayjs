@@ -461,7 +461,8 @@ const POSTING_ATTRIBUTE = /\s(?:name|action|formaction)="[^"]*"/g
 // A component the server renders per request inside a prerendered page: spliced into it for `inline`, fetched by the browser on approach for `defer`.
 // Outside a page looking for them, as when the whole page renders per request, it renders as any component does.
 // `noscript` is the text of a link to the page with a deferred island in place, for a browser without JavaScript.
-export function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: ServerIslandMode, noscript?: unknown): unknown {
+// `failed` is the use's `@failed` block, else the component's own (`kayFailed`, which a component declaring one carries): a deferred island holds it hidden, for the browser to show when the island fails for good.
+export function serverIsland<P>(fn: ((props: P) => unknown) & { kayFailed?: () => unknown }, props: P, mode: ServerIslandMode, noscript?: unknown, failed?: () => unknown): unknown {
   const state = islands
 
   if (!state || state.inside > 0)
@@ -495,7 +496,11 @@ export function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: Serve
   state.modes.push(mode)
 
   // The copy a deferred island shows until the browser fetches its own has its size, inert and with nothing it could post, as what it holds is from the build.
-  const placeholder = mode === 'defer' ? `<slot data-kay-server="${index}" inert>${html.replace(POSTING_TAG, tag => tag.replace(POSTING_ATTRIBUTE, ''))}</slot>${noscript == null ? '' : `<noscript><a href="?${ISLAND_PARAM}" rel="nofollow">${child(noscript)}</a></noscript>`}` : ''
+  const inert = mode === 'defer' ? html.replace(POSTING_TAG, tag => tag.replace(POSTING_ATTRIBUTE, '')) : ''
+  const block = mode === 'defer' ? failed ?? fn.kayFailed : undefined
+  // A failed block cannot sit inside an inert island, whose button would not click, so the copy is inert on its own beside it.
+  const copy = block === undefined ? `<slot data-kay-server="${index}" inert>${inert}</slot>` : `<slot data-kay-server="${index}"><slot inert>${inert}</slot><slot data-kay-failure hidden>${child(block())}</slot></slot>`
+  const placeholder = mode === 'defer' ? `${copy}${noscript == null ? '' : `<noscript><a href="?${ISLAND_PARAM}" rel="nofollow">${child(noscript)}</a></noscript>`}` : ''
 
   return renderedHtml(`<!--kay-server:${index}-->${placeholder}<!--/kay-server:${index}-->`)
 }

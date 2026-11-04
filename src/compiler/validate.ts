@@ -1,11 +1,11 @@
-import type { Attribute, Details, Diagnostic, ElementNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, Span } from './ast'
+import type { Attribute, Details, Diagnostic, ElementNode, KayFile, Labelled, NamedAttribute, Node, ServerIslandMark, SlotNode, Span } from './ast'
 import type { GenerateOptions } from './codegen'
 import type { LintName } from './lints'
 import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
-import { childBlocks, EVENT_MODIFIERS, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, serverIslandOf, templateFacts, visitNodes } from './ast'
+import { childBlocks, EVENT_MODIFIERS, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, serverIslandOf, templateFacts, visitNodes } from './ast'
 
 const UI_SOURCE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
 const AI_CHAT_SOURCES = new Set(['@kaynooo/kayjs-ai/chat.kay', '@kaynooo/kayjs-ai/chat-launcher.kay'])
@@ -558,7 +558,7 @@ class Validator {
         this.error(attribute.name, `\`${name}\` has no effect inside an island`, { note: 'an island hydrates and lives on as a whole' })
 
       if (attribute === serverIsland?.attribute)
-        this.serverIsland(serverIsland)
+        this.serverIsland(serverIsland, failedBlockOf(element, this.src))
       else if (name === FIELD_ATTRIBUTE && !element.component && FIELD_ELEMENTS.has(element.name))
         this.field(element, attribute)
       else
@@ -578,7 +578,7 @@ class Validator {
       this.error(attribute.name, 'A field has `field` or `name`, not both', { related: [{ ...named.name, label: 'named here' }], help: 'drop `name`: `field` writes it' })
   }
 
-  private serverIsland({ attribute, mode, noscript }: ServerIslandMark): void {
+  private serverIsland({ attribute, mode, noscript }: ServerIslandMark, failed: SlotNode | undefined): void {
     if (this.options.island !== undefined || this.options.insideIsland)
       this.error(attribute.name, '`server` has no effect inside an island', { note: 'an island renders in the browser too, as a whole' })
     else if (mode === undefined)
@@ -587,6 +587,8 @@ class Validator {
       this.error(noscript.name, '`noscript` only goes with `server="defer"`', { note: 'an inline server island arrives with the page, so it needs no JavaScript' })
     else if (noscript?.kind === 'boolean')
       this.error(noscript.name, '`noscript` takes the text of its link', { help: 'such as `noscript="Show the contact form"`' })
+    else if (mode !== 'defer' && failed)
+      this.error(failed.name, '`@failed` only goes with `server="defer"`', { note: 'an inline server island arrives with the page, so it cannot fail to load' })
   }
 
   // Several parts on one component call: the first is the part the call is, the others are parts of this component whose entries it hands on to the called one, each named once and none of them `root`, which a call hands on by being the root.

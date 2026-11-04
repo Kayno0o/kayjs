@@ -1,7 +1,7 @@
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, MatchNode, NamedAttribute, Node, SlotNode, SnippetNode, Span, TemplateFacts, TextNode, TryNode } from './ast'
 import type { CodeBuilder } from './mapping'
 import type { Sites } from './rewrite'
-import { actionOf, bindsOwnProp, FIELD_ATTRIBUTE, FIELD_ELEMENTS, handedParts, isSlot, keyedByPosition, partAttribute, serverIslandOf } from './ast'
+import { actionOf, bindsOwnProp, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, handedParts, isSlot, keyedByPosition, partAttribute, serverIslandOf } from './ast'
 import { isFunctionAt, sentParts } from './expression'
 import { addConstValue, addRowItem, slotValue } from './items'
 import { DYNAMIC_TAG } from './mapping'
@@ -612,9 +612,20 @@ export class JsxTemplate {
       const slots = element.children.filter((child): child is SlotNode => child.kind === 'slot')
       const children = element.children.filter(child => child.kind !== 'slot')
 
+      const failed = failedBlockOf(element, this.src)
+
       for (const slot of slots) {
         if (!element.component)
           continue
+
+        // Not a prop: what it renders is checked on its own.
+        if (slot === failed) {
+          b.add(' {...(void (')
+          this.emitRoot(slot.children)
+          b.add('), {})}')
+
+          continue
+        }
 
         // `@row(todo)` passes a function the component calls per item, its parameters typed from the prop.
         if (slot.params && this.options.check && this.options.sendsIslandProps) {

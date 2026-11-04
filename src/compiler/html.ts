@@ -4,7 +4,7 @@ import type { CodeBuilder } from './mapping'
 import type { ElementPlan } from './markup'
 import { DATA_SCRIPT, LEADING_NEWLINE } from '../runtime/head'
 import { mayLeaveSite } from '../runtime/outside'
-import { actionOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
+import { actionOf, failedBlockOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
 import { addRowItem, childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
 import { addStyleArguments, BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, GROUP_HAS, groupValue, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
@@ -972,7 +972,9 @@ export class HtmlTemplate extends TemplateWriter {
     else
       b.add(`${helperName(island ? 'serverIsland' : 'component')}(`).addSource(element.tag).add(', ')
 
-    this.componentProps(element, false)
+    const failed = island ? failedBlockOf(element, this.src) : undefined
+
+    this.componentProps(element, false, failed)
 
     if (island)
       b.add(`, ${JSON.stringify(island.mode ?? 'inline')}`)
@@ -981,6 +983,13 @@ export class HtmlTemplate extends TemplateWriter {
       b.add(`, ${JSON.stringify(decodeEntities(island.noscript.text))}`)
     else if (island?.noscript?.kind === 'expression')
       b.add(', (').addSource(island.noscript.expression).add(')')
+    else if (failed)
+      b.add(', undefined')
+
+    if (failed) {
+      b.add(', () => ')
+      this.childrenValue(failed.children)
+    }
 
     b.add('))')
   }

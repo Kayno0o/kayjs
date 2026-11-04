@@ -239,6 +239,8 @@ export const SERVER_ISLAND_ATTRIBUTE = 'server'
 export const SERVER_ISLAND_MODES = new Set(['defer'])
 // Beside `server="defer"`, the text of a link to the page with the island in place, for a browser without JavaScript.
 export const SERVER_ISLAND_NOSCRIPT = 'noscript'
+// The block under a deferred server island call, or at the root of the component, shown once the island failed for good.
+export const SERVER_ISLAND_FAILED = 'failed'
 
 export interface ServerIslandMark {
   attribute: NamedAttribute
@@ -264,6 +266,14 @@ export function serverIslandOf(element: ElementNode, source: string): ServerIsla
     return { attribute, mode: 'inline', noscript }
 
   return { attribute, mode: attribute.kind === 'static' && SERVER_ISLAND_MODES.has(attribute.text) ? attribute.text as 'defer' : undefined, noscript }
+}
+
+// The `@failed` block under a server island call, which the server renders inside the island hidden for the browser to show when the island fails for good; it is not a prop of the component.
+export function failedBlockOf(element: ElementNode, source: string): SlotNode | undefined {
+  if (serverIslandOf(element, source) === undefined)
+    return undefined
+
+  return element.children.find((child): child is SlotNode => child.kind === 'slot' && source.slice(child.name.start, child.name.end) === SERVER_ISLAND_FAILED)
 }
 
 // Whether an attribute of a component call belongs to its server island mark rather than to its props.

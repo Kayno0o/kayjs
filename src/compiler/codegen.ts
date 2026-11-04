@@ -91,6 +91,8 @@ export interface GenerateOptions {
   promote?: string | undefined
   // Code to run rather than type-check, built from the template: `html` builds server markup as strings, `dom` builds the browser's DOM. The analysis pass still generates JSX, which scope analysis reads.
   output?: 'html' | 'dom' | undefined
+  // The component's own `@failed` block as a `KayFailed` function, which a server island reads off the component.
+  failedCode?: string | undefined
   // Server markup of an island or a twin, carrying the markers hydration needs.
   hydratable?: boolean | undefined
   // Points a relative import elsewhere, or keeps it when it returns undefined: a shadow file sits deeper than its source.
@@ -678,10 +680,13 @@ class ModuleShell {
     if (this.mode === 'html' && outlets.length > 0)
       b.add(`\nexport const slots = ${JSON.stringify(outlets)}\n`)
 
+    if (this.mode === 'html' && this.options.failedCode !== undefined)
+      b.add(`\n${this.options.failedCode}\n${name}.kayFailed = KayFailed\n`)
+
     if (this.kind === 'promotable twin')
       b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${this.options.cause === undefined ? islandMessages(src) : `${islandMessages(src) || ', []'}, ${JSON.stringify(this.options.cause)}`}) as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
     else if (this.kind === 'twin')
-      b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props)) as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
+      b.add(`\nexport default ${this.mode === 'html' && this.options.failedCode !== undefined ? `Object.assign((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props), { kayFailed: KayFailed })` : `((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props))`} as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
     else if (this.kind === 'island' && widened && !this.genericComponent)
       b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' ? this.options.cause : undefined)}) as unknown as ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>${this.widenedCall(`ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>`)}\n`)
     else if (widened && this.kind !== 'island')

@@ -273,6 +273,52 @@ describe('server islands', () => {
     }
   })
 
+  it('renders the `@failed` block of a deferred use or component hidden beside the inert copy, and nothing for an island without one', async () => {
+    const build = await scratchBuild({ routes })
+
+    try {
+      await build.prerender({ routes })
+
+      const failed = await Bun.file(join(build.pages, 'failed.html')).text()
+      const islands = [...failed.matchAll(/<!--kay-server:(\d)-->([\s\S]*?)<!--\/kay-server:\1-->/g)].map(match => match[2]!)
+
+      // The component's own block, then the use's block winning over it, the copy inert on its own so a button in the block can be clicked.
+      expect(islands[0]).toBe('<slot data-kay-server="0"><slot inert><p class="own-count">1</p></slot><slot data-kay-failure hidden><p class="own-failure">Own failure</p><button type="button" data-kay-retry>Try again</button></slot></slot>')
+      expect(islands[1]).toBe('<slot data-kay-server="1"><slot inert><p class="own-count">2</p></slot><slot data-kay-failure hidden><p class="use-failure">Use failure</p></slot></slot>')
+      // An inline island arrives with the page, so it holds none.
+      expect(islands[2]).toBe('')
+
+      const app = await build.serve({ routes, security: false })
+      const fetched = await (await app.handle(new Request('http://localhost/failed?kay_island=0', { headers: { [ISLAND_HEADER]: '1' } }))).text()
+
+      expect(fetched).toBe('<p class="own-count">1</p>')
+    }
+    finally {
+      await build.remove()
+    }
+  })
+
+  it('takes `@failed` out of a deferred use\'s props, and refuses it on an inline one', () => {
+    const compile = (call: string) => compileKay(`---\nimport Card from './card.kay'\n---\n${call}\n`, 'src/routes/index.kay', { output: 'html', check: true })
+    const html = compile('Card(server="defer" title="a")\n  @failed\n    p No luck\n  @other\n    p Other').tsx
+    const messages = (call: string) => compile(call).diagnostics.map(diagnostic => diagnostic.message)
+
+    expect(html).toContain('KayServerIsland(Card, { "title": "a", get "other"() { return ')
+    expect(html).toContain('}, "defer", undefined, () => ')
+    expect(html).not.toContain('"failed"')
+    expect(messages('Card(server)\n  @failed\n    p No luck')).toContain('`@failed` only goes with `server="defer"`')
+    expect(messages('Card(server="defer")\n  @failed\n    p No luck')).toEqual([])
+    expect(messages('Card\n  @failed\n    p No luck')).toEqual([])
+  })
+
+  it('reports a script value a component\'s own `@failed` reads, which the server does not have', () => {
+    const compile = (script: string, block: string) => compileKay(`---\n${script}\n---\np.real\n@failed\n  ${block}\n`, 'src/components/card.kay', { output: 'html', check: true })
+
+    expect(compile('const { n } = props<{ n: number }>()', 'p {n}').diagnostics.map(diagnostic => diagnostic.message)).toEqual(['`@failed` of a component reads `n`, which the server does not have'])
+    expect(compile('', 'p static').diagnostics).toEqual([])
+    expect(compile('', 'p static').tsx).toContain('Card.kayFailed = KayFailed')
+  })
+
   it('compiles the mark to a server island on the server, a plain component in an island', () => {
     const source = '---\nimport Card from \'./card.kay\'\n---\nCard(server title="a")\nCard(server="defer" noscript="More")\n'
     const html = compileKay(source, 'src/routes/index.kay', { output: 'html' }).tsx
@@ -402,6 +448,78 @@ describe('a deferred server island, in the browser', () => {
       expect(events[1]![0]).toBe('kay:server-island')
       expect(slot.hasAttribute('data-kay-failed')).toBe(false)
       expect(slot.querySelector('.stamp')!.textContent).toBe('later')
+    }
+    finally {
+      fetching.mockRestore()
+    }
+  })
+
+  it('shows the `@failed` block of a failed island, and retries it from a control marked `data-kay-retry` with no script of the page', async () => {
+    const { slot, events, fetching } = await deferred([new Response('no', { status: 404 }), new Response('no', { status: 404 }), new Response('<p class="stamp">later</p>')])
+
+    slot.removeAttribute('inert')
+    slot.innerHTML = '<slot inert><p class="stamp">built</p></slot><slot data-kay-failure hidden><p>Not loaded</p><button type="button" data-kay-retry><span>Try again</span></button><button type="button" class="other">Other</button></slot>'
+
+    const block = slot.querySelector<HTMLElement>('[data-kay-failure]')!
+
+    try {
+      await hydrateIslands({})
+      await waitFor(() => events.length > 0)
+
+      expect(block.hidden).toBe(false)
+      expect(slot.hasAttribute('inert')).toBe(false)
+      expect(slot.querySelector('slot[inert] .stamp')!.textContent).toBe('built')
+
+      // Only a control marked for retry asks again, whatever it holds.
+      slot.querySelector<HTMLElement>('.other')!.click()
+      await Bun.sleep(20)
+
+      expect(events).toHaveLength(1)
+
+      slot.querySelector<HTMLElement>('[data-kay-retry] span')!.click()
+      await waitFor(() => events.length > 1)
+
+      // The retry failed again for good: the block is back after it was hidden while asking.
+      expect(events[1]![0]).toBe('kay:server-island-error')
+      expect(block.hidden).toBe(false)
+
+      slot.querySelector<HTMLElement>('[data-kay-retry]')!.click()
+      await waitFor(() => events.length > 2)
+
+      expect(events[2]![0]).toBe('kay:server-island')
+      expect(slot.querySelector('[data-kay-failure]')).toBeNull()
+      expect(slot.querySelector('.stamp')!.textContent).toBe('later')
+      expect(slot.hasAttribute('data-kay-failed')).toBe(false)
+
+      // A click after the island loaded asks nothing.
+      slot.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Bun.sleep(20)
+
+      expect(events).toHaveLength(3)
+    }
+    finally {
+      fetching.mockRestore()
+    }
+  })
+
+  it('hides the `@failed` block again while a retry loads', async () => {
+    const { slot, events, fetching } = await deferred([new Response('no', { status: 404 }), 'hang'])
+
+    slot.innerHTML = '<slot inert><p class="stamp">built</p></slot><slot data-kay-failure hidden><button type="button" data-kay-retry>Try again</button></slot>'
+
+    try {
+      await hydrateIslands({})
+      await waitFor(() => events.length > 0)
+
+      const block = slot.querySelector<HTMLElement>('[data-kay-failure]')!
+
+      expect(block.hidden).toBe(false)
+
+      slot.querySelector<HTMLElement>('[data-kay-retry]')!.click()
+      await Bun.sleep(20)
+
+      expect(block.hidden).toBe(true)
+      expect(slot.getAttribute('aria-busy')).toBe('true')
     }
     finally {
       fetching.mockRestore()

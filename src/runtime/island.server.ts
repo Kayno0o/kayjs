@@ -189,7 +189,17 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     }
   }
 
-  return render as IslandComponent<P>
+  return carryFailed(component, render) as IslandComponent<P>
+}
+
+// A component's own `@failed` block, which a use deferring it as a server island reads off the function it calls.
+function carryFailed<T>(from: unknown, to: T): T {
+  const failed = (from as { kayFailed?: () => unknown } | undefined)?.kayFailed
+
+  if (failed !== undefined)
+    (to as { kayFailed?: () => unknown }).kayFailed = failed
+
+  return to
 }
 
 // The markup standing where a client-only island will render, on the server's side of its own page: no ids or islands of its own, as the browser throws it away.
@@ -203,7 +213,7 @@ function placeholder(given: JSX.Element | undefined, own: (() => JSX.Element) | 
 export function promote<P extends object>(id: string, render: (props: P) => JSX.Element, hydrated: (props: P) => JSX.Element, messages: readonly string[] = [], cause?: string): (props: P) => JSX.Element {
   const asIsland = island(id, hydrated, messages, false, 'passes an island what only an island sends', [], cause)
 
-  return (props) => {
+  return carryFailed(render, (props: P) => {
     if (depth > 0)
       return hydrated(props)
 
@@ -221,7 +231,7 @@ export function promote<P extends object>(id: string, render: (props: P) => JSX.
 
       return asIsland(props)
     }
-  }
+  })
 }
 
 // The children and slots without parameters a static parent passes, which the compiler writes as getters, as the markup they render to; one holding only text is data like any prop.

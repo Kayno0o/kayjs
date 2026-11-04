@@ -541,7 +541,9 @@ function selectOptions(value: unknown, markup: string, only?: boolean): string
 const SERVER_ISLAND: RegExp
 
 [./html] serverIsland
-function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: ServerIslandMode, noscript?: unknown): unknown
+function serverIsland<P>(fn: ((props: P) => unknown) & {
+  kayFailed?: () => unknown;
+}, props: P, mode: ServerIslandMode, noscript?: unknown, failed?: (() => unknown) | undefined): unknown
 
 [./html] ServerIslandMode
 type ServerIslandMode = 'inline' | 'defer'

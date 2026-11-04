@@ -388,7 +388,8 @@ export abstract class TemplateWriter {
   }
 
   // A component's props: its attributes, then its slots and children, each read through a getter or a function so it renders where the component puts it.
-  protected componentProps(element: ElementNode, getters: boolean): void {
+  // `except` is a slot that is no prop, as a server island's `@failed`.
+  protected componentProps(element: ElementNode, getters: boolean, except?: SlotNode): void {
     const { b } = this
     const spreads = element.attributes.some(attribute => attribute.kind === 'spread')
 
@@ -397,7 +398,7 @@ export abstract class TemplateWriter {
 
     const props = this.sources(element, getters, true)
 
-    for (const slot of element.children.filter((child): child is SlotNode => child.kind === 'slot')) {
+    for (const slot of element.children.filter((child): child is SlotNode => child.kind === 'slot' && child !== except)) {
       props.separate()
 
       if (slot.params) {

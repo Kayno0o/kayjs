@@ -1,0 +1,7 @@
+---
+const { n } = props<{ n: number }>()
+---
+p.own-count {n}
+@failed
+  p.own-failure Own failure
+  button(type="button" data-kay-retry) Try again

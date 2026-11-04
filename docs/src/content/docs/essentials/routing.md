@@ -273,6 +273,17 @@ Leave it off when the island's content is reachable without it. `noscript` goes 
 
 A fetch that gets no answer in 10 seconds, or fails with a server error, is asked again after 1 and then 3 seconds, waiting for the tab to be visible and the network to be up. If it is lost, the island keeps its inert copy and gets a `data-kay-failed` attribute you can style.
 
+To tell the visitor, write an `@failed` block under the use. It sits hidden beside the inert copy, and shows once the island is lost; a control inside it with `data-kay-retry` asks again, with no script of your own:
+
+```kay
+ContactForm(server="defer")
+  @failed
+    p The form did not load.
+    button(type="button" data-kay-retry) Try again
+```
+
+A component can declare its own `@failed` at the root of its template, as a client-only one declares its `@fallback`, and a use's block wins over it. The block is rendered by the server without running the component's script, so it holds static markup and what it imports. While a retry loads, the block hides again.
+
 The page hears about it from two events on `document`: `kay:server-island` when the island is in, and `kay:server-island-error` when it is lost. The error event carries `detail.error` (an `ApiError`) and `detail.retry()`. Leaving the page cancels the request, and `aria-busy` marks the island while it loads.
 
 A layout that reads `ctx.locals`, `ctx.cookies` or `ctx.query` cannot be prerendered. A page holding a server island whose layout reads one is rendered on each request instead, and `kay build` lists it as `on request` with the file and line of the read. With `prerender: true`, or in a static export, the build fails with that file and line.

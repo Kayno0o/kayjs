@@ -45,6 +45,34 @@ async function pause(ms: number, signal: AbortSignal): Promise<void> {
     await wake(signal)
 }
 
+// What the island's `@failed` block holds, rendered hidden beside the inert copy; a control inside it marked `data-kay-retry` asks again.
+const FAILURE = ':scope > [data-kay-failure]'
+const RETRY = '[data-kay-retry]'
+const retries = new WeakMap<HTMLElement, () => void>()
+
+// Shows the block and wires its retry controls once per island, by delegation as the block comes back with the inert copy a page swap restores.
+function showFailure(element: HTMLElement, retry: () => void): void {
+  const block = element.querySelector<HTMLElement>(FAILURE)
+
+  if (block === null)
+    return
+
+  // The block cannot be clicked inside an inert island: the copy beside it is inert on its own.
+  element.removeAttribute('inert')
+  block.hidden = false
+
+  if (retries.has(element))
+    return
+
+  retries.set(element, retry)
+  element.addEventListener('click', (event) => {
+    if (element.hasAttribute('data-kay-failed') && event.target instanceof Element && element.contains(event.target.closest(RETRY))) {
+      event.preventDefault()
+      retries.get(element)?.()
+    }
+  })
+}
+
 function announce(element: HTMLElement, type: string, detail: object): void {
   element.dispatchEvent(new CustomEvent(type, { bubbles: true, detail: { element, id: element.dataset.kayServer, ...detail } }))
 }
@@ -64,6 +92,7 @@ export async function fetchServerIsland(element: FetchedIsland, dispose: (root: 
   watch.observe(document, { childList: true, subtree: true })
   element.setAttribute('aria-busy', 'true')
   element.removeAttribute('data-kay-failed')
+  element.querySelector<HTMLElement>(FAILURE)?.setAttribute('hidden', '')
 
   try {
     let text: string | undefined
@@ -94,6 +123,7 @@ export async function fetchServerIsland(element: FetchedIsland, dispose: (root: 
           element.innerHTML = held
 
         element.setAttribute('data-kay-failed', '')
+        showFailure(element, retry)
         // Written out rather than through kayLog, whose import would hoist log.ts into every page's eager chunk.
         console.warn(`[kay] the server island ${element.dataset.kayServer} of ${location.pathname} was not loaded`, error)
         announce(element, 'kay:server-island-error', { error, retry })

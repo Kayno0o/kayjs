@@ -240,6 +240,8 @@ export function promotedChecks(original: string, root?: string, imported?: Impor
   return [...scriptFences(script).flatMap(fence => serverOnlyImports(fence)), ...announced, ...contradicted]
 }
 
+const FAILED_FUNCTION = /^function KayFailed\(/m
+
 // Compiles a .kay component: to TSX the type checker reads, or with `output` to the HTML strings and DOM code that run.
 export function compileKay(original: string, filename: string, options: CompileOptions = {}): CompileResult {
   const { file, expansion, problems } = parseExpanded(original)
@@ -258,6 +260,9 @@ export function compileKay(original: string, filename: string, options: CompileO
   const routeFile = file.server !== undefined || ROUTE_FILES.has(basename(filename))
   const client = file.client !== undefined || (options.clientOnly === true && !routeFile)
   const fallback = client ? takeFallback(file, filename, options, script, scope) : undefined
+  // A component's own `@failed`, for a use deferring it as a server island: its function joins this module, the helpers and imports it needs being this module's.
+  const failed = !client && !routeFile && options.page !== true ? takeFallback(file, filename, options, script, scope, 'failed') : undefined
+  const failedCode = failed && options.output === 'html' ? failed.code.slice(failed.code.search(FAILED_FUNCTION)) : undefined
   const live = routeFile ? undefined : liveImport(script, options.importedSignals)
   const island = client || isInteractive(file, script) || live !== undefined ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
@@ -265,7 +270,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const promotion = island === undefined && !routeFile ? promotionSite(file, script, options.importedSignals) : undefined
   const promote = promotion === undefined ? undefined : islandId(filename, options.root)
   const cause = realCause(island === undefined ? promotion : islandCause(file, script) ?? liveCause(file, script, live), expansion, original)
-  const generateOptions = { cause: options.inspect === true && cause !== undefined ? causeSummary(cause, island === undefined) : undefined, classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerGuards: options.outerGuards, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && (routeFile || options.page === true), pageFile: routeFile || options.page === true, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: basename(filename) === ERROR_PAGE, cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
+  const generateOptions = { cause: options.inspect === true && cause !== undefined ? causeSummary(cause, island === undefined) : undefined, classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, promote, output: options.output, failedCode, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerGuards: options.outerGuards, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && (routeFile || options.page === true), pageFile: routeFile || options.page === true, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: basename(filename) === ERROR_PAGE, cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {
@@ -330,7 +335,7 @@ export function compileKay(original: string, filename: string, options: CompileO
 
   const shorthands = diagnostics.some(diagnostic => (diagnostic.fixes?.length ?? 0) > 0) ? [...elementsIn(file.template)].flatMap(element => element.attributes.filter((attribute): attribute is Shorthand => attribute.kind === 'expression' && attribute.shorthand !== undefined)) : []
   const facts = templateFacts(file)
-  const classes = [...facts.classes, ...expansion?.classes(file) ?? [], ...fallback?.classes ?? []]
+  const classes = [...facts.classes, ...expansion?.classes(file) ?? [], ...fallback?.classes ?? [], ...failed?.classes ?? []]
   const spelled = (options.check ? applyLints(diagnostics, source, options.lints) : diagnostics).map(diagnostic => spelledOut(diagnostic, shorthands, source))
   const reported = (expansion ? [...spelled.map(diagnostic => expansion.diagnostic(diagnostic)), ...coded(problems, 'template-syntax')] : spelled).sort((a, b) => a.start - b.start)
 
@@ -385,10 +390,10 @@ function spelledOut(diagnostic: Diagnostic, shorthands: Shorthand[], source: str
 
 const FALLBACK_COMPONENT = /^export default function \w+\(/m
 
-// The `@fallback` block at the root of a client-only component, which the server shows where the island will render: taken out of the template, and compiled alone, as the server never runs the script it would read.
+// The `@fallback` block at the root of a client-only component, which the server shows where the island will render, or the `@failed` block of a component a use defers as a server island: taken out of the template, and compiled alone, as the server never runs the script it would read.
 // It keeps the script's imports it names and the component's scope attribute, and reports a script value or prop it reads, which the server does not have.
-function takeFallback(file: KayFile, filename: string, options: CompileOptions, script: ScriptAnalysis, scope: string | undefined): { code: string, classes: string[] } | undefined {
-  const index = file.template.findIndex(node => node.kind === 'slot' && file.source.slice(node.name.start, node.name.end) === 'fallback')
+function takeFallback(file: KayFile, filename: string, options: CompileOptions, script: ScriptAnalysis, scope: string | undefined, which: 'fallback' | 'failed' = 'fallback'): { code: string, classes: string[] } | undefined {
+  const index = file.template.findIndex(node => node.kind === 'slot' && file.source.slice(node.name.start, node.name.end) === which)
   const block = file.template[index]
 
   if (block?.kind !== 'slot')
@@ -410,14 +415,14 @@ function takeFallback(file: KayFile, filename: string, options: CompileOptions, 
   for (const diagnostic of compiled.diagnostics)
     file.diagnostics.push({ ...diagnostic, start: block.name.start, end: block.name.end })
 
-  for (const name of reads) {
-    const at = file.source.slice(block.start, block.end).search(new RegExp(`(?<![\\w$])${name.replaceAll('$', '\\$')}(?![\\w$])`, 'g'))
+  for (const read of reads) {
+    const at = file.source.slice(block.start, block.end).search(new RegExp(`(?<![\\w$])${read.replaceAll('$', '\\$')}(?![\\w$])`, 'g'))
     const start = at < 0 ? block.name.start : block.start + at
 
-    file.diagnostics.push({ start, end: at < 0 ? block.name.end : start + name.length, code: 'template-invalid', message: `\`@fallback\` of a \`--- client\` component reads \`${name}\`, which the server does not have`, note: 'the server renders it without running the script', help: 'write static markup, or import what it needs' })
+    file.diagnostics.push({ start, end: at < 0 ? block.name.end : start + read.length, code: 'template-invalid', message: `\`@${which}\` of ${which === 'failed' ? 'a' : 'a `--- client`'} component reads \`${read}\`, which the server does not have`, note: 'the server renders it without running the script', help: 'write static markup, or import what it needs' })
   }
 
-  return { code: compiled.tsx.replace(FALLBACK_COMPONENT, 'function KayFallback('), classes: compiled.classes }
+  return { code: compiled.tsx.replace(FALLBACK_COMPONENT, which === 'failed' ? 'function KayFailed(' : 'function KayFallback('), classes: compiled.classes }
 }
 
 // The top-level names a script declares, which a fallback reading one reads a value the server does not have.
