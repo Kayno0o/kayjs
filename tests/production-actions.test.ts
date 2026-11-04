@@ -839,6 +839,64 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
     expect(await whoami()).toBe('unknown')
   })
 
+  describe('with no proxy setting', () => {
+    const forwarded = new Request('http://localhost/', { headers: { 'x-forwarded-for': '203.0.113.7, 198.51.100.1' } })
+    const plain = new Request('http://localhost/')
+
+    // What the app's routes see as the client of a request from `peer`, under the environment given.
+    const seen = async (setting: Parameters<typeof trustProxy>[1], peer: string, request: Request, env = 'production') => {
+      const before = process.env.NODE_ENV
+      const app = new Elysia()
+
+      process.env.NODE_ENV = env
+
+      try {
+        trustProxy(app, setting)
+        app.get('/', ({ request: incoming }) => clientAddress(incoming, socket(peer)))
+
+        return await (await app.handle(request)).text()
+      }
+      finally {
+        if (before === undefined)
+          delete process.env.NODE_ENV
+        else
+          process.env.NODE_ENV = before
+      }
+    }
+
+    it('counts one proxy in front in production for a request from a private address that carries X-Forwarded-For', async () => {
+      expect(await seen(undefined, '10.0.0.2', forwarded)).toBe('198.51.100.1')
+      expect(await seen(undefined, '127.0.0.1', forwarded)).toBe('198.51.100.1')
+    })
+
+    it('counts a public peer, and a private one with no header, by their own address in production', async () => {
+      expect(await seen(undefined, '198.51.100.9', forwarded)).toBe('198.51.100.9')
+      expect(await seen(undefined, '10.0.0.2', plain)).toBe('10.0.0.2')
+    })
+
+    it('keeps counting the socket outside production, and under proxy: false in production, without a warning', async () => {
+      const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+      try {
+        expect(await seen(undefined, '10.0.0.2', forwarded, 'development')).toBe('10.0.0.2')
+
+        const warned = (): number => warn.mock.calls.filter(([message]) => String(message).includes('proxy: { hops: 1 }')).length
+        const before = warned()
+
+        expect(await seen(false, '10.0.0.2', forwarded)).toBe('10.0.0.2')
+        expect(warned()).toBe(before)
+      }
+      finally {
+        warn.mockRestore()
+      }
+    })
+
+    it('leaves a setting that is given as it was', async () => {
+      expect(await seen(2, '10.0.0.2', forwarded)).toBe('203.0.113.7')
+      expect(await seen({ header: 'x-real-ip' }, '10.0.0.2', new Request('http://localhost/', { headers: { 'x-real-ip': '203.0.113.9' } }))).toBe('203.0.113.9')
+    })
+  })
+
   it('refuses a proxy setting it cannot read, as the server boots', async () => {
     // One through `pages()`, which reads it as the server boots; the rest where it is read, as setting the routes up costs half a second each, which a busy host multiplies.
     await expect(pages({ root: FIXTURE, prebuilt: false, proxy: {} })).rejects.toThrow('kay: proxy')

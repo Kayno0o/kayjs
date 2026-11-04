@@ -25,6 +25,8 @@ export function config({ has, settings }: Setup): string {
     server && has('docker') && '  proxy: true,',
     server && '  // Cookies set with ctx.cookies.set are HttpOnly, SameSite=Lax, Secure over https and under the base unless a call says otherwise.',
     server && '  security: { cookies: {} },',
+    server && has('auth') && '  // A page, endpoint or API module that no guard covers answers 403, so a route added later is closed until it has a guard or sets `guards: false`.',
+    server && has('auth') && '  requireGuards: true,',
     settings.seo !== false && '  seo: { name: \'__NAME__\', titleTemplate: \'%s | __NAME__\', description: \'__NAME__, made with kay\' },',
     '})',
   )

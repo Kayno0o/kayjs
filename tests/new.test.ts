@@ -1012,6 +1012,9 @@ describe('kay new', () => {
         if (variant.has('server') && variant.has('docker'))
           expect({ features, site: contents['compose.prod.yaml']!.includes('SITE_URL: ${SITE_URL:?set SITE_URL}'), example: contents['.env.example']!.split('\n').includes('SITE_URL=') }).toEqual({ features, site: true, example: true })
 
+        // An app behind a sign-in fails closed: a route added later without a guard answers 403 until it has one.
+        expect({ features, requireGuards: contents['kay.config.ts']!.includes('\n  requireGuards: true,') }).toEqual({ features, requireGuards: variant.has('auth') })
+
         if (variant.has('auth')) {
           const dockerfile = contents.Dockerfile
           const compose = contents['compose.prod.yaml']

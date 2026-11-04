@@ -9,6 +9,7 @@ import { afterAll, describe, expect, it, jest, setSystemTime, spyOn } from 'bun:
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { jobRuns } from '../src/runtime/counters'
+import { setTimeZone } from '../src/runtime/i18n'
 import { openSqlite } from '../src/runtime/sqlite.server'
 import { background, memoryJobs, queue, schedule, shutdown, sqliteJobs } from '../src/server'
 import { drainQueues, forgetQueue, trackDetached } from '../src/server/queue'
@@ -37,10 +38,10 @@ async function until(condition: () => boolean, timeout = 5000): Promise<void> {
 
 // Bun.cron stood in for, so a test fires the job itself instead of waiting for the minute.
 function fakeCron() {
-  const fired: { handler: () => unknown, stopped: boolean }[] = []
+  const fired: { handler: () => unknown, stopped: boolean, zone?: unknown }[] = []
   const parse = Bun.cron.parse.bind(Bun.cron)
-  const cron = spyOn(Bun, 'cron').mockImplementation(((_: string, handler: () => unknown) => {
-    const entry = { handler, stopped: false }
+  const cron = spyOn(Bun, 'cron').mockImplementation(((_: string, handler: () => unknown, zone?: unknown) => {
+    const entry = { handler, stopped: false, zone }
 
     fired.push(entry)
 
@@ -56,6 +57,28 @@ const scheduleOf = schedule
 let copies = 0
 
 describe('schedule', () => {
+  it('reads a cron in the config\'s timeZone unless it names its own tz, and in the system\'s with neither', async () => {
+    const cron = fakeCron()
+    const start = async (when: string, options: { tz?: string } = {}) => {
+      const app = new Elysia().use(schedule(when, () => undefined, options)).listen(0)
+
+      await shutdown(app)
+    }
+
+    try {
+      await start('@hourly')
+      setTimeZone('Asia/Tokyo')
+      await start('@hourly')
+      await start('@hourly', { tz: 'UTC' })
+      await start('30s')
+      expect(cron.fired.map(entry => entry.zone)).toEqual([{}, { tz: 'Asia/Tokyo' }, { tz: 'UTC' }])
+    }
+    finally {
+      setTimeZone(undefined)
+      cron.restore()
+    }
+  })
+
   it('starts with the server, once, and stops with it, waiting for the run in progress', async () => {
     const cron = fakeCron()
     const runs: string[] = []

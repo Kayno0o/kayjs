@@ -594,7 +594,7 @@ describe('hostile requests', () => {
   })
 
   it('takes the address from the proxy it trusts, never from a header the visitor wrote', async () => {
-    const app = await pages({ root: dir, routesDir: join(dir, 'routes'), prebuilt: false, extensions: [analytics(plausible())] })
+    const app = await pages({ root: dir, routesDir: join(dir, 'routes'), prebuilt: false, extensions: [analytics(plausible())], proxy: false })
 
     await app.handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: JSON.stringify(visit()), headers: { 'user-agent': CHROME, 'x-forwarded-for': '10.1.1.1' } }))
     await forwardsSettled()

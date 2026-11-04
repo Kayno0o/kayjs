@@ -57,8 +57,8 @@ export interface SessionOptions {
   domain?: string | undefined
   // Whether the browser sends the cookie along a request another site starts, a link followed or a form posted from there: `'lax'` by default sends it on a link's navigation and not on a post; `'strict'` on neither, so a visitor following a link from elsewhere arrives signed out; `'none'` on all, for a site embedded in another's page, and always `Secure`, which browsers ask of it.
   sameSite?: SameSite | undefined
-  // Keeps the data server-side, the cookie carrying only an id: the app's `store.sessions` in kay.config.ts by default; without either the data travels sealed in the cookie, about 3.5 KB at most.
-  store?: SessionStore | undefined
+  // Keeps the data server-side, the cookie carrying only an id: the app's `store.sessions` in kay.config.ts by default, else a SQLite file `data/sessions.sqlite` as jobs keep `data/jobs.sqlite` (memory under `bun test`). `false` keeps the data sealed in the cookie instead, about 3.5 KB at most and never revocable by the session itself, for a host with no disk of its own.
+  store?: SessionStore | false | undefined
 }
 
 export interface Session<Data extends object> {
@@ -123,8 +123,9 @@ export function acceptCookieData(): void {
   acceptingCookieData = true
 }
 
-// Whether this process was told yet that a session without a store cannot be revoked.
-let warnedNoStore = false
+// The store of a `session()` with neither its own nor the app's, made on first use.
+let defaultSessions: SessionStore | undefined
+const DEFAULT_SESSIONS_PATH = 'data/sessions.sqlite'
 const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => void }>()
 
 // Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
@@ -157,7 +158,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (options.sameSite !== undefined && !SAME_SITE.has(options.sameSite))
     throw new KayError('config-invalid', `kay: the session sameSite is ${JSON.stringify(options.sameSite)}, which is none of 'lax', 'strict' and 'none'`)
 
-  const config: SessionConfig = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store ?? appStore()?.sessions, keys, revokedElsewhere: false }
+  const config: SessionConfig = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store === false ? undefined : options.store ?? appStore()?.sessions ?? (config.revokedElsewhere ? undefined : (defaultSessions ??= process.env.NODE_ENV === 'test' ? memorySessions() : sqliteSessions(DEFAULT_SESSIONS_PATH))), keys, revokedElsewhere: false }
 
   const plugin = new Elysia({ name: 'kay/session', seed: config.name })
     .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) }))
@@ -215,10 +216,10 @@ interface SessionConfig {
   domain?: string | undefined
   // The domains a library shares the session under, used when `domain` is not set.
   shared?: string[] | undefined
-  // The session's own store, else the app's `store.sessions`, read per request as a `session()` made while its module loads comes before the config.
+  // The session's own store, else the app's `store.sessions`, else the default file, read per request as a `session()` made while its module loads comes before the config.
   store: () => SessionStore | undefined
   keys: Buffer[]
-  // Whether a library refuses the cookie of a session it ended, as kayjs-auth does, so a missing store warns of nothing.
+  // Whether a library refuses the cookie of a session it ended, as kayjs-auth does, so it needs no default store.
   revokedElsewhere: boolean
 }
 
@@ -244,9 +245,6 @@ class RequestSession<Data extends object> implements Session<Data> {
     this.domain = config.domain ?? sharedDomain(config.shared, request)
     this.name = this.secure && this.domain === undefined && config.shared === undefined && !config.name.startsWith('__') ? `__Host-${config.name}` : config.name
     this.store = config.store()
-
-    if (!this.store && !config.revokedElsewhere)
-      warnNoStore(config.name)
   }
 
   async get<Key extends keyof Data>(key: Key): Promise<Data[Key] | undefined> {
@@ -391,15 +389,6 @@ class RequestSession<Data extends object> implements Session<Data> {
   private cookie(value: string, maxAge: number | undefined): string {
     return new Bun.Cookie(this.name, value, { path: '/', ...this.domain === undefined ? {} : { domain: this.domain }, httpOnly: true, sameSite: this.config.sameSite, secure: this.secure || this.config.sameSite === 'none', ...maxAge === undefined ? {} : { maxAge } }).serialize()
   }
-}
-
-// Logs once, in production, that a session with no store cannot be ended on the server.
-function warnNoStore(cookie: string): void {
-  if (warnedNoStore || process.env.NODE_ENV !== 'production')
-    return
-
-  warnedNoStore = true
-  kayLog('warn', `a session kept in its ${cookie} cookie alone, with no store, cannot be revoked by the session itself: signing out only clears the browser's cookie, and a copy taken before stays valid until it expires unless the app ends it elsewhere; set store: sqliteData('data/app.sqlite') in kay.config.ts, or give session() a store, to end sessions on the server`)
 }
 
 // What the cookie holds, and whether a secret other than the first sealed it; sealed under its name, so no other cookie passes for it.

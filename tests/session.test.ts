@@ -48,7 +48,7 @@ function browser(app: { handle: (request: Request) => Promise<Response> }) {
 
 function counter(options: Partial<Parameters<typeof session>[0]> = {}) {
   return new Elysia()
-    .use(session<{ count: number }>({ secret: SECRET, ...options }))
+    .use(session<{ count: number }>({ secret: SECRET, store: false, ...options }))
     .get('/count', async ({ session }) => {
       const count = (await session.get('count') ?? 0) + 1
 
@@ -99,72 +99,102 @@ describe('sessions', () => {
     setSystemTime(Date.now())
   })
 
-  it('warns once in production that a session without a store cannot be revoked, and not with its own, with the app\'s or outside production', async () => {
-    const SINK = Symbol.for('kay.log')
-    const global = globalThis as { [SINK]?: unknown }
-    const sink = global[SINK]
-    const warnings: unknown[] = []
-    const environment = process.env.NODE_ENV
-
-    global[SINK] = (level: string, message: string) => level === 'warn' && warnings.push(message)
-
-    try {
-      const plain = async (options: Partial<Parameters<typeof session>[0]>) => counter(options).handle(new Request('http://localhost/plain'))
-
-      process.env.NODE_ENV = 'development'
-      await plain({})
-      process.env.NODE_ENV = 'production'
-      await plain({ store: memorySessions() })
-      setupStore({ sessions: memorySessions() })
-      await plain({})
+  describe('with no store given', () => {
+    const unset = () => {
       setupStore(undefined)
-      expect(warnings).toEqual([])
-      await plain({})
-      await plain({})
-    }
-    finally {
-      global[SINK] = sink
-      setupStore(undefined)
-
-      if (environment === undefined)
-        delete process.env.NODE_ENV
-      else
-        process.env.NODE_ENV = environment
     }
 
-    expect(warnings).toEqual([expect.stringContaining('a session kept in its kay_session cookie alone, with no store')])
-  })
+    // A session plugin with no store of its own, so it meets the app's or the default one.
+    const plain = (options: Partial<Parameters<typeof session>[0]> = {}) => new Elysia()
+      .use(session<{ count: number }>({ secret: SECRET, ...options }))
+      .get('/count', async ({ session }) => {
+        const count = (await session.get('count') ?? 0) + 1
 
-  it('does not warn in production of a session no store keeps when a library ends sessions itself', async () => {
-    const SINK = Symbol.for('kay.log')
-    const global = globalThis as { [SINK]?: unknown }
-    const sink = global[SINK]
-    const warnings: unknown[] = []
-    const environment = process.env.NODE_ENV
+        await session.set('count', count)
 
-    global[SINK] = (level: string, message: string) => level === 'warn' && warnings.push(message)
-    process.env.NODE_ENV = 'production'
+        return String(count)
+      })
+      .get('/peek', async ({ session }) => String(await session.get('count') ?? 'none'))
+      .get('/out', async ({ session }) => {
+        await session.destroy()
 
-    try {
-      const plugin = session({ secret: SECRET })
+        return 'out'
+      })
 
-      plugin.endsSessionsElsewhere()
-      await new Elysia().use(plugin).get('/plain', async ({ session }) => {
+    beforeEach(unset)
+    afterEach(unset)
+
+    it('keeps the data in the default store, the cookie carrying an id alone, and warns of nothing', async () => {
+      const logged = await logsOf(async () => {
+        const visit = browser(plain())
+
+        await visit('/count')
+
+        const { cookie } = await visit('/count')
+
+        expect(cookie().length).toBeLessThan(200)
+        expect((await visit('/peek')).text).toBe('2')
+      })
+
+      expect(logged).toEqual([])
+    })
+
+    it('revokes a session wherever a copy of its cookie is', async () => {
+      const visit = browser(plain())
+
+      await visit('/count')
+
+      const copy = (await visit('/count')).cookie()
+
+      await visit('/out')
+      expect(await (await plain().handle(new Request('http://localhost/peek', { headers: { cookie: copy } }))).text()).toBe('none')
+    })
+
+    it('shares the default store between the session plugins of one process', async () => {
+      const first = browser(plain())
+      const { cookie } = await first('/count')
+
+      expect(await (await plain().handle(new Request('http://localhost/peek', { headers: { cookie: cookie() } }))).text()).toBe('1')
+    })
+
+    it('leaves the app\'s store.sessions and the plugin\'s own store to win over it', async () => {
+      const own = memorySessions()
+      const app = memorySessions()
+
+      await browser(plain({ store: own }))('/count')
+      setupStore({ sessions: app })
+      await browser(plain())('/count')
+
+      expect([...(await own.deleteWhere(() => true) ? [1] : [])]).toEqual([1])
+      expect(await app.deleteWhere(() => true)).toBe(1)
+    })
+
+    it('keeps the data in the cookie under store: false, and where a library ends sessions itself', async () => {
+      const visit = browser(plain({ store: false }))
+
+      await visit('/count')
+      expect((await visit('/count')).cookie().length).toBeGreaterThan(100)
+
+      const library = session<{ count: number }>({ secret: SECRET })
+
+      library.endsSessionsElsewhere()
+
+      const cookie = (await browser(new Elysia().use(library).get('/count', async ({ session }) => {
         await session.set('count', 1)
 
         return 'ok'
-      }).handle(new Request('http://localhost/plain'))
-    }
-    finally {
-      global[SINK] = sink
+      }))('/count')).cookie()
 
-      if (environment === undefined)
-        delete process.env.NODE_ENV
-      else
-        process.env.NODE_ENV = environment
-    }
+      expect(cookie.length).toBeGreaterThan(70)
+      expect(await (await plain({ store: false }).handle(new Request('http://localhost/peek', { headers: { cookie } }))).text()).toBe('1')
+    })
 
-    expect(warnings).toEqual([])
+    it('keeps its sessions in data/sessions.sqlite outside a test, as jobs keep data/jobs.sqlite', async () => {
+      const source = await Bun.file(join(import.meta.dir, '../src/server/session.ts')).text()
+
+      expect(source).toContain('sqliteSessions(DEFAULT_SESSIONS_PATH)')
+      expect(source).toContain('DEFAULT_SESSIONS_PATH = \'data/sessions.sqlite\'')
+    })
   })
 
   describe('in the app store', () => {
@@ -184,7 +214,7 @@ describe('sessions', () => {
 
     it('keeps a session naming no store in the app\'s store.sessions, set after the session was made', async () => {
       const app = recording()
-      const visit = browser(counter())
+      const visit = browser(counter({ store: undefined }))
 
       setupStore({ sessions: app.store })
       expect((await visit('/count')).text).toBe('1')
@@ -204,12 +234,17 @@ describe('sessions', () => {
 
     it('opens no session from a cookie holding its data once the app has a store, as no sign-out could end a copy of it', async () => {
       const app = recording()
-      const visit = browser(counter())
+      const before = browser(counter())
 
-      expect((await visit('/count')).text).toBe('1')
+      expect((await before('/count')).text).toBe('1')
+
+      const { cookie } = await before('/count')
+
       setupStore({ sessions: app.store })
-      expect((await visit('/count')).text).toBe('1')
-      expect((await visit('/peek')).text).toBe('1')
+
+      const visit = browser(counter({ store: undefined }))
+
+      expect((await visit('/count', { headers: { cookie: cookie() } })).text).toBe('1')
       expect(app.kept).toEqual([{ count: 1 }])
     })
   })
@@ -878,7 +913,7 @@ describe('sessions', () => {
     await visit('/count')
     expect([...saved.values()]).toEqual([{ count: 1 }])
 
-    const big = new Elysia().use(session<{ text: string }>({ secret: SECRET })).get('/', async ({ session }) => {
+    const big = new Elysia().use(session<{ text: string }>({ secret: SECRET, store: false })).get('/', async ({ session }) => {
       await session.set('text', 'x'.repeat(4000))
 
       return 'ok'

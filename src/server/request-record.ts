@@ -23,6 +23,8 @@ export class RequestRecord {
   server: Server<unknown> | undefined = undefined
   // The `proxy` setting of the app it reached, undefined for one setting none.
   proxy: ProxyConfig | undefined = undefined
+  // Whether the app set `proxy: false`, saying none is in front, which silences the warning about a forwarded header.
+  proxyOff: true | undefined = undefined
   // The app that received it, which serves an action a library calls as a tool when no server does; held weakly, so an app nothing reaches any more goes.
   app: WeakRef<Elysia> | undefined = undefined
   // Its id, drawn on first read or passed on by a trusted proxy or a rewrite.

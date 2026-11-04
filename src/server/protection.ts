@@ -66,6 +66,9 @@ const limitLists = new WeakMap<object, ActionLimit[]>()
 // One memory store per limit, so clients flooding one never push another's windows out, such as a login form's.
 const memories = new Map<string, ReturnType<typeof memoryRates>>()
 let warnedUnconfigured = false
+let notedInferred = false
+// The setting a production app with no `proxy` gets.
+const INFERRED_PROXY: ProxyConfig = { hops: 1 }
 // The proxy settings already warned about a forwarded header from a public peer, once each, by what they say: plain Elysia may pass a fresh object per request.
 const warnedUntrusted = new Set<string>()
 // Each list of `trusted` ranges, read once.
@@ -831,8 +834,10 @@ export function checkProxy(setting: ProxyConfig | number | boolean | undefined):
 }
 
 // Records the app's proxy settings on each request it gets, for `clientAddress` to read them wherever it is called from.
+// In production a `proxy` left out is one proxy in front, read from private addresses only: a server there is behind one far more often than it faces visitors, and `false` says it is not.
 export function trustProxy(app: Elysia, setting: ProxyConfig | number | boolean | undefined): void {
-  const proxy = checkProxy(setting)
+  const proxy = checkProxy(setting) ?? (setting === undefined && process.env.NODE_ENV === 'production' ? INFERRED_PROXY : undefined)
+  const off = setting === false
 
   app.onRequest(({ request, server }) => {
     const record = requestRecord(request)
@@ -841,6 +846,8 @@ export function trustProxy(app: Elysia, setting: ProxyConfig | number | boolean 
 
     if (server)
       record.server = server
+
+    record.proxyOff = off ? true : undefined
   })
 }
 
@@ -862,14 +869,18 @@ export function knownAddress(request: Request, server: Server<unknown> | null | 
   if (trusted && fromProxy) {
     const forwarded = forwardedAddress(request, trusted)
 
-    if (forwarded !== undefined && forwarded !== '')
+    if (forwarded !== undefined && forwarded !== '') {
+      if (trusted === INFERRED_PROXY && address !== undefined)
+        noteInferred()
+
       return forwarded
+    }
   }
 
-  if (!trusted && address !== undefined && fromProxy && request.headers.has('x-forwarded-for'))
+  if (!trusted && address !== undefined && fromProxy && record?.proxyOff !== true && request.headers.has('x-forwarded-for'))
     warnUnconfigured()
 
-  if (trusted && !fromProxy && request.headers.has(trusted.header ?? 'x-forwarded-for'))
+  if (trusted && trusted !== INFERRED_PROXY && !fromProxy && request.headers.has(trusted.header ?? 'x-forwarded-for'))
     warnUntrusted(trusted, address)
 
   return address
@@ -998,6 +1009,14 @@ function warnUntrusted(proxy: ProxyConfig, address: string): void {
   warnedUntrusted.add(key)
 
   kayLog('warn', `a request from ${address} carries ${header}, but that address is public and not in proxy.trusted, so kay counts it as the client and ignores the header; a CDN reaching the server from public addresses has its ranges listed in proxy.trusted`)
+}
+
+function noteInferred(): void {
+  if (notedInferred)
+    return
+
+  notedInferred = true
+  kayLog('info', 'requests come through a proxy, as their X-Forwarded-For from a private address shows, and kay.config.ts sets no proxy, so kay counts one proxy in front and reads the visitor from the last entry; set proxy: true to say so, proxy: 2 or proxy: { header } for another setup, or proxy: false when none is in front')
 }
 
 function warnUnconfigured(): void {

@@ -7,6 +7,7 @@ import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { countJobRun } from '../runtime/counters'
 import { DURATION_TEXT, durationSeconds } from '../runtime/duration'
+import { timeZone } from '../runtime/i18n'
 import { kayLog } from '../runtime/log'
 import { MAX_TIMER_MS } from './config-limits'
 import { onDrain, stopGraceMs, STOPPED } from './drain'
@@ -15,7 +16,7 @@ import { defaultJobStore } from './queue'
 import { reportBackgroundError } from './report'
 
 export interface ScheduleOptions {
-  // IANA time zone the schedule reads in, such as `Europe/Paris`; the system's by default.
+  // IANA time zone the schedule reads in, such as `Europe/Paris`; the config's `timeZone` by default, else the system's.
   tz?: string | undefined
   // Runs each time once across every process sharing the job store, the first to reach it taking it: names the lock, unique per schedule.
   // A production server (`NODE_ENV=production`) locks every schedule by default, under a name made of its schedule and its job's source; `false` runs it in every process, and `KAY_LOCK_SCHEDULES=false` makes that the default of an app running one process.
@@ -116,7 +117,13 @@ export function schedule(first: Duration | string | Record<string, Jobs>, second
 }
 
 function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
-  const zone = options.tz === undefined ? {} : { tz: options.tz }
+  const zoneNow = (): { tz?: string } => {
+    const tz = options.tz ?? timeZone()
+
+    return tz === undefined ? {} : { tz }
+  }
+
+  const zone = zoneNow()
 
   // A typo fails the boot rather than never running.
   if (Bun.cron.parse(cron, Date.now(), zone) === null)
@@ -140,10 +147,11 @@ function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: Au
       if (options.boot === true)
         running = run(true)
 
+      // The config's zone is installed once the app is set up, which comes after this plugin is made.
       handle = Bun.cron(cron, async () => {
         running = after(running, run)
         await running
-      }, zone)
+      }, zoneNow())
     })
     .onStop(async () => {
       forgetDrain?.()
