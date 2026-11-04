@@ -1,4 +1,4 @@
-import { ApiError } from './api-error'
+import { ApiError } from './api-error-class'
 import { skew } from './build'
 import { ISLAND_HEADER, ISLAND_PARAM } from './server-islands'
 

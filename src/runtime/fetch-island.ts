@@ -1,4 +1,4 @@
-import { ApiError } from './api-error'
+import { ApiError } from './api-error-class'
 import { requestIsland } from './island-request'
 
 export interface FetchedIsland extends HTMLElement {

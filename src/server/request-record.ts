@@ -41,7 +41,7 @@ export class RequestRecord {
   servedThrough: Handle | undefined = undefined
   // Its clock and signal, made on first use; and whether its page streams its body, which the timeout then cuts short.
   deadline: Deadline | undefined = undefined
-  streamed = false
+  streamed: true | undefined = undefined
   // The errors already reported for it, so the catch-all reports none twice.
   reported: Set<unknown> | undefined = undefined
   // Its context as kay's guards and handlers read it, copied once so they share it.
