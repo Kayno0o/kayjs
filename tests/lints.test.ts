@@ -1208,6 +1208,24 @@ describe('unreturned-fail', () => {
     expect(found(`export const a = action(s.Object({}), (input, ctx) => {\n  // kay-allow unreturned-fail\n  ctx.fail(400, 'x')\n})`)).toEqual([])
   })
 
+  it('reports an awaited fail, and one on a side of &&, || or a ternary, fixing only a direct call', () => {
+    expect(found('export const a = action(s.Object({}), async (input, ctx) => {\n  await ctx.fail(400, \'x\')\n})')).toHaveLength(1)
+    expect(fixed(server('export const a = action(s.Object({ n: s.String({ maxLength: 9 }) }), async (input, ctx) => {\n  await ctx.fail(400, \'x\')\n})'))[0]).toContain('return await ctx.fail')
+    expect(found('export const a = action(s.Object({}), (input, ctx) => {\n  input && ctx.fail(400, \'x\')\n})')).toHaveLength(1)
+    expect(found('export const a = action(s.Object({}), (input, ctx) => {\n  input ? ctx.fail(400, \'x\') : ctx.fail(500, \'y\')\n})')).toHaveLength(2)
+    expect(lints(server('export const a = action(s.Object({}), (input, ctx) => {\n  input && ctx.fail(400, \'x\')\n})')).filter(d => d.code === 'unreturned-fail')).toHaveLength(1)
+    expect(fixed(server('export const a = action(s.Object({}), (input, ctx) => {\n  input && ctx.fail(400, \'x\')\n})'))).toEqual([])
+  })
+
+  it('matches action only when kay gives it, and visits a nested action once', () => {
+    const body = 'export const a = action(s.Object({}), (input, ctx) => {\n  ctx.fail(400, \'x\')\n})'
+
+    expect(found(body.replace('action', 'make'))).toEqual([])
+    expect(lints(`--- server\nimport { action } from './mine'\nimport { s } from 'kay'\n\n${body}\n---\np x`).filter(d => d.code === 'unreturned-fail')).toEqual([])
+    expect(lints(`--- server\nimport { action as act, s } from 'kay'\n\n${body.replace('action', 'act')}\n---\np x`).filter(d => d.code === 'unreturned-fail')).toHaveLength(1)
+    expect(found('export const a = action(s.Object({}), (input, ctx) => {\n  const b = action(s.Object({}), (i, c) => {\n    c.fail(400, \'x\')\n  })\n  ctx.fail(400, \'y\')\n})')).toHaveLength(2)
+  })
+
   it('is found in a plain module as in a fence', () => {
     const module = 'export const a = action(s.Object({}), (input, ctx) => {\n  ctx.fail(400, \'x\')\n})'
 

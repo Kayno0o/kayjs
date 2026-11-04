@@ -534,15 +534,58 @@ function failReader(ctx: Node | undefined): ((call: NodeOfType<'CallExpression'>
   return undefined
 }
 
+// The `fail` calls an expression statement drops: the call itself, awaited, or on either side of `&&`, `||`, `??` and a ternary.
+function droppedFails(node: Node, reads: (call: NodeOfType<'CallExpression'>) => boolean): NodeOfType<'CallExpression'>[] {
+  if (node.type === 'CallExpression')
+    return reads(node) ? [node] : []
+
+  if (node.type === 'AwaitExpression')
+    return droppedFails(node.argument, reads)
+
+  if (node.type === 'LogicalExpression')
+    return [...droppedFails(node.left, reads), ...droppedFails(node.right, reads)]
+
+  if (node.type === 'ConditionalExpression')
+    return [...droppedFails(node.consequent, reads), ...droppedFails(node.alternate, reads)]
+
+  return node.type === 'ParenthesizedExpression' || node.type === 'TSNonNullExpression' ? droppedFails(node.expression, reads) : []
+}
+
+// The names `action` is called by: the one `kay` gives with no import, and the aliases imported from it; none when another module's or a local one takes the name.
+function actionNames(fence: ParsedFence): Set<string> {
+  const names = new Set(['action'])
+
+  for (const node of fence.ast.body) {
+    if (node.type === 'ImportDeclaration') {
+      for (const specifier of node.specifiers) {
+        const name = specifier.type === 'ImportSpecifier' ? specifier.imported : undefined
+        const imported = name?.type === 'Identifier' ? name.name : name?.value
+
+        if (node.source.value === 'kay' && imported === 'action')
+          names.add(specifier.local.name)
+        else if (specifier.local.name === 'action')
+          names.delete('action')
+      }
+    }
+    else if ((node.type === 'FunctionDeclaration' && node.id?.name === 'action') || (node.type === 'VariableDeclaration' && node.declarations.some(declaration => patternNames(declaration.id).includes('action')))) {
+      names.delete('action')
+    }
+  }
+
+  return names
+}
+
 // A `ctx.fail(...)` statement in an action's handler: `fail` returns the failure, where `deny`, `notFound` and `redirect` throw, so a statement not returned does nothing and the handler carries on.
 export function unreturnedFails(fence: ParsedFence): Diagnostic[] {
   if (!fence.code.includes('fail(') || !fence.code.includes('action'))
     return []
 
   const diagnostics: Diagnostic[] = []
+  const names = actionNames(fence)
+  const seen = new Set<number>()
 
   eachNode(fence.ast, (node) => {
-    if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== 'action')
+    if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || !names.has(node.callee.name))
       return
 
     const handler = node.arguments.findIndex(argument => argument.type === 'ArrowFunctionExpression' || argument.type === 'FunctionExpression')
@@ -560,15 +603,25 @@ export function unreturnedFails(fence: ParsedFence): Diagnostic[] {
       if (isFunction(inner))
         return false
 
-      if (inner.type === 'ExpressionStatement' && inner.expression.type === 'CallExpression' && reads(inner.expression)) {
-        diagnostics.push({
-          ...fence.shift(inner.expression),
-          code: 'unreturned-fail',
-          message: 'This `fail()` is not returned, so it does nothing and the handler carries on',
-          note: '`fail` returns the failure the action answers with, where `deny`, `notFound` and `redirect` throw',
-          help: 'write `return ctx.fail(...)`',
-          fixes: [{ title: 'Return it', edits: [{ start: fence.offset + inner.start, end: fence.offset + inner.start, text: 'return ' }], safe: true }],
-        })
+      if (inner.type === 'ExpressionStatement') {
+        const { expression } = inner
+        const awaited = expression.type === 'AwaitExpression' ? expression.argument : expression
+        const direct = awaited.type === 'CallExpression' ? awaited : undefined
+
+        for (const call of droppedFails(inner.expression, reads)) {
+          if (seen.has(call.start))
+            continue
+
+          seen.add(call.start)
+          diagnostics.push({
+            ...fence.shift(call),
+            code: 'unreturned-fail',
+            message: 'This `fail()` is not returned, so it does nothing and the handler carries on',
+            note: '`fail` returns the failure the action answers with, where `deny`, `notFound` and `redirect` throw',
+            help: 'write `return ctx.fail(...)`',
+            fixes: call === direct ? [{ title: 'Return it', edits: [{ start: fence.offset + inner.start, end: fence.offset + inner.start, text: 'return ' }], safe: true }] : [],
+          })
+        }
       }
 
       return true
