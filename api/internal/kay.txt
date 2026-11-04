@@ -996,6 +996,9 @@ interface Logo
 [./library] matchLocale
 function matchLocale(locales: readonly string[], wanted: readonly string[]): string | undefined
 
+[./library] MaybePromise
+type MaybePromise<T> = T | Promise<T>
+
 [./library] memoryRates
 function memoryRates(): SyncRates
 

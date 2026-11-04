@@ -37,6 +37,7 @@ export { isUrlAttribute, UNSAFE_ATTRIBUTE, UNSAFE_TAGS } from '../runtime/saniti
 export { configuredSite, setSite } from '../runtime/site'
 export { openSqlite } from '../runtime/sqlite.server'
 export { parseEvents } from '../runtime/sse'
+export type { MaybePromise } from '../runtime/store-base'
 export { defineContext } from '../runtime/template-context'
 export type { ContextDefinition } from '../runtime/template-context'
 export { acceptedLocales, matchLocale, validLocale } from './accept-language'

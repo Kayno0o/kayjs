@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite'
+import type { MaybePromise } from 'kay/library'
 import type { SuppressionStore } from './suppressions'
 import { openSqlite } from 'kay/library'
 import { suppressionsIn } from './suppressions'
@@ -35,35 +36,33 @@ export interface Broadcast {
 }
 
 // A store answers synchronously (SQLite) or with a promise (Postgres): callers await every call.
-type Maybe<T> = T | Promise<T>
-
 // What the mailing lists keep their data in; `openLists` is the SQLite one, `pgLists` the Postgres one, both with the same semantics: a delivery is claimed before its mail goes, and removing or erasing a subscriber takes its deliveries with it.
 export interface ListStore {
   // Whether the store was closed, which the sweep then leaves alone.
   readonly closed?: boolean
   // The address's row on the list, made pending when it has none, with the proof of the post that made it.
-  ask: (list: string, email: string, id: string, locale: string, now?: number, proof?: Proof) => Maybe<Subscriber>
+  ask: (list: string, email: string, id: string, locale: string, now?: number, proof?: Proof) => MaybePromise<Subscriber>
   // Forgets the confirmations nobody clicked in 7 days and the broadcasts finished 30 days ago with their deliveries, which the lists run when a store opens and every hour.
-  sweep: (now?: number) => Maybe<void>
+  sweep: (now?: number) => MaybePromise<void>
   // Whether the subscriber is confirmed after the call; one confirmed already stays as it is. A `issuedAt` confirms only a row asked before it, so the link of an earlier mail cannot confirm a later sign-up.
-  confirm: (list: string, id: string, now?: number, issuedAt?: number) => Maybe<boolean>
-  remove: (list: string, id: string) => Maybe<boolean>
-  removeEmail: (list: string, email: string) => Maybe<boolean>
+  confirm: (list: string, id: string, now?: number, issuedAt?: number) => MaybePromise<boolean>
+  remove: (list: string, id: string) => MaybePromise<boolean>
+  removeEmail: (list: string, email: string) => MaybePromise<boolean>
   // Takes the address off every list of the store, with its deliveries; how many rows went.
-  erase: (email: string) => Maybe<number>
+  erase: (email: string) => MaybePromise<number>
   // Every row of the address, whatever its list and state, oldest first.
-  forEmail: (email: string) => Maybe<Subscriber[]>
-  subscribers: (list: string) => Maybe<Subscriber[]>
-  count: (list: string) => Maybe<number>
-  addBroadcast: (id: string, list: string, message: string, now?: number) => Maybe<void>
-  broadcast: (id: string) => Maybe<Broadcast | undefined>
-  finish: (id: string, now?: number) => Maybe<unknown>
-  next: (broadcast: Broadcast, limit: number) => Maybe<Subscriber[]>
+  forEmail: (email: string) => MaybePromise<Subscriber[]>
+  subscribers: (list: string) => MaybePromise<Subscriber[]>
+  count: (list: string) => MaybePromise<number>
+  addBroadcast: (id: string, list: string, message: string, now?: number) => MaybePromise<void>
+  broadcast: (id: string) => MaybePromise<Broadcast | undefined>
+  finish: (id: string, now?: number) => MaybePromise<unknown>
+  next: (broadcast: Broadcast, limit: number) => MaybePromise<Subscriber[]>
   // Claims the recipient before the mail goes, so a process that dies inside the send is never followed by one sending it again; false when it was claimed already or left the list.
-  claim: (broadcast: string, subscriber: string, now?: number) => Maybe<boolean>
-  sent: (broadcast: string, subscriber: string, now?: number) => Maybe<unknown>
-  release: (broadcast: string, subscriber: string, now?: number) => Maybe<unknown>
-  progress: (broadcast: Broadcast) => Maybe<BroadcastProgress>
+  claim: (broadcast: string, subscriber: string, now?: number) => MaybePromise<boolean>
+  sent: (broadcast: string, subscriber: string, now?: number) => MaybePromise<unknown>
+  release: (broadcast: string, subscriber: string, now?: number) => MaybePromise<unknown>
+  progress: (broadcast: Broadcast) => MaybePromise<BroadcastProgress>
   // Bounces and complaints, as a `SuppressionStore` keeps them, which a store of an app's own may leave out: the mailer then keeps them in its `suppressionStore`, else the default file.
   suppress?: SuppressionStore['suppress'] | undefined
   suppressed?: SuppressionStore['suppressed'] | undefined

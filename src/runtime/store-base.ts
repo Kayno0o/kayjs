@@ -1,3 +1,6 @@
+// What a store method answers when it may or may not wait: the value at once, or a promise of it, so a store over memory or a file answers at once and one over a database or Redis answers later. Callers `await` every call.
+export type MaybePromise<T> = T | Promise<T>
+
 // What every store an app plugs in may have, whatever it keeps: `ping` and `close`, both optional and either may return a promise, so a store with neither costs nothing. Callers only await the result, so `close: () => redis.quit()` fits.
 // `AppStore` extends it too, so a store keeping every kind (`pgData`) pings and closes them all with one method.
 export interface StoreBase {

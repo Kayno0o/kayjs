@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite'
 import type { Duration } from '../runtime/duration'
-import type { StoreBase } from '../runtime/store-base'
+import type { MaybePromise, StoreBase } from '../runtime/store-base'
 import type { Hook } from './hooks'
 import type { LiveJob } from './queue-live'
 import type { WorkflowAdmin } from './workflow'
@@ -50,45 +50,43 @@ export interface StoredJobState extends StoredJob {
   status: 'waiting' | 'running' | 'failed'
 }
 
-type Maybe<T> = T | Promise<T>
-
 // Where queued jobs wait, shared by every process opening it: `sqliteJobs` by default, or one of an app's own, Redis or Postgres say.
 export interface JobStore extends StoreBase {
   // Keeps a job, unless it has a `key` that a waiting or running job of its queue holds already: then it keeps nothing and resolves with that job's id, atomically, whichever process added it. A store without `state` ignores keys.
-  add: (job: StoredJob) => Maybe<string | void>
+  add: (job: StoredJob) => MaybePromise<string | void>
   // Takes the queue's next job whose time has come and that no process holds, holding it until `until`, past which a process that died running it is taken as gone; one process at a time gets a job.
   // A store keeping time of its own may hold it for `until - now` from its clock instead, and says so in the job's `heldUntil`.
-  claim: (queue: string, now: number, until: number) => Maybe<StoredJob | undefined>
+  claim: (queue: string, now: number, until: number) => MaybePromise<StoredJob | undefined>
   // Removes it. With the hold `until` it was claimed with, only while that hold is still the job's, so a run that finishes late never completes the job another process holds; without it, whatever the hold.
-  complete: (id: string, until?: number) => Maybe<void>
+  complete: (id: string, until?: number) => MaybePromise<void>
   // Runs it again at `runAt`, only while the hold `until` is still the job's when it is given. Resolves with `false` when the write did not apply, the hold being another's, so the run reports nothing; a store resolving with nothing counts as having applied it.
-  retry: (id: string, runAt: number, error: string, until?: number) => Maybe<boolean | void>
+  retry: (id: string, runAt: number, error: string, until?: number) => MaybePromise<boolean | void>
   // Gives a job back untouched, its attempt not counted, for the next process to take: a run stopped by a shutdown. Only while the hold `until` it was claimed with is still the job's, so a late release never clears another process's claim. A store without it has the job retried after its backoff as any failed run.
   // With `runAt`, the job is due then rather than at once: a run that wants another go later without spending an attempt.
-  release?: ((id: string, until: number, runAt?: number) => Maybe<void>) | undefined
+  release?: ((id: string, until: number, runAt?: number) => MaybePromise<void>) | undefined
   // Writes what the run holding the job until `until` reports, devalue text, only while that hold is still the job's; a claim clears it.
-  progress?: ((id: string, until: number, progress: string) => Maybe<void>) | undefined
+  progress?: ((id: string, until: number, progress: string) => MaybePromise<void>) | undefined
   // The waiting or running job of the queue with that key or id, else its last failed one, `now` telling a held job from one whose hold ran out; undefined for a job that completed.
-  state?: ((queue: string, ref: { key: string } | { id: string }, now: number) => Maybe<StoredJobState | undefined>) | undefined
+  state?: ((queue: string, ref: { key: string } | { id: string }, now: number) => MaybePromise<StoredJobState | undefined>) | undefined
   // The waiting and running jobs of the queue by when they are due, the earliest first, `limit` of them at most, each with its status as `state` tells it at `now`: what a queue with `live` shows its pages, read in one query. A store without it is listed with `jobs` and asked `state` job by job.
-  live?: ((queue: string, now: number, limit?: number) => Maybe<StoredJobState[]>) | undefined
+  live?: ((queue: string, now: number, limit?: number) => MaybePromise<StoredJobState[]>) | undefined
   // Rewrites a job in place: its payload, and when it is due when `runAt` is given. With `{ until }`, only while that hold is still the job's, and the run counts as having started once (a checkpoint of a run that goes on); with `{ payload, now }`, only while the job is not held and its payload is still that text (an event waking a waiting run). Resolves with whether it applied. `workflow` needs it.
-  update?: ((id: string, change: { payload: string, runAt?: number | undefined }, guard: { until: number } | { payload: string, now: number }) => Maybe<boolean>) | undefined
+  update?: ((id: string, change: { payload: string, runAt?: number | undefined }, guard: { until: number } | { payload: string, now: number }) => MaybePromise<boolean>) | undefined
   // Keeps it as failed, out of the queue, with `payload` in place of the stored one when the queue redacts what it keeps; a store ignoring it keeps the payload whole. Only while the hold `until` is still the job's when it is given.
   // Resolves with `false` when the hold was another's and nothing was written, as `retry` does.
-  fail: (id: string, error: string, payload?: string, until?: number) => Maybe<boolean | void>
+  fail: (id: string, error: string, payload?: string, until?: number) => MaybePromise<boolean | void>
   // Removes the failed jobs of the queue whose time came before `before`, and resolves with how many went; a store without it has them listed with `failed` and removed one by one.
-  purge?: ((queue: string, before: number) => Maybe<number>) | undefined
+  purge?: ((queue: string, before: number) => MaybePromise<number>) | undefined
   // The failed jobs of the queue, oldest first, `limit` of them at most when it is given.
-  failed: (queue: string, limit?: number) => Maybe<StoredJob[]>
+  failed: (queue: string, limit?: number) => MaybePromise<StoredJob[]>
   // Puts a failed job back to wait, due at `runAt` with its attempts given back, for a retry from the dev tool or a jobs page; resolves with whether it did: false for a job that is not failed, or whose key a live job holds since.
-  revive?: ((id: string, runAt: number) => Maybe<boolean>) | undefined
+  revive?: ((id: string, runAt: number) => MaybePromise<boolean>) | undefined
   // Every job of the queue, waiting or failed, by when it is due, the earliest first, which `remove` looks through for a payload; a store without it removes jobs by id alone. The dev tool and the jobs page pass `failed: false` for the live ones and a `limit`, so a long queue is never read whole.
-  jobs?: ((queue: string, options?: { limit?: number, failed?: boolean }) => Maybe<StoredJob[]>) | undefined
+  jobs?: ((queue: string, options?: { limit?: number, failed?: boolean }) => MaybePromise<StoredJob[]>) | undefined
   // When the queue's next job may run, so a worker sleeps until then.
-  nextRunAt: (queue: string) => Maybe<number | undefined>
+  nextRunAt: (queue: string) => MaybePromise<number | undefined>
   // True for the first caller naming this lock and slot, in any process: a schedule's run happens once.
-  lock: (name: string, slot: number) => Maybe<boolean>
+  lock: (name: string, slot: number) => MaybePromise<boolean>
 }
 
 export interface QueueOptions<Payload> {

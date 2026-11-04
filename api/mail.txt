@@ -184,27 +184,27 @@ interface ListOptions
 
 [.] ListStore
 interface ListStore
-  addBroadcast: (id: string, list: string, message: string, now?: number | undefined) => Maybe<void>
-  ask: (list: string, email: string, id: string, locale: string, now?: number | undefined, proof?: Proof | undefined) => Maybe<Subscriber>
-  broadcast: (id: string) => Maybe<Broadcast | undefined>
-  claim: (broadcast: string, subscriber: string, now?: number | undefined) => Maybe<boolean>
+  addBroadcast: (id: string, list: string, message: string, now?: number | undefined) => MaybePromise<void>
+  ask: (list: string, email: string, id: string, locale: string, now?: number | undefined, proof?: Proof | undefined) => MaybePromise<Subscriber>
+  broadcast: (id: string) => MaybePromise<Broadcast | undefined>
+  claim: (broadcast: string, subscriber: string, now?: number | undefined) => MaybePromise<boolean>
   closed?: boolean
-  confirm: (list: string, id: string, now?: number | undefined, issuedAt?: number | undefined) => Maybe<boolean>
-  count: (list: string) => Maybe<number>
-  erase: (email: string) => Maybe<number>
+  confirm: (list: string, id: string, now?: number | undefined, issuedAt?: number | undefined) => MaybePromise<boolean>
+  count: (list: string) => MaybePromise<number>
+  erase: (email: string) => MaybePromise<number>
   finish: (id: string, now?: number | undefined) => unknown
-  forEmail: (email: string) => Maybe<Subscriber[]>
-  lift?: ((email: string) => Maybe<boolean>) | undefined
-  next: (broadcast: Broadcast, limit: number) => Maybe<Subscriber[]>
-  progress: (broadcast: Broadcast) => Maybe<BroadcastProgress>
+  forEmail: (email: string) => MaybePromise<Subscriber[]>
+  lift?: ((email: string) => MaybePromise<boolean>) | undefined
+  next: (broadcast: Broadcast, limit: number) => MaybePromise<Subscriber[]>
+  progress: (broadcast: Broadcast) => MaybePromise<BroadcastProgress>
   release: (broadcast: string, subscriber: string, now?: number | undefined) => unknown
-  remove: (list: string, id: string) => Maybe<boolean>
-  removeEmail: (list: string, email: string) => Maybe<boolean>
+  remove: (list: string, id: string) => MaybePromise<boolean>
+  removeEmail: (list: string, email: string) => MaybePromise<boolean>
   sent: (broadcast: string, subscriber: string, now?: number | undefined) => unknown
-  subscribers: (list: string) => Maybe<Subscriber[]>
-  suppress?: ((email: string, reason: SuppressionReason, source: string, now?: number | undefined) => Maybe<void>) | undefined
-  suppressed?: ((emails: string[]) => Maybe<Suppression[]>) | undefined
-  sweep: (now?: number | undefined) => Maybe<void>
+  subscribers: (list: string) => MaybePromise<Subscriber[]>
+  suppress?: ((email: string, reason: SuppressionReason, source: string, now?: number | undefined) => MaybePromise<void>) | undefined
+  suppressed?: ((emails: string[]) => MaybePromise<Suppression[]>) | undefined
+  sweep: (now?: number | undefined) => MaybePromise<void>
 
 [.] Logo
 interface Logo
@@ -451,9 +451,9 @@ type SuppressionReason = 'bounce' | 'complaint'
 
 [.] SuppressionStore
 interface SuppressionStore
-  lift: (email: string) => Maybe<boolean>
-  suppress: (email: string, reason: SuppressionReason, source: string, now?: number | undefined) => Maybe<void>
-  suppressed: (emails: string[]) => Maybe<Suppression[]>
+  lift: (email: string) => MaybePromise<boolean>
+  suppress: (email: string, reason: SuppressionReason, source: string, now?: number | undefined) => MaybePromise<void>
+  suppressed: (emails: string[]) => MaybePromise<Suppression[]>
 
 [.] TextContent
 interface TextContent

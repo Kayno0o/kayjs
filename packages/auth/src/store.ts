@@ -1,4 +1,5 @@
 import type { Duration } from 'kay'
+import type { MaybePromise } from 'kay/library'
 import type { AuthRates } from './rates'
 // An account as kayjs-auth stores it. The app sees a `User`, which leaves the secrets out.
 export interface UserRecord {
@@ -399,4 +400,4 @@ export interface PruneLimits {
   sessionAbsoluteMaxAge: Duration
 }
 
-export type MaybePromise<T> = T | Promise<T>
+export type { MaybePromise }

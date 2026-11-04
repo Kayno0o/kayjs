@@ -1,20 +1,19 @@
 import type { Database } from 'bun:sqlite'
+import type { MaybePromise } from 'kay/library'
 import type { Suppression, SuppressionReason } from './events'
 import { existsSync } from 'node:fs'
 import { openSqlite } from 'kay/library'
 import { normalizeAddress } from './list-address'
 import { log } from './log'
 
-type Maybe<T> = T | Promise<T>
-
 // Where bounces and complaints are kept, the addresses in `normalizeAddress` form: `pgSuppressions(db)`, `sqliteSuppressions(path)`, or a list store, which keeps them beside its lists.
 export interface SuppressionStore {
   // Remembers the address as one not to mail again, keeping the first reason and time it was given.
-  suppress: (email: string, reason: SuppressionReason, source: string, now?: number) => Maybe<void>
+  suppress: (email: string, reason: SuppressionReason, source: string, now?: number) => MaybePromise<void>
   // The addresses among these that are suppressed, with why.
-  suppressed: (emails: string[]) => Maybe<Suppression[]>
+  suppressed: (emails: string[]) => MaybePromise<Suppression[]>
   // Mails the address again; whether it was suppressed.
-  lift: (email: string) => Maybe<boolean>
+  lift: (email: string) => MaybePromise<boolean>
 }
 
 // The suppressions table of an open SQLite database, made unless it exists.
