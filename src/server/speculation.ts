@@ -16,9 +16,17 @@ function chain(length: number): string {
 // A link follows its nearest `data-prefetch`, itself or an ancestor. CSS cannot ask for the nearest, but the chain of off and on elements above a link, squeezed to alternate, ends on off exactly when its longest subsequence starting on off has an odd length, so the selector lists each odd length that the next one does not reach, up to a nesting of NESTING levels (off in on, on in off, off in on in off) to keep the selector, which every page carries, short. Deeper nesting fails open: a link marked off under three or more alternations is still prefetched by these rules, while the JS prefetch keeps the nearest rule.
 const OPTED_OUT = Array.from({ length: (NESTING + 1) / 2 }, (_, at) => `:is(${chain(at * 2 + 1)}):not(:is(${chain(at * 2 + 2)}))`).join(', ')
 
-// Under a mount point or a moved API, one script per setting, base and API path, made once.
-const MOUNTED = new Map<string, string>()
-const RULES = new Map<string, string>((['conservative', 'moderate', 'eager'] as const).flatMap(eagerness => [[eagerness, rules(eagerness, true)], [`${eagerness}\nflat`, rules(eagerness, false)]]))
+// One script per setting, form, base and API path, made once.
+const SCRIPTS = new Map<string, string>()
+
+function keyOf(eagerness: string, nearest: boolean, base: string, apiPath: string): string {
+  return `${eagerness}\n${nearest}\n${base}\n${apiPath}`
+}
+
+for (const eagerness of ['conservative', 'moderate', 'eager'] as const) {
+  for (const nearest of [true, false])
+    SCRIPTS.set(keyOf(eagerness, nearest, '', '/api'), rules(eagerness, nearest))
+}
 
 // Browsers without speculation rules ignore the script, so a link still loads as usual there.
 // Under a mount point, only its own pages are prefetched.
@@ -27,14 +35,11 @@ export function speculationRules(prefetch: Prefetch = 'moderate', base = '', api
   if (prefetch === false)
     return ''
 
-  if (base === '' && apiPath === '/api')
-    return RULES.get(nearest ? prefetch : `${prefetch}\nflat`) ?? ''
-
-  const key = `${prefetch}\n${base}\n${apiPath}\n${nearest}`
-  let script = MOUNTED.get(key)
+  const key = keyOf(prefetch, nearest, base, apiPath)
+  let script = SCRIPTS.get(key)
 
   if (script === undefined)
-    MOUNTED.set(key, script = rules(prefetch, nearest, base, apiPath))
+    SCRIPTS.set(key, script = rules(prefetch, nearest, base, apiPath))
 
   return script
 }

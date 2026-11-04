@@ -1,0 +1,4 @@
+head
+  title Plain
+h1 Plain
+a(href="/marked") Marked

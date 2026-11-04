@@ -274,21 +274,19 @@ function hostsToAnswer(security: SecurityConfig | false | undefined, site: strin
 
 // Who the request is from and whether it may come: the proxy it came through, the server's own mark, the proxy key, the hosts, then the security headers on every answer.
 export function trustRequests({ app, env, options, served, security, filePaths, setup, mcpAt, mcpKey, metrics, log, health }: Boot): void {
-  const healthPath = health?.path
-
   setRequestIdHeader(options.observe?.requestIdHeader)
   trustProxy(app, options.proxy)
   // Before the key check reads the mark, and dropped from the request there, so no handler reads it.
   app.onRequest(({ request }) => {
     receiveInternal(request)
   })
-  requireProxyKey(app, checkProxy(options.proxy), { dev: env.dev, exported: env.exported, base: env.base, health: healthPath, endpoint: mcpKey === undefined ? undefined : mcpAt, metrics: () => metrics && served.holds(metrics) ? metrics.path : undefined, logRefused: requestRefusalLogger(log), security })
+  requireProxyKey(app, checkProxy(options.proxy), { dev: env.dev, exported: env.exported, base: env.base, health: health?.path, endpoint: mcpKey === undefined ? undefined : mcpAt, metrics: () => metrics && served.holds(metrics) ? metrics.path : undefined, logRefused: requestRefusalLogger(log), security })
   refuseForeignHosts(app, setup.site, security)
 
   const hosts = hostsToAnswer(options.security, setup.site, env)
 
   if (hosts !== undefined)
-    refuseUnknownHosts(app, { site: setup.site, hosts, localeHosts: Object.values(setup.i18n?.settings.hosts ?? {}), security, health: healthPath === undefined ? undefined : [healthPath, `${env.base}${healthPath}`] })
+    refuseUnknownHosts(app, { site: setup.site, hosts, localeHosts: Object.values(setup.i18n?.settings.hosts ?? {}), security, health: health && [health.path, `${env.base}${health.path}`] })
 
   if (security)
     sendSecurityHeaders(app, security, filePaths)

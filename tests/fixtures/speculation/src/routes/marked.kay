@@ -1,0 +1,4 @@
+head
+  title Marked
+nav(data-prefetch="false")
+  a(href="/plain") Plain

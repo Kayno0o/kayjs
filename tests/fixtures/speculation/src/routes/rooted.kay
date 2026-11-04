@@ -1,0 +1,4 @@
+head
+  html(data-prefetch="eager")
+  title Rooted
+h1 Rooted

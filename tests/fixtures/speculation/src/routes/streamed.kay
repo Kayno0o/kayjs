@@ -1,0 +1,8 @@
+--- server
+const later = Bun.sleep(20).then(() => 'Later')
+---
+h1 Streamed
+await later
+  p Waiting
+then text
+  p {text}
