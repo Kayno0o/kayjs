@@ -1,7 +1,8 @@
 import type { Elysia } from 'elysia'
 import type { Reply } from './mime'
-import { createHash, createHmac, createPublicKey, timingSafeEqual, verify } from 'node:crypto'
+import { createHmac, createPublicKey, verify } from 'node:crypto'
 import process from 'node:process'
+import { sameText } from 'kay/library'
 import { normalizeAddress } from './list-address'
 import { log } from './log'
 import { isOwnMessageId } from './message-id'
@@ -78,11 +79,6 @@ export function secretsOf(given: EventSecrets | undefined): EventSecrets {
   return secrets
 }
 
-// Compared through digests, so the length of a secret is not told by the time a guess takes.
-function same(a: string, b: string): boolean {
-  return timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest())
-}
-
 const fresh = (seconds: number): boolean => Number.isFinite(seconds) && Math.abs(Date.now() / 1000 - seconds) <= WINDOW_SECONDS
 
 function postmarkAuthorised(secret: string, request: Request): boolean {
@@ -92,7 +88,7 @@ function postmarkAuthorised(secret: string, request: Request): boolean {
     return false
 
   try {
-    return same(Buffer.from(match[1]!, 'base64').toString('utf8'), secret)
+    return sameText(Buffer.from(match[1]!, 'base64').toString('utf8'), secret)
   }
   catch {
     return false
@@ -105,7 +101,7 @@ function mailgunSigned(secret: string, body: unknown): boolean {
   if (typeof signature?.timestamp !== 'string' || typeof signature.token !== 'string' || typeof signature.signature !== 'string' || !fresh(Number(signature.timestamp)))
     return false
 
-  return same(createHmac('sha256', secret).update(signature.timestamp + signature.token).digest('hex'), signature.signature.toLowerCase())
+  return sameText(createHmac('sha256', secret).update(signature.timestamp + signature.token).digest('hex'), signature.signature.toLowerCase())
 }
 
 function sendgridSigned(secret: string, request: Request, raw: Uint8Array): boolean {
@@ -138,7 +134,7 @@ function svixSigned(secret: string, request: Request, text: string): boolean {
   return header.split(' ').some((entry) => {
     const [version, value] = entry.split(',')
 
-    return version === 'v1' && value !== undefined && same(expected, value)
+    return version === 'v1' && value !== undefined && sameText(expected, value)
   })
 }
 
@@ -240,7 +236,7 @@ function inboundAuthorised(secret: string, request: Request): boolean {
   const bearer = BEARER.exec(header)
 
   if (bearer !== null)
-    return same(bearer[1]!, secret)
+    return sameText(bearer[1]!, secret)
 
   const basic = BASIC.exec(header)
 
@@ -250,7 +246,7 @@ function inboundAuthorised(secret: string, request: Request): boolean {
   // A provider's inbound URL carries its credentials as Basic: the password is the secret, any user.
   const decoded = Buffer.from(basic[1]!, 'base64').toString('utf8')
 
-  return same(decoded.slice(decoded.indexOf(':') + 1), secret)
+  return sameText(decoded.slice(decoded.indexOf(':') + 1), secret)
 }
 
 // The raw message of a request: its body, or the `email` (SendGrid) or `body-mime` (Mailgun) field of a form.

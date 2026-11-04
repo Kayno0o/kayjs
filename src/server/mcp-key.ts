@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
-import { nodeCrypto } from './builtins'
+import { sameText } from './seal'
 
 const KEY_VARIABLE = 'KAY_MCP_KEY'
 const KEY_FILE_VARIABLE = 'KAY_MCP_KEY_FILE'
@@ -157,11 +157,9 @@ function readWhole(path: string): string {
   return ''
 }
 
-const digest = (text: string): Buffer => new Bun.CryptoHasher('sha256').update(text).digest()
-
-// Whether `request` carries `key` as its one bearer token: the scheme is read in any case, and both sides are hashed first so neither the content nor the length of the key shows in the time taken.
+// Whether `request` carries `key` as its one bearer token: the scheme is read in any case, and `sameText` hashes both sides so neither the content nor the length of the key shows in the time taken.
 export function bearsMcpKey(request: Request, key: string): boolean {
   const token = BEARER.exec(request.headers.get('authorization') ?? '')?.[1]
 
-  return token !== undefined && nodeCrypto().timingSafeEqual(digest(token), digest(key))
+  return token !== undefined && sameText(token, key)
 }

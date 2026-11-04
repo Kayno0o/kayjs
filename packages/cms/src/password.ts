@@ -1,8 +1,8 @@
 import type { Duration, Guard, RateStore } from 'kay'
 import type { Kv, KvStore, LazyGuard } from 'kay/library'
-import { createHash, createHmac, scryptSync, timingSafeEqual } from 'node:crypto'
+import { createHmac, scryptSync } from 'node:crypto'
 import { guard } from 'kay'
-import { appSecrets, appStore, configError, durationSeconds, keyedDigest, kv, memoryRates } from 'kay/library'
+import { appSecrets, appStore, configError, durationSeconds, keyedDigest, kv, memoryRates, sameText } from 'kay/library'
 import { wording } from 'kay/words'
 import { log } from './log'
 
@@ -48,17 +48,8 @@ export interface PasswordOptions {
 // Who a password guard let a request in as, for the screens to name and the roles to read.
 export const signedInBy = new WeakMap<Request, { name: string, roles: readonly string[] }>()
 
-function digest(text: string): Buffer {
-  return createHash('sha256').update(text).digest()
-}
-
-function same(a: Buffer, b: Buffer): boolean {
-  return a.length === b.length && timingSafeEqual(a, b)
-}
-
 // The passwords of a `passwordGuard()`, and the sign-in cookie it signs with them. Changing a password ends every sign-in made with it.
 export class Passwords {
-  private readonly digests = new Map<string, Buffer>()
   private readonly keys = new Map<string, Buffer>()
   private readonly given = new Map<string, string>()
   // The signatures of cookies signed out in this process, each kept until the cookie would have expired anyway; the store holds the same for the other processes and a restart.
@@ -101,7 +92,6 @@ export class Passwords {
       }
 
       this.given.set(role, password)
-      this.digests.set(role, digest(password))
     }
   }
 
@@ -140,16 +130,15 @@ export class Passwords {
 
   // The roles the guard holds a password for.
   roles(): string[] {
-    return [...this.digests.keys()]
+    return [...this.given.keys()]
   }
 
   // The role this password opens, or undefined. Every password is compared, so the time taken tells nothing of which one was close.
   match(given: string): string | undefined {
-    const hashed = digest(given)
     let found: string | undefined
 
-    for (const [role, expected] of this.digests) {
-      if (same(hashed, expected))
+    for (const [role, expected] of this.given) {
+      if (sameText(given, expected))
         found ??= role
     }
 
@@ -203,7 +192,7 @@ export class Passwords {
     const [role = '', expires = '', signature = ''] = parts
     const payload = `${role}.${expires}`
 
-    if (!this.given.has(role) || !same(Buffer.from(signature), Buffer.from(this.sign(role, payload))))
+    if (!this.given.has(role) || !sameText(signature, this.sign(role, payload)))
       return undefined
 
     if (this.revoked.has(signature))

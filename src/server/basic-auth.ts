@@ -1,7 +1,7 @@
 import type { Guard } from '../runtime/core'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
-import { nodeCrypto } from './builtins'
+import { sameText } from './seal'
 
 export interface BasicAuthOptions {
   // The user name; a request is refused while it is unset or empty, as the secret behind it may come from an environment variable that is missing.
@@ -39,13 +39,6 @@ function credentialsOf(header: string | null): { user: string, password: string 
   return colon === -1 ? undefined : { user: text.slice(0, colon), password: text.slice(colon + 1) }
 }
 
-// Digests of equal length, so the compare tells nothing of where the texts differ or how long the expected one is.
-function sameDigest(given: string, expected: Buffer): boolean {
-  const { createHash, timingSafeEqual } = nodeCrypto()
-
-  return timingSafeEqual(createHash('sha256').update(given).digest(), expected)
-}
-
 // A guard for HTTP Basic, for a device that only speaks it: `export default basicAuth({ user: process.env.TRACKER_USER, password: process.env.TRACKER_PASSWORD, realm: 'voyager' })` in a `_guard.ts` of `src/api/` or `src/routes/`.
 // It answers 401 with `WWW-Authenticate` to a request without the right credentials, and to every request while either is unset, so a missing environment variable never opens the route.
 export function basicAuth(options: BasicAuthOptions): Guard {
@@ -59,7 +52,6 @@ export function basicAuth(options: BasicAuthOptions): Guard {
 
   const challenge = `Basic realm="${realm.replace(/["\\]/g, '\\$&')}", charset="UTF-8"`
   const configured = user !== undefined && user !== '' && password !== undefined && password !== ''
-  let expected: { user: Buffer, password: Buffer } | undefined
   let warned = false
 
   return ({ request, headers, deny }) => {
@@ -78,14 +70,10 @@ export function basicAuth(options: BasicAuthOptions): Guard {
       return refuse()
     }
 
-    const { createHash } = nodeCrypto()
-
-    expected ??= { user: createHash('sha256').update(user).digest(), password: createHash('sha256').update(password).digest() }
-
     const given = credentialsOf(request.headers.get('authorization'))
     // Both are always compared, so a wrong user and a wrong password take as long.
-    const userMatches = sameDigest(given?.user ?? '', expected.user)
-    const passwordMatches = sameDigest(given?.password ?? '', expected.password)
+    const userMatches = sameText(given?.user ?? '', user)
+    const passwordMatches = sameText(given?.password ?? '', password)
 
     if (given === undefined || !userMatches || !passwordMatches)
       return refuse()

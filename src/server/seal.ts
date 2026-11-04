@@ -64,10 +64,9 @@ export function openWith(keys: Uint8Array[], value: string, context?: string): {
   return undefined
 }
 
-// Compares in a time that tells nothing of where two texts differ, as a signature or a code checked against a guess must.
+// Compares in a time that tells nothing of where two texts differ or how long either is, as a signature, a code or a key checked against a guess must: both sides are hashed first, so the compare always runs on two digests of one length.
 export function sameText(given: string, expected: string): boolean {
-  const a = Buffer.from(given)
-  const b = Buffer.from(expected)
+  const { createHash, timingSafeEqual } = nodeCrypto()
 
-  return a.length === b.length && nodeCrypto().timingSafeEqual(a, b)
+  return timingSafeEqual(createHash('sha256').update(given).digest(), createHash('sha256').update(expected).digest())
 }

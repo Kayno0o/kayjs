@@ -1,4 +1,4 @@
-import { appSecrets } from 'kay/library'
+import { appSecrets, sameText } from 'kay/library'
 
 const OWN = /^<([\da-f-]{36})\.([\w-]{16})@[^>\s]+>$/i
 
@@ -28,6 +28,6 @@ export function isOwnMessageId(value: string | undefined): boolean {
   return (appSecrets() ?? []).some((secret) => {
     const expected = mac(secret, id!)
 
-    return expected.length === tag!.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(tag!))
+    return sameText(expected, tag!)
   })
 }

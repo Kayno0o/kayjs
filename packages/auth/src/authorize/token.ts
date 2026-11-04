@@ -1,8 +1,8 @@
 import type { Core } from '../core'
 import type { OAuthCodeRecord, OAuthGrantRecord, OAuthRefreshRecord } from '../store'
 import type { TokenReply } from './reply'
-import { createHash, timingSafeEqual } from 'node:crypto'
-import { banned } from '../core'
+import { createHash } from 'node:crypto'
+import { banned, sameText } from '../core'
 import { digest, randomToken } from '../keys'
 import { spend } from '../limits'
 import { refused } from './reply'
@@ -16,10 +16,7 @@ const VERIFIER = /^[\w.~-]{43,128}$/
 const WHITESPACE = /\s+/
 
 function matches(verifier: string, challenge: string): boolean {
-  const computed = Buffer.from(createHash('sha256').update(verifier).digest('base64url'))
-  const expected = Buffer.from(challenge)
-
-  return computed.length === expected.length && timingSafeEqual(computed, expected)
+  return sameText(createHash('sha256').update(verifier).digest('base64url'), challenge)
 }
 
 // A bearer token and a refresh token of one family for the grant, which is how `user()`, `via()` and `requireUser({ scope })` see the client; the family ends at `familyEnd` whatever its rotations.

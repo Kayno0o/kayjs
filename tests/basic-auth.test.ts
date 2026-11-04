@@ -95,11 +95,11 @@ describe('basicAuth', () => {
     expect(await attempt(basicAuth({ user: 'a', password: 'b', realm: 'say "hi" \\ ok' }), undefined)).toEqual({ status: 401, challenge: 'Basic realm="say \\"hi\\" \\\\ ok", charset="UTF-8"' })
   })
 
-  it('compares digests with timingSafeEqual, never the texts', async () => {
+  it('compares through sameText, which hashes both sides, never the texts', async () => {
     const source = await Bun.file(join(import.meta.dir, '../src/server/basic-auth.ts')).text()
 
-    expect(source).toContain('timingSafeEqual')
-    expect(source).toContain('nodeCrypto()')
+    expect(source).toContain('sameText(')
+    expect(source).not.toContain('timingSafeEqual')
     expect(source).not.toMatch(/from 'node:crypto'/)
   })
 })
