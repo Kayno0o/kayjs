@@ -26,6 +26,8 @@ const PAINT = `(() => {
   window.__kayPainted = false
   Promise.all([document.fonts.ready, ...[...document.images].map(async image => {
     image.loading = 'eager'
+    // Decoded with the frame, so the shot never draws an image still decoding off the main thread as blank.
+    image.decoding = 'sync'
 
     if (!image.complete) {
       await new Promise(resolve => {

@@ -134,6 +134,10 @@ describe('the rate of a websocket\'s messages', () => {
       for (let count = 0; count < 800; count++)
         socket.send('x')
 
+      // Every echo of the round is in before the wait, so a loaded server still answering it does not count it in the next window.
+      for (let tries = 0; tries < 300 && received.length < (round + 1) * 800; tries++)
+        await Bun.sleep(10)
+
       // The limit counts messages in a window of one second, which has to pass for real.
       await Bun.sleep(1100)
     }
