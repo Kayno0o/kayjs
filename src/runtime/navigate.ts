@@ -278,6 +278,9 @@ function onPopState(event: PopStateEvent): void {
     return
   }
 
+  // An entry a pushing query param wrote for this page moves its signals and leaves nothing, so no guard asks.
+  navigation.traversed?.(saved)
+
   // Leaving with unsaved changes goes back to the page left first, so it keeps its URL while asked. An entry kay did not write tells no place, so it is let through.
   if (!passing && saved?.at !== undefined && saved.at !== navigation.at && pageKey(url) !== navigation.shown && (navigation.before || dirtyGuard())) {
     held = { url, delta: saved.at - navigation.at }
@@ -291,7 +294,7 @@ function onPopState(event: PopStateEvent): void {
   if (saved?.at !== undefined)
     navigation.at = saved.at
 
-  if (pageKey(url) === navigation.shown || navigation.traversed?.(saved)) {
+  if (pageKey(url) === navigation.shown) {
     restoreScroll(swap.saved, url.hash)
 
     return

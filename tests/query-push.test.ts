@@ -2,7 +2,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { queryParam } from '../src/runtime'
 import { startNavigation } from '../src/runtime/navigate'
-import { navigation } from '../src/runtime/navigation'
+import { leaveGuards, navigation } from '../src/runtime/navigation'
 
 const setURL = (url: string) => (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(url)
 
@@ -39,11 +39,14 @@ describe('a traversal between the entries a pushing query param wrote', () => {
     }
   })
 
-  it('asks the leave guards first, as a traversal between entries of one path does', () => {
+  it('asks no leave guard, the page being the same', () => {
     const tab = queryParam('tab', { history: 'push' })
     const go = spyOn(history, 'go').mockImplementation(() => undefined)
+    const dirty = { dirty: () => true, confirm: () => false }
+    const before = () => false
 
-    navigation.before = () => false
+    navigation.before = before
+    leaveGuards.add(dirty)
 
     try {
       // Read first: outside a browser build the signal loads the address on its first use.
@@ -51,11 +54,12 @@ describe('a traversal between the entries a pushing query param wrote', () => {
       tab.set('c')
       setURL('http://localhost/tabs?tab=a')
       window.dispatchEvent(new PopStateEvent('popstate', { state: { kay: true, at: navigation.at - 1, scroll: [0, 0], kayq: navigation.page } }))
-      expect(go).toHaveBeenCalledTimes(1)
-      expect(tab()).toBe('c')
+      expect(go).not.toHaveBeenCalled()
+      expect(tab()).toBe('a')
     }
     finally {
       navigation.before = undefined
+      leaveGuards.delete(dirty)
       go.mockRestore()
     }
   })

@@ -234,7 +234,9 @@ function flush(): void {
   try {
     if (push && url.href !== location.href) {
       // The entry left is marked too, so Back to it follows the signals.
-      history.replaceState(marked(history.state), '')
+      if ((history.state as Record<string, unknown> | null)?.[MARK] !== navigation.page)
+        history.replaceState(marked(history.state), '')
+
       navigation.at++
       history.pushState(marked(historyState()), '', url)
       pushed = true
