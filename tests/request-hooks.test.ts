@@ -29,8 +29,7 @@ describe('the app-wide request hooks', () => {
     ])
     app = await pages({
       root: dir,
-      routes: 'routes',
-      api: 'api',
+      dirs: { routes: 'routes', api: 'api' },
       prebuilt: false,
       observe: { log: false, onError: ({ source }) => void errors.push({ source }) },
       beforeRequest: ({ request, url, context }) => {
@@ -129,7 +128,7 @@ describe('the app-wide start and stop hooks', () => {
 
     const app = await pages({
       root: dir,
-      routes: 'routes',
+      dirs: { routes: 'routes' },
       prebuilt: false,
       observe: { log: false, onError: ({ source }) => void errors.push(source) },
       onStart: ({ url }) => void told.push(`start ${url === undefined ? 'nowhere' : 'listening'}`),
@@ -182,7 +181,7 @@ h1 Home
 `)
     app = await pages({
       root: dir,
-      routes: 'routes',
+      dirs: { routes: 'routes' },
       prebuilt: false,
       observe: { log: false },
       actions: {
@@ -264,8 +263,7 @@ describe('the request hooks in every corner', () => {
     ])
     app = await pages({
       root: dir,
-      routes: 'routes',
-      api: 'api',
+      dirs: { routes: 'routes', api: 'api' },
       prebuilt: false,
       base: '/shop',
       trailingSlash: 'always',

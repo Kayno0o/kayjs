@@ -47,7 +47,7 @@ describe('what a guard hands on', () => {
       Bun.write(join(dir, 'routes/memo/_layout.kay'), `--- server\n${COUNT}const org = await ctx.once('org', async () => { counts.org = (counts.org ?? 0) + 1; await Bun.sleep(20); return { name: ctx.request.headers.get('x-org') ?? 'none' } })\n---\nheader\n  p.layout {org.name}\nslot\n`),
       Bun.write(join(dir, 'routes/memo/index.kay'), `--- server\n${COUNT}const org = await ctx.once('org', async () => { counts.org = (counts.org ?? 0) + 1; return { name: 'second' } })\nconst other = await ctx.once('other', () => { throw new Error('boom') }).catch(() => 'failed')\nconst again = await ctx.once('other', () => 'never').catch(() => 'failed again')\n---\np.page {org.name} {other} {again} {counts.org}\n`),
     ])
-    app = await pages({ root: dir, routes: 'routes', prebuilt: false })
+    app = await pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

@@ -604,7 +604,7 @@ describe('hostile requests', () => {
   })
 
   it('reads the address from the proxy kay infers in production when the app sets none', async () => {
-    const app = await pages({ root: dir, routes: join(dir, 'routes'), prebuilt: false, extensions: [analytics(plausible())] })
+    const app = await pages({ root: dir, dirs: { routes: join(dir, 'routes') }, prebuilt: false, extensions: [analytics(plausible())] })
 
     await app.handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: JSON.stringify(visit()), headers: { 'user-agent': CHROME, 'x-forwarded-for': '10.1.1.1' } }))
     await forwardsSettled()
