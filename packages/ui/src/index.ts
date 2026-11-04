@@ -30,6 +30,7 @@ export type { AxisScale, AxisTick, BarListRow, BarSeries, ChartSeries, ScatterAx
 export type * from './popover'
 export type { RangeValue } from './range'
 export { rangeFrom } from './range'
+export type { RowsSource } from './source'
 export type { SparkTone } from './sparkline'
 export type { StatDelta } from './stat'
 export type { StepCookies, StepDraft, StepDraftOptions, StepItem } from './steps'

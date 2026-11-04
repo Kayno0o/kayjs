@@ -20,6 +20,12 @@ The list is `role="list"` named by `label`, which is required, and each row a `l
 
 Find-in-page only sees the rows drawn, and a focused control in a row that scrolls out of view loses its focus. Give a long list a filter to find a row by.
 
+## From a function or a promise
+
+`items` also takes a function returning the items or a promise of them, loaded in the browser with `skeletonItems` (5) skeletons meanwhile and a `failureLabel` with a retry if it rejects.
+
+`onLoad` and `onError` hear each answer, `busy` shows the skeleton for items the page loads itself. `itemHref(item, index)` and `onItemClick(item, index, event)` make each item a link or a button, a stretched anchor named by `itemLabel` over it with the item's own links and buttons above.
+
 ## Loaded page by page
 
 It takes `list`, an `infiniteList`, in place of the array.`LoadMore` follows the rows inside the box, so the next page loads as the reader nears the end, and a failed page shows its alert with a retry. See [Infinite lists](/ui/load-more).

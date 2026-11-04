@@ -1378,6 +1378,9 @@ type RowKey<Row> = (keyof Row & string) | ((row: Row) => string | number)
 [./lib/index] RowKeyValue
 type RowKeyValue<Row, Key extends RowKey<Row>> = Key extends keyof Row ? Row[Key] : Key extends (row: Row) => infer Value ? Value : never
 
+[./lib/index] RowsSource
+type RowsSource<Row> = Row[] | (() => Row[] | Promise<Row[]>) | Promise<Row[]>
+
 [./lib/index] ScatterAxis
 interface ScatterAxis
   domain?: readonly [number, number]
@@ -2142,6 +2145,25 @@ const default: UiSettings
 
 [./lib/shade] shade
 function shade(color: string, value: number): string | undefined
+
+[./lib/source] asyncRows
+function asyncRows<Row>(given: () => RowsSource<Row> | undefined, hooks?: AsyncRowsHooks<Row>): AsyncRows<Row>
+
+[./lib/source] AsyncRows
+interface AsyncRows<Row>
+  failed: () => boolean
+  loading: () => boolean
+  retry: () => void
+  retryable: boolean
+  rows: () => Row[]
+
+[./lib/source] AsyncRowsHooks
+interface AsyncRowsHooks<Row>
+  onError?: ((error: unknown) => unknown) | undefined
+  onLoad?: ((rows: Row[]) => unknown) | undefined
+
+[./lib/source] RowsSource
+type RowsSource<Row> = Row[] | (() => Row[] | Promise<Row[]>) | Promise<Row[]>
 
 [./lib/sparkline] SparkTone
 type SparkTone = Tone

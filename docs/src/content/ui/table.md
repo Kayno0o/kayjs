@@ -36,6 +36,16 @@ The `@bulk(keys, clear)` block draws the page's bulk actions beside the count wh
 
 <Demo name="table/expandable" />
 
+## Rows from a source
+
+`rows` also takes a function returning the rows or a promise of them. A function returning an array is drawn by the server; a promise loads in the browser, `skeletonRows` (5) skeleton rows standing in meanwhile, and a failure shows `failureLabel` with a retry that calls the function again (a bare promise gets none).
+
+`onLoad(rows)` and `onError(error)` hear each answer, and `loadingLabel`, `failureLabel` and `retryLabel` replace the words. `busy` draws the skeleton for rows the page loads itself, and a table over a `list` shows it while the first page is on its way.
+
+## Rows as links
+
+`rowHref(row)` makes each row a link and `onRowClick(row, event)` a button, or hears the click of a link row. The first cell holds a real anchor or button stretched over the row, named `Open <first column's text>` (`openRowLabel(row)`), so middle click and open in a new tab work. The checkbox, the toggle and the links and buttons the cells draw stay clickable above it, so ticking a row never navigates. Text in a linked row cannot be selected with the mouse.
+
 ## Row key
 
 `rowKey` is required. It returns a string or a number that names a row across updates, and a selection is kept by it.

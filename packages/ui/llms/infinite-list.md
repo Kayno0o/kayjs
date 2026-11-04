@@ -20,3 +20,10 @@
 ## Reference
 
 - Every `infiniteList` option and method is typed in the package (`InfiniteListOptions`, `InfiniteList`), with its behaviour in the notes above.
+
+### Table and VirtualList sources, busy and row links
+
+- `rows` (Table) and `items` (VirtualList) take an array, a function returning one, or a promise of one, as Menu's `items` does. A function returning an array stays reactive and is drawn by the server; a promise, or a function returning one, loads in the browser with skeleton rows meanwhile (`skeletonRows` / `skeletonItems`, 5), and a rejection draws a `failureLabel` alert with a retry (`retryLabel`) that calls the function again; a bare promise cannot be asked twice, so it gets no retry. Only the latest answer lands. `onLoad(rows)` and `onError(error)` mark each transition, and `loadingLabel` (a status screen readers hear), `failureLabel` and `retryLabel` word them (`ui.table.*`, `ui.virtualList.*`).
+- `busy` draws the skeleton for a source the app loads itself: over no rows the skeleton replaces `@empty`, over rows they stay dimmed with `aria-busy`. A `list` still on its first page with no rows (a sort or filter restart) is busy too; a failed page keeps `LoadMore`'s alert and retry. The skeleton parts are `skeletonRow`, `skeletonCell` and `skeletonBar` (Table), `skeleton` and `skeletonBar` (VirtualList), the failure `failure`, the screen reader text `status`.
+- `rowHref(row)` makes each row a link (undefined for a row that leads nowhere) and `onRowClick(row, event)` a button, or hears the click of a link row (`event.preventDefault()` to navigate yourself). A `tr` cannot be an anchor, so the first cell holds a `rowLink` anchor or `rowButton` stretched over the row, named `Open <first column's text>` (`openRowLabel(row)`): middle click and open in a new tab work, and the checkbox, the toggle and the links and buttons the cells draw stay clickable above it. VirtualList has `itemHref(item, index)`, `onItemClick(item, index, event)` and `itemLabel(item, index)` (`itemLink`, `itemButton` parts) the same way.
+- `Table(columns={columns} rows={() => fetchPeople()} rowKey="id" rowHref={person => person.url})`.
