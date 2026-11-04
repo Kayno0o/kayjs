@@ -124,6 +124,8 @@ export interface ActionProtection<Field extends string = never> {
   protect?: ActionProtect<Field> | undefined
   // The most a post may send, files included, bytes or a size such as `'20mb'`, in place of the app's `maxSize`; a bigger one fails with 413 before it is read.
   maxSize?: ByteSize | undefined
+  // The longest the action may take, in place of `serve.timeout`: a string such as '30s', or `false` for none. Past it the post fails with 504 and `ctx.signal` aborts.
+  timeout?: Duration | false | undefined
   // What the visitor reads when one of these refuses a post, in place of kay's English, as a schema's `error` is for a field.
   messages?: ProtectionMessages | undefined
 }
@@ -136,6 +138,7 @@ export interface ResolvedProtection {
   minTime?: Duration | MinTimeOptions | undefined
   proofOfWork?: boolean | number | ProofOfWorkOptions | undefined
   maxSize?: ByteSize | undefined
+  timeout?: Duration | false | undefined
   messages?: ProtectionMessages | undefined
 }
 

@@ -39,7 +39,7 @@ import { DEFAULT_BODY_LIMIT, limitBodies, mountLimits } from './body'
 import { serveBuildFiles } from './build-files'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
-import { remoteLimits } from './config-limits'
+import { remoteLimits, timeoutMs } from './config-limits'
 import { cookieDefaults, defaultCookies } from './cookies'
 import { DEV_A11Y, DEV_AXE, DEV_DATA, DEV_DATA_QUERY, DEV_DATA_ROWS, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_JOBS, DEV_JOBS_CANCEL, DEV_JOBS_DELETE, DEV_JOBS_RETRY, DEV_JOBS_SEND, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TAB, DEV_TABS, DEV_TOOL, DEV_UI, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStack, devStyles, devTab, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, refuseRemoteDevTools, rememberBoot, trackRunning } from './dev'
 import { clearDevErrorsOnAnswer } from './dev-errors'
@@ -502,7 +502,7 @@ export async function buildFiles({ app, env, setup: { client }, security, filePa
 
 // The options actions, API modules, endpoints and kay's guarded routes share.
 export function actionOptionsOf({ env, options, setup, late }: Boot, skipBroken: boolean): ActionOptions {
-  return { skipBroken, dev: env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.requireGuards, cors: options.cors }
+  return { skipBroken, dev: env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.requireGuards, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors }
 }
 
 // The actions, the API modules and the endpoints, then the jobs page, after the extensions whose derived values the guards read through `ctx.locals`.
@@ -752,7 +752,7 @@ export async function pageRoutes(boot: Boot, { redirects, publicServed, redirect
 
   const fallback = await source.fallback(project, mounts)
 
-  const { uncaught, unmatched } = servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: env.trailingSlash ?? 'never', fallback, respond })
+  const { uncaught, unmatched } = servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: env.trailingSlash ?? 'never', fallback, respond, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout') })
 
   pageFor.unmatched = unmatched
 

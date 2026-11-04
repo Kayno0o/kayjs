@@ -3,6 +3,7 @@ import type { RenderConfigKey } from '../project'
 import type { CardPageContext, ErrorPageContext, Locals, PageContext, PageError } from '../runtime'
 import type { Action, Outcome } from '../runtime/action'
 import type { PendingBlock } from '../runtime/await.server'
+import type { Duration } from '../runtime/duration'
 import type { EditorProps } from '../runtime/edit'
 import type { EntryRef } from '../runtime/fields'
 import type { HeadOptions, HeadTag, RenderedHead } from '../runtime/head'
@@ -70,6 +71,7 @@ import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } fr
 import { reportServerError } from './report'
 import { RequestReadError } from './request-read'
 import { requestRecord } from './request-record'
+import { requestSignal, RequestTimeout, retime } from './request-timeout'
 import { overHttps } from './request-url'
 import { askedPath } from './rewrite'
 import { CONTEXT_LAYOUT, guardUrl, routeChain } from './routes'
@@ -414,12 +416,19 @@ function loadChain(route: ServedRoute, rendering: Rendering, client: ClientBuild
 
   try {
     readRouteQuery(files, modules, rendering, options)
+    retimePage(modules, rendering, options)
 
     return { files, modules, data: modules.map((_, index) => settledEmpty(files[index]!, loaded)), loaded, timings: undefined, phases: undefined }
   }
   catch (error) {
     return renderFailure(error, route.special, rendering, loaded, client, options)
   }
+}
+
+// The page's own `timeout`, or its layout's, replacing the app's once its modules are there.
+function retimePage(modules: PageModule[], rendering: Rendering, options: RenderOptions): void {
+  if (!options.prerendering)
+    retime(rendering.ctx.request, chainSetting(modules, 'timeout') as Duration | false | undefined)
 }
 
 // Read once the guards let the request through, so a refused query never renders what they protect; the layouts and the page share it.
@@ -439,6 +448,7 @@ async function loadChainAsync(route: ServedRoute, files: string[], rendering: Re
     const imports = performance.now() - importsStarted
 
     readRouteQuery(files, modules, rendering, options)
+    retimePage(modules, rendering, options)
 
     const timings = timing ? Array.from<number>({ length: files.length }) : undefined
 
@@ -844,6 +854,9 @@ function createRendering(context: RequestContext, params: Record<string, unknown
       },
       // The app's derive and resolve hooks ran before this handler, so the context carries what `Register` declares.
       locals: context as unknown as Locals,
+      get signal() {
+        return requestSignal(request)
+      },
       status: (code) => {
         rendering.status = code
       },
@@ -884,6 +897,10 @@ function respond(rendering: Rendering, output: Body | Rebased): Response {
 
   const unwrapped = output instanceof Rebased ? output.body : output
   const body = unwrapped instanceof Pieced ? unwrapped.text : unwrapped
+
+  if (body instanceof ReadableStream)
+    requestRecord(rendering.ctx.request).streamed = true
+
   const response = bodyResponse(unwrapped, { status: rendering.status, headers: rendering.headers })
 
   return !(output instanceof Rebased) && rendering.base !== '' && (typeof body === 'string' || body instanceof ReadableStream) ? rebaseHtml(response, rendering.base, typeof body === 'string') : response
@@ -906,6 +923,9 @@ function keepPersonal({ headers, ctx, prerendering }: Rendering): void {
 function pageErrorOf(error: unknown, dev: boolean | undefined): PageError {
   if (error instanceof NotFound)
     return { status: 404, message: 'Not Found' }
+
+  if (error instanceof RequestTimeout)
+    return { status: 504, message: dev ? error.message : 'Gateway Timeout' }
 
   return error instanceof Denied ? { status: error.status, message: error.message } : describeError(error, dev)
 }

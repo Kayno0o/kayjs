@@ -170,6 +170,30 @@ On SIGTERM, SIGINT or SIGHUP the server stops taking connections, lets open requ
 
 A queue job whose handler ignores its signal is handed back after 3 seconds, or less with a short `serve.shutdownTimeout`, and the rooms store lets go of this replica's members. The server then runs the `onStop` hooks and exits. Requests still open after `serve.shutdownTimeout`, 10 seconds by default, are closed.
 
+## Request timeouts
+
+A hung database call or a slow upstream holds its request, and the connection, until the visitor leaves. `serve.timeout` ends the request instead:
+
+```ts
+export default defineConfig({
+  serve: { timeout: '15s' },
+})
+```
+
+Past it, a page answers 504 through the nearest `_error.kay`, an action call fails with 504, and an API route or endpoint answers `504 Gateway Timeout`. The timeout is logged and handed to `observe.onError`.
+
+Every page, guard, endpoint and action context has `ctx.signal`, which aborts at the timeout and when the visitor leaves. Pass it to `fetch` or a database call so the work stops with the request:
+
+```kay
+--- server
+const response = await fetch('https://api.example.com/rows', { signal: ctx.signal })
+const rows = await response.json() as string[]
+---
+p {rows.length} rows
+```
+
+A route may set its own: `export const page = { timeout: '30s' }` on a page, `api({ timeout: '60s' })` on an API module, `{ timeout: '60s' }` in an action's options, or `false` for none. A streamed page whose headers went out is cut at the timeout.
+
 ## Several workers
 
 One Bun process uses one core. `kay start --workers 4` serves from four, all on the same port, and `--workers auto` takes one per core. The executable takes the same option: `./server --workers 4`, or `KAY_WORKERS=4` in its environment. The default is one worker. The option works on Linux, where the kernel shares connections between processes; elsewhere kay warns and runs one.

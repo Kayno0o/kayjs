@@ -1,0 +1,6 @@
+--- server
+export const page = { timeout: '30ms' }
+
+await Bun.sleep(400)
+---
+p late

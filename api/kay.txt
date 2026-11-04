@@ -31,6 +31,7 @@ interface ActionContext<Params extends Readonly<Record<string, unknown>> = Route
   params: Params
   redirect: Redirect
   request: Request
+  signal: AbortSignal
   status: (code: number) => void
   url: URL
 
@@ -65,6 +66,7 @@ interface ActionProtection<Field extends string = never>
   maxSize?: ByteSize | undefined
   messages?: ProtectionMessages | undefined
   protect?: ActionProtect<Field> | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   tool?: ActionTool | boolean | string | undefined
 
 [.] ActionRateLimit
@@ -198,6 +200,7 @@ interface CardPageContext<Params extends Record<string, unknown> = Record<string
   query: Readonly<Record<string, unknown>>
   redirect: Redirect
   request: Request
+  signal: AbortSignal
   status: (code: number) => void
   url: URL
 
@@ -292,6 +295,7 @@ interface ErrorPageContext<Params extends Record<string, unknown> = Record<strin
   query: Readonly<Record<string, unknown>>
   redirect: Redirect
   request: Request
+  signal: AbortSignal
   status: (code: number) => void
   url: URL
 
@@ -613,6 +617,7 @@ interface PageContext<Params extends Record<string, unknown> = Record<string, st
   query: Query
   redirect: Redirect
   request: Request
+  signal: AbortSignal
   status: (code: number) => void
   url: URL
 
@@ -649,6 +654,7 @@ interface PageSettings
   search?: ((params: Record<string, string>) => PageSearch | Promise<PageSearch | undefined> | undefined) | PageSearch
   security?: PageSecurity
   sitemap?: boolean | object
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] PartClass
@@ -864,6 +870,7 @@ interface RequestContext<Params extends Record<string, unknown> = Record<string,
   params: Params
   redirect: Redirect
   request: Request
+  signal: AbortSignal
   url: URL
 
 [.] ResolvedProtection
@@ -874,6 +881,7 @@ interface ResolvedProtection
   minTime?: MinTimeOptions | `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   proofOfWork?: ProofOfWorkOptions | boolean | number | undefined
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   tool?: ActionTool | boolean | string | undefined
 
 [.] resource
@@ -2340,6 +2348,7 @@ interface ApiOptions
   guards?: false | undefined
   maxSize?: (() => ByteSize) | ByteSize | undefined
   rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
 
 [./server] ApiRateLimit
 interface ApiRateLimit extends RateLimit
@@ -3184,6 +3193,11 @@ interface RequestEntry
 
 [./server] requestId
 function requestId(request: Request): string
+
+[./server] RequestTimeout
+class RequestTimeout
+  new (ms: number): RequestTimeout
+  ms: number
 
 [./server] retryLater
 function retryLater(wait: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, reason?: string): Error

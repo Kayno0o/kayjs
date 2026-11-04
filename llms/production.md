@@ -28,19 +28,6 @@ log.warn('slow relay')
 log.error('failed', new Error('refused'))
 ```
 
-### Trace requests with OpenTelemetry
-
-`tracer` takes an OpenTelemetry tracer, the SDK registered before the server starts:
-
-```ts
-import { trace } from '@opentelemetry/api'
-import { defineConfig } from 'kay/server'
-
-export default defineConfig({
-  observe: { tracer: trace.getTracer('my-site') },
-})
-```
-
 ### Check the database in the health route
 
 `health` moves the route and adds a check, which answers 503 when it returns `false`, throws or takes over 5 s, or when the `ping` of a store ([Stores](stores.md)) rejects, and runs at most once every 3 s, probes between sharing its answer, which `timeout` changes (`health: { timeout: '10s' }`, a duration such as `'250ms'`, which `./server --health` and the build's check of the executable wait for too, though the Dockerfile `kay new` writes cuts a probe off at 6 s: raise its `--timeout` with it):
@@ -140,22 +127,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - Outside a server, in the browser or a script, they go to the console as `[kayjs-mail] message`.
 - Every response carries its request's id as `X-Request-Id`, time-ordered, made by kay unless `proxy` is set and the proxy passed one on in that header; `observe: { requestIdHeader: 'x-correlation-id' }` in kay.config.ts names another header for both.
 - An error logged while answering a request is headed by the request, `kay: GET /blog/hello, request AZnLe0vUe9qD0uXq9vLwZw`, then its stack, so a line from a user or a log search finds both.
-- `requestId(request)` from `kay/server` gives it, in `onError` or a route, and a server span carries it as `kay.request.id`.
-
-### Tracing and timing
-
-- `observe: { serverTiming: true }` in kay.config.ts sends the `Server-Timing` header development sends on every page rendered per request in production too: `guards;dur=0.4, import;dur=0.2, loads;dur=12.6, load-0;desc="src/routes/_layout.kay";dur=3.1, load-1;desc="src/routes/blog/[slug].kay";dur=12.4, render;dur=1.8`: the guards (on a route that has any), the import of the page's modules and its loads as a whole, which run at once, then each load, layouts first, then the render.
-- Anyone loading the page reads it, page file names included.
-- A prerendered page has none, but one with server islands carries the timings of the loads and render that filled them.
-- `tracer` takes an OpenTelemetry tracer, which kay calls without depending on OpenTelemetry: the app installs `@opentelemetry/api` and an SDK exporting the spans, as `@opentelemetry/sdk-trace-node` with an OTLP exporter, registered before the server starts, then passes `tracer: trace.getTracer('my-site')`.
-- Without one, kay starts no span and the requests cost nothing more.
-- A span carries the request path (`url.path`, and a route's `[slug]` as the name) and a failed one the exception message, so a path or a message holding an id, an address or a name is personal data in the tracing backend: give it the retention and access of one, and keep such values out of messages thrown.
-- A page request is a server span named after its route, `GET /blog/[slug]`, with `http.request.method`, `http.route`, `url.path` and `http.response.status_code`, and inside it one span per load, `kay.load src/routes/blog/[slug].kay`, and one for the render, `kay.render ...`.
-- Spans the loads start nest under theirs.
-- An action call is one too, `POST /_kay/action/...`, holding the handler's spans and the page it renders back.
-- A span whose work threw records the error and an error status, as does a request answered with a 5xx.
-- An API request is a server span from its guards to its response, `POST /api/upload`; spans its handler starts do not nest under it, since Elysia runs the handler outside any call kay makes.
-- Spans nest across `await` through the context manager the SDK registers, which Bun's `AsyncLocalStorage` backs.
+- `requestId(request)` from `kay/server` gives it, in `onError` or a route, and a server span carries it as `kay.request.id` ([Tracing](tracing.md)).
 
 ### Metrics for a collector
 
@@ -176,6 +148,15 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - New connections are refused from the signal on, so a load balancer stops sending any; a client on a connection kept alive gets 503 from the health route meanwhile.
 - Requests still open after `serve.shutdownTimeout`, 10 seconds by default, are closed and the process exits with 1.
 - `kay dev` restarts at once instead.
+
+### Request timeouts
+
+- `serve: { timeout: '15s' }` in kay.config.ts holds every page, action, `api()` route and endpoint to that time; none by default. A hung database call otherwise keeps its request, and the connection, until the client leaves.
+- Past it a page answers 504 through the nearest `_error.kay` (`ctx.error.status` is 504), an action call fails with 504 and the message `kay.action.timeout`, an API route or endpoint answers `504 Gateway Timeout` as text. It is logged and handed to `observe.onError` as a `RequestTimeout` from `kay/server`.
+- `ctx.signal` is on the page, guard, endpoint and action contexts, and aborts at the timeout and when the client leaves; pass it to `fetch`, a database call or anything that takes a signal, so the work stops with the request. An `api()` route reads it as `request.signal`, which aborts at the timeout too (only under a timeout).
+- A page sets its own in `export const page = { timeout: '30s' }` (the innermost layout or page wins), an `api({ timeout })` module and an action's options likewise, one route of an API module as `detail: { timeout }`; `false` is none.
+- The clock counts from the request's arrival. Work that cannot be stopped, a handler ignoring the signal, goes on after the 504. A streamed page whose headers went out is cut at the time: the body ends with an error, the status stays 200, and the timeout is reported. An API route that returns a stream or a generator is not cut, nor an event stream.
+- A job has no request, so no `ctx.signal`: `schedule` and queues take their own `timeout`.
 
 ### A deploy under open tabs
 

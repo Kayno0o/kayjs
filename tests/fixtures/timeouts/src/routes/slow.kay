@@ -1,0 +1,8 @@
+--- server
+import { seen } from '../seen'
+
+seen.page = ctx.signal
+
+await Bun.sleep(600)
+---
+p late

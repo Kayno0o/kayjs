@@ -28,6 +28,7 @@ import { pageLocale } from '../runtime/words.server'
 import { actionClash } from './action-clash'
 import { routerPath } from './base'
 import { importModule } from './bundle'
+import { timeoutMs } from './config-limits'
 import { cookieJar } from './cookies'
 import { eventBody } from './event-stream'
 import { fieldMessage, validated } from './field-errors'
@@ -40,6 +41,7 @@ import { countSucceeded, isAgentCall, markChallenge, PRETEND, protectionRefusal,
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { recordOf, requestRecord } from './request-record'
+import { requestSignal, RequestTimeout, withTimeout } from './request-timeout'
 import { LOCAL_HOST, overHttps, requestUrl } from './request-url'
 import { guardUrl } from './routes'
 import { fieldOf } from './schema-check'
@@ -101,6 +103,8 @@ export interface ActionOptions {
   // Where the site is mounted, which the page a refused form post came from is served under.
   base?: string | undefined
   requireGuards?: boolean | undefined
+  // `serve.timeout` in milliseconds.
+  timeout?: number | undefined
   // How a redirect is spelled, with the trailing slash its page has.
   redirectSpelling?: ((location: string) => string) | undefined
   // The app's `cors`, the rule of every API module that sets none.
@@ -164,6 +168,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
 
       // Read once, as the rate limits' `key` hooks are fixed by the registration.
       const keyedLimit = keyed(value)
+      const ownTimeout = value.protection?.timeout === undefined ? undefined : timeoutMs(value.protection.timeout, `the timeout of ${value.url}`) ?? false
 
       if (tool && page.params.length === 0)
         tools.push({ name, url: value.url, schema: value.schema, tool, guards: guards.filter(guard => guard.check !== unguarded).map(guard => guard.file) })
@@ -171,7 +176,8 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
       limits.set(value.url, { bytes: value.protection?.maxSize, files: fileBodyLimit(value.schema), refuse: async (request, bytes, server) => inLocale(request, options, async () => tooLarge(value, request, bytes, server, back)) })
       // A span per call, the handler's own spans and the page it renders back nested in it.
       app.post(value.url, async context => traced(`POST ${value.url}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url, 'kay.request.id': requestId(context.request) } }), async (span) => {
-        const response = await answeringRequest(context.request, async () => inLocale(context.request, options, async () => onceWritten(context.request, value.url, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => cachedPageUrl(context.request, () => guardedPage(context.request, page, match, options)) }))))
+        const run = async () => answeringRequest(context.request, async () => inLocale(context.request, options, async () => onceWritten(context.request, value.url, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => cachedPageUrl(context.request, () => guardedPage(context.request, page, match, options)) }))))
+        const response = await timedAction(context, ownTimeout, options, run, async () => inLocale(context.request, options, async () => failed(context.request, new Headers(), cookieJar(context.request).cookies, { action: value.url, status: 504, values: isCall(context.request) ? {} : submittedValues(context.body), errors: { '': kayWord('kay.action.timeout') } }, context.server, back)))
 
         if (span)
           answered(span, response.status)
@@ -248,6 +254,21 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
   }
 
   return { limits, tools }
+}
+
+// Runs the action under its timeout; one that ran out is reported as a server error and answered as a failed post, 504.
+async function timedAction(context: { request: Request }, own: number | false | undefined, options: ActionOptions, run: () => Promise<Response>, timedOut: () => Promise<Response>): Promise<Response> {
+  try {
+    return await withTimeout(context.request, own, options.timeout, run)
+  }
+  catch (error) {
+    if (!(error instanceof RequestTimeout))
+      throw error
+
+    reportServerError(error, context.request, options.onError)
+
+    return timedOut()
+  }
 }
 
 function keyed(action: ServerAction<TSchema, unknown>): boolean {
@@ -607,6 +628,9 @@ export async function passGuards(guards: LoadedGuard[], context: { request: Requ
       return state.jar.cookies
     },
     locals: context as unknown as Locals,
+    get signal() {
+      return requestSignal(request)
+    },
     headers: state.headers,
     ...stoppers(request),
   }
@@ -726,6 +750,9 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     },
     // The app's derive and resolve hooks ran before this handler, so the context carries what `Register` declares.
     locals: context as unknown as Locals,
+    get signal() {
+      return requestSignal(request)
+    },
     headers,
     status: (code) => {
       status = code
@@ -745,7 +772,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     // A call reads a stream as it comes; a plain form post or an agent gets its last value, as a handler returning it would.
     const streams = isAsyncIterable(result) && isCall(request) && !isAgentCall(request)
-    const answer = isAsyncIterable(result) ? await (streams ? started(result, request.signal) : lastOf(result, request.signal)) : result
+    const answer = isAsyncIterable(result) ? await (streams ? started(result, requestSignal(request)) : lastOf(result, requestSignal(request))) : result
 
     await countGoneThrough(action, request, context.server, options)
 

@@ -279,6 +279,8 @@ export interface RequestContext<Params extends Record<string, unknown> = Record<
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, 'name'>): void, (options: CookieDeleteOptions): void } }
   // What the app's Elysia `derive`, `resolve` and `decorate` add, typed through `Register`.
   locals: Locals
+  // Aborts when the client leaves and when the request passes its `serve.timeout`: hand it to `fetch`, a database call or any work that takes one, so it stops with the request.
+  signal: AbortSignal
   // Added to the response, whichever way the request ends.
   headers: Headers
   // Stops with a redirect, 302 for a read and 303 for a post unless given; it throws, so what follows does not run.
@@ -381,6 +383,8 @@ export interface PageSettings {
   layouts?: false
   // `false` runs none of the `_guard.ts` files above the page, nor above its actions or a layout's: a sign-in page under a guard asking for a session.
   guards?: false
+  // The longest the page may take to answer, in place of `serve.timeout`: a string such as '30s', or `false` for none. Past it the page answers 504 through the nearest `_error.kay`; the innermost layout or page that sets it wins.
+  timeout?: Duration | false
   // The schema `ctx.query` is read against; a query it refuses answers 400.
   query?: TSchema
   // The pages of the route the sitemap lists, as `prerender` takes them; `false` leaves it out.

@@ -30,6 +30,7 @@ import { inPreview, inSharedDraft, previewRequested, requestDrafts, sharedEntry 
 import { requestId } from './protection'
 import { hasFlash, renderPage, renderUncaught, renderUnmatched, servePrerendered, sharedContext, withEditor } from './render'
 import { reportServerError } from './report'
+import { withPageTimeout } from './request-timeout'
 import { overHttps, requestUrl } from './request-url'
 import { revalidateStale } from './revalidate'
 import { canonicalPath, withoutSlash } from './routes'
@@ -202,6 +203,8 @@ export interface PageRoutes {
   // The routes directory's own `_404.kay` and `_error.kay`, for a path no page serves.
   fallback: SpecialPages
   respond: PageResponder
+  // `serve.timeout` in milliseconds.
+  timeout?: number | undefined
 }
 
 // How a request nothing serves is answered, as the routes directory's `_404.kay` draws it.
@@ -209,8 +212,9 @@ export type Unmatched = (given: RequestContext & { set: Context['set'] }) => Pro
 
 // A route per path the router serves, then one answering what none of them does, each in the locale its prefix or its host names.
 // Returns how an error thrown before any page was chosen is answered, in the locale the request names, and how a path none serves is, when the routes directory has a page for either.
-export function servePageRoutes(app: Elysia, { table, served: claims, matchers, i18n, locales, client, renderOptions, trailingSlash, fallback, respond }: PageRoutes): { uncaught: (error: unknown, context: RequestContext) => Promise<Response>, unmatched: Unmatched | undefined } {
+export function servePageRoutes(app: Elysia, { table, served: claims, matchers, i18n, locales, client, renderOptions, trailingSlash, fallback, respond, timeout }: PageRoutes): { uncaught: (error: unknown, context: RequestContext) => Promise<Response>, unmatched: Unmatched | undefined } {
   const settings = i18n?.settings
+  const onError = renderOptions.observe?.onError
   const inImplicitLocale = async (url: URL, request: Request, run: () => Promise<Response>) => runInLocale(stateFor(locales, locales.settings.defaultLocale, url.pathname, request), run)
 
   const answer = async (candidates: Candidate[], context: RequestContext & { params: unknown }, url: URL): Promise<Response> => {
@@ -229,7 +233,7 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
         pageRoutes.set(context.request, route.pattern)
 
         return traced(() => `${method} ${route.pattern}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': method, 'http.route': route.pattern, 'url.path': url.pathname, 'kay.request.id': requestId(context.request) } }), async (span) => {
-          const response = await respond(route, params, context, url)
+          const response = await withPageTimeout(context.request, timeout, async () => respond(route, params, context, url), error => reportServerError(error, context.request, onError))
 
           if (span)
             answered(span, response.status)

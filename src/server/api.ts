@@ -3,6 +3,7 @@ import type { ExtensionApp } from '../config'
 import type { Locals } from '../runtime'
 import type { ActionTool } from '../runtime/action'
 import type { ByteSize } from '../runtime/byte-size'
+import type { Duration } from '../runtime/duration'
 import type { ActionOptions } from './actions'
 import type { ApiModule } from './api-modules'
 import type { BodyLimit, RouteBodyLimit } from './body'
@@ -21,6 +22,7 @@ import { kayLog } from '../runtime/log'
 import { withDefaultBounds } from '../runtime/schema-bounds'
 import { admitCrossSite, contextLocale, crossSiteRefused, crossSiteResponse, guardsFirst, passGuards, requestState } from './actions'
 import { importModule } from './bundle'
+import { timeoutMs } from './config-limits'
 import { cookieJar } from './cookies'
 import { corsAdmits, corsResponse, corsRule, dropOwnGrant, grantedByKay, preflight, varyByOrigin, withCors, withoutOwnGrant } from './cors'
 import { streamReporters } from './event-stream'
@@ -31,6 +33,7 @@ import { apiLimitWait, checkApiLimit, requestId, tooManyRequests } from './prote
 import { sharedContext } from './render'
 import { isUncaught, reportServerError } from './report'
 import { recordOf, requestRecord } from './request-record'
+import { requestSignal, RequestTimeout, timedOutResponse, withTimeout } from './request-timeout'
 import { requestUrl } from './request-url'
 import { apiRoutePath, withoutSlash } from './routes'
 import { markPrivate, wasReadPersonally } from './scope'
@@ -47,6 +50,8 @@ const BODY_LIMIT = Symbol.for('kay.bodyLimit')
 const CORS = Symbol.for('kay.cors')
 // Where `api({ rateLimit })` keeps the limits of the module.
 const RATE_LIMIT = Symbol.for('kay.rateLimit')
+// Where `api({ timeout })` keeps the module's timeout.
+const TIMEOUT = Symbol.for('kay.timeout')
 
 // The requests the guards of their module let through, whose later errors are no refused input.
 const admitted = new WeakSet<Request>()
@@ -111,9 +116,16 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
     }
 
     // The handlers and error hooks run in Elysia's call, so each is wrapped to run in the request's locale, as the guards do.
+    const moduleTimeout = (instance as { [TIMEOUT]?: number | false })[TIMEOUT]
+
     for (const route of instance.routes) {
-      if (typeof route.handler === 'function')
-        route.handler = inRequestLocale(route.handler as Handler, options, route.method === 'GET')
+      if (typeof route.handler === 'function') {
+        const own = (route.hooks as { detail?: { timeout?: Duration | false } } | undefined)?.detail?.timeout
+        const routeTimeout = own === undefined ? moduleTimeout : timeoutMs(own, `the timeout of ${route.method} ${route.path}`) ?? false
+        const located = inRequestLocale(route.handler as Handler, options, route.method === 'GET')
+
+        route.handler = route.method === 'WS' ? located : timedHandler(located, routeTimeout, options)
+      }
 
       const hooks = route.hooks as { body?: unknown, error?: unknown, beforeHandle?: unknown, detail?: { messages?: SocketLimits } } | undefined
 
@@ -353,6 +365,42 @@ export function inRequestLocale(fn: Handler, options: ActionOptions, following =
 
   // Elysia tells a generator or an async handler by its `constructor`, and a handler's `name` shows in traces and errors.
   Object.defineProperties(wrapped, { toString: { value: () => original.toString() }, constructor: { value: original.constructor }, name: { value: original.name }, [WRAPPED]: { value: original } })
+
+  return wrapped
+}
+
+// A route that ran out of time is reported as any server error and answers 504, as a Response its module's hooks carry over.
+async function answeredLate(request: Request, onError: ActionOptions['onError'], run: () => Promise<unknown>): Promise<unknown> {
+  try {
+    return await run()
+  }
+  catch (error) {
+    if (!(error instanceof RequestTimeout))
+      throw error
+
+    reportServerError(error, request, onError)
+
+    return timedOutResponse()
+  }
+}
+
+// A handler held to its timeout: a promise it returns is raced against the clock, and `request.signal` reads as `ctx.signal` does, aborting at the timeout too. A synchronous answer and a generator, whose stream the timeout does not cut, run as they were.
+function timedHandler(fn: Handler, own: number | false | undefined, { timeout: fallback, onError }: ActionOptions): Handler {
+  if (own === false || (own === undefined && fallback === undefined))
+    return fn
+
+  const wrapped: Handler = function (this: unknown, context, ...rest) {
+    const { request } = context
+
+    Object.defineProperty(request, 'signal', { value: requestSignal(request), configurable: true })
+
+    const result: unknown = fn.call(this, context, ...rest)
+
+    return result instanceof Promise ? answeredLate(request, onError, async () => withTimeout<unknown>(request, own, fallback, async () => result)) : result
+  }
+
+  // A module served by a second app in the same process starts again from the handler as written.
+  Object.defineProperties(wrapped, { toString: { value: () => fn.toString() }, constructor: { value: fn.constructor }, name: { value: fn.name }, [WRAPPED]: { value: (fn as { [WRAPPED]?: Handler })[WRAPPED] ?? fn } })
 
   return wrapped
 }
@@ -616,6 +664,8 @@ declare module 'elysia' {
   interface DocumentDecoration {
     // The most a request to this route may send, bytes or a size such as `'20mb'`, in place of the module's and the app's `maxSize`; a bigger one answers 413 before it is read.
     maxSize?: ByteSize | undefined
+    // The longest this route may take, in place of the module's and the app's `timeout`: a string such as '30s', or `false` for none. Past it the request answers 504 and `request.signal` aborts.
+    timeout?: Duration | false | undefined
     // At most `max` requests to this route from one client, or from whatever `key` names, every `window`; past that it answers 429 with `Retry-After`. Counted after the module's guards, beside the module's own `rateLimit`.
     rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
     // Offers the route to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description }`, as an action's `tool` is. A route without it is in the OpenAPI document and never offered.
@@ -632,6 +682,8 @@ type Empty = Record<never, never>
 export interface ApiOptions {
   // The most a request to the module's routes may send, bytes or a size such as `'20mb'`, in place of the app's `maxSize`; a function is read once the server mounts the module, after the config's extensions ran.
   maxSize?: ByteSize | (() => ByteSize) | undefined
+  // The longest a route of the module may take, in place of `serve.timeout`: a string such as '30s', or `false` for none. Past it the request answers 504 and `request.signal` aborts.
+  timeout?: Duration | false | undefined
   // Lets other sites' pages call the module's routes from the browser: `cors: { origins: ['https://app.example.com'], credentials: true }`. `false` keeps the module to its own site where the app's `cors` in kay.config.ts opens the others.
   cors?: CorsOptions | false | undefined
   // At most `max` requests to any route of the module from one client, or from whatever `key` names, every `window`; past that they answer 429 with `Retry-After`. Counted after the module's guards.
@@ -648,6 +700,9 @@ export function api(options: ApiOptions = {}): Elysia<'', { decorator: Empty, st
 
   if (maxSize !== undefined)
     Object.defineProperty(instance, BODY_LIMIT, { value: maxSize })
+
+  if (options.timeout !== undefined)
+    Object.defineProperty(instance, TIMEOUT, { value: timeoutMs(options.timeout, 'the timeout of an api() module') ?? false })
 
   if (options.cors !== undefined)
     Object.defineProperty(instance, CORS, { value: options.cors === false ? false : corsRule(options.cors) })

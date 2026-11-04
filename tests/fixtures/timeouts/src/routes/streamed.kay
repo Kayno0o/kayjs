@@ -1,0 +1,6 @@
+--- server
+const later = Bun.sleep(600).then(() => 'late comments')
+---
+p first
+await later then text
+  p.comments {text}

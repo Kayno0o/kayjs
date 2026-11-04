@@ -8,9 +8,9 @@ export function resolveProtection(options: ActionProtection<string> | undefined)
   if (options === undefined)
     return undefined
 
-  const { protect, tool, maxSize, messages } = options
+  const { protect, tool, maxSize, timeout, messages } = options
 
-  return Object.fromEntries(Object.entries({ tool, maxSize, messages, ...protect }).filter(([, value]) => value !== undefined))
+  return Object.fromEntries(Object.entries({ tool, maxSize, timeout, messages, ...protect }).filter(([, value]) => value !== undefined))
 }
 
 // `proofOfWork` with its defaults, `maxAge` in milliseconds; undefined when it is off.

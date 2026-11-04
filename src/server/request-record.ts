@@ -10,6 +10,7 @@ import type { CacheReads } from './live'
 import type { ToolCall } from './mcp'
 import type { RefundableStore } from './protection'
 import type { RequestContext } from './render'
+import type { Deadline } from './request-timeout'
 import type { Namer } from './request-user'
 import type { Span } from './trace'
 import type { Handle } from './visit'
@@ -37,6 +38,9 @@ export class RequestRecord {
   toolCall: ToolCall | undefined = undefined
   // What serves it whole, the app's plugins included, where kay's part of the app cannot reach them: `kay/test`'s app.
   servedThrough: Handle | undefined = undefined
+  // Its clock and signal, made on first use; and whether its page streams its body, which the timeout then cuts short.
+  deadline: Deadline | undefined = undefined
+  streamed = false
   // The errors already reported for it, so the catch-all reports none twice.
   reported: Set<unknown> | undefined = undefined
   // Its context as kay's guards and handlers read it, copied once so they share it.

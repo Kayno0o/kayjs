@@ -1,0 +1,24 @@
+--- server
+import { action } from 'kay'
+import { seen } from '../seen'
+
+export const slow = action(async (ctx) => {
+  seen.action = ctx.signal
+  await Bun.sleep(600)
+
+  return 'late'
+})
+
+export const patient = action(async () => {
+  await Bun.sleep(250)
+
+  return 'done'
+}, { timeout: false })
+
+export const strict = action(async () => {
+  await Bun.sleep(400)
+
+  return 'late'
+}, { timeout: '30ms' })
+---
+p actions

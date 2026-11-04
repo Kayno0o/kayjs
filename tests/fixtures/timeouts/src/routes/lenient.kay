@@ -1,0 +1,6 @@
+--- server
+export const page = { timeout: false }
+
+await Bun.sleep(250)
+---
+p patient

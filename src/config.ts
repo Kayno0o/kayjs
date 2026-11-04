@@ -205,6 +205,8 @@ export interface ServeConfig {
   compressionDictionary?: boolean | undefined
   // How long a stopping server gives open requests and streams to finish before closing them, a string such as '30s'; 10 seconds by default.
   shutdownTimeout?: Duration | undefined
+  // The longest a page, an action, an `api()` route or an endpoint may take to answer, a string such as '15s'; past it the request answers 504 (a page through the nearest `_error.kay`), is logged and handed to `observe.onError`, and `ctx.signal` aborts. None by default. A page sets its own in `export const page = { timeout }`, an `api({ timeout })` module and an action's third argument likewise, `false` for none.
+  timeout?: Duration | false | undefined
 }
 
 export interface ObserveConfig {

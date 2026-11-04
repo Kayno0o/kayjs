@@ -2,7 +2,7 @@ import type { HealthConfig, ImagesConfig, LiveConfig } from '../config'
 import type { Duration } from '../runtime/duration'
 import { KayError } from '../compiler/errors'
 import { byteSize } from '../runtime/byte-size'
-import { durationSeconds } from '../runtime/duration'
+import { durationSeconds, optionMs } from '../runtime/duration'
 
 // The limits kay.config.ts may move, each read with its default and refused naming its option: kept apart from the server modules using them, so `kay check` and the language server validate them without loading Elysia.
 
@@ -24,6 +24,19 @@ export function healthTimeoutMs(config: HealthConfig | undefined): number {
 
 export function shutdownSeconds(timeout: Duration): number {
   return durationSeconds(timeout, 'serve.shutdownTimeout')
+}
+
+// A timeout as milliseconds: `false` and an unset value mean none; anything else is a positive duration.
+export function timeoutMs(value: Duration | false | undefined, what: string): number | undefined {
+  if (value === undefined || value === false)
+    return undefined
+
+  const ms = optionMs(value, what)
+
+  if (ms > MAX_TIMER_MS)
+    throw new KayError('config-invalid', `kay: ${what} is ${value}; it takes at most 24 days`)
+
+  return ms
 }
 
 const DEFAULT_PER_MINUTE = 120

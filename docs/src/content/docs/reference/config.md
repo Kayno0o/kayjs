@@ -81,6 +81,7 @@ In `serve`, how the server answers:
 | `serve.compress` | Compresses responses rendered per request. On in production; `false` when a proxy or CDN does it |
 | `serve.compressionDictionary` | A server build with a prerendered page uses its 404 page as a dictionary and sends a page to a browser holding it as the difference from it. On by default; `false` builds none, so no page names one. See [Pages that send only their difference](/guides/deployment#pages-that-send-only-their-difference) |
 | `serve.shutdownTimeout` | How long a stopping server lets open requests finish, as seconds or `'30s'`. 10 seconds by default |
+| `serve.timeout` | The longest a page, action, API route or endpoint may take, `'15s'`: past it the request answers 504 and `ctx.signal` aborts. None by default, `false` for none; a page, an `api()` module and an action set their own |
 
 In `observe`, what you watch the server by:
 

@@ -14,6 +14,7 @@ import { pageSetting } from './page-settings'
 import { listedParams, pathOf } from './prerendered'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
+import { requestSignal, RequestTimeout, timedOutResponse, withTimeout } from './request-timeout'
 import { routerKey } from './routes'
 import { markPrivate, readPersonally, wasReadPersonally } from './scope'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
@@ -57,8 +58,23 @@ export async function serveEndpoints(app: Elysia, endpoints: Endpoint[], options
 
       const params = Object.fromEntries(endpoint.params.map((name, index) => [name, index === values.length - 1 && endpoint.suffix !== undefined ? last.slice(0, -endpoint.suffix.length) : values[index]!]))
 
-      return answeringRequest(context.request, async () => answer(endpoint, sharedContext(context.request, () => ({ ...context })), params, options))
+      return answeringRequest(context.request, async () => timedOut(context.request, options, async () => withTimeout(context.request, undefined, options.timeout, async () => answer(endpoint, sharedContext(context.request, () => ({ ...context })), params, options))))
     })
+  }
+}
+
+// A timeout is reported as any server error and answered 504, the catch-all for errors no route caught being registered after the endpoints.
+async function timedOut(request: Request, { onError }: ActionOptions, run: () => Promise<Response>): Promise<Response> {
+  try {
+    return await run()
+  }
+  catch (error) {
+    if (!(error instanceof RequestTimeout))
+      throw error
+
+    reportServerError(error, request, onError)
+
+    return timedOutResponse()
   }
 }
 
@@ -91,6 +107,9 @@ async function answer(endpoint: ServedEndpoint, context: { request: Request }, p
       return jar.cookies
     },
     locals: context as unknown as Locals,
+    get signal() {
+      return requestSignal(request)
+    },
     headers,
     ...stoppers(request),
   }
