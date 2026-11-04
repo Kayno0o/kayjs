@@ -2,8 +2,10 @@
 // The fixtures are apps of their own, outside the tsconfig. The Astro, Next and Nuxt bench apps are type-checked by their own tools in `bench:check`: their programs loaded here too run eslint out of memory.
 export const typeAwareSlices: string[][] = [
   ['src/**/*.ts'],
-  ['tests/[a-l]*.ts'],
-  ['tests/[!a-l]*.ts'],
+  ['tests/[a-d]*.ts'],
+  ['tests/[e-l]*.ts'],
+  ['tests/[m-r]*.ts'],
+  ['tests/[!a-r]*.ts'],
   ['*.ts', 'scripts/*.ts'],
   ['bench/*.ts', 'bench/{shared,sites}/**/*.ts'],
   ['bench/apps/{kay,solid,svelte}/**/*.ts'],
