@@ -300,6 +300,13 @@ describe('elements', () => {
     expect(diagnosticsAt(source, 40)).toEqual([[keyword, `\`${keyword}\` is pug syntax kay does not have`.slice(0, 40)]])
   })
 
+  it.each([
+    ['import X from \'./x\'\np', 'import', '`import` is a module statement, which a template does not take'],
+    ['div\n  export const a = 1', 'export', '`export` is a module statement, which a template does not take'],
+  ])('reports a module statement written in a template: %p', (source, at, message) => {
+    expect(diagnosticsAt(source)).toEqual([[at, message]])
+    expect(diagnosticsAt('p import this\nimport(x)\n| import x')).toEqual([])
+  })
 
   it('reads a backslash before a brace in a quoted attribute as the brace', () => {
     expect(element(parse('a(title="Hi \\{name} {x}")').template[0]).attributes[0]).toMatchObject({ kind: 'static', text: 'Hi {name} {x}' })

@@ -77,11 +77,26 @@ describe('hints for the first template mistakes', () => {
     expect(errors(found).map(error => error[3])).toEqual([expect.stringContaining('`data-tooltip="..."`')])
   })
 
-  it('keeps every unknown element and reports each elif once, nested or beside siblings', async () => {
-    const typos = errors(await report('---\n---\ndiv\n  p a\n  lii b\n  p c\n  spann d\n'))
+  it('reports each unknown element once, nearest HTML element suggested', async () => {
+    const typos = errors(await report('---\n---\ndiv\n  p a\n  lii b\n  p c\n  spann d\n  zzzzz e\n'))
 
-    expect(typos.map(error => [error[2], error[3]])).toEqual(Array.from({ length: 4 }, () => ['TS2339', undefined]))
+    expect(typos.map(error => [error[0], error[2], error[3]])).toEqual([
+      [5, 'TS2339', '`lii` is no HTML element, snippet or component in scope: did you mean `li`?'],
+      [7, 'TS2339', '`spann` is no HTML element, snippet or component in scope: did you mean `span`?'],
+      [8, 'TS2339', '`zzzzz` is no HTML element, snippet or component in scope'],
+    ])
+  })
 
+  it('says a snippet is rendered in braces and an imported lowercase name is a component to capitalise', async () => {
+    const found = errors(await report('---\nimport card from "../card.kay"\n---\nsnippet foo()\n  p hi\nfoo() text\ncard(title="a") text\n', { 'src/card.kay': card }))
+
+    expect(found.filter(error => error[2] === 'TS2339').map(error => [error[0], error[3]])).toEqual([
+      [6, '`foo` is a snippet, which is rendered in braces: `{foo(...)}`'],
+      [7, 'components are capitalised: import it as `Card` and call `Card(...)`'],
+    ])
+  })
+
+  it('reports each elif once, nested or beside siblings', async () => {
     const nested = errors(await report('---\nconst a = true\n---\ndiv\n  if a\n    p a\n  elif a\n    p b\n  elif a\n    p c\n  span x\n'))
 
     expect(nested.map(error => [error[0], error[3]])).toEqual([[7, 'kay writes it as two words, `else if condition`'], [9, 'kay writes it as two words, `else if condition`']])
@@ -90,7 +105,7 @@ describe('hints for the first template mistakes', () => {
   it('counts an elif tag by its whole name, a longer tag opening the same way not shifting the ordinal', async () => {
     const found = errors(await report('---\nconst a = true\n---\ndiv\n  elifx\n  if a\n    p a\n  elif a\n    p b\n'))
 
-    expect(found.filter(error => error[3] !== undefined).map(error => error[0])).toEqual([8])
+    expect(found.filter(error => String(error[3]).includes('two words')).map(error => error[0])).toEqual([8])
   })
 
   it('ends a handler\'s braces past a regular expression, a comment and a template holding a quote or a brace', async () => {

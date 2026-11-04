@@ -2,6 +2,8 @@
 // Each row recognises one mistake by tsgo's code and message and the source at its place; the next mistake is one more row.
 import type { Span } from '../compiler/ast'
 import type { TsgoDiagnostic } from './diagnose'
+import { HTML_ELEMENTS } from '../compiler/lints'
+import { nearest } from '../nearest'
 
 const ASSIGNABILITY = 2322
 const MISSING_PROPERTY = 2339
@@ -28,6 +30,7 @@ const BIND_ATTRIBUTE = /(?<![\w:$-])bind:value=\{/
 const UNKNOWN_ELEMENT = /^Property '([\w$-]+)' does not exist on type 'JSX\.IntrinsicElements'/
 const UNKNOWN_ATTRIBUTE = /Property '(\w+)' does not exist on type 'HtmlAttributes</
 const TAG_NAME = /^[\w$.:-]+$/
+const NAME_ESCAPES = /[$.]/g
 const NAME_CHAR = /[\w:$-]/
 const CHECKBOX = /\btype\s*=\s*["']checkbox["']/
 
@@ -165,6 +168,10 @@ function attributeNamed(source: string, list: Span, name: string): Span | undefi
   return { start, end: Math.max(end, value) }
 }
 
+function escapeName(name: string): string {
+  return name.replace(NAME_ESCAPES, '\\$&')
+}
+
 // `onClick={bump()}`: the call's result handed where the function goes.
 const calledHandler: Row = (diagnostic, source, span) => {
   if (diagnostic.code !== ASSIGNABILITY || !VOID_HANDLER.test(diagnostic.message) || !HANDLER_ATTRIBUTE.test(source.slice(span.start, span.start + 80)))
@@ -217,26 +224,44 @@ const mistypedBind: Row = (diagnostic, source, span) => {
   return { span: attribute, help: `\`bind:value\` writes a ${given} here, and the signal holds ${held}: bind a signal of that type` }
 }
 
-// `elif a`, an element to TypeScript, reported at its opening tag, which the source maps loosely, and again at its closing tag.
-const elseIf: Row = (diagnostic, source, _span, tsx) => {
+// An element name nothing declares, reported at its opening tag, which the source maps loosely, and again at its closing tag.
+// `elif` is `else if` written as one word, a snippet is rendered as `{foo()}`, an imported component is capitalised, and a typo is answered with the nearest HTML element.
+const unknownElement: Row = (diagnostic, source, _span, tsx) => {
   const name = diagnostic.code === MISSING_PROPERTY ? UNKNOWN_ELEMENT.exec(diagnostic.message)?.[1] : undefined
 
-  if (name === undefined || !ELSE_IF_SPELLINGS.has(name))
+  if (name === undefined)
     return undefined
 
   if (tsx.startsWith('</', diagnostic.start))
     return 'duplicate'
 
+  const escaped = escapeName(name)
+
   // The source maps the tag loosely, so it is the nth line opening on the name that stands for the nth such tag of the generated code.
-  const ordinal = [...tsx.slice(0, diagnostic.start).matchAll(new RegExp(`<${name}(?![\\w$-])`, 'g'))].length
-  const token = [...source.matchAll(new RegExp(`^[ \\t]*${name}(?![\\w$-])`, 'gm'))][ordinal]
+  const ordinal = [...tsx.slice(0, diagnostic.start).matchAll(new RegExp(`<${escaped}(?![\\w$-])`, 'g'))].length
+  const token = [...source.matchAll(new RegExp(`^[ \\t]*${escaped}(?![\\w$-])`, 'gm'))][ordinal]
 
   if (!token)
     return undefined
 
   const start = token.index + token[0].length - name.length
+  const found = { start, end: start + name.length }
 
-  return { span: { start, end: start + name.length }, help: 'kay writes it as two words, `else if condition`' }
+  if (ELSE_IF_SPELLINGS.has(name))
+    return { span: found, help: 'kay writes it as two words, `else if condition`' }
+
+  if (new RegExp(`^[ \\t]*snippet\\s+${escaped}(?![\\w$-])`, 'm').test(source))
+    return { span: found, help: `\`${name}\` is a snippet, which is rendered in braces: \`{${name}(...)}\`` }
+
+  if (new RegExp(`^[ \\t]*import\\b[^\\n]*(?<![\\w$])${escaped}(?![\\w$])`, 'm').test(source)) {
+    const component = name[0]!.toUpperCase() + name.slice(1)
+
+    return { span: found, help: `components are capitalised: import it as \`${component}\` and call \`${component}(...)\`` }
+  }
+
+  const near = nearest(name, [...HTML_ELEMENTS])
+
+  return { span: found, help: `\`${name}\` is no HTML element, snippet or component in scope${near === undefined ? '' : `: did you mean \`${near}\`?`}` }
 }
 
 // `className` and `htmlFor`: kay writes the HTML names.
@@ -262,7 +287,7 @@ const tooltipName: Row = (diagnostic, source, span) => {
   return attribute && { span: attribute, help: 'a tooltip is `data-tooltip="..."` on an element the keyboard reaches (a `button`, a link, or one with `tabindex="0"`), or `data-hint="..."` for text only the pointer adds' }
 }
 
-const ROWS: Row[] = [calledHandler, mistypedBind, elseIf, reactNames, tooltipName]
+const ROWS: Row[] = [calledHandler, mistypedBind, unknownElement, reactNames, tooltipName]
 
 export function templateHint(diagnostic: TsgoDiagnostic, source: string, span: Span | undefined, tsx: string): TemplateHint | 'duplicate' | undefined {
   if (span === undefined)

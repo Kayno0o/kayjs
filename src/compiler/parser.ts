@@ -71,7 +71,8 @@ const PUG_HINTS: Record<string, string> = {
   mixin: 'kay reuses markup through a component: import a `.kay` file and use its tag, or declare a `snippet` for markup used in one file',
   doctype: 'kay writes the doctype of every page itself',
 }
-
+// Module statements, which a template compiles to elements named after them: they belong in the fence.
+const MODULE_STATEMENT = /(import|export)(?=[ \t{*]|\r?\n|$)/y
 // `\{name}` in a quoted attribute value, a literal brace that `brace-in-attribute` leaves alone.
 const ESCAPED_BRACE = /\\\{(?=[a-z_$])/gi
 // `then list` closing the `await` line, or a bare `then`.
@@ -314,7 +315,7 @@ class TemplateParser {
     [keyword('then|catch'), 'tc', (parser, indent, siblings, head) => parser.attachAwaitBranch(indent, siblings.at(-1), head[0] as 'then' | 'catch')],
     [keyword('else[ \\t]+if|else'), 'e', (parser, indent, siblings, head) => parser.attachElse(indent, siblings.at(-1), head[0] !== 'else')],
     [PUG_KEYWORD, 'ewucibmd', (parser, indent, _, head) => parser.skipLine(indent, { length: head[0].length, message: `\`${head[0]}\` is pug syntax kay does not have`, help: PUG_HINTS[head[0]] })],
-
+    [MODULE_STATEMENT, 'ie', (parser, indent, _, head) => parser.skipLine(indent, { length: head[0].length, message: `\`${head[0]}\` is a module statement, which a template does not take`, help: head[0] === 'import' ? 'write the import in the script fence (`---`) above the template' : 'declare it in the script fence (`---`), or in a `--- module` fence to export it' })],
     [keyword('snippet'), 's', (parser, indent, siblings) => {
       const node = parser.parseSnippet(indent)
 
