@@ -64,6 +64,14 @@ let origin: string
 let page: TestPage
 let release: (() => Promise<void>) | undefined
 
+// One edit's trip: the debounce, the compile on the page's thread and the frame's reply, a second on an idle host and several when a landing or the suite competes for the CPU.
+const ROUND_TRIP = '30s'
+
+// The page loads the compiler (its bundle and the parser's wasm, compiled and instantiated in the browser) and boots the frame before any markup shows, a few seconds of the browser's CPU on a loaded runner. `aria-busy` is the page's own word for that work being over, so the first markup is waited for on it.
+async function settled(): Promise<void> {
+  await page.waitFor('.playground-result[aria-busy="false"]', { timeout: ROUND_TRIP })
+}
+
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs playground in a browser', () => {
   beforeAll(async () => {
     release = await takeDocsBuilt()
@@ -81,7 +89,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
       throw new Error('kay start did not serve the docs')
 
     // The docs bundle the compiler and the frame's runtime on their first request (`bundled`), seconds of CPU on a loaded runner, so the first test's waits would be spent on the server's build rather than on the playground.
-    await Promise.all(['playground/compiler.js', 'playground/frame.html'].map(async file => (await fetch(`${origin}${file}`)).arrayBuffer()))
+    await Promise.all(['playground/compiler.js', 'playground/frame.html', 'playground/parser.wasm32-wasip1.wasm'].map(async file => (await fetch(`${origin}${file}`)).arrayBuffer()))
 
     page = await browse(origin, { path, width: 1440, height: 900 })
   }, 300_000)
@@ -94,21 +102,27 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
 
   it('opens an example from the address, shows the server\'s markup and the live component, and follows an edit', async () => {
     await page.goto(`/getting-started/playground#code=${encodeSource(COUNTER)}`)
+    await settled()
     await page.click('.playground-result button')
-    await page.waitUntil(() => document.querySelector('.playground-markup code')?.textContent?.includes('Clicked 0 times'))
-    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Clicked 0 times')
+    await page.waitUntil(() => document.querySelector('.playground-markup code')?.textContent?.includes('Clicked 0 times'), { timeout: ROUND_TRIP })
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Clicked 0 times', { timeout: ROUND_TRIP })
 
     await page.fill('.playground-input textarea', '---\n---\np Hello from the playground\n')
-    await page.waitUntil(() => document.querySelector('.playground-markup code')?.textContent?.includes('Hello from the playground'))
-    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Hello from the playground')
+    await page.waitUntil(() => document.querySelector('.playground-markup code')?.textContent?.includes('Hello from the playground'), { timeout: ROUND_TRIP })
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Hello from the playground', { timeout: ROUND_TRIP })
     expect(await page.count('.playground-problems')).toBe(0)
     expect((await page.a11y('.playground')).map(violation => `${violation.id} ${violation.nodes.map(node => node.target).join(' ')}`)).toEqual([])
     expect(page.errors).toEqual([])
   }, 60_000)
 
   it('shows a compile error at its line and keeps the last good result', async () => {
+    // Its own page and its own good result, so a failure of the test before it fails that test alone.
+    await page.goto('/getting-started/playground')
+    await settled()
+    await page.fill('.playground-input textarea', '---\n---\np Hello from the playground\n')
+    await page.waitUntil(() => document.querySelector('.playground-markup code')?.textContent?.includes('Hello from the playground'), { timeout: ROUND_TRIP })
     await page.fill('.playground-input textarea', '---\n---\ndiv\n  p {1 +}\n')
-    await page.waitFor('.playground-problems')
+    await page.waitFor('.playground-problems', { timeout: ROUND_TRIP })
     expect(await page.text('.playground-problems')).toMatch(/playground\.kay:4/)
     expect(await page.text('.playground-markup code')).toContain('Hello from the playground')
   }, 60_000)
@@ -195,7 +209,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     expect(await page.text('.playground-markup code')).toBe('')
 
     await page.click('.playground-result button')
-    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Clicked 0 times')
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Clicked 0 times', { timeout: ROUND_TRIP })
     expect(await page.count('.playground-held')).toBe(0)
 
     await page.fill('.playground-input textarea', '---\n---\np Typed\n')
