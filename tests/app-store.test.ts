@@ -1,4 +1,4 @@
-import type { Action, Duration } from '../src/runtime'
+import type { Action } from '../src/runtime'
 import type { AppStore } from '../src/server/app-store'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -21,7 +21,7 @@ function counting() {
   const store = memoryRates()
   const seen: string[] = []
 
-  return { seen, store: { hit: (key: string, window: Duration, weight?: number) => {
+  return { seen, store: { hit: (key: string, window: number, weight?: number) => {
     seen.push(key)
 
     return store.hit(key, window, weight)

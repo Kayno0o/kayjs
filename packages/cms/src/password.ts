@@ -32,6 +32,7 @@ const FAILURES = 'cms:sign-in-failures'
 // Wrong passwords from anyone, every quarter of an hour, past which no sign-in is tried until the window closes: the per-visitor limit does not stop a guess spread over many addresses.
 const FAILURE_CEILING = 100
 const FAILURE_WINDOW = '15m'
+const FAILURE_WINDOW_MS = 15 * 60_000
 
 export interface PasswordOptions {
   // How long a sign-in lasts, `'14d'` by default.
@@ -167,7 +168,7 @@ export class Passwords {
   // Counts a wrong password against the ceiling, logging the first one past it.
   async failed(): Promise<void> {
     try {
-      const window = await this.store().hit(FAILURES, FAILURE_WINDOW)
+      const window = await this.store().hit(FAILURES, FAILURE_WINDOW_MS)
 
       if (window.count === FAILURE_CEILING)
         log.warn(`${FAILURE_CEILING} wrong passwords in ${FAILURE_WINDOW}: the cms sign-in refuses every try until the window closes`)
@@ -255,7 +256,7 @@ export class Passwords {
     const signature = value?.split('.')[2] ?? ''
 
     try {
-      await this.store().hit(REVOKED + keyedDigest('cms-session', signature), `${Math.max(1, left)}ms`)
+      await this.store().hit(REVOKED + keyedDigest('cms-session', signature), Math.max(1, left))
     }
     catch (error) {
       log.error(`the store did not keep a signed-out cookie, so other processes still accept it until it expires: ${error instanceof Error ? error.message : String(error)}`)

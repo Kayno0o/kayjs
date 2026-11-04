@@ -81,10 +81,10 @@ describe('time options take a Duration', () => {
     expect(() => testApp({ audit: { maxAge: 'a year' as Duration } })).toThrow('kay: audit.maxAge is \'a year\'')
   })
 
-  test('a limit window takes a string, handed to the store as written, and a bad one names its limit', async () => {
-    const windows: Duration[] = []
+  test('a limit window takes a string, handed to the store in milliseconds, and a bad one names its limit', async () => {
+    const windows: number[] = []
     const base = memoryAuthStore()
-    const store = { ...base, rates: { ...base.rates!, hit: async (key: string, window: Duration) => {
+    const store = { ...base, rates: { ...base.rates!, hit: async (key: string, window: number) => {
       windows.push(window)
 
       return base.rates!.hit(key, window)
@@ -92,14 +92,14 @@ describe('time options take a Duration', () => {
     const { browser } = testApp({ store, rateLimit: { register: { max: 1, window: '2h' } } })
 
     await browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
-    expect(windows).toContain('2h')
+    expect(windows).toContain(7_200_000)
     expect(() => testApp({ rateLimit: { signIn: { max: 1, window: '-5m' } } })).toThrow('rateLimit.signIn.window is \'-5m\'')
   })
 
-  test('rateLimit windows reach the store as written', async () => {
-    const windows: Duration[] = []
+  test('rateLimit windows reach the store in milliseconds', async () => {
+    const windows: number[] = []
     const base = memoryAuthStore()
-    const store = { ...base, rates: { ...base.rates!, hit: async (key: string, window: Duration) => {
+    const store = { ...base, rates: { ...base.rates!, hit: async (key: string, window: number) => {
       windows.push(window)
 
       return base.rates!.hit(key, window)
@@ -107,8 +107,8 @@ describe('time options take a Duration', () => {
     const { browser } = testApp({ store, rateLimit: { register: { max: 1, window: '3h' }, signIn: { max: 1, window: '1h' } } })
 
     await browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
-    expect(windows).toContain('3h')
-    expect(windows).not.toContain('2h')
+    expect(windows).toContain(10_800_000)
+    expect(windows).not.toContain(7_200_000)
     expect(() => testApp({ rateLimit: { signIn: { max: 1, window: '-5m' } } })).toThrow('kay: rateLimit.signIn.window is \'-5m\'')
   })
 

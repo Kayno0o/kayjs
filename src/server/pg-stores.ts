@@ -5,7 +5,6 @@ import type { PushStore } from './push-store'
 import type { DeletableSessionStore, SessionData } from './session'
 import type { VitalCount, VitalReading, VitalsStore } from './vitals-store'
 import { parse, stringify } from 'devalue'
-import { durationSeconds, optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { outsideRequest } from './clean-context'
 import { rowsOf } from './pg-jobs'
@@ -69,12 +68,11 @@ export function pgSessions(pg: PgHandle): DeletableSessionStore {
 
       const db = await pg.db()
       const text = stringify(data)
-      const seconds = durationSeconds(maxAge, 'a session\x27s maxAge')
 
       if (++writes % SWEEP_EVERY === 0)
         await sweep()
 
-      await query(db, `INSERT INTO kay_sessions (id, data, expires) VALUES ($1, $2, ${NOW} + $3::bigint) ON CONFLICT (id) DO UPDATE SET data = excluded.data, expires = excluded.expires`, [id, text, Math.round(seconds * 1000)])
+      await query(db, `INSERT INTO kay_sessions (id, data, expires) VALUES ($1, $2, ${NOW} + $3::bigint) ON CONFLICT (id) DO UPDATE SET data = excluded.data, expires = excluded.expires`, [id, text, Math.round(maxAge)])
     },
     async delete(id) {
       const db = await pg.db()
@@ -137,7 +135,6 @@ export function pgRates(pg: PgHandle): RateStore {
     async hit(key, window, weight = 1) {
       const hash = await hashed(key)
       const db = await pg.db()
-      const length = optionMs(window, 'a rate window')
 
       if (Date.now() - swept > SWEEP_RATES_MS) {
         swept = Date.now()
@@ -145,7 +142,7 @@ export function pgRates(pg: PgHandle): RateStore {
       }
 
       // The row's old values are what both cases read: a closed window opens afresh, an open one counts the weight more.
-      const [row] = await query<{ count: number, reset_at: string }>(db, `WITH t AS (SELECT ${NOW} AS now) INSERT INTO kay_rates (key, count, reset_at) SELECT $1, $2::integer, t.now + $3::bigint FROM t ON CONFLICT (key) DO UPDATE SET count = CASE WHEN kay_rates.reset_at <= (SELECT now FROM t) THEN $2::integer ELSE kay_rates.count + $2::integer END, reset_at = CASE WHEN kay_rates.reset_at <= (SELECT now FROM t) THEN (SELECT now FROM t) + $3::bigint ELSE kay_rates.reset_at END RETURNING count, reset_at`, [hash, weight, Math.round(length)])
+      const [row] = await query<{ count: number, reset_at: string }>(db, `WITH t AS (SELECT ${NOW} AS now) INSERT INTO kay_rates (key, count, reset_at) SELECT $1, $2::integer, t.now + $3::bigint FROM t ON CONFLICT (key) DO UPDATE SET count = CASE WHEN kay_rates.reset_at <= (SELECT now FROM t) THEN $2::integer ELSE kay_rates.count + $2::integer END, reset_at = CASE WHEN kay_rates.reset_at <= (SELECT now FROM t) THEN (SELECT now FROM t) + $3::bigint ELSE kay_rates.reset_at END RETURNING count, reset_at`, [hash, weight, Math.round(window)])
 
       return { count: row!.count, resetAt: Number(row!.reset_at) }
     },

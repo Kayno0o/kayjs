@@ -2,6 +2,7 @@ import type { Duration } from 'kay'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, hashPassword } from '@kaynooo/utils'
+import { optionMs } from 'kay/library'
 import { afterResponse } from './events'
 import { randomToken } from './keys'
 import { counted, spend } from './limits'
@@ -45,7 +46,7 @@ export async function startGuess(state: RequestState, record: UserRecord | undef
 
 // Counts a wrong password against the account's ceiling, which no right password gives back.
 export async function failGuess(state: RequestState, guess: Guess): Promise<void> {
-  await state.core.rates.hit(guess.failures, guess.window)
+  await state.core.rates.hit(guess.failures, optionMs(guess.window, 'an attempts window'))
 }
 
 // A right password costs this client and the burst in flight nothing: the guesses they hold are forgotten, but not the failures of other clients, so signing in does not hand an attacker a fresh ceiling.
@@ -56,7 +57,7 @@ export async function forgive(state: RequestState, guess: Guess): Promise<void> 
 
 // Mails the holder that signing in is paused, at most once a day however often the lockout comes back, so guessing cannot flood their inbox.
 export async function mailLockout(state: RequestState, record: UserRecord): Promise<void> {
-  if ((await state.core.rates.hit(`sign-in-locked-mail:${record.id}`, '1d')).count === 1)
+  if ((await state.core.rates.hit(`sign-in-locked-mail:${record.id}`, 86_400_000)).count === 1)
     await afterResponse('reporting a sign-in lockout', async () => notify(state, record, 'sign-in-locked'))
 }
 
@@ -81,7 +82,7 @@ export async function secondFactorLimited(state: RequestState, record: UserRecor
   if (await spend(rates, `two-factor:${state.client}`, limits.twoFactor))
     return true
 
-  const guesses = (await rates.hit(`two-factor:${record.id}`, limits.twoFactorAccount.window)).count
+  const guesses = (await rates.hit(`two-factor:${record.id}`, optionMs(limits.twoFactorAccount.window, 'an attempts window'))).count
 
   if (guesses <= limits.twoFactorAccount.max)
     return false

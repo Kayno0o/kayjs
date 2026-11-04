@@ -285,7 +285,7 @@ async function admit(settings: Settings, asker: Asker): Promise<{ key: string | 
     const key = await visitorKey(settings.key, asker)
 
     if (limit && key !== undefined) {
-      const window = checked(await bounded(async () => storeOf(limit, false).hit(`ai:limit\n${key}`, `${limit.ms}ms`)))!
+      const window = checked(await bounded(async () => storeOf(limit, false).hit(`ai:limit\n${key}`, limit.ms)))!
 
       if (window.count > limit.max)
         throw limited('asks', window.resetAt)
@@ -340,8 +340,8 @@ async function record(budget: NonNullable<Settings['budget']>, key: string | und
   try {
     const counting = storeOf(budget, true)
     const windows = await bounded(async () => Promise.all([
-      key === undefined ? undefined : counting.hit(`ai:budget\n${key}`, `${budget.ms}ms`, used),
-      budget.total === undefined ? undefined : counting.hit(TOTAL, `${budget.ms}ms`, used),
+      key === undefined ? undefined : counting.hit(`ai:budget\n${key}`, budget.ms, used),
+      budget.total === undefined ? undefined : counting.hit(TOTAL, budget.ms, used),
     ]))
 
     if (windows.some(window => window !== undefined && window.count < used))

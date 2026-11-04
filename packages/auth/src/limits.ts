@@ -1,7 +1,7 @@
 import type { Duration } from 'kay'
 import type { Core } from './core'
 import type { AuthRates } from './rates'
-import { durationSeconds } from 'kay/library'
+import { durationSeconds, optionMs } from 'kay/library'
 
 // `max` attempts every `window`, a string such as '15m', as in kay's own `rateLimit`.
 export interface Limit {
@@ -75,7 +75,7 @@ export function resolveLimits(given: LimitsOption | undefined): Limits {
 
 // Counts one attempt and answers whether it was over the limit.
 export async function spend(rates: AuthRates, key: string, limit: Limit): Promise<boolean> {
-  return (await rates.hit(key, limit.window)).count > limit.max
+  return (await rates.hit(key, optionMs(limit.window, 'an attempts window'))).count > limit.max
 }
 
 // The attempts counted under `key` in its open window, none once it ended.

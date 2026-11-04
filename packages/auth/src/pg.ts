@@ -491,7 +491,7 @@ export function pgStore(db: Database): AuthStore {
 
         // One statement, so two attempts at once both count: a window still open is raised, an ended one starts over.
         const [row] = await db.raw<{ count: number, reset_at: Date | string | number }>`
-          INSERT INTO "kay_attempts" ("key", "count", "reset_at") VALUES (${key}, ${weight}, ${new Date(now.getTime() + durationSeconds(window, 'an attempts window') * 1000)})
+          INSERT INTO "kay_attempts" ("key", "count", "reset_at") VALUES (${key}, ${weight}, ${new Date(now.getTime() + window)})
           ON CONFLICT ("key") DO UPDATE SET
             "count" = CASE WHEN "kay_attempts"."reset_at" > ${now} THEN "kay_attempts"."count" + ${weight} ELSE ${weight} END,
             "reset_at" = CASE WHEN "kay_attempts"."reset_at" > ${now} THEN "kay_attempts"."reset_at" ELSE EXCLUDED."reset_at" END

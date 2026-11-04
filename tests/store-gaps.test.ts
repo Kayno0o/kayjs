@@ -364,8 +364,8 @@ describe('a rates store that answers', () => {
         throw new Error('the database went away')
       } }, memory)
 
-      await standIn.hit('one', '1m')
-      await standIn.hit('one', '1m')
+      await standIn.hit('one', 60_000)
+      await standIn.hit('one', 60_000)
       expect(memory.peek('one')?.count).toBe(2)
       await standIn.reset('one')
       expect(memory.peek('one')).toBeUndefined()
@@ -391,7 +391,7 @@ describe('a rates store that answers', () => {
 
       return hit(key, window, weight)
     }
-    await standIn.hit('one', '1m')
+    await standIn.hit('one', 60_000)
     expect(keys).toEqual(['one'])
   })
 
@@ -404,8 +404,8 @@ describe('a rates store that answers', () => {
       const broken = brokenRates()
 
       for (let round = 0; round < 3; round++) {
-        await ratesFor('gaps-two-stores', broken).hit('one', '1m')
-        await ratesFor('gaps-two-stores').hit('one', '1m')
+        await ratesFor('gaps-two-stores', broken).hit('one', 60_000)
+        await ratesFor('gaps-two-stores').hit('one', 60_000)
       }
 
       expect(seen.count()).toBe(1)

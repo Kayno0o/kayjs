@@ -174,10 +174,10 @@ test('the default limits are written as an app writes its own, with a Duration w
 test('the memory counter drops no open window however many are open, so a flood of keys cannot lift a lockout', () => {
   const rates = memoryAuthRates()
 
-  rates.hit('account', '1h')
+  rates.hit('account', 3_600_000)
 
   for (let key = 0; key < 20_000; key++)
-    rates.hit(`flood-${key}`, '1h')
+    rates.hit(`flood-${key}`, 3_600_000)
 
   expect(rates.peek('account')!.count).toBe(1)
 })

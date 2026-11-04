@@ -126,7 +126,7 @@ pgDescribe('pgData', () => {
     const sql = await fresh()
     const { url } = await postgres()
 
-    await pgData(sql).sessions.set('a', { user: 1 }, '1h')
+    await pgData(sql).sessions.set('a', { user: 1 }, 3_600_000)
 
     const present = await rows<{ found: number }>(sql, `SELECT count(*)::int AS found FROM unnest(ARRAY[${dataTables.map(name => `'${name}'`).join(',')}]) AS name WHERE to_regclass(name) IS NOT NULL`)
 
@@ -358,7 +358,7 @@ pgDescribe('pgData', () => {
 
     const stores = handles(5).map(handle => pgSessions(handle))
 
-    await Promise.all(stores.map(async (store, index) => store.set(`s${index}`, { index }, '1h')))
+    await Promise.all(stores.map(async (store, index) => store.set(`s${index}`, { index }, 3_600_000)))
     expect(await stores[0]!.get('s4')).toEqual({ index: 4 })
   })
 
@@ -366,7 +366,7 @@ pgDescribe('pgData', () => {
     const sql = await fresh()
     const { url } = await postgres()
 
-    await pgData(sql).sessions.set('x', { n: 1 }, '1h')
+    await pgData(sql).sessions.set('x', { n: 1 }, 3_600_000)
     expect(await pgData({ sql }).sessions.get('x')).toEqual({ n: 1 })
 
     const byUrl = pgData(url)
@@ -381,9 +381,9 @@ pgDescribe('pgSessions', () => {
 
     const [first, second] = handles(2).map(handle => pgSessions(handle))
 
-    await first!.set('a', { user: 1, cart: ['x', new Date(0)] }, '1h')
+    await first!.set('a', { user: 1, cart: ['x', new Date(0)] }, 3_600_000)
     expect(await second!.get('a')).toEqual({ user: 1, cart: ['x', new Date(0)] })
-    await second!.set('a', { user: 2 }, '1h')
+    await second!.set('a', { user: 2 }, 3_600_000)
     expect(await first!.get('a')).toEqual({ user: 2 })
     await first!.delete('a')
     expect(await second!.get('a')).toBeUndefined()
@@ -393,10 +393,10 @@ pgDescribe('pgSessions', () => {
     const sql = await fresh()
     const store = pgSessions(pgHandle(sql))
 
-    await store.set('old', { user: 1 }, '1h')
+    await store.set('old', { user: 1 }, 3_600_000)
     await rows(sql, 'UPDATE kay_sessions SET expires = 0')
     expect(await store.get('old')).toBeUndefined()
-    await store.set('new', { user: 2 }, '1s')
+    await store.set('new', { user: 2 }, 1000)
     expect(await store.get('new')).toEqual({ user: 2 })
   })
 
@@ -404,9 +404,9 @@ pgDescribe('pgSessions', () => {
     const sql = await fresh()
     const store = pgSessions(pgHandle(sql))
 
-    await store.set('a', { user: 1 }, '1h')
-    await store.set('b', { user: 1 }, '1h')
-    await store.set('c', { user: 2 }, '1h')
+    await store.set('a', { user: 1 }, 3_600_000)
+    await store.set('b', { user: 1 }, 3_600_000)
+    await store.set('c', { user: 2 }, 3_600_000)
     await rows(sql, 'INSERT INTO kay_sessions (id, data, expires) VALUES (\'broken\', \'not devalue\', 9999999999999)')
     expect(await store.deleteWhere((data) => {
       return data.user === 1
@@ -420,9 +420,9 @@ pgDescribe('pgSessions', () => {
     const sql = await fresh()
     const store = pgSessions(pgHandle(sql))
 
-    await store.set('a', { user: 1 }, '1h')
-    await store.set('b', { user: '1' }, '1h')
-    await store.set('c', { user: 'ada', note: 1 }, '1h')
+    await store.set('a', { user: 1 }, 3_600_000)
+    await store.set('b', { user: '1' }, 3_600_000)
+    await store.set('c', { user: 'ada', note: 1 }, 3_600_000)
     await rows(sql, 'INSERT INTO kay_sessions (id, data, expires) VALUES (\'broken\', \'not devalue\', 9999999999999)')
     await rows(sql, `INSERT INTO kay_sessions (id, data, expires) SELECT 'bulk' || n, '${stringify({ user: 2 })}', 9999999999999 FROM generate_series(1, 1300) AS n`)
 
@@ -440,9 +440,9 @@ pgDescribe('pgSessions', () => {
 
       const odd = 'a"b\\c \u{1F600}\n\uD800'
 
-      await store.set('odd', { user: odd, ok: true }, '1h')
-      await store.set('odd2', { user: odd, ok: false }, '1h')
-      await store.set('zero', { n: -0 }, '1h')
+      await store.set('odd', { user: odd, ok: true }, 3_600_000)
+      await store.set('odd2', { user: odd, ok: false }, 3_600_000)
+      await store.set('zero', { n: -0 }, 3_600_000)
       expect(await store.deleteWhere({ user: odd, ok: true })).toBe(1)
       expect(await store.deleteWhere({ user: odd })).toBe(1)
       expect(await store.deleteWhere({ n: 0 })).toBe(1)
@@ -462,7 +462,7 @@ pgDescribe('pgSessions', () => {
     const sql = await fresh()
     const store = pgSessions(pgHandle(sql))
 
-    await store.set('seed', { user: 0 }, '1h')
+    await store.set('seed', { user: 0 }, 3_600_000)
 
     const data = stringify({ user: 1 })
 
@@ -487,24 +487,24 @@ pgDescribe('pgRates', () => {
     await fresh()
 
     const rates = pgRates(pgHandle((await postgres()).sql))
-    const first = await rates.hit('ada', '300ms')
+    const first = await rates.hit('ada', 300)
 
     expect(first.count).toBe(1)
-    expect((await rates.hit('ada', '300ms')).count).toBe(2)
-    expect((await rates.hit('ada', '300ms', 5)).count).toBe(7)
+    expect((await rates.hit('ada', 300)).count).toBe(2)
+    expect((await rates.hit('ada', 300, 5)).count).toBe(7)
     expect((await rates.peek!('ada'))?.count).toBe(7)
     expect((await rates.peek!('bob'))).toBeUndefined()
-    expect((await rates.hit('ada', '300ms')).resetAt).toBe(first.resetAt)
+    expect((await rates.hit('ada', 300)).resetAt).toBe(first.resetAt)
     await waitFor(async () => await rates.peek!('ada') === undefined, 'the window to close')
     expect(await rates.peek!('ada')).toBeUndefined()
-    expect((await rates.hit('ada', '300ms')).count).toBe(1)
+    expect((await rates.hit('ada', 300)).count).toBe(1)
   })
 
   pgIt('takes one attempt back from the window it names, from any replica, never below zero', async () => {
     await fresh()
 
     const [first, second] = handles(2).map(handle => pgRates(handle))
-    const { resetAt } = await first!.hit('ada', '60s', 2)
+    const { resetAt } = await first!.hit('ada', 60_000, 2)
 
     await second!.refund!('ada', resetAt)
     expect((await first!.peek!('ada'))?.count).toBe(1)
@@ -512,7 +512,7 @@ pgDescribe('pgRates', () => {
     await second!.refund!('ada', resetAt)
     expect((await first!.peek!('ada'))?.count).toBe(0)
     // A window that is not the one named is left alone.
-    await first!.hit('ada', '60s')
+    await first!.hit('ada', 60_000)
     await second!.refund!('ada', resetAt - 1000)
     expect((await first!.peek!('ada'))?.count).toBe(1)
     await second!.refund!('bob', resetAt)
@@ -524,19 +524,19 @@ pgDescribe('pgRates', () => {
 
     const [first, second] = handles(2).map(handle => pgRates(handle))
 
-    await first!.hit('ada', '60s', 2)
-    await first!.hit('bob', '60s')
+    await first!.hit('ada', 60_000, 2)
+    await first!.hit('bob', 60_000)
     await second!.reset!('ada')
     expect(await first!.peek!('ada')).toBeUndefined()
     expect((await first!.peek!('bob'))?.count).toBe(1)
-    expect((await first!.hit('ada', '60s')).count).toBe(1)
+    expect((await first!.hit('ada', 60_000)).count).toBe(1)
   })
 
   pgIt('shares the counts between replicas, and stores no key in the clear', async () => {
     const sql = await fresh()
     const [first, second] = handles(2).map(handle => pgRates(handle))
 
-    await Promise.all([first!.hit('203.0.113.9', '60s'), second!.hit('203.0.113.9', '60s'), first!.hit('203.0.113.9', '60s')])
+    await Promise.all([first!.hit('203.0.113.9', 60_000), second!.hit('203.0.113.9', 60_000), first!.hit('203.0.113.9', 60_000)])
     expect((await second!.peek!('203.0.113.9'))?.count).toBe(3)
 
     const stored = await rows<{ key: string }>(sql, 'SELECT key FROM kay_rates')
@@ -1002,7 +1002,7 @@ pgDescribe('pgData app identity', () => {
   pgIt('the first app to boot claims the database and a second one is refused naming both', async () => {
     const sql = await fresh()
 
-    await asApp('shop', async () => pgData(sql).sessions.set('a', { user: 1 }, '1h'))
+    await asApp('shop', async () => pgData(sql).sessions.set('a', { user: 1 }, 3_600_000))
     expect(await owner(sql)).toBe('shop')
 
     // Every store refuses, the jobs' included, which would otherwise hand the other app's `mail` jobs to this one.

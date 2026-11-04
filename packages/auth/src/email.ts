@@ -378,7 +378,7 @@ async function spendCode(state: RequestState, type: CodeType, code: string) {
   const record = spent && await core.store.users.get(spent.userId)
 
   if (!spent || !record || record.email !== spent.email) {
-    if ((await core.rates.hit(`email-code-miss:${pending.nonce}`, `${core.email!.maxAge[type]}s`)).count < CODE_MISSES)
+    if ((await core.rates.hit(`email-code-miss:${pending.nonce}`, core.email!.maxAge[type] * 1000)).count < CODE_MISSES)
       return { ok: false, error: 'invalid' } as const
 
     // Only this session's pending code is dropped: the holder's live code may be one another session asked for, and it is unreachable from here anyway, since its digest binds that session's nonce.

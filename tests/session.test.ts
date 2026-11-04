@@ -1,4 +1,4 @@
-import type { Action, Duration } from '../src/runtime'
+import type { Action } from '../src/runtime'
 import type { SessionData, SessionStore } from '../src/server'
 import { hkdfSync } from 'node:crypto'
 import { rename, rm } from 'node:fs/promises'
@@ -9,7 +9,6 @@ import { afterEach, beforeEach, describe, expect, it, setSystemTime, spyOn } fro
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { buildClient } from '../src/build/client'
-import { durationSeconds } from '../src/runtime/duration'
 import { configuredSite, setSite } from '../src/runtime/site'
 import { memorySessions, session, sqliteSessions } from '../src/server'
 import { setupStore } from '../src/server/app-store'
@@ -174,7 +173,7 @@ describe('sessions', () => {
       const store = memorySessions()
       const kept: SessionData[] = []
 
-      return { kept, store: { ...store, set: async (id: string, data: SessionData, maxAge: Duration) => {
+      return { kept, store: { ...store, set: async (id: string, data: SessionData, maxAge: number) => {
         kept.push({ ...data })
 
         return store.set(id, data, maxAge)
@@ -245,13 +244,13 @@ describe('sessions', () => {
   it('caps the memory store, the oldest sessions going first and a session written again counting as new', async () => {
     const store = memorySessions()
 
-    await store.set('first', { n: 0 }, '60s')
+    await store.set('first', { n: 0 }, 60_000)
 
     for (let index = 0; index < 99_999; index++)
-      await store.set(`s${index}`, { n: index }, '60s')
+      await store.set(`s${index}`, { n: index }, 60_000)
 
-    await store.set('first', { n: 1 }, '60s')
-    await store.set('overflow', { n: 2 }, '60s')
+    await store.set('first', { n: 1 }, 60_000)
+    await store.set('overflow', { n: 2 }, 60_000)
 
     expect(await store.get('first')).toEqual({ n: 1 })
     expect(await store.get('s0')).toBeUndefined()
@@ -385,7 +384,7 @@ describe('sessions', () => {
     const lifetimes: number[] = []
     const memory = memorySessions()
     const visit = browser(counter({ store: { ...memory, async set(id, data, maxAge) {
-      lifetimes.push(durationSeconds(maxAge, 'maxAge'))
+      lifetimes.push(maxAge / 1000)
       await memory.set(id, data, maxAge)
     } } }))
     const DAY = 24 * 60 * 60
@@ -523,7 +522,7 @@ describe('sessions', () => {
     const lifetimes: number[] = []
     const memory = memorySessions()
     const visit = browser(counter({ absoluteMaxAge: '30s', browserMaxAge: '50s', store: { ...memory, async set(id, data, maxAge) {
-      lifetimes.push(durationSeconds(maxAge, 'maxAge'))
+      lifetimes.push(maxAge / 1000)
       await memory.set(id, data, maxAge)
     } } }))
 
@@ -556,7 +555,7 @@ describe('sessions', () => {
     const lifetimes: number[] = []
     const memory = memorySessions()
     const visit = browser(counter({ maxAge: '30d', browserMaxAge: '50s', store: { ...memory, async set(id, data, maxAge) {
-      lifetimes.push(durationSeconds(maxAge, 'maxAge'))
+      lifetimes.push(maxAge / 1000)
       await memory.set(id, data, maxAge)
     } } }))
 
@@ -645,9 +644,9 @@ describe('sessions', () => {
 
   for (const [name, store] of [['in memory', memorySessions()], ['in sqlite', sqliteSessions(':memory:')]] as const) {
     it(`erases the sessions ${name} whose data matches, and only those`, async () => {
-      await store.set('a', { userId: 1 }, '60s')
-      await store.set('b', { userId: 2 }, '60s')
-      await store.set('c', { userId: 1, cart: [3] }, '60s')
+      await store.set('a', { userId: 1 }, 60_000)
+      await store.set('b', { userId: 2 }, 60_000)
+      await store.set('c', { userId: 1, cart: [3] }, 60_000)
 
       expect(await store.deleteWhere(data => data.userId === 1)).toBe(2)
       expect([await store.get('a'), await store.get('b'), await store.get('c')]).toEqual([undefined, { userId: 2 }, undefined])
@@ -657,13 +656,13 @@ describe('sessions', () => {
   for (const [name, store] of [['in memory', memorySessions()], ['in sqlite', sqliteSessions(':memory:')]] as const) {
     it(`erases one person's sessions ${name} out of many by an object match, equal values only`, async () => {
       for (let n = 0; n < 1200; n++)
-        await store.set(`other${n}`, { userId: n % 2 === 0 ? 'u2' : 12 }, '60s')
+        await store.set(`other${n}`, { userId: n % 2 === 0 ? 'u2' : 12 }, 60_000)
 
-      await store.set('a', { userId: 1 }, '60s')
-      await store.set('b', { userId: '1' }, '60s')
-      await store.set('c', { userId: 1, cart: [3] }, '60s')
-      await store.set('d', { other: 1, userId: null }, '60s')
-      await store.set('e', { userId: 'u1', note: 'u2' }, '60s')
+      await store.set('a', { userId: 1 }, 60_000)
+      await store.set('b', { userId: '1' }, 60_000)
+      await store.set('c', { userId: 1, cart: [3] }, 60_000)
+      await store.set('d', { other: 1, userId: null }, 60_000)
+      await store.set('e', { userId: 'u1', note: 'u2' }, 60_000)
 
       expect(await store.deleteWhere({ userId: 1 })).toBe(2)
       expect(await store.deleteWhere({ userId: 'u1' })).toBe(1)
@@ -678,11 +677,11 @@ describe('sessions', () => {
     it(`finds ${name} a value with escapes, a zero stored as -0, a boolean, and a match on two fields`, async () => {
       const odd = 'a"b\\c \u{1F600}\n\uD800'
 
-      await store.set('odd', { userId: odd, ok: true }, '60s')
-      await store.set('odd2', { userId: odd, ok: false }, '60s')
-      await store.set('zero', { n: -0 }, '60s')
-      await store.set('flag', { done: true, who: 'x' }, '60s')
-      await store.set('flag2', { done: true, who: 'y' }, '60s')
+      await store.set('odd', { userId: odd, ok: true }, 60_000)
+      await store.set('odd2', { userId: odd, ok: false }, 60_000)
+      await store.set('zero', { n: -0 }, 60_000)
+      await store.set('flag', { done: true, who: 'x' }, 60_000)
+      await store.set('flag2', { done: true, who: 'y' }, 60_000)
 
       expect(await store.deleteWhere({ userId: odd, ok: true })).toBe(1)
       expect(await store.deleteWhere({ userId: odd })).toBe(1)
@@ -692,7 +691,7 @@ describe('sessions', () => {
     })
 
     it(`refuses an object match ${name} that is empty or holds undefined, which would end every session or none`, async () => {
-      await store.set('a', { userId: 1 }, '60s')
+      await store.set('a', { userId: 1 }, 60_000)
       await expect(store.deleteWhere({})).rejects.toThrow('deleteWhere takes')
       await expect(store.deleteWhere({ userId: undefined } as never)).rejects.toThrow('deleteWhere takes')
       await expect(store.deleteWhere({ userId: new Date(0) } as never)).rejects.toThrow('deleteWhere takes')
@@ -706,7 +705,7 @@ describe('sessions', () => {
     const store = sqliteStoreAt(file)
     const db = new Database(file)
 
-    await store.set('seed', { userId: 0 }, '60s')
+    await store.set('seed', { userId: 0 }, 60_000)
     db.run(`INSERT INTO kay_sessions (id, data, expires) SELECT 'bulk' || n, ?, ${Date.now() + 60_000} FROM (WITH RECURSIVE s(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM s WHERE n < 1300) SELECT n FROM s)`, [stringify({ userId: 1 })])
 
     let seen = 0
@@ -750,8 +749,8 @@ describe('sessions', () => {
     const store = sqliteStoreAt(file)
     const db = new Database(file)
 
-    await store.set('a', { userId: 1 }, '60s')
-    await store.set('old', { userId: 1 }, '60s')
+    await store.set('a', { userId: 1 }, 60_000)
+    await store.set('old', { userId: 1 }, 60_000)
     db.run('UPDATE kay_sessions SET expires = ? WHERE id = ?', [Date.now() - 1000, 'old'])
     db.run('INSERT INTO kay_sessions (id, data, expires) VALUES (?, ?, ?)', ['broken', '{not devalue', Date.now() + 60_000])
 
@@ -765,7 +764,7 @@ describe('sessions', () => {
 
     const memory = memorySessions()
 
-    await memory.set('old', { userId: 1 }, '1s')
+    await memory.set('old', { userId: 1 }, 1000)
     setSystemTime(Date.now() + 2000)
     expect(await memory.deleteWhere(() => true)).toBe(0)
   })
@@ -818,12 +817,12 @@ describe('sessions', () => {
     const file = join(await scratchDir('sessions-'), 'sessions.sqlite')
     const store = sqliteStoreAt(file)
 
-    await store.set('a', { userId: 1 }, '60s')
+    await store.set('a', { userId: 1 }, 60_000)
     await deleteSqlite(file)
 
     expect(sqliteStoreAt(file)).toBe(store)
     expect(await store.get('a')).toBeUndefined()
-    await store.set('b', { userId: 2 }, '60s')
+    await store.set('b', { userId: 2 }, 60_000)
     expect(readSessionIds(file)).toEqual(['b'])
   })
 
@@ -834,13 +833,13 @@ describe('sessions', () => {
 
     try {
       setSystemTime(new Date())
-      await store.set('a', { userId: 1 }, '60s')
+      await store.set('a', { userId: 1 }, 60_000)
       await deleteSqlite(file)
       // Within the few seconds, the deleted file's handle still answers.
       expect(await store.get('a')).toEqual({ userId: 1 })
 
       setSystemTime(new Date(Date.now() + 10_000))
-      await store.set('b', { userId: 2 }, '60s')
+      await store.set('b', { userId: 2 }, 60_000)
       expect(readSessionIds(file)).toEqual(['b'])
 
       const replacement = new Database(join(dir, 'replacement.sqlite'))
@@ -1002,7 +1001,7 @@ describe('sqliteSessions under bun test', () => {
     const file = join(dir, 'data', 'sessions.sqlite')
     const store = sqliteSessions(file)
 
-    await store.set('a', { userId: 1 }, '60s')
+    await store.set('a', { userId: 1 }, 60_000)
 
     expect(await store.get('a')).toEqual({ userId: 1 })
     expect(await Bun.file(file).exists()).toBe(false)

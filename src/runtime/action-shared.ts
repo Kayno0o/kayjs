@@ -21,9 +21,9 @@ declare const HONEYPOT: unique symbol
 
 // Where rate limits count, shared by every process opening it: `sqliteRates` from `kay/server`, or one of an app's own.
 export interface RateStore extends StoreBase {
-  // Counts `weight` more under `key`, one attempt unless given, opening a window of `window`, such as `'60000ms'`, when none is open: the count in it so far, this hit included, and when it closes, in ms since the epoch.
+  // Counts `weight` more under `key`, one attempt unless given, opening a window of `windowMs` milliseconds when none is open: the count in it so far, this hit included, and when it closes, in ms since the epoch.
   // A store of its own adds `weight` to the count, or a weighted limit, tokens say, refuses it.
-  hit: (key: string, window: Duration, weight?: number) => RateWindow | Promise<RateWindow>
+  hit: (key: string, windowMs: number, weight?: number) => RateWindow | Promise<RateWindow>
   // The window open under `key` without counting an attempt, undefined when none is: what a limit counting only the posts that went through reads before the handler runs.
   peek?: (key: string) => RateWindow | undefined | Promise<RateWindow | undefined>
   // Takes back one attempt `hit` counted under `key` in the window closing at `resetAt`, never below zero, and does nothing once that window is gone: how kay lets a call that started no work, such as kayjs-ai's resume of a reply it keeps, not spend the limit. A store without it simply keeps the attempt counted.

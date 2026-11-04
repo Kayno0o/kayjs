@@ -18,7 +18,7 @@
 | `cache` | `CacheStore` | `get`, `set`, `delete`, `keys` | `dependencies`, `publish`, `subscribe` | `sqliteCache`, `pgCache` |
 | `live` | `LiveStore` | `entries`, `set`, `delete`, `subscribe` | `end`, `endAll`, `stop`, `hold` | `sqliteLive`, `pgLive` |
 | `jobs` | `JobStore` | `add`, `claim`, `complete`, `retry`, `fail`, `failed`, `nextRunAt`, `lock` | `release`, `progress`, `state`, `live`, `update`, `purge`, `revive` | `memoryJobs`, `sqliteJobs`, `pgJobs` |
-| `rates` | `RateStore` | `hit(key, window, weight)` | `peek`, `refund`, `reset` | `memoryRates`, `sqliteRates`, `pgRates` |
+| `rates` | `RateStore` | `hit(key, window, weight)` (`window` in ms) | `peek`, `refund`, `reset` | `memoryRates`, `sqliteRates`, `pgRates` |
 | `rooms` | `RoomStore` | `add`, `remove`, `members`, `publish`, `subscribe`, `close` | `state`, `update` (promises) | `memoryRooms`, `sqliteRooms`, `pgRooms` |
 | `vitals` | `VitalsStore` | `add`, `counts` | | `memoryVitals`, `sqliteVitals`, `pgVitals` |
 | `notifications` | `NotificationStore` | `add`, `list`, `unread`, `markRead`, `markAllRead`, `erase`, `prune` | | `memoryNotifications`, `sqliteNotifications`, `pgNotifications` |
@@ -27,6 +27,7 @@
 
 - Every factory is imported from `kay/server`, such as `import { memoryNotifications, memoryPush, memoryRates, memoryRooms, sqliteLive, sqliteNotifications, sqlitePush } from 'kay/server'`. A factory is `<backend><Thing>`: the backend is `memory`, `sqlite`, `pg`, `disk` or `s3`, the thing the store's key in the plural form the table shows. `sqliteData(path)` and `pgData(db)` make every kind over one file or database, neither with the files.
 - Every interface extends `StoreBase` from `kay/server`, as `store` does: `ping()` and `close()`, both optional, either may return a promise. `health` runs each store's `ping` beside the route's `check`, under `health.timeout` and its 3 s cache, and answers 503 when one rejects. A stop calls each store's `close()` once, `store`'s own last, so a `pgData` closes its connection after the rooms let go of their members. A store with neither costs nothing.
+- A store receives a duration as milliseconds, a number: `SessionStore.set`'s `maxAge` and `RateStore.hit`'s `window`. An option an app writes (`maxAge: '30d'`, `rateLimit.window`) is always a `Duration`, which kay turns into milliseconds before it calls a store.
 - `pgData(db).ping()` is a round trip to the database, and `await pgData(url).close()` or `await using store = pgData(url)` closes a store opened in a script or a test; closing twice is the same as once.
 - `files` is read by `files` from `kay/server`, the image route and `kay build --static`: no factory fills it, so files stay in `data/files` (in memory under `bun test` and `testSite`) until the app writes `store: { ...sqliteData(path), files: s3Files() }` or a store of its own ([Stored files](files.md#stores)).
 - `fileStore` in kay.config.ts, before 1.87, is `store: { files }`: the old key works until 1.90, wins over `store.files` while both are written, and `kay check` reports it as `deprecated-file-store`.

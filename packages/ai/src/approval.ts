@@ -80,7 +80,7 @@ export function ticketAllows(ticket: string, name: string, input: Record<string,
 
 // Spends a ticket: true the first time it is asked, in the app's `store.rates` when it has one, so the same message posted again, a retry or a resend, cannot run the call twice. A store that fails or hangs runs no call, as the limits refuse an ask they cannot read.
 export async function spend(ticket: string): Promise<boolean> {
-  const window = await bounded(async () => (appStore()?.rates ?? used).hit(`ai:approval\n${new Bun.CryptoHasher('sha256').update(ticket).digest('base64url')}`, `${TICKET_MS}ms`))
+  const window = await bounded(async () => (appStore()?.rates ?? used).hit(`ai:approval\n${new Bun.CryptoHasher('sha256').update(ticket).digest('base64url')}`, TICKET_MS))
 
   return window.count === 1
 }

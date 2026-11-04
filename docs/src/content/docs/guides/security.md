@@ -182,18 +182,17 @@ rateLimit: { max: 5, window: '1m', store: sqliteRates('data/rates.sqlite') }
 
 ### Your own store
 
-`store` takes a `RateStore`, from `kay`, to count in Redis or a database. `hit` adds a weight under a key, one attempt unless given, and opens a window when none is open. It answers with the count so far, this hit included, and when the window closes.
+`store` takes a `RateStore`, from `kay`, to count in Redis or a database. `hit` adds a weight under a key, one attempt unless given, and opens a window of `window` milliseconds when none is open. It answers with the count so far, this hit included, and when the window closes.
 
 ```ts
 import type { RateStore } from 'kay'
-import { durationMs } from 'kay'
 
 const store: RateStore = {
   hit: async (key, window, weight = 1) => {
     const count = await redis.incrby(key, weight)
 
     if (count === weight)
-      await redis.pexpire(key, durationMs(window))
+      await redis.pexpire(key, window)
 
     return { count, resetAt: Date.now() + await redis.pttl(key) }
   },

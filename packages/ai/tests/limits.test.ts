@@ -1,4 +1,3 @@
-import type { Duration } from 'kay'
 import type { Piece, Provider } from '../src'
 import { existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -58,7 +57,7 @@ function tracking() {
 
   return {
     keys,
-    hit: (key: string, window: Duration, weight?: number) => {
+    hit: (key: string, window: number, weight?: number) => {
       keys.add(key)
 
       return base.hit(key, window, weight)
@@ -811,7 +810,7 @@ describe('the app store', () => {
     const inner = memoryRates()
     const keys: string[] = []
 
-    return { keys, store: { hit: (key: string, window: Duration, weight?: number) => {
+    return { keys, store: { hit: (key: string, window: number, weight?: number) => {
       keys.push(key)
 
       return inner.hit(key, window, weight)

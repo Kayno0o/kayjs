@@ -9,7 +9,7 @@ import { linkSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
 import { honeypotField, minTimeOf, STAMP_FIELD } from '../runtime/action'
-import { durationSeconds, optionMs } from '../runtime/duration'
+import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { NAVIGATE_HEADER, WORK_HEADER } from '../runtime/swap'
@@ -123,11 +123,6 @@ function windowMs(rateLimit: { window: Duration }): number {
   return ms
 }
 
-// The window as the stores read it.
-function windowText(rateLimit: { window: Duration }): `${number}ms` {
-  return `${windowMs(rateLimit)}ms`
-}
-
 // Fixed windows per key in this process: enough to slow a script hammering a form, which is what a contact or login form needs.
 export function memoryRates(): SyncRates {
   // Ordered by when each window opened, so the oldest come first.
@@ -149,7 +144,7 @@ export function memoryRates(): SyncRates {
 
         // Moved to the end, as the newest window.
         windows.delete(key)
-        windows.set(key, window = { count: 0, resetAt: now + optionMs(length, 'a rate window') })
+        windows.set(key, window = { count: 0, resetAt: now + length })
       }
 
       window.count += weight
@@ -243,7 +238,7 @@ export function sqliteRates(path: string): SyncRates {
 }
 
 // Answered at once, as a store reading SQLite needs no promise.
-export interface SyncRates { hit: (key: string, window: Duration, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined, refund: (key: string, resetAt: number) => void, reset: (key: string) => void }
+export interface SyncRates { hit: (key: string, windowMs: number, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined, refund: (key: string, resetAt: number) => void, reset: (key: string) => void }
 type OpenRates = SyncRates & { close: () => void }
 
 function openRates(path: string): OpenRates {
@@ -277,7 +272,7 @@ function openRates(path: string): OpenRates {
         sweep.run(now)
       }
 
-      const row = hit.get(hashed(key), now, optionMs(window, 'a rate window'), weight)!
+      const row = hit.get(hashed(key), now, window, weight)!
 
       return { count: row.count, resetAt: row.reset_at }
     },
@@ -307,7 +302,7 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
       if (!Number.isSafeInteger(weight) || weight < 1)
         throw new KayError('config-invalid', `kay: rateLimit('${name}').hit()'s weight is ${weight}; it takes a whole number of at least 1`)
 
-      const window = await ratesFor(name, limit.store).hit(typeof from === 'string' ? `${name}\nkey:${from}` : limitKey(name, clientAddress(from, server)), `${ms}ms`, weight)
+      const window = await ratesFor(name, limit.store).hit(typeof from === 'string' ? `${name}\nkey:${from}` : limitKey(name, clientAddress(from, server)), ms, weight)
 
       // A count below the weight holds less than this hit alone: the store counted one, which shows on a window's first hit.
       if (window.count < weight)
@@ -346,7 +341,7 @@ export async function apiLimitWait(limits: { name: string, limit: ApiRateLimit }
   let wait: number | undefined
 
   for (const { name, limit } of limits) {
-    const own = waitFor(await ratesFor(name, limit.store).hit(await actionKey(name, limit, request, client, context), windowText(limit)), limit.max)
+    const own = waitFor(await ratesFor(name, limit.store).hit(await actionKey(name, limit, request, client, context), windowMs(limit)), limit.max)
 
     if (own !== undefined && (wait === undefined || own > wait))
       wait = own
@@ -483,7 +478,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
       own = reached(await store.peek!(key), limit.max)
     }
     else {
-      const window = await store.hit(key, windowText(limit))
+      const window = await store.hit(key, windowMs(limit))
 
       own = waitFor(window, limit.max)
 
@@ -517,7 +512,7 @@ export async function countSucceeded(action: ServerAction<TSchema, unknown>, req
   const client = clientAddress(request, server)
 
   for (const { name, limit } of limits)
-    await ratesFor(name, limit.store).hit(await actionKey(name, limit, request, client, undefined), windowText(limit))
+    await ratesFor(name, limit.store).hit(await actionKey(name, limit, request, client, undefined), windowMs(limit))
 }
 
 // Takes back the attempts the action's `rateLimit` counted for this request, once, for a call that started no work: kayjs-ai's resume of a reply it keeps. A limit counting only the posts that went through is left alone, and so is a store with no `refund`; the request being the one the action answers, any other request has nothing counted.
@@ -633,7 +628,7 @@ export function ratesFor(name: string, given?: RateStore): RateStore {
 
 // What a store falls back on, answering at once.
 export interface FallbackMemory {
-  hit: (key: string, window: Duration, weight?: number) => RateWindow
+  hit: (key: string, windowMs: number, weight?: number) => RateWindow
   peek: (key: string) => RateWindow | undefined
   refund?: ((key: string, resetAt: number) => void) | undefined
   reset?: ((key: string) => void) | undefined
@@ -746,7 +741,7 @@ async function withinLimit<Result>(work: Promise<Result>): Promise<Result> {
 
 // Seconds until the client may try again under `name`, in the app's `store.rates` else this process's memory, or undefined while it is under the limit: for kay's own routes.
 export async function overLimit(name: string, client: string, max: number, windowMs: number): Promise<number | undefined> {
-  return waitFor(await ratesFor(name).hit(limitKey(name, client), `${windowMs}ms`), max)
+  return waitFor(await ratesFor(name).hit(limitKey(name, client), windowMs), max)
 }
 
 // The refusal of a route over its limit whose caller reads the answer, an API module's or the MCP endpoint's: kay's beacons answer theirs with no body, as their other refusals.

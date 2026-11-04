@@ -75,16 +75,15 @@ An empty object, or one with an `undefined` value, throws instead of ending ever
 
 ### Your own store
 
-A store is an object with three methods, each sync or async. `set` is given `maxAge` as a duration string such as `'2592000s'`, past which the store may forget the session. `durationMs` from `kay` turns it into milliseconds.
+A store is an object with three methods, each sync or async. `set` is given `maxAge` in milliseconds, past which the store may forget the session.
 
 ```ts
 import type { SessionStore } from 'kay/server'
-import { durationMs } from 'kay'
 
 const store: SessionStore = {
   get: async id => JSON.parse(await redis.get(`session:${id}`) ?? 'null') ?? undefined,
   set: async (id, data, maxAge) => {
-    await redis.set(`session:${id}`, JSON.stringify(data), 'EX', Math.ceil(durationMs(maxAge) / 1000))
+    await redis.set(`session:${id}`, JSON.stringify(data), 'EX', Math.ceil(maxAge / 1000))
   },
   delete: async (id) => {
     await redis.del(`session:${id}`)

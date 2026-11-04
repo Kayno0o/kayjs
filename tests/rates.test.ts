@@ -9,18 +9,18 @@ import { scratchDir } from './scratch'
 describe('a weighted hit', () => {
   it('counts its weight in memory and in SQLite, one when given none', async () => {
     for (const store of [memoryRates(), sqliteRates(join(await scratchDir('rates'), 'rates.sqlite'))]) {
-      expect((await store.hit('key', '60000ms', 5)).count).toBe(5)
-      expect((await store.hit('key', '60000ms')).count).toBe(6)
+      expect((await store.hit('key', 60_000, 5)).count).toBe(5)
+      expect((await store.hit('key', 60_000)).count).toBe(6)
       expect((await store.peek('key'))!.count).toBe(6)
     }
   })
 
   it('opens an expired window afresh with the weight, in SQLite as in memory', async () => {
     for (const store of [memoryRates(), sqliteRates(join(await scratchDir('rates'), 'rates.sqlite'))]) {
-      await store.hit('key', '1ms', 5)
+      await store.hit('key', 1, 5)
       // The 1 ms window really has to pass, which the store reads from the clock.
       await Bun.sleep(5)
-      expect((await store.hit('key', '60000ms', 3)).count).toBe(3)
+      expect((await store.hit('key', 60_000, 3)).count).toBe(3)
     }
   })
 
@@ -60,7 +60,7 @@ describe('a weighted hit', () => {
 describe('a refund', () => {
   it('takes one attempt off the window it names, in memory and in SQLite, never below zero', async () => {
     for (const store of [memoryRates(), sqliteRates(join(await scratchDir('rates'), 'rates.sqlite'))]) {
-      const { resetAt } = await store.hit('key', '60000ms', 3)
+      const { resetAt } = await store.hit('key', 60_000, 3)
 
       await store.refund('key', resetAt)
       expect((await store.peek('key'))!.count).toBe(2)
@@ -76,10 +76,10 @@ describe('a refund', () => {
 
   it('leaves a window that is not the one it names, as one reopened since is another', async () => {
     for (const store of [memoryRates(), sqliteRates(join(await scratchDir('rates'), 'rates.sqlite'))]) {
-      const old = await store.hit('key', '1ms')
+      const old = await store.hit('key', 1)
 
       await Bun.sleep(5)
-      expect((await store.hit('key', '60000ms')).count).toBe(1)
+      expect((await store.hit('key', 60_000)).count).toBe(1)
       await store.refund('key', old.resetAt)
       expect((await store.peek('key'))!.count).toBe(1)
     }
@@ -89,12 +89,12 @@ describe('a refund', () => {
 describe('a reset', () => {
   it('forgets the window of its key alone, in memory and in SQLite, the next hit opening a fresh one', async () => {
     for (const store of [memoryRates(), sqliteRates(join(await scratchDir('rates'), 'rates.sqlite'))]) {
-      await store.hit('key', '60000ms', 3)
-      await store.hit('other', '60000ms')
+      await store.hit('key', 60_000, 3)
+      await store.hit('other', 60_000)
       await store.reset('key')
       expect(await store.peek('key')).toBeUndefined()
       expect((await store.peek('other'))!.count).toBe(1)
-      expect((await store.hit('key', '60000ms')).count).toBe(1)
+      expect((await store.hit('key', 60_000)).count).toBe(1)
       await store.reset('none')
       expect(await store.peek('none')).toBeUndefined()
     }

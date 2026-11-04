@@ -40,8 +40,8 @@ describe('the Postgres stores under a database that does not answer', () => {
   it('fail every call with a logged error instead of hanging', async () => {
     const calls = {
       sessions: async () => pgSessions(silent).get('a'),
-      sessionWrite: async () => pgSessions(silent).set('a', {}, '1h'),
-      rates: async () => pgRates(silent).hit('a', '1m'),
+      sessionWrite: async () => pgSessions(silent).set('a', {}, 3_600_000),
+      rates: async () => pgRates(silent).hit('a', 60_000),
       cache: async () => pgCache(silent).get('a'),
       notifications: async () => pgNotifications(silent).unread('a', 0),
     }

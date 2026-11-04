@@ -24,6 +24,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - A root `class`, `style` or layout given to one now lands one level up from the input: style the wrapper with `class.field`. One declaring neither renders as before.
 - No lint can recognise it: the change is in the markup a component renders.
+### A store receives durations as milliseconds
+
+- `SessionStore.set(id, data, maxAge)` and `RateStore.hit(key, window, weight)` are given `maxAge` and `window` in milliseconds, a number, where they were `Duration` strings (`'2592000s'`, `'60000ms'`): a store of your own drops its `durationMs(...)` call and uses the number (`redis.pexpire(key, window)`), and a test calling a kay store passes `60_000` where it passed `'60s'`. kay's own stores, kayjs-auth, kayjs-ai and kayjs-cms are changed. `kay check` cannot see a store written by hand, and a string given to a number-reading store fails at its first call, so TypeScript is what finds them; options an app writes stay `Duration`s.
 
 ## 1.87.0
 

@@ -337,7 +337,7 @@ async function take(state: RequestState, purpose: PasskeyPurpose, user: string |
   if (!parked || parked.purpose !== purpose || parked.user !== user || parked.expires < Date.now())
     return undefined
 
-  return (await state.core.rates.hit(`passkey-challenge:${parked.challenge}`, `${CHALLENGE_MAX_AGE_MS}ms`)).count === 1 ? parked.challenge : undefined
+  return (await state.core.rates.hit(`passkey-challenge:${parked.challenge}`, CHALLENGE_MAX_AGE_MS)).count === 1 ? parked.challenge : undefined
 }
 
 // Whether `response` is `passkey` signing `challenge`; its counter and last use are recorded. A counter that did not move past the stored one, the sign of a cloned authenticator, is refused.
