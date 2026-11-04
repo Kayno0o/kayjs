@@ -804,9 +804,9 @@ const IDENTIFIER = /^[a-z_$][\w$]*$/i
 const TAG = /<(\/?)([a-z][a-z\d]*)(?=[\s/>])([^<>]*)>/gi
 // `{name}`, `{user.name}` or `{count(1)}` inside a quoted attribute value, not after a backslash.
 const BRACED = /(?<![\\{])\{([a-z_$][\w$]*(?:\??\.[\w$]+)*(?:\([^(){}]*\))?)\}(?!\})/gi
-// What a template literal would read differently than the attribute text does.
 const PATH_START = /[.(?]/
 const WHITESPACE_RUN = /\s+/g
+// What a template literal would read differently than the attribute text does.
 const UNQUOTABLE = /[`\\&]|\$\{/
 const SELF_CLOSING = /\s*\/$/
 // What `#[...]` cannot hold as written: another tag, or a bracket ending it early.
@@ -979,7 +979,9 @@ export function templateLints(file: KayFile): Diagnostic[] {
 function declares(source: string, name: string): boolean {
   const word = name.replaceAll('$', '\\$')
 
-  return new RegExp(`\\b(?:const|let|var|function|snippet|class|then|catch)\\s+${word}(?![\\w$])|^\\s*(?:const|let|var|import|for)\\b[^\\n]*[{\\[,]\\s*${word}\\s*(?:[,}\\]:=]|of\\b|as\\b)|^\\s*for\\s+[^\\n]*\\b${word}\\s+of\\b`, 'm').test(source)
+  const line = '^[ \\t]*(?:export[ \\t]+)?(?:async[ \\t]+)?'
+
+  return new RegExp(`${line}(?:const|let|var|function|snippet|class)[ \\t]+${word}(?![\\w$])|${line}import[ \\t]+(?:type[ \\t]+)?${word}(?![\\w$])|^[ \\t]*(?:await\\b[^\\n]*[ \\t])?(?:then|catch)[ \\t]+${word}(?![\\w$])|${line}(?:const|let|var|import|for)\\b[^\\n]*[{\\[,][ \\t]*${word}[ \\t]*(?:[,}\\]:=]|of\\b|as\\b)|^[ \\t]*for[ \\t]+[^\\n]*\\b${word}[ \\t]+of\\b`, 'm').test(source)
 }
 
 // `title="Hello {name}"`: a quoted value is literal, so the braces would reach the page.

@@ -745,6 +745,13 @@ describe('brace-in-attribute', () => {
     expect(fixes('---\nconst { name } = props<{ name: string }>()\n---\na(title="{name}") go\n')).toEqual([true])
   })
 
+  it('counts a default import and a declaration line, not a word in text, as declaring the name', () => {
+    const fixes = (source: string) => compileKay(source, 'list.kay', { check: true }).diagnostics.flatMap(d => d.fixes ?? []).map(fix => fix.safe)
+
+    expect(fixes('---\nimport label from "./label"\nimport type Kind, { x } from "./k"\n---\na(title="{label}") go\n')).toEqual([true])
+    expect(fixes('---\n---\np the const name here\na(title="{name}") go\n')).toEqual([false])
+  })
+
   it('collapses a class value running over lines in the template literal', () => {
     expect(fixed(`${head}a(class="\n  p-1 {name}\n") go\n`)).toEqual([`${head}a(class={\`p-1 \${name}\`}) go\n`])
   })
