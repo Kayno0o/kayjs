@@ -55,13 +55,13 @@ interface TemplateHelpers
   Dynamic: <Tag>(props: { component: Tag; } & PropsOf<Tag>) => Element
   For: {
   <T>(props: {
-    each: false | readonly T[] | null | undefined;
+    each: false | null | readonly T[] | undefined;
     keyed: (item: T) => unknown;
     fallback?: Element;
     children: Element;
   }): Element;
   <T>(props: {
-    each: false | readonly T[] | null | undefined;
+    each: false | null | readonly T[] | undefined;
     keyed: false;
     fallback?: Element;
     children: Element;
@@ -75,7 +75,7 @@ interface TemplateHelpers
   partClass: (props: unknown, part: string) => unknown
   partHanded: (part: string, list: readonly unknown[]) => unknown
   partsClass: (list: readonly unknown[]) => unknown
-  staticFor: <T>(each: false | readonly T[] | null | undefined, rendered: Element, fallback?: Element) => Element
+  staticFor: <T>(each: false | null | readonly T[] | undefined, rendered: Element, fallback?: Element) => Element
 
 [.] TemplateValues
 interface TemplateValues
@@ -122,7 +122,7 @@ interface PendingBlock
   id: string
   ready: (value: never) => unknown
   site?: Error | undefined
-  value: Promise<unknown> | AsyncIterable<unknown>
+  value: AsyncIterable<unknown> | Promise<unknown>
 
 [./await] rejectedAt
 function rejectedAt(block: PendingBlock, reason: unknown): unknown
@@ -790,14 +790,14 @@ type CheckedAnswer = { value: unknown } | { issues: AnswerIssue[] }
 function clearMissing(file?: string | undefined): number
 
 [./library] commandProject
-function commandProject(name: string, root: string, config: KayConfig, shared?: Partial<Pick<CommandProject, "format" | "quiet" | "dryRun">>): CommandProject
+function commandProject(name: string, root: string, config: KayConfig, shared?: Partial<Pick<CommandProject, "dryRun" | "format" | "quiet">>): CommandProject
 
 [./library] CommandProject
 interface CommandProject
   config: KayConfig
   dryRun: boolean
-  fail: (message: string, code?: string | null | undefined) => number
-  format: "text" | "json"
+  fail: (message: string, code?: null | string | undefined) => number
+  format: "json" | "text"
   quiet: boolean
   result: (document: object) => void
   root: string
@@ -820,7 +820,7 @@ function connectionOf(source: PgJobsSource): SQL
 
 [./library] ContextDefinition
 interface ContextDefinition<Values extends object = object>
-  load?: ((request: Request) => Values | Promise<Values>) | undefined
+  load?: ((request: Request) => Promise<Values> | Values) | undefined
   loaders?: Record<string, (request: Request) => unknown> | undefined
   values?: Values | undefined
 
@@ -873,7 +873,7 @@ function escapeHtml(text: string): string
 
 [./library] FallbackMemory
 interface FallbackMemory
-  hit: (key: string, window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, weight?: number | undefined) => RateWindow
+  hit: (key: string, window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, weight?: number | undefined) => RateWindow
   peek: (key: string) => RateWindow | undefined
   refund?: ((key: string, resetAt: number) => void) | undefined
   reset?: ((key: string) => void) | undefined
@@ -937,8 +937,8 @@ interface KayCommand extends Omit<Command, 'run'>
   normalize?: (args: string[]) => string[]
   options: CommandOptions
   positionals: number
-  refuses?: Partial<Record<"format" | "quiet" | "dry-run", string>>
-  run: (parsed: Parsed, refuse: (reason?: string | undefined) => number, project: CommandProject) => number | Promise<number>
+  refuses?: Partial<Record<"dry-run" | "format" | "quiet", string>>
+  run: (parsed: Parsed, refuse: (reason?: string | undefined) => number, project: CommandProject) => Promise<number> | number
   usage: string
 
 [./library] keepCookiesPrivate
@@ -979,7 +979,7 @@ function localizedEntry(root: string, config: Pick<KayConfig, "contentConfig" | 
 interface LocalizedEntry
   body: string | undefined
   data: Record<string, DataValue>
-  mark: "field" | "comment" | undefined
+  mark: "comment" | "field" | undefined
   schema: JsonSchema
 
 [./library] Logo
@@ -1048,7 +1048,7 @@ function overHttps(request: Request): boolean
 [./library] Parsed
 interface Parsed
   positionals: string[]
-  values: Record<string, string | boolean | string[] | undefined>
+  values: Record<string, boolean | string | string[] | undefined>
 
 [./library] parseEvents
 function parseEvents<End>(body: ReadableStream<Uint8Array<ArrayBufferLike>>, signal: AbortSignal, onEvent: (event: string, data: string) => End | undefined): Promise<End | undefined>
@@ -1388,7 +1388,7 @@ const AUTH_MAIL_FRENCH: {
   readonly 'organization-handed-over': { ...#89b11890 (6 lines)
 
 [./library/auth-mails] AUTH_MAIL_SAMPLES
-const AUTH_MAIL_SAMPLES: Readonly<Record<AuthMailKind, Pick<AuthMailData, "url" | "code" | "detail">>>
+const AUTH_MAIL_SAMPLES: Readonly<Record<AuthMailKind, Pick<AuthMailData, "code" | "detail" | "url">>>
 
 [./library/auth-mails] AUTH_MAIL_WORDING
 const AUTH_MAIL_WORDING: Readonly<Record<string, AuthMailWording>>
@@ -1413,7 +1413,7 @@ interface AuthMailData
   detail?: string | undefined
   email: string
   locale: string
-  maxAge?: { link?: number; code?: number; } | undefined
+  maxAge?: undefined | { link?: number; code?: number; }
   name: string
   url?: string | undefined
 

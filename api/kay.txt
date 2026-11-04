@@ -6,7 +6,7 @@ function action<Schema extends TSchema, Output, const Honeypot extends string = 
 
 [.] Action
 interface Action<Input, Output, Honeypot extends string = never>
-  error: (field?: "" | Honeypot | Extract<keyof Input, string> | undefined) => string | undefined
+  error: (field?: "" | Extract<keyof Input, string> | Honeypot | undefined) => string | undefined
   failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
   pending: () => boolean
   progress: () => number | undefined
@@ -48,8 +48,8 @@ interface ActionFor<Params extends Readonly<Record<string, unknown>>>
 [.] ActionProtect
 interface ActionProtect<Field extends string = never>
   honeypot?: Field | HoneypotOptions<Field> | undefined
-  minTime?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | MinTimeOptions | undefined
-  proofOfWork?: number | boolean | ProofOfWorkOptions | undefined
+  minTime?: MinTimeOptions | `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  proofOfWork?: ProofOfWorkOptions | boolean | number | undefined
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
 
 [.] ActionProtection
@@ -57,7 +57,7 @@ interface ActionProtection<Field extends string = never>
   maxSize?: ByteSize | undefined
   messages?: ProtectionMessages | undefined
   protect?: ActionProtect<Field> | undefined
-  tool?: string | boolean | ActionTool | undefined
+  tool?: ActionTool | boolean | string | undefined
 
 [.] ActionRateLimit
 interface ActionRateLimit extends RateLimit
@@ -65,7 +65,7 @@ interface ActionRateLimit extends RateLimit
   key?: RateKey | undefined
   max: number
   store?: RateStore | undefined
-  window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] ActionRedirectError
 class ActionRedirectError
@@ -195,10 +195,10 @@ type ContextOfModule<Module> = Module extends { default: ContextDefinition<infer
 const ctx: object
 
 [.] debounced
-function debounced<T>(source: () => T, delay: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`): Memo<T>
+function debounced<T>(source: () => T, delay: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`): Memo<T>
 
 [.] defer
-function defer<T>(value: T | PromiseLike<T>): Deferred<T>
+function defer<T>(value: PromiseLike<T> | T): Deferred<T>
 
 [.] Deferred
 type Deferred<T> = Promise<T>
@@ -211,7 +211,7 @@ function describeField(ids: string, options?: DescribeOptions): void
 
 [.] DescribeOptions
 interface DescribeOptions
-  required?: boolean | "all" | undefined
+  required?: "all" | boolean | undefined
 
 [.] dispatch
 function dispatch<Message extends {
@@ -226,7 +226,7 @@ function dispatch<Message extends {
 type Duration = `${number}${'ms' | keyof typeof UNIT_SECONDS}`
 
 [.] durationMs
-function durationMs(value: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`): number
+function durationMs(value: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`): number
 
 [.] editing
 function editing(): boolean
@@ -289,7 +289,7 @@ interface EventReader<T> extends Source<ConnectionStatus>
 type EventStream<T> = Response & { readonly [EVENTS]: T }
 
 [.] every
-function every(interval: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, run: () => unknown, options?: EveryOptions | undefined): void
+function every(interval: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, run: () => unknown, options?: EveryOptions | undefined): void
 
 [.] EveryOptions
 interface EveryOptions
@@ -321,7 +321,7 @@ function flush(): void
 function focusInvalid(root?: ParentNode | undefined): Promise<boolean>
 
 [.] followLog
-function followLog(container: Element | (() => Element | null | undefined), options?: FollowLogOptions): FollowLog
+function followLog(container: (() => Element | null | undefined) | Element, options?: FollowLogOptions): FollowLog
 
 [.] FollowLog
 interface FollowLog
@@ -335,7 +335,7 @@ interface FollowLogOptions
 [.] FormFailure
 interface FormFailure<Input, Data, Honeypot extends string = never>
   data?: Data
-  errors: Partial<Record<"" | Honeypot | Extract<keyof Input, string>, string>>
+  errors: Partial<Record<"" | Extract<keyof Input, string> | Honeypot, string>>
   message: string
   status: number
   values: Partial<Record<Extract<keyof Input, string>, string>>
@@ -345,7 +345,7 @@ interface FormSuccess<Output>
   data: Output
 
 [.] guard
-function guard<Own extends object = object>(check: (ctx: GuardContext<Own>) => void | Promise<void>): Guard
+function guard<Own extends object = object>(check: (ctx: GuardContext<Own>) => Promise<void> | void): Guard
 
 [.] Guard
 type Guard = (ctx: GuardContext) => void | Promise<void>
@@ -379,7 +379,7 @@ type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Element) & 
 [.] IslandOptions
 interface IslandOptions
   hydrate?: HydrateWhen | undefined
-  persist?: string | boolean | undefined
+  persist?: boolean | string | undefined
 
 [.] IslandProp
 type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> : NotSerializable<Value> : unknown
@@ -397,20 +397,20 @@ type Lastmod = Date | string | number
 
 [.] LeaveGuardOptions
 interface LeaveGuardOptions
-  confirm?: ((to: URL) => boolean | Promise<boolean>) | undefined
+  confirm?: ((to: URL) => Promise<boolean> | boolean) | undefined
 
 [.] linked
 function linked<T>(source: () => T): Signal<T>
 
 [.] listen
-function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: T | (() => T | null | undefined), type: K, handler: (event: EventMapOf<T>[K]) => void, options?: boolean | AddEventListenerOptions | undefined): void
+function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: (() => T | null | undefined) | T, type: K, handler: (event: EventMapOf<T>[K]) => void, options?: AddEventListenerOptions | boolean | undefined): void
 
 [.] live
-function live<T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(initial: PlainValue<T>, options: LiveOptions<Ttl> & {
+function live<T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `${number}w` | const Ttl extends Duration = `${number}ms`>(initial: PlainValue<T>, options: LiveOptions<Ttl> & {
   user: true;
 }): LiveOwn<T>
-function live<T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(initial: PlainValue<T>, options?: LiveOptions<Ttl> | undefined): Live<T>
-function live<K extends LiveKey, T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(initial: (key: K) => PlainValue<T>, options?: LiveOptions<Ttl> | undefined): LiveByKey<K, T>
+function live<T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `${number}w` | const Ttl extends Duration = `${number}ms`>(initial: PlainValue<T>, options?: LiveOptions<Ttl> | undefined): Live<T>
+function live<K extends LiveKey, T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `${number}w` | const Ttl extends Duration = `${number}ms`>(initial: (key: K) => PlainValue<T>, options?: LiveOptions<Ttl> | undefined): LiveByKey<K, T>
 
 [.] Live
 interface Live<T>
@@ -419,7 +419,7 @@ interface Live<T>
 [.] LiveByKey
 interface LiveByKey<K extends LiveKey, T>
   delete: (key: K) => void
-  set: (key: K, next: T | ((current: T) => T)) => void
+  set: (key: K, next: ((current: T) => T) | T) => void
 
 [.] LiveKey
 type LiveKey = string
@@ -432,7 +432,7 @@ interface LiveOptions<Ttl extends Duration = Duration>
 [.] LiveOwn
 interface LiveOwn<T>
   delete: (user: string) => void
-  set: (user: string, next: T | ((current: T) => T)) => void
+  set: (user: string, next: ((current: T) => T) | T) => void
 
 [.] LoadStatus
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
@@ -468,7 +468,7 @@ interface LocalIssue<Row>
   id: number
   kept?: Row | undefined
   key: string
-  kind: "rejected" | "conflict"
+  kind: "conflict" | "rejected"
   message: string
   mine?: Row | undefined
   op: "put" | "remove"
@@ -480,7 +480,7 @@ interface LocalOptions<Row extends object, Key extends keyof Row & string>
   conflict?: ((conflict: LocalConflict<Row>) => Row | undefined) | undefined
   key: Key
   put: Action<Row, unknown, never>
-  read: (signal: AbortSignal) => readonly Row[] | Promise<readonly Row[]>
+  read: (signal: AbortSignal) => Promise<readonly Row[]> | readonly Row[]
   remove?: Action<Pick<Row, Key>, unknown, never> | undefined
   version?: number | undefined
 
@@ -520,8 +520,8 @@ type Memo<T> = () => T
 
 [.] MinTimeOptions
 interface MinTimeOptions
-  after: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  after: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   plain?: boolean | undefined
   pretend?: boolean | undefined
 
@@ -529,7 +529,7 @@ interface MinTimeOptions
 type MinTimeRefusal = 'early' | 'expired'
 
 [.] navigate
-function navigate(to: { query: Readonly<Record<string, string | number | null | undefined>>; }, options?: NavigateOptions | undefined): Promise<boolean>
+function navigate(to: { query: Readonly<Record<string, null | number | string | undefined>>; }, options?: NavigateOptions | undefined): Promise<boolean>
 function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions | undefined): Promise<boolean>
 
 [.] NavigateEvent
@@ -539,7 +539,7 @@ interface NavigateEvent
 [.] NavigateOptions
 interface NavigateOptions
   replace?: boolean | undefined
-  scroll?: "top" | "keep" | undefined
+  scroll?: "keep" | "top" | undefined
   transition?: boolean | undefined
 
 [.] navigation
@@ -552,7 +552,7 @@ type NavigationState = 'idle' | 'loading' | 'swapping'
 type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions) => Promise<Answer<Success<Output>>>)
 
 [.] onBeforeNavigate
-function onBeforeNavigate(fn: (event: BeforeNavigate) => boolean | void | Promise<boolean | void>): () => void
+function onBeforeNavigate(fn: (event: BeforeNavigate) => Promise<boolean | void> | boolean | void): () => void
 
 [.] onCleanup
 function onCleanup(fn: () => void): void
@@ -592,53 +592,53 @@ type PageSearch = false | { weight?: number }
 
 [.] PageSecurity
 interface PageSecurity
-  csp?: false | Record<string, false | string[]>
-  headers?: Record<string, string | false>
+  csp?: Record<string, false | string[]> | false
+  headers?: Record<string, false | string>
 
 [.] PageSettings
 interface PageSettings
-  cacheControl?: string | false
+  cacheControl?: false | string
   feed?: false | object | readonly object[]
   guards?: false
   keep?: true
-  lastmod?: Lastmod | ((params: Record<string, string>) => Lastmod | Promise<Lastmod | undefined> | undefined)
+  lastmod?: ((params: Record<string, string>) => Lastmod | Promise<Lastmod | undefined> | undefined) | Lastmod
   layouts?: false
   noindex?: boolean
   prerender?: boolean | object
   query?: TSchema
   reload?: true
-  revalidate?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
-  search?: PageSearch | ((params: Record<string, string>) => PageSearch | Promise<PageSearch | undefined> | undefined)
+  revalidate?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+  search?: ((params: Record<string, string>) => PageSearch | Promise<PageSearch | undefined> | undefined) | PageSearch
   security?: PageSecurity
   sitemap?: boolean | object
-  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] PartClass
 type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Props['class' & keyof Props] : never : never
 
 [.] persisted
 function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, "maxAge" | "values"> & { storage: "query"; }): Signal<T>
-function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, "maxAge"> & {
+function persisted<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, "maxAge"> & {
   storage: "query";
   values: readonly T[];
 }): Signal<T>
-function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: (PersistedOptions<T> & {
-  storage?: "cookie" | undefined;
-  values: readonly T[];
-}) | (Omit<PersistedOptions<T>, "maxAge"> & {
+function persisted<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: (Omit<PersistedOptions<T>, "maxAge"> & {
   storage: "local";
+  values: readonly T[];
+}) | (PersistedOptions<T> & {
+  storage?: "cookie" | undefined;
   values: readonly T[];
 })): Signal<T>
-function persisted<T>(name: string, value: PlainValue<T>, options?: (Omit<PersistedOptions<T>, "values"> & {
-  storage?: "cookie" | undefined;
-}) | (Omit<PersistedOptions<T>, "maxAge" | "values"> & {
+function persisted<T>(name: string, value: PlainValue<T>, options?: (Omit<PersistedOptions<T>, "maxAge" | "values"> & {
   storage: "local";
+}) | (Omit<PersistedOptions<T>, "values"> & {
+  storage?: "cookie" | undefined;
 }) | undefined): Signal<T>
 
 [.] PersistedOptions
 interface PersistedOptions<T> extends SignalOptions<T>
   equals?: Equals<T> | undefined
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   storage?: PersistStorage | undefined
   values?: readonly T[] | undefined
 
@@ -671,7 +671,7 @@ function previewing(): boolean
 [.] ProofOfWorkOptions
 interface ProofOfWorkOptions
   difficulty?: number | undefined
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   pretend?: boolean | undefined
   store?: RateStore | undefined
 
@@ -681,11 +681,11 @@ type ProofOfWorkRefusal = 'missing' | 'expired' | 'wrong'
 [.] ProtectionMessages
 interface ProtectionMessages
   honeypot?: string | undefined
-  maxSize?: string | ((bytes: number) => string) | undefined
-  minTime?: string | ((reason: MinTimeRefusal) => string) | undefined
-  proofOfWork?: string | ((reason: ProofOfWorkRefusal) => string) | undefined
-  rateLimit?: string | ((wait: number) => string) | undefined
-  serverError?: string | ((error: unknown, ctx: ActionContext<Readonly<Record<string, unknown>>>) => string | Promise<string>) | undefined
+  maxSize?: ((bytes: number) => string) | string | undefined
+  minTime?: ((reason: MinTimeRefusal) => string) | string | undefined
+  proofOfWork?: ((reason: ProofOfWorkRefusal) => string) | string | undefined
+  rateLimit?: ((wait: number) => string) | string | undefined
+  serverError?: ((error: unknown, ctx: ActionContext<Readonly<Record<string, unknown>>>) => Promise<string> | string) | string | undefined
 
 [.] publicEnv
 const publicEnv: Readonly<Record<never, never>>
@@ -733,7 +733,7 @@ interface QueuedJob<Payload = unknown, Progress = unknown>
   payload: Payload
   progress?: Progress
   runAt: number
-  status: "waiting" | "running"
+  status: "running" | "waiting"
 
 [.] RateKey
 type RateKey = (ctx: RateKeyContext) => string | undefined | Promise<string | undefined>
@@ -745,16 +745,16 @@ type RateKeyContext = Pick<RequestContext, 'request' | 'locale' | 'cookies' | 'l
 interface RateLimit
   max: number
   store?: RateStore | undefined
-  window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] RateStore
 interface RateStore extends StoreBase
   close?: (() => unknown) | undefined
-  hit: (key: string, window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, weight?: number | undefined) => RateWindow | Promise<RateWindow>
-  peek?: (key: string) => RateWindow | Promise<RateWindow | undefined> | undefined
+  hit: (key: string, window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, weight?: number | undefined) => Promise<RateWindow> | RateWindow
+  peek?: (key: string) => Promise<RateWindow | undefined> | RateWindow | undefined
   ping?: (() => unknown) | undefined
-  refund?: (key: string, resetAt: number) => void | Promise<void>
-  reset?: (key: string) => void | Promise<void>
+  refund?: (key: string, resetAt: number) => Promise<void> | void
+  reset?: (key: string) => Promise<void> | void
 
 [.] RateWindow
 interface RateWindow
@@ -772,7 +772,7 @@ interface Recipe<Variants extends VariantTable>
 [.] RecipeConfig
 interface RecipeConfig<Variants extends VariantTable>
   defaults?: VariantValues<NoInfer<Variants>>
-  parts?: string | Readonly<Record<string, string>>
+  parts?: Readonly<Record<string, string>> | string
   variants?: Variants
 
 [.] RecipeProps
@@ -817,17 +817,17 @@ interface RequestContext<Params extends Record<string, unknown> = Record<string,
 
 [.] ResolvedProtection
 interface ResolvedProtection
-  honeypot?: string | HoneypotOptions<string> | undefined
+  honeypot?: HoneypotOptions<string> | string | undefined
   maxSize?: ByteSize | undefined
   messages?: ProtectionMessages | undefined
-  minTime?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | MinTimeOptions | undefined
-  proofOfWork?: number | boolean | ProofOfWorkOptions | undefined
+  minTime?: MinTimeOptions | `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  proofOfWork?: ProofOfWorkOptions | boolean | number | undefined
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
-  tool?: string | boolean | ActionTool | undefined
+  tool?: ActionTool | boolean | string | undefined
 
 [.] resource
-function resource<Module, const Path extends ResourcePath<Module>>(module: Module, path: Path, ...[options]: Optional<ResourceOptions<Module, Path> | (() => ResourceOptions<Module, Path>)>): ResourceOf<Module, Path>
-function resource<T>(load: (signal: AbortSignal) => T | PromiseLike<T>): Resource<Awaited<T>>
+function resource<Module, const Path extends ResourcePath<Module>>(module: Module, path: Path, ...[options]: Optional<(() => ResourceOptions<Module, Path>) | ResourceOptions<Module, Path>>): ResourceOf<Module, Path>
+function resource<T>(load: (signal: AbortSignal) => PromiseLike<T> | T): Resource<Awaited<T>>
 
 [.] Resource
 interface Resource<T> extends Source<ResourceStatus>
@@ -867,7 +867,7 @@ type RouteArgs<Pattern extends string> = string extends Pattern ? [params?: Read
 [.] RouteOptions
 interface RouteOptions
   hash?: string | undefined
-  query?: Readonly<Record<string, boolean | Value | readonly (boolean | Value)[] | null | undefined>> | undefined
+  query?: Readonly<Record<string, Value | boolean | null | readonly (Value | boolean)[] | undefined>> | undefined
 
 [.] RouteParams
 type RouteParams = Readonly<Record<string, unknown>>
@@ -893,7 +893,7 @@ const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
   Cookie: <T extends TProperties>(properties: T, {
     domain, expires, httpOnly, maxAge, path, priority, sameSite, secure, secrets, sign, ...options
   }?: CookieValidatorOptions<T> | undefined) => TObject<T>;
-  UnionEnum: <const T extends NonEmptyArray<TEnumValue> | Readonly<NonEmptyArray<TEnumValue>>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
+  UnionEnum: <Readonly<NonEmptyArray<TEnumValue>> | const T extends NonEmptyArray<TEnumValue>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
   NoValidate: <T extends TAnySchema>(v: T, enabled?: boolean | undefined) => T;
   Form: <T extends TProperties>(v: T, options?: ObjectOptions | undefined) => TForm<T>;
   ArrayBuffer(options?: TArrayBuffer | undefined): TUnsafe<ArrayBuffer>;
@@ -961,11 +961,11 @@ function selection<Key extends string | number>(initial?: Key | undefined): Sele
 [.] Selection
 interface Selection<Key>
   is: (key: Key) => boolean
-  set: (key: Key | ((current: Key | undefined) => Key | undefined) | undefined) => void
+  set: (key: ((current: Key | undefined) => Key | undefined) | Key | undefined) => void
 
 [.] ServerAction
 interface ServerAction<Schema extends TSchema, Output, Honeypot extends string = never> extends Action<Sendable<Static<Schema>>, Output, Honeypot>
-  error: (field?: "" | Honeypot | Extract<keyof Sendable<(Schema & { params: []; })["static"]>, string> | undefined) => string | undefined
+  error: (field?: "" | Extract<keyof Sendable<(Schema & { params: []; })["static"]>, string> | Honeypot | undefined) => string | undefined
   failed: () => FormFailure<Sendable<(Schema & { params: []; })["static"]>, FailureData<Output>, Honeypot> | undefined
   handler: (input: (Schema & { params: []; })["static"], ctx: ActionContext<Readonly<Record<string, unknown>>>) => Output | Promise<Output>
   pending: () => boolean
@@ -986,12 +986,12 @@ type ServerOfModule<Module, Name extends string> = Module extends Record<Name, i
 type Setter<T> = (next: T | ((current: T) => T)) => void
 
 [.] shortcut
-function shortcut(keys: string | (() => string | null | undefined), handler: (event: KeyboardEvent) => void, options?: ShortcutOptions): void
+function shortcut(keys: (() => null | string | undefined) | string, handler: (event: KeyboardEvent) => void, options?: ShortcutOptions): void
 
 [.] ShortcutOptions
 interface ShortcutOptions
   inputs?: boolean | undefined
-  on?: Element | (() => Element | null | undefined) | undefined
+  on?: (() => Element | null | undefined) | Element | undefined
   preventDefault?: boolean | undefined
   repeat?: boolean | undefined
 
@@ -1150,7 +1150,7 @@ function withBase(path: string): string
 interface WithPublicFields<Schema extends TSchema>
 
 [.] withQuery
-function withQuery(changes: Readonly<Record<string, string | number | null | undefined>>): string
+function withQuery(changes: Readonly<Record<string, null | number | string | undefined>>): string
 
 [./analytics] analytics
 function analytics(options: AnalyticsOptions): KayExtension<AnyElysia>
@@ -1167,7 +1167,7 @@ const ANALYTICS_SCRIPT_PATH: "/_kay/analytics.js"
 [./analytics] AnalyticsConsent
 interface AnalyticsConsent
   agree?: AnalyticsText | undefined
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   notice?: boolean | undefined
   policy?: AnalyticsText | undefined
   refuse?: AnalyticsText | undefined
@@ -1188,10 +1188,10 @@ type AnalyticsText = string | Record<string, string>
 
 [./analytics] CloudflareOptions
 interface CloudflareOptions extends Common
-  consent?: boolean | AnalyticsConsent | undefined
+  consent?: AnalyticsConsent | boolean | undefined
   exclude?: undefined
   hosts?: string[] | undefined
-  info?: false | AnalyticsInfo | undefined
+  info?: AnalyticsInfo | false | undefined
   policyUrl?: string | undefined
   provider: "cloudflare"
   titles?: undefined
@@ -1212,11 +1212,11 @@ const CUSTOM_SCRIPT_PATH: "/_kay/analytics/script.js"
 [./analytics] CustomOptions
 interface CustomOptions extends Common
   address?: boolean | undefined
-  consent?: boolean | AnalyticsConsent | undefined
+  consent?: AnalyticsConsent | boolean | undefined
   endpoint: string
   exclude?: undefined
   hosts?: string[] | undefined
-  info?: false | AnalyticsInfo | undefined
+  info?: AnalyticsInfo | false | undefined
   integrity?: string | undefined
   policyUrl?: string | undefined
   provider: "custom"
@@ -1225,25 +1225,25 @@ interface CustomOptions extends Common
 
 [./analytics] FathomOptions
 interface FathomOptions extends Common
-  consent?: boolean | AnalyticsConsent | undefined
+  consent?: AnalyticsConsent | boolean | undefined
   exclude?: undefined
   hosts?: string[] | undefined
-  info?: false | AnalyticsInfo | undefined
+  info?: AnalyticsInfo | false | undefined
   policyUrl?: string | undefined
   provider: "fathom"
   siteId: string
-  spa?: "auto" | "history" | "hash" | undefined
+  spa?: "auto" | "hash" | "history" | undefined
   titles?: undefined
 
 [./analytics] Ga4Options
 interface Ga4Options extends Counted
   address?: boolean | undefined
   apiSecret: string
-  consent?: boolean | AnalyticsConsent | undefined
+  consent?: AnalyticsConsent | boolean | undefined
   exclude?: string[] | undefined
   host?: string | undefined
   hosts?: string[] | undefined
-  info?: false | AnalyticsInfo | undefined
+  info?: AnalyticsInfo | false | undefined
   measurementId: string
   policyUrl?: string | undefined
   provider: "ga4"
@@ -1261,14 +1261,14 @@ interface LazyGuard
 
 [./analytics] MatomoOptions
 interface MatomoOptions extends Counted
-  consent?: boolean | AnalyticsConsent | undefined
+  consent?: AnalyticsConsent | boolean | undefined
   exclude?: string[] | undefined
   host: string
   hosts?: string[] | undefined
-  info?: false | AnalyticsInfo | undefined
+  info?: AnalyticsInfo | false | undefined
   policyUrl?: string | undefined
   provider: "matomo"
-  siteId: string | number
+  siteId: number | string
   titles?: boolean | undefined
   tokenAuth?: string | undefined
 
@@ -1277,12 +1277,12 @@ const NOTICE_SCRIPT_PATH: "/_kay/analytics/notice.js"
 
 [./analytics] PlausibleOptions
 interface PlausibleOptions extends Counted
-  consent?: boolean | AnalyticsConsent | undefined
+  consent?: AnalyticsConsent | boolean | undefined
   domain?: string | undefined
   exclude?: string[] | undefined
   host?: string | undefined
   hosts?: string[] | undefined
-  info?: false | AnalyticsInfo | undefined
+  info?: AnalyticsInfo | false | undefined
   policyUrl?: string | undefined
   provider: "plausible"
   titles?: boolean | undefined
@@ -1296,12 +1296,12 @@ interface RouteVitals
 
 [./analytics] SimpleAnalyticsOptions
 interface SimpleAnalyticsOptions extends Counted
-  consent?: boolean | AnalyticsConsent | undefined
+  consent?: AnalyticsConsent | boolean | undefined
   exclude?: string[] | undefined
   host?: string | undefined
   hostname?: string | undefined
   hosts?: string[] | undefined
-  info?: false | AnalyticsInfo | undefined
+  info?: AnalyticsInfo | false | undefined
   policyUrl?: string | undefined
   provider: "simpleanalytics"
   titles?: boolean | undefined
@@ -1311,11 +1311,11 @@ const TRACKER_TAGS: WeakSet<HeadTag>
 
 [./analytics] UmamiOptions
 interface UmamiOptions extends Counted
-  consent?: boolean | AnalyticsConsent | undefined
+  consent?: AnalyticsConsent | boolean | undefined
   exclude?: string[] | undefined
   host?: string | undefined
   hosts?: string[] | undefined
-  info?: false | AnalyticsInfo | undefined
+  info?: AnalyticsInfo | false | undefined
   policyUrl?: string | undefined
   provider: "umami"
   titles?: boolean | undefined
@@ -1338,9 +1338,9 @@ function vitalsReport(now?: number): Promise<RouteVitals[]>
 
 [./analytics] VitalsStore
 interface VitalsStore extends StoreBase
-  add: (route: string, readings: VitalReading[], day: number) => void | Promise<void>
+  add: (route: string, readings: VitalReading[], day: number) => Promise<void> | void
   close?: (() => unknown) | undefined
-  counts: (since: number) => VitalCount[] | Promise<VitalCount[]>
+  counts: (since: number) => Promise<VitalCount[]> | VitalCount[]
   ping?: (() => unknown) | undefined
 
 [./analytics] VitalSummary
@@ -1361,21 +1361,21 @@ interface KayBunOptions
   settings?: Record<string, string> | undefined
 
 [./cache] cache
-function cache<A extends unknown[], T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(load: (...args: A) => T | Promise<T>, options: CacheFunctionOptions<Ttl, T>): CachedFunction<A, T>
+function cache<A extends unknown[], T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `${number}w` | const Ttl extends Duration = `${number}ms`>(load: (...args: A) => Promise<T> | T, options: CacheFunctionOptions<Ttl, T>): CachedFunction<A, T>
 
 [./cache] cached
-function cached<T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options?: CacheOptions<T>): Promise<T>
+function cached<T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `${number}w` | const Ttl extends Duration = `${number}ms`>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => Promise<T> | T, options?: CacheOptions<T>): Promise<T>
 
 [./cache] CachedFunction
 interface CachedFunction<A extends unknown[], T>
-  invalidate: (...args: [] | A) => void
+  invalidate: (...args: A | []) => void
 
 [./cache] CacheFunctionOptions
 interface CacheFunctionOptions<Ttl extends Duration = Duration, T = unknown> extends CacheOptions<T>
   fallback?: T | undefined
   live?: boolean | undefined
   stale?: boolean | undefined
-  store?: false | CacheStore | undefined
+  store?: CacheStore | false | undefined
   tags?: CacheTag[] | undefined
   ttl: Ttl & PositiveDuration<Ttl>
 
@@ -1384,18 +1384,18 @@ interface CacheOptions<T = unknown>
   fallback?: T | undefined
   live?: boolean | undefined
   stale?: boolean | undefined
-  store?: false | CacheStore | undefined
+  store?: CacheStore | false | undefined
 
 [./cache] CacheStore
 interface CacheStore extends StoreBase
   close?: (() => unknown) | undefined
-  delete: (key: string) => void | Promise<void>
+  delete: (key: string) => Promise<void> | void
   dependencies?: () => Map<string, string[]> | Promise<Map<string, string[]>>
-  get: (key: string) => StoredValue | Promise<StoredValue | undefined> | undefined
-  keys: () => string[] | Promise<string[]>
+  get: (key: string) => Promise<StoredValue | undefined> | StoredValue | undefined
+  keys: () => Promise<string[]> | string[]
   ping?: (() => unknown) | undefined
-  publish?: (message: string) => void | Promise<void>
-  set: (key: string, text: string, freshUntil: number) => void | Promise<void>
+  publish?: (message: string) => Promise<void> | void
+  set: (key: string, text: string, freshUntil: number) => Promise<void> | void
   subscribe?: (listener: (message: string) => void) => void
 
 [./cache] cacheTag
@@ -1409,10 +1409,10 @@ interface CacheTag
 type Invalidatable = string | ((key: string) => boolean) | { invalidate: () => void }
 
 [./cache] invalidate
-function invalidate(target: Invalidatable | { page: string | ((path: string) => boolean); }): void
+function invalidate(target: Invalidatable | { page: ((path: string) => boolean) | string; }): void
 
 [./cache] invalidatePage
-function invalidatePage(path: string | ((path: string) => boolean)): void
+function invalidatePage(path: ((path: string) => boolean) | string): void
 
 [./cache] sqliteCache
 function sqliteCache(path: string): SyncCacheStore
@@ -1453,7 +1453,7 @@ interface CompileOptions
   lints?: LintLevels | undefined
   outerQueries?: string[] | undefined
   outerSlots?: string[] | undefined
-  output?: "html" | "dom" | undefined
+  output?: "dom" | "html" | undefined
   page?: boolean | undefined
   paramTypes?: Record<string, string> | undefined
   params?: string[] | undefined
@@ -1502,14 +1502,14 @@ function blocks<const Types extends Record<string, AnyObject>>(types: Types, opt
 function bodyHtml(body: string): Promise<string>
 
 [./content] collection
-function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never, const Formats extends FeedFormat | readonly FeedFormat[] = "rss">(source: string | ContentLoader<Stored<(Schema & {
+function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never, const Formats extends FeedFormat | readonly FeedFormat[] = "rss">(source: ContentLoader<Stored<(Schema & {
   params: [];
-})["static"]>>, options: CollectionOptions<Schema, [Route] extends [never] ? false : true> & {
+})["static"]>> | string, options: CollectionOptions<Schema, [Route] extends [never] ? false : true> & {
   components?: Components;
-  feed?: {
+  feed?: undefined | {
     path: FeedPath;
     format?: Formats;
-  } | undefined;
+  };
   seed?: Seed;
   route?: Route | undefined;
 }): Collection<(Schema & {
@@ -1537,7 +1537,7 @@ function collectionInfo(name: string, { counts }?: { counts?: boolean | undefine
 
 [./content] CollectionInfo
 interface CollectionInfo
-  body?: { kind: "markdown"; } | undefined
+  body?: undefined | { kind: "markdown"; }
   components: string[]
   count?: number | undefined
   defaultLocale?: string | undefined
@@ -1606,25 +1606,25 @@ function contentKey(name: string): string
 [./content] ContentLoader
 interface ContentLoader<Data = unknown>
   body?: boolean | undefined
-  count?: ((context: { preview: boolean; }) => number | Promise<number>) | undefined
+  count?: ((context: { preview: boolean; }) => Promise<number> | number) | undefined
   get?: ((place: string, context: { preview: boolean; }) => LoadedEntry | Promise<LoadedEntry | undefined> | undefined) | undefined
   load: (context: { preview: boolean; }) => LoadedEntry[] | Promise<LoadedEntry[]>
   name: string
-  remove?: ((entry: { slug: string; locale?: string | undefined; }) => void | Promise<void>) | undefined
-  save?: ((entry: { slug: string; locale?: string | undefined; data: Data; body?: string | undefined; create?: true; }) => void | Promise<void>) | undefined
+  remove?: ((entry: { slug: string; locale?: string | undefined; }) => Promise<void> | void) | undefined
+  save?: ((entry: { slug: string; locale?: string | undefined; data: Data; body?: string | undefined; create?: true; }) => Promise<void> | void) | undefined
   saveMany?: ((entries: {
   slug: string;
   locale?: string | undefined;
   data: Data;
   body?: string | undefined;
-  expect?: {
+  expect?: undefined | {
     field: string;
     was: number | undefined;
-  } | undefined;
-}[]) => void | Promise<void>) | undefined
+  };
+}[]) => Promise<void> | void) | undefined
   sibling?: ((kind: string) => ContentLoader<unknown>) | undefined
   store?: CacheStore | undefined
-  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./content] convertField
 function convertField(name: string, convert: (value: unknown, data: Record<string, unknown>) => unknown): Migration
@@ -1744,7 +1744,7 @@ interface FieldInputOptions
   rows?: number | undefined
   suffix?: string | undefined
   titleField?: string | undefined
-  type?: "search" | "url" | "text" | "email" | "tel" | undefined
+  type?: "email" | "search" | "tel" | "text" | "url" | undefined
   when?: string | undefined
 
 [./content] FieldKind
@@ -1852,7 +1852,7 @@ function paginate<Item>(source: Items<Item>, size: number): Paginated<Item>
 
 [./content] Paginated
 interface Paginated<Item>
-  page: (param: string | number | undefined) => Promise<Page<Item> | undefined>
+  page: (param: number | string | undefined) => Promise<Page<Item> | undefined>
   pageCounts: (settings?: LocaleSettings | undefined) => Promise<Map<string | undefined, number>>
   pageSize: number
 
@@ -1942,7 +1942,7 @@ interface DevTab
 interface DevTabOptions
   announce?: boolean
   hidden?: () => void
-  icon?: "search" | "copy" | "image" | "circle-x" | "triangle-alert" | "database" | "list-checks" | "server" | "list-ordered" | "scan-search" | "key-round" | "gauge" | "route" | "languages" | "boxes" | "mail" | "network" | "crosshair" | "maximize-2" | "minimize-2" | "panel-right" | "panel-left" | "panel-bottom" | "app-window" | "x" | "check" | "clipboard-copy" | "lock" | "user-round" | "pencil" | "ear" | "palette" | "puzzle"
+  icon?: "app-window" | "boxes" | "check" | "circle-x" | "clipboard-copy" | "copy" | "crosshair" | "database" | "ear" | "gauge" | "image" | "key-round" | "languages" | "list-checks" | "list-ordered" | "lock" | "mail" | "maximize-2" | "minimize-2" | "network" | "palette" | "panel-bottom" | "panel-left" | "panel-right" | "pencil" | "puzzle" | "route" | "scan-search" | "search" | "server" | "triangle-alert" | "user-round" | "x"
   id: string
   label: string
   shown?: () => void
@@ -2007,7 +2007,7 @@ type Direction = 'ltr' | 'rtl'
 function formatBytes(bytes: number, options?: NumberFormatOptions | undefined): string
 
 [./i18n] formatDate
-function formatDate(value: number | Date, options?: DateFormatOptions | undefined): string
+function formatDate(value: Date | number, options?: DateFormatOptions | undefined): string
 
 [./i18n] formatDuration
 function formatDuration(milliseconds: number, options?: DurationFormatOptions | undefined): string
@@ -2019,7 +2019,7 @@ function formatList(items: Iterable<string>, options?: ListFormatOptions | undef
 function formatNumber(value: number, options?: NumberFormatOptions | undefined): string
 
 [./i18n] formatRelativeTime
-function formatRelativeTime(value: number | Date, options?: RelativeTimeOptions | undefined): string
+function formatRelativeTime(value: Date | number, options?: RelativeTimeOptions | undefined): string
 function formatRelativeTime(value: number, unit: RelativeTimeFormatUnit, options?: RelativeFormatOptions | undefined): string
 
 [./i18n] locale
@@ -2073,12 +2073,12 @@ type Plural = { readonly other: string } & Readonly<Partial<Record<Exclude<Plura
 type PluralCategory = 'zero' | 'one' | 'two' | 'few' | 'many' | 'other'
 
 [./i18n] relativeTime
-function relativeTime(value: () => number | Date, options?: RelativeFormatOptions | undefined): () => string
+function relativeTime(value: () => Date | number, options?: RelativeFormatOptions | undefined): () => string
 
 [./i18n] RelativeTimeOptions
 interface RelativeTimeOptions extends Intl.RelativeTimeFormatOptions, LocaleOption
   locale?: string | undefined
-  now?: number | Date | undefined
+  now?: Date | number | undefined
 
 [./i18n] RichText
 type RichText = [Messages] extends [never] ? (props: {
@@ -2091,7 +2091,7 @@ type RichText = [Messages] extends [never] ? (props: {
 function t(key: string, params?: Record<string, MessageValue> | undefined): string
 
 [./i18n] T
-function T(props: { key: string; } & Record<string, MessageValue | Block>): Element
+function T(props: { key: string; } & Record<string, Block | MessageValue>): Element
 
 [./i18n] timeZone
 function timeZone(): string | undefined
@@ -2274,9 +2274,9 @@ interface ApiModule
 
 [./server] ApiOptions
 interface ApiOptions
-  cors?: false | CorsOptions | undefined
+  cors?: CorsOptions | false | undefined
   guards?: false | undefined
-  maxSize?: ByteSize | (() => ByteSize) | undefined
+  maxSize?: (() => ByteSize) | ByteSize | undefined
   rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
 
 [./server] ApiRateLimit
@@ -2284,7 +2284,7 @@ interface ApiRateLimit extends RateLimit
   key?: RateKey | undefined
   max: number
   store?: RateStore | undefined
-  window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [./server] AppStore
 interface AppStore extends StoreBase
@@ -2298,7 +2298,7 @@ interface AppStore extends StoreBase
   ping?: (() => unknown) | undefined
   push?: PushStore | undefined
   rates?: RateStore | undefined
-  rooms?: RoomStore | AsyncRoomStore | undefined
+  rooms?: AsyncRoomStore | RoomStore | undefined
   sessions?: SessionStore | undefined
   vitals?: VitalsStore | undefined
 
@@ -2309,7 +2309,7 @@ interface AsyncRooms<Message, Member = undefined, State = undefined> extends Roo
   leave: (ws: RoomConnection, room?: string | undefined) => void
   memberOf: (ws: RoomConnection, room: string) => Member | undefined
   members: (room: string) => Member[]
-  publish: (room: string, message: Message, options?: { except?: RoomConnection; to?: Member; } | undefined) => void
+  publish: (room: string, message: Message, options?: undefined | { except?: RoomConnection; to?: Member; }) => void
   response: TUnsafe<Message>
   roomsOf: (ws: RoomConnection) => string[]
   state: (room: string) => Promise<State>
@@ -2382,11 +2382,11 @@ class BrowserError
   url: string
 
 [./server] clientAddress
-function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: number | boolean | ProxyConfig | undefined): string
+function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | boolean | number | undefined): string
 
 [./server] CoalesceOptions
 interface CoalesceOptions
-  wait?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  wait?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] CorsOptions
 type CorsOptions = CorsCommon & ({ origins: '*', credentials?: false | undefined } | { origins: readonly string[], credentials?: boolean | undefined })
@@ -2404,7 +2404,7 @@ function crossOriginPaths(plugin: object, paths: readonly string[], options: Cor
 function crossSiteRefused(request: Request, site?: string | undefined): boolean
 
 [./server] crossSiteResponse
-function crossSiteResponse(request: Request, what: "request" | "action", site?: string | undefined): Response
+function crossSiteResponse(request: Request, what: "action" | "request", site?: string | undefined): Response
 
 [./server] CspViolationError
 class CspViolationError
@@ -2457,7 +2457,7 @@ function editSessionOf(request: Request): string | undefined
 
 [./server] EnqueueOptions
 interface EnqueueOptions
-  delay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  delay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   key?: string | undefined
 
 [./server] enterPreview
@@ -2540,7 +2540,7 @@ interface HookContext
   userId: string | undefined
 
 [./server] imageSize
-function imageSize(input: Blob | ArrayBuffer | Uint8Array<ArrayBufferLike>, options?: {
+function imageSize(input: ArrayBuffer | Blob | Uint8Array<ArrayBufferLike>, options?: {
   maxPixels?: number | undefined;
 }): Promise<{
   width: number;
@@ -2568,7 +2568,7 @@ interface JobState<Progress>
   error?: string
   id: string
   progress?: Progress
-  status: "failed" | "waiting" | "running"
+  status: "failed" | "running" | "waiting"
 
 [./server] JobStore
 interface JobStore extends StoreBase
@@ -2578,7 +2578,7 @@ interface JobStore extends StoreBase
   complete: (id: string, until?: number | undefined) => Maybe<void>
   fail: (id: string, error: string, payload?: string | undefined, until?: number | undefined) => Maybe<boolean | void>
   failed: (queue: string, limit?: number | undefined) => Maybe<StoredJob[]>
-  jobs?: ((queue: string, options?: { limit?: number; failed?: boolean; } | undefined) => Maybe<StoredJob[]>) | undefined
+  jobs?: ((queue: string, options?: undefined | { limit?: number; failed?: boolean; }) => Maybe<StoredJob[]>) | undefined
   live?: ((queue: string, now: number, limit?: number | undefined) => Maybe<StoredJobState[]>) | undefined
   lock: (name: string, slot: number) => Maybe<boolean>
   nextRunAt: (queue: string) => Maybe<number | undefined>
@@ -2588,15 +2588,15 @@ interface JobStore extends StoreBase
   release?: ((id: string, until: number, runAt?: number | undefined) => Maybe<void>) | undefined
   retry: (id: string, runAt: number, error: string, until?: number | undefined) => Maybe<boolean | void>
   revive?: ((id: string, runAt: number) => Maybe<boolean>) | undefined
-  state?: ((queue: string, ref: { key: string; } | { id: string; }, now: number) => Maybe<StoredJobState | undefined>) | undefined
+  state?: ((queue: string, ref: { id: string; } | { key: string; }, now: number) => Maybe<StoredJobState | undefined>) | undefined
   update?: ((id: string, change: {
   payload: string;
   runAt?: number | undefined;
 }, guard: {
-  until: number;
-} | {
   payload: string;
   now: number;
+} | {
+  until: number;
 }) => Maybe<boolean>) | undefined
 
 [./server] jobTables
@@ -2618,14 +2618,14 @@ interface KayConfig
   cors?: CorsOptions | undefined
   dirs?: DirsConfig | undefined
   entry?: string | undefined
-  env?: false | { compose?: string | string[] | undefined; example?: string | undefined; } | undefined
+  env?: false | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
-  favicon?: string | false | FaviconConfig | undefined
+  favicon?: FaviconConfig | false | string | undefined
   fileStore?: FileStore | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   head?: HeadTag[] | undefined
-  health?: false | HealthConfig | undefined
-  hydration?: { visible?: string | undefined; serverIslands?: string | undefined; } | undefined
+  health?: HealthConfig | false | undefined
+  hydration?: undefined | { visible?: string | undefined; serverIslands?: string | undefined; }
   i18n?: I18nConfig | undefined
   images?: ImagesConfig | undefined
   inlineStyles?: boolean | undefined
@@ -2634,7 +2634,7 @@ interface KayConfig
   lateStyles?: boolean | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
-  links?: { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; } | undefined
+  links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
   log?: Logger | undefined
@@ -2643,37 +2643,37 @@ interface KayConfig
   maxSize?: ByteSize | undefined
   maxSizeByPath?: Record<string, ByteSize> | undefined
   maxSizes?: Record<string, ByteSize> | undefined
-  mcp?: boolean | McpConfig | undefined
-  metrics?: boolean | MetricsConfig | undefined
+  mcp?: McpConfig | boolean | undefined
+  metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
   navigation?: boolean | undefined
   observe?: ObserveConfig | undefined
-  offline?: boolean | OfflineConfig | undefined
-  onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => void | Promise<void>) | undefined
-  openapi?: boolean | OpenApiConfig | undefined
+  offline?: OfflineConfig | boolean | undefined
+  onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => Promise<void> | void) | undefined
+  openapi?: OpenApiConfig | boolean | undefined
   plugins?: BunPlugin[] | undefined
   prefetch?: Prefetch | undefined
-  preview?: false | PreviewConfig | undefined
-  proxy?: number | boolean | ProxyConfig | undefined
-  publicCache?: Record<string, `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`> | undefined
+  preview?: PreviewConfig | false | undefined
+  proxy?: ProxyConfig | boolean | number | undefined
+  publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
   publicDir?: string | undefined
   redirects?: Redirects | undefined
   requestIdHeader?: string | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
-  robots?: false | RobotsConfig | undefined
+  robots?: RobotsConfig | false | undefined
   routes?: string | undefined
   routesDir?: string | undefined
-  runtimeRedirects?: { hosts?: string[] | undefined; } | undefined
+  runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
   saveData?: boolean | undefined
   search?: boolean | undefined
   secret?: string | string[] | undefined
-  security?: false | SecurityConfig | undefined
+  security?: SecurityConfig | false | undefined
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
   serverTiming?: boolean | undefined
   settings?: Record<string, string> | undefined
-  shutdownTimeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  shutdownTimeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   site?: string | undefined
   sitemap?: SitemapConfig | undefined
   storage?: FileStore | undefined
@@ -2685,26 +2685,26 @@ interface KayConfig
 
 [./server] KayExtension
 interface KayExtension<Server extends AnyElysia = AnyElysia>
-  api?: { dir: string; prefix?: string | undefined; former?: string | undefined; } | undefined
+  api?: undefined | { dir: string; prefix?: string | undefined; former?: string | undefined; }
   appFiles?: Record<string, string> | undefined
   asksConsent?: boolean | undefined
   check?: (() => ExtensionProblem[] | Promise<ExtensionProblem[]>) | undefined
   commands?: Record<string, string> | undefined
   config?: Omit<KayConfig, "extensions"> | undefined
   context?: string | undefined
-  devTool?: { module: string; } | undefined
+  devTool?: undefined | { module: string; }
   editor?: string | undefined
   env?: EnvSchema | undefined
-  layout?: string | { file: string; reaching: string[]; } | undefined
+  layout?: string | undefined | { file: string; reaching: string[]; }
   maxSize?: Record<string, ByteSize> | undefined
   messages?: string | undefined
   name: string
   needsServer?: boolean | undefined
   references?: string[] | undefined
-  routes?: { dir: string; prefix?: string | undefined; } | undefined
+  routes?: undefined | { dir: string; prefix?: string | undefined; }
   satisfies?: "missing-alt"[] | undefined
-  server?: Server | ((app: ExtensionApp) => Server | Promise<Server>) | undefined
-  serverModule?: { path: string; export?: string | undefined; prepare?: ((exported: unknown) => void | Promise<void>) | undefined; } | undefined
+  server?: ((app: ExtensionApp) => Promise<Server> | Server) | Server | undefined
+  serverModule?: undefined | { path: string; export?: string | undefined; prepare?: ((exported: unknown) => Promise<void> | void) | undefined; }
   staticFiles?: Record<string, string> | undefined
   transformPage?: PageHook | undefined
   transformServedPage?: PageHook | undefined
@@ -2715,13 +2715,13 @@ type LiveEntry = [id: string, key: string, text: string] | [id: string, key: str
 [./server] LiveStore
 interface LiveStore extends StoreBase
   close?: (() => unknown) | undefined
-  delete: (id: string, key: string) => void | Promise<void>
-  end?: (id: string, key: string, expiresAt: number) => void | Promise<void>
-  endAll?: (id: string, ttl: number) => void | Promise<void>
+  delete: (id: string, key: string) => Promise<void> | void
+  end?: (id: string, key: string, expiresAt: number) => Promise<void> | void
+  endAll?: (id: string, ttl: number) => Promise<void> | void
   entries: () => Entries | Promise<Entries>
   hold?: (held: boolean) => void
   ping?: (() => unknown) | undefined
-  set: (id: string, key: string, text: string, expiresAt?: number | undefined) => void | Promise<void>
+  set: (id: string, key: string, text: string, expiresAt?: number | undefined) => Promise<void> | void
   stop?: () => void
   subscribe: (listener: (id: string, key: string, text: string | undefined, expiresAt?: number | undefined) => void) => void
 
@@ -2789,25 +2789,25 @@ const notifications: {
 
 [./server] NotificationStore
 interface NotificationStore extends StoreBase
-  add: (user: string, note: StoredNotification, most: number) => void | Promise<void>
+  add: (user: string, note: StoredNotification, most: number) => Promise<void> | void
   close?: (() => unknown) | undefined
-  erase: (user: string) => number | Promise<number>
+  erase: (user: string) => Promise<number> | number
   list: (user: string, limit: number, now: number) => Notification[] | Promise<Notification[]>
-  markAllRead: (user: string, now: number) => number | Promise<number>
-  markRead: (user: string, id: string, now: number) => boolean | Promise<boolean>
+  markAllRead: (user: string, now: number) => Promise<number> | number
+  markRead: (user: string, id: string, now: number) => Promise<boolean> | boolean
   ping?: (() => unknown) | undefined
-  prune: (now: number) => number | Promise<number>
-  unread: (user: string, now: number) => number | Promise<number>
+  prune: (now: number) => Promise<number> | number
+  unread: (user: string, now: number) => Promise<number> | number
 
 [./server] notify
 function notify(user: string, { title, url, ttl, keep, push }: NotifyOptions): Promise<Notification>
 
 [./server] NotifyOptions
 interface NotifyOptions
-  keep?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  keep?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   push?: boolean | undefined
   title: string
-  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   url?: string | undefined
 
 [./server] PageHook
@@ -2860,14 +2860,14 @@ interface PagesOptions extends KayConfig
   dev?: boolean | undefined
   dirs?: DirsConfig | undefined
   entry?: string | undefined
-  env?: false | { compose?: string | string[] | undefined; example?: string | undefined; } | undefined
+  env?: false | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
-  favicon?: string | false | FaviconConfig | undefined
+  favicon?: FaviconConfig | false | string | undefined
   fileStore?: FileStore | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   head?: HeadTag[] | undefined
-  health?: false | HealthConfig | undefined
-  hydration?: { visible?: string | undefined; serverIslands?: string | undefined; } | undefined
+  health?: HealthConfig | false | undefined
+  hydration?: undefined | { visible?: string | undefined; serverIslands?: string | undefined; }
   i18n?: I18nConfig | undefined
   images?: ImagesConfig | undefined
   inlineStyles?: boolean | undefined
@@ -2876,7 +2876,7 @@ interface PagesOptions extends KayConfig
   lateStyles?: boolean | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
-  links?: { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; } | undefined
+  links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
   log?: Logger | undefined
@@ -2885,39 +2885,39 @@ interface PagesOptions extends KayConfig
   maxSize?: ByteSize | undefined
   maxSizeByPath?: Record<string, ByteSize> | undefined
   maxSizes?: Record<string, ByteSize> | undefined
-  mcp?: boolean | McpConfig | undefined
-  metrics?: boolean | MetricsConfig | undefined
+  mcp?: McpConfig | boolean | undefined
+  metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
   navigation?: boolean | undefined
   observe?: ObserveConfig | undefined
-  offline?: boolean | OfflineConfig | undefined
-  onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => void | Promise<void>) | undefined
-  openapi?: boolean | OpenApiConfig | undefined
+  offline?: OfflineConfig | boolean | undefined
+  onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => Promise<void> | void) | undefined
+  openapi?: OpenApiConfig | boolean | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
   prefetch?: Prefetch | undefined
-  preview?: false | PreviewConfig | undefined
-  proxy?: number | boolean | ProxyConfig | undefined
-  publicCache?: Record<string, `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`> | undefined
+  preview?: PreviewConfig | false | undefined
+  proxy?: ProxyConfig | boolean | number | undefined
+  publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
   publicDir?: string | undefined
   redirects?: Redirects | undefined
   requestIdHeader?: string | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
-  robots?: false | RobotsConfig | undefined
+  robots?: RobotsConfig | false | undefined
   root?: string | undefined
   routes?: string | undefined
   routesDir?: string | undefined
-  runtimeRedirects?: { hosts?: string[] | undefined; } | undefined
+  runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
   saveData?: boolean | undefined
   search?: boolean | undefined
   secret?: string | string[] | undefined
-  security?: false | SecurityConfig | undefined
+  security?: SecurityConfig | false | undefined
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
   serverTiming?: boolean | undefined
   settings?: Record<string, string> | undefined
-  shutdownTimeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  shutdownTimeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   site?: string | undefined
   sitemap?: SitemapConfig | undefined
   storage?: FileStore | undefined
@@ -2961,7 +2961,7 @@ interface PreviewScope
 
 [./server] previewUrl
 function previewUrl(path: string, options?: {
-  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`;
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
   edit?: boolean;
   entry?: PreviewScope;
 }): string
@@ -2974,12 +2974,12 @@ interface ProcessedImage
   width: number
 
 [./server] processImage
-function processImage(input: Blob | ArrayBuffer | Uint8Array<ArrayBufferLike>, options?: ProcessImageOptions): Promise<ProcessedImage>
+function processImage(input: ArrayBuffer | Blob | Uint8Array<ArrayBufferLike>, options?: ProcessImageOptions): Promise<ProcessedImage>
 
 [./server] ProcessImageOptions
 interface ProcessImageOptions
-  fit?: "inside" | "cover" | undefined
-  format?: "webp" | "jpeg" | "png" | undefined
+  fit?: "cover" | "inside" | undefined
+  format?: "jpeg" | "png" | "webp" | undefined
   height?: number | undefined
   maxPixels?: number | undefined
   quality?: number | undefined
@@ -3009,17 +3009,17 @@ interface PushResult
 [./server] PushSendOptions
 interface PushSendOptions
   topic?: string | undefined
-  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  urgency?: "very-low" | "low" | "normal" | "high" | undefined
+  ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  urgency?: "high" | "low" | "normal" | "very-low" | undefined
 
 [./server] PushStore
 interface PushStore extends StoreBase
-  add: (user: string, subscription: PushSubscriptionRecord, most: number) => void | Promise<void>
+  add: (user: string, subscription: PushSubscriptionRecord, most: number) => Promise<void> | void
   close?: (() => unknown) | undefined
-  erase: (user: string) => number | Promise<number>
-  list: (user: string) => PushSubscriptionRecord[] | Promise<PushSubscriptionRecord[]>
+  erase: (user: string) => Promise<number> | number
+  list: (user: string) => Promise<PushSubscriptionRecord[]> | PushSubscriptionRecord[]
   ping?: (() => unknown) | undefined
-  remove: (endpoint: string, user?: string | undefined) => boolean | Promise<boolean>
+  remove: (endpoint: string, user?: string | undefined) => Promise<boolean> | boolean
 
 [./server] PushSubscriptionRecord
 interface PushSubscriptionRecord
@@ -3054,14 +3054,14 @@ type Queue<Payload, Progress = unknown> = Elysia & {
 [./server] QueueOptions
 interface QueueOptions<Payload>
   attempts?: number | undefined
-  backoff?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  backoff?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   concurrency?: number | undefined
-  failedTtl?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  idlePoll?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  keepFailed?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  failedTtl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
+  idlePoll?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  keepFailed?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   lazy?: boolean | undefined
-  live?: boolean | ((payload: Payload, job: LiveJob) => unknown) | undefined
-  lostAfter?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  live?: ((payload: Payload, job: LiveJob) => unknown) | boolean | undefined
+  lostAfter?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   onError?: Hook<{ id: string; payload: Payload; attempts: number; error: unknown; }> | undefined
   onFailed?: ((event: { payload: Payload; error: unknown; }) => unknown) | undefined
   onRetry?: Hook<{ id: string; payload: Payload; attempts: number; error: unknown; wait: number; }> | undefined
@@ -3078,7 +3078,7 @@ function rateLimit(name: string, limit: RateLimit): RateLimiter
 
 [./server] RateLimiter
 interface RateLimiter
-  hit: (from: string | Request, server?: Server<unknown> | null | undefined, weight?: number | undefined) => Promise<number | undefined>
+  hit: (from: Request | string, server?: Server<unknown> | null | undefined, weight?: number | undefined) => Promise<number | undefined>
 
 [./server] RenderedPage
 interface RenderedPage
@@ -3114,7 +3114,7 @@ interface RequestEntry
 function requestId(request: Request): string
 
 [./server] retryLater
-function retryLater(wait: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, reason?: string): Error
+function retryLater(wait: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, reason?: string): Error
 
 [./server] RoomConnection
 interface RoomConnection
@@ -3146,7 +3146,7 @@ interface Rooms<Message, Member = undefined, State = undefined> extends RoomsBas
   leave: (ws: RoomConnection, room?: string | undefined) => void
   memberOf: (ws: RoomConnection, room: string) => Member | undefined
   members: (room: string) => Member[]
-  publish: (room: string, message: Message, options?: { except?: RoomConnection; to?: Member; } | undefined) => void
+  publish: (room: string, message: Message, options?: undefined | { except?: RoomConnection; to?: Member; }) => void
   response: TUnsafe<Message>
   roomsOf: (ws: RoomConnection) => string[]
   state: (room: string) => State
@@ -3206,7 +3206,7 @@ const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
   Cookie: <T extends TProperties>(properties: T, {
     domain, expires, httpOnly, maxAge, path, priority, sameSite, secure, secrets, sign, ...options
   }?: CookieValidatorOptions<T> | undefined) => TObject<T>;
-  UnionEnum: <const T extends NonEmptyArray<TEnumValue> | Readonly<NonEmptyArray<TEnumValue>>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
+  UnionEnum: <Readonly<NonEmptyArray<TEnumValue>> | const T extends NonEmptyArray<TEnumValue>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
   NoValidate: <T extends TAnySchema>(v: T, enabled?: boolean | undefined) => T;
   Form: <T extends TProperties>(v: T, options?: ObjectOptions | undefined) => TForm<T>;
   ArrayBuffer(options?: TArrayBuffer | undefined): TUnsafe<ArrayBuffer>;
@@ -3321,12 +3321,12 @@ function schedule<const Table extends Record<string, Jobs>>(table: Table & {
 interface ScheduleOptions
   boot?: boolean | undefined
   enabled?: boolean | undefined
-  lock?: string | false | undefined
+  lock?: false | string | undefined
   onError?: Hook<{ schedule: string; boot: boolean; duration: number; error: unknown; }> | undefined
   onStart?: Hook<{ schedule: string; boot: boolean; }> | undefined
   onSuccess?: Hook<{ schedule: string; boot: boolean; duration: number; }> | undefined
   store?: JobStore | undefined
-  timeout?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   tz?: string | undefined
 
 [./server] ScriptHashOptions
@@ -3382,7 +3382,7 @@ function session<Data extends object = SessionData>(options?: SessionOptions): E
 interface Session<Data extends object>
   destroy: () => Promise<void>
   get: <Key extends keyof Data>(key: Key) => Promise<Data[Key] | undefined>
-  maxAge: (maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | "browser") => Promise<void>
+  maxAge: (maxAge: "browser" | `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`) => Promise<void>
   regenerate: () => Promise<void>
   set: <Key extends keyof Data>(key: Key, value: Data[Key]) => Promise<void>
   settings: SessionSettings
@@ -3396,29 +3396,29 @@ type SessionMatch = ((data: SessionData) => boolean) | Readonly<Record<string, s
 
 [./server] SessionOptions
 interface SessionOptions
-  absoluteMaxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  browserMaxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  absoluteMaxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  browserMaxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   cookie?: string | undefined
   domain?: string | undefined
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   sameSite?: SameSite | undefined
   secret?: string | string[] | undefined
   store?: SessionStore | undefined
 
 [./server] SessionSettings
 interface SessionSettings
-  absoluteMaxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
-  browserMaxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
-  maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  absoluteMaxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+  browserMaxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+  maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [./server] SessionStore
 interface SessionStore extends StoreBase
   close?: (() => unknown) | undefined
-  delete: (id: string) => void | Promise<void>
-  deleteWhere?: ((match: (data: SessionData) => boolean) => number | Promise<number>) | undefined
-  get: (id: string) => SessionData | Promise<SessionData | undefined> | undefined
+  delete: (id: string) => Promise<void> | void
+  deleteWhere?: ((match: (data: SessionData) => boolean) => Promise<number> | number) | undefined
+  get: (id: string) => Promise<SessionData | undefined> | SessionData | undefined
   ping?: (() => unknown) | undefined
-  set: (id: string, data: SessionData, maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`) => void | Promise<void>
+  set: (id: string, data: SessionData, maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`) => Promise<void> | void
 
 [./server] shutdown
 function shutdown(app: AnyElysia, force?: boolean): Promise<void>
@@ -3428,7 +3428,7 @@ const signed: { sign(use: string, value: string, options?: SignOptions): string;
 
 [./server] SignOptions
 interface SignOptions
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] SNIFFED_BYTES
 const SNIFFED_BYTES: 4096
@@ -3463,7 +3463,7 @@ function sqlitePush(path: string): PushStore
 function sqliteRates(path: string): SyncRates
 
 [./server] sqliteRooms
-function sqliteRooms(path: string, { poll }?: { poll?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; }): RoomStore
+function sqliteRooms(path: string, { poll }?: { poll?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; }): RoomStore
 
 [./server] sqliteSessions
 function sqliteSessions(path: string): DeletableSessionStore
@@ -3473,7 +3473,7 @@ function sqliteStore(path: string): DeletableSessionStore
 
 [./server] StartOptions
 interface StartOptions
-  delay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  delay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   id?: string | undefined
 
 [./server] StoreBase
@@ -3509,7 +3509,7 @@ interface StoredJobState extends StoredJob
   progress?: string
   queue: string
   runAt: number
-  status: "failed" | "waiting" | "running"
+  status: "failed" | "running" | "waiting"
 
 [./server] StoredNotification
 interface StoredNotification
@@ -3526,11 +3526,11 @@ interface StoreRooms<Message, Member = undefined, State = undefined> extends Roo
   leave: (ws: RoomConnection, room?: string | undefined) => void
   memberOf: (ws: RoomConnection, room: string) => Member | undefined
   members: (room: string) => Member[]
-  publish: (room: string, message: Message, options?: { except?: RoomConnection; to?: Member; } | undefined) => void
+  publish: (room: string, message: Message, options?: undefined | { except?: RoomConnection; to?: Member; }) => void
   response: TUnsafe<Message>
   roomsOf: (ws: RoomConnection) => string[]
-  state: (room: string) => State | Promise<State>
-  update: (room: string, change: (state: State) => State) => State | Promise<State>
+  state: (room: string) => Promise<State> | State
+  update: (room: string, change: (state: State) => State) => Promise<State> | State
 
 [./server] toolCall
 function toolCall(request: Request): ToolCall | undefined
@@ -3546,10 +3546,10 @@ function typeOfName(name: string): string
 
 [./server] UrlOptions
 interface UrlOptions
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] verifyWork
-function verifyWork(solution: string | null | undefined, scope: string, options?: VerifyWorkOptions): Promise<ProofOfWorkRefusal | undefined>
+function verifyWork(solution: null | string | undefined, scope: string, options?: VerifyWorkOptions): Promise<ProofOfWorkRefusal | undefined>
 
 [./server] VerifyWorkOptions
 interface VerifyWorkOptions
@@ -3565,7 +3565,7 @@ function workChallenge(scope: string, options?: WorkChallengeOptions): string
 [./server] WorkChallengeOptions
 interface WorkChallengeOptions
   difficulty?: number | undefined
-  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./server] workflow
 function workflow<Input = undefined, Known extends Events = Events>(name: string, flow: (run: WorkflowRun<Input, Known>) => unknown, options?: WorkflowOptions<Input>): Workflow<Input, Known>
@@ -3577,12 +3577,12 @@ type Workflow<Input, Known extends Events> = Elysia & {
 [./server] WorkflowOptions
 interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'lostAfter' | 'idlePoll' | 'failedTtl' | 'keepFailed'>
   attempts?: number | undefined
-  backoff?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  backoff?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   concurrency?: number | undefined
-  failedTtl?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  idlePoll?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  keepFailed?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  lostAfter?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  failedTtl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
+  idlePoll?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  keepFailed?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
+  lostAfter?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   onError?: Hook<{ id: string; input: Input; attempts: number; error: unknown; }> | undefined
   onFailed?: ((event: { id: string; input: Input; error: unknown; }) => unknown) | undefined
   onRetry?: Hook<{ id: string; input: Input; attempts: number; error: unknown; wait: number; }> | undefined
@@ -3600,17 +3600,17 @@ interface WorkflowRun<Input, Known extends Events>
 interface WorkflowStatus
   error?: string
   event?: string
-  status: "failed" | "waiting" | "running" | "sleeping"
+  status: "failed" | "running" | "sleeping" | "waiting"
   steps: number
 
 [./server] WorkflowStep
 interface WorkflowStep<Known extends Events>
-  run: <Result>(name: string, work: (signal: AbortSignal) => Result | Promise<Result>) => Promise<Awaited<Result>>
-  sleep: (wait: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`) => Promise<void>
+  run: <Result>(name: string, work: (signal: AbortSignal) => Promise<Result> | Result) => Promise<Awaited<Result>>
+  sleep: (wait: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`) => Promise<void>
   waitFor: {
   <Event extends keyof Known & string>(event: Event): Promise<Known[Event]>;
   <Event extends keyof Known & string>(event: Event, options: {
-    timeout: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`;
+    timeout: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
   }): Promise<WaitResult<Known[Event]>>;
 }
 
@@ -3619,7 +3619,7 @@ interface A11yViolation
   help: string
   helpUrl: string
   id: string
-  impact: "moderate" | "minor" | "serious" | "critical" | null
+  impact: "critical" | "minor" | "moderate" | "serious" | null
   nodes: { target: string; html: string; }[]
   tags: string[]
 
@@ -3631,16 +3631,16 @@ function browse(url: string, options?: BrowserOptions): Promise<TestPage>
 
 [./test] BrowserOptions
 interface BrowserOptions
-  colorScheme?: "light" | "dark" | undefined
-  cookies?: string | { name: string; value: string; }[] | undefined
+  colorScheme?: "dark" | "light" | undefined
+  cookies?: string | undefined | { name: string; value: string; }[]
   height?: number | undefined
   javaScript?: boolean | undefined
   lenient?: boolean | undefined
   path?: string | undefined
-  reducedMotion?: "reduce" | "no-preference" | undefined
+  reducedMotion?: "no-preference" | "reduce" | undefined
   strict?: boolean | undefined
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  viewport?: "phone" | "tablet" | { width: number; height: number; deviceScaleFactor?: number | undefined; mobile?: boolean | undefined; } | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  viewport?: "phone" | "tablet" | undefined | { width: number; height: number; deviceScaleFactor?: number | undefined; mobile?: boolean | undefined; }
   width?: number | undefined
 
 [./test] browserPath
@@ -3648,9 +3648,9 @@ function browserPath(path?: string | undefined): string | undefined
 
 [./test] ClickOptions
 interface ClickOptions extends PointerOptions
-  at?: { x: number; y: number; } | undefined
+  at?: undefined | { x: number; y: number; }
   modifiers?: Modifier[] | undefined
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./test] ContentSeed
 type ContentSeed = Record<string, SeedEntry[]>
@@ -3663,18 +3663,18 @@ interface CookieJar
   cookies: CookieMap
   header: (path?: string | undefined) => string
   keep: (response: Response) => void
-  send: (handle: (request: Request) => Response | Promise<Response>, request: Request, path?: string | undefined) => Promise<Response>
+  send: (handle: (request: Request) => Promise<Response> | Response, request: Request, path?: string | undefined) => Promise<Response>
 
 [./test] DialogHandler
 type DialogHandler = (dialog: PageDialog) => boolean | string | Promise<boolean | string>
 
 [./test] DragOptions
 interface DragOptions extends WaitOptions
-  at?: { x: number; y: number; } | undefined
+  at?: undefined | { x: number; y: number; }
   hold?: number | undefined
   steps?: number | undefined
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
-  to?: { x: number; y: number; } | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  to?: undefined | { x: number; y: number; }
 
 [./test] EnvOverride
 type EnvOverride<Env extends object> = { [Name in keyof Env]?: Env[Name] | undefined }
@@ -3714,7 +3714,7 @@ interface Found
 
 [./test] FulfillOptions
 interface FulfillOptions
-  body?: string | Uint8Array<ArrayBufferLike> | undefined
+  body?: Uint8Array<ArrayBufferLike> | string | undefined
   headers?: Record<string, string> | undefined
   json?: unknown
   status?: number | undefined
@@ -3757,7 +3757,7 @@ function overrideEnv<Env extends object>(env: Env, values: EnvOverride<Env>): En
 interface PageDialog
   defaultPrompt: string
   message: string
-  type: "alert" | "confirm" | "prompt" | "beforeunload"
+  type: "alert" | "beforeunload" | "confirm" | "prompt"
 
 [./test] PageReading
 interface PageReading
@@ -3773,7 +3773,7 @@ interface PageReading
 interface PageRequest
   abort: (reason?: string | undefined) => Promise<void>
   body: string | undefined
-  continue: (options?: { headers?: Record<string, string> | undefined; } | undefined) => Promise<void>
+  continue: (options?: undefined | { headers?: Record<string, string> | undefined; }) => Promise<void>
   fetch: () => Promise<FetchedResponse>
   fulfill: (options?: FulfillOptions | undefined) => Promise<void>
   headers: Record<string, string>
@@ -3796,8 +3796,8 @@ function persistedCookie(name: string, value: unknown): string
 
 [./test] PointerOptions
 interface PointerOptions extends WaitOptions
-  at?: { x: number; y: number; } | undefined
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  at?: undefined | { x: number; y: number; }
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./test] readPersisted
 function readPersisted(key: string): unknown
@@ -3856,7 +3856,7 @@ interface TestOptions extends PagesOptions
   apiDir?: string | undefined
   apiPath?: string | undefined
   base?: string | undefined
-  browser?: boolean | BrowserOptions | undefined
+  browser?: BrowserOptions | boolean | undefined
   budget?: BudgetConfig | undefined
   checks?: ProjectCheck[] | undefined
   client?: ClientConfig | undefined
@@ -3868,15 +3868,15 @@ interface TestOptions extends PagesOptions
   dev?: boolean | undefined
   dirs?: DirsConfig | undefined
   entry?: string | undefined
-  env?: false | { compose?: string | string[] | undefined; example?: string | undefined; } | undefined
+  env?: false | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
-  favicon?: string | false | FaviconConfig | undefined
+  favicon?: FaviconConfig | false | string | undefined
   fileStore?: FileStore | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   head?: HeadTag[] | undefined
   headers?: Record<string, string> | undefined
-  health?: false | HealthConfig | undefined
-  hydration?: { visible?: string | undefined; serverIslands?: string | undefined; } | undefined
+  health?: HealthConfig | false | undefined
+  hydration?: undefined | { visible?: string | undefined; serverIslands?: string | undefined; }
   i18n?: I18nConfig | undefined
   images?: ImagesConfig | undefined
   inlineStyles?: boolean | undefined
@@ -3886,51 +3886,51 @@ interface TestOptions extends PagesOptions
   lateStyles?: boolean | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
-  links?: { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; } | undefined
+  links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
-  locals?: ((request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined
+  locals?: ((request: Request) => Promise<Record<string, unknown>> | Record<string, unknown>) | undefined
   log?: Logger | undefined
   manifest?: ManifestConfig | undefined
   markdown?: MarkdownConfig | undefined
   maxSize?: ByteSize | undefined
   maxSizeByPath?: Record<string, ByteSize> | undefined
   maxSizes?: Record<string, ByteSize> | undefined
-  mcp?: boolean | McpConfig | undefined
+  mcp?: McpConfig | boolean | undefined
   mcpKey?: string | undefined
-  metrics?: boolean | MetricsConfig | undefined
+  metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
   navigation?: boolean | undefined
   observe?: ObserveConfig | undefined
-  offline?: boolean | OfflineConfig | undefined
-  onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => void | Promise<void>) | undefined
-  openapi?: boolean | OpenApiConfig | undefined
+  offline?: OfflineConfig | boolean | undefined
+  onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => Promise<void> | void) | undefined
+  openapi?: OpenApiConfig | boolean | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
   prefetch?: Prefetch | undefined
-  preview?: false | PreviewConfig | undefined
-  proxy?: number | boolean | ProxyConfig | undefined
+  preview?: PreviewConfig | false | undefined
+  proxy?: ProxyConfig | boolean | number | undefined
   proxyKey?: string | undefined
-  publicCache?: Record<string, `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`> | undefined
+  publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
   publicDir?: string | undefined
   redirects?: Redirects | undefined
   requestIdHeader?: string | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
-  robots?: false | RobotsConfig | undefined
+  robots?: RobotsConfig | false | undefined
   root?: string | undefined
   routes?: string | undefined
   routesDir?: string | undefined
-  runtimeRedirects?: { hosts?: string[] | undefined; } | undefined
+  runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
   saveData?: boolean | undefined
   search?: boolean | undefined
   secret?: string | string[] | undefined
-  security?: false | SecurityConfig | undefined
+  security?: SecurityConfig | false | undefined
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
   serverTiming?: boolean | undefined
   settings?: Record<string, string> | undefined
-  shutdownTimeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  shutdownTimeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   site?: string | undefined
   sitemap?: SitemapConfig | undefined
   storage?: FileStore | undefined
@@ -3945,7 +3945,7 @@ interface TestOptions extends PagesOptions
 [./test] TestPage
 interface TestPage
   a11y: (selector?: string | undefined) => Promise<A11yViolation[]>
-  advance: (duration: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`) => Promise<void>
+  advance: (duration: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`) => Promise<void>
   back: () => Promise<void>
   cdp: <T = unknown>(method: string, params?: Record<string, unknown> | undefined) => Promise<T>
   click: (selector: string, options?: ClickOptions | undefined) => Promise<void>
@@ -3953,7 +3953,7 @@ interface TestPage
   count: (selector: string) => Promise<number>
   drag: (from: string, to: string, options?: DragOptions | undefined) => Promise<void>
   errors: string[]
-  evaluate: <Args extends unknown[], Result>(run: (...args: Args) => Result | Promise<Result>, ...args: Args) => Promise<Result>
+  evaluate: <Args extends unknown[], Result>(run: (...args: Args) => Promise<Result> | Result, ...args: Args) => Promise<Result>
   fill: (selector: string, text: string) => Promise<void>
   forward: () => Promise<void>
   goto: (path: string) => Promise<void>
@@ -3963,21 +3963,21 @@ interface TestPage
   onDialog: (handler: DialogHandler) => Promise<void>
   online: () => Promise<void>
   path: () => Promise<string>
-  press: (key: VirtualKey | (string & {}), options?: PressOptions | undefined) => Promise<void>
+  press: (key: (string & {}) | VirtualKey, options?: PressOptions | undefined) => Promise<void>
   reload: () => Promise<void>
   responses: PageResponse[]
   route: (match: RouteMatch, handler: RouteHandler) => Promise<void>
-  text: (selector: string) => Promise<string | null>
+  text: (selector: string) => Promise<null | string>
   type: (text: string) => Promise<void>
   unroute: (match?: RouteMatch | undefined) => Promise<void>
   upload: (selector: string, files: string | string[]) => Promise<void>
-  value: (selector: string) => Promise<string | null>
+  value: (selector: string) => Promise<null | string>
   view: WebView
   waitFor: (selector: string, options?: WaitForOptions | undefined) => Promise<void>
-  waitForResponse: (match: RouteMatch, options?: {
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
+  waitForResponse: (match: RouteMatch, options?: undefined | {
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
   complete?: boolean | undefined;
-} | undefined) => Promise<PageResponse>
+}) => Promise<PageResponse>
   waitUntil: <Args extends unknown[]>(condition: (...args: Args) => unknown, options?: WaitUntilOptions | undefined, ...args: Args) => Promise<void>
   warnings: string[]
 
@@ -4005,7 +4005,7 @@ interface TestSite
 } : {
   query?: Record<string, unknown>;
 }) & CallBody<MethodRoute<Module, Path, Chosen<M>>> & VisitInit>) => Promise<ApiResult<ApiAnswer<Module, Path, M>>>
-  as: (who: string | Record<string, string>) => TestSite
+  as: (who: Record<string, string> | string) => TestSite
   call: <Target extends Action<never, unknown>>(action: Target, ...call: CallArguments<Target>) => Promise<Tested<ResultOf<Target>>>
   close: () => Promise<void>
   content: TestContent
@@ -4081,8 +4081,8 @@ interface TestSite
   query?: Record<string, unknown>;
 }) & Body<MethodRoute<Module, Path, Chosen<M>>> & VisitInit>) => TestStream<StreamOf<Module, Path, M>>
   submit: {
-  <Honeypot extends string = never>(action: NoInputAction<unknown, Honeypot>, fields?: Partial<Record<Honeypot | "kay_since", FormValue | FormValue[] | undefined>> | undefined, init?: SubmitInit | undefined): Promise<Visit>;
-  <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Honeypot | "kay_since" | Extract<keyof Input, string>, FormValue | FormValue[] | undefined>>, init?: SubmitInit | undefined): Promise<Visit>;
+  <Honeypot extends string = never>(action: NoInputAction<unknown, Honeypot>, fields?: Partial<Record<"kay_since" | Honeypot, FormValue | FormValue[] | undefined>> | undefined, init?: SubmitInit | undefined): Promise<Visit>;
+  <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<"kay_since" | Extract<keyof Input, string> | Honeypot, FormValue | FormValue[] | undefined>>, init?: SubmitInit | undefined): Promise<Visit>;
 }
   visit: (path: string, init?: VisitInit | undefined) => Promise<Visit>
 
@@ -4121,18 +4121,18 @@ interface VisitInit
 interface WaitForOptions extends WaitOptions
   gone?: boolean | undefined
   text?: string | undefined
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./test] WaitOptions
 interface WaitOptions
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [./test] waitUntil
-function waitUntil<T>(condition: () => T | Promise<T>, options?: WaitUntilOptions): Promise<Exclude<Awaited<T>, false | "" | 0 | null | undefined>>
+function waitUntil<T>(condition: () => Promise<T> | T, options?: WaitUntilOptions): Promise<Exclude<Awaited<T>, "" | 0 | false | null | undefined>>
 
 [./test] WaitUntilOptions
 interface WaitUntilOptions
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   what?: string | undefined
 
 [./test] writePersisted

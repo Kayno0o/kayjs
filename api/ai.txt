@@ -21,16 +21,16 @@ type AiLimit = 'asks' | 'budget' | 'total'
 
 [.] AiOptions
 interface AiOptions extends AskHooks
-  budget?: false | BudgetOptions | undefined
+  budget?: BudgetOptions | false | undefined
   conversations?: ConversationStore | undefined
-  imageAlt?: boolean | { reviewed?: string[] | undefined; } | undefined
-  key?: ((request: Request) => string | Promise<string | undefined> | undefined) | undefined
+  imageAlt?: boolean | undefined | { reviewed?: string[] | undefined; }
+  key?: ((request: Request) => Promise<string | undefined> | string | undefined) | undefined
   onError?: ((error: unknown) => unknown) | undefined
   onFinish?: ((done: FinishHookCall) => unknown) | undefined
-  onRequest?: ((call: RequestHookCall) => void | RequestHookChange | Promise<void | RequestHookChange | undefined> | undefined) | undefined
+  onRequest?: ((call: RequestHookCall) => Promise<RequestHookChange | undefined | void> | RequestHookChange | undefined | void) | undefined
   onStep?: ((step: Step) => unknown) | undefined
   onToolCall?: ((call: ToolCall) => unknown) | undefined
-  rateLimit?: false | LimitOptions | undefined
+  rateLimit?: LimitOptions | false | undefined
 
 [.] anthropic
 function anthropic(options: AnthropicOptions): Provider
@@ -63,15 +63,15 @@ interface Asked
 interface AskHooks
   onError?: ((error: unknown) => unknown) | undefined
   onFinish?: ((done: FinishHookCall) => unknown) | undefined
-  onRequest?: ((call: RequestHookCall) => void | RequestHookChange | Promise<void | RequestHookChange | undefined> | undefined) | undefined
+  onRequest?: ((call: RequestHookCall) => Promise<RequestHookChange | undefined | void> | RequestHookChange | undefined | void) | undefined
   onStep?: ((step: Step) => unknown) | undefined
   onToolCall?: ((call: ToolCall) => unknown) | undefined
 
 [.] AskOptions
 interface AskOptions extends AskHooks
   body?: Record<string, unknown> | undefined
-  cache?: boolean | "1h" | undefined
-  confirm?: false | Confirm | undefined
+  cache?: "1h" | boolean | undefined
+  confirm?: Confirm | false | undefined
   key?: string | undefined
   maxAttachmentBytes?: number | undefined
   maxInputChars?: number | undefined
@@ -80,7 +80,7 @@ interface AskOptions extends AskHooks
   model?: string | undefined
   onError?: ((error: unknown) => unknown) | undefined
   onFinish?: ((done: FinishHookCall) => unknown) | undefined
-  onRequest?: ((call: RequestHookCall) => void | RequestHookChange | Promise<void | RequestHookChange | undefined> | undefined) | undefined
+  onRequest?: ((call: RequestHookCall) => Promise<RequestHookChange | undefined | void> | RequestHookChange | undefined | void) | undefined
   onStep?: ((step: Step) => unknown) | undefined
   onToolCall?: ((call: ToolCall) => unknown) | undefined
   outlive?: boolean | undefined
@@ -90,11 +90,11 @@ interface AskOptions extends AskHooks
   sources?: readonly Source[] | undefined
   system?: string | undefined
   temperature?: number | undefined
-  timeout?: {
-  connect?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
-  idle?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
-} | undefined
-  tools?: readonly (ToolAction | FunctionTool)[] | undefined
+  timeout?: undefined | {
+  connect?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+  idle?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+}
+  tools?: readonly (FunctionTool | ToolAction)[] | undefined
 
 [.] Attachment
 type Attachment = Blob | Uint8Array | ArrayBuffer | StoredFile
@@ -107,12 +107,12 @@ interface BudgetOptions
   store?: RateStore | undefined
   tokens: number
   total?: number | undefined
-  window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] Calls
 interface Calls
-  cache?: { read?: number | undefined; written?: number | undefined; } | undefined
-  calls?: { name: string; input?: unknown; id?: string | undefined; }[] | undefined
+  cache?: undefined | { read?: number | undefined; written?: number | undefined; }
+  calls?: undefined | { name: string; input?: unknown; id?: string | undefined; }[]
   data?: unknown
   finish?: Finish | undefined
   reasoning?: string | string[] | undefined
@@ -127,7 +127,7 @@ interface ChatFailure
 interface ChatMessage
   attachments?: File[]
   content: string
-  role: "user" | "assistant"
+  role: "assistant" | "user"
 
 [.] chatMessages
 function chatMessages(options?: WithoutFiles | undefined): TArray<TObject<{ role: TUnionEnum<["user", "assistant"]>; content: TString; }>>
@@ -135,7 +135,7 @@ function chatMessages(options: ChatMessagesOptions): TArray<TObject<{ attachment
 
 [.] ChatMessagesOptions
 interface ChatMessagesOptions
-  attachments?: boolean | { type?: string | string[] | undefined; maxFiles?: number | undefined; } | undefined
+  attachments?: boolean | undefined | { type?: string | string[] | undefined; maxFiles?: number | undefined; }
   maxItems?: number | undefined
   maxLength?: number | undefined
 
@@ -147,7 +147,7 @@ interface ChatTurnView extends ChatTurn
   calls: readonly ToolCall[]
   content: string
   pending: boolean
-  role: "user" | "assistant"
+  role: "assistant" | "user"
   sources?: readonly Source[] | undefined
   stopped: boolean
 
@@ -219,7 +219,7 @@ interface EmbedOptions extends CallOptions
   model?: string | undefined
   provider?: Provider | undefined
   signal?: AbortSignal | undefined
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [.] EmbedRequest
 interface EmbedRequest
@@ -308,7 +308,7 @@ function lastChatMessage<Messages extends readonly ChatMessage[]>(messages: Mess
 interface LimitOptions
   max: number
   store?: RateStore | undefined
-  window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] Media
 interface Media
@@ -321,7 +321,7 @@ interface Media
 interface Message
   attachments?: readonly Attachment[] | undefined
   content: string
-  role: "user" | "assistant"
+  role: "assistant" | "user"
   sources?: readonly Source[] | undefined
 
 [.] mocked
@@ -393,14 +393,14 @@ interface ProviderMessage extends Omit<Message, 'attachments'>
   calls?: ToolUse[] | undefined
   content: string
   results?: ToolOutcome[] | undefined
-  role: "user" | "assistant"
+  role: "assistant" | "user"
   sources?: readonly Source[] | undefined
   thinking?: Thinking[] | undefined
 
 [.] ProviderRequest
 interface ProviderRequest
   body?: Record<string, unknown> | undefined
-  cache?: boolean | "1h" | undefined
+  cache?: "1h" | boolean | undefined
   maxTokens: number
   messages: ProviderMessage[]
   model: string
@@ -419,7 +419,7 @@ function replaces(request?: Request | undefined): Replaces | undefined
 
 [.] Replaces
 interface Replaces
-  kind: "regenerate" | "edit"
+  kind: "edit" | "regenerate"
   turns: number
 
 [.] Reply
@@ -471,7 +471,7 @@ interface SpeakOptions extends CallOptions
   provider?: Provider | undefined
   signal?: AbortSignal | undefined
   speed?: number | undefined
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   voice?: string | undefined
 
 [.] SpeakRequest
@@ -518,7 +518,7 @@ function storedFile(key: string): StoredFile
 interface StoredTurn
   content: string
   reply?: string | undefined
-  role: "user" | "assistant"
+  role: "assistant" | "user"
   sources?: Source[] | undefined
   steps?: StoredCall[][] | undefined
   stopped?: boolean | undefined
@@ -526,8 +526,8 @@ interface StoredTurn
 [.] StructuredAskOptions
 interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOptions
   body?: Record<string, unknown> | undefined
-  cache?: boolean | "1h" | undefined
-  confirm?: false | Confirm | undefined
+  cache?: "1h" | boolean | undefined
+  confirm?: Confirm | false | undefined
   key?: string | undefined
   maxAttachmentBytes?: number | undefined
   maxInputChars?: number | undefined
@@ -536,7 +536,7 @@ interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOpti
   model?: string | undefined
   onError?: ((error: unknown) => unknown) | undefined
   onFinish?: ((done: FinishHookCall) => unknown) | undefined
-  onRequest?: ((call: RequestHookCall) => void | RequestHookChange | Promise<void | RequestHookChange | undefined> | undefined) | undefined
+  onRequest?: ((call: RequestHookCall) => Promise<RequestHookChange | undefined | void> | RequestHookChange | undefined | void) | undefined
   onStep?: ((step: Step) => unknown) | undefined
   onToolCall?: ((call: ToolCall) => unknown) | undefined
   outlive?: boolean | undefined
@@ -547,11 +547,11 @@ interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOpti
   sources?: readonly Source[] | undefined
   system?: string | undefined
   temperature?: number | undefined
-  timeout?: {
-  connect?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
-  idle?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
-} | undefined
-  tools?: readonly (ToolAction | FunctionTool)[] | undefined
+  timeout?: undefined | {
+  connect?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+  idle?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined;
+}
+  tools?: readonly (FunctionTool | ToolAction)[] | undefined
 
 [.] StructuredReply
 interface StructuredReply<Value, Snapshot = DeepPartial<Value>> extends PromiseLike<Value>, AsyncIterable<Snapshot>
@@ -566,8 +566,8 @@ interface StructuredReply<Value, Snapshot = DeepPartial<Value>> extends PromiseL
 
 [.] Timeouts
 interface Timeouts
-  connect: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
-  idle: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  connect: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+  idle: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] tool
 function tool<const Schema extends TSchema>(options: FunctionToolOptions<Schema>): FunctionTool
@@ -584,7 +584,7 @@ interface ToolCall
   ms?: number | undefined
   name: string
   result?: string | undefined
-  status: "running" | "done" | "failed"
+  status: "done" | "failed" | "running"
 
 [.] ToolOutcome
 interface ToolOutcome
@@ -619,7 +619,7 @@ interface TranscribeOptions extends CallOptions
   model?: string | undefined
   provider?: Provider | undefined
   signal?: AbortSignal | undefined
-  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [.] TranscribeRequest
 interface TranscribeRequest
@@ -647,7 +647,7 @@ component default
   argumentsLabel: string
   block?: ((call: ToolCall) => Element) | undefined
   calls: ToolCall[]
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   list?: string | undefined;
   call?: string | undefined;
@@ -656,7 +656,7 @@ component default
   status?: string | undefined;
   title?: string | undefined;
   code?: string | undefined;
-} | undefined
+}
   details: boolean
   doneLabel: string
   failedLabel: string
@@ -668,7 +668,7 @@ component default
 [./chat-launcher.kay] default
 component default
   accept?: string | undefined
-  action: Action<{ messages: ChatMessage[]; }, AsyncIterable<string | Progress> | Failure<unknown>, never>
+  action: Action<{ messages: ChatMessage[]; }, AsyncIterable<Progress | string> | Failure<unknown>, never>
   actions?: ((turn: ChatTurnView) => Element) | undefined
   allowLabel?: string | undefined
   allowedLabel?: string | undefined
@@ -710,7 +710,7 @@ component default
   fill?: boolean | undefined
   footer?: Element
   greeting?: string | undefined
-  hash?: string | false | undefined
+  hash?: false | string | undefined
   history?: number | undefined
   icon?: Element
   images?: string | string[] | undefined
@@ -754,19 +754,19 @@ component default
   sendIcon?: Element
   sendLabel?: string | undefined
   signedOutLabel?: string | undefined
-  size?: "sm" | "md" | "lg" | undefined
+  size?: "lg" | "md" | "sm" | undefined
   source?: ((source: Source, n: number) => Element) | undefined
   sourcesLabel?: string | undefined
   stopIcon?: Element
   stopLabel?: string | undefined
   stoppedLabel?: string | undefined
-  suggestions?: string[] | (() => string[] | Promise<string[]>) | undefined
+  suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined
   tableLabel?: string | undefined
   thinkingLabel?: string | undefined
   tone?: "accent" | "neutral" | undefined
   toolDetails?: boolean | undefined
   toolLabels?: Record<string, string> | undefined
-  transcribe?: Action<{ audio: File; }, string | Failure<unknown> | { text: string; }, never> | undefined
+  transcribe?: Action<{ audio: File; }, Failure<unknown> | string | { text: string; }, never> | undefined
   transcribeFailedLabel?: string | undefined
   transcribingLabel?: string | undefined
   turn?: ((turn: ChatTurnView, index: number) => Element) | undefined
@@ -777,7 +777,7 @@ component default
 [./chat-panel.kay] default
 component default
   children?: Element
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   panel?: string | undefined;
   head?: string | undefined;
@@ -788,14 +788,14 @@ component default
   body?: string | undefined;
   button?: string | undefined;
   glyph?: string | undefined;
-} | undefined
+}
   closeIcon: Element
   closeLabel?: string | undefined
   collapseIcon: Element
   collapseLabel?: string | undefined
   expandIcon: Element
   expandLabel?: string | undefined
-  hash?: string | false | undefined
+  hash?: false | string | undefined
   icon: Element
   label?: string | undefined
   newIcon: Element
@@ -807,7 +807,7 @@ component default
 [./chat-sources.kay] default
 component default
   block?: ((source: Source, n: number) => Element) | undefined
-  class?: string | { root?: string | undefined; label?: string | undefined; list?: string | undefined; item?: string | undefined; link?: string | undefined; } | undefined
+  class?: string | undefined | { root?: string | undefined; label?: string | undefined; list?: string | undefined; item?: string | undefined; link?: string | undefined; }
   here: boolean
   label: string
   sources: Source[]
@@ -815,7 +815,7 @@ component default
 [./chat.kay] default
 component default
   accept?: string | undefined
-  action: Action<{ messages: ChatMessage[]; }, AsyncIterable<string | Progress> | Failure<unknown>, never>
+  action: Action<{ messages: ChatMessage[]; }, AsyncIterable<Progress | string> | Failure<unknown>, never>
   actions?: ((turn: ChatTurnView) => Element) | undefined
   allowLabel?: string | undefined
   allowedLabel?: string | undefined
@@ -830,7 +830,7 @@ component default
   call?: ((call: ToolCall) => Element) | undefined
   cancelLabel?: string | undefined
   changeFailedLabel?: string | undefined
-  class?: string | {
+  class?: string | undefined | {
   root?: string | undefined;
   conversations?: string | undefined;
   newConversation?: string | undefined;
@@ -876,7 +876,7 @@ component default
   record?: any;
   recordSpinner?: any;
   send?: any;
-} | undefined
+}
   conflictLabel?: string | undefined
   conversationIn?: "address" | "browser" | undefined
   conversations?: boolean | undefined
@@ -938,19 +938,19 @@ component default
   sendIcon?: Element
   sendLabel?: string | undefined
   signedOutLabel?: string | undefined
-  size?: "sm" | "md" | "lg" | undefined
+  size?: "lg" | "md" | "sm" | undefined
   source?: ((source: Source, n: number) => Element) | undefined
   sourcesLabel?: string | undefined
   stopIcon?: Element
   stopLabel?: string | undefined
   stoppedLabel?: string | undefined
-  suggestions?: string[] | (() => string[] | Promise<string[]>) | undefined
+  suggestions?: (() => Promise<string[]> | string[]) | string[] | undefined
   tableLabel?: string | undefined
   thinkingLabel?: string | undefined
   tone?: "accent" | "neutral" | undefined
   toolDetails?: boolean | undefined
   toolLabels?: Record<string, string> | undefined
-  transcribe?: Action<{ audio: File; }, string | Failure<unknown> | { text: string; }, never> | undefined
+  transcribe?: Action<{ audio: File; }, Failure<unknown> | string | { text: string; }, never> | undefined
   transcribeFailedLabel?: string | undefined
   transcribingLabel?: string | undefined
   turn?: ((turn: ChatTurnView, index: number) => Element) | undefined
