@@ -280,10 +280,10 @@ describe('server islands', () => {
   })
 
   it('renders the `@failed` block of a deferred use or component hidden beside the inert copy, and nothing for an island without one', async () => {
-    const build = await scratchBuild({ routes })
+    const build = await scratchBuild({ routesDir: routes })
 
     try {
-      await build.prerender({ routes })
+      await build.prerender({ routesDir: routes })
 
       const failed = await Bun.file(join(build.pages, 'failed.html')).text()
       const islands = [...failed.matchAll(/<!--kay-server:(\d)-->([\s\S]*?)<!--\/kay-server:\1-->/g)].map(match => match[2]!)
@@ -296,7 +296,7 @@ describe('server islands', () => {
       // An interactive component carries its own block through the island wrapper too.
       expect(islands[3]).toContain('<slot data-kay-failure role="alert" hidden><p class="live-failure">Live failure</p>')
 
-      const app = await build.serve({ routes, security: false })
+      const app = await build.serve({ routesDir: routes, security: false })
       const fetched = await (await app.handle(new Request('http://localhost/failed?kay_island=0', { headers: { [ISLAND_HEADER]: '1' } }))).text()
 
       expect(fetched).toBe('<p class="own-count">1</p>')
