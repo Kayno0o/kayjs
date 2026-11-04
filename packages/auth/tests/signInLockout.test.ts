@@ -154,12 +154,12 @@ describe('guessing at an account', () => {
 
       // The ceiling's window ends.
       for (const key of ['sign-in-failures', 'sign-in-ceiling'])
-        await app.store.rates!.reset(`${key}:id:${app.user.id}`)
+        await app.store.rates!.reset!(`kayjs-auth\n${key}:id:${app.user.id}`)
     }
 
     expect(app.notices()).toHaveLength(1)
 
-    await app.store.rates!.reset(`sign-in-locked-mail:${app.user.id}`)
+    await app.store.rates!.reset!(`kayjs-auth\nsign-in-locked-mail:${app.user.id}`)
 
     for (let i = 1; i <= 4; i++)
       await attempt(app, `10.0.6.${i}`, WRONG)

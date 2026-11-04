@@ -110,7 +110,7 @@ describe('pruning what expired', () => {
     expect(await store.tokens.consume('gone', 'verify-email')).toBeUndefined()
     expect(await store.tokens.consume('kept', 'verify-email')).toBeDefined()
     expect((await store.sessions.listByUser('u1')).map(found => found.id)).toEqual(['fresh'])
-    expect(await store.rates!.peek('closed')).toBeUndefined()
+    expect(await store.rates!.peek!('closed')).toBeUndefined()
   })
 })
 
@@ -341,7 +341,7 @@ describe('attempt keys', () => {
 
     const keys = log.calls.filter(call => call.name === 'rates.hit').map(call => call.args[0] as string)
 
-    expect(keys.some(key => key.startsWith('forgot:'))).toBe(true)
+    expect(keys.some(key => key.startsWith('kayjs-auth\nforgot:'))).toBe(true)
     expect(keys.filter(key => key.includes('ada') || key.includes('@'))).toEqual([])
     // forgotAccount allows 3 an hour: the fourth, spelled either way, is limited.
     expect(answers.map(answer => answer.error)).toEqual([undefined, undefined, undefined, 'limited'])
@@ -355,7 +355,7 @@ describe('attempt keys', () => {
 
     const keys = log.calls.filter(call => call.name === 'rates.hit').map(call => call.args[0] as string)
 
-    expect(keys.some(key => key.startsWith('sign-in-account:'))).toBe(true)
+    expect(keys.some(key => key.startsWith('kayjs-auth\nsign-in-account:'))).toBe(true)
     expect(keys.filter(key => key.includes('nobody'))).toEqual([])
   })
 

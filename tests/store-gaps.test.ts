@@ -236,10 +236,13 @@ describe('a rates store that fails, given to a limit or the app\'s', () => {
     }
   })
 
-  it('still refuses a limit on the posts that went through when the store has no peek', async () => {
+  it('limits the posts that went through on a store with no peek, which kay derives', async () => {
     const action = { url: '/_kay/action/gaps-peekless', protection: { rateLimit: { max: 1, window: '1m', count: 'succeeded', store: { hit: memoryRates().hit } } } } as never
+    const request = () => new Request('http://localhost/', { method: 'POST' })
 
-    await expect(protectionRefusal(action, new Request('http://localhost/', { method: 'POST' }), refusalOptions)).rejects.toThrow('peek')
+    expect(await protectionRefusal(action, request(), refusalOptions)).toBeUndefined()
+    await countSucceeded(action, request(), null)
+    expect(await protectionRefusal(action, request(), refusalOptions)).toMatchObject({ status: 429 })
   })
 
   it('refuses a replayed proof of work from memory', async () => {

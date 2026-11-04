@@ -164,13 +164,16 @@ describe('the MCP endpoint', () => {
 })
 
 describe('an app store without peek', () => {
-  it('refuses a limit counting the posts that went through', async () => {
-    const { protectionRefusal } = await import('../src/server/protection')
+  it('limits the posts that went through, kay deriving the peek', async () => {
+    const { countSucceeded, protectionRefusal } = await import('../src/server/protection')
     const rates = { hit: memoryRates().hit }
-    const action = { url: '/_kay/a', protection: { rateLimit: { max: 1, window: '1m', count: 'succeeded' } } }
+    const action = { url: '/_kay/a', protection: { rateLimit: { max: 1, window: '1m', count: 'succeeded' } } } as never
+    const request = () => new Request('http://localhost/_kay/a', { method: 'POST' })
 
     setupStore({ rates })
-    await expect(protectionRefusal(action as never, new Request('http://localhost/_kay/a', { method: 'POST' }), { body: {}, form: false, server: null })).rejects.toThrow('peek')
+    expect(await protectionRefusal(action, request(), { body: {}, form: false, server: null })).toBeUndefined()
+    await countSucceeded(action, request(), null)
+    expect(await protectionRefusal(action, request(), { body: {}, form: false, server: null })).toMatchObject({ status: 429 })
   })
 })
 

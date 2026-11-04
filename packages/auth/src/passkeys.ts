@@ -11,7 +11,7 @@ import { banned, homeOf } from './core'
 import { readDevice } from './device'
 import { report } from './events'
 import { secondFactorLimited } from './guesses'
-import { spend } from './limits'
+import { spend, windowOf } from './limits'
 import { notify } from './notify'
 import { reprove } from './proof'
 import { endOtherSessions } from './sessions'
@@ -269,7 +269,7 @@ export async function verifyTwoFactorPasskey(state: RequestState, response: Auth
     return { ok: false, error: 'invalid' }
   }
 
-  await state.core.rates.reset(`two-factor:${record.id}`)
+  await state.core.rates(state.core.limits.twoFactorAccount).reset(`two-factor:${record.id}`)
   await state.session.unset('authChallenge')
   await signIn(record, pending.method ?? 'unknown')
 
@@ -337,7 +337,7 @@ async function take(state: RequestState, purpose: PasskeyPurpose, user: string |
   if (!parked || parked.purpose !== purpose || parked.user !== user || parked.expires < Date.now())
     return undefined
 
-  return (await state.core.rates.hit(`passkey-challenge:${parked.challenge}`, CHALLENGE_MAX_AGE_MS)).count === 1 ? parked.challenge : undefined
+  return (await state.core.rates(windowOf(CHALLENGE_MAX_AGE_MS)).hit(`passkey-challenge:${parked.challenge}`)).count === 1 ? parked.challenge : undefined
 }
 
 // Whether `response` is `passkey` signing `challenge`; its counter and last use are recorded. A counter that did not move past the stored one, the sign of a cloned authenticator, is refused.

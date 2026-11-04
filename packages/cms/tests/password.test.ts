@@ -430,8 +430,14 @@ describe('the cookie name', () => {
 })
 
 describe('a store without peek', () => {
-  test('is refused for a store given to passwordGuard, as it could not count the ceiling', () => {
-    expect(() => passwordGuard('pw-editor', { store: { hit: () => ({ count: 1, resetAt: 0 }) } })).toThrow('peek')
+  test('counts the ceiling all the same, kay deriving the peek', async () => {
+    const memory = memoryRates()
+    const passwords = new Passwords({ editor: 'pw-editor' }, '1h', 's', { hit: memory.hit })
+
+    for (let tried = 0; tried < 100; tried++)
+      await passwords.failed()
+
+    expect(await passwords.lockedOut()).toBe(true)
   })
 })
 

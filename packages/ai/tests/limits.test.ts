@@ -528,8 +528,14 @@ describe('ai({ budget })', () => {
     expect(store.count()).toBe(10)
   })
 
-  it('needs a store that can peek', () => {
-    expect(() => ai({ budget: { tokens: 1, window: '1m', store: { hit: () => ({ count: 1, resetAt: 0 }) } } })).toThrow('peek')
+  it('takes a store with no peek, which kay derives', async () => {
+    const memory = memoryRates()
+
+    ai({ budget: { tokens: 1000, window: '1m', store: { hit: memory.hit } } })
+    fakeAi.reply(usedBy(1000))
+    await ask('a', { key: 'v' })
+
+    expect((await failure(ask('a', { key: 'v' }))).limit).toBe('budget')
   })
 
   it('refuses a budget that is not a whole number of at least 1', () => {
@@ -844,7 +850,7 @@ describe('the app store', () => {
     expect(app.keys).toHaveLength(0)
   })
 
-  it('counts the budget in memory when the app store has no peek', async () => {
+  it('counts the budget in the app store even when it has no peek', async () => {
     const app = counting()
 
     setupStore({ rates: { hit: app.store.hit } })
@@ -852,7 +858,7 @@ describe('the app store', () => {
     fakeAi.reply(usedBy(1000))
     await ask('a', { key: 'v' })
 
-    expect(app.keys).toHaveLength(0)
+    expect(app.keys.length).toBeGreaterThan(0)
     expect((await failure(ask('a', { key: 'v' }))).limit).toBe('budget')
   })
 })

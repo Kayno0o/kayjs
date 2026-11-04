@@ -15,7 +15,7 @@ import type { OrganizationsCore } from './organizationsCore'
 import type { ProfileOptions, RememberMode } from './pages'
 import type { PasskeyChallenge, Relying } from './passkeys'
 import type { Challenge } from './proof'
-import type { AuthRates } from './rates'
+import type { AuthLimiters } from './rates'
 import type { ResolvedRules } from './rules'
 import type { AuthStore, IdentityRecord, UserRecord } from './store'
 import type { Requirement } from './types'
@@ -113,7 +113,7 @@ export interface Switches {
 export interface Core {
   store: AuthStore
   // Where attempts are counted: the store's `rates`, else the app's `store.rates`, else this process's memory.
-  rates: AuthRates
+  rates: AuthLimiters
   keys: Keys
   // The site's public origin: `site` of createAuth, else the site kay.config.ts or SITE_URL sets.
   url?: string | undefined

@@ -8,7 +8,7 @@ import type { ContextProvider, LoadedContexts } from './context-values'
 import type { ResolvedCookieDefaults } from './cookies'
 import type { CacheReads } from './live'
 import type { ToolCall } from './mcp'
-import type { RefundableStore } from './protection'
+import type { Limiter } from './protection'
 import type { RequestContext } from './render'
 import type { Deadline } from './request-timeout'
 import type { Namer } from './request-user'
@@ -75,7 +75,7 @@ export class RequestRecord {
   crossSite: { site: string | undefined, crossSite: boolean } | undefined = undefined
   postedFrom: string | null | undefined = undefined
   // The rate limit hits an action counted, which a call that started no work takes back, and the key each limit counted it under.
-  refundableHits: { store: RefundableStore, key: string, resetAt: number }[] | undefined = undefined
+  refundableHits: { limiter: Limiter, key: string, resetAt: number }[] | undefined = undefined
   countedKeys: Map<object, string> | undefined = undefined
 }
 

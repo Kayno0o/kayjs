@@ -19,7 +19,7 @@ import { createOAuthClient } from './oauth/client'
 import { createOAuthTokenRefresher } from './oauth/refresher'
 import { organizationsCore } from './organizationsCore'
 import { DEFAULT_PREFIX as DEFAULT_PAGES_PREFIX, pagePaths, pagesOf } from './pages'
-import { authRates } from './rates'
+import { authLimiters } from './rates'
 import { resolveRules } from './rules'
 import { userDataRules } from './userData'
 
@@ -215,7 +215,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
 
   const core: Core = {
     store: options.store,
-    rates: authRates(options.store),
+    rates: authLimiters(options.store),
     keys: deriveKeys(options.secret ?? options.sessions.deriveSecret?.('kayjs-auth') ?? noSecret()),
     get url() {
       return bind().url

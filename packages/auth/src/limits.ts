@@ -1,7 +1,7 @@
 import type { Duration } from 'kay'
 import type { Core } from './core'
-import type { AuthRates } from './rates'
-import { durationSeconds, optionMs } from 'kay/library'
+import type { AuthLimiters } from './rates'
+import { durationSeconds } from 'kay/library'
 
 // `max` attempts every `window`, a string such as '15m', as in kay's own `rateLimit`.
 export interface Limit {
@@ -74,13 +74,18 @@ export function resolveLimits(given: LimitsOption | undefined): Limits {
 }
 
 // Counts one attempt and answers whether it was over the limit.
-export async function spend(rates: AuthRates, key: string, limit: Limit): Promise<boolean> {
-  return (await rates.hit(key, optionMs(limit.window, 'an attempts window'))).count > limit.max
+export async function spend(rates: AuthLimiters, key: string, limit: Limit): Promise<boolean> {
+  return await rates(limit).enforce(key) !== undefined
 }
 
 // The attempts counted under `key` in its open window, none once it ended.
-export async function counted(rates: AuthRates, key: string): Promise<number> {
-  return (await rates.peek(key))?.count ?? 0
+export async function counted(rates: AuthLimiters, key: string, limit: Limit): Promise<number> {
+  return (await rates(limit).peek(key))?.count ?? 0
+}
+
+// A limit that only names a window in milliseconds, for a count nothing is refused by.
+export function windowOf(ms: number): Limit {
+  return { max: Number.MAX_SAFE_INTEGER, window: `${ms}ms` }
 }
 
 // The key counting attempts against what a visitor typed, such as an address: kept as a keyed digest, so the table holds no email.

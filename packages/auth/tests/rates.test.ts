@@ -51,7 +51,7 @@ describe('where attempts are counted', () => {
     expect(keys.filter(key => !key.startsWith('kayjs-auth\n'))).toEqual([])
   })
 
-  test('a store without rates counts in memory when the app keeps none, and when its store.rates cannot reset, saying so once', async () => {
+  test('a store without rates counts in memory when the app keeps none, and in an app store.rates with only hit, warning of nothing', async () => {
     const warned = spyOn(log, 'warn').mockImplementation(() => undefined)
 
     try {
@@ -65,7 +65,7 @@ describe('where attempts are counted', () => {
         expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
       }
 
-      expect(warned.mock.calls.filter(call => String(call[0]).includes('store.rates has no peek or reset'))).toHaveLength(1)
+      expect(warned).not.toHaveBeenCalled()
     }
     finally {
       warned.mockRestore()

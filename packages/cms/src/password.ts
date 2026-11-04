@@ -1,8 +1,8 @@
 import type { Duration, Guard, RateStore } from 'kay'
-import type { Kv, KvStore, LazyGuard } from 'kay/library'
+import type { Kv, KvStore, LazyGuard, Limiter } from 'kay/library'
 import { createHmac, scryptSync } from 'node:crypto'
 import { guard } from 'kay'
-import { appSecrets, appStore, configError, durationSeconds, keyedDigest, kv, memoryRates, sameText } from 'kay/library'
+import { appSecrets, appStore, configError, durationSeconds, keyedDigest, kv, limiter, sameText } from 'kay/library'
 import { wording } from 'kay/words'
 import { log } from './log'
 
@@ -28,11 +28,10 @@ const KEY_SALT = 'kayjs-cms/password/v1:'
 const MIN_PASSWORD_LENGTH = 12
 let warnedOfNoSecret = false
 
-const FAILURES = 'cms:sign-in-failures'
+const FAILURES = 'sign-in-failures'
 // Wrong passwords from anyone, every quarter of an hour, past which no sign-in is tried until the window closes: the per-visitor limit does not stop a guess spread over many addresses.
 const FAILURE_CEILING = 100
 const FAILURE_WINDOW = '15m'
-const FAILURE_WINDOW_MS = 15 * 60_000
 
 export interface PasswordOptions {
   // How long a sign-in lasts, `'14d'` by default.
@@ -55,17 +54,16 @@ export class Passwords {
   // The signatures of cookies signed out in this process, each kept until the cookie would have expired anyway; the store holds the same for the other processes and a restart.
   private readonly revoked = new Map<string, number>()
   private readonly seconds: number
-  private readonly memory = memoryRates()
+  // A store that fails refuses every sign-in rather than lifting the ceiling.
+  private readonly failures: Limiter
   private readonly signedOut: Kv
   private lastIssued = 0
   private told = false
 
   constructor(passwords: Record<string, string>, maxAge: Duration, private readonly secret?: string, private readonly chosenStore?: RateStore, private readonly chosenKv?: KvStore) {
     this.signedOut = kv('cms:revoked', chosenKv)
+    this.failures = limiter({ max: FAILURE_CEILING, window: FAILURE_WINDOW, store: chosenStore, name: 'cms', failure: 'refuse' })
     this.seconds = durationSeconds(maxAge, '`passwordGuard({ maxAge })`')
-
-    if (chosenStore !== undefined && chosenStore.peek === undefined)
-      this.store()
 
     const entries = Object.entries(passwords)
     const production = process.env.NODE_ENV === 'production'
@@ -93,16 +91,6 @@ export class Passwords {
 
       this.given.set(role, password)
     }
-  }
-
-  // The store the ceiling is counted in; one without `peek` could not count it, so it is refused.
-  private store(): RateStore & Required<Pick<RateStore, 'peek'>> {
-    const store = this.chosenStore ?? appStore()?.rates ?? this.memory
-
-    if (store.peek === undefined)
-      throw configError('`passwordGuard()` needs a rate store with a `peek(key)` method, to count wrong passwords; add it to `store.rates`, or use `sqliteRates()`')
-
-    return store as RateStore & Required<Pick<RateStore, 'peek'>>
   }
 
   // Slow on purpose: a cookie seen once must not let the password be guessed offline at hashing speed. Made on first use, as the app's secret may be set up after the guard.
@@ -148,7 +136,7 @@ export class Passwords {
   // Whether wrong passwords from all visitors have passed the ceiling, so no sign-in is tried until the window closes; a store that cannot answer counts as passed.
   async lockedOut(): Promise<boolean> {
     try {
-      const window = await this.store().peek(FAILURES)
+      const window = await this.failures.peek(FAILURES)
 
       return (window?.count ?? 0) >= FAILURE_CEILING
     }
@@ -162,7 +150,7 @@ export class Passwords {
   // Counts a wrong password against the ceiling, logging the first one past it.
   async failed(): Promise<void> {
     try {
-      const window = await this.store().hit(FAILURES, FAILURE_WINDOW_MS)
+      const window = await this.failures.hit(FAILURES)
 
       if (window.count === FAILURE_CEILING)
         log.warn(`${FAILURE_CEILING} wrong passwords in ${FAILURE_WINDOW}: the cms sign-in refuses every try until the window closes`)

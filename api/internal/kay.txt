@@ -1005,6 +1005,27 @@ interface LibraryTool
   name: string
   readOnly?: boolean | undefined
 
+[./library] limiter
+function limiter({ max, window, name, ...rest }: LimiterOptions): Limiter
+
+[./library] Limiter
+interface Limiter
+  enforce: (key: string, weight?: number | undefined) => Promise<number | undefined>
+  hit: (key: string, weight?: number | undefined) => Promise<RateWindow>
+  max: number
+  peek: (key: string) => Promise<RateWindow | undefined>
+  refund: (key: string, resetAt: number) => Promise<boolean>
+  reset: (key: string) => Promise<void>
+
+[./library] LimiterOptions
+interface LimiterOptions
+  failure?: "memory" | "refuse" | undefined
+  max: number
+  memory?: RateStore | undefined
+  name?: string | undefined
+  store?: RateStore | undefined
+  window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+
 [./library] localizedEntry
 function localizedEntry(root: string, config: Pick<KayConfig, "contentConfig" | "i18n">, collection: string, slug: string): Promise<LocalizedEntry>
 

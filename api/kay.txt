@@ -2856,6 +2856,27 @@ interface KvStore extends StoreBase
   ping?: (() => unknown) | undefined
   set: (key: string, value: string, ttlMs?: number | undefined) => MaybePromise<void>
 
+[./server] limiter
+function limiter({ max, window, name, ...rest }: LimiterOptions): Limiter
+
+[./server] Limiter
+interface Limiter
+  enforce: (key: string, weight?: number | undefined) => Promise<number | undefined>
+  hit: (key: string, weight?: number | undefined) => Promise<RateWindow>
+  max: number
+  peek: (key: string) => Promise<RateWindow | undefined>
+  refund: (key: string, resetAt: number) => Promise<boolean>
+  reset: (key: string) => Promise<void>
+
+[./server] LimiterOptions
+interface LimiterOptions
+  failure?: "memory" | "refuse" | undefined
+  max: number
+  memory?: RateStore | undefined
+  name?: string | undefined
+  store?: RateStore | undefined
+  window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+
 [./server] LiveEntry
 type LiveEntry = [id: string, key: string, text: string] | [id: string, key: string, text: string, expiresAt: number]
 

@@ -90,7 +90,7 @@ export async function reprove(state: RequestState, proof: Proof, options: { seco
   if (!proved)
     return { ok: false, error: 'proof' }
 
-  await state.core.rates.reset(`reprove:${record.id}`)
+  await state.core.rates(state.core.limits.reprove).reset(`reprove:${record.id}`)
 
   const signedIn = await state.session.get('auth')
 

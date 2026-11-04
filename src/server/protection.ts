@@ -15,6 +15,7 @@ import { openSqlite } from '../runtime/sqlite.server'
 import { NAVIGATE_HEADER, WORK_HEADER } from '../runtime/swap'
 import { appStore } from './app-store'
 import { nodeNet } from './builtins'
+import { optionMs } from './config-error'
 import { checkRequestIdHeader } from './config-limits'
 import { inMemory } from './memory-mark'
 import { STORE_TIMEOUT_MS } from './pg-limit'
@@ -298,14 +299,14 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
   if (!Number.isInteger(limit.max) || limit.max < 1)
     throw new KayError('config-invalid', `kay: rateLimit('${name}')'s max is ${limit.max}; it takes a whole number of at least 1`)
 
-  const ms = durationSeconds(limit.window, `rateLimit('${name}')'s window`) * 1000
+  const counting = makeLimiter({ name, max: limit.max, ms: durationSeconds(limit.window, `rateLimit('${name}')'s window`) * 1000, store: limit.store })
 
   return {
     hit: async (from, server, weight = 1) => {
       if (!Number.isSafeInteger(weight) || weight < 1)
         throw new KayError('config-invalid', `kay: rateLimit('${name}').hit()'s weight is ${weight}; it takes a whole number of at least 1`)
 
-      const window = await ratesFor(name, limit.store).hit(typeof from === 'string' ? `${name}\nkey:${from}` : limitKey(name, clientAddress(from, server)), ms, weight)
+      const window = await counting.hit(typeof from === 'string' ? `key:${from}` : rateKey(clientAddress(from, server)), weight)
 
       // A count below the weight holds less than this hit alone: the store counted one, which shows on a window's first hit.
       if (window.count < weight)
@@ -316,8 +317,107 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
   }
 }
 
-function limitKey(name: string, client: string): string {
-  return `${name}\n${rateKey(client)}`
+export interface LimiterOptions {
+  max: number
+  window: Duration
+  // The app's `store.rates` unless given, else this process's memory.
+  store?: RateStore | undefined
+  // What the limiter counts for: its keys sit under it and it names the store in the log, so limiters sharing a store never share a count. `'limiter'` unless given.
+  name?: string | undefined
+  // What a store that fails or hangs does: `'memory'` (the default) counts in this process's memory meanwhile, logged once, so a request is never refused for it; `'refuse'` lets the failure through, for a limit that must not lift because it could not be read.
+  failure?: 'memory' | 'refuse' | undefined
+  // Where it counts when neither `store` nor the app's `store.rates` is there, a store of the caller's own so it can sweep or forget it; this process's memory for `name` unless given.
+  memory?: RateStore | undefined
+}
+
+// One limit over a rate store, counted the same wherever it is used: kay's actions, guards and API routes, and the libraries.
+export interface Limiter {
+  // Counts `weight` more (one unless given) under `key` and answers the window.
+  hit: (key: string, weight?: number) => Promise<RateWindow>
+  // The window open under `key` without counting an attempt, undefined when none is. A store with no `peek` answers it with a hit of weight 0, which opens an empty window it did not hold, so the next hit joins it.
+  peek: (key: string) => Promise<RateWindow | undefined>
+  // Forgets the window under `key`. A store with no `reset` has the count taken off with a hit of the negative weight, which leaves an empty window open.
+  reset: (key: string) => Promise<void>
+  // Counts an attempt and answers the seconds to wait once the count is past `max`, else undefined.
+  enforce: (key: string, weight?: number) => Promise<number | undefined>
+  // Takes back one attempt `hit` counted in the window closing at `resetAt`; false when the store has no `refund`.
+  refund: (key: string, resetAt: number) => Promise<boolean>
+  readonly max: number
+}
+
+// `max` every `window` in a rate store, with `hit`, `peek`, `reset` and `enforce` whatever the store implements: kay derives `peek` and `reset` for one that lacks them.
+export function limiter({ max, window, name = 'limiter', ...rest }: LimiterOptions): Limiter {
+  if (!Number.isInteger(max) || max < 1)
+    throw new KayError('config-invalid', `kay: limiter('${name}')'s max is ${max}; it takes a whole number of at least 1`)
+
+  return makeLimiter({ name, max, ms: optionMs(window, `limiter('${name}')'s window`), ...rest })
+}
+
+function makeLimiter({ name, max, ms, store: given, failure, memory }: { name: string, max: number, ms: number } & Pick<LimiterOptions, 'store' | 'failure' | 'memory'>): Limiter {
+  // Read on each call, as the server sets the app's `store.rates` up after a library may have made its limiter.
+  const store = (): RateStore => {
+    const shared = given ?? appStore()?.rates
+
+    if (shared === undefined)
+      return memory ?? memoryOf(name)
+
+    return failure === 'refuse' ? shared : ratesFor(name, shared)
+  }
+  const keyed = (key: string) => `${name}\n${key}`
+
+  const peek = async (key: string): Promise<RateWindow | undefined> => {
+    const used = store()
+
+    if (used.peek)
+      return used.peek(keyed(key))
+
+    const window = await used.hit(keyed(key), ms, 0)
+
+    return window.count > 0 ? window : undefined
+  }
+
+  return {
+    max,
+    hit: async (key, weight) => store().hit(keyed(key), ms, weight),
+    peek,
+    reset: async (key) => {
+      const used = store()
+
+      if (used.reset) {
+        await used.reset(keyed(key))
+
+        return
+      }
+
+      const window = await peek(key)
+
+      if (window)
+        await used.hit(keyed(key), ms, -window.count)
+    },
+    enforce: async (key, weight) => waitFor(await store().hit(keyed(key), ms, weight), max),
+    refund: async (key, resetAt) => {
+      const used = store()
+
+      if (!used.refund)
+        return false
+
+      await used.refund(keyed(key), resetAt)
+
+      return true
+    },
+  }
+}
+
+// The limiter of each limit an action or API route declares, made once.
+const limiters = new WeakMap<object, Limiter>()
+
+function limiterOf(entry: { name: string, limit: RateLimit }): Limiter {
+  let made = limiters.get(entry)
+
+  if (!made)
+    limiters.set(entry, made = makeLimiter({ name: entry.name, max: entry.limit.max, ms: windowMs(entry.limit), store: entry.limit.store }))
+
+  return made
 }
 
 // The action's limits, each counted under its own name: the first under the action's URL, the same in every process, the others under their place in the list.
@@ -343,8 +443,8 @@ export async function apiLimitWait(limits: { name: string, limit: ApiRateLimit }
   const client = clientAddress(request, server)
   let wait: number | undefined
 
-  for (const { name, limit } of limits) {
-    const own = waitFor(await ratesFor(name, limit.store).hit(await actionKey(name, limit, request, client, context), windowMs(limit)), limit.max)
+  for (const entry of limits) {
+    const own = await limiterOf(entry).enforce(await actionKey(entry.name, entry.limit, request, client, context))
 
     if (own !== undefined && (wait === undefined || own > wait))
       wait = own
@@ -404,8 +504,6 @@ export interface RefusalInput {
   plain?: boolean | undefined
   keyContext?: (() => Omit<RateKeyContext, 'client'>) | undefined
 }
-
-export type RefundableStore = RateStore & { refund: NonNullable<RateStore['refund']> }
 
 export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, { body, form, server, plain = form, keyContext }: RefusalInput): Promise<ProtectionRefusal | typeof PRETEND | undefined> {
   const { honeypot, messages } = action.protection ?? {}
@@ -467,30 +565,25 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
   let wait: number | undefined
 
   // Every limit counts the attempt, whichever refuses it, and the longest wait is the one to tell.
-  for (const { name, limit } of limits) {
-    const store = ratesFor(name, limit.store)
-
-    if (limit.count === 'succeeded' && !store.peek)
-      throw new KayError('config-invalid', `kay: ${name} counts only the posts that went through, so its store needs a peek(key) method; the app's \`store.rates\` has none`)
-
+  for (const entry of limits) {
+    const { name, limit } = entry
+    const counting = limiterOf(entry)
     const key = await actionKey(name, limit, request, client, keyContext)
     // A limit on the posts that went through only reads its count here; the handler's success adds to it.
     let own: number | undefined
 
     if (limit.count === 'succeeded') {
-      own = reached(await store.peek!(key), limit.max)
+      own = reached(await counting.peek(key), limit.max)
     }
     else {
-      const window = await store.hit(key, windowMs(limit))
+      const window = await counting.hit(key)
 
       own = waitFor(window, limit.max)
 
-      if (store.refund) {
-        const record = requestRecord(request)
+      const record = requestRecord(request)
 
-        record.refundableHits ??= []
-        record.refundableHits.push({ store: store as RefundableStore, key, resetAt: window.resetAt })
-      }
+      record.refundableHits ??= []
+      record.refundableHits.push({ limiter: counting, key, resetAt: window.resetAt })
     }
 
     if (own !== undefined && (wait === undefined || own > wait))
@@ -514,8 +607,8 @@ export async function countSucceeded(action: ServerAction<TSchema, unknown>, req
 
   const client = clientAddress(request, server)
 
-  for (const { name, limit } of limits)
-    await ratesFor(name, limit.store).hit(await actionKey(name, limit, request, client, undefined), windowMs(limit))
+  for (const entry of limits)
+    await limiterOf(entry).hit(await actionKey(entry.name, entry.limit, request, client, undefined))
 }
 
 // Takes back the attempts the action's `rateLimit` counted for this request, once, for a call that started no work: kayjs-ai's resume of a reply it keeps. A limit counting only the posts that went through is left alone, and so is a store with no `refund`; the request being the one the action answers, any other request has nothing counted.
@@ -528,9 +621,9 @@ export async function refundRateLimit(request: Request | undefined): Promise<voi
 
   record.refundableHits = undefined
 
-  // Each store came from `ratesFor`, which logs a refund that fails and goes on.
-  for (const { store, key, resetAt } of counted)
-    await store.refund(key, resetAt)
+  // Each limiter counts through `ratesFor`, which logs a refund that fails and goes on.
+  for (const { limiter: counting, key, resetAt } of counted)
+    await counting.refund(key, resetAt)
 }
 
 // The most characters of a custom key kept as it is, a longer one is hashed: a store keeps a key whole.
@@ -546,7 +639,7 @@ async function actionKey(name: string, limit: { key?: RateKey | undefined }, req
     return known
 
   if (!limit.key || !context)
-    return limitKey(name, client)
+    return rateKey(client)
 
   let identity: string | undefined
 
@@ -567,7 +660,7 @@ async function actionKey(name: string, limit: { key?: RateKey | undefined }, req
     }
   }
 
-  const counted = identity === undefined ? limitKey(name, client) : `${name}\nkey:${identity.length > MAX_KEY_LENGTH ? new Bun.CryptoHasher('sha256').update(identity).digest('base64url') : identity}`
+  const counted = identity === undefined ? rateKey(client) : `key:${identity.length > MAX_KEY_LENGTH ? new Bun.CryptoHasher('sha256').update(identity).digest('base64url') : identity}`
 
   const record = requestRecord(request)
 
@@ -744,7 +837,7 @@ async function withinLimit<Result>(work: Promise<Result>): Promise<Result> {
 
 // Seconds until the client may try again under `name`, in the app's `store.rates` else this process's memory, or undefined while it is under the limit: for kay's own routes.
 export async function overLimit(name: string, client: string, max: number, windowMs: number): Promise<number | undefined> {
-  return waitFor(await ratesFor(name).hit(limitKey(name, client), windowMs), max)
+  return makeLimiter({ name, max, ms: windowMs }).enforce(rateKey(client))
 }
 
 // The refusal of a route over its limit whose caller reads the answer, an API module's or the MCP endpoint's: kay's beacons answer theirs with no body, as their other refusals.

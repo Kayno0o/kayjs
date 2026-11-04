@@ -26,11 +26,11 @@ export interface RateStore extends StoreBase {
   // Counts `weight` more under `key`, one attempt unless given, opening a window of `windowMs` milliseconds when none is open: the count in it so far, this hit included, and when it closes, in ms since the epoch.
   // A store of its own adds `weight` to the count, or a weighted limit, tokens say, refuses it.
   hit: (key: string, windowMs: number, weight?: number) => MaybePromise<RateWindow>
-  // The window open under `key` without counting an attempt, undefined when none is: what a limit counting only the posts that went through reads before the handler runs.
+  // The window open under `key` without counting an attempt, undefined when none is: what a limit counting only the posts that went through reads before the handler runs. A `limiter` derives it, with a hit of weight 0, for a store without it.
   peek?: (key: string) => MaybePromise<RateWindow | undefined>
   // Takes back one attempt `hit` counted under `key` in the window closing at `resetAt`, never below zero, and does nothing once that window is gone: how kay lets a call that started no work, such as kayjs-ai's resume of a reply it keeps, not spend the limit. A store without it simply keeps the attempt counted.
   refund?: (key: string, resetAt: number) => MaybePromise<void>
-  // Forgets the window open under `key`, so its next hit opens a fresh one: how kayjs-auth clears a count once the attempt it guards succeeds, a sign-in say.
+  // Forgets the window open under `key`, so its next hit opens a fresh one: how kayjs-auth clears a count once the attempt it guards succeeds, a sign-in say. A `limiter` derives it, with a hit of the negative weight, for a store without it.
   reset?: (key: string) => MaybePromise<void>
 }
 

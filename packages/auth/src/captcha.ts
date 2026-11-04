@@ -110,7 +110,7 @@ async function pastThreshold(state: RequestState, action: CaptchaAction): Promis
   if (rule === undefined || rule === false)
     return undefined
 
-  const count = await counted(state.core.rates, `${COUNTED[action].key}:${state.client}`)
+  const count = await counted(state.core.rates, `${COUNTED[action].key}:${state.client}`, state.core.limits[COUNTED[action].limit])
   const threshold = rule === 'always' ? 0 : rule
 
   return count >= threshold ? count - threshold : undefined

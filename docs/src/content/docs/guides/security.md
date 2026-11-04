@@ -199,13 +199,32 @@ const store: RateStore = {
 }
 ```
 
-`peek(key)` is optional. It reads the open window without counting, which a limit set to `count: 'succeeded'` needs.
+`hit` is all a store needs. `peek(key)` and `reset(key)` are optional, and kay works them out when they are missing: a `peek` as a hit of weight 0, and a `reset` as a hit of minus the open count (which needs a store that adds a negative weight like any other). Add them for a store that can do either in one step.
+
+`peek(key)` reads the open window without counting, which a limit set to `count: 'succeeded'` needs.
 
 `refund(key, resetAt)` is optional too. It takes one attempt back off the window that closes at `resetAt`, never below zero, and does nothing once that window is gone. kay calls it for a call that started no work, such as kayjs-ai's resume of a reply the server kept, and a store without it simply keeps the attempt counted.
 
-`reset(key)` is optional as well. It forgets the window under `key`, so the next hit opens a fresh one. kayjs-auth calls it to clear a count once a sign-in succeeds, and counts in its own memory when the app's store has no `peek` or `reset`.
+`reset(key)` forgets the window under `key`, so the next hit opens a fresh one. kayjs-auth calls it to clear a count once a sign-in succeeds.
 
 A store that throws or rejects never fails the request: the limit counts in the process's memory instead, and kay logs it once until the store answers again. A store that takes over eight seconds is passed over for the next ten, so a hanging database holds one request rather than every one.
+
+### Your own limit
+
+`limiter` from `kay/server` is the limit kay's own actions and routes count through, for code of your own. It has `hit`, `peek`, `reset` and `enforce`, whichever of them your store has.
+
+```ts
+import { limiter } from 'kay/server'
+
+const exports = limiter({ max: 5, window: '1h', name: 'exports' })
+
+const wait = await exports.enforce(user.id)
+
+if (wait !== undefined)
+  throw new Error(`Try again in ${wait} s`)
+```
+
+It counts in the app's `store.rates` unless you give `store`, and in memory without one. `enforce` counts an attempt and gives the seconds to wait once past `max`. `peek` reads the count without adding to it, and `reset` forgets it. Limiters with different `name`s never share a count.
 
 <ReadMore href="/llms/rate-limits">Several limits at once and the exact counting rules.</ReadMore>
 

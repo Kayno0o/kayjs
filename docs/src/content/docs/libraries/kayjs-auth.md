@@ -806,7 +806,7 @@ Behind a proxy, kay reads the client address through `proxy` in `kay.config.ts`.
 
 Any object with the `AuthStore` methods is a store. Each method is sync or async.
 
-A store of your own counts attempts in the app's `store.rates`, or in memory without one. To count them in its own database, give it `rates`, a kay `RateStore` with `peek` and `reset`.
+A store of your own counts attempts in the app's `store.rates`, or in memory without one. To count them in its own database, give it `rates`, a kay `RateStore`; one with only `hit` is enough, as kay works out `peek` and `reset`.
 
 One verb does one thing in every group: `create` adds a row, `delete` removes one, `upsert` creates or replaces, `consume` deletes a row and answers it, or whether it had it, once only.
 

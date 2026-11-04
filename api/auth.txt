@@ -401,7 +401,7 @@ interface AuthPagesOptions
   prefix?: string | undefined
 
 [.] AuthRates
-type AuthRates = RateStore & Required<Pick<RateStore, 'peek' | 'reset'>>
+type AuthRates = RateStore
 
 [.] AuthRequirement
 type AuthRequirement<Role extends string> = Requirement<BareUser, Role>
@@ -512,7 +512,7 @@ interface AuthStore
   delete: (userId: string, id: string) => MaybePromise<boolean>;
 }
   prune?: (limits: PruneLimits) => MaybePromise<void>
-  rates?: AuthRates | undefined
+  rates?: RateStore | undefined
   recoveryCodes: {
   replace: (userId: string, digests: string[]) => MaybePromise<void>;
   consume: (userId: string, digest: string) => MaybePromise<boolean>;

@@ -458,7 +458,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect((await store.bearerTokens.listByUser('u1')).map(token => token.id).sort()).toEqual(['just-expired', 'live', 'never'])
       expect((await store.sessions.listByUser('u1')).map(session => session.id)).toEqual(['live'])
       expect((await store.sessions.listByUser('u2')).map(session => session.id)).toEqual(['current'])
-      expect((await store.rates!.peek('long'))!.count).toBe(1)
+      expect((await store.rates!.peek!('long'))!.count).toBe(1)
     })
 
     test('staleGuests lists guests created before an instant that hold no session, oldest first, up to a limit', async () => {
@@ -695,23 +695,23 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       const rates = store.rates!
       const opened = await rates.hit('k', 60_000)
 
-      expect(await rates.peek('k')).toEqual(opened)
+      expect(await rates.peek!('k')).toEqual(opened)
       expect(opened.count).toBe(1)
       expect(Math.abs(opened.resetAt - (Date.now() + 60_000))).toBeLessThan(2000)
       expect((await Promise.all([rates.hit('k', 60_000), rates.hit('k', 60_000)])).map(window => window.count)).toEqual(expect.arrayContaining([2, 3]))
       expect((await rates.hit('k', 60_000, 2)).count).toBe(5)
-      expect((await rates.peek('k'))!.resetAt).toBe(opened.resetAt)
+      expect((await rates.peek!('k'))!.resetAt).toBe(opened.resetAt)
 
       setSystemTime(Date.now() + 61_000)
 
-      expect(await rates.peek('k')).toBeUndefined()
+      expect(await rates.peek!('k')).toBeUndefined()
       expect((await rates.hit('k', 60_000)).count).toBe(1)
 
       await rates.hit('other', 60_000)
-      await rates.reset('k')
+      await rates.reset!('k')
 
-      expect(await rates.peek('k')).toBeUndefined()
-      expect((await rates.peek('other'))!.count).toBe(1)
+      expect(await rates.peek!('k')).toBeUndefined()
+      expect((await rates.peek!('other'))!.count).toBe(1)
     })
   })
 }
