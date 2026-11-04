@@ -6,7 +6,7 @@ import process from 'node:process'
 import { APP_DEPENDENCIES, dependencyNames, libraryMessageExtensions, readManifest } from './build/manifests'
 import { KayError } from './compiler/errors'
 import { CONFIG_FILE } from './config'
-import { CONFIG_GROUPS, groupedKeys, isBag, mergeBags, REMOVED_KEYS, unknownConfigKeys } from './config-shape'
+import { CONFIG_GROUPS, groupedKeys, invalidConfigValues, isBag, mergeBags, REMOVED_KEYS, unknownConfigKeys } from './config-shape'
 import { NATIVE_PLUGINS } from './native-plugins'
 import { publicEnvFiles } from './server/env-state'
 
@@ -145,6 +145,11 @@ function checkedConfig(config: LoadedConfig, where = CONFIG_FILE): void {
 
   if (unknown.length > 0)
     throw new KayError('config-invalid', `kay: ${where} has ${unknown.length === 1 ? 'an option' : 'options'} kay does not know: ${unknown.join('; ')}`)
+
+  const invalid = invalidConfigValues(config)
+
+  if (invalid.length > 0)
+    throw new KayError('config-invalid', `kay: ${where} has ${invalid.length === 1 ? 'a value' : 'values'} of the wrong kind: ${invalid.join('; ')}`)
 
   if (checks !== undefined && !Array.isArray(checks))
     throw new KayError('config-invalid', `kay: \`checks\` in ${where} is a list of functions, not ${typeof checks}`)

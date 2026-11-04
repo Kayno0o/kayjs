@@ -795,6 +795,9 @@ function checkAnswer(schema: TSchema, value: unknown): CheckedAnswer
 [./library] CheckedAnswer
 type CheckedAnswer = { value: unknown } | { issues: AnswerIssue[] }
 
+[./library] checkOptionKeys
+function checkOptionKeys(what: string, options: object | undefined, known: Record<string, true>): void
+
 [./library] clearMissing
 function clearMissing(file?: string | undefined): number
 

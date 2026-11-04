@@ -190,7 +190,7 @@ new Elysia()
   .use(await pages())
 ```
 
-- `schedule` takes five cron fields, `minute hour day-of-month month day-of-week`, or a nickname such as `@daily`, read in the system's time zone unless `tz` names one.
+- `schedule` takes five cron fields, `minute hour day-of-month month day-of-week`, or a nickname such as `@daily`, read in the `timeZone` of kay.config.ts unless `tz` names one, the system's when neither is set.
 - A literal one with another number of fields, an unknown nickname or a day its month never has, `0 0 30 2 *`, is a type error; a computed one it cannot read, or that never comes, fails the boot.
 - Runs never overlap: the next is planned once the last settles.
 - A run that throws is logged and the next one comes as planned.

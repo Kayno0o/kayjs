@@ -98,7 +98,7 @@ A site with a kayjs-mail mailing list also calls `await mail.erase(user.email)`,
 
 `files.delete` also deletes every resized variant of the file and every social card drawn on it.
 
-Sessions kept in the cookie alone, without a store, cannot be listed. They end when they expire, or for everyone when the secret is replaced.
+Sessions kept in the cookie alone, with `store: false`, cannot be listed. They end when they expire, or for everyone when the secret is replaced.
 
 ## Counting visits
 

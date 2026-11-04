@@ -285,7 +285,7 @@ A `limits.byPath` entry at the path of an API module wins over the module's own 
 
 ## Trust a proxy
 
-Behind nginx, Caddy or Cloudflare, every request comes from the proxy. Without help, rate limits count the proxy as one visitor. Say how many proxies sit in front.
+Behind nginx, Caddy or Cloudflare, every request comes from the proxy. In production, kay counts one proxy in front for a request from a private address that carries `X-Forwarded-For`, so a single nginx or Caddy needs nothing. Say it when there are more, or when there are none.
 
 ```ts
 export default defineConfig({
@@ -293,7 +293,7 @@ export default defineConfig({
 })
 ```
 
-`true` is one proxy, and `2` is two, such as Cloudflare then nginx. To read a header the proxy sets, name it: `proxy: { header: 'cf-connecting-ip' }`.
+`true` is one proxy, `2` is two, such as Cloudflare then nginx, and `false` is none. To read a header the proxy sets, name it: `proxy: { header: 'cf-connecting-ip' }`.
 
 Only trust a proxy every request goes through. If a visitor can reach the server past it, they can write the header themselves.
 

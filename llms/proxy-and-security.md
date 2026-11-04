@@ -88,8 +88,8 @@ export default defineConfig({
 - The proxy passes `X-Forwarded-Proto` on every location, websockets included (nginx: `proxy_set_header X-Forwarded-Proto $scheme`), as kay's cookies are `Secure` and the session's named `__Host-kay_session` over https: a request that says `http` reads no session.
 - A request without the header counts as https in production when `site` is https; with no `site`, production warns once that cookies go out without `Secure`.
 - A post goes back to its page as a path and never reads a forwarded header for it, so the swap works behind a proxy that ends TLS with nothing declared for it.
-- Without `proxy`, the address the request came from is the client.
-- A server getting requests from a private address that carry `X-Forwarded-For` warns once that every visitor counts as the proxy.
+- Without `proxy`, a production server counts one proxy in front for a request from a private address that carries `X-Forwarded-For` (the setting `proxy: true` makes), logging once that it does; a request from a public address, or with no header, counts by the address it came from. `proxy: false` says none is in front.
+- Outside production, without `proxy`, the address the request came from is the client, and a server getting requests from a private address that carry `X-Forwarded-For` warns once that every visitor counts as the proxy.
 - In a plain Elysia app that `pages()` does not serve, `clientAddress(request, server, { hops: 1 })` takes the setting itself.
 
 ### Security headers

@@ -8,7 +8,7 @@ import type { OwnOptions, OwnPlugin } from '../own'
 import type { CreateUserInput, CreateUserResult } from '../password'
 import type { LinkType } from '../store'
 import { resolve } from 'node:path'
-import { appModules, configError } from 'kay/library'
+import { appModules, checkOptionKeys, configError } from 'kay/library'
 import { pickLocale } from '../locale'
 import { buildOwn, MAIL_EXTENSION, ownEnv } from '../own'
 
@@ -254,10 +254,14 @@ function authOfExport(exported: unknown, module: string): { [PAGES_OF]?: PagesHa
   return exported as { [PAGES_OF]?: PagesHandle | undefined }
 }
 
+const KNOWN_OPTIONS: Record<keyof OwnOptions | keyof AuthExtensionOptions, true> = { module: true, server: true, plugin: true, prefix: true, pages: true, cookie: true, oauth: true, store: true, email: true, hooks: true, viewer: true, secret: true, site: true, name: true, signInPage: true, failurePage: true, twoFactorPage: true, allow: true, signUp: true, onSignUp: true, user: true, profileFields: true, onDelete: true, guests: true, exportData: true, onAuthEvent: true, audit: true, scopes: true, roles: true, organizations: true, admin: true, defaultRoles: true, remember: true, rules: true, sessionsPage: true, securityPage: true, locate: true, rateLimit: true, passkeys: true, password: true, magicLink: true, twoFactor: true, captcha: true, breachedPasswords: true, proxy: true, oauthServer: true, forwardAuth: true, authorize: true, home: true }
+
 // kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `auth({ module: './src/auth' })`, the module exporting the `auth` made with `createAuth`. Its plugin is used before the pages, so the app mounts nothing else and declares no `Register`, and `prefix` and `home` reach `createAuth({ pages: true })`; the prebuilt pages come with it unless `pages: false`.
 export function auth<Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options?: OwnOptions<Role, Prefix, Scope, OrgRole, UserData>): AuthPages<OwnPlugin<Role, Prefix, Scope, OrgRole, UserData>>
 export function auth(options: AuthExtensionOptions): AuthPages
 export function auth(options: object = {}): AuthPages {
+  checkOptionKeys('auth()', options, KNOWN_OPTIONS)
+
   const given = options as AuthExtensionOptions
 
   if (given.module === undefined && given.server === undefined && given.plugin !== false)

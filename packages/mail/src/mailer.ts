@@ -13,7 +13,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
 import { direction } from 'kay/i18n'
-import { configError, escapeHtml as escape, inFlightWork, notify, underKayDev } from 'kay/library'
+import { checkOptionKeys, configError, escapeHtml as escape, inFlightWork, notify, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
@@ -454,9 +454,13 @@ export async function enqueue<P extends object>(message: MailMessage<P>, options
   return (await registeredOrThrow()).enqueue(message, options)
 }
 
+const KNOWN_OPTIONS: Record<keyof MailExtensionOptions, true> = { module: true, server: true, from: true, fromName: true, to: true, transport: true, smtp: true, locale: true, queue: true, logRecipients: true, logSubjects: true, listStore: true, suppressionStore: true, events: true, inbound: true, optional: true }
+
 // Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`; its `mail.auth` and `mail.contact` messages come with the package (`kay.messages`).
 // `mail({ from, locale, ...})` takes the options of `mailer()` and builds it as `pages()` does, with no module; `module` or `server` are for a mailer written by the app, loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
 export function mail(options: MailExtensionOptions = {}): KayExtension<Mailer> {
+  checkOptionKeys('mail()', options, KNOWN_OPTIONS)
+
   const { module, server, ...mailerOptions } = options
 
   if (module !== undefined && server !== undefined)

@@ -1,24 +1,150 @@
-import type { ActionsConfig, ClientConfig, CookieDefaults, DirsConfig, HealthConfig, I18nConfig, KayConfig, LimitsConfig, ObserveConfig, OfflineConfig, ProxyConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
+import type { BudgetConfig } from './build/budget'
+import type { ActionsConfig, CardConfig, ClientConfig, CookieDefaults, DirsConfig, FaviconConfig, HealthConfig, I18nConfig, ImagesConfig, JobsConfig, KayConfig, LimitsConfig, LiveConfig, ManifestConfig, MarkdownConfig, MetricsConfig, ObserveConfig, OfflineConfig, PreviewConfig, ProxyConfig, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
+import type { Rule } from './config-rules'
+import { bag, bool, bytes, duration, either, fn, list, lit, map, num, obj, oneOf, str, typedKeys } from './config-rules'
 import { nearest } from './nearest'
 
-// Every key the config and its nested bags take, written as records so the compiler refuses a key added to a type and missing here, or listed here and gone from the type.
-const CONFIG: Record<keyof KayConfig, true> = { dirs: true, limits: true, serve: true, observe: true, client: true, i18n: true, routesDir: true, apiDir: true, apiPath: true, publicDir: true, publicCache: true, minify: true, lang: true, site: true, seo: true, robots: true, sitemap: true, head: true, images: true, budget: true, favicon: true, manifest: true, entry: true, offline: true, search: true, fonts: true, security: true, proxy: true, maxSize: true, maxSizeByPath: true, requireGuards: true, cors: true, openapi: true, mcp: true, compress: true, compressionDictionary: true, health: true, metrics: true, jobs: true, log: true, serverTiming: true, tracer: true, rewrite: true, redirects: true, runtimeRedirects: true, live: true, requestIdHeader: true, timeZone: true, base: true, links: true, trailingSlash: true, contentConfig: true, markdown: true, shutdownTimeout: true, navigation: true, inlineStyles: true, lateStyles: true, typography: true, hydration: true, prefetch: true, saveData: true, plugins: true, librarySettings: true, lints: true, secret: true, preview: true, fileStore: true, store: true, onError: true, env: true, checks: true, actions: true, beforeRequest: true, onResponse: true, onStart: true, onStop: true, extensions: true }
-const SECURITY: Record<keyof SecurityConfig, true> = { csp: true, reportOnly: true, reports: true, permissions: true, headers: true, hosts: true, cookies: true }
-const I18N: Record<keyof I18nConfig, true> = { locales: true, defaultLocale: true, prefixDefault: true, domains: true, paths: true, messages: true }
-const SEO: Record<keyof SeoConfig, true> = { name: true, titleTemplate: true, description: true, image: true, imageAlt: true, twitter: true, locale: true, themeColor: true, jsonLd: true }
-const DIRS: Record<keyof DirsConfig, true> = { routes: true, api: true, public: true }
-const LIMITS: Record<keyof LimitsConfig, true> = { body: true, byPath: true }
-const SERVE: Record<keyof ServeConfig, true> = { apiPath: true, compress: true, compressionDictionary: true, shutdownTimeout: true, timeout: true }
-const OBSERVE: Record<keyof ObserveConfig, true> = { log: true, serverTiming: true, requestIdHeader: true, tracer: true, extract: true, onError: true }
-const CLIENT: Record<keyof ClientConfig, true> = { navigation: true, inlineStyles: true, lateStyles: true, typography: true, hydration: true, prefetch: true, saveData: true }
-const ACTIONS: Record<keyof ActionsConfig, true> = { protect: true, maxSize: true, messages: true, beforeRun: true, onSuccess: true, onError: true }
-const OFFLINE: Record<keyof OfflineConfig, true> = { pages: true, fallback: true }
-const HEALTH: Record<keyof HealthConfig, true> = { path: true, timeout: true, check: true }
-const PROXY: Record<keyof ProxyConfig, true> = { hops: true, header: true, trusted: true, trustPrivate: true, key: true, open: true }
-const SITEMAP: Record<keyof SitemapConfig, true> = { ttl: true }
+// Every key the config and its nested bags take, each with the check of its value, written as records so the compiler refuses a key added to a type and missing here, or listed here and gone from the type.
+// A key takes `true` to accept any value while its type is too open to check; a lane adding a key to `KayConfig` adds it here, beside its type, with a check from `config-rules.ts` (`str`, `bool`, `oneOf('a', 'b')`, `list(str)`, `bag({ ... })`, `either(...)`), and a bag it holds as a `Record<keyof ItsInterface, Rule>` passed to `bag`.
+const localized = either(str, map(str))
+const SECURITY_KEYS: Record<keyof SecurityConfig, Rule> = { csp: either(lit(false), map(either(list(str), lit(false)))), reportOnly: map(either(list(str), lit(false))), reports: either(lit(true), str), permissions: map(either(str, list(str), lit(false))), headers: map(either(str, lit(false))), hosts: either(list(str), bool), cookies: either(lit(false), bag({ httpOnly: bool, sameSite: oneOf('lax', 'strict', 'none'), secure: either(bool, oneOf('auto')), path: str } satisfies Record<keyof CookieDefaults, Rule>)) }
+const I18N: Record<keyof I18nConfig, Rule> = { locales: list(str), defaultLocale: str, prefixDefault: bool, domains: map(str), paths: map(map(str)), messages: str }
+const I18N_BAG = bag(I18N, ({ locales, defaultLocale }, path, out) => {
+  if (Array.isArray(locales) && typeof defaultLocale === 'string' && !locales.includes(defaultLocale))
+    out.push(`\`${path}.defaultLocale\` is ${JSON.stringify(defaultLocale)}, expected one of its locales: ${locales.map(locale => JSON.stringify(locale)).join(', ')}`)
+})
+const SEO: Record<keyof SeoConfig, Rule> = { name: localized, titleTemplate: localized, description: localized, image: localized, imageAlt: localized, twitter: str, locale: localized, themeColor: either(str, bag({ light: str, dark: str })), jsonLd: list(obj) }
+const DIRS: Record<keyof DirsConfig, Rule> = { routes: str, api: str, public: str }
+const LIMITS: Record<keyof LimitsConfig, Rule> = { body: bytes, byPath: map(bytes) }
+const SERVE: Record<keyof ServeConfig, Rule> = { apiPath: str, compress: bool, compressionDictionary: bool, shutdownTimeout: duration, timeout: either(duration, lit(false)) }
+const OBSERVE: Record<keyof ObserveConfig, Rule> = { log: true, serverTiming: bool, requestIdHeader: str, tracer: true, extract: either(fn, lit(false)), onError: fn }
+const HYDRATION = bag({ visible: str, serverIslands: str })
+const CLIENT: Record<keyof ClientConfig, Rule> = { navigation: bool, inlineStyles: bool, lateStyles: bool, typography: bool, hydration: HYDRATION, prefetch: either(oneOf('conservative', 'moderate', 'eager'), lit(false)), saveData: bool }
+const ACTIONS: Record<keyof ActionsConfig, Rule> = { protect: either(lit(false), obj), maxSize: bytes, messages: obj, beforeRun: fn, onSuccess: fn, onError: fn }
+const OFFLINE: Record<keyof OfflineConfig, Rule> = { pages: list(str), fallback: str }
+const HEALTH: Record<keyof HealthConfig, Rule> = { path: str, timeout: duration, check: fn }
+const PROXY: Record<keyof ProxyConfig, Rule> = { hops: num, header: str, trusted: list(str), trustPrivate: lit(false), key: str, open: list(str) }
+const SITEMAP: Record<keyof SitemapConfig, Rule> = { ttl: duration }
+const ROBOTS: Record<keyof RobotsConfig, Rule> = { disallow: list(str), allow: list(str) }
+const PREVIEW: Record<keyof PreviewConfig, Rule> = { secret: str, maxAge: duration }
+const LIVE: Record<keyof LiveConfig, Rule> = { connections: num, perMinute: num }
+const JOBS: Record<keyof JobsConfig, Rule> = { guard: either(fn, list(fn)), path: str }
+const METRICS: Record<keyof MetricsConfig, Rule> = { path: str }
+const BUDGET: Record<keyof BudgetConfig, Rule> = { js: bytes, css: bytes, weight: bytes, grade: oneOf('A', 'B', 'C', 'D', 'E', 'F', 'G') }
+const FAVICON: Record<keyof FaviconConfig, Rule> = { image: str, svg: str }
+const MANIFEST: Record<keyof ManifestConfig, Rule> = { shortName: str, themeColor: str, backgroundColor: str, display: oneOf('fullscreen', 'standalone', 'minimal-ui', 'browser'), orientation: oneOf('any', 'natural', 'landscape', 'landscape-primary', 'landscape-secondary', 'portrait', 'portrait-primary', 'portrait-secondary'), startUrl: str, scope: str, maskable: str, shortcuts: list(obj) }
+const MARKDOWN: Record<keyof MarkdownConfig, Rule> = { highlight: fn, headingLinks: bool, readingSpeed: num, imageSizes: str }
+const CARD: Record<keyof CardConfig, Rule> = { font: bag({ family: str, weight: num }), background: str, color: str, logo: str }
+const IMAGES: Record<keyof ImagesConfig, Rule> = { ttl: duration, dirs: map(str), remote: list(str), remoteMaxSize: bytes, remoteTimeout: duration, quality: num, webp: bag({ quality: num }), widths: list(num), avif: either(lit(false), bag({ quality: num })), maxDensity: num, placeholder: lit(false), aspects: list(str), card: bag(CARD), resolve: fn, guard: fn }
+const CORS = bag({ origins: either(oneOf('*'), list(str)), credentials: bool, expose: list(str), headers: list(str), maxAge: duration })
+const CONFIG: Record<keyof KayConfig, Rule> = {
+  dirs: bag(DIRS),
+  limits: bag(LIMITS),
+  serve: bag(SERVE),
+  observe: bag(OBSERVE),
+  client: bag(CLIENT),
+  actions: bag(ACTIONS),
+  beforeRequest: fn,
+  onResponse: fn,
+  onStart: fn,
+  onStop: fn,
+  routes: str,
+  api: str,
+  maxSizes: map(bytes),
+  content: str,
+  settings: map(str),
+  storage: true,
+  i18n: I18N_BAG,
+  routesDir: str,
+  apiDir: str,
+  apiPath: str,
+  publicDir: str,
+  publicCache: map(duration),
+  minify: bool,
+  lang: str,
+  site: str,
+  seo: bag(SEO),
+  robots: either(lit(false), bag(ROBOTS)),
+  sitemap: bag(SITEMAP),
+  head: list(obj),
+  images: bag(IMAGES),
+  budget: bag(BUDGET),
+  favicon: either(str, lit(false), bag(FAVICON)),
+  manifest: bag(MANIFEST),
+  entry: str,
+  offline: either(lit(true), lit(false), bag(OFFLINE)),
+  search: bool,
+  fonts: list(obj),
+  security: either(lit(false), bag(SECURITY_KEYS)),
+  proxy: either(bool, num, bag(PROXY)),
+  maxSize: bytes,
+  maxSizeByPath: map(bytes),
+  requireGuards: bool,
+  cors: CORS,
+  openapi: either(bool, obj),
+  mcp: either(bool, obj),
+  compress: bool,
+  compressionDictionary: bool,
+  health: either(lit(false), bag(HEALTH)),
+  metrics: either(bool, bag(METRICS)),
+  jobs: bag(JOBS),
+  log: true,
+  serverTiming: bool,
+  tracer: true,
+  rewrite: true,
+  redirects: true,
+  runtimeRedirects: bag({ hosts: list(str) }),
+  live: bag(LIVE),
+  requestIdHeader: str,
+  timeZone: str,
+  base: str,
+  links: bag({ outside: oneOf('new-tab', 'same-tab'), schemes: list(str) }),
+  trailingSlash: oneOf('never', 'always', 'ignore'),
+  contentConfig: str,
+  markdown: bag(MARKDOWN),
+  shutdownTimeout: duration,
+  navigation: bool,
+  inlineStyles: bool,
+  lateStyles: bool,
+  typography: bool,
+  hydration: HYDRATION,
+  prefetch: either(oneOf('conservative', 'moderate', 'eager'), lit(false)),
+  saveData: bool,
+  plugins: list(obj),
+  librarySettings: map(str),
+  lints: true,
+  secret: either(str, list(str)),
+  preview: either(lit(false), bag(PREVIEW)),
+  fileStore: true,
+  store: true,
+  onError: fn,
+  env: true,
+  checks: true,
+  extensions: list(obj),
+}
 
-// The names a config key had before 1.88 and no longer has, each with where it lives now: one is reported as an unknown key naming its replacement.
-export const REMOVED_KEYS: Record<string, string> = { routes: 'dirs.routes', api: 'dirs.api', content: 'contentConfig', storage: 'store.files', maxSizes: 'limits.byPath', settings: 'librarySettings' }
+// The keys 1.84 renamed so that every directory ends in `Dir` and no two keys differ by a letter, each with the key that replaces it: still read until 1.87, and reported by `deprecated-config-keys`.
+export const RENAMED_KEYS = { routes: 'routesDir', api: 'apiDir', content: 'contentConfig', storage: 'fileStore', maxSizes: 'maxSizeByPath', settings: 'librarySettings' } as const satisfies Partial<Record<keyof KayConfig, keyof KayConfig>>
+
+// The config with each key of `RENAMED_KEYS` under its new name, unless the new name is set already, in which case it wins.
+export function renamedKeys<Config extends object>(config: Config): Config {
+  const given = config as Record<string, unknown>
+
+  if (!Object.keys(RENAMED_KEYS).some(old => Object.hasOwn(given, old)))
+    return config
+
+  const renamed: Record<string, unknown> = { ...given }
+
+  for (const [old, name] of Object.entries(RENAMED_KEYS)) {
+    if (!Object.hasOwn(given, old))
+      continue
+
+    delete renamed[old]
+    renamed[name] ??= given[old]
+  }
+
+  return renamed as Config
+}
 
 // The flat keys 1.88 grouped by concern, each with the bag that holds it now and its name there: still read until 1.91, and reported by `deprecated-config-groups`.
 export const GROUPED_KEYS = {
@@ -78,6 +204,11 @@ export function groupedKeys<Config extends object>(config: Config): Config {
   return grouped as Config
 }
 
+// The config as the current release reads it: the 1.84 names renamed, then every flat key in its bag.
+export function currentKeys<Config extends object>(config: Config): Config {
+  return groupedKeys(renamedKeys(config))
+}
+
 const defined = (given: Record<string, unknown>): [string, unknown][] => Object.entries(given).filter(([, value]) => value !== undefined)
 
 // The options of a code call laid over the config, each bag one level deep: `testSite({ client: { navigation: false } })` keeps the config's other `client` keys. An option left `undefined` leaves the config's value alone.
@@ -97,42 +228,47 @@ export function mergeBags(base: object, over: object): Record<string, unknown> {
   return merged
 }
 
-const COOKIE_DEFAULTS: Record<keyof CookieDefaults, true> = { httpOnly: true, sameSite: true, secure: true, path: true }
-const BAGS: Record<string, Record<string, true>> = { dirs: DIRS, limits: LIMITS, serve: SERVE, observe: OBSERVE, client: CLIENT, actions: ACTIONS, security: SECURITY, i18n: I18N, seo: SEO, offline: OFFLINE, health: HEALTH, proxy: PROXY, sitemap: SITEMAP }
-
-// Each key of a config, or of one of its option bags, that no type of the config takes, as `` `trailingslash`, did you mean `trailingSlash`? ``; what an app mistyped would otherwise leave at kay's default with nothing said.
+// Each key of a config, or of one of its option bags, that no type of the config takes, as ```trailingslash`, did you mean `trailingSlash`?``; what an app mistyped would otherwise leave at kay's default with nothing said.
 // A bag that is not an object is left to the checks of its own value.
 export function unknownConfigKeys(config: object): string[] {
   const problems: string[] = []
 
-  const report = (given: object, known: Record<string, true>, path: string): void => {
-    for (const key of Object.keys(given)) {
-      if (Object.hasOwn(known, key))
-        continue
+  const walk = (given: Record<string, unknown>, known: Record<string, Rule>, path: string): void => {
+    for (const [key, value] of Object.entries(given)) {
+      if (Object.hasOwn(known, key)) {
+        const inner = typedKeys(known[key])
 
+        if (inner !== undefined && isBag(value))
+          walk(value, inner, `${path}${key}.`)
+
+        continue
+      }
+
+      // An old name is offered as the name that replaced it.
       const found = nearest(key, Object.keys(known))
-      const removed = known === CONFIG && Object.hasOwn(REMOVED_KEYS, key) ? REMOVED_KEYS[key] : undefined
+      const renamed = found !== undefined && path === '' && Object.hasOwn(RENAMED_KEYS, found) ? RENAMED_KEYS[found as keyof typeof RENAMED_KEYS] : found
       // A key that moved into a bag is offered where it lives now.
-      const grouped = found !== undefined && known === CONFIG && Object.hasOwn(GROUPED_KEYS, found) ? GROUPED_KEYS[found as keyof typeof GROUPED_KEYS] : undefined
-      const near = removed ?? (grouped === undefined ? found : `${grouped[0]}.${grouped[1]}`)
+      const grouped = renamed !== undefined && path === '' && Object.hasOwn(GROUPED_KEYS, renamed) ? GROUPED_KEYS[renamed as keyof typeof GROUPED_KEYS] : undefined
+      const near = grouped === undefined ? renamed : `${grouped[0]}.${grouped[1]}`
 
       problems.push(`\`${path}${key}\`${near === undefined ? '' : `, did you mean \`${path}${near}\`?`}`)
     }
   }
 
-  report(config, CONFIG, '')
-
-  for (const [name, known] of Object.entries(BAGS)) {
-    const bag: unknown = (config as Record<string, unknown>)[name]
-
-    if (typeof bag === 'object' && bag !== null && !Array.isArray(bag))
-      report(bag, known, `${name}.`)
-  }
-
-  const cookies: unknown = (config as { security?: { cookies?: unknown } }).security?.cookies
-
-  if (typeof cookies === 'object' && cookies !== null)
-    report(cookies, COOKIE_DEFAULTS, 'security.cookies.')
+  walk(config as Record<string, unknown>, CONFIG, '')
 
   return problems
+}
+
+// The leading dot a path gets from the bag walk, which starts at no key.
+const LEADING_DOT = /^`\./
+
+// Each value of a config, or of one of its option bags, that is not the kind its key takes, as ```trailingSlash` is "sometimes", expected one of "never", "always" or "ignore"; did you mean "never"?``, the key written as a path.
+// A key an app set to `undefined` is left out, as the types allow it.
+export function invalidConfigValues(config: object): string[] {
+  const out: string[] = []
+
+  bag(CONFIG)(config, '', out)
+
+  return out.map(message => message.replace(LEADING_DOT, '`'))
 }

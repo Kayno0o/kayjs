@@ -116,7 +116,7 @@ describe('kay build with a budget', () => {
     const bad = await built(await project('budget: { js: \'20 kb\' }, lints: { \'over-budget\': \'allow\' }'))
 
     expect(bad.code).toBe(1)
-    expect(bad.document.problems.map(problem => problem.message).join('\n')).toContain('`budget.js` is \'20 kb\'')
+    expect(bad.document.problems.map(problem => problem.message).join('\n')).toContain('`budget.js` is "20 kb"')
   }, 120_000)
 
   it('has --deny-warnings fail on a check warning with no budget set', async () => {

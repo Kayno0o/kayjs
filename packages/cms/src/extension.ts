@@ -2,7 +2,7 @@ import type { KayExtension } from 'kay/server'
 import type { FileSaver } from './files'
 import type { CmsOptions } from './settings'
 import { s } from 'kay'
-import { configError, serverRoot, underKayDev, viewPresenceWith } from 'kay/library'
+import { checkOptionKeys, configError, serverRoot, underKayDev, viewPresenceWith } from 'kay/library'
 import { api, defineEnv } from 'kay/server'
 import { viewMembers } from './editor-names'
 import { forgejo } from './files'
@@ -81,8 +81,12 @@ function savedFromEnv(): FileSaver {
 
 const UNCHECKED = 'the collections could not be checked for field kinds with no component or a layout naming a field they lack, or a `when` waiting for none'
 
+const KNOWN_OPTIONS: Record<keyof CmsOptions, true> = { prefix: true, guard: true, role: true, files: true, uploads: true, pageSize: true, rawHtml: true, collections: true, pageLink: true, newsletter: true, roles: true, member: true, author: true, fourEyes: true, onSave: true, history: true }
+
 // The one line an app adds to kay.config.ts. `editor` is the island kay renders at the end of every page in edit mode only.
 export function cms(options: CmsOptions = {}): KayExtension {
+  checkOptionKeys('cms()', options, KNOWN_OPTIONS)
+
   const { prefix } = configure(options)
 
   return {

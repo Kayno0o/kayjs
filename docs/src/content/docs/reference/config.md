@@ -5,6 +5,8 @@ description: The options of kay.config.ts most projects set.
 ---
 `kay.config.ts` at the project root exports the config by default. `defineConfig` types it, and `kay dev`, `kay build`, `kay check` and the server all read it. A key kay does not know, at the top or in an option bag such as `security`, is a type error in `defineConfig` and stops every command with the nearest known name, so a mistyped `trailingslash` never leaves the default in place unnoticed.
 
+A value of the wrong kind, such as `trailingSlash: 'sometimes'` or `lang: 5`, stops them too, once, naming the key, what it accepts and the nearest match. `auth()`, `cms()`, `mail()` and `ai()` check their options the same way.
+
 ```ts
 import { defineConfig } from 'kay/server'
 
@@ -147,7 +149,7 @@ In `client`, what pages ship to the browser and how it behaves there:
 | `fonts` | Self-hosted fonts, from files or a Fontsource package |
 | `plugins` | Bun plugins the browser build runs, such as Tailwind's |
 | `budget` | The most JavaScript (`js`), CSS (`css`) or whole page (`weight`) one page may load, compressed, as `'20kb'`, and the worst EcoIndex `grade` it may have. `kay build` warns with `over-budget` for a page over it. All are off until set. See [Set a budget](/guides/performance#set-a-budget) |
-| `timeZone` | The IANA time zone dates are written in, `Europe/Paris`: `formatDate`, a message's date and the relative time tooltip, on the server and in islands, unless a call names its own. The server's and the visitor's zone by default. See [Internationalization](/guides/i18n#sizes-durations-and-the-time-zone) |
+| `timeZone` | The IANA time zone dates are written in, `Europe/Paris`: `formatDate`, a message's date and the relative time tooltip, on the server and in islands, unless a call names its own. The server's and the visitor's zone by default, and the zone a `schedule` cron is read in unless it names a `tz`. See [Internationalization](/guides/i18n#sizes-durations-and-the-time-zone) |
 | `minify` | Minifies the browser build. On for `kay build`, off for `kay dev` unless set to `true` |
 | `librarySettings` | A module for a kay library's settings, such as `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. See [kayjs-ui](/libraries/kayjs-ui) |
 | `lints` | The level of each lint. See [Checks](/reference/checks) |

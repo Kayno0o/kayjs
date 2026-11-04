@@ -119,7 +119,7 @@ describe('the grouped config keys', () => {
 
   it('checks the keys of each bag, and offers a flat key where it lives now', () => {
     expect(unknownConfigKeys({ dirs: { routes: 'a' }, limits: { body: 1 }, serve: { compress: true }, observe: { log: false }, client: { saveData: false } })).toEqual([])
-    expect(unknownConfigKeys({ dirs: { route: 'a' }, client: { saveDat: false }, limits: { max: 1 } })).toEqual(['`dirs.route`, did you mean `dirs.routes`?', '`limits.max`', '`client.saveDat`, did you mean `client.saveData`?'])
+    expect(unknownConfigKeys({ dirs: { route: 'a' }, client: { saveDat: false }, limits: { max: 1 } })).toEqual(['`dirs.route`, did you mean `dirs.routes`?', '`client.saveDat`, did you mean `client.saveData`?', '`limits.max`'])
     expect(unknownConfigKeys({ routsDir: 'a', compres: false })).toEqual(['`routsDir`, did you mean `dirs.routes`?', '`compres`, did you mean `serve.compress`?'])
   })
 })

@@ -2,6 +2,20 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.89.0
+
+### Defaults that fit production
+
+- With no `proxy`, a production server counts one proxy in front for a request from a private address that carries `X-Forwarded-For`, as `proxy: true` does, and logs once that it does; before, every visitor behind a reverse proxy shared one rate-limit key. A server that faces visitors directly is unchanged, since a public address is counted by itself; set `proxy: false` for one reachable from a private network that is no proxy, `proxy: 2` for two proxies.
+- `session()` with no `store` and none in `store.sessions` keeps its sessions in `data/sessions.sqlite` (memory under `bun test`), revocable, where it kept them in the cookie: everyone signed in by cookie is signed out once. `session({ store: false })` keeps the old behaviour for a host with no disk of its own; a host with several servers gives the app a shared `store`. kayjs-auth is unchanged. Nothing warns about a missing store any more.
+- A `schedule` cron without `tz` is read in the `timeZone` of kay.config.ts when it sets one, the system's otherwise; name `tz` on a schedule that must keep the system's zone.
+- `kay new` with auth scaffolds `requireGuards: true`; `requireGuards` stays `false` by default for an existing app, since a public site would otherwise declare `guards: false` on every page.
+
+### Config values are checked once, and library options too
+
+- A value of the wrong kind in `kay.config.ts`, in the options of `pages()` or `testSite()` or in an extension's `config` (`trailingSlash: 'sometimes'`, `compress: 7`, `lang: 5`) stops every command with `config-invalid`, naming the key path, what it accepts and the nearest match; it left kay's default in place or died with a `TypeError` before. A key kay does not know is refused in every option bag now, not only six of them.
+- `auth()`, `cms()`, `mail()` and `ai()` throw for an option they do not take, with the nearest one: remove a mistyped or stale option.
+
 ## 1.88.0
 
 ### The names of 1.84 are gone

@@ -39,6 +39,10 @@ export interface KayConfig extends AppHooks {
   client?: ClientConfig | undefined
   // What every action starts from: the `protect` checks, `maxSize` and `messages` an action's own options replace key by key, and the `beforeRun`, `onSuccess` and `onError` hooks, which run before the action's own.
   actions?: ActionsConfig | undefined
+  /** @deprecated Renamed `routesDir` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
+  routes?: string | undefined
+  /** @deprecated Renamed `apiDir` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
+  api?: string | undefined
   // How long a browser keeps a file of `public/` without asking again, by the path it is served at, as a glob: `{ '/fonts/**': '365d', '**/*.png': '30d' }`; the first pattern a path matches decides, and a file none names keeps revalidating through its ETag on every visit. Ignored by `kay dev`, so an edit shows at once.
   publicCache?: Record<string, Duration> | undefined
   minify?: boolean | undefined
@@ -69,8 +73,10 @@ export interface KayConfig extends AppHooks {
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   // The security headers every response carries, or `false` for none; a header the app sets itself wins.
   security?: SecurityConfig | false | undefined
-  // The proxies in front of the server, `true` for one and a number for that many, which the client's address that rate limits count is read through. Without it, or with `false`, the address the server was reached from is the client, so behind a proxy every visitor counts as that proxy.
+  // The proxies in front of the server, `true` for one and a number for that many, which the client's address that rate limits count is read through. Left out in production, one proxy is in front for a request from a private address that carries `X-Forwarded-For`; `false` says none is, and the address the server was reached from is the client. Outside production, left out or `false`, the address the server was reached from is the client.
   proxy?: ProxyConfig | number | boolean | undefined
+  /** @deprecated Renamed `maxSizeByPath` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
+  maxSizes?: Record<string, ByteSize> | undefined
   // Every page, action, endpoint and API module of the app answers 403 unless a `_guard.ts` covers it or it sets `guards: false`, in its `page` or its `api()` options; `kay check` reports each such route. A library's routes keep the guards it gives them.
   requireGuards?: boolean | undefined
   // Lets other sites' pages call every API module's routes from the browser, as `api({ cors })` does for one: `cors: { origins: ['https://app.example.com'], credentials: true }`. A module setting its own `cors` keeps it, and `api({ cors: false })` keeps a module to its own site.
@@ -95,7 +101,7 @@ export interface KayConfig extends AppHooks {
   live?: LiveConfig | undefined
   // The locales pages are served in, each under its prefix or on its own domain, with messages in `src/messages/<locale>.ts`.
   i18n?: I18nConfig | undefined
-  // The IANA time zone dates are written in, `Europe/Paris`: `formatDate` and the dates of kay's own screens, on the server and in the islands alike, unless a call names its own `timeZone`. The server's and the visitor's zone by default.
+  // The IANA time zone dates are written in, `Europe/Paris`: `formatDate` and the dates of kay's own screens, on the server and in the islands alike, unless a call names its own `timeZone`. The server's and the visitor's zone by default, and the one a `schedule` cron is read in unless it names a `tz`.
   timeZone?: string | undefined
   // Where the site is mounted when not at its host's root, `/docs`; `SITE_BASE` when left out, as `site` reads `SITE_URL`, and a `base` written here wins over it. The links, assets, forms and redirects pages render, the sitemap and the feeds carry it, links stay written without it, and a proxy in front of the server takes it off requests.
   base?: string | undefined
@@ -106,12 +112,16 @@ export interface KayConfig extends AppHooks {
   trailingSlash?: TrailingSlash | undefined
   // The module exporting the project's content collections, `src/content.config.ts` by default; their folders are relative to it.
   contentConfig?: string | undefined
+  /** @deprecated Renamed `contentConfig` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
+  content?: string | undefined
   // How every collection's Markdown compiles; a collection's own option of the same name wins.
   markdown?: MarkdownConfig | undefined
   // Bun plugins the browser build runs, such as Tailwind's.
   plugins?: BunPlugin[] | undefined
   // The app's own module for a kay library's settings, by the library's name: `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.
   librarySettings?: Record<string, string> | undefined
+  /** @deprecated Renamed `librarySettings` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
+  settings?: Record<string, string> | undefined
   // The level of each lint `kay check`, `kay build`, `kay dev` and the editor report, or of each lint in a group, over its default: `{ 'positional-key': 'deny', 'seo': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
   lints?: LintLevels | undefined
   // The app's one secret, at least 32 random characters: it seals `session()`'s cookie, signs form stamps, links to private files and the flash cookie, and gives `preview` its key, each under a key derived for its use. `KAY_SECRET` alone does the same, so this is for a secret kept elsewhere than the environment. A list, or commas in `KAY_SECRET`, rotates it: the first seals and signs, every one opens and verifies: sessions, kayjs-auth's sealed data, stamps, private-file links, the flash cookie and preview links, so a rotation breaks none of them. A `session()` called as a module loads reads `KAY_SECRET` only, as the config is not read yet, so a secret meant for sessions goes in `KAY_SECRET`. Development and tests derive one for the checkout; production without any refuses to boot a `session()`, and a production server using none refuses to start, as it would sign with a key of the process, which a restart changes and other replicas do not share; `KAY_EPHEMERAL_SECRET=1` starts it anyway, for a single throwaway server.
@@ -120,7 +130,9 @@ export interface KayConfig extends AppHooks {
   preview?: PreviewConfig | false | undefined
   /** @deprecated Moved under `store` in 1.87 as `store: { files }`; the old key works until 1.90, and `kay upgrade` moves it. */
   fileStore?: FileStore | undefined
-  // Where the app keeps what outlives one process, for every feature naming no store of its own: `session()`'s data, `cached` values, `live()` values, queued jobs and schedule locks, rate limit counts, the tabs a page's `presence()` lists and the Web Vitals `vitals()` counts and the notifications `notify()` stores, the push subscriptions, the small keyed values libraries keep with an end (`kv`), and the files `files` from `kay/server` keeps in `files`, which only the app writes: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`. `sqliteData('data/app.sqlite')` keeps all but the files in one file; `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications, push, kv, files }` takes stores of your own, each optional, Redis say, and each may have `ping` for `health` and `close` for a stop. Without it sessions travel in their cookie, jobs stay in `data/jobs.sqlite` and the others in memory.
+  /** @deprecated Renamed `fileStore` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
+  storage?: FileStore | undefined
+  // Where the app keeps what outlives one process, for every feature naming no store of its own: `session()`'s data, `cached` values, `live()` values, queued jobs and schedule locks, rate limit counts, the tabs a page's `presence()` lists and the Web Vitals `vitals()` counts and the notifications `notify()` stores, the push subscriptions, the small keyed values libraries keep with an end (`kv`), and the files `files` from `kay/server` keeps in `files`, which only the app writes: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`. `sqliteData('data/app.sqlite')` keeps all but the files in one file; `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications, push, kv, files }` takes stores of your own, each optional, Redis say, and each may have `ping` for `health` and `close` for a stop. Without it sessions stay in `data/sessions.sqlite` (`session({ store: false })` keeps them in their cookie), jobs in `data/jobs.sqlite` and the others in memory.
   store?: AppStore | undefined
   // The files `kay env` and `kay check` compare the declared variables with: a compose file or several, and the example env file (`{ compose: 'compose.prod.yaml', example: '.env.example' }`). Each variable production needs must be set by a compose service and listed in the example, and each one the example lists must be declared. `false` turns the comparison off, the default one against the root compose files and `.env.example` included.
   env?: { compose?: string | string[] | undefined, example?: string | undefined } | false | undefined

@@ -3540,7 +3540,7 @@ interface SessionOptions
   maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   sameSite?: SameSite | undefined
   secret?: string | string[] | undefined
-  store?: SessionStore | undefined
+  store?: SessionStore | false | undefined
 
 [./server] SessionSettings
 interface SessionSettings
