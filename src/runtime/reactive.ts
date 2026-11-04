@@ -297,6 +297,7 @@ export function undoable(change: () => void): () => void {
 }
 
 // Runs `change` now and hands back what puts the signals it wrote back, `undo`, for when the work it shows fails, and `keep` for when it went through: the way to show at once the change a form posting in place makes, `kay:action-start` making it and `kay:action-error` undoing it. Changes made one after another and undone in any order end where they began.
+// kept: free
 export function optimistic(change: () => void): { undo: () => void, keep: () => void } {
   const undo = undoable(change)
 
