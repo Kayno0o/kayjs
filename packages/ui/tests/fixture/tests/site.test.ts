@@ -1375,3 +1375,24 @@ describe('the option snippet of the choice controls', () => {
     expect((await find('/drawn-options', '#multi input[type=checkbox]')).map(input => attr(input, 'aria-label'))).toEqual(['Alpha', 'Beta'])
   })
 })
+
+describe('a refused no-JS post', () => {
+  test('is shown again by every control of the form, whatever its kind', async () => {
+    const { signup } = await import('../src/routes/refill.kay')
+    const refused = await site.submit(signup, { name: 'A', bio: 'Hello', plan: 'pro', size: 'l', tags: ['a', 'c'], terms: 'on' } as never, { from: '/refill' })
+    const html = refused.html
+
+    expect(refused.find('input[name=name]').map(found => attr(found, 'value'))).toEqual(['A'])
+    expect(refused.find('textarea[name=bio]').map(found => found.text)).toEqual(['Hello'])
+    expect(html).toMatch(/<option[^>]*value="pro"[^>]*selected|<option[^>]*selected[^>]*value="pro"/)
+    expect(refused.find('input[name=size][checked]').map(found => attr(found, 'value'))).toEqual(['l'])
+    expect(refused.find('input[name=tags][checked]').map(found => attr(found, 'value'))).toEqual(['a', 'c'])
+    expect(refused.find('input[name=terms][checked]')).toHaveLength(1)
+    expect(refused.find('input[name=news][checked]')).toHaveLength(0)
+
+    const fresh = await site.visit('/refill')
+
+    expect(fresh.find('input[name=terms][checked]')).toHaveLength(0)
+    expect(fresh.find('input[name=name]').map(found => attr(found, 'value'))).toEqual([null])
+  })
+})

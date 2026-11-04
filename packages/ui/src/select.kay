@@ -2,7 +2,7 @@
 import type { FieldSize } from './field-look'
 import type { JSX } from 'kay'
 import type { ComboboxQuery } from './combobox'
-import { effect, recipe, signal, untrack } from 'kay'
+import { effect, postedValue, recipe, signal, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
 import { FIELD_LOOK, FIELD_SELECT_BOX, fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import { changeAccepted } from './change'
@@ -43,6 +43,10 @@ const { size = 'md', invalid, value, options, onChange, param, paramDefault, nam
   onLoad?: ((options: readonly SelectOption<Value>[]) => unknown) | undefined
   onError?: ((error: unknown) => unknown) | undefined
 }>()
+
+// A select with no callback is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
+const sent = onChange || param !== undefined ? undefined : postedValue(name)
+const wanted = () => String(sent ?? value)
 
 interface SelectOption<Choice> { value: Choice, label: string, disabled?: boolean | undefined }
 
@@ -182,4 +186,4 @@ select(aria-busy={busy || asking() || moving() ? 'true' : undefined} {...rest} d
   if failed()
     option(value="" disabled) {failureLabel}
   for choice of list() key={choice.value}
-    option(ref={element => element.toggleAttribute('selected', untrack(() => String(choice.value) === String(value)))} value={choice.value} disabled={choice.disabled} selected={String(choice.value) === String(value)}) {choice.label}
+    option(ref={element => element.toggleAttribute('selected', untrack(() => String(choice.value) === wanted()))} value={choice.value} disabled={choice.disabled} selected={String(choice.value) === wanted()}) {choice.label}

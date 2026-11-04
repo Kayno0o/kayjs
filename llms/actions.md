@@ -224,7 +224,7 @@ form(action={add})
 
 ### Refused fields and their messages
 
-- A form posting to an action shows a refused post again by itself: each `input`, `textarea` and `select` in it whose `name`, and `type` if any, are written out takes the value the post sent in place of the one the template gives, a checkbox or radio button whether it was ticked, a password, a file and the honeypot excepted.
+- A form posting to an action shows a refused post again by itself: each `input`, `textarea` and `select` in it whose `name`, and `type` if any, are written out takes the value the post sent in place of the one the template gives, a checkbox or radio button whether it was ticked, a password, a file and the honeypot excepted. A component inside the form reads the same post with `postedValue(name)`, `postedChecked(name, value?)` and `postedValues(name)` from `kay` (undefined outside a refused post, in the browser, and for a password), which is how the kayjs-ui controls refill; a list field posts back as `name[]`.
 - Each field the post was refused for gets `aria-invalid="true"`, and `aria-describedby` naming the element showing its message, so a screen reader reads the message with the field. In an island the mark goes once the field is no longer refused, unless a component still marks it through `markInvalid` (see [Islands](navigation.md#forms-posting-in-place)), such as a kayjs-ui `FormField` showing a message of its own.
 - An `error title` line inside the form shows that message: `p.error`, with the id `add-title-error`, while the post is refused for `title`, nothing otherwise.
 - `error.text-sm title` adds classes.

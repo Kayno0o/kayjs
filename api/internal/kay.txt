@@ -623,6 +623,9 @@ function formMarked(element: Element, target: unknown, field: string): void
 [./internal] formProtection
 function formProtection(target: unknown, kept?: boolean): string
 
+[./internal] formScope
+function formScope(target: unknown, render: () => string): string
+
 [./internal] formValue
 function formValue(target: unknown, name: string): string | undefined
 

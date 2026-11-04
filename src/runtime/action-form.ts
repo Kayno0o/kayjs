@@ -87,6 +87,58 @@ export function formValue(target: unknown, name: string): string | undefined {
   return untrack((target as FormTarget).failed)?.values[name]
 }
 
+// The actions of the forms being rendered, the innermost last, which a component inside one reads to show a refused post's values again.
+const enclosing: unknown[] = []
+
+// Renders a form's content with the form's action as the one `postedValue` and `postedChecked` read.
+export function formScope(target: unknown, render: () => string): string {
+  enclosing.push(target)
+
+  try {
+    return render()
+  }
+  finally {
+    enclosing.pop()
+  }
+}
+
+// What a refused post sent for the field `name` of the form being rendered, for a component drawing a field to start from; undefined outside a form posting to an action, without a refusal, for a password or a secret, and in the browser, where the server's markup is claimed as it is.
+export function postedValue(name: unknown): string | undefined {
+  return typeof name !== 'string' || name === '' ? undefined : formValue(enclosing.at(-1), name)
+}
+
+// Whether a checkbox or radio button named `name` was ticked in the refused post, `value` being the one it posts when ticked; undefined as `postedValue` is.
+export function postedChecked(name: unknown, value?: string | number): boolean | undefined {
+  return typeof name !== 'string' || name === '' ? undefined : formChecked(enclosing.at(-1), name, value)
+}
+
+// Every value a refused post sent for the field `name` of the form being rendered, such as the choices of a group of checkboxes, none when it sent none; undefined as `postedValue` is.
+export function postedValues(name: unknown): string[] | undefined {
+  const target = enclosing.at(-1)
+  const posted = typeof name === 'string' && name !== '' && isAction(target) ? untrack((target as FormTarget).failed)?.values : undefined
+
+  // A refusal that read no field, such as a body too large, has nothing to choose.
+  if (!posted || Object.keys(posted).length === 0)
+    return undefined
+
+  const list = posted[`${name as string}[]`]
+
+  if (list !== undefined) {
+    try {
+      const parsed: unknown = JSON.parse(list)
+
+      return Array.isArray(parsed) ? parsed.map(String) : []
+    }
+    catch {
+      return []
+    }
+  }
+
+  const one = posted[name as string]
+
+  return one === undefined ? [] : [one]
+}
+
 // The field carrying when a form posting to an action with `minTime` rendered.
 export const STAMP_FIELD = 'kay_since'
 

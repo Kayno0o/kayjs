@@ -645,6 +645,15 @@ interface PersistedOptions<T> extends SignalOptions<T>
 [.] PersistStorage
 type PersistStorage = 'cookie' | 'local' | 'query'
 
+[.] postedChecked
+function postedChecked(name: unknown, value?: string | number | undefined): boolean | undefined
+
+[.] postedValue
+function postedValue(name: unknown): string | undefined
+
+[.] postedValues
+function postedValues(name: unknown): string[] | undefined
+
 [.] PrerenderedContext
 type PrerenderedContext<Flag, Context> = [Flag] extends [false | null | undefined] ? Context : boolean extends Flag ? Context : Omit<Context, 'cookies' | 'query' | 'locals'> & {
   cookies: {

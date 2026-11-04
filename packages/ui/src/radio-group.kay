@@ -1,8 +1,10 @@
 --- <Value extends string | number | null, Held extends Value | null = Value>
 import type { JSX, Snippet } from 'kay'
-import { recipe, uid, untrack } from 'kay'
+import { postedValue, recipe, uid, untrack } from 'kay'
 import type { NullOption } from './null-option'
 import { controlledRadios } from './controlled-radios'
+import { RADIO_INVALID } from './field-look'
+import { sentOption } from './refill'
 
 // 'kui-radio-group' stays as the component's name for an app's CSS; the group is named so a choice reads its busy state.
 const look = recipe({
@@ -10,13 +12,13 @@ const look = recipe({
     root: 'kui-radio-group group/radios flex flex-col gap-2',
     radio: 'flex flex-col',
     choice: 'inline-flex cursor-pointer items-center gap-2 self-start has-[input:disabled]:opacity-50 group-aria-busy/radios:cursor-progress group-not-aria-busy/radios:has-[input:disabled]:cursor-not-allowed',
-    input: 'm-0 size-4 shrink-0 cursor-[inherit] accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+    input: `m-0 size-4 shrink-0 cursor-[inherit] accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${RADIO_INVALID}`,
     label: 'text-sm text-foreground',
     description: 'pl-6 text-xs text-muted',
   },
 })
 
-const { options, value, label, name, disabled = false, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value, label, name, invalid, disabled = false, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `description` is a quieter line under the label, which screen readers hear after it; `disabled` keeps that option from being picked.
   options: readonly { value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }[] & NullOption<Value, Held>
   // The option picked to start with, or `null` for none; a group whose parent passes another follows it.
@@ -25,6 +27,8 @@ const { options, value, label, name, disabled = false, onChange, option: drawRow
   label?: string | undefined
   // Disables every option; an option's own `disabled` still applies when this is false.
   disabled?: boolean | undefined
+  // Marks the group as refused, its radios in the danger colour, with `aria-invalid` on the group. A FormField showing a message marks the radios on its own.
+  invalid?: boolean | undefined
   // The radios' name, which the group submits under inside a form, and which a FormField reads the field's message by; one unique on the page is drawn when none is given.
   name?: string | undefined
   // A promise holds the group busy until it settles, and puts the previous option back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
@@ -35,11 +39,14 @@ const { options, value, label, name, disabled = false, onChange, option: drawRow
   option?: Snippet<[option: { value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }]> | undefined
 }>()
 
+// A group with no callback is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
+const sent = onChange ? undefined : postedValue(name)
+
 const { group, picked, busy, ref, pick } = controlledRadios({
   control: 'RadioGroup',
   input: '[data-part=input]',
   options: () => options,
-  value: () => value,
+  value: () => sentOption(sent, options, value),
   name: () => name,
   onChange: () => onChange as ((value: string | number | null) => unknown) | undefined,
   appRef: rest.ref,
@@ -48,7 +55,7 @@ const { group, picked, busy, ref, pick } = controlledRadios({
 const prefix = uid()
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field. The description sits beside the label, not inside it, so the option is named by its label alone.
-div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-busy={busy() ? 'true' : undefined})
+div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-busy={busy() ? 'true' : undefined})
   for option, index of options key={option.value}
     div(part="radio")
       label(part="choice")

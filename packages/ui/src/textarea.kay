@@ -2,7 +2,7 @@
 import type { FieldSize } from './field-look'
 import type { JSX } from 'kay'
 import { FIELD_BOX, FIELD_LOOK, fieldInvalid, fieldSize, keepInvalid } from './field-look'
-import { recipe, untrack } from 'kay'
+import { postedValue, recipe, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
 import { startRef } from './form-reset'
 
@@ -23,6 +23,9 @@ const { size = 'md', invalid, value, onInput, onChange, onBlur, writeFocused = f
   // Lets any write of the parent land while the box is focused, the caret going to the end, such as a chat clearing its draft or putting a refused message back.
   writeFocused?: boolean | undefined
 }>()
+
+// A field with no callback is plain: a refused post of its form, which the server renders it for, gives its text back in place of its own.
+const sent = onInput || onChange ? undefined : postedValue(rest.name)
 
 let box: HTMLTextAreaElement | undefined
 
@@ -49,4 +52,4 @@ const ref = startRef<HTMLTextAreaElement>((element) => {
 }, rest.ref)
 
 ---
-textarea({...rest} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} value={untrack(() => value)} onInput={event => { heard(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onChange={event => { heard(event.currentTarget.value); onChange?.(event.currentTarget.value) }} onBlur={event => { sync(true); onBlur?.(event) }})
+textarea({...rest} data-size={fieldSize(size)} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} value={sent ?? untrack(() => value)} onInput={event => { heard(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onChange={event => { heard(event.currentTarget.value); onChange?.(event.currentTarget.value) }} onBlur={event => { sync(true); onBlur?.(event) }})

@@ -118,7 +118,7 @@ export function readFlash(cookies: CookieMap, name: string): SuccessFlash | unde
   }
 }
 
-// What a form posted, as text, without the fields a page should never echo back.
+// What a form posted, as text, without the fields a page should never echo back. A field posted more than once, such as a group of checkboxes, goes under `<name>[]` as a JSON list of its values, which `postedValues` reads.
 export function submittedValues(body: unknown): Record<string, string> {
   const values: Record<string, string> = {}
 
@@ -126,8 +126,13 @@ export function submittedValues(body: unknown): Record<string, string> {
     return values
 
   for (const [name, value] of Object.entries(body)) {
-    if (!isSecret(name) && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'))
+    if (isSecret(name))
+      continue
+
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
       values[name] = String(value)
+    else if (Array.isArray(value))
+      values[`${name}[]`] = JSON.stringify(value.filter(item => typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean').map(String))
   }
 
   return values

@@ -430,7 +430,7 @@ class ModuleShell {
       kayHelpers.push('formDescribed')
 
     if (mode === 'html' && facts.actionForm)
-      kayHelpers.push('formProtection')
+      kayHelpers.push('formProtection', 'formScope')
 
     if (fence ? fence.exportNames.length > 0 : actions.length > 0)
       kayHelpers.push(fence ? 'registerActions' : 'actionStub')
@@ -1225,7 +1225,7 @@ function fillElement(block: SlotNode): ElementNode {
   return { kind: 'element', start: block.start, end: block.end, tag: { start: block.start, end: block.start }, name: 'KayFill', component: true, classes: [], attributes: [], children: block.children, fills: block.name }
 }
 
-type KayHelper = 'fill' | 'uiRecipe' | 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
+type KayHelper = 'fill' | 'uiRecipe' | 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'formScope' | 'registerActions' | 'actionStub' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
 
 type Helper = TemplateHelper | 'omit'
 

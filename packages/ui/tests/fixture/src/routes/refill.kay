@@ -1,0 +1,37 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const signup = action(t.Object({
+  name: t.String({ minLength: 2, maxLength: 100, error: 'Two letters at least' }),
+  bio: t.String({ maxLength: 100 }),
+  plan: t.String({ maxLength: 100 }),
+  size: t.String({ maxLength: 100 }),
+  tags: t.Optional(t.Array(t.String({ maxLength: 20 }), { maxItems: 10 })),
+  terms: t.Optional(t.String({ maxLength: 10 })),
+  news: t.Optional(t.String({ maxLength: 10 })),
+}), async () => 'ok')
+---
+---
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+
+const plans = [{ value: 'free', label: 'Free' }, { value: 'pro', label: 'Pro' }]
+const sizes = [{ value: 's', label: 'Small' }, { value: 'l', label: 'Large' }]
+const tags = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }, { value: 'c', label: 'Gamma' }]
+---
+main
+  form#refill(action={signup})
+    TextInput(name="name" aria-label="Name")
+    Textarea(name="bio" aria-label="Bio")
+    Select(name="plan" value="free" options={plans} aria-label="Plan")
+    RadioGroup(name="size" value="s" options={sizes} aria-label="Size")
+    ChipGroup(name="tags" options={tags} value={[]} label="Tags")
+    Checkbox(name="terms" label="Terms")
+    Toggle(name="news" label="News")
+    button Send

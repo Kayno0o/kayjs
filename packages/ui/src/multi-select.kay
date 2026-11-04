@@ -5,7 +5,7 @@ import type { JSX, Snippet } from 'kay'
 import type { ComboboxQuery } from './combobox'
 import type { MultiSelectOption } from './multi-select'
 import type { PopoverPlacement } from './popover'
-import { effect, onCleanup, recipe, signal, untrack } from 'kay'
+import { effect, onCleanup, postedValues, recipe, signal, untrack } from 'kay'
 import { stepIndex } from './cycle'
 import { defaultKept, onFormReset, startRef } from './form-reset'
 import Icon from './icon.kay'
@@ -94,7 +94,9 @@ const { size = 'md', invalid, id, options, value = [], label, placeholder = word
   onChange?: ((value: Value[]) => unknown) | undefined
 }>()
 
-const picked = signal<readonly Value[]>(value)
+// A control with no callback is plain: a refused post of its form, which the server renders it for, gives its choices back in place of its own; a function of options leaves them as the text they were posted as.
+const sent = onChange ? undefined : postedValues(name)
+const picked = signal<readonly Value[]>(sent === undefined ? value : typeof options === 'function' ? sent as Value[] : options.filter(one => sent.includes(String(one.value))).map(one => one.value))
 const query = signal('')
 let root: HTMLElement | undefined
 

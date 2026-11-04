@@ -2,16 +2,16 @@
 import type { JSX, Snippet } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
-import { effect, recipe, signal, uid, untrack } from 'kay'
+import { effect, postedValues, recipe, signal, uid, untrack } from 'kay'
 import { changeAccepted } from './change'
-import { LABEL_TEXT } from './field-look'
+import { GROUP_INVALID, LABEL_TEXT } from './field-look'
 import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 import Icon from './icon.kay'
 
 // 'kui-chip' stays as the name of a chip for an app's CSS and the skins; the label reads the input before it.
 const look = recipe({
   parts: {
-    root: 'kui-chip-group group/chips flex flex-wrap gap-2',
+    root: `kui-chip-group group/chips flex flex-wrap gap-2 ${GROUP_INVALID}`,
     chip: 'kui-chip relative cursor-pointer has-[input:disabled]:opacity-50 group-aria-busy/chips:cursor-progress group-not-aria-busy/chips:has-[input:disabled]:cursor-not-allowed',
     input: 'peer/chip absolute size-0 opacity-0',
     label: 'inline-flex items-center gap-1 rounded-md border-solid border-[length:var(--border-width)] bg-surface px-2.5 py-1 text-xs text-muted transition-colors [border-color:var(--_control-line,var(--color-border))] hover:text-foreground peer-checked/chip:border-accent peer-checked/chip:bg-accent peer-checked/chip:text-accent-foreground peer-checked/chip:hover:text-accent-foreground peer-focus-visible/chip:outline-2 peer-focus-visible/chip:outline-offset-2 peer-focus-visible/chip:outline-accent',
@@ -21,7 +21,7 @@ const look = recipe({
   },
 })
 
-const { options, value, label, showLabel = false, name, disabled = false, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value, label, showLabel = false, name, invalid, disabled = false, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that chip as it is.
   options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
   // The options picked to start with, in any order; a group whose parent passes others follows them.
@@ -32,6 +32,8 @@ const { options, value, label, showLabel = false, name, disabled = false, onChan
   showLabel?: boolean | undefined
   // Disables every chip; an option's own `disabled` still applies when this is false.
   disabled?: boolean | undefined
+  // Marks the group as refused, its chips' keylines in the danger colour, with `aria-invalid` on the group. A FormField showing a message marks the boxes on its own.
+  invalid?: boolean | undefined
   // The checkboxes' name, which the group submits under inside a form, once per picked option; one unique on the page is drawn when none is given.
   name?: string | undefined
   // Gets every picked option, in the order of `options`.
@@ -46,7 +48,9 @@ const group = name ?? uid()
 // The heading's id while `showLabel` writes it, which then names the group in place of `aria-label`.
 const heading = showLabel ? uid() : undefined
 // Held as string or number: a signal cannot take a type parameter that might be a function.
-const picked = signal<readonly (string | number)[]>(value)
+// A group with no callback is plain: a refused post of its form, which the server renders it for, gives its choices back in place of its own.
+const sent = onChange ? undefined : postedValues(name)
+const picked = signal<readonly (string | number)[]>(sent === undefined ? value : options.map(one => one.value).filter(one => sent.includes(String(one))))
 const busy = signal(false)
 let root: HTMLElement | undefined
 // How often the parent's `value` reached the group, so a change under way knows whether the parent answered it.
@@ -104,7 +108,7 @@ onFormReset(() => root, resetting.reset)
 ---
 // Real checkboxes drawn as chips, so the group submits like any other field and Space toggles the focused chip. A click while a change is under way ticks nothing.
 snippet chips()
-  div(part="root" {...rest} ref={ref} role="group" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-busy={busy() ? 'true' : undefined})
+  div(part="root" {...rest} ref={ref} role="group" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-busy={busy() ? 'true' : undefined})
     for option of options key={option.value}
       label(part="chip")
         input(part="input" ref={element => element.defaultChecked = untrack(() => value.includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})

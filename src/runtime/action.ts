@@ -10,7 +10,7 @@ export { actionStub, OUTCOME_SCRIPT, readActionResponse, setRequestOutcome } fro
 export { decodeCall, encodeCall, FILE_MARK, FORM_CALL, INPUT_PART } from './action-encode'
 export type { EncodedCall } from './action-encode'
 export { ActionError, ActionRedirectError, failure, isFailure } from './action-error'
-export { collectForms, formAction, formChecked, formDescribed, formError, formInvalid, formMarked, formProtection, formValue, PAYLOAD_PARAM, setStamper, STAMP_FIELD } from './action-form'
+export { collectForms, formAction, formChecked, formDescribed, formError, formInvalid, formMarked, formProtection, formScope, formValue, PAYLOAD_PARAM, postedChecked, postedValue, postedValues, setStamper, STAMP_FIELD } from './action-form'
 export type { FieldName } from './action-form'
 export { SETTLED } from './action-owner'
 export type { Caller, Settles } from './action-owner'

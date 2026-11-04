@@ -2,17 +2,18 @@
 import type { JSX, Snippet } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
-import { recipe, uid, untrack, withQuery } from 'kay'
+import { postedValue, recipe, uid, untrack, withQuery } from 'kay'
 import type { NullOption } from './null-option'
 import { controlledRadios } from './controlled-radios'
-import { LABEL_TEXT } from './field-look'
+import { GROUP_INVALID, LABEL_TEXT } from './field-look'
+import { sentOption } from './refill'
 import { paramChange } from './param-change'
 import Icon from './icon.kay'
 
 // 'kui-segmented' stays as the component's name for an app's CSS and the skins; the border colour reads --_control-line, which a skin sets.
 const look = recipe({
   parts: {
-    root: 'kui-segmented group/segmented inline-flex border-solid border-[length:var(--border-width)] bg-surface [border-color:var(--_control-line,var(--color-border))] data-[orientation=vertical]:flex-col',
+    root: `kui-segmented group/segmented inline-flex border-solid border-[length:var(--border-width)] bg-surface [border-color:var(--_control-line,var(--color-border))] data-[orientation=vertical]:flex-col ${GROUP_INVALID}`,
     option: 'relative cursor-pointer has-[input:disabled]:opacity-50 group-aria-busy/segmented:cursor-progress group-not-aria-busy/segmented:has-[input:disabled]:cursor-not-allowed',
     input: 'peer/option absolute size-0 opacity-0',
     label: 'flex items-center gap-1 px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground peer-checked/option:bg-accent peer-checked/option:text-accent-foreground peer-checked/option:hover:text-accent-foreground peer-focus-visible/option:outline-2 peer-focus-visible/option:-outline-offset-2 peer-focus-visible/option:outline-accent',
@@ -23,7 +24,7 @@ const look = recipe({
   },
 })
 
-const { options, value, label, showLabel = false, name, param, paramDefault, disabled = false, orientation = 'horizontal', onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value, label, showLabel = false, name, invalid, param, paramDefault, disabled = false, orientation = 'horizontal', onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that option from being picked.
   options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[] & NullOption<Value, Held>
   // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it.
@@ -34,6 +35,8 @@ const { options, value, label, showLabel = false, name, param, paramDefault, dis
   showLabel?: boolean | undefined
   // Disables every option; an option's own `disabled` still applies when this is false.
   disabled?: boolean | undefined
+  // Marks the group as refused, its keyline in the danger colour, with `aria-invalid` on the group. A FormField showing a message marks the radios on its own.
+  invalid?: boolean | undefined
   // The radios' name, which the group submits under inside a form; one unique on the page is drawn when none is given.
   name?: string | undefined
   // Holds a query param of the page instead of, or besides, `onChange`: a pick goes to the current page with `param` set to the option and every other param kept, the group busy until the page shows it, and each option also covers a link to that address, so a middle click, a new tab, a copy or a crawler finds it. Give `value` the param as the page read it. The radios take its name, so a GET form around the group sends it without JavaScript.
@@ -50,11 +53,14 @@ const { options, value, label, showLabel = false, name, param, paramDefault, dis
   option?: Snippet<[option: { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }]> | undefined
 }>()
 
+// A group with no callback or param is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
+const sent = onChange || param !== undefined ? undefined : postedValue(name)
+
 const { group, picked, busy, ref, pick } = controlledRadios({
   control: 'Segmented',
   input: '[data-part=input]',
   options: () => options,
-  value: () => value,
+  value: () => sentOption(sent, options, value),
   name: () => name ?? param,
   onChange: () => paramChange(param, paramDefault, onChange as ((value: string | number | null) => unknown) | undefined),
   appRef: rest.ref,
@@ -89,7 +95,7 @@ const heading = showLabel ? uid() : undefined
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field.
 snippet radios()
-  div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() ? 'true' : undefined})
+  div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() ? 'true' : undefined})
     for option of options key={option.value}
       label(part="option")
         input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => pick(option.value)})

@@ -518,3 +518,7 @@ export const contact = action(schema, send, {
 Without one, a production server refuses to start, as it would sign with a key of its own process. A restart changes that key and other replicas do not share it. `KAY_EPHEMERAL_SECRET=1` starts it anyway, for a single throwaway server that says so once in its log.
 
 <ReadMore href="/llms/action-protection">Your own proof of work check, shared rate limit stores, refusal messages and body limits.</ReadMore>
+
+## Components that show a refused post
+
+A component inside a form reads the refused post with `postedValue(name)`, `postedChecked(name, value)` and `postedValues(name)` from `kay`, so a control of your own can show it again as the kayjs-ui ones do. They answer `undefined` outside a refused post, in the browser and for a password. A list field is posted back as `name[]`.

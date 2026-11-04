@@ -853,6 +853,17 @@ export class HtmlTemplate extends TemplateWriter {
         b.add(')')
       })
     }
+    else if (action && children.length > 0) {
+      // The components inside read the form's action as they render, to show a refused post's values again.
+      markup.dynamic(() => {
+        const inner = new Markup(b)
+
+        b.add(`${helperName('formScope')}((`).addSource(action.expression).add('), () => ')
+        body(inner)
+        inner.end()
+        b.add(')')
+      })
+    }
     else {
       body(markup)
     }
