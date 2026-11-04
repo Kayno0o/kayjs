@@ -6,6 +6,7 @@ import type { GuardContext, Locals, RouteParams } from '../runtime'
 import type { ActionContext, ActionRun, FieldErrors, RateKeyContext, ServerAction } from '../runtime/action'
 import type { Locale } from '../runtime/i18n'
 import type { LocaleState } from '../runtime/locale-state'
+import type { ActionHookLists } from './action-hooks'
 import type { BodyLimit } from './body'
 import type { CookieJar } from './cookies'
 import type { CorsOptions } from './cors'
@@ -43,7 +44,7 @@ import { countSucceeded, isAgentCall, markChallenge, PRETEND, protectionRefusal,
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { recordOf, requestRecord } from './request-record'
-import { guardValues, onceOf } from './request-scope'
+import { forgetOnces, guardValues, onceOf } from './request-scope'
 import { requestSignal, RequestTimeoutError, withTimeout } from './request-timeout'
 import { LOCAL_HOST, overHttps, requestUrl } from './request-url'
 import { guardUrl } from './routes'
@@ -149,26 +150,26 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
         throw error
     }
 
-    for (const [name, value] of Object.entries(module)) {
-      if (!isAction(value))
+    for (const [name, exported] of Object.entries(module)) {
+      if (!isAction(exported))
         continue
 
       // Every string field with no bound of its own takes the default, for the route's validation, the form's `maxlength` and the tool's schema alike.
-      Object.assign(value, { schema: withDefaultBounds(value.schema) })
+      Object.assign(exported, { schema: withDefaultBounds(exported.schema) })
 
-      const taken = served.get(value.url)
+      const taken = served.get(exported.url)
 
       // One action exported under two names is served once.
-      if (taken?.action === value)
+      if (taken?.action === exported)
         continue
 
       if (taken)
-        throw actionClash(taken.file, file, value.url)
+        throw actionClash(taken.file, file, exported.url)
 
-      served.set(value.url, { file, action: value })
+      served.set(exported.url, { file, action: exported })
 
-      withActionDefaults(value, options.actions)
-
+      const value = withActionDefaults(exported, options.actions)
+      const named = { name, file: relative(process.cwd(), file), lists: hooksOf(options.actions, value.protection) }
       const tool = toolSettings(value.protection?.tool)
 
       pageBound.set(value, page.params.length > 0)
@@ -183,7 +184,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
       limits.set(value.url, { bytes: value.protection?.maxSize, files: fileBodyLimit(value.schema), refuse: async (request, bytes, server) => inLocale(request, options, async () => tooLarge(value, request, bytes, server, back)) })
       // A span per call, the handler's own spans and the page it renders back nested in it.
       app.post(value.url, async context => traced(`POST ${value.url}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url, 'kay.request.id': requestId(context.request) } }), async (span) => {
-        const run = async () => answeringRequest(context.request, async () => inLocale(context.request, options, async () => onceWritten(context.request, value.url, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => cachedPageUrl(context.request, () => guardedPage(context.request, page, match, options)) }, { name, file }))))
+        const run = async () => answeringRequest(context.request, async () => inLocale(context.request, options, async () => onceWritten(context.request, value.url, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => cachedPageUrl(context.request, () => guardedPage(context.request, page, match, options)) }, named))))
         const response = await timedAction(context.request, ownTimeout, options, run, async () => inLocale(context.request, options, async () => failed(context.request, new Headers(), cookieJar(context.request).cookies, { action: value.url, status: 504, values: isCall(context.request) ? {} : submittedValues(context.body), errors: { '': kayWord('kay.action.timeout') } }, context.server, back)))
 
         if (span)
@@ -737,7 +738,7 @@ function backTo(request: Request, base: string): string {
 }
 
 // The Elysia context, with what the app derives and resolves, is the action's `ctx.locals`.
-async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request, server: Server | null }, options: ActionOptions, back: Back, read: { params: () => void, url: () => URL }, named: { name: string, file: string }): Promise<Response> {
+async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request, server: Server | null }, options: ActionOptions, back: Back, read: { params: () => void, url: () => URL }, named: { name: string, file: string, lists: ActionHookLists }): Promise<Response> {
   const { request } = context
   const state = recordOf(request)?.guarded ?? { jar: cookieJar(request), headers: new Headers() }
   const { jar, headers } = state
@@ -778,8 +779,8 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     fail: <Data>(code: number, data?: Data, errors?: FieldErrors) => failure(code, data as Data, errors),
   }
 
-  const lists = hooksOf(options.actions, action.protection)
-  const run: ActionRun = { action: named.name, file: relative(process.cwd(), named.file), input: context.body, ctx }
+  const { lists } = named
+  const run: ActionRun = { action: named.name, file: named.file, input: context.body, ctx }
 
   try {
     const stopping = await refusedBeforeRun(lists, run)
@@ -794,6 +795,9 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     // An async iterable is taken as it is, as awaiting one that is also a thenable, a model's reply, would read it to its end before it could stream.
     const returned = action.handler(context.body, ctx)
     const result = isAsyncIterable(returned) ? returned : await returned
+
+    // What `ctx.once` loaded before the handler changed things is stale for the page rendered again after a failure.
+    forgetOnces(request)
 
     // A string passed to `ctx.fail` is the form's message, read where a rate limit's is.
     if (isFailure(result)) {
@@ -812,6 +816,8 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     return streams ? streamed(request, jar, headers, answer as AsyncIterable<unknown>, status, options) : succeeded(action, request, jar, headers, answer, status, options.base)
   }
   catch (error) {
+    forgetOnces(request)
+
     // Sent on after it went through, as to a thank-you page.
     if (error instanceof Redirect) {
       await countGoneThrough(action, request, context.server, options)

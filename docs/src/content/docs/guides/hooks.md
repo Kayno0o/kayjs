@@ -49,7 +49,7 @@ When several `beforeX` hooks are set, each sees what the one before changed, and
 
 ## Hooks for the whole app
 
-`kay.config.ts` takes the same flat keys. `beforeRequest` runs before the guards of every request that reaches a route and can refuse it with `false` or `refuse()`, or answer with a `Response`. `onResponse` is told the status and the duration of every answer. `onStart` and `onStop` run when the server listens and when it stops.
+`kay.config.ts` takes the same flat keys. `beforeRequest` runs before the guards of every request that reaches a route and can refuse it with `false` or `refuse()`, or answer with a `Response`. `onResponse` is told the status and the duration of every answer. `onStart` and `onStop` run when the server listens and when it stops; `onStop` runs after the hooks of plugins and extensions. A redirect an action throws counts as a success for `onSuccess`.
 
 ```ts
 export default defineConfig({

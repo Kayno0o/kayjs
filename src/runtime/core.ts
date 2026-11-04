@@ -340,16 +340,18 @@ export interface CardPageContext<Params extends Record<string, unknown> = Record
 // For an action, `url` and `params` are those of the page it was posted from; for an API route, its own as Elysia hands them to the handler.
 // `Own` names locals a guard knows beyond the app's, for a library's own guard to read what its plugin adds with no cast.
 // Its `guard` holds what the guards above it returned.
-export type GuardContext<Own extends object = object> = Omit<RequestContext<RouteParams>, 'locals'> & { locals: Locals & Own }
+export type GuardContext<Own extends object = object, Guarded extends object = object> = Omit<RequestContext<RouteParams, Guarded>, 'locals'> & { locals: Locals & Own }
 
 // A guard may return an object, which the guards, layouts, pages and actions below it read as `ctx.guard`.
 export type Guard<Value = unknown> = (ctx: GuardContext) => Value | Promise<Value>
 
-// What one guard hands on, nothing when it returns no object.
-export type GuardValue<G> = G extends (...args: never[]) => infer Returned ? Awaited<Returned> extends infer Value extends object ? Value : object : object
+// What one guard hands on, nothing when it returns no plain object: an array or a function is dropped at runtime, a class instance too, and `undefined` from a branch leaves the rest.
+export type GuardValue<G> = G extends (...args: never[]) => infer Returned ? PlainObject<Exclude<Awaited<Returned>, void | undefined>> : object
+
+type PlainObject<Value> = [Value] extends [never] ? object : Value extends readonly unknown[] | ((...args: never[]) => unknown) ? never : Value extends object ? Value : never
 
 // What the guards of a route hand on together, outermost first.
-export type GuardValues<Guards extends readonly unknown[]> = Guards extends readonly [infer First, ...infer Rest] ? GuardValue<First> & GuardValues<Rest> : object
+export type GuardValues<Guards extends readonly unknown[]> = Guards extends readonly [infer First, ...infer Rest] ? Omit<GuardValue<First>, keyof GuardValues<Rest>> & GuardValues<Rest> : object
 
 // What the `GET` of an endpoint file reads: `src/routes/feeds/[slug].json.ts` gets `{ slug }`, the extension left out.
 export type EndpointContext<Params extends Record<string, unknown> = Record<string, string>, Guarded extends object = object> = RequestContext<Params, Guarded>
@@ -368,7 +370,7 @@ declare global {
 
 // The default export of a `_guard.ts`: runs before every page and every action in its directory and below, and lets the request through unless it redirects or denies.
 // kept: request
-export function guard<Own extends object = object, const Value extends object | void = void>(check: (ctx: GuardContext<Own>) => Value | Promise<Value>): Guard<Value> {
+export function guard<Own extends object = object, const Value extends object | void = void>(check: (ctx: GuardContext<Own, Readonly<Record<string, unknown>>>) => Value | Promise<Value>): Guard<Value> {
   return check as Guard<Value>
 }
 

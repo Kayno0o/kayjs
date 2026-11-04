@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { stringify } from 'devalue'
+import { forgetOnces, onceForRequest } from '../src/server/request-scope'
 import { kayCheck } from './check-helper'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -30,6 +31,10 @@ describe('what a guard hands on', () => {
       // Returned values that are not plain objects hand nothing on.
       Bun.write(join(dir, 'routes/odd/_guard.ts'), GUARD('() => new (class Holder { value = 1 })()')),
       Bun.write(join(dir, 'routes/odd/index.kay'), '--- server\nconst seen = JSON.stringify(ctx.guard)\n---\np.page {seen}\n'),
+      Bun.write(join(dir, 'routes/arr/_guard.ts'), GUARD('() => [1, 2]')),
+      Bun.write(join(dir, 'routes/arr/index.kay'), '--- server\nconst seen = JSON.stringify(ctx.guard)\n---\np.page {seen}\n'),
+      Bun.write(join(dir, 'routes/prim/_guard.ts'), GUARD('() => \'text\'')),
+      Bun.write(join(dir, 'routes/prim/index.kay'), '--- server\nconst seen = JSON.stringify(ctx.guard)\n---\np.page {seen}\n'),
       Bun.write(join(dir, 'routes/hostile/_guard.ts'), GUARD('() => JSON.parse(\'{"__proto__":{"polluted":true},"ok":1}\')')),
       Bun.write(join(dir, 'routes/hostile/index.kay'), '--- server\nconst seen = JSON.stringify({ own: Object.keys(ctx.guard), polluted: ({} as any).polluted === true, proto: Object.getPrototypeOf(ctx.guard) === Object.prototype })\n---\np.page {seen}\n'),
       // An open page runs none of the guards above it, so it hands nothing on.
@@ -64,6 +69,22 @@ describe('what a guard hands on', () => {
 
   it('hands on nothing from a guard returning an object that is not plain', async () => {
     expect(await text('/odd')).toContain('{"who":"nobody","shared":"outer"}')
+  })
+
+  it('hands on nothing from a guard returning an array or a primitive', async () => {
+    expect(await text('/arr')).toContain('<p class="page">{"who":"nobody","shared":"outer"}</p>')
+    expect(await text('/prim')).toContain('<p class="page">{"who":"nobody","shared":"outer"}</p>')
+  })
+
+  it('forgets the answers of a request when it renders again', async () => {
+    const request = new Request('http://localhost/memo-reset')
+    let loads = 0
+    const load = () => ++loads
+
+    expect(await onceForRequest(request, 'k', load)).toBe(1)
+    expect(await onceForRequest(request, 'k', load)).toBe(1)
+    forgetOnces(request)
+    expect(await onceForRequest(request, 'k', load)).toBe(2)
   })
 
   it('keeps a hostile __proto__ key from reaching any prototype', async () => {
@@ -161,6 +182,27 @@ describe('kay check on ctx.guard', () => {
     })
 
     expect(output).toContain('team')
+    expect(code).not.toBe(0)
+  }, TIMEOUT)
+
+  it('types a guard that may return nothing, and the inner of two guards sharing a key', async () => {
+    const { code, output } = await check({
+      'src/routes/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request }) => request.headers.has(\'x\') ? { org: 1, shared: \'outer\' } : undefined)\n',
+      'src/routes/in/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(() => ({ shared: 2 }))\n',
+      'src/routes/in/index.kay': '--- server\nconst org: number = ctx.guard.org\nconst shared: number = ctx.guard.shared\n---\np {org} {shared}\n',
+    })
+
+    expect(output).toMatch(/checked with no problems in \d+ ms/)
+    expect(code).toBe(0)
+  }, TIMEOUT)
+
+  it('refuses ctx.guard on a prerendered page', async () => {
+    const { code, output } = await check({
+      'src/routes/_guard.ts': ORG,
+      'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\nconst nope = ctx.guard.org\n---\np {String(nope)}\n',
+    })
+
+    expect(output).toContain('guard')
     expect(code).not.toBe(0)
   }, TIMEOUT)
 

@@ -37,11 +37,14 @@ import { guard } from 'kay'
 export default guard(async ({ params, deny }) => {
   const org = await loadOrg(String(params.org))
 
-  return org ?? deny(404)
+  if (org === undefined)
+    return deny(404)
+
+  return { org }
 })
 ```
 
-Wrap the record in an object (`return { org }`) to give it a name. A page, a layout and the actions of a page read `ctx.guard.org`, and `kay check` types it from the guards above the file. The objects of several guards are merged, outermost first, and a guard below wins a key it shares. A guard reads what the ones above returned in its own `ctx.guard`.
+The object names what the guard hands on. Only a plain object counts: an array, a class instance or a primitive is ignored. A page, a layout and the actions of a page read `ctx.guard.org`, and `kay check` types it from the guards above the file. The objects of several guards are merged, outermost first, and a guard below wins a key it shares. A guard reads what the ones above returned in its own `ctx.guard`.
 
 `ctx.guard` is empty on a page that sets `guards: false`, and a prerendered page has none, since its guards run when it is served. `ctx.locals` stays what the app's Elysia plugins add.
 

@@ -34,7 +34,7 @@ import { BUILD_HEADER, DRAFT_ROUTE } from '../runtime/swap'
 import { registerActionRoutes } from './actions'
 import { serveApi } from './api'
 import { apiPathOf, mcpRateLimit, RESOURCE_METADATA, sharedGuards } from './api-modules'
-import { hookApp } from './app-hooks'
+import { hookLifecycle, hookRequests } from './app-hooks'
 import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies, mountLimits } from './body'
 import { serveBuildFiles } from './build-files'
@@ -507,8 +507,13 @@ export function actionOptionsOf({ env, options, setup, late }: Boot, skipBroken:
 }
 
 // The app's request, response and lifecycle hooks, after kay's own checks and endpoints so a refused host or the health check run none, and before the extensions so their routes run them too.
-export function hookRequests({ app, options }: Boot): void {
-  hookApp(app, options)
+export function hookRequestsOf({ app, options }: Boot): void {
+  hookRequests(app, options)
+}
+
+// The app's `onStart` and `onStop`, after the extensions so its stop hook runs once theirs did.
+export function hookLifecycleOf({ app, options }: Boot): void {
+  hookLifecycle(app, options)
 }
 
 // The actions, the API modules and the endpoints, then the jobs page, after the extensions whose derived values the guards read through `ctx.locals`.

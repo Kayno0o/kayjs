@@ -100,10 +100,11 @@ export default defineConfig({
 })
 ```
 
-- `beforeRequest({ request, url, locals, context })` runs before the guards and loads of every request that reaches a route (a page, an action, an endpoint, an API route, an extension's route), after kay's own host, proxy and security checks. `false` or a thrown `refuse()` refuses it, 403 or the refusal's status; a returned `Response` answers instead; any other throw answers 500 and is reported with source `beforeRequest`.
-- `onResponse({ request, url, locals, status, duration })` is told after the answer is made, `duration` in milliseconds. A throw is reported with source `onResponse`.
-- `onStart({ url })` runs when the server listens and `onStop()` when it stops, after the open requests finished, after the plugins' own `onStart` and `onStop` hooks of Elysia; a throw is reported and the others still run.
+- `beforeRequest({ request, url, locals, context })` runs before the guards, the loads and the validation of the input of every request that reaches a route (a page, an action, an endpoint, an API route, an extension's route), after kay's own host, proxy and security checks, so a refused caller learns nothing from a field error. `false` or a thrown `refuse()` refuses it, 403 or the refusal's status; a returned `Response` answers instead; any other throw, or a hook that does not finish in 10 s, answers 500 and is reported with source `beforeRequest`. `locals` holds what kay and the app's own plugins added before it, not the `derive` and `resolve` values of extensions: read who asks from `context`.
+- `onResponse({ request, url, locals, status, duration })` is told after the answer is made, `duration` in milliseconds, up to the first byte for a streamed answer. A throw is reported with source `onResponse`.
+- `onStart({ url })` runs when the server listens and `onStop()` when it stops, after the open requests finished and after the `onStop` hooks of the plugins and extensions; a throw is reported and the others still run.
 - `actions.beforeRun({ action, file, input, ctx })` runs before every action's handler, once the guards and the schema let the post through; `false` or `refuse()` fails the post. It cannot change the input. `onSuccess` adds `result`, `onError` adds `status`, `message`, `errors`, `data` and `error` (undefined for `ctx.fail`).
+- A redirect the handler throws is a success (the action did its work, as in post-redirect-get): `onSuccess` is told it with `result` undefined, and `onError` is not. `onSuccess` of a streaming action is told as the stream starts, before it is read.
 - The app's action hooks run before the action's own (`action(schema, handler, { onSuccess })`), both observing, a throw reported and never failing the action.
 
 ### The context

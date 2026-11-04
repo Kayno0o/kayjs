@@ -82,8 +82,7 @@ export function declare(schema: TSchema, handler: (input: unknown, ctx: ActionCo
     url: { get: () => state.url, set: (url: string) => void (state.url = url), enumerable: true },
     schema: { value: schema, enumerable: true, writable: true },
     handler: { value: handler, enumerable: true },
-    // Configurable, so the app's `actions` defaults can be laid under it when the server registers the action.
-    protection: { value: protection, enumerable: true, configurable: true },
+    protection: { value: protection, enumerable: true },
     [ACTION]: { value: true },
   }) as unknown as ServerAction<TSchema, unknown>
 }

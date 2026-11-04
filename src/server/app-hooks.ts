@@ -1,12 +1,10 @@
 import type { Elysia } from 'elysia'
 import type { Locals } from '../runtime'
 import type { Hook, HookContext } from './hooks'
-import { thrownRefusal } from '../runtime/refuse'
-import { hookContext, notify } from './hooks'
+import { decide, hookContext, notify } from './hooks'
 import { answeringRequest, statusOf } from './log'
-import { reportHookError } from './report'
 
-// What a request hook is told: the request, its URL and the app's `ctx.locals`, with what the app's `derive` and `resolve` added.
+// What a request hook is told: the request, its URL and the app's `ctx.locals` as they stand when the hook runs, before the extensions' and plugins' own `derive` and `resolve` values are added; `context` holds who asks.
 export interface RequestEvent {
   request: Request
   url: URL
@@ -26,7 +24,7 @@ export interface StartEvent {
 
 // The hooks of the whole app, `kay.config.ts` keys.
 export interface AppHooks {
-  // Runs before the guards and the loads of every request that reaches a route (a page, an action, an endpoint, an API route, a public file), once kay's own checks (host, proxy key, security headers) let it in. Returning `false` or throwing `refuse()` refuses it, 403 unless the refusal says another status; returning a `Response` answers with it.
+  // Runs before the guards, the loads and the validation of the input of every request that reaches a route (a page, an action, an endpoint, an API route, an extension's route), once kay's own checks (host, proxy key, security headers) let it in. Returning `false` or throwing `refuse()` refuses it, 403 unless the refusal says another status; returning a `Response` answers with it.
   beforeRequest?: ((event: RequestEvent & { context: HookContext }) => void | false | Response | Promise<void | false | Response>) | undefined
   // Told after the answer is made, for a page, an action, an endpoint and an API route alike: log, count or bill it. A throw is reported and never changes the answer.
   onResponse?: Hook<ResponseEvent> | undefined
@@ -35,15 +33,25 @@ export interface AppHooks {
   onStop?: Hook<Record<never, never>> | undefined
 }
 
-const REFUSED = 'Refused'
+// The context `beforeRequest` was told, kept for the request's `onResponse`, so the user is looked up once.
+const contexts = new WeakMap<Request, HookContext>()
 
-// Registers the app's request, response and lifecycle hooks, none when the config sets none, so a plain app runs no extra hook per request.
-export function hookApp(app: Elysia, { beforeRequest, onResponse, onStart, onStop }: AppHooks): void {
+// Registers the app's request and response hooks, none when the config sets none, so a plain app runs no extra hook per request.
+export function hookRequests(app: Elysia, { beforeRequest, onResponse }: AppHooks): void {
   if (beforeRequest !== undefined) {
-    app.onBeforeHandle({ as: 'global' }, async (context) => {
+    // The transform stage runs before the body, query and params are validated, so a caller the hook refuses learns nothing from a field error.
+    app.onTransform({ as: 'global' }, async (context) => {
       const { request } = context
+      const answer = await answeringRequest(request, async () => refuseWith(request, beforeRequest, { request, url: new URL(request.url), locals: context as unknown as Locals }))
 
-      return answeringRequest(request, async () => refuseWith(request, beforeRequest, { request, url: new URL(request.url), locals: context as unknown as Locals }))
+      if (answer === undefined)
+        return undefined
+
+      for (const [name, value] of answer.headers)
+        context.set.headers[name] = value
+
+      // Elysia answers a custom status returned here and skips the validation and the handler, though its types only know `void`.
+      return context.status(answer.status as 403, new Uint8Array(await answer.arrayBuffer())) as never
     })
   }
 
@@ -56,13 +64,18 @@ export function hookApp(app: Elysia, { beforeRequest, onResponse, onStart, onSto
     app.onAfterResponse({ as: 'global' }, async (context) => {
       const { request, set, responseValue } = context
       const begun = started.get(request)
+      const known = contexts.get(request)
 
       started.delete(request)
+      contexts.delete(request)
 
-      await answeringRequest(request, async () => notify('onResponse', [onResponse], { request, url: new URL(request.url), locals: context as unknown as Locals, status: statusOf(responseValue, set), duration: begun === undefined ? 0 : Math.round(performance.now() - begun) }))
+      await answeringRequest(request, async () => notify('onResponse', [onResponse], { request, url: new URL(request.url), locals: context as unknown as Locals, status: statusOf(responseValue, set), duration: begun === undefined ? 0 : Math.round(performance.now() - begun) }, { context: known }))
     })
   }
+}
 
+// Registers `onStart` and `onStop` after the plugins and extensions, so the app's stop hook runs once theirs did.
+export function hookLifecycle(app: Elysia, { onStart, onStop }: AppHooks): void {
   if (onStart !== undefined) {
     app.onStart(async (root) => {
       await notify('onStart', [onStart], { url: root.server?.url.href })
@@ -76,24 +89,32 @@ export function hookApp(app: Elysia, { beforeRequest, onResponse, onStart, onSto
   }
 }
 
-// The response a refusing `beforeRequest` answers with, undefined when the request goes on. A hook that fails any other way refuses as a server error, after it is reported: a check that cannot run lets nothing through.
+// The response a refusing `beforeRequest` answers with, undefined when the request goes on. A hook that fails any other way, or does not finish in 10 s, refuses as a server error after it is reported: a check that cannot run lets nothing through.
 async function refuseWith(request: Request, hook: NonNullable<AppHooks['beforeRequest']>, event: RequestEvent): Promise<Response | undefined> {
-  try {
-    const answer = await hook({ ...event, context: await hookContext() })
+  const context = await hookContext()
+  let answered: Response | undefined
 
-    if (answer instanceof Response)
-      return answer
+  contexts.set(request, context)
 
-    return answer === false ? new Response(REFUSED, { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } }) : undefined
-  }
-  catch (error) {
-    const refusal = thrownRefusal(error)
+  const outcome = await decide('beforeRequest', [async (told: RequestEvent & { context: HookContext }) => {
+    const answer = await hook(told)
 
-    if (refusal !== undefined)
-      return new Response(refusal.message, { status: refusal.status, headers: { 'content-type': 'text/plain; charset=utf-8', ...refusal.retryAfter !== undefined && { 'retry-after': String(refusal.retryAfter) } } })
+    if (answer instanceof Response) {
+      answered = answer
 
-    await reportHookError('beforeRequest', error, request)
+      return false
+    }
 
-    return new Response('Internal Server Error', { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } })
-  }
+    return answer === false ? false : undefined
+  }], event, context)
+
+  if (answered !== undefined)
+    return answered
+
+  if ('change' in outcome)
+    return undefined
+
+  const { refused } = outcome
+
+  return new Response(refused.message, { status: refused.status, headers: { 'content-type': 'text/plain; charset=utf-8', ...refused.retryAfter !== undefined && { 'retry-after': String(refused.retryAfter) } } })
 }

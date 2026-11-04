@@ -118,7 +118,7 @@ export interface ActionProtect<Field extends string = never> {
   proofOfWork?: boolean | number | ProofOfWorkOptions | undefined
 }
 
-// What the hooks of an action are told of a run: the action's export name and its file relative to the project, the input the schema accepted and the context it runs with.
+// What the hooks of an action are told of a run: the action's export name and its file relative to the directory the server runs from, the input the schema accepted and the context it runs with.
 export interface ActionRun {
   action: string
   file: string

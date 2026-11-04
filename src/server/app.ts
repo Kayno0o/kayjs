@@ -12,7 +12,7 @@ import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { refuseFeedsWithoutSite } from '../content/server'
 import { mcpPath, mcpRateLimit } from './api-modules'
-import { actionOptionsOf, apiDocuments, appRoutes, bootOf, bootWarnings, buildFiles, compressAnswers, files, hookRequests, identifyRequests, kayEndpoints, keptPageWrites, knowPages, lateApp, limitBodiesAndClaimApi, logAnswers, pageRoutes, reports, rewriteAnswers, serveDevRoutes, serverMode, siteFiles, stopOnSignals, trustRequests, useExtensions } from './app-stages'
+import { actionOptionsOf, apiDocuments, appRoutes, bootOf, bootWarnings, buildFiles, compressAnswers, files, hookLifecycleOf, hookRequestsOf, identifyRequests, kayEndpoints, keptPageWrites, knowPages, lateApp, limitBodiesAndClaimApi, logAnswers, pageRoutes, reports, rewriteAnswers, serveDevRoutes, serverMode, siteFiles, stopOnSignals, trustRequests, useExtensions } from './app-stages'
 import { bundled } from './bundle'
 import { checkRequestIdHeader, checkTimeZone, healthTimeoutMs } from './config-limits'
 import { corsRule } from './cors'
@@ -181,9 +181,11 @@ export async function pagesApp(project: Project<ServedOptions>, loadClient: () =
   else
     stopOnSignals(boot)
 
-  hookRequests(boot)
+  hookRequestsOf(boot)
 
   const servers = await useExtensions(boot)
+
+  hookLifecycleOf(boot)
 
   await buildFiles(boot, earlier)
 

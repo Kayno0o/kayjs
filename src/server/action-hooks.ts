@@ -50,28 +50,20 @@ export async function tellError(lists: ActionHookLists, event: ActionRun, failur
     await notify('actions.onError', lists.error, { ...event, ...failure })
 }
 
-// What each action declared before the app's defaults were laid under it, so an app registered twice in a process (a test site after another) starts from the action's own options.
-const declared = new WeakMap<object, ServerAction<TSchema, unknown>['protection']>()
+// The action as one app serves it, with the app's `actions` defaults laid under its own options key by key: a check the action names replaces the app's, `messages` merge one level, and `protect: false` keeps the app's checks out (its `maxSize` and `messages` still apply). The action itself is left as declared, so two apps in one process (a test site after another) each read their own defaults.
+export function withActionDefaults(action: ServerAction<TSchema, unknown>, defaults: ActionsConfig | undefined): ServerAction<TSchema, unknown> {
+  const own = action.protection
 
-// Lays the app's `actions` defaults under an action's own options, key by key: a check the action names replaces the app's, `messages` merge one level, and `protect: false` keeps the defaults out.
-export function withActionDefaults(action: ServerAction<TSchema, unknown>, defaults: ActionsConfig | undefined): void {
-  const own = declared.has(action) ? declared.get(action) : action.protection
+  if (defaults === undefined)
+    return action
 
-  declared.set(action, own)
-
-  if (defaults === undefined || own?.defaults === false) {
-    if (own !== action.protection)
-      Object.defineProperty(action, 'protection', { value: own, enumerable: true, configurable: true })
-
-    return
-  }
-
-  const base = resolveProtection({ protect: defaults.protect, maxSize: defaults.maxSize, messages: defaults.messages })
+  const base = resolveProtection({ protect: own?.defaults === false ? false : defaults.protect, maxSize: defaults.maxSize, messages: defaults.messages })
 
   if (base === undefined || Object.keys(base).length === 0)
-    return
+    return action
 
-  const messages = base.messages === undefined && own?.messages === undefined ? undefined : { ...base.messages, ...own?.messages }
+  const rest = { ...base, defaults: undefined }
+  const messages = rest.messages === undefined && own?.messages === undefined ? undefined : { ...rest.messages, ...own?.messages }
 
-  Object.defineProperty(action, 'protection', { value: { ...base, ...own, ...messages && { messages } }, enumerable: true, configurable: true })
+  return Object.create(action, { protection: { value: { ...rest, ...own, ...messages && { messages } }, enumerable: true } }) as ServerAction<TSchema, unknown>
 }

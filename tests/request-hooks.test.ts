@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { stringify } from 'devalue'
+import { Elysia } from 'elysia'
 import { refuse } from '../src/runtime/refuse'
 import { shutdown } from '../src/server/lifecycle'
 import { scratchDir } from './scratch'
@@ -95,7 +96,7 @@ describe('the app-wide request hooks', () => {
     const crashed = await get('/feed.json', { 'x-crash': '1' })
 
     expect(crashed.status).toBe(500)
-    expect(await crashed.text()).toBe('Internal Server Error')
+    expect(await crashed.text()).toBe('Internal server error')
     expect(errors).toEqual([{ source: 'beforeRequest' }])
   })
 
@@ -239,5 +240,86 @@ h1 Home
     expect([await status('limited', '5.5.5.5'), await status('limited', '5.5.5.5'), await status('limited', '5.5.5.5')]).toEqual([200, 200, 429])
     expect([await status('strict', '6.6.6.6'), await status('strict', '6.6.6.6')]).toEqual([200, 429])
     expect([await status('open', '7.7.7.7'), await status('open', '7.7.7.7'), await status('open', '7.7.7.7')]).toEqual([200, 200, 200])
+  })
+})
+
+describe('the request hooks in every corner', () => {
+  const answers: { path: string, status: number }[] = []
+  const calls: string[] = []
+  const order: string[] = []
+  let dir = ''
+  let app: Awaited<ReturnType<typeof pages>>
+
+  const get = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers }))
+  const post = async (path: string, body: unknown, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) }))
+
+  beforeAll(async () => {
+    dir = await scratchDir('request-hooks-corners-')
+    await Promise.all([
+      Bun.write(join(dir, 'public/hello.txt'), 'hello\n'),
+      Bun.write(join(dir, 'routes/index.kay'), '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const add = action(t.Object({ n: t.Number() }), ({ n }) => n)\n---\nh1 Home\n'),
+      Bun.write(join(dir, 'routes/boom.json.ts'), 'export function GET() {\n  throw new Error(\'boom\')\n}\n'),
+      Bun.write(join(dir, 'routes/slow.json.ts'), 'export async function GET() {\n  await Bun.sleep(120)\n\n  return \'slow\'\n}\n'),
+      Bun.write(join(dir, 'api/items.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api({ guards: false }).post(\'/\', ({ body }) => body.n, { body: t.Object({ n: t.Number() }) })\n'),
+    ])
+    app = await pages({
+      root: dir,
+      routes: 'routes',
+      api: 'api',
+      prebuilt: false,
+      base: '/shop',
+      trailingSlash: 'always',
+      redirects: { '/old': '/' },
+      observe: { log: false },
+      extensions: [{ name: 'order', server: new Elysia({ name: 'order' }).onStop(() => void order.push('extension')).get('/ext', () => 'ext') }],
+      beforeRequest: ({ request, url }) => {
+        calls.push(url.pathname)
+
+        if (request.headers.has('x-refuse'))
+          return false
+
+        return undefined
+      },
+      onResponse: ({ url, status }) => void answers.push({ path: url.pathname, status }),
+      onStop: () => void order.push('config'),
+    })
+  })
+
+  afterAll(async () => rm(dir, { recursive: true, force: true }))
+
+  it('refuses a request whose input is invalid before the input is validated, for an action and an API route', async () => {
+    const action = app.routes.find(route => route.method === 'POST' && route.path.startsWith('/_kay/action/'))?.path ?? ''
+    const invalid = { n: 'not a number' }
+
+    expect((await post(action, invalid, { 'x-refuse': '1' })).status).toBe(403)
+    expect((await post('/api/items', invalid, { 'x-refuse': '1' })).status).toBe(403)
+    expect((await post('/api/items', invalid)).status).toBe(422)
+  })
+
+  it('tells onResponse a public file, a redirect, a thrown error and an extension route, and runs beforeRequest for them', async () => {
+    answers.length = 0
+    calls.length = 0
+    expect((await get('/hello.txt')).status).toBe(200)
+    expect([301, 302, 307, 308]).toContain((await get('/old')).status)
+    expect((await get('/boom.json')).status).toBe(500)
+    expect((await get('/ext')).status).toBe(200)
+    await Bun.sleep(20)
+    expect(answers.map(({ status }) => status)).toEqual(expect.arrayContaining([200, 500]))
+    expect(answers.some(({ path }) => path === '/ext')).toBe(true)
+    expect(calls).toContain('/ext')
+  })
+
+  it('runs the stop hooks of the extensions before the config\'s, and after the open requests finished', async () => {
+    order.length = 0
+    app.listen({ port: 0, hostname: '127.0.0.1' })
+
+    const base = `http://127.0.0.1:${app.server?.port}`
+    const slow = (async () => (await fetch(`${base}/slow.json`)).text())()
+
+    await Bun.sleep(30)
+    await shutdown(app)
+    order.push('stopped')
+    expect(await slow).toBe('slow')
+    expect(order).toEqual(['extension', 'config', 'stopped'])
   })
 })

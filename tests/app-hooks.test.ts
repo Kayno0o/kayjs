@@ -190,6 +190,19 @@ describe('the hooks pagesApp registers', () => {
     expect(pinned(answers)).toMatchSnapshot()
   })
 
+  it('runs with the app\'s own hooks set, in the order pinned', async () => {
+    const app = await pages({ root, prebuilt: false, log: quiet, extensions, beforeRequest: () => undefined, onResponse: quiet, onStart: quiet, onStop: quiet, actions: { protect: { rateLimit: { max: 5, window: '1m' } }, beforeRun: quiet, onSuccess: quiet, onError: quiet } })
+    const { run, pinned } = recorder(app)
+    const action = app.routes.find(route => route.method === 'POST' && route.path.startsWith('/_kay/action/'))?.path
+    const answers: Record<string, unknown> = {}
+
+    for (const path of ['/', '/admin', '/missing', '/api/items', '/ext'])
+      answers[`GET ${path}`] = await run(new Request(`${SITE}${path}`))
+
+    answers['POST an action'] = await run(new Request(`${SITE}${action}`, { method: 'POST', headers: form, body: 'title=one' }))
+    expect(pinned(answers)).toMatchSnapshot()
+  })
+
   it('runs under a base with trailing slashes, in the order pinned', async () => {
     const app = await pages({ root, prebuilt: false, base: '/shop', trailingSlash: 'always', log: quiet, extensions, redirects: { '/old': '/' } })
     const { run, pinned } = recorder(app)
