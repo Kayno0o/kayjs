@@ -223,15 +223,17 @@ describe('imageAlt', () => {
   })
 
   it('keeps writing the drafts already kept when no model is configured any more, and keeps a decorative image out of the page and the listing', async () => {
-    fakeAi.reply({ data: { alt: 'A team' } })
-    fakeAi.reply({ data: { alt: '' } })
-
     const path = await image('team-abc.png')
     const other = await image('logo-abc.png')
-    const both = `${IMG}<img src="/_kay/assets/logo-abc.png">`
+    const logo = '<img src="/_kay/assets/logo-abc.png">'
+    const both = `${IMG}${logo}`
     const files = { [ASSET]: path, '/_kay/assets/logo-abc.png': other }
 
-    await page(both, files)
+    // The two images are the same bytes, so the fake answers them in the order the calls come: drafted one page after the other, not left to the order two concurrent cache reads settle in.
+    fakeAi.reply({ data: { alt: 'A team' } })
+    await page(IMG, files)
+    fakeAi.reply({ data: { alt: '' } })
+    await page(logo, files)
 
     const was = process.env.NODE_ENV
 
