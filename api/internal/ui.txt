@@ -1036,7 +1036,7 @@ function callAction<Output>(form: HTMLFormElement, action: Action<never, Output,
 function fieldIssues(name: () => string | undefined, issue: () => string | undefined): () => string[]
 
 [./lib/forms] fieldLinks
-function fieldLinks(group: boolean, hint: boolean, messages: () => readonly unknown[], required?: boolean): FieldLinks
+function fieldLinks(group: boolean, hint: () => boolean, messages: () => readonly unknown[], required?: () => boolean): FieldLinks
 
 [./lib/forms] FieldLinks
 interface FieldLinks
