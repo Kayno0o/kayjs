@@ -188,6 +188,14 @@ describe('the hooks pagesApp registers', () => {
       answers[name] = await run(request)
 
     expect(pinned(answers)).toMatchSnapshot()
+
+    // Elysia ends the mapResponse chain at the first hook that answers, so a response carrying a cookie stays private only while the guard runs ahead of every other one.
+    for (const [name, answer] of Object.entries(answers)) {
+      const first = (answer as { hooks: string[] }).hooks.find(hook => hook.startsWith('mapResponse:'))
+
+      if (first !== undefined)
+        expect(first, name).toContain('keepCookiesPrivate(set, responseValue)')
+    }
   })
 
   it('runs with the app\'s own hooks set, in the order pinned', async () => {
