@@ -167,7 +167,8 @@ export function traced<T>(name: string | (() => string), options: SpanOptions | 
   if (!parent)
     return tracer.startActiveSpan(title, given, run)
 
-  if (tracer.startActiveSpan.length >= 4)
+  // A wrapper written with rest parameters declares none, and forwards all four to a real tracer.
+  if (tracer.startActiveSpan.length >= 4 || tracer.startActiveSpan.length === 0)
     return (tracer.startActiveSpan as unknown as ActiveWithParent)(title, given, parent, run)
 
   return run(tracer.startSpan(title, given, parent))

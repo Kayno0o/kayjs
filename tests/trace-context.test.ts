@@ -19,7 +19,7 @@ interface Started {
 
 // A tracer reading its parent the way OpenTelemetry's does, from the span stored under its context key, and giving each span its parent's trace id.
 // `three` is a hand-written tracer declaring the three parameters kay called before 1.89; the default has OpenTelemetry's four.
-function tracer(shape: 'otel' | 'three' = 'otel'): { tracer: Tracer, started: Started[] } {
+function tracer(shape: 'otel' | 'three' | 'rest' = 'otel'): { tracer: Tracer, started: Started[], activated?: number[] } {
   const started: Started[] = []
   let counter = 0
   const make = (name: string, _options?: SpanOptions, context?: TraceContext): Span => {
@@ -30,6 +30,12 @@ function tracer(shape: 'otel' | 'three' = 'otel'): { tracer: Tracer, started: St
 
     return { setAttribute: () => undefined, setStatus: () => undefined, recordException: () => undefined, end: () => undefined, spanContext: () => ids }
   }
+
+  const activated: number[] = []
+  const otel = (name: string, options: SpanOptions, context: TraceContext | ((span: Span) => unknown), fn?: (span: Span) => unknown) => fn === undefined ? (context as (span: Span) => unknown)(make(name, options)) : fn(make(name, options, context as TraceContext))
+
+  if (shape === 'rest')
+    return { tracer: { startSpan: make, startActiveSpan: ((...args: unknown[]) => (activated.push(args.length), otel as (...forwarded: unknown[]) => unknown)(...args)) as Tracer['startActiveSpan'] }, started, activated }
 
   return {
     tracer: {
@@ -85,6 +91,16 @@ describe('an incoming traceparent', () => {
     expect(response.status).toBe(200)
     expect(started[0]).toMatchObject({ name: 'GET /', parent: { traceId: TRACE } })
     expect((await site.handle(visit())).status).toBe(200)
+  })
+
+  it('keeps a rest-parameter wrapper around a real tracer working: it receives the parent as the context', async () => {
+    const { tracer: recording, started, activated } = tracer('rest')
+    const site = await pages({ root: 'tests/fixtures/site', tracer: recording })
+    const response = await site.handle(visit({ traceparent: INCOMING }))
+
+    expect(response.status).toBe(200)
+    expect(started[0]).toMatchObject({ name: 'GET /', parent: { traceId: TRACE, spanId: PARENT } })
+    expect(activated?.[0]).toBe(4)
   })
 
   it('carries tracestate on the remote span context', async () => {
