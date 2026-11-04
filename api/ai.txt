@@ -226,7 +226,7 @@ interface EmbedRequest
   dimensions: number | undefined
   input: string[]
   model: string
-  timeout: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  timeout: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] Fake
 interface Fake extends Provider
@@ -480,7 +480,7 @@ interface SpeakRequest
   model: string
   speed: number | undefined
   text: string
-  timeout: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  timeout: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
   voice: string | undefined
 
 [.] Spoken
@@ -626,7 +626,7 @@ interface TranscribeRequest
   audio: Blob
   language: string | undefined
   model: string
-  timeout: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  timeout: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
 
 [.] Usage
 interface Usage
@@ -722,7 +722,6 @@ component default
   maxChars?: number | undefined
   maxFileSize?: number | undefined
   maxFiles?: number | undefined
-  maxMessages?: number | undefined
   newIcon?: Element
   newLabel?: string | undefined
   note?: Element
@@ -936,7 +935,6 @@ component default
   maxChars?: number | undefined
   maxFileSize?: number | undefined
   maxFiles?: number | undefined
-  maxMessages?: number | undefined
   newButton?: boolean | undefined
   newIcon?: Element
   newLabel?: string | undefined

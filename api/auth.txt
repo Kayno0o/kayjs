@@ -298,16 +298,10 @@ interface AuthMailMessage extends MailContent
   html: string
   kind: AuthMailKind
   locale: string
-<<<<<<< HEAD
-  maxAge?: undefined | { link?: number; code?: number; }
-||||||| parent of 037707e (feat(auth)!: durations and dates where a number stood)
-  maxAge?: { link?: number; code?: number; } | undefined
-=======
-  maxAge?: {
-  link?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`;
-  code?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`;
-} | undefined
->>>>>>> 037707e (feat(auth)!: durations and dates where a number stood)
+  maxAge?: undefined | {
+  link?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
+  code?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
+}
   name: string
   subject: string
   text: string
@@ -433,8 +427,8 @@ interface AuthStore
     before?: AuditCursor;
     limit: number;
   }) => MaybePromise<AuditRecord[]>;
-  prune: (before: Date) => MaybePromise<void>;
-  forget: (userId: string, pseudonym: string) => MaybePromise<void>;
+  prune: (before: Date) => MaybePromise<number>;
+  erase: (userId: string, pseudonym: string) => MaybePromise<number>;
 }
   bearerTokens: {
   create: (token: BearerTokenRecord) => MaybePromise<void>;
@@ -446,15 +440,15 @@ interface AuthStore
   listByUser: (userId: string) => MaybePromise<BearerTokenRecord[]>;
   touch: (id: string, at: Date) => MaybePromise<void>;
   delete: (userId: string, id: string) => MaybePromise<boolean>;
-  deleteForUser?: (userId: string) => MaybePromise<void>;
+  erase?: (userId: string) => MaybePromise<number>;
 }
   identities: {
   find: (provider: string, providerId: string) => MaybePromise<IdentityRecord | undefined>;
   listByUser: (userId: string) => MaybePromise<IdentityRecord[]>;
   create: (identity: IdentityRecord) => MaybePromise<void>;
   update: (provider: string, providerId: string, patch: Partial<Pick<IdentityRecord, "accessToken" | "refreshToken" | "tokenExpiresAt">>) => MaybePromise<void>;
-  delete: (provider: string, providerId: string) => MaybePromise<void>;
-  deleteForUser?: (userId: string) => MaybePromise<void>;
+  delete: (provider: string, providerId: string) => MaybePromise<boolean>;
+  erase?: (userId: string) => MaybePromise<number>;
 }
   invitations?: {
   create: (invitation: InvitationRecord) => MaybePromise<void>;
@@ -499,7 +493,7 @@ interface AuthStore
       reused: boolean;
     }>;
     revokeFamily: (userId: string, family: string) => MaybePromise<void>;
-    deleteForUser: (userId: string) => MaybePromise<void>;
+    erase: (userId: string) => MaybePromise<number>;
   };
 }
   organizations?: {
@@ -534,7 +528,7 @@ interface AuthStore
   tokens: {
   create: (token: TokenRecord) => MaybePromise<void>;
   consume: (digest: string, type: TokenType) => MaybePromise<TokenRecord | undefined>;
-  deleteForUser: (userId: string, type?: TokenType | undefined) => MaybePromise<void>;
+  erase: (userId: string, type?: TokenType | undefined) => MaybePromise<number>;
 }
   users: {
   get: (id: string) => MaybePromise<UserRecord | undefined>;
@@ -543,7 +537,7 @@ interface AuthStore
   findByUsername: (username: string) => MaybePromise<UserRecord | undefined>;
   create: (user: UserRecord) => MaybePromise<UserRecord | void>;
   update: (id: string, patch: Partial<Omit<UserRecord, "createdAt" | "id">>) => MaybePromise<UserRecord | undefined>;
-  delete: (id: string) => MaybePromise<void>;
+  delete: (id: string) => MaybePromise<boolean>;
   staleGuests?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>;
   staleUnverified?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>;
   list: (query: {
@@ -1163,7 +1157,7 @@ type IssueTokenResult = { ok: true, token: string, id: string } | { ok: false, e
 type Level = 'read' | 'write'
 
 [.] lifetime
-function lifetime(duration: number | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, locale: string): string
+function lifetime(duration: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number, locale: string): string
 
 [.] Limit
 interface Limit
@@ -1842,19 +1836,9 @@ interface SignInOptions
 
 [.] StoredCredential
 interface StoredCredential
-<<<<<<< HEAD
   accessToken?: null | string | undefined
-  expiresAt?: null | number | undefined
-  refreshToken?: null | string | undefined
-||||||| parent of 037707e (feat(auth)!: durations and dates where a number stood)
-  accessToken?: string | null | undefined
-  expiresAt?: number | null | undefined
-  refreshToken?: string | null | undefined
-=======
-  accessToken?: string | null | undefined
   expiresAt?: Date | null | undefined
-  refreshToken?: string | null | undefined
->>>>>>> 037707e (feat(auth)!: durations and dates where a number stood)
+  refreshToken?: null | string | undefined
 
 [.] StoreUrl
 interface StoreUrl
@@ -1879,13 +1863,7 @@ interface TokenRecord
 
 [.] TokenRefresherDeps
 interface TokenRefresherDeps<K, S>
-<<<<<<< HEAD
-  exchange: (subject: S) => Promise<null | { accessToken: string; expiresAt?: number | undefined; }>
-||||||| parent of 037707e (feat(auth)!: durations and dates where a number stood)
-  exchange: (subject: S) => Promise<{ accessToken: string; expiresAt?: number | undefined; } | null>
-=======
-  exchange: (subject: S) => Promise<{ accessToken: string; expiresAt?: Date | undefined; } | null>
->>>>>>> 037707e (feat(auth)!: durations and dates where a number stood)
+  exchange: (subject: S) => Promise<null | { accessToken: string; expiresAt?: Date | undefined; }>
   key: (subject: S) => K
   load: (subject: S) => StoredCredential
   margin?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined

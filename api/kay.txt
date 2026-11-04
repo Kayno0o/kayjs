@@ -759,11 +759,11 @@ interface RateLimit
 [.] RateStore
 interface RateStore extends StoreBase
   close?: (() => unknown) | undefined
-  hit: (key: string, window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, weight?: number | undefined) => Promise<RateWindow> | RateWindow
-  peek?: (key: string) => Promise<RateWindow | undefined> | RateWindow | undefined
+  hit: (key: string, windowMs: number, weight?: number | undefined) => MaybePromise<RateWindow>
+  peek?: (key: string) => MaybePromise<RateWindow | undefined>
   ping?: (() => unknown) | undefined
-  refund?: (key: string, resetAt: number) => Promise<void> | void
-  reset?: (key: string) => Promise<void> | void
+  refund?: (key: string, resetAt: number) => MaybePromise<void>
+  reset?: (key: string) => MaybePromise<void>
 
 [.] RateWindow
 interface RateWindow
@@ -1347,9 +1347,9 @@ function vitalsReport(now?: number): Promise<RouteVitals[]>
 
 [./analytics] VitalsStore
 interface VitalsStore extends StoreBase
-  add: (route: string, readings: VitalReading[], day: number) => Promise<void> | void
+  add: (route: string, readings: VitalReading[], day: number) => MaybePromise<void>
   close?: (() => unknown) | undefined
-  counts: (since: number) => Promise<VitalCount[]> | VitalCount[]
+  counts: (since: number) => MaybePromise<VitalCount[]>
   ping?: (() => unknown) | undefined
 
 [./analytics] VitalSummary
@@ -2308,34 +2308,15 @@ interface AppStore extends StoreBase
   ping?: (() => unknown) | undefined
   push?: PushStore | undefined
   rates?: RateStore | undefined
-  rooms?: AsyncRoomStore | RoomStore | undefined
+  rooms?: RoomStore | undefined
   sessions?: SessionStore | undefined
   vitals?: VitalsStore | undefined
 
 [./server] AsyncRooms
-interface AsyncRooms<Message, Member = undefined, State = undefined> extends RoomsBase<Message, Member>
-  coalesce: (read: (room: string) => Message | Promise<Message>, options?: CoalesceOptions | undefined) => (room: string) => void
-  join: (ws: RoomConnection, room: string, ...member: undefined extends Member ? [member?: Member] : [member: Member]) => void
-  leave: (ws: RoomConnection, room?: string | undefined) => void
-  memberOf: (ws: RoomConnection, room: string) => Member | undefined
-  members: (room: string) => Member[]
-  publish: (room: string, message: Message, options?: undefined | { except?: RoomConnection; to?: Member; }) => void
-  response: TUnsafe<Message>
-  roomsOf: (ws: RoomConnection) => string[]
-  state: (room: string) => Promise<State>
-  update: (room: string, change: (state: State) => State) => Promise<State>
+type AsyncRooms<Message, Member = undefined, State = undefined> = Rooms<Message, Member, State>
 
 [./server] AsyncRoomStore
-interface AsyncRoomStore extends RoomStoreBase
-  add: (room: string, connection: string, member: string) => void
-  close: () => unknown
-  members: (room: string) => string[]
-  ping?: (() => unknown) | undefined
-  publish: (room: string, text: string, recipients: RoomRecipients) => void
-  remove: (room: string, connection: string) => void
-  state?: (room: string) => Promise<string | undefined>
-  subscribe: (listener: RoomListener) => () => void
-  update?: (room: string, change: (current: string | undefined) => string) => Promise<string>
+type AsyncRoomStore = RoomStore
 
 [./server] background
 function background(work: (signal: AbortSignal) => unknown, options?: BackgroundOptions): Elysia<"", {
@@ -2451,7 +2432,7 @@ function defineEnv<Schema extends EnvSchema>(declared: Schema, source?: Record<s
 })["static"] & (keyof PublicFieldsOf<Schema> extends never ? unknown : WithPublicFields<Schema>)
 
 [./server] DeletableSessionStore
-type DeletableSessionStore = SessionStore & { deleteWhere: (match: SessionMatch) => number | Promise<number> }
+type DeletableSessionStore = SessionStore & { deleteWhere: (match: SessionMatch) => MaybePromise<number> }
 
 [./server] diskFiles
 function diskFiles(dir?: string): FileStore
@@ -2509,7 +2490,7 @@ interface FailedJob<Payload>
 const files: {
   put(data: Blob, options?: PutOptions): Promise<string>;
   get(key: string): Promise<Blob | undefined>;
-  delete(key: string): Promise<void>;
+  delete(key: string): Promise<boolean>;
   list(options?: {
     folder?: string | undefined;
   }): Promise<StoredFile[]>;
@@ -2521,7 +2502,7 @@ const files: {
 [./server] FileStore
 interface FileStore extends StoreBase
   close?: (() => unknown) | undefined
-  delete: (key: string) => Promise<void>
+  delete: (key: string) => Promise<boolean>
   list?: ((prefix?: string | undefined) => Promise<StoredFile[]>) | undefined
   path?: ((key: string) => string) | undefined
   ping?: (() => unknown) | undefined
@@ -2582,23 +2563,23 @@ interface JobState<Progress>
 
 [./server] JobStore
 interface JobStore extends StoreBase
-  add: (job: StoredJob) => Maybe<string | void>
-  claim: (queue: string, now: number, until: number) => Maybe<StoredJob | undefined>
+  add: (job: StoredJob) => MaybePromise<string | void>
+  claim: (queue: string, now: number, until: number) => MaybePromise<StoredJob | undefined>
   close?: (() => unknown) | undefined
-  complete: (id: string, until?: number | undefined) => Maybe<void>
-  fail: (id: string, error: string, payload?: string | undefined, until?: number | undefined) => Maybe<boolean | void>
-  failed: (queue: string, limit?: number | undefined) => Maybe<StoredJob[]>
-  jobs?: ((queue: string, options?: undefined | { limit?: number; failed?: boolean; }) => Maybe<StoredJob[]>) | undefined
-  live?: ((queue: string, now: number, limit?: number | undefined) => Maybe<StoredJobState[]>) | undefined
-  lock: (name: string, slot: number) => Maybe<boolean>
-  nextRunAt: (queue: string) => Maybe<number | undefined>
+  complete: (id: string, until?: number | undefined) => MaybePromise<void>
+  fail: (id: string, error: string, payload?: string | undefined, until?: number | undefined) => MaybePromise<boolean | void>
+  failed: (queue: string, limit?: number | undefined) => MaybePromise<StoredJob[]>
+  jobs?: ((queue: string, options?: undefined | { limit?: number; failed?: boolean; }) => MaybePromise<StoredJob[]>) | undefined
+  live?: ((queue: string, now: number, limit?: number | undefined) => MaybePromise<StoredJobState[]>) | undefined
+  lock: (name: string, slot: number) => MaybePromise<boolean>
+  nextRunAt: (queue: string) => MaybePromise<number | undefined>
   ping?: (() => unknown) | undefined
-  progress?: ((id: string, until: number, progress: string) => Maybe<void>) | undefined
-  purge?: ((queue: string, before: number) => Maybe<number>) | undefined
-  release?: ((id: string, until: number, runAt?: number | undefined) => Maybe<void>) | undefined
-  retry: (id: string, runAt: number, error: string, until?: number | undefined) => Maybe<boolean | void>
-  revive?: ((id: string, runAt: number) => Maybe<boolean>) | undefined
-  state?: ((queue: string, ref: { id: string; } | { key: string; }, now: number) => Maybe<StoredJobState | undefined>) | undefined
+  progress?: ((id: string, until: number, progress: string) => MaybePromise<void>) | undefined
+  prune?: ((queue: string, before: number) => MaybePromise<number>) | undefined
+  release?: ((id: string, until: number, runAt?: number | undefined) => MaybePromise<void>) | undefined
+  retry: (id: string, runAt: number, error: string, until?: number | undefined) => MaybePromise<boolean | void>
+  revive?: ((id: string, runAt: number) => MaybePromise<boolean>) | undefined
+  state?: ((queue: string, ref: { id: string; } | { key: string; }, now: number) => MaybePromise<StoredJobState | undefined>) | undefined
   update?: ((id: string, change: {
   payload: string;
   runAt?: number | undefined;
@@ -2607,7 +2588,7 @@ interface JobStore extends StoreBase
   now: number;
 } | {
   until: number;
-}) => Maybe<boolean>) | undefined
+}) => MaybePromise<boolean>) | undefined
 
 [./server] jobTables
 const jobTables: readonly ["kay_jobs", "kay_locks"]
@@ -2760,6 +2741,9 @@ type LogEntry = RequestEntry | MessageEntry
 [./server] Logger
 type Logger = boolean | 'json' | ((entry: LogEntry) => void)
 
+[./server] MaybePromise
+type MaybePromise<T> = T | Promise<T>
+
 [./server] memoryFiles
 function memoryFiles(): FileStore
 
@@ -2767,7 +2751,7 @@ function memoryFiles(): FileStore
 function memoryJobs(): JobStore
 
 [./server] memoryKv
-function memoryKv(): KvStore
+function memoryKv(max?: number | undefined): KvStore
 
 [./server] memoryNotifications
 function memoryNotifications(): NotificationStore
@@ -2821,15 +2805,15 @@ const notifications: {
 
 [./server] NotificationStore
 interface NotificationStore extends StoreBase
-  add: (user: string, note: StoredNotification, most: number) => Promise<void> | void
+  add: (user: string, note: StoredNotification, most: number) => MaybePromise<void>
   close?: (() => unknown) | undefined
-  erase: (user: string) => Promise<number> | number
-  list: (user: string, limit: number, now: number) => Notification[] | Promise<Notification[]>
-  markAllRead: (user: string, now: number) => Promise<number> | number
-  markRead: (user: string, id: string, now: number) => Promise<boolean> | boolean
+  erase: (user: string) => MaybePromise<number>
+  list: (user: string, limit: number, now: number) => MaybePromise<Notification[]>
+  markAllRead: (user: string, now: number) => MaybePromise<number>
+  markRead: (user: string, id: string, now: number) => MaybePromise<boolean>
   ping?: (() => unknown) | undefined
-  prune: (now: number) => Promise<number> | number
-  unread: (user: string, now: number) => Promise<number> | number
+  prune: (now: number) => MaybePromise<number>
+  unread: (user: string, now: number) => MaybePromise<number>
 
 [./server] notify
 function notify(user: string, { title, url, ttl, keep, push }: NotifyOptions): Promise<Notification>
@@ -2972,7 +2956,7 @@ function pgData(source: PgJobsSource): {
   cache: CacheStore;
   jobs: JobStore;
   rates: RateStore;
-  rooms: AsyncRoomStore;
+  rooms: RoomStore;
   vitals: VitalsStore;
   live: LiveStore;
 }
@@ -3047,12 +3031,12 @@ interface PushSendOptions
 
 [./server] PushStore
 interface PushStore extends StoreBase
-  add: (user: string, subscription: PushSubscriptionRecord, most: number) => Promise<void> | void
+  add: (user: string, subscription: PushSubscriptionRecord, most: number) => MaybePromise<void>
   close?: (() => unknown) | undefined
-  erase: (user: string) => Promise<number> | number
-  list: (user: string) => Promise<PushSubscriptionRecord[]> | PushSubscriptionRecord[]
+  delete: (endpoint: string, user?: string | undefined) => MaybePromise<boolean>
+  erase: (user: string) => MaybePromise<number>
+  list: (user: string) => MaybePromise<PushSubscriptionRecord[]>
   ping?: (() => unknown) | undefined
-  remove: (endpoint: string, user?: string | undefined) => Promise<boolean> | boolean
 
 [./server] PushSubscriptionRecord
 interface PushSubscriptionRecord
@@ -3159,18 +3143,9 @@ interface RoomRecipients
   to?: string
 
 [./server] rooms
-function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, RoomStore>] : [options: RoomsOptions<Message, State, RoomStore> & {
+function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State>] : [options: RoomsOptions<Message, State> & {
   state: () => State;
 }]): Rooms<Message, Member, State>
-function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options: RoomsOptions<Message, State, AsyncRoomStore> & {
-  store: AsyncRoomStore;
-}] : [options: RoomsOptions<Message, State, AsyncRoomStore> & {
-  store: AsyncRoomStore;
-  state: () => State;
-}]): AsyncRooms<Message, Member, State>
-function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, RoomStore | AsyncRoomStore>] : [options: RoomsOptions<Message, State, RoomStore | AsyncRoomStore> & {
-  state: () => State;
-}]): StoreRooms<Message, Member, State>
 
 [./server] Rooms
 interface Rooms<Message, Member = undefined, State = undefined> extends RoomsBase<Message, Member>
@@ -3182,26 +3157,26 @@ interface Rooms<Message, Member = undefined, State = undefined> extends RoomsBas
   publish: (room: string, message: Message, options?: undefined | { except?: RoomConnection; to?: Member; }) => void
   response: TUnsafe<Message>
   roomsOf: (ws: RoomConnection) => string[]
-  state: (room: string) => State
-  update: (room: string, change: (state: State) => State) => State
+  state: (room: string) => Promise<State>
+  update: (room: string, change: (state: State) => State) => Promise<State>
 
 [./server] RoomsOptions
-interface RoomsOptions<Message = never, State = undefined, Store = RoomStore>
+interface RoomsOptions<Message = never, State = undefined>
   snapshot?: ((state: State, room: string) => Message) | undefined
   state?: (() => State) | undefined
-  store?: Store | undefined
+  store?: RoomStore | undefined
 
 [./server] RoomStore
-interface RoomStore extends RoomStoreBase
+interface RoomStore extends StoreBase
   add: (room: string, connection: string, member: string) => void
   close: () => unknown
   members: (room: string) => string[]
   ping?: (() => unknown) | undefined
   publish: (room: string, text: string, recipients: RoomRecipients) => void
   remove: (room: string, connection: string) => void
-  state?: (room: string) => string | undefined
+  state?: (room: string) => Promise<string | undefined>
   subscribe: (listener: RoomListener) => () => void
-  update?: (room: string, change: (current: string | undefined) => string) => string
+  update?: (room: string, change: (current: string | undefined) => string) => Promise<string>
 
 [./server] Route
 interface Route
@@ -3447,11 +3422,11 @@ interface SessionSettings
 [./server] SessionStore
 interface SessionStore extends StoreBase
   close?: (() => unknown) | undefined
-  delete: (id: string) => Promise<void> | void
-  deleteWhere?: ((match: (data: SessionData) => boolean) => Promise<number> | number) | undefined
-  get: (id: string) => Promise<SessionData | undefined> | SessionData | undefined
+  delete: (id: string) => MaybePromise<void>
+  deleteWhere?: ((match: (data: SessionData) => boolean) => MaybePromise<number>) | undefined
+  get: (id: string) => MaybePromise<SessionData | undefined>
   ping?: (() => unknown) | undefined
-  set: (id: string, data: SessionData, maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`) => Promise<void> | void
+  set: (id: string, data: SessionData, maxAgeMs: number) => MaybePromise<void>
 
 [./server] shutdown
 function shutdown(app: AnyElysia, force?: boolean): Promise<void>
@@ -3557,17 +3532,7 @@ interface StoredNotification
   url?: string | undefined
 
 [./server] StoreRooms
-interface StoreRooms<Message, Member = undefined, State = undefined> extends RoomsBase<Message, Member>
-  coalesce: (read: (room: string) => Message | Promise<Message>, options?: CoalesceOptions | undefined) => (room: string) => void
-  join: (ws: RoomConnection, room: string, ...member: undefined extends Member ? [member?: Member] : [member: Member]) => void
-  leave: (ws: RoomConnection, room?: string | undefined) => void
-  memberOf: (ws: RoomConnection, room: string) => Member | undefined
-  members: (room: string) => Member[]
-  publish: (room: string, message: Message, options?: undefined | { except?: RoomConnection; to?: Member; }) => void
-  response: TUnsafe<Message>
-  roomsOf: (ws: RoomConnection) => string[]
-  state: (room: string) => Promise<State> | State
-  update: (room: string, change: (state: State) => State) => Promise<State> | State
+type StoreRooms<Message, Member = undefined, State = undefined> = Rooms<Message, Member, State>
 
 [./server] toolCall
 function toolCall(request: Request): ToolCall | undefined

@@ -512,10 +512,11 @@ interface MemberInfo
 function parseMarker(value: string, body?: boolean): FieldMarker | undefined
 
 [.] passwordGuard
-function passwordGuard(passwords: Record<string, string> | string, { maxAge, secret, store }?: PasswordOptions): Guard
+function passwordGuard(passwords: Record<string, string> | string, { maxAge, secret, store, kv: signedOut }?: PasswordOptions): Guard
 
 [.] PasswordOptions
 interface PasswordOptions
+  kv?: KvStore | undefined
   maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   secret?: string | undefined
   store?: RateStore | undefined

@@ -859,7 +859,7 @@ function drainQueues(): Promise<number>
 function durationSeconds(value: unknown, what: string): number
 
 [./library] durationWords
-function durationWords(duration: number | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, locale: string): string
+function durationWords(duration: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number, locale: string): string
 
 [./library] editSessionAdmitted
 function editSessionAdmitted(request: Request): boolean
@@ -876,7 +876,7 @@ function escapeHtml(text: string): string
 
 [./library] FallbackMemory
 interface FallbackMemory
-  hit: (key: string, window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, weight?: number | undefined) => RateWindow
+  hit: (key: string, windowMs: number, weight?: number | undefined) => RateWindow
   peek: (key: string) => RateWindow | undefined
   refund?: ((key: string, resetAt: number) => void) | undefined
   reset?: ((key: string) => void) | undefined
@@ -1438,16 +1438,10 @@ interface AuthMailData
   detail?: string | undefined
   email: string
   locale: string
-<<<<<<< HEAD
-  maxAge?: undefined | { link?: number; code?: number; }
-||||||| parent of 037707e (feat(auth)!: durations and dates where a number stood)
-  maxAge?: { link?: number; code?: number; } | undefined
-=======
-  maxAge?: {
-  link?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`;
-  code?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`;
-} | undefined
->>>>>>> 037707e (feat(auth)!: durations and dates where a number stood)
+  maxAge?: undefined | {
+  link?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
+  code?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`;
+}
   name: string
   url?: string | undefined
 
