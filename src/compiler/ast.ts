@@ -241,6 +241,8 @@ export const SERVER_ISLAND_MODES = new Set(['defer'])
 export const SERVER_ISLAND_NOSCRIPT = 'noscript'
 // The block under a deferred server island call, or at the root of the component, shown once the island failed for good.
 export const SERVER_ISLAND_FAILED = 'failed'
+// What the validator says of a `server` mark inside an island, which a `@failed` block taken out for the server compiles into.
+export const SERVER_IN_ISLAND = '`server` has no effect inside an island'
 
 export interface ServerIslandMark {
   attribute: NamedAttribute

@@ -37,6 +37,8 @@ export interface ServerRecord {
   icons: Record<string, string>
   // The library settings modules the app replaces, by their path from the root.
   replaced: string[]
+  // The directories holding the project's pages, by their path from the root: a recorded server compiles a module the record lacks without loading the app's config.
+  pages?: string[]
 }
 
 const inBuild = (file: unknown): boolean => typeof file === 'string' && !file.includes('..') && !isAbsolute(file)
@@ -50,6 +52,7 @@ function isRecord(record: ServerRecord): boolean {
     && Object.values(record.files).every(found => isObject(found) && inBuild(found.file) && LOADERS.has(found.loader) && typeof found.hash === 'string' && (found.map === undefined || inBuild(found.map)))
     && Object.values(record.covered).every(hash => typeof hash === 'string')
     && Array.isArray(record.replaced) && record.replaced.every(file => typeof file === 'string')
+    && (record.pages === undefined || (Array.isArray(record.pages) && record.pages.every(dir => typeof dir === 'string' && !isAbsolute(dir))))
     && Object.values(record.icons).every(inBuild)
 }
 

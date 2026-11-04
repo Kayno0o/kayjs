@@ -7,7 +7,7 @@ import { ASSET_FILE } from '../build/assets'
 import { KAY_MODULE, scriptLoader } from '../build/files'
 import { registerEmbeddedMapFile } from '../build/sourcemap'
 import { withoutTwin } from '../compiler/twin'
-import { loadConfig } from '../config-loader'
+
 import { projectPaths } from '../project'
 import { readServerRecord, recordName, ROOT_TOKEN, SERVER_DIR, UP_TOKEN } from './server-record'
 
@@ -55,9 +55,9 @@ async function register(root: string, output: string): Promise<boolean> {
   // What the loader would answer: set up on the first module the record cannot answer.
   const compiled = async (args: OnLoadArgs): Promise<OnLoadResult> => {
     loads ??= (async () => {
-      const [{ kay }, { capturedLoads }, { pageDirs }, config] = await Promise.all([import('../build/plugin'), import('../build/captured-loads'), import('../build/page-dirs'), loadConfig(root)])
+      const [{ kay }, { capturedLoads }] = await Promise.all([import('../build/plugin'), import('../build/captured-loads')])
 
-      return (await capturedLoads(kay({ target: 'ssr', root, pages: pageDirs(root, config), cacheDir: projectPaths(root).cache, settings: record.settings, placeholder: record.placeholder }), onResolve)).loads
+      return (await capturedLoads(kay({ target: 'ssr', root, pages: record.pages?.map(dir => join(base, dir)), cacheDir: projectPaths(root).cache, settings: record.settings, placeholder: record.placeholder }), onResolve)).loads
     })()
 
     return (await loads).find(load => load.filter.test(args.path))?.callback(args) ?? asIs(args.path)

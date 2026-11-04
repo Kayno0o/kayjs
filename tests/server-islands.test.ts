@@ -1,11 +1,12 @@
 import type { FetchedIsland } from '../src/runtime/fetch-island'
 import { rm, symlink } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import process from 'node:process'
 import { gunzipSync } from 'node:zlib'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test'
-import { transformKay } from '../src/build/transform'
+import { pageDirs } from '../src/build/page-dirs'
+import { transformKay, transformKayCached } from '../src/build/transform'
 import { compileKay } from '../src/compiler'
 import { ApiError } from '../src/runtime/api-error'
 import { hydrateIslands } from '../src/runtime/client'
@@ -16,6 +17,7 @@ import { ISLAND_HEADER } from '../src/runtime/server-islands'
 import { holdFetched } from '../src/runtime/swap-held'
 import { readManifest } from '../src/server/client'
 import { ExportError } from '../src/server/prerender'
+import { readServerRecord, SERVER_RECORD } from '../src/server/server-record'
 import { renders } from './fixtures/server-islands/src/renders'
 import { scratchBuild } from './prerendered'
 import { fixtureCopy, scratchDir } from './scratch'
@@ -374,6 +376,54 @@ describe('server islands', () => {
     expect(compile('src/pages/about.kay', [join(root, 'real/pages')])).toContain('KayFill("failed"')
     expect(compile('real/pages/about.kay', [join(root, 'src/pages')])).toContain('KayFill("failed"')
     expect(compile('src/components/about.kay', [join(root, 'src/pages')])).toContain('.kayFailed = KayFailed')
+  })
+
+  it('takes the page directories off the config, an extension\'s routes in and its layout\'s folder out, and the cache follows them', async () => {
+    const root = await scratchDir('failed-config')
+    const source = 'p body\n@failed\n  p.fills Page block\n'
+    const dirs = pageDirs(root, { dirs: { routes: 'src/pages' }, extensions: [{ name: 'ext', routes: { dir: 'ext/pages' }, layout: 'ext/_layout.kay' }] })
+
+    expect(dirs.map(dir => relative(root, dir))).toEqual(['src/pages', 'ext/pages'])
+
+    const compile = (file: string, pages = dirs) => transformKay(source, join(root, file), { target: 'ssr', root, pages })
+
+    expect(compile('src/pages/a.kay')).toContain('KayFill("failed"')
+    expect(compile('ext/pages/a.kay')).toContain('KayFill("failed"')
+    // The folder of an outer layout holds the extension's components too.
+    expect(compile('ext/card.kay')).toContain('.kayFailed = KayFailed')
+    expect(compile('src/components/card.kay')).toContain('.kayFailed = KayFailed')
+
+    const cacheDir = await scratchDir('failed-cache')
+    const cached = async (pages: string[]) => transformKayCached(source, join(root, 'src/pages/a.kay'), { target: 'ssr', root, cacheDir, pages })
+
+    expect(await cached(dirs)).toContain('KayFill("failed"')
+    expect(await cached([])).toContain('.kayFailed = KayFailed')
+  })
+
+  it('records the page directories of a build and refuses a record naming one outside it', async () => {
+    const output = await scratchDir('failed-record')
+    const record = { settings: {}, files: {}, covered: {}, icons: {}, replaced: [] }
+
+    await Bun.write(join(output, SERVER_RECORD), JSON.stringify({ ...record, pages: ['src/pages', '../ext/pages'] }))
+    expect((await readServerRecord(output))?.pages).toEqual(['src/pages', '../ext/pages'])
+
+    await Bun.write(join(output, SERVER_RECORD), JSON.stringify({ ...record, pages: ['/etc'] }))
+    expect(await readServerRecord(output)).toBeUndefined()
+  })
+
+  it('places a `@failed` refusal on the node across blank lines and nesting, and the control a `bind:` or `ref` makes interactive', () => {
+    const refusal = (source: string, message: string) => {
+      const found = compileKay(source, 'src/components/card.kay', { output: 'html', check: true }).diagnostics.find(diagnostic => diagnostic.message === message)
+
+      return found && source.slice(found.start, found.end)
+    }
+
+    const nested = '---\nimport Icon from \'./icon.kay\'\n---\np.real\n@failed\n  p static\n\n  div\n    p deeper\n\n    Icon(server)\n'
+
+    expect(refusal(nested, '`@failed` holds a server island')).toBe('Icon')
+    expect(refusal('---\nlet x = $state(\'\')\n---\np.real\n@failed\n  p static\n\n  input(bind:value={x})\n', '`@failed` holds something interactive')).toBe('bind:value')
+    expect(refusal('---\nlet el\n---\np.real\n@failed\n  p static\n  p(ref={el}) hi\n', '`@failed` holds something interactive')).toBe('ref')
+    expect(refusal('---\nimport { save } from \'./save\'\n---\np.real\n@failed\n  p static\n\n  form(action={save})\n    button Go\n', '`@failed` holds a form posting to an action')).toBe('form')
   })
 
   it('reports a script value a component\'s own `@failed` reads, which the server does not have', () => {

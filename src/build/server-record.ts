@@ -50,7 +50,8 @@ export async function writeServerRecord(project: Project): Promise<void> {
   const settings = config.librarySettings ?? {}
   const placeholder = config.images?.placeholder
   const { modules } = await serverParts(project)
-  const { loads, modules: virtual, resolves } = await capturedLoads(kay({ target: 'ssr', root, pages: pageDirs(root, config), cacheDir: paths.cache, settings, placeholder, embedMaps: true, mapName: file => file }))
+  const pages = pageDirs(root, config)
+  const { loads, modules: virtual, resolves } = await capturedLoads(kay({ target: 'ssr', root, pages, cacheDir: paths.cache, settings, placeholder, embedMaps: true, mapName: file => file }))
   const libraries = await findKayLibraries(root)
   const replaced = settingsReplacements(root, settings).flatMap(({ paths: found }) => found.map(path => realpathSync(path)))
   const files: ServerRecord['files'] = {}
@@ -177,7 +178,7 @@ export async function writeServerRecord(project: Project): Promise<void> {
     await Bun.write(join(dir, file), tokenised ? tokens(contents) : contents)
 
   await mkdir(dirname(record), { recursive: true })
-  await Bun.write(record, JSON.stringify({ settings, ...placeholder === false && { placeholder }, ...upwards !== '' && { anchor: upwards }, files, covered, icons, replaced: replaced.map(path => relative(base, path).split(sep).join('/')).sort() } satisfies ServerRecord))
+  await Bun.write(record, JSON.stringify({ settings, ...placeholder === false && { placeholder }, ...upwards !== '' && { anchor: upwards }, files, covered, icons, replaced: replaced.map(path => relative(base, path).split(sep).join('/')).sort(), pages: pages.map(dir => relative(base, existsSync(dir) ? realpathSync(dir) : dir).split(sep).join('/')) } satisfies ServerRecord))
 }
 
 // The module a wasm file imported with `type: 'file'` loads as, which answers with the file's own path.

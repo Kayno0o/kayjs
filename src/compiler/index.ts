@@ -9,7 +9,7 @@ import type { ImportedSignals, SignalKind } from './module-signals'
 import type { NameFindings } from './rewrite'
 import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
-import { actionOf, drawIcons, elementsIn, serverIslandOf, templateFacts, visitNodes } from './ast'
+import { actionOf, drawIcons, elementsIn, INTERACTIVE_ATTRIBUTE, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandCause, islandMessages, lineOf, promotionSite } from './codegen'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, openRedirects, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
@@ -240,7 +240,6 @@ export function promotedChecks(original: string, root?: string, imported?: Impor
   return [...scriptFences(script).flatMap(fence => serverOnlyImports(fence)), ...announced, ...contradicted]
 }
 
-const EVENT_HANDLER = /^on[A-Z]/
 const FAILED_FUNCTION = /^function KayFailed\(/m
 
 // Compiles a .kay component: to TSX the type checker reads, or with `output` to the HTML strings and DOM code that run.
@@ -424,7 +423,7 @@ function takeBlock(file: KayFile, filename: string, options: CompileOptions, scr
   const reads = outerReads(parsed).filter(name => declared.has(name) && !own.has(name))
 
   // A server island in the block is refused below, at the island itself.
-  for (const diagnostic of compiled.diagnostics.filter(diagnostic => which !== 'failed' || !diagnostic.message.startsWith('`server` has no effect')))
+  for (const diagnostic of compiled.diagnostics.filter(diagnostic => which !== 'failed' || diagnostic.message !== SERVER_IN_ISLAND))
     file.diagnostics.push({ ...diagnostic, start: block.name.start, end: block.name.end })
 
   // The block is spliced into the page hidden and hydrates nothing, so what needs the browser or a request of its own has no place in it.
@@ -442,27 +441,28 @@ function takeBlock(file: KayFile, filename: string, options: CompileOptions, scr
       return { start, end: start + span.end - span.start }
     }
 
-    const refused = (span: Span, message: string, help: string) => file.diagnostics.push({ ...placed(span), code: 'template-invalid', message, note: 'the block is rendered hidden with the server island, and nothing in it hydrates', help })
-    let first: { island?: Span | undefined, handler?: Span | undefined, action?: Span | undefined } = {}
+    // Where the refusal points: the node found in the block, else the block's name.
+    const refused = (span: Span | undefined, message: string, help: string) => file.diagnostics.push({ ...span === undefined ? block.name : placed(span), code: 'template-invalid', message, note: 'the block is rendered hidden with the server island, and nothing in it hydrates', help })
+    let island: Span | undefined
+    let handler: Span | undefined
+    let action: Span | undefined
 
     visitNodes(parsed.template, (node) => {
       if (node.kind !== 'element')
         return
 
-      first = {
-        island: first.island ?? (serverIslandOf(node, parsed.source) === undefined ? undefined : node.tag),
-        handler: first.handler ?? node.attributes.flatMap(attribute => attribute.kind !== 'spread' && EVENT_HANDLER.test(parsed.source.slice(attribute.name.start, attribute.name.end)) ? [attribute.name] : [])[0],
-        action: first.action ?? (actionOf(node, parsed.source) ? node.tag : undefined),
-      }
+      island ??= serverIslandOf(node, parsed.source) === undefined ? undefined : node.tag
+      handler ??= node.attributes.flatMap(attribute => attribute.kind !== 'spread' && INTERACTIVE_ATTRIBUTE.test(parsed.source.slice(attribute.name.start, attribute.name.end)) ? [attribute.name] : [])[0]
+      action ??= actionOf(node, parsed.source) ? node.tag : undefined
     })
 
-    if (first.island)
-      refused(first.island, '`@failed` holds a server island', 'render it outside the block, or leave it out')
+    if (island)
+      refused(island, '`@failed` holds a server island', 'render it outside the block, or leave it out')
     else if (compiled.island !== undefined)
-      refused(first.handler ?? block.name, '`@failed` holds something interactive', 'keep static markup and links, and a control marked `data-kay-retry`')
+      refused(handler, '`@failed` holds something interactive', 'keep static markup and links, and a control marked `data-kay-retry`')
 
     if (compiled.actionForm)
-      refused(first.action ?? block.name, '`@failed` holds a form posting to an action', 'link to the page holding the form instead')
+      refused(action, '`@failed` holds a form posting to an action', 'link to the page holding the form instead')
   }
 
   for (const name of reads) {

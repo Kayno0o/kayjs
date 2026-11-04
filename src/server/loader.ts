@@ -109,6 +109,8 @@ function scoped(project: Project, inner: BunPlugin): BunPlugin {
 export async function registerLoader(root: string, settings?: Record<string, string>): Promise<void> {
   const config = await loadConfig(root)
   const chosen = settings ?? config.librarySettings ?? {}
+  // Worked out before the project is entered, as nothing may await between that and its loader being registered.
+  const pages = (await import('../build/page-dirs')).pageDirs(root, config)
   const key = JSON.stringify(Object.entries(chosen).sort(([a], [b]) => a.localeCompare(b)))
   const at = resolve(root)
   let known = projects.get(at)
@@ -144,7 +146,7 @@ export async function registerLoader(root: string, settings?: Record<string, str
     const project: Project = { root: at, prefixes: prefixesOf(at), settings: key, early: false, ready: Promise.resolve(), loads: [] }
 
     projects.set(at, project)
-    project.ready = register(project, chosen, config.images?.placeholder, (await import('../build/page-dirs')).pageDirs(root, config))
+    project.ready = register(project, chosen, config.images?.placeholder, pages)
   }
 
   current = projects.get(at)

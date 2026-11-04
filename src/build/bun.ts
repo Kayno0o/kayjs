@@ -10,6 +10,7 @@ export interface KayBunOptions {
 }
 
 // The plugin compiling `.kay` files for a page kay does not serve: for the browser in a browser build, for the server everywhere else. Its components render fresh, with no server markup to hydrate.
+// It takes the default routes directory for the pages, as it knows no `kay.config.ts`: a root `@failed` in a page elsewhere is read as a component's own block.
 export function kay(options: KayBunOptions = {}): BunPlugin {
   return kayPlugin({ ...options, hydratable: false } satisfies KayPluginOptions)
 }

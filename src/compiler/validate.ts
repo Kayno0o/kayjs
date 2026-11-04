@@ -5,7 +5,7 @@ import type { PageSettingName } from './page-settings'
 import type { ImportBinding, ScriptAnalysis, ServerAnalysis } from './script'
 import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
-import { childBlocks, EVENT_MODIFIERS, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, serverIslandOf, templateFacts, visitNodes } from './ast'
+import { childBlocks, EVENT_MODIFIERS, failedBlockOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
 
 const UI_SOURCE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
 const AI_CHAT_SOURCES = new Set(['@kaynooo/kayjs-ai/chat.kay', '@kaynooo/kayjs-ai/chat-launcher.kay'])
@@ -580,7 +580,7 @@ class Validator {
 
   private serverIsland({ attribute, mode, noscript }: ServerIslandMark, failed: SlotNode | undefined): void {
     if (this.options.island !== undefined || this.options.insideIsland) {
-      this.error(attribute.name, '`server` has no effect inside an island', { note: 'an island renders in the browser too, as a whole' })
+      this.error(attribute.name, SERVER_IN_ISLAND, { note: 'an island renders in the browser too, as a whole' })
     }
     else if (mode === undefined) {
       this.error(attribute.name, '`server` takes no value, or "defer"', { help: '`server` renders it per request inside the prerendered page, `server="defer"` once the browser fetches it on approach' })

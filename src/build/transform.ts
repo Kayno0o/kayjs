@@ -5,7 +5,7 @@ import type { LintLevels } from '../compiler/lints'
 import type { ImportedSignals } from '../compiler/module-signals'
 import type { ClassTable } from '../runtime/class-table'
 import type { CacheSlot } from './cache'
-import { realpathSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import process from 'node:process'
 import { compileKay, formatDiagnostic, iconSetsKey, ISLAND_TWIN, withoutTwin } from '../compiler'
@@ -228,11 +228,26 @@ async function pruneEntries(cacheDir: string, entries: RegExp): Promise<number> 
   return pruneCache(cacheDir, entries, name => live.has(name.slice(0, name.indexOf('-'))))
 }
 
+// The real path of each page directory, worked out once as a compile asks for every file.
+const realDirs = new Map<string, string>()
+
 // Whether the file sits under one of the directories, compared by real path as a linked routes directory or file names them.
 function inPages(file: string, dirs: readonly string[]): boolean {
   const real = realpathOrSelf(file)
 
-  return dirs.some(dir => real.startsWith(realpathOrSelf(dir) + sep))
+  return dirs.some((dir) => {
+    let found = realDirs.get(dir)
+
+    if (found === undefined) {
+      found = realpathOrSelf(dir)
+
+      // A directory not there yet is looked for again.
+      if (found !== dir || existsSync(dir))
+        realDirs.set(dir, found)
+    }
+
+    return real.startsWith(found + sep)
+  })
 }
 
 function realpathOrSelf(file: string): string {
