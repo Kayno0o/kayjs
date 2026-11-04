@@ -24,7 +24,7 @@ export interface AsyncRows<Row> {
 // An app's callback that throws is logged, not taken for a failed load.
 function notify(call: () => unknown) {
   try {
-    call()
+    untrack(call)
   }
   catch (error) {
     console.error('kayjs-ui: a rows callback threw', error)

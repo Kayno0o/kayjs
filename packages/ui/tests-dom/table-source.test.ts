@@ -1,7 +1,9 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
+import { signal } from 'kay'
 import { mountComponent, settle } from 'kay/test'
 import { infiniteList } from '../src/infinite-list'
+import BrokenTable from '../tests/fixture/src/components/broken-table.kay'
 import { click, library } from './dom'
 
 interface Planet {
@@ -254,6 +256,78 @@ describe('Table over a list', () => {
     expect(mounted.root.querySelector('[data-part="emptyCell"]')).toBeNull()
     expect(skeletons(mounted.root)).toBe(0)
     quiet.mockRestore()
+  })
+})
+
+describe('Table over a failing list', () => {
+  test('shows the alert alone: no empty block, no noMatch, no skeleton', async () => {
+    const quiet = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    mounted = await mountComponent(BrokenTable, { load: async () => {
+      throw new Error('down')
+    } })
+    await settle()
+
+    expect(mounted.root.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    expect(mounted.root.querySelector('.nothing')).toBeNull()
+    expect(mounted.root.querySelector('.no-match')).toBeNull()
+    expect(skeletons(mounted.root)).toBe(0)
+    quiet.mockRestore()
+  })
+
+  test('shows the empty block once a list loaded nothing', async () => {
+    mounted = await mountComponent(BrokenTable, { load: async () => [] })
+    await settle()
+
+    expect(mounted.root.querySelector('.nothing')).not.toBeNull()
+  })
+})
+
+describe('Table source callbacks', () => {
+  test('a signal read in onLoad does not run the load again', async () => {
+    const other = signal(0)
+    let calls = 0
+
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: () => {
+      calls++
+
+      return PLANETS
+    }, rowKey: 'id', onLoad: () => other() })
+    await settle()
+
+    expect(calls).toBe(1)
+    other.set(1)
+    await settle()
+
+    expect(calls).toBe(1)
+  })
+})
+
+describe('VirtualList over a list', () => {
+  test('keeps its loading status for LoadMore while the list is pending', async () => {
+    const wait = deferred<string[]>()
+    const feed = infiniteList<string>([], { pageSize: 2, load: async () => wait.promise })
+
+    mounted = await mountComponent(VirtualList, { list: feed, label: 'Planets', item: (name: string) => name })
+    void feed.restart({})
+    await settle()
+
+    expect(mounted.root.querySelector('[data-part="status"]')?.textContent).toBe('')
+    expect(mounted.root.querySelectorAll('[data-part="skeleton"]')).toHaveLength(5)
+    wait.resolve([])
+  })
+
+  test('keeps one notices listitem with the status mounted before its text', async () => {
+    const wait = deferred<string[]>()
+
+    mounted = await mountComponent(VirtualList, { items: wait.promise, label: 'Planets', item: (name: string) => name })
+
+    expect(mounted.root.querySelectorAll('[data-part="notices"]')).toHaveLength(1)
+    expect(mounted.root.querySelector('[data-part="notices"] [role="status"]')?.textContent).toBe('Loading…')
+    wait.resolve(['Mars'])
+    await settle()
+
+    expect(mounted.root.querySelector('[data-part="notices"] [role="status"]')?.textContent).toBe('')
   })
 })
 

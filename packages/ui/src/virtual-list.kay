@@ -16,6 +16,7 @@ const look = recipe({
     item: 'data-linked:relative data-linked:isolate data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=itemLink],[data-part=itemButton])]:relative data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=itemLink],[data-part=itemButton])]:z-1',
     itemLink: 'absolute inset-0 z-0 m-0 block h-full w-full cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
     itemButton: 'absolute inset-0 z-0 m-0 block h-full w-full cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+    notices: '',
     skeleton: 'px-3 py-2.5',
     skeletonBar: 'block h-[1em] w-full animate-pulse bg-surface-strong motion-reduce:animate-none',
     status: 'sr-only',
@@ -64,6 +65,8 @@ const loaded = asyncRows<Item>(() => given, { onLoad: answer => onLoad?.(answer)
 const items = () => source ? source.rows() : loaded.rows()
 const waiting = () => busy || (source ? source.pending() && !source.failed() : loaded.loading())
 const skeleton = () => waiting() && items().length === 0
+// LoadMore announces a list's pending page itself.
+const announced = () => source !== undefined && source.pending()
 const skeletonIndexes = () => Array.from({ length: Math.max(1, Math.floor(skeletonItems)) }, (_, index) => index)
 const openLabel = (row: Item, index: number) => itemLabel ? itemLabel(row, index) : wording('ui.virtualList.openItem', 'Open item {position}', { position: index + 1 })
 const linked = () => itemHref !== undefined || onItemClick !== undefined
@@ -80,18 +83,19 @@ onMount(() => {
 ---
 // Only the rows in view are drawn, between two stretches of room standing for the others. The box takes the focus to scroll by keyboard; find-in-page sees the drawn rows alone, and a focused row that scrolls out of the window is gone with its focus.
 div(part="root" {...rest} ref={element => box = element} role="list" tabindex="0" aria-label={label} aria-busy={waiting() ? 'true' : undefined})
-  if loaded.failed()
-    div(part="failureItem" role="listitem")
+  // One listitem holds the notices, so the list keeps valid children and the status stays mounted for its text to be announced; the items state their own position and size.
+  div(part="notices" role="listitem")
+    p(part="status" role="status") {skeleton() && !announced() ? loadingLabel : ''}
+    if loaded.failed()
       div(part="failure" role="alert")
         p(part="message") {failureLabel}
         if loaded.retryable()
           Button(label={retryLabel} variant="ghost" size="sm" onClick={loaded.retry})
-  if skeleton()
-    div(part="skeletons" role="listitem")
-      p(part="status" role="status") {loadingLabel}
-      for index of skeletonIndexes() key={index}
-        div(part="skeleton" aria-hidden="true")
-          span(part="skeletonBar")
+    if skeleton()
+      div(part="skeletons" aria-hidden="true")
+        for index of skeletonIndexes() key={index}
+          div(part="skeleton")
+            span(part="skeletonBar")
   div(part="content" ref={element => content = element} role="presentation" style={`padding-block: ${list.before()}px ${list.after()}px`})
     for entry of entries() key={keyOf(entry.row, entry.index)}
       div(part="item" role="listitem" data-linked={linked() ? '' : undefined} data-virtual-index={entry.index} aria-posinset={entry.index + 1} aria-setsize={list.count()})

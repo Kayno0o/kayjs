@@ -1,0 +1,14 @@
+---
+// kay-island
+import { infiniteList } from '@kaynooo/kayjs-ui'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+const { load } = props<{ load: () => Promise<{ id: number, name: string }[]> }>()
+
+const feed = infiniteList<{ id: number, name: string }>([], { pageSize: 2, load })
+---
+Table(columns={[{ key: 'name', header: 'Name', sortValue: true }]} list={feed} rowKey="id" sort={{ key: 'name', direction: 'asc' }} filterParam="q")
+  @empty
+    p.nothing No planets
+  @noMatch
+    p.no-match Nothing matches

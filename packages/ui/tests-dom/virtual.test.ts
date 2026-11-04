@@ -51,7 +51,7 @@ describe('VirtualList', () => {
     mounted = await mountComponent(VirtualListComponent, { count: 1000 })
 
     const { root } = mounted
-    const items = rowsOf(root, '[role="listitem"]')
+    const items = rowsOf(root, '[data-part="item"]')
 
     expect(items.length).toBeGreaterThan(10)
     expect(items.length).toBeLessThan(50)
@@ -88,13 +88,13 @@ describe('VirtualList', () => {
     mounted = await mountComponent(VirtualListComponent, { count: 100 })
 
     const { root } = mounted
-    const before = rowsOf(root, '[role="listitem"]').length
-    const first = root.querySelector('[role="listitem"]')!
+    const before = rowsOf(root, '[data-part="item"]').length
+    const first = root.querySelector('[data-part="item"]')!
 
     Resize.made.at(-1)!.callback([{ target: first, borderBoxSize: [{ blockSize: 60 }] }])
     await settle()
 
-    const drawn = rowsOf(root, '[role="listitem"]').length
+    const drawn = rowsOf(root, '[data-part="item"]').length
     const rooms = (root.querySelector('[role="presentation"]') as HTMLElement).style.paddingBlock
 
     // The taller first row pushes the others down, so fewer fit the window.
@@ -110,7 +110,7 @@ describe('VirtualList', () => {
 
     await scrollTo(box, 20 * 500)
 
-    const above = rowsOf(root, '[role="listitem"]')[0]!
+    const above = rowsOf(root, '[data-part="item"]')[0]!
 
     expect(Number(above.getAttribute('data-virtual-index'))).toBeLessThan(500)
 

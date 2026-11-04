@@ -2628,11 +2628,11 @@ component default
 component default
   | { busy?: boolean | undefined; class?: string | undefined | {
   root?: string | undefined;
-  failureItem?: string | undefined;
+  notices?: string | undefined;
+  status?: string | undefined;
   failure?: string | undefined;
   message?: string | undefined;
   skeletons?: string | undefined;
-  status?: string | undefined;
   skeleton?: string | undefined;
   skeletonBar?: string | undefined;
   content?: string | undefined;
@@ -2642,11 +2642,11 @@ component default
 }; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items: (RowsSource<Item> | undefined) & RowsSource<Item>; label: string; list?: undefined; loadingLabel?: string | undefined; onError?: ((error: unknown) => unknown) | undefined; onItemClick?: ((item: Item, index: number, event: MouseEvent) => unknown) | undefined; onLoad?: ((items: Item[]) => unknown) | undefined; overscan?: number | undefined; retryLabel?: string | undefined; skeletonItems?: number | undefined }
   | { busy?: boolean | undefined; class?: string | undefined | {
   root?: string | undefined;
-  failureItem?: string | undefined;
+  notices?: string | undefined;
+  status?: string | undefined;
   failure?: string | undefined;
   message?: string | undefined;
   skeletons?: string | undefined;
-  status?: string | undefined;
   skeleton?: string | undefined;
   skeletonBar?: string | undefined;
   content?: string | undefined;
