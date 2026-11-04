@@ -106,12 +106,13 @@ async function settledWithin(work: Promise<void>, ms: number) {
 const TESTS_LOCK = 'kay-land-tests'
 
 // Runs one step once `slot` lets it, so the time it queues is not the time it runs, which STEP_LIMIT_MS counts.
+// A landing a test starts in a scratch repo runs inside a test step already holding that lock, which `slot` would make it wait for forever, so it takes a slot alone.
 async function step(label: string, argv: string[], cwd = '.', lock?: string) {
-  const prefix = slotPrefix(lock)
+  const prefix = slotPrefix(lock === process.env.KAY_LAND_LOCKED ? undefined : lock)
   const held = prefix === undefined ? undefined : await holder(prefix)
 
   try {
-    await run(label, argv, cwd)
+    await run(label, argv, cwd, lock)
   }
   finally {
     await held?.release()
@@ -119,7 +120,7 @@ async function step(label: string, argv: string[], cwd = '.', lock?: string) {
 }
 
 // Runs one step in a process group of its own, its output going to the log as it comes, and fails the landing on its failed tests and last lines, or on where it stood once it ran past STEP_LIMIT_MS.
-async function run(label: string, argv: string[], cwd: string) {
+async function run(label: string, argv: string[], cwd: string, lock?: string) {
   const started = performance.now()
   const before = scopeMemory()
   const sampler = sampleScope()
@@ -128,7 +129,7 @@ async function run(label: string, argv: string[], cwd: string) {
   await appendFile(LOG, `$ ${label}\n`)
 
   // Its stderr into its stdout, so one pipe keeps their lines in the order they were written, the shell's own included, which says why a command could not start.
-  const child = Bun.spawn(['sh', '-c', 'exec 2>&1; exec "$@"', 'sh', ...nicedCommand(argv)], { cwd, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit', detached: true })
+  const child = Bun.spawn(['sh', '-c', 'exec 2>&1; exec "$@"', 'sh', ...nicedCommand(argv)], { cwd, env: lock === undefined ? process.env : { ...process.env, KAY_LAND_LOCKED: lock }, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit', detached: true })
   let output = ''
   let hung = false
   const limit = setTimeout(() => {
