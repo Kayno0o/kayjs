@@ -44,6 +44,12 @@ class ActionError
   name: string
   status: number
 
+[.] ActionErrorDetail
+interface ActionErrorDetail
+  action: string
+  errors: Record<string, string>
+  status: number
+
 [.] ActionFor
 interface ActionFor<Params extends Readonly<Record<string, unknown>>>
 
@@ -80,6 +86,11 @@ class ActionRedirectError
   name: string
   status: number
 
+[.] ActionStartDetail
+interface ActionStartDetail
+  action: string
+  data: FormData
+
 [.] ActionStream
 interface ActionStream<T> extends Omit<EventReader<T>, 'retry'>
   close: () => void
@@ -89,6 +100,10 @@ interface ActionStream<T> extends Omit<EventReader<T>, 'retry'>
   on: (listener: (value: T) => void) => () => void
   pending: () => boolean
   status: () => ConnectionStatus
+
+[.] ActionSuccessDetail
+interface ActionSuccessDetail
+  action: string
 
 [.] Answer
 type Answer<Output> = Output extends AsyncIterable<infer Value> ? ActionStream<Value> : Output
@@ -578,6 +593,9 @@ function onMount(fn: () => void): void
 
 [.] onNavigate
 function onNavigate(fn: (event: NavigateEvent) => unknown): () => void
+
+[.] optimistic
+function optimistic(change: () => void): { undo: () => void; keep: () => void; }
 
 [.] PageContext
 interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>> extends RequestContext<Params>

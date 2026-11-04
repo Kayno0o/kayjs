@@ -1163,8 +1163,13 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         (window as { kayAlive?: boolean, kayHeard?: string[] }).kayAlive = true;
         (window as { kayHeard?: string[] }).kayHeard = heard
 
-        for (const type of ['start', 'success', 'error'])
-          document.addEventListener(`kay:action-${type}`, event => heard.push(`${type}:${String((event as CustomEvent<{ data?: FormData }>).detail.data?.get('title') ?? '')}`))
+        for (const type of ['start', 'success', 'error']) {
+          document.addEventListener(`kay:action-${type}`, (event) => {
+            const { data, status, errors } = (event as CustomEvent<{ data?: FormData, status?: number, errors?: Record<string, string> }>).detail
+
+            heard.push(`${type}:${String(data?.get('title') ?? '')}:${status ?? ''}:${Object.keys(errors ?? {}).join()}`)
+          })
+        }
       })
 
       const posted = own.waitForResponse('/_kay/action/*')
@@ -1202,7 +1207,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       expect(await own.value('input[name="title"]')).toBe('taken')
       expect(await sameDocument(own)).toBe(true)
       // The form announces its post to an island: the fields as it starts, then how it went.
-      expect(await own.evaluate(() => (window as { kayHeard?: string[] }).kayHeard)).toEqual(['start:abcd', 'success:', 'start:taken', 'error:'])
+      expect(await own.evaluate(() => (window as { kayHeard?: string[] }).kayHeard)).toEqual(['start:abcd::', 'success:::', 'start:taken::', 'error::409:'])
     }
     finally {
       own.close()

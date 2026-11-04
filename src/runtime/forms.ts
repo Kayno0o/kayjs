@@ -3,14 +3,16 @@ import { controlsOf } from './form-controls'
 import { busyForms, checkedForms, submitNatively } from './form-submits'
 import { leave, loadAgain, navigation, prefetched, swappable } from './navigation'
 import { pendingBlocks } from './pending'
-import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
+import { FAILURE_HEADER, NAVIGATE_HEADER, OUTCOME_SCRIPT, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { uploaded } from './upload'
+import { decodeServerValue } from './wire'
 
 // Form posting, which `./form-submits` loads once a form posting to an action takes focus or is submitted: checked, then sent, then the page it answers shown through the swap.
 // The swap is imported as `./navigate` imports it, so that the two load as chunks of their own rather than through a third holding what they share.
 
 // What the server answered a form the swap posted.
 interface Answer {
+  status: number
   type: string
   text: string
   redirect: string | null
@@ -28,8 +30,21 @@ const style = (form: HTMLFormElement): CSSStyleDeclaration => Reflect.get(HTMLEl
 type Swapper = typeof import('./page-swap')
 
 // Tells an island's `listen(form, ...)` how the post goes, while the form is still the one on the page: `kay:action-start` (before the post, with the fields as `data`, for an optimistic change), then `kay:action-success` or `kay:action-error`.
-function announce(form: HTMLFormElement, type: 'start' | 'success' | 'error', detail: { action: string, data?: FormData }): void {
+function announce(form: HTMLFormElement, type: 'start' | 'success' | 'error', detail: object): void {
   form.dispatchEvent(new CustomEvent(`kay:action-${type}`, { bubbles: true, detail }))
+}
+
+// The message per field a refused post's page carries, as an `ActionError` would: read from the outcome the server wrote into it.
+function refusedErrors(page: string): Record<string, string> {
+  const script = new DOMParser().parseFromString(page, 'text/html').querySelector(`script[${OUTCOME_SCRIPT}]`)
+  const text = script?.textContent ?? ''
+
+  try {
+    return text === '' ? {} : (decodeServerValue(text) as { errors?: Record<string, string> }).errors ?? {}
+  }
+  catch {
+    return {}
+  }
 }
 
 let checks: Promise<typeof import('./validate')> | undefined
@@ -176,7 +191,7 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
     }
   }
   catch {
-    announce(form, 'error', { action: withoutBase(url.pathname) })
+    announce(form, 'error', { action: withoutBase(url.pathname), status: 0, errors: {} })
 
     // A post that reached the server has run its action, only the answer was lost: the page loads rather than the form posting again.
     if (delivery.reached) {
@@ -205,7 +220,12 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
   if (navigation.visits !== navigated)
     return
 
-  announce(form, response.redirect !== null ? 'success' : 'error', { action: withoutBase(url.pathname) })
+  const happened = { action: withoutBase(url.pathname), status: response.status }
+
+  if (response.redirect !== null)
+    announce(form, 'success', { action: happened.action })
+  else
+    announce(form, 'error', { ...happened, errors: response.refused ? refusedErrors(response.text) : {} })
 
   // Sent once: from here on a failure loads the page rather than posting again.
   if (response.redirect !== null) {
@@ -291,5 +311,5 @@ async function post(url: URL, body: FormData | URLSearchParams, form: HTMLFormEl
 
   delivery.reached = true
 
-  return { type: response.headers.get('content-type') ?? '', text: await response.text(), redirect: response.headers.get(REDIRECT_HEADER), refused: response.headers.has(FAILURE_HEADER), work: response.headers.get(WORK_HEADER) }
+  return { status: response.status, type: response.headers.get('content-type') ?? '', text: await response.text(), redirect: response.headers.get(REDIRECT_HEADER), refused: response.headers.has(FAILURE_HEADER), work: response.headers.get(WORK_HEADER) }
 }

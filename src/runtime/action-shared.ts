@@ -230,12 +230,44 @@ export type Outcome
   = | { action: string, succeeded?: undefined, status: number, values: Record<string, string>, errors: Record<string, string>, data?: unknown }
     | { action: string, succeeded: true, data: unknown }
 
+// What the events a form posting in place fires carry: `kay:action-start` before the post, then `kay:action-success` or `kay:action-error` (`errors` as an `ActionError` carries them, empty when the post got no answer).
+export interface ActionStartDetail {
+  action: string
+  data: FormData
+}
+
+export interface ActionSuccessDetail {
+  action: string
+}
+
+export interface ActionErrorDetail {
+  action: string
+  status: number
+  errors: Record<string, string>
+}
+
+declare global {
+  interface HTMLElementEventMap {
+    'kay:action-start': CustomEvent<ActionStartDetail>
+    'kay:action-success': CustomEvent<ActionSuccessDetail>
+    'kay:action-error': CustomEvent<ActionErrorDetail>
+  }
+
+  interface DocumentEventMap {
+    'kay:action-start': CustomEvent<ActionStartDetail>
+    'kay:action-success': CustomEvent<ActionSuccessDetail>
+    'kay:action-error': CustomEvent<ActionErrorDetail>
+  }
+}
+
 // Something a call can refresh in place of the page: a `resource()`, or any object with a `refresh()`.
 export interface Refreshable {
   refresh: () => unknown
 }
 
-// How a call tries again: `times` more posts after the first, `delay` before the first of them, doubling after each, and `when` to tell the failures worth another try from the rest; by default a call that got no answer or a timeout, and a 502, 503 or 504.
+// How a call tries again: `times` more posts after the first, `delay` before the first of them, doubling after each, and `when` to tell the failures worth another try from the rest.
+// By default only what cannot have run is repeated: a 503, and a network failure or a 502 before the post was sent. A timeout, a 504 or any failure after the post was sent needs a `when`, as the handler may have run; a redirect and an abort are never repeated, whatever `when` says.
+// Every try of a call sends the same `Idempotency-Key` header, which a handler reads from `ctx.request` to tell a repeat from a new call.
 export interface RetryOptions {
   times: number
   delay?: Duration | undefined
@@ -253,7 +285,7 @@ export interface CallOptions<Output = unknown> {
   queue?: CallQueue | undefined
   // Aborts the post once it waited this long for the answer (not while it queues), rejecting with a `TimeoutError`; the change `optimistic` showed goes back.
   timeout?: Duration | undefined
-  // Posts again when the call fails in a way worth another try, a number being `{ times }`. A post that reached the server may have run, so use it for a handler that tolerates being run twice.
+  // Posts again when the call fails in a way worth another try, a number being `{ times }`. By default only a 503 and a failure before the post was sent are repeated; see `RetryOptions` for `when` and the `Idempotency-Key` every try carries.
   retry?: number | RetryOptions | undefined
   // Called when the call is made, before its post is sent; the hooks never fail the call, a throw is logged.
   onStart?: ((event: { input: unknown }) => unknown) | undefined

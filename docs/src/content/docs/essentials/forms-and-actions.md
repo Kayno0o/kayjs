@@ -333,7 +333,40 @@ p {column()}
 
 The call still throws when it fails. While it runs, `pending()` follows its own request. Calls over one signal can overlap: each failure puts the signal back to what it held before that call, whichever order they fail in. To order the calls themselves, see [Queuing calls](#queuing-calls).
 
-A form posting in place, `form(action={move})`, tells an island how it went through three events on the form, which bubble: `kay:action-start` before the post, with the fields in `event.detail.data`, then `kay:action-success` or `kay:action-error`. Listen on the form with `listen(form, 'kay:action-start', ...)` to show a change at once, and put it back on `kay:action-error`.
+A form posting in place, `form(action={add})`, tells an island how it went through three events on the form, which bubble. `kay:action-start` comes before the post, with the action's URL and the fields in `event.detail.data`. `kay:action-success` comes when it went through, with the `action`. `kay:action-error` comes when it did not, with the `action`, the `status` (0 when there was no answer) and the `errors` per field, `''` being the whole form.
+
+`optimistic` from `kay` runs a change and hands back `undo` and `keep`. Show the change on start, then undo it on error. Changes made one after another and undone in any order end where they began.
+
+```kay
+--- server
+import { s } from 'kay'
+
+export const add = action(s.Object({ title: s.String({ minLength: 1 }) }), async ({ title }) => title)
+--- script
+import { listen, optimistic } from 'kay'
+
+let form: HTMLFormElement | undefined
+let titles: string[] = []
+let shown: { undo: () => void, keep: () => void } | undefined
+
+listen(() => form, 'kay:action-start', (event) => {
+  const title = String(event.detail.data.get('title'))
+
+  shown = optimistic(() => titles = [...titles, title])
+})
+listen(() => form, 'kay:action-success', () => shown?.keep())
+listen(() => form, 'kay:action-error', event => {
+  shown?.undo()
+  console.warn(event.detail.status, event.detail.errors)
+})
+---
+form(ref={element => form = element} action={add})
+  input(field="title" aria-label="Title")
+  button Add
+ul
+  for title of titles
+    li {title}
+```
 
 ### Refreshing less
 
@@ -342,8 +375,11 @@ Pass a `resource()`, or a list of them, as `refresh` to refresh those and leave 
 ### Waiting, trying again and knowing how it went
 
 - `timeout: '5s'` aborts a post the server has not answered in that time. The call rejects with a `TimeoutError` and `pending()` clears. The time counts from the post, not from the wait in a queue.
-- `retry: 2` posts again, up to twice, after a call that got no answer, a timeout or a 502, 503 or 504. `retry: { times: 2, delay: '1s', when: error => error.status === 429 }` sets the pause, which doubles each time, and which failures are worth another try. A post that reached the server may have run, so use it for a handler that tolerates running twice.
-- `onStart`, `onSuccess`, `onError` and `onSettled` observe the call. Each gets one object (`{ input }`, `{ data }`, `{ error }` with an `ApiError`, `{ data, error }`). An abort and a redirect are no error. A hook that throws is logged and never fails the call.
+- `retry: 2` posts again, up to twice, after a failure that cannot have run the handler: a 503, or a post that failed before it was sent. `retry: { times: 2, delay: '1s', when: error => error.status === 429 }` sets the pause, which doubles each time, and which failures are worth another try.
+- A timeout, a 504 or a network failure after the post was sent needs a `when`, as the handler may have run. A redirect and an abort are never tried again, whatever `when` says.
+- Every try of a call sends the same `Idempotency-Key` header. The handler reads it from `ctx.request` to tell a repeat from a new call.
+- `timeout: '0s'` means no timeout, and text that is no duration throws.
+- `onStart`, `onSuccess`, `onError` and `onSettled` observe the call. Each gets one object (`{ input }`, `{ data }`, `{ error }` with an `ApiError`, `{ data, error }`). An abort and a redirect are no error, though `onSettled` runs for them with the failure. For a stream, `onSuccess` runs when the stream starts, not when it ends, and `latest` does not abort a stream that has started. A hook that throws is logged and never fails the call.
 
 ```ts
 await save(card, { timeout: '8s', retry: 2, onError: ({ error }) => toast(error.message) })
@@ -394,7 +430,9 @@ export const reply = action(s.Object({ prompt: s.String({ maxLength: 2000 }) }),
 ---
 ```
 
-If the handler throws an error carrying `Symbol.for('kay.refused')` as `{ status, retryAfter?, message, errors?, data? }`, the action answers that status with a `Retry-After` header and the message, with `errors` beside the fields and `data` as `ctx.fail` gives them, in place of a 500. `refuse()` from `kay` throws one. kayjs-ai refuses a visitor over its limit this way, and the action's `messages.rateLimit` can word it.
+If the handler throws an error carrying `Symbol.for('kay.refused')` as `{ status, retryAfter?, message, errors?, data? }`, the action answers that status with a `Retry-After` header and the message, with `errors` beside the fields and `data` as `ctx.fail` gives them, in place of a 500. `refuse()` from `kay` throws one.
+
+`refuse()` is the throwing twin of `return ctx.fail(status, data, errors)`, which answers the same. kayjs-ai refuses a visitor over its limit this way, and the action's `messages.rateLimit` can word it.
 
 An island calling it gets a stream once the first value is there. `last()` reads the latest value, `status()` tells whether it is still open (`pending()` and `error()` read it too), and `close()` stops it.
 

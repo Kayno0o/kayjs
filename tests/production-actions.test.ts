@@ -162,6 +162,25 @@ describe('action protection', () => {
     expect(html).toContain('value="taken"')
   })
 
+  it('keeps hostile or unknown keys of ctx.fail errors harmless: a __proto__ key is refused plainly, a key outside the schema shown nowhere', async () => {
+    const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
+    const site = await testSite({ root: FIXTURE, security: false })
+    const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
+    const post = async (message: string, address: string) => app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': address }, body: stringify({ message }) }))
+    const hostile = await post('hostile', '203.0.113.33')
+
+    expect(hostile.status).toBe(500)
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+
+    const answer = await post('stray', '203.0.113.34')
+    const html = (await site.submit(enquire, { message: 'stray' }, { from: '/enquiry' })).html
+
+    expect(answer.status).toBe(422)
+    expect(Object.keys((parse(await answer.text()) as { errors: object }).errors).sort()).toEqual(['message', 'nothere'])
+    expect(html).toContain('<p id="enquire-message-error" class="error">Own</p>')
+    expect(html).not.toContain('Stray')
+  })
+
   it('answers a thrown refuse() as it answers ctx.fail, with its message, field errors and data', async () => {
     const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
     const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }

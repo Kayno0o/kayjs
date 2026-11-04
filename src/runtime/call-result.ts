@@ -62,7 +62,7 @@ export function trackCalls<Args extends unknown[]>(
       return { ok: true, data }
     }
     catch (failure) {
-      if (aside?.(failure) !== true && (failure as { name?: unknown } | null)?.name !== 'AbortError' && !args.some(arg => (arg as { signal?: AbortSignal } | undefined)?.signal?.aborted === true)) {
+      if (aside?.(failure) !== true && !args.some(arg => (arg as { signal?: AbortSignal } | undefined)?.signal?.aborted === true)) {
         failedWith = args
         setOutcome('failed')
         setError(apiErrorOf(failure))

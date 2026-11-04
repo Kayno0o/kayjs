@@ -45,6 +45,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   onCleanup: 'free',
   onMount: 'free',
   onNavigate: 'free',
+  optimistic: 'free',
   persisted: 'local',
   postedChecked: 'free',
   postedValue: 'free',

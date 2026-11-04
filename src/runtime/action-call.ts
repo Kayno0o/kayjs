@@ -1,6 +1,6 @@
 import type { Caller } from './action-owner'
 import type { Action, ActionStream, CallOptions, CallQueue, Outcome, Refreshable, TrackedCall } from './action-shared'
-import type { ApiError } from './api-error'
+import type { Duration } from './duration'
 import { encodeCall } from './action-encode'
 import { ActionError, ActionRedirectError } from './action-error'
 import { withFields } from './action-form'
@@ -10,24 +10,29 @@ import { actionFailed, apiErrorOf, messageOf } from './api-error'
 import { withBase } from './base'
 import { skew } from './build'
 import { trackCalls, whenIdle } from './call-result'
-import { durationMs } from './duration'
+import { durationSeconds, isZeroDuration } from './duration'
 import { leave, mayLeave, navigation, prefetched } from './navigation'
 import { pageData } from './page-data'
 import { getOwner, liveOwner, ownSignal, released, undoable, untrack } from './reactive'
 import { reload } from './stale'
-import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
+import { FAILURE_HEADER, OUTCOME_SCRIPT, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { ACTION_PREFIX, ACTION_TYPE, decodeServerValue, malformed, serverWritten } from './wire'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
 declare const KAY_BROWSER: true | undefined
 
-// Where the server writes the post a page with islands was rendered in answer to.
-export const OUTCOME_SCRIPT = 'data-kay-outcome'
+export { OUTCOME_SCRIPT }
 
 const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
-// The answers of a server that is down or overloaded for the moment, which a retry may get past.
-const BUSY_STATUSES = new Set([502, 503, 504])
 const RETRY_DELAY_MS = 500
+// The reasons of the aborts a `latest` call makes of the earlier ones, which are no failure of a `track()` handle.
+const superseding = new WeakSet<object>()
+// The errors of a post that failed in the network, as opposed to one thrown before it was sent (an encoding, a redirect to a page that is none).
+const networkFailures = new WeakSet<object>()
+
+function idempotencyKey(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('')
+}
 
 // The calls of an action, or of one `track()` handle, that `queue` orders: `tail` settles when the last `serial` call is done, `latest` is the call in flight a newer one aborts.
 interface Lane {
@@ -36,43 +41,91 @@ interface Lane {
   latest?: AbortController | undefined
 }
 
-function superseded(): DOMException {
-  return new DOMException('Superseded by a later call', 'AbortError')
+// One signal for several, aborting with the reason of the first to abort. A lone one is returned as it is, so a browser that has no `AbortSignal.any` still runs the call; `stop` lets go of the listeners, and `always` makes a signal of its own whose sources can be let go of before the call ends.
+function join(sources: (AbortSignal | undefined)[], always = false): { signal: AbortSignal | undefined, stop: (only?: AbortSignal) => void } {
+  const list = sources.filter(source => source !== undefined)
+
+  if (list.length < 2 && !always)
+    return { signal: list[0], stop: () => undefined }
+
+  const controller = new AbortController()
+  const forwards = list.map(source => [source, () => controller.abort(source.reason)] as const)
+
+  for (const [source, forward] of forwards) {
+    if (source.aborted) {
+      controller.abort(source.reason)
+
+      break
+    }
+
+    source.addEventListener('abort', forward, { once: true })
+  }
+
+  return {
+    signal: controller.signal,
+    stop: (only) => {
+      for (const [source, forward] of forwards) {
+        if (only === undefined || only === source)
+          source.removeEventListener('abort', forward)
+      }
+    },
+  }
 }
 
-function isAbort(error: unknown): boolean {
-  return (error as { name?: unknown } | null)?.name === 'AbortError'
-}
-
-// Waits for the calls ahead, giving up at once when this one is aborted meanwhile.
-async function queued(before: Promise<unknown>, signal: AbortSignal | undefined): Promise<void> {
+// Waits for `ms`, or for the calls ahead when given a promise, giving up at once when the signal aborts meanwhile.
+async function waitFor(wait: number | Promise<unknown>, signal: AbortSignal | undefined): Promise<void> {
   signal?.throwIfAborted()
 
-  await (signal === undefined
-    ? before
-    : Promise.race([before, new Promise<never>((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))]))
+  let stop = () => undefined as void
+
+  try {
+    await new Promise<unknown>((resolve, reject) => {
+      const abort = () => reject(signal!.reason)
+      const id = typeof wait === 'number' ? setTimeout(resolve, wait) : undefined
+
+      if (typeof wait !== 'number') {
+        void (async () => {
+          try {
+            resolve(await wait)
+          }
+          catch (error) {
+            reject(error)
+          }
+        })()
+      }
+
+      signal?.addEventListener('abort', abort, { once: true })
+      stop = () => {
+        clearTimeout(id)
+        signal?.removeEventListener('abort', abort)
+      }
+    })
+  }
+  finally {
+    stop()
+  }
 }
 
-async function pause(ms: number, signal: AbortSignal | undefined): Promise<void> {
-  signal?.throwIfAborted()
-
-  await new Promise<void>((resolve, reject) => {
-    const id = setTimeout(resolve, ms)
-
-    signal?.addEventListener('abort', () => {
-      clearTimeout(id)
-      reject(signal.reason)
-    }, { once: true })
-  })
+// How long a wait of the call's lasts: nothing for a zero, a clear error for text that is no duration.
+function waitOf(value: Duration | undefined, what: string): number | undefined {
+  return value === undefined || isZeroDuration(value) ? undefined : durationSeconds(value, what) * 1000
 }
 
-function retryOf(retry: CallOptions['retry']): { times: number, delay: number, when: (error: ApiError) => boolean } {
+// Whether a failure is one a retry may repeat: the server's answer or the network's failure, never a redirect, an abort or something thrown before the post was sent. Unless `when` says otherwise, a 503 (the server turned the call away) and a failure before the post was sent are, and nothing else, as a post that reached the server may have run.
+function retryOf(retry: CallOptions['retry']): { times: number, delay: number, again: (error: unknown, sent: boolean) => boolean } {
   const options = typeof retry === 'number' ? { times: retry } : retry
 
   return {
     times: options?.times ?? 0,
-    delay: options?.delay === undefined ? RETRY_DELAY_MS : durationMs(options.delay),
-    when: options?.when ?? (error => error.status === 0 || BUSY_STATUSES.has(error.status)),
+    delay: waitOf(options?.delay, 'retry.delay') ?? RETRY_DELAY_MS,
+    again: (error, sent) => {
+      if (error instanceof ActionRedirectError || !(error instanceof ActionError || networkFailures.has(error as object) || (error as { name?: unknown } | null)?.name === 'TimeoutError'))
+        return false
+
+      const failure = apiErrorOf(error)
+
+      return options?.when ? options.when(failure) : failure.status === 503 || (!sent && (failure.status === 0 || failure.status === 502))
+    },
   }
 }
 
@@ -200,12 +253,19 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
       }
     }
     const later = mode === 'latest' ? new AbortController() : undefined
+    // What aborts the call as a whole: its own signal, and a later call of a `latest` queue, which stops mattering once the post is answered.
+    const whole = join([options?.signal, later?.signal], later !== undefined)
+    const timeoutOption = options?.timeout
+    const timeout = waitOf(timeoutOption, 'timeout')
 
     try {
       undo = options?.optimistic ? undoable(options.optimistic) : undefined
 
       if (later) {
-        lane.latest?.abort(superseded())
+        const reason = new DOMException('Superseded by a later call', 'AbortError')
+
+        superseding.add(reason)
+        lane.latest?.abort(reason)
         lane.latest = later
       }
 
@@ -215,39 +275,46 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
         lane.tail = Promise.all([before, new Promise<void>((resolve) => {
           release = resolve
         })])
-        await queued(before, options?.signal)
+        await waitFor(before, whole.signal)
       }
 
       const attempts = retryOf(options?.retry)
+      // One key for every try of the call, which a handler reads from `ctx.request` to tell a repeat from a new call.
+      const key = attempts.times > 0 ? idempotencyKey() : undefined
 
       for (let attempt = 0; ; attempt++) {
-        // The wait for the answer is bounded from the post's start, and each try has its own.
-        const timeout = options?.timeout === undefined ? undefined : new AbortController()
-        const timer = timeout && setTimeout(() => {
-          timedOut = true
-          timeout.abort(new DOMException(`The server did not answer in ${options!.timeout}`, 'TimeoutError'))
-        }, durationMs(options!.timeout!))
-        const cancel = AbortSignal.any([options?.signal, later?.signal, timeout?.signal].filter(item => item !== undefined))
+        // The wait for the answer counts from the moment the post is sent, and each try has its own.
+        const limit = timeout === undefined ? undefined : new AbortController()
+        const attemptSignal = join([whole.signal, limit?.signal])
+        let timer: ReturnType<typeof setTimeout> | undefined
+        let sentNow = false
 
         try {
-          answer = await post(url(), input, setProgress, cancel, () => {
-            sent = true
-          }, left, caller, options?.headers)
+          answer = await post(url(), input, setProgress, attemptSignal.signal, () => {
+            sent = sentNow = true
+            clearTimeout(timer)
+            timer = limit && setTimeout(() => {
+              timedOut = true
+              limit.abort(new DOMException(`The server did not answer within ${String(timeoutOption)}`, 'TimeoutError'))
+            }, timeout)
+          }, left, caller, key === undefined ? options?.headers : { 'idempotency-key': key, ...options?.headers })
 
           break
         }
         catch (error) {
-          if (attempt >= attempts.times || options?.signal?.aborted === true || later?.signal.aborted === true || !attempts.when(apiErrorOf(error)))
+          if (attempt >= attempts.times || whole.signal?.aborted === true || !attempts.again(error, sentNow && (error as { sent?: unknown } | null)?.sent !== false))
             throw error
 
-          await pause(attempts.delay * 2 ** attempt, options?.signal)
+          await waitFor(attempts.delay * 2 ** attempt, whole.signal)
         }
         finally {
           clearTimeout(timer)
+          attemptSignal.stop()
         }
       }
 
       posted = true
+      whole.stop(later?.signal)
       release?.()
       release = undefined
 
@@ -283,12 +350,16 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
       if (error instanceof ActionError && !(error instanceof ActionRedirectError))
         called(page, { action: url(), status: error.status, values: {}, errors: error.errors, data: error.data }, turn)
 
-      if (!(error instanceof ActionRedirectError) && !isAbort(error))
+      if (!(error instanceof ActionRedirectError) && whole.signal?.aborted !== true)
         void hooked(options?.onError, { error: apiErrorOf(error) })
 
       throw error
     }
     finally {
+      // A stream is aborted by the call's own signal until it ends.
+      if (!streaming)
+        whole.stop()
+
       release?.()
 
       if (undo)
@@ -339,7 +410,7 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
     call as (input: unknown, options?: CallOptions) => Promise<unknown>,
     error => !(error instanceof ActionError) || error instanceof ActionRedirectError || refusedAt.get(error) !== url() ? undefined : { ok: false, status: error.status, message: error.message, errors: error.errors, data: error.data },
     (data, release) => onStreamEnd(data, release),
-    error => error instanceof ActionRedirectError,
+    error => error instanceof ActionRedirectError || superseding.has(error as object),
   )
 }
 
@@ -363,7 +434,15 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
     if (signal?.aborted !== true)
       onSent()
 
-    return files && upload ? upload.uploaded('POST', withBase(url), headers, files, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal } })
+    try {
+      return await (files && upload ? upload.uploaded('POST', withBase(url), headers, files, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal } }))
+    }
+    catch (error) {
+      if (typeof error === 'object' && error !== null)
+        networkFailures.add(error)
+
+      throw error
+    }
   }
 
   let response: Response

@@ -143,10 +143,12 @@ export function createSignal<T>(value: T, options?: InternalSignalOptions<T>): [
       }
     }
 
+    // Seen before the equality check, so an undoable change writing a value the signal holds still takes its place in the order of changes.
+    interceptor?.writing?.(node as SignalNode<unknown>, write as (value: unknown) => void)
+
     if (node.equals !== false && node.equals(node.value, next))
       return
 
-    interceptor?.writing?.(node as SignalNode<unknown>, write as (value: unknown) => void)
     node.value = next
     options?.written?.(next)
     notify(node)
@@ -239,12 +241,15 @@ export function undoable(change: () => void): () => void {
       const list = unsettled.get(node)
       const at = list?.indexOf(entry) ?? -1
 
-      if (written === undefined || node.value === written.get(node)) {
+      const next = at === -1 ? undefined : list![at + 1]
+
+      // A change still waiting after this one owns the signal now: it takes the value this one started from, whatever it wrote.
+      if (next !== undefined && written !== undefined) {
+        next.writes.get(node)!.before = before
+      }
+      else if (written === undefined || node.value === written.get(node)) {
         parent?.(node, node.value, before)
         write(before)
-      }
-      else if (at !== -1 && list![at + 1]) {
-        list![at + 1]!.writes.get(node)!.before = before
       }
     }
 
@@ -289,6 +294,13 @@ export function undoable(change: () => void): () => void {
     entries.set(undo, entry)
 
   return undo
+}
+
+// Runs `change` now and hands back what puts the signals it wrote back, `undo`, for when the work it shows fails, and `keep` for when it went through: the way to show at once the change a form posting in place makes, `kay:action-start` making it and `kay:action-error` undoing it. Changes made one after another and undone in any order end where they began.
+export function optimistic(change: () => void): { undo: () => void, keep: () => void } {
+  const undo = undoable(change)
+
+  return { undo, keep: () => released(undo) }
 }
 
 // A component's call: an owner of its own, so what it provides reaches what it renders and nothing beside it. `detached`, as an island is, it reads nothing provided above.

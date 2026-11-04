@@ -236,6 +236,9 @@ function buttonOf(attributes: TagAttributes): undefined | {
   onWebkitanimationstart?: EventHandler<HTMLButtonElement, Event> | undefined;
   onWebkittransitionend?: EventHandler<HTMLButtonElement, Event> | undefined;
   onWheel?: EventHandler<HTMLButtonElement, WheelEvent> | undefined;
+  "onKay:action-start"?: EventHandler<HTMLButtonElement, CustomEvent<ActionStartDetail>> | undefined;
+  "onKay:action-success"?: EventHandler<HTMLButtonElement, CustomEvent<ActionSuccessDetail>> | undefined;
+  "onKay:action-error"?: EventHandler<HTMLButtonElement, CustomEvent<ActionErrorDetail>> | undefined;
   autocapitalize?: Value;
   dir?: Value;
   draggable?: Value;
@@ -418,6 +421,9 @@ function buttonOf(attributes: TagAttributes): undefined | {
   onWebkitanimationstart?: EventHandler<HTMLButtonElement, Event> | undefined;
   onWebkittransitionend?: EventHandler<HTMLButtonElement, Event> | undefined;
   onWheel?: EventHandler<HTMLButtonElement, WheelEvent> | undefined;
+  "onKay:action-start"?: EventHandler<HTMLButtonElement, CustomEvent<ActionStartDetail>> | undefined;
+  "onKay:action-success"?: EventHandler<HTMLButtonElement, CustomEvent<ActionSuccessDetail>> | undefined;
+  "onKay:action-error"?: EventHandler<HTMLButtonElement, CustomEvent<ActionErrorDetail>> | undefined;
   autocapitalize?: Value;
   dir?: Value;
   draggable?: Value;

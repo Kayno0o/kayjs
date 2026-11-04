@@ -18,6 +18,8 @@ export const BUILD_HEADER = 'x-kay-build'
 export const DRAFT_ROUTE = '/_kay/draft'
 // Marks the data script holding the challenges of the actions a page's forms post to, by action URL.
 export const WORK_SCRIPT = 'data-kay-work'
+// Where the server writes the post a page with islands was rendered in answer to.
+export const OUTCOME_SCRIPT = 'data-kay-outcome'
 
 // The meta naming the build a page was rendered for.
 export const BUILD_META = 'kay-build'

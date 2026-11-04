@@ -204,13 +204,13 @@ form(action={add})
 
 ### Refused posts
 
-- `ctx.fail` returns the failure where `ctx.deny`, `ctx.notFound` and `ctx.redirect` throw, so write `return ctx.fail(...)`: a statement without `return` does nothing, which `kay check` reports as `unreturned-fail` and `--fix` repairs.
+- `ctx.fail` returns the failure where `ctx.deny`, `ctx.notFound` and `ctx.redirect` throw, so write `return ctx.fail(status, data, errors)` (the same answer as `refuse(message, { errors, data })`, which throws): a statement without `return` does nothing, which `kay check` reports as `unreturned-fail` and `--fix` repairs.
 - A post the schema refuses, or whose handler returns `ctx.fail(status, data)`, is answered with the page it came from, rendered with the failure's status, rather than with a redirect.
 - There `add.failed()` returns `{ status, message, values, errors, data }`, typed from the action, or `undefined`.
 - `values` is what the form posted (fields named like a password left out).
 - `errors` is a message per refused field, the schema's `error` option when set.
 - `data` is what `ctx.fail` received.
-- `return ctx.fail(409, undefined, { email: 'Already taken' })` puts a message on a field, typed from the schema's keys, with `''` for the form's own; it joins a string `data` and the schema's messages, so `error email`, `aria-invalid`, `add.error('email')`, the value re-fill and an island's `ActionError.errors` (and a kayjs-ui `FormField` named `email`) follow it with and without JavaScript.
+- `return ctx.fail(409, undefined, { email: 'Already taken' })` puts a message on a field, typed from the schema's keys, with `''` for the form's own (a string `data` is that too), so `error email`, `aria-invalid`, `add.error('email')`, the value re-fill and an island's `ActionError.errors` (and a kayjs-ui `FormField` named `email`) follow it with and without JavaScript.
 - A string passed to `ctx.fail` is the form's message too, under `errors['']` where a rate limit's refusal sits: `return ctx.fail(502, 'Not sent; try again later')`, read by `add.error()`.
 - The page renders as a visit of it would, through the app's plugins and the page's guards, and nothing the visitor typed is lost however long it is.
 - Reloading it posts again, as after any form a server answers in place.

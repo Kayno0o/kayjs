@@ -16,6 +16,12 @@ export const enquire = action(t.Object({ message: t.String({ maxLength: 200 }) }
   if (message === 'taken')
     return ctx.fail(409, undefined, { message: 'Already sent' })
 
+  if (message === 'hostile')
+    return ctx.fail(422, undefined, JSON.parse('{"__proto__":{"polluted":"yes"},"message":"Own"}') as Record<string, string>)
+
+  if (message === 'stray')
+    return ctx.fail(422, undefined, { nothere: 'Stray', message: 'Own' } as Record<string, string>)
+
   if (message === 'away')
     ctx.redirect('/contact')
 
