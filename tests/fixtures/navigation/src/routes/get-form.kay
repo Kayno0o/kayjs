@@ -1,0 +1,23 @@
+--- server
+import Linker from '../components/linker.kay'
+
+const found = ctx.url.searchParams.get('q') ?? 'nothing'
+---
+head
+  title Get form
+h1 Get form
+p.found Found {found}
+form.same(action="/get-form" method="get")
+  input(name="q" aria-label="Search")
+  button.go(name="mode" value="all") Search
+  button.other(formaction="/query" name="from" value="other") Elsewhere
+form.reload(action="/get-form" data-reload)
+  input(name="q" value="reloaded" aria-label="Reload")
+  button.reload-go Reload
+form.keep(action="/get-form" data-keep-scroll)
+  input(name="q" value="kept" aria-label="Keep")
+  button.keep-go Keep
+form.away(action="https://example.com/search")
+  input(name="q" aria-label="Away")
+  button.away-go Away
+Linker(persist)

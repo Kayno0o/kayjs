@@ -2014,6 +2014,57 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
+  it('swaps a same-origin GET form in place as a link, the fields in the query, and leaves the others to the browser', async () => {
+    const fresh = await open('/get-form')
+    const submit = async (form: string, fill?: string, button?: string) => fresh.evaluate((formSelector, value, buttonSelector) => {
+      const element = document.querySelector<HTMLFormElement>(formSelector)!
+
+      if (value !== undefined)
+        element.querySelector('input')!.value = value
+
+      element.requestSubmit(buttonSelector === undefined ? null : element.querySelector<HTMLButtonElement>(buttonSelector))
+    }, form, fill, button)
+
+    try {
+      await fresh.evaluate(() => {
+        const state = window as { kayAlive?: boolean, kayPrevented?: boolean[] }
+
+        state.kayAlive = true
+        state.kayPrevented = []
+        // Runs after kay's own listener on the document, then stops what the browser would do for the forms left to it.
+        window.addEventListener('submit', (event) => {
+          state.kayPrevented!.push(event.defaultPrevented)
+          event.preventDefault()
+        })
+      })
+
+      await submit('form.same', 'hello world', 'button.go')
+      await fresh.waitUntil(() => location.search === '?q=hello+world&mode=all')
+      await fresh.waitFor('p.found', { text: 'Found hello world' })
+      expect(await sameDocument(fresh)).toBe(true)
+
+      await submit('form.same', 'again', 'button.other')
+      await fresh.waitUntil(() => location.pathname === '/query' && location.search === '?q=again&from=other')
+      await fresh.waitFor('h1', { text: 'Query' })
+      expect(await sameDocument(fresh)).toBe(true)
+
+      await fresh.back()
+      await fresh.waitFor('p.found', { text: 'Found hello world' })
+      await submit('form.keep')
+      await fresh.waitFor('p.found', { text: 'Found kept' })
+      expect(await sameDocument(fresh)).toBe(true)
+
+      // A form opting out, and one to another origin, are the browser's.
+      await submit('form.reload')
+      await submit('form.away')
+      expect(await fresh.evaluate(() => (window as { kayPrevented?: boolean[] }).kayPrevented)).toEqual([true, true, true, false, false])
+      expect(fresh.errors).toEqual([])
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
   it('marks only the page tabs of a TabNav with data-keep-scroll, a #section link scrolling to its section', async () => {
     await page.goto(`${origin}/tabbed-hash`)
 
