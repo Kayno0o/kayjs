@@ -382,6 +382,38 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     }
   })
 
+  it('tries a click again when the element goes between the page finding it and aiming at it', async () => {
+    const own = await site.open('/')
+
+    try {
+      for (const aim of [undefined, { x: 2, y: 2 }]) {
+        await own.evaluate(() => {
+          document.getElementById('gone')?.remove()
+          document.body.insertAdjacentHTML('afterbegin', '<a id="gone" href="#gone" style="display:block;height:30px">gone</a>')
+
+          const link = document.getElementById('gone')!
+          const original = link.scrollIntoView.bind(link)
+
+          // The first scroll to it, which the click's wait for the element makes, takes it away, as a list's bar goes with its hover, and it is back a moment later.
+          link.scrollIntoView = (...args) => {
+            original(...args)
+            link.remove()
+            setTimeout(() => document.body.prepend(link), 100)
+            link.scrollIntoView = original
+          }
+        })
+        await own.click('#gone', aim === undefined ? {} : { at: aim })
+        expect(await own.evaluate(() => location.hash)).toBe('#gone')
+        await own.evaluate(() => {
+          location.hash = ''
+        })
+      }
+    }
+    finally {
+      own.close()
+    }
+  })
+
   it('waits for an element to keep still before it clicks a point other than its middle', async () => {
     const own = await site.open('/', { timeout: '3000ms' })
 

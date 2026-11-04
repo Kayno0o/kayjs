@@ -615,25 +615,42 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   }, [selector, options.javaScript !== false]))
 
   // The point `at` of the element, scrolled so it is in the view, in viewport pixels.
-  const pointAt = async (selector: string, at: { x: number, y: number }) => inView<[number, number]>(script((target: string, x: number, y: number) => {
-    const element = document.querySelector(target)!
-    const place = () => {
-      const { left, top } = element.getBoundingClientRect()
+  const pointAt = async (selector: string, at: { x: number, y: number }): Promise<[number, number]> => {
+    const point = await inView<[number, number] | null>(script((target: string, x: number, y: number) => {
+      const element = document.querySelector(target)
 
-      return [left + x, top + y] as [number, number]
-    }
-    const [px, py] = place()
+      if (element === null)
+        return null
 
-    if (px < 0 || py < 0 || px >= innerWidth || py >= innerHeight)
-      scrollBy({ left: px - innerWidth / 2, top: py - innerHeight / 2, behavior: 'instant' })
+      const place = () => {
+        const { left, top } = element.getBoundingClientRect()
 
-    return place()
-  }, [selector, at.x, at.y]))
+        return [left + x, top + y] as [number, number]
+      }
+      const [px, py] = place()
+
+      if (px < 0 || py < 0 || px >= innerWidth || py >= innerHeight)
+        scrollBy({ left: px - innerWidth / 2, top: py - innerHeight / 2, behavior: 'instant' })
+
+      return place()
+    }, [selector, at.x, at.y]))
+
+    // Gone since the click found it, as a list's bar goes with its hover or a render replaces the node: a click tries again.
+    if (point === null)
+      throw new Error(`kay: ${selector} is not found, waiting for it to be actionable`)
+
+    return point
+  }
 
   // Where a click reaches the element: scrolled to each alignment in turn, the point of its box that nothing covers first at the middle and then nearer each side, and whether it is the middle. What keeps a click from reaching it (nothing drawn, another element over every point) comes back as a reason instead.
   // The element is waited on for stillness once, at the alignment where a point reaches it, as Bun's own click does for the middle: its box must stay put across two frames, and the point is found again where it stopped.
   const reach = async (selector: string) => inView<[number, number, boolean] | string>(script(async (target: string, frames: boolean, alignments: string[], points: number[][]) => {
-    const element = document.querySelector(target)!
+    const element = document.querySelector(target)
+
+    // Gone since the click found it: a list's bar goes with its hover, a render replaces the node.
+    if (element === null)
+      return 'not found'
+
     let covered = 'out of view'
 
     const frame = async () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
@@ -824,7 +841,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         const tried = Date.now()
 
         try {
-          const at = aim === undefined ? await reach(selector) : [...await pointAt(selector, aim), false] as [number, number, boolean]
+          const at = aim === undefined ? await reach(selector) : await pointAt(selector, aim)
 
           if (typeof at === 'string') {
             await Bun.sleep(POLL_MS)
