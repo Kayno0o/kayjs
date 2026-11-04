@@ -139,7 +139,7 @@ describe('pages fetched ahead of a click', () => {
       const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => new Promise<Response>(() => undefined)) as unknown as typeof fetch)
 
       globalThis.IntersectionObserver = class {
-        entry = { notify: (_: { isIntersecting: boolean, target: Element }[]) => undefined, observed: [] as Element[] }
+        entry = { notify: (_: { isIntersecting: boolean, target: Element }[]) => undefined as void, observed: [] as Element[] }
 
         constructor(callback: (entries: { isIntersecting: boolean, target: Element }[]) => void) {
           this.entry.notify = callback
@@ -202,7 +202,7 @@ describe('pages fetched ahead of a click', () => {
       const { startNavigation } = await import(`../src/runtime/navigate.ts?wire=${++runs}`) as typeof import('../src/runtime/navigate')
       const added = spyOn(document, 'addEventListener')
 
-      navigation.hooks = undefined
+      Reflect.deleteProperty(navigation, 'hooks')
       startNavigation({ hydrate: () => undefined, dispose: () => undefined })
       await new Promise(done => setTimeout(done, 50))
 
