@@ -861,13 +861,13 @@ class Validator {
         continue
 
       if (FIELD_TAGS.has(file) && name === 'size') {
-      const value = attribute.kind === 'static' ? attribute.text : this.text(attribute.expression)
+        const value = attribute.kind === 'static' ? attribute.text : this.text(attribute.expression)
 
-      if (NUMBER.test(value))
-        this.lint(attribute.name, 'deprecated-ui-tone', `\`size\` on \`${element.name}\` is a field size since kayjs-ui 1.87, \`sm\`, \`md\` or \`lg\`, not the native character width`, { help: 'width the field with a class, such as `w-[20ch]`' })
+        if (NUMBER.test(value))
+          this.lint(attribute.name, 'deprecated-ui-tone', `\`size\` on \`${element.name}\` is a field size since kayjs-ui 1.87, \`sm\`, \`md\` or \`lg\`, not the native character width`, { help: 'width the field with a class, such as `w-[20ch]`' })
 
-      continue
-    }
+        continue
+      }
 
       const span = attribute.kind === 'static' ? attribute.value : attribute.expression
       const wanted = (file === 'sparkline' && (name === 'tone' || name === 'tones')) || (file === 'status-strip' && name === 'cells') || (file === 'timeline' && name === 'entries')

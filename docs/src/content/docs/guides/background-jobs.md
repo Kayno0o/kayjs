@@ -321,7 +321,7 @@ The function runs again from its top each time the run is taken, and a finished 
 
 A step that throws is retried with the queue's `attempts` and `backoff`, and the steps done before it do not run again. A step finishing starts the count of attempts again. A stop ends the run before its next step starts, so the process taking over never runs a step beside the first.
 
-The options are those of a queue: `store`, `attempts`, `backoff`, `concurrency`, `lostAfter`, `idlePoll` and `keepFailed`, and `onStart`, `onSuccess`, `onRetry` and `onError` get `{ id, input }`; `onRetry` and `onError` also get `attempts` and `error`, `onRetry` the `wait` in ms too.
+The options are those of a queue: `store`, `attempts`, `backoff`, `concurrency`, `lostAfter`, `idlePoll` and `failedTtl`, and `onStart`, `onSuccess`, `onRetry` and `onError` get `{ id, input }`; `onRetry` and `onError` also get `attempts` and `error`, `onRetry` the `wait` in ms too.
 
 `onStart` is told once per run, not after each sleep, wait or retry. A stop during the first attempt, before any step is kept, may tell it again, as may a run stored by an older kay. `lostAfter` bounds the time between two sleeps or waits. A custom job store needs `update`, `release` and `state`.
 
