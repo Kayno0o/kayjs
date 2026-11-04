@@ -17,7 +17,7 @@ export { SETTLED } from './action-owner'
 export type { Caller, Settles } from './action-owner'
 export { honeypotField, minTimeOf, resolveProtection, workOf } from './action-protection'
 export { isAction } from './action-shared'
-export type { Action, ActionContext, ActionErrorDetail, ActionProtect, ActionProtection, ActionRateLimit, ActionStartDetail, ActionStream, ActionSuccessDetail, ActionTool, Answer, CallOptions, CallQueue, CallResult, Failure, FailureData, FailureOf, FailuresOf, FieldErrors, Final, FormFailure, FormSuccess, HoneypotOptions, InputOf, MinTimeOptions, MinTimeRefusal, Outcome, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, Refreshable, ResolvedProtection, ResultOf, RetryOptions, Sendable, ServerAction, Settled, Success, SuccessOf, TrackedCall } from './action-shared'
+export type { Action, ActionContext, ActionDone, ActionErrorDetail, ActionFailed, ActionHooks, ActionProtect, ActionProtection, ActionRateLimit, ActionRun, ActionStartDetail, ActionStream, ActionSuccessDetail, ActionTool, Answer, CallOptions, CallQueue, CallResult, Failure, FailureData, FailureOf, FailuresOf, FieldErrors, Final, FormFailure, FormSuccess, HoneypotOptions, InputOf, MinTimeOptions, MinTimeRefusal, Outcome, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, Refreshable, ResolvedProtection, ResultOf, RetryOptions, Sendable, ServerAction, Settled, Success, SuccessOf, TrackedCall } from './action-shared'
 
 const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
 // A module outside the root, as a linked library is, has `..` segments in its path, which a URL would resolve away.
@@ -82,7 +82,8 @@ export function declare(schema: TSchema, handler: (input: unknown, ctx: ActionCo
     url: { get: () => state.url, set: (url: string) => void (state.url = url), enumerable: true },
     schema: { value: schema, enumerable: true, writable: true },
     handler: { value: handler, enumerable: true },
-    protection: { value: protection, enumerable: true },
+    // Configurable, so the app's `actions` defaults can be laid under it when the server registers the action.
+    protection: { value: protection, enumerable: true, configurable: true },
     [ACTION]: { value: true },
   }) as unknown as ServerAction<TSchema, unknown>
 }

@@ -83,6 +83,29 @@ An `onX` hook run by `notify()` is awaited for up to 10 s, then left running. A 
 
 For one transition: the library's own work (log, counters), the app-wide hooks of `kay.config.ts`, the hooks in the extension's options (or its `src/<lib>.ts`), the per-call hook. A per-call hook adds to the options' hooks, it never replaces them. `beforeX` hooks run after the access checks and before validation, so what they change is validated; each sees the value the previous one left and the first refusal stops the chain. `onX` hooks all run in that order and a throw does not skip the next.
 
+### The app's own hooks
+
+`kay.config.ts` takes flat keys, all optional: `beforeRequest`, `onResponse`, `onStart`, `onStop`, and `actions: { protect, maxSize, messages, beforeRun, onSuccess, onError }`.
+
+```ts
+export default defineConfig({
+  beforeRequest: ({ request, url, context }) => (blocked(context.ip) ? false : undefined),
+  onResponse: ({ request, url, status, duration }) => metrics.count(url.pathname, status, duration),
+  onStart: ({ url }) => console.log(`listening on ${url}`),
+  onStop: async () => pool.end(),
+  actions: {
+    protect: { rateLimit: { max: 30, window: '1m' } },
+    onError: ({ action, file, status, message }) => audit(action, file, status, message),
+  },
+})
+```
+
+- `beforeRequest({ request, url, locals, context })` runs before the guards and loads of every request that reaches a route (a page, an action, an endpoint, an API route, an extension's route), after kay's own host, proxy and security checks. `false` or a thrown `refuse()` refuses it, 403 or the refusal's status; a returned `Response` answers instead; any other throw answers 500 and is reported with source `beforeRequest`.
+- `onResponse({ request, url, locals, status, duration })` is told after the answer is made, `duration` in milliseconds. A throw is reported with source `onResponse`.
+- `onStart({ url })` runs when the server listens and `onStop()` when it stops, after the open requests finished, after the plugins' own `onStart` and `onStop` hooks of Elysia; a throw is reported and the others still run.
+- `actions.beforeRun({ action, file, input, ctx })` runs before every action's handler, once the guards and the schema let the post through; `false` or `refuse()` fails the post. It cannot change the input. `onSuccess` adds `result`, `onError` adds `status`, `message`, `errors`, `data` and `error` (undefined for `ctx.fail`).
+- The app's action hooks run before the action's own (`action(schema, handler, { onSuccess })`), both observing, a throw reported and never failing the action.
+
 ### The context
 
 Every hook gets `context: HookContext`, from `kay/library` (the type also from `kay/server`):

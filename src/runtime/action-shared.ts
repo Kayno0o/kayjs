@@ -1,4 +1,5 @@
 import type { Static, TSchema } from 'elysia'
+import type { BeforeHook, Hook } from '../server/hooks'
 import type { ActionError, FAILURE } from './action-error'
 import type { ApiError } from './api-error'
 import type { ByteSize } from './byte-size'
@@ -117,11 +118,44 @@ export interface ActionProtect<Field extends string = never> {
   proofOfWork?: boolean | number | ProofOfWorkOptions | undefined
 }
 
-// What an action reads of its third argument, grouped by concern: `protect` for the checks above, `messages` for their refusals, `tool` for agents and `maxSize` for the body.
-export interface ActionProtection<Field extends string = never> {
+// What the hooks of an action are told of a run: the action's export name and its file relative to the project, the input the schema accepted and the context it runs with.
+export interface ActionRun {
+  action: string
+  file: string
+  input: unknown
+  ctx: ActionContext
+}
+
+// A run that went through: what the handler returned, undefined after a redirect.
+export interface ActionDone extends ActionRun {
+  result: unknown
+}
+
+// A run that did not go through, as the visitor is told: `status`, `message`, field `errors` and `data` are the failure shape (`ctx.fail`, `refuse()`, `ctx.deny`, a server error); `error` is what was thrown, undefined for `ctx.fail`.
+export interface ActionFailed extends ActionRun {
+  status: number
+  message: string
+  errors: FieldErrors
+  data: unknown
+  error: unknown
+}
+
+// The hooks an action takes, in its options and, for every action, in `actions` of kay.config.ts: the app's run first.
+export interface ActionHooks {
+  // Runs once the guards and the schema let the post through, before the handler: returning `false` or throwing `refuse()` stops it and fails the post. It changes nothing: the input was validated, so a handler that wants another one makes it.
+  beforeRun?: BeforeHook<ActionRun, never> | undefined
+  // Told after the handler returned, a redirect it threw included. A throw is reported and never fails the action.
+  onSuccess?: Hook<ActionDone> | undefined
+  // Told after the handler failed with `ctx.fail`, `refuse()`, `ctx.deny()`, `ctx.notFound()` or an error. A redirect is no failure.
+  onError?: Hook<ActionFailed> | undefined
+}
+
+// What an action reads of its third argument, grouped by concern: `protect` for the checks above, `messages` for their refusals, `tool` for agents, `maxSize` for the body, and the hooks.
+export interface ActionProtection<Field extends string = never> extends ActionHooks {
   // Offers the action to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description }`. An action without it is never offered. A call runs the action as a form post would, its guards and rate limits included, except that the `honeypot`, `minTime` and `proofOfWork` of `protect` are skipped, as they only make sense for a form a person filled in.
   tool?: boolean | string | ActionTool | undefined
-  protect?: ActionProtect<Field> | undefined
+  // The checks, over the app's `actions.protect` key by key: one named here replaces the app's, and `false` takes none of the app's defaults for this action.
+  protect?: ActionProtect<Field> | false | undefined
   // The most a post may send, files included, bytes or a size such as `'20mb'`, in place of the app's `maxSize`; a bigger one fails with 413 before it is read.
   maxSize?: ByteSize | undefined
   // The longest the action may take, in place of `serve.timeout`: a string such as '30s', or `false` for none. Past it the post fails with 504 and `ctx.signal` aborts.
@@ -131,7 +165,9 @@ export interface ActionProtection<Field extends string = never> {
 }
 
 // An action's options once `protect` is read, the checks on a level with the rest: what the server reads.
-export interface ResolvedProtection {
+export interface ResolvedProtection extends ActionHooks {
+  // `false` when the action took `protect: false`, so the app's defaults do not reach it.
+  defaults?: false | undefined
   tool?: boolean | string | ActionTool | undefined
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
   honeypot?: string | HoneypotOptions | undefined

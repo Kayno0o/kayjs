@@ -47,6 +47,20 @@ A thrown `refuse()` is answered this way in actions, in the `beforeX` hooks of l
 
 When several `beforeX` hooks are set, each sees what the one before changed, and the first to refuse ends the chain. If a `beforeX` hook throws anything else, X is refused with a 500 error and the error is reported. A broken check never lets something through.
 
+## Hooks for the whole app
+
+`kay.config.ts` takes the same flat keys. `beforeRequest` runs before the guards of every request that reaches a route and can refuse it with `false` or `refuse()`, or answer with a `Response`. `onResponse` is told the status and the duration of every answer. `onStart` and `onStop` run when the server listens and when it stops.
+
+```ts
+export default defineConfig({
+  beforeRequest: ({ context }) => (isBlocked(context.ip) ? false : undefined),
+  onResponse: ({ url, status, duration }) => metrics.count(url.pathname, status, duration),
+  onStop: async () => pool.end(),
+})
+```
+
+Every action gets the same treatment from `actions`: `beforeRun`, `onSuccess` and `onError` run for each action before the ones the action sets itself. `beforeRun` can refuse a run but not change its input.
+
 ## When an `onX` hook throws
 
 The transition has already happened, so the error never undoes it. The error is logged and handed to the `observe.onError` of `kay.config.ts` with a `source` naming the hook, such as `cms.onSave`. Kay waits up to 10 seconds for a hook, then leaves it running, reports that it was late, and goes on. All the `onX` hooks of one transition run in order, even when one throws.

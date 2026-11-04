@@ -34,6 +34,7 @@ import { BUILD_HEADER, DRAFT_ROUTE } from '../runtime/swap'
 import { registerActionRoutes } from './actions'
 import { serveApi } from './api'
 import { apiPathOf, mcpRateLimit, RESOURCE_METADATA, sharedGuards } from './api-modules'
+import { hookApp } from './app-hooks'
 import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies, mountLimits } from './body'
 import { serveBuildFiles } from './build-files'
@@ -502,7 +503,12 @@ export async function buildFiles({ app, env, setup: { client }, security, filePa
 
 // The options actions, API modules, endpoints and kay's guarded routes share.
 export function actionOptionsOf({ env, options, setup, late }: Boot, skipBroken: boolean): ActionOptions {
-  return { skipBroken, dev: env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.requireGuards, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors }
+  return { skipBroken, dev: env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.requireGuards, timeout: timeoutMs(options.serve?.timeout, 'serve.timeout'), cors: options.cors, actions: options.actions }
+}
+
+// The app's request, response and lifecycle hooks, after kay's own checks and endpoints so a refused host or the health check run none, and before the extensions so their routes run them too.
+export function hookRequests({ app, options }: Boot): void {
+  hookApp(app, options)
 }
 
 // The actions, the API modules and the endpoints, then the jobs page, after the extensions whose derived values the guards read through `ctx.locals`.

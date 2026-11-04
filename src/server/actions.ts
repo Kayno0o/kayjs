@@ -1,9 +1,9 @@
 import type { CookieMap } from 'bun'
 import type { Elysia, TSchema, ValidationError } from 'elysia'
 import type { Server } from 'elysia/universal'
-import type { ObserveConfig } from '../config'
+import type { ActionsConfig, ObserveConfig } from '../config'
 import type { GuardContext, Locals, RouteParams } from '../runtime'
-import type { ActionContext, FieldErrors, RateKeyContext, ServerAction } from '../runtime/action'
+import type { ActionContext, ActionRun, FieldErrors, RateKeyContext, ServerAction } from '../runtime/action'
 import type { Locale } from '../runtime/i18n'
 import type { LocaleState } from '../runtime/locale-state'
 import type { BodyLimit } from './body'
@@ -13,6 +13,7 @@ import type { Flash } from './flash'
 import type { LoadedGuard, ServedRoute } from './guards'
 import type { I18n } from './i18n'
 import type { DocumentedAction } from './openapi'
+import { relative } from 'node:path'
 import { decodeCall, failure, FORM_CALL, isAction, isFailure, PAYLOAD_PARAM } from '../runtime/action'
 import { joinBase } from '../runtime/base'
 import { escapeAttribute } from '../runtime/escape'
@@ -26,6 +27,7 @@ import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from '.
 import { encodeValue, unsendable } from '../runtime/wire'
 import { pageLocale } from '../runtime/words.server'
 import { actionClash } from './action-clash'
+import { hooksOf, refusedBeforeRun, tellError, tellSuccess, withActionDefaults } from './action-hooks'
 import { routerPath } from './base'
 import { importModule } from './bundle'
 import { timeoutMs } from './config-limits'
@@ -112,6 +114,8 @@ export interface ActionOptions {
   cors?: CorsOptions | undefined
   // A page or layout that does not compile serves no action instead of failing the whole app, as a test site does so the tests of other pages go on; the visit of that page fails with its error.
   skipBroken?: boolean | undefined
+  // The app's `actions` defaults and hooks, which every action starts from.
+  actions?: ActionsConfig | undefined
 }
 
 export interface RouteMatch {
@@ -163,6 +167,8 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
 
       served.set(value.url, { file, action: value })
 
+      withActionDefaults(value, options.actions)
+
       const tool = toolSettings(value.protection?.tool)
 
       pageBound.set(value, page.params.length > 0)
@@ -177,7 +183,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
       limits.set(value.url, { bytes: value.protection?.maxSize, files: fileBodyLimit(value.schema), refuse: async (request, bytes, server) => inLocale(request, options, async () => tooLarge(value, request, bytes, server, back)) })
       // A span per call, the handler's own spans and the page it renders back nested in it.
       app.post(value.url, async context => traced(`POST ${value.url}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url, 'kay.request.id': requestId(context.request) } }), async (span) => {
-        const run = async () => answeringRequest(context.request, async () => inLocale(context.request, options, async () => onceWritten(context.request, value.url, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => cachedPageUrl(context.request, () => guardedPage(context.request, page, match, options)) }))))
+        const run = async () => answeringRequest(context.request, async () => inLocale(context.request, options, async () => onceWritten(context.request, value.url, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => cachedPageUrl(context.request, () => guardedPage(context.request, page, match, options)) }, { name, file }))))
         const response = await timedAction(context.request, ownTimeout, options, run, async () => inLocale(context.request, options, async () => failed(context.request, new Headers(), cookieJar(context.request).cookies, { action: value.url, status: 504, values: isCall(context.request) ? {} : submittedValues(context.body), errors: { '': kayWord('kay.action.timeout') } }, context.server, back)))
 
         if (span)
@@ -731,7 +737,7 @@ function backTo(request: Request, base: string): string {
 }
 
 // The Elysia context, with what the app derives and resolves, is the action's `ctx.locals`.
-async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request, server: Server | null }, options: ActionOptions, back: Back, read: { params: () => void, url: () => URL }): Promise<Response> {
+async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request, server: Server | null }, options: ActionOptions, back: Back, read: { params: () => void, url: () => URL }, named: { name: string, file: string }): Promise<Response> {
   const { request } = context
   const state = recordOf(request)?.guarded ?? { jar: cookieJar(request), headers: new Headers() }
   const { jar, headers } = state
@@ -772,27 +778,48 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     fail: <Data>(code: number, data?: Data, errors?: FieldErrors) => failure(code, data as Data, errors),
   }
 
+  const lists = hooksOf(options.actions, action.protection)
+  const run: ActionRun = { action: named.name, file: relative(process.cwd(), named.file), input: context.body, ctx }
+
   try {
+    const stopping = await refusedBeforeRun(lists, run)
+
+    if (stopping !== undefined) {
+      if (stopping.retryAfter !== undefined)
+        headers.set('retry-after', String(stopping.retryAfter))
+
+      return await failed(request, headers, jar.cookies, { action: action.url, status: stopping.status, values: submittedValues(context.body), errors: { '': stopping.message, ...stopping.errors }, data: stopping.data }, context.server, back)
+    }
+
     // An async iterable is taken as it is, as awaiting one that is also a thenable, a model's reply, would read it to its end before it could stream.
     const returned = action.handler(context.body, ctx)
     const result = isAsyncIterable(returned) ? returned : await returned
 
     // A string passed to `ctx.fail` is the form's message, read where a rate limit's is.
-    if (isFailure(result))
+    if (isFailure(result)) {
+      await tellError(lists, run, { status: result.status, message: typeof result.data === 'string' ? result.data : result.errors?.[''] ?? '', errors: result.errors ?? {}, data: result.data, error: undefined })
+
       return await failed(request, headers, jar.cookies, { action: action.url, status: result.status, values: submittedValues(context.body), errors: { ...typeof result.data === 'string' ? { '': result.data } : {}, ...result.errors }, data: result.data }, context.server, back)
+    }
 
     // A call reads a stream as it comes; a plain form post or an agent gets its last value, as a handler returning it would.
     const streams = isAsyncIterable(result) && isCall(request) && !isAgentCall(request)
     const answer = isAsyncIterable(result) ? await (streams ? started(result, requestSignal(request)) : lastOf(result, requestSignal(request))) : result
 
     await countGoneThrough(action, request, context.server, options)
+    await tellSuccess(lists, run, answer)
 
     return streams ? streamed(request, jar, headers, answer as AsyncIterable<unknown>, status, options) : succeeded(action, request, jar, headers, answer, status, options.base)
   }
   catch (error) {
     // Sent on after it went through, as to a thank-you page.
-    if (error instanceof Redirect)
+    if (error instanceof Redirect) {
       await countGoneThrough(action, request, context.server, options)
+      await tellSuccess(lists, run, undefined)
+    }
+
+    if (error instanceof Denied || error instanceof NotFound)
+      await tellError(lists, run, { status: error instanceof Denied ? error.status : 404, message: error instanceof Denied ? error.message : 'Not Found', errors: {}, data: undefined, error })
 
     if (error instanceof Redirect || error instanceof Denied || error instanceof NotFound)
       return stopped(error, request, state, options)
@@ -805,6 +832,8 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     // A library's limit, such as kayjs-ai's, answers like the action's own rate limit.
     if (refused !== undefined) {
+      await tellError(lists, run, { status: refused.status, message: refused.message, errors: refused.errors, data: refused.data, error })
+
       if (refused.retryAfter !== undefined)
         headers.set('retry-after', String(refused.retryAfter))
 
@@ -813,6 +842,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     // A mistake, or a service the handler relies on gone down: logged as any server error, and told the visitor beside the form they keep, as a refusal is.
     reportServerError(error, request, options.onError)
+    await tellError(lists, run, { status: 500, message: 'Internal server error', errors: {}, data: undefined, error })
 
     return failed(request, headers, jar.cookies, { action: action.url, status: 500, values: submittedValues(context.body), errors: { '': await serverErrorMessage(action, error, ctx, request, options.onError) } }, context.server, back)
   }

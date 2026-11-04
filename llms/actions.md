@@ -155,6 +155,7 @@ form(action={add})
   button Add
 ```
 
+- `actions: { protect, maxSize, messages }` in `kay.config.ts` is the default of every action, `protect` key by key: an action's own `rateLimit` replaces the app's, and `protect: false` takes none of the app's. `actions: { beforeRun, onSuccess, onError }` hook every run, before the action's own hooks of the same name: [hooks](hooks.md#the-apps-own-hooks).
 - An action with no input leaves the schema out: `action(async (ctx) => { ... }, protection?)`, validated as an empty object, its handler getting the context alone, called as `signOut()`, `signOut(undefined, { refresh: false })` or `site.call(signOut)`, and posted by `form(action={signOut})`.
 - An action several pages and components share lives in an `_actions.kay` of a routes directory, a `--- server` fence alone, no closing `---` needed: it is served like a layout's actions, behind the guards of its directory and above, reading the params of every page below it, and `page = { guards: false }` opens it as a layout's.
 - A page or a component imports it by its path, `import { removeTissue } from '../routes/admin/_actions.kay'`, in the server fence of a page or an island alike; no route file is imported, and `kay build`, `kay check` and `kay routes` see it as they see a layout's actions.

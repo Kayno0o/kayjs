@@ -4,6 +4,7 @@ import type { BudgetConfig } from './build/budget'
 import type { Listed as RouteListing } from './commands/routes'
 import type { LintLevels } from './compiler/lints'
 import type { Highlighter } from './content/markdown'
+import type { ActionHooks, ActionProtect, ProtectionMessages } from './runtime/action'
 import type { ByteSize } from './runtime/byte-size'
 import type { Duration } from './runtime/duration'
 import type { HeadTag } from './runtime/head'
@@ -11,6 +12,7 @@ import type { Guard, GuardContext } from './runtime/index'
 import type { Localized } from './runtime/localized'
 import type { JsonLd } from './runtime/seo'
 import type { McpConfig } from './server/api-modules'
+import type { AppHooks } from './server/app-hooks'
 import type { AppStore } from './server/app-store'
 import type { CorsOptions } from './server/cors'
 import type { EnvSchema } from './server/env'
@@ -24,7 +26,7 @@ import type { FileStore } from './server/storage'
 import type { TraceExtractor, Tracer } from './server/trace'
 
 // What `kay.config.ts` exports by default; `pages()`, `kay build`, `kay dev` and `kay check` all read it.
-export interface KayConfig {
+export interface KayConfig extends AppHooks {
   // Where the project keeps its parts, relative to the root.
   dirs?: DirsConfig | undefined
   // What a request may carry.
@@ -35,6 +37,8 @@ export interface KayConfig {
   observe?: ObserveConfig | undefined
   // What pages ship to the browser and how it behaves there: navigation, styles, typography, hydration, prefetching and Save-Data.
   client?: ClientConfig | undefined
+  // What every action starts from: the `protect` checks, `maxSize` and `messages` an action's own options replace key by key, and the `beforeRun`, `onSuccess` and `onError` hooks, which run before the action's own.
+  actions?: ActionsConfig | undefined
   // How long a browser keeps a file of `public/` without asking again, by the path it is served at, as a glob: `{ '/fonts/**': '365d', '**/*.png': '30d' }`; the first pattern a path matches decides, and a file none names keeps revalidating through its ETag on every visit. Ignored by `kay dev`, so an edit shows at once.
   publicCache?: Record<string, Duration> | undefined
   minify?: boolean | undefined
@@ -166,6 +170,15 @@ export interface KayConfig {
   saveData?: boolean | undefined
   // What libraries add to the app, each listed once: `extensions: [auth()]`.
   extensions?: KayExtension[] | undefined
+}
+
+export interface ActionsConfig extends ActionHooks {
+  // The checks every action gets, as `protect` of an action's options takes them: an action naming a check replaces the app's, and `protect: false` takes none of them.
+  protect?: ActionProtect<string> | undefined
+  // The most a post to an action may send, in place of the app's `limits.body` for the actions alone.
+  maxSize?: ByteSize | undefined
+  // The wording of the refusals, per refusal, replaced by an action's own wording of the same refusal.
+  messages?: ProtectionMessages | undefined
 }
 
 export interface DirsConfig {

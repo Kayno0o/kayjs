@@ -83,6 +83,15 @@ In `serve`, how the server answers:
 | `serve.shutdownTimeout` | How long a stopping server lets open requests finish, as seconds or `'30s'`. 10 seconds by default |
 | `serve.timeout` | The longest a page, action, API route or endpoint may take, `'15s'`: past it the request answers 504 and `ctx.signal` aborts. None by default, `false` for none; a page, an `api()` module and an action set their own |
 
+At the top level, hooks for the whole app:
+
+| Option | Effect |
+| --- | --- |
+| `beforeRequest` | Runs before the guards of every request that reaches a route. Return `false` or throw `refuse()` to refuse it, or return a `Response` to answer it |
+| `onResponse` | Told `{ request, url, status, duration }` after each answer |
+| `onStart`, `onStop` | Run when the server listens and when it stops |
+| `actions` | Defaults for every action: `protect`, `maxSize`, `messages`, and the hooks `beforeRun`, `onSuccess` and `onError`. An action's own settings replace them key by key, and `protect: false` takes none. See [Hooks](/guides/hooks) |
+
 In `observe`, what you watch the server by:
 
 | Option | Effect |

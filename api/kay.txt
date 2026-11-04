@@ -37,6 +37,14 @@ interface ActionContext<Params extends Readonly<Record<string, unknown>> = Route
   status: (code: number) => void
   url: URL
 
+[.] ActionDone
+interface ActionDone extends ActionRun
+  action: string
+  ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>
+  file: string
+  input: unknown
+  result: unknown
+
 [.] ActionError
 class ActionError
   new <Data = unknown>(status: number, body: string, errors?: Record<string, string>, data?: Data | undefined, message?: string): ActionError<Data>
@@ -53,8 +61,26 @@ interface ActionErrorDetail
   errors: Record<string, string>
   status: number
 
+[.] ActionFailed
+interface ActionFailed extends ActionRun
+  action: string
+  ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>
+  data: unknown
+  error: unknown
+  errors: Partial<Record<string, string>>
+  file: string
+  input: unknown
+  message: string
+  status: number
+
 [.] ActionFor
 interface ActionFor<Params extends Readonly<Record<string, unknown>>, Guarded extends object = object>
+
+[.] ActionHooks
+interface ActionHooks
+  beforeRun?: BeforeHook<ActionRun, never> | undefined
+  onError?: Hook<ActionFailed> | undefined
+  onSuccess?: Hook<ActionDone> | undefined
 
 [.] ActionProtect
 interface ActionProtect<Field extends string = never>
@@ -64,10 +90,13 @@ interface ActionProtect<Field extends string = never>
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
 
 [.] ActionProtection
-interface ActionProtection<Field extends string = never>
+interface ActionProtection<Field extends string = never> extends ActionHooks
+  beforeRun?: BeforeHook<ActionRun, never> | undefined
   maxSize?: ByteSize | undefined
   messages?: ProtectionMessages | undefined
-  protect?: ActionProtect<Field> | undefined
+  onError?: Hook<ActionFailed> | undefined
+  onSuccess?: Hook<ActionDone> | undefined
+  protect?: ActionProtect<Field> | false | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   tool?: ActionTool | boolean | string | undefined
 
@@ -89,6 +118,13 @@ class ActionRedirectError
   location: string
   name: string
   status: number
+
+[.] ActionRun
+interface ActionRun
+  action: string
+  ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>
+  file: string
+  input: unknown
 
 [.] ActionStartDetail
 interface ActionStartDetail
@@ -895,11 +931,15 @@ interface RequestContext<Params extends Record<string, unknown> = Record<string,
   url: URL
 
 [.] ResolvedProtection
-interface ResolvedProtection
+interface ResolvedProtection extends ActionHooks
+  beforeRun?: BeforeHook<ActionRun, never> | undefined
+  defaults?: false | undefined
   honeypot?: HoneypotOptions<string> | string | undefined
   maxSize?: ByteSize | undefined
   messages?: ProtectionMessages | undefined
   minTime?: MinTimeOptions | `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  onError?: Hook<ActionFailed> | undefined
+  onSuccess?: Hook<ActionDone> | undefined
   proofOfWork?: ProofOfWorkOptions | boolean | number | undefined
   rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
@@ -2679,10 +2719,12 @@ interface JobStore extends StoreBase
 const jobTables: readonly ["kay_jobs", "kay_locks"]
 
 [./server] KayConfig
-interface KayConfig
+interface KayConfig extends AppHooks
+  actions?: ActionsConfig | undefined
   apiDir?: string | undefined
   apiPath?: string | undefined
   base?: string | undefined
+  beforeRequest?: ((event: RequestEvent & { context: HookContext; }) => Promise<Response | false | void> | Response | false | void) | undefined
   budget?: BudgetConfig | undefined
   checks?: ProjectCheck[] | undefined
   client?: ClientConfig | undefined
@@ -2723,6 +2765,9 @@ interface KayConfig
   observe?: ObserveConfig | undefined
   offline?: OfflineConfig | boolean | undefined
   onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => Promise<void> | void) | undefined
+  onResponse?: Hook<ResponseEvent> | undefined
+  onStart?: Hook<StartEvent> | undefined
+  onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
   plugins?: BunPlugin[] | undefined
   prefetch?: Prefetch | undefined
@@ -2937,9 +2982,11 @@ function pages(options?: PagesOptions): Promise<Elysia<"", {
 
 [./server] PagesOptions
 interface PagesOptions extends KayConfig
+  actions?: ActionsConfig | undefined
   apiDir?: string | undefined
   apiPath?: string | undefined
   base?: string | undefined
+  beforeRequest?: ((event: RequestEvent & { context: HookContext; }) => Promise<Response | false | void> | Response | false | void) | undefined
   budget?: BudgetConfig | undefined
   checks?: ProjectCheck[] | undefined
   client?: ClientConfig | undefined
@@ -2981,6 +3028,9 @@ interface PagesOptions extends KayConfig
   observe?: ObserveConfig | undefined
   offline?: OfflineConfig | boolean | undefined
   onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => Promise<void> | void) | undefined
+  onResponse?: Hook<ResponseEvent> | undefined
+  onStart?: Hook<StartEvent> | undefined
+  onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
@@ -3928,9 +3978,11 @@ interface TestContent
 
 [./test] TestOptions
 interface TestOptions extends PagesOptions
+  actions?: ActionsConfig | undefined
   apiDir?: string | undefined
   apiPath?: string | undefined
   base?: string | undefined
+  beforeRequest?: ((event: RequestEvent & { context: HookContext; }) => Promise<Response | false | void> | Response | false | void) | undefined
   browser?: BrowserOptions | boolean | undefined
   budget?: BudgetConfig | undefined
   checks?: ProjectCheck[] | undefined
@@ -3977,6 +4029,9 @@ interface TestOptions extends PagesOptions
   observe?: ObserveConfig | undefined
   offline?: OfflineConfig | boolean | undefined
   onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => Promise<void> | void) | undefined
+  onResponse?: Hook<ResponseEvent> | undefined
+  onStart?: Hook<StartEvent> | undefined
+  onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
