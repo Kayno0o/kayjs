@@ -197,8 +197,13 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         guarded.onBeforeHandle(({ request }) => crossSiteRefused(request) ? crossSiteResponse(request, 'request') : undefined)
       }
       else {
+        // What the guards handed on replaces the empty `guard` the derive of `api()` set, for the handler to read; set as a property, as handing `context` to a function would have Elysia parse the cookies, query and headers of the route.
         guarded.onBeforeHandle(async (context) => {
-          return answeringRequest(context.request, async () => inApiLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), options, cors)))
+          const refused = await answeringRequest(context.request, async () => inApiLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), options, cors)))
+
+          ;(context as { guard?: unknown }).guard = guardValues(context.request)
+
+          return refused
         })
       }
 
@@ -739,16 +744,6 @@ export interface ApiOptions {
   errorShape?: 'kay' | 'elysia' | undefined
 }
 
-// `guard` and `once` of an API route's context, read from its request.
-const REQUEST_VALUES = {
-  guard: { get(this: { request: Request }) {
-    return guardValues(this.request)
-  }, enumerable: true, configurable: true },
-  once: { get(this: { request: Request }) {
-    return onceOf(this.request)
-  }, enumerable: true, configurable: true },
-}
-
 // What a route of an `api()` module reads besides the app's locals: the values the `_guard.ts` files above it handed on, and `ctx.once`.
 type ApiRequest<Guarded extends object> = ApiLocals & { guard: Guarded, once: Once }
 
@@ -757,13 +752,8 @@ type ApiRequest<Guarded extends object> = ApiLocals & { guard: Guarded, once: On
 export function api<Guarded extends object = object>(options: ApiOptions = {}): Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiRequest<Guarded> }> {
   const instance = new Elysia()
 
-  // Read when the handler asks, once the module's guards have run: Elysia copies what a derive returns, so the getters are defined on the context itself.
-  // A `derive` or `resolve` of the module's own runs before its guards, so `guard` is empty there.
-  instance.derive((context) => {
-    Object.defineProperties(context, REQUEST_VALUES)
-
-    return {}
-  })
+  // `guard` is empty until the module's guards run, which set it, so a `derive` or `resolve` of the module's own reads none; only `request` is read, so Elysia parses nothing more for it.
+  instance.derive(({ request }) => ({ guard: guardValues(request), once: onceOf(request) }))
 
   const maxSize = options.maxSize
 
