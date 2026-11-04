@@ -15,7 +15,12 @@ export interface PersistedOptions<T> extends SignalOptions<T> {
   maxAge?: Duration | undefined
   // The values the signal may hold, the default among them: a kept value outside them, stale or edited by hand, reads as the default, on the server and in the browser. Compared as `===`, so for text, numbers and booleans.
   values?: readonly T[] | undefined
+  // Every call naming the same cookie or localStorage key in a page gets one signal, and a value another tab writes reaches it (the `storage` event for `local`, a BroadcastChannel for a cookie); `false` keeps this call's signal alone, deaf to the others. Not for `query`.
+  sync?: boolean | undefined
 }
+
+// The signals of a page by storage and name, so islands persisting one name hold one value.
+const sharedSignals = new Map<string, object>()
 
 // What a signal kept in the query takes besides: how a write reaches the history.
 export interface QueryHistoryOptions {
@@ -26,21 +31,33 @@ export interface QueryHistoryOptions {
 // A signal whose value is kept across pages and visits under `name`, the cookie's or the localStorage key's, or in the URL under the query param `name`, which the default leaves out.
 // A string unless `T` says otherwise, for a param the page's `query` schema reads as another type: the URL holds text.
 // kept: local, it reads the request's cookie or query, so it is free only where every call says `storage: 'local'`, kept in `localStorage` and read once the page has hydrated.
-export function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, 'maxAge' | 'values'> & QueryHistoryOptions & { storage: 'query' }): Signal<T>
+export function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, 'maxAge' | 'values' | 'sync'> & QueryHistoryOptions & { storage: 'query' }): Signal<T>
 // `values` types the signal as their union, and the default must be one of them.
-export function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, 'maxAge'> & QueryHistoryOptions & { storage: 'query', values: readonly T[] }): Signal<T>
+export function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, 'maxAge' | 'sync'> & QueryHistoryOptions & { storage: 'query', values: readonly T[] }): Signal<T>
 export function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: PersistedOptions<T> & { storage?: 'cookie' | undefined, values: readonly T[] } | Omit<PersistedOptions<T>, 'maxAge'> & { storage: 'local', values: readonly T[] }): Signal<T>
 export function persisted<T>(name: string, value: PlainValue<T>, options?: Omit<PersistedOptions<T>, 'values'> & { storage?: 'cookie' | undefined } | Omit<PersistedOptions<T>, 'maxAge' | 'values'> & { storage: 'local' }): Signal<T>
 export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T> & QueryHistoryOptions): Signal<T> {
-  const [own, write] = createSignal<T>(value, options)
   const storage = options?.storage ?? 'cookie'
-  // The same as `queryParam(name)`, `value` standing for the param left out.
-  const kept = storage === 'query' ? keepParam(name, own, write, value as T, options?.values, options?.history) : keepValue(name, storage, own, write, options?.maxAge, options?.values)
+  const id = `${storage}:${name}`
+  // The server renders each request apart, so only a browser shares: the first call's default and options stand.
+  const shared = storage !== 'query' && options?.sync !== false && typeof document !== 'undefined'
+  const known = shared ? sharedSignals.get(id) : undefined
 
-  return withSetter(kept.read, (next) => {
+  if (known)
+    return known as Signal<T>
+
+  const [own, write] = createSignal<T>(value, options)
+  // The same as `queryParam(name)`, `value` standing for the param left out.
+  const kept = storage === 'query' ? keepParam(name, own, write, value as T, options?.values, options?.history) : keepValue(name, storage, own, write, options?.maxAge, options?.values, options?.sync, value as T)
+  const made = withSetter(kept.read, (next) => {
     write(next)
     kept.save(untrack(own))
   })
+
+  if (shared)
+    sharedSignals.set(id, made)
+
+  return made
 }
 
 // A signal holding the page's query param `name`, read as the `query` schemas of the page and its layouts read it, so `queryParam<number>('page')` holds a number; the schema's default when the param is left out or refused, which writing leaves out of the URL.

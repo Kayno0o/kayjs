@@ -719,10 +719,10 @@ interface PageSettings
 type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Props['class' & keyof Props] : never : never
 
 [.] persisted
-function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, "maxAge" | "values"> & QueryHistoryOptions & {
+function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, "maxAge" | "sync" | "values"> & QueryHistoryOptions & {
   storage: "query";
 }): Signal<T>
-function persisted<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, "maxAge"> & QueryHistoryOptions & {
+function persisted<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, "maxAge" | "sync"> & QueryHistoryOptions & {
   storage: "query";
   values: readonly T[];
 }): Signal<T>
@@ -744,6 +744,7 @@ interface PersistedOptions<T> extends SignalOptions<T>
   equals?: Equals<T> | undefined
   maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   storage?: PersistStorage | undefined
+  sync?: boolean | undefined
   values?: readonly T[] | undefined
 
 [.] PersistStorage

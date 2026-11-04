@@ -37,16 +37,61 @@ export const COOKIE_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 
 // What a persisted signal reads and keeps, around the signal's own `read`: a cookie the server reads too, so a page renders with it, or localStorage, read once the page has hydrated.
 // A signal kept in the query goes through `keepParam` in `./query-param` instead.
-export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'query'>, read: () => T, write: (value: T) => void, maxAge?: Duration, values?: readonly unknown[]): Persisted<T> {
+// In a browser, unless `sync` is false, a value another tab writes reaches `write`: through the `storage` event for `local`, a BroadcastChannel for a cookie.
+export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'query'>, read: () => T, write: (value: T) => void, maxAge?: Duration, values?: readonly unknown[], sync?: boolean, fallback?: T): Persisted<T> {
   if (storage === 'cookie' && !COOKIE_NAME.test(key))
     throw new TypeError(`kay: ${JSON.stringify(key)} cannot name a cookie; give persisted() a name of letters, digits and - _ .`)
 
   const seconds = maxAge === undefined ? YEAR_SECONDS : durationSeconds(maxAge, `the maxAge of persisted(${JSON.stringify(key)})`)
   const store: Store<T> = storage === 'cookie'
-    ? { request: scope => decoded(scope.cookie(key), values), stored: () => decoded(cookie(key), values), save: value => saveCookie(key, value, seconds) }
+    ? { request: scope => decoded(scope.cookie(key), values), stored: () => decoded(cookie(key), values), save: value => saveCookie(key, value, seconds, sync !== false) }
     : { stored: () => decoded(readLocal(key), values), save: value => saveLocal(key, value), afterHydration: true }
 
+  if (sync !== false && typeof document !== 'undefined')
+    listen(key, storage, write, values, fallback as T)
+
   return keep(store, read, write)
+}
+
+// The browser's channel between the tabs of one origin, shared by every cookie signal of the page; none where the browser has no BroadcastChannel.
+let channel: BroadcastChannel | null | undefined
+const heard = new Map<string, (text: string | null) => void>()
+
+// Tells the page's signal kept under `key` what another tab wrote: a `null` text is the key removed, which reads as `fallback`.
+function listen<T>(key: string, storage: Exclude<PersistStorage, 'query'>, write: (value: T) => void, values: readonly unknown[] | undefined, fallback: T): void {
+  const hear = (text: string | null) => {
+    if (text === null) {
+      write(fallback)
+
+      return
+    }
+
+    const stored = decoded<T>(text, values)
+
+    if (stored.found)
+      write(stored.value)
+  }
+
+  if (storage === 'local') {
+    // `clear()` fires one event with no key.
+    addEventListener('storage', (event: StorageEvent) => {
+      if ((event.key === key || event.key === null) && sameArea(event.storageArea))
+        hear(event.newValue)
+    })
+
+    return
+  }
+
+  if (channel === undefined) {
+    channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('kay:persisted')
+    channel?.addEventListener('message', (event: MessageEvent<unknown>) => {
+      const [name, text] = event.data as [string, string]
+
+      heard.get(name)?.(text)
+    })
+  }
+
+  heard.set(key, hear)
 }
 
 // A signal kept in `store`, around its own `read` and `write`: the browser writes what the store holds into it as it starts, or on its first read once hydrated, then keeps each value written.
@@ -178,8 +223,9 @@ function cookie(name: string): string | undefined {
   return undefined
 }
 
-function saveCookie(name: string, value: unknown, seconds: number): void {
-  const text = encodeURIComponent(sendValue(value))
+function saveCookie(name: string, value: unknown, seconds: number, tell: boolean): void {
+  const sent = sendValue(value)
+  const text = encodeURIComponent(sent)
 
   if (text.length + name.length > MAX_COOKIE_BYTES) {
     kayLog('warn', `the value of the persisted signal ${name} is over ${MAX_COOKIE_BYTES} bytes encoded, too big for a cookie, so it was not kept; persist it with { storage: 'local' }`)
@@ -191,6 +237,18 @@ function saveCookie(name: string, value: unknown, seconds: number): void {
   const path = withBase('/').replace(TRAILING_SLASH, '') || '/'
 
   document.cookie = `${name}=${text}; path=${path}; max-age=${Math.ceil(seconds)}; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`
+
+  if (tell)
+    channel?.postMessage([name, sent])
+}
+
+function sameArea(area: Storage | null): boolean {
+  try {
+    return area === localStorage
+  }
+  catch {
+    return false
+  }
 }
 
 function readLocal(key: string): string | null {

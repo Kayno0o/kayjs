@@ -153,6 +153,8 @@ Pass `{ storage: 'query' }` to keep a string in the page's URL instead, as `?q=.
 
 Pass `{ storage: 'local' }` to use localStorage. The server never sees it, so every island reading it renders the default first, then shows the kept value.
 
+Islands that persist the same name share one signal, so a change in one shows in the others at once, and in other tabs of the browser too: through the `storage` event for `local`, a broadcast channel for a cookie. `{ sync: false }` keeps a call's signal on its own.
+
 Derive from a persisted value inside the island. A memo made outside one gives a late-hydrating island the kept value, which its server markup does not hold.
 
 `queryParam<number>('page')` holds one param of the page's [query](/essentials/data-loading), typed by the page's `query` schema. `current.set(n => n + 1)` writes `?page=3`. A write takes the current history entry's place; `queryParam<number>('page', { history: 'push' })` adds an entry for each write instead, so Back and Forward step through the pages and the signal follows.
