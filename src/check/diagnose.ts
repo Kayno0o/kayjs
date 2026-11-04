@@ -131,7 +131,7 @@ export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, l
     return undefined
 
   if (hint)
-    return { message: diagnostic.message, help: hint.help, span: hint.span }
+    return { message: hint.message ?? diagnostic.message, help: hint.help, span: hint.span }
 
   const help = unknownNameHelp(diagnostic.message)
 

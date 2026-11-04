@@ -13,6 +13,8 @@ export interface TemplateHint {
   // Where the mistake is, narrowed to the attribute at fault when the source shows it.
   span: Span
   help: string
+  // Words replacing TypeScript's own, for a report that prints a type kay generated.
+  message?: string
 }
 
 // A row answers a hint, `'duplicate'` for a report that repeats another's, or undefined when the diagnostic is not its mistake.
@@ -30,6 +32,11 @@ const BIND_ATTRIBUTE = /(?<![\w:$-])bind:value=\{/
 const UNKNOWN_ELEMENT = /^Property '([\w$-]+)' does not exist on type 'JSX\.IntrinsicElements'/
 const UNKNOWN_ATTRIBUTE = /Property '(\w+)' does not exist on type 'HtmlAttributes</
 const TAG_NAME = /^[\w$.:-]+$/
+const UNDECLARED_PROP = /^Type '[\s\S]*?' is not assignable to type '(\{[\s\S]*)'\.\n\s*Property '([\w$-]+)' does not exist on type '[\s\S]*'\.?$/
+const PROP_MEMBER = /^\s*([\w$]+)\??:([\s\S]*)$/
+const COMPONENT_CALL = /^([A-Z][\w$.]*)\(/
+const ISLAND_OPTIONS = new Set(['hydrate', 'persist', 'fallback'])
+const BLOCK_TYPE = /^(?:\([^)]*\) => )?Element$/
 const NAME_ESCAPES = /[$.]/g
 const NAME_CHAR = /[\w:$-]/
 const CHECKBOX = /\btype\s*=\s*["']checkbox["']/
@@ -287,7 +294,102 @@ const tooltipName: Row = (diagnostic, source, span) => {
   return attribute && { span: attribute, help: 'a tooltip is `data-tooltip="..."` on an element the keyboard reaches (a `button`, a link, or one with `tabindex="0"`), or `data-hint="..."` for text only the pointer adds' }
 }
 
-const ROWS: Row[] = [calledHandler, mistypedBind, unknownElement, reactNames, tooltipName]
+// The first object type of the props a component call is checked against, split at its top-level `;` into `[name, type]` pairs.
+function declaredProps(type: string): [string, string][] {
+  const props: [string, string][] = []
+  let depth = 0
+  let from = 1
+
+  for (let index = 0; index < type.length; index++) {
+    const char = type[index]!
+
+    if ('{(<['.includes(char))
+      depth++
+    else if ('})>]'.includes(char) && !(char === '>' && type[index - 1] === '='))
+      depth--
+
+    if (depth === 0 || (depth === 1 && char === ';')) {
+      const member = PROP_MEMBER.exec(type.slice(from, index))
+
+      if (member)
+        props.push([member[1]!, member[2]!.trim()])
+
+      from = index + 1
+    }
+
+    if (depth === 0)
+      break
+  }
+
+  return props
+}
+
+// The component a props error is about: the call on its line, or for an `@block` the nearest call above at a lesser indentation.
+function calledComponent(source: string, at: number): string | undefined {
+  const lineEnd = source.indexOf('\n', at)
+  const [own, ...above] = source.slice(0, lineEnd === -1 ? source.length : lineEnd).split('\n').toReversed()
+  const ownCall = COMPONENT_CALL.exec(own!.trimStart())
+
+  if (ownCall)
+    return ownCall[1]
+
+  const indent = own!.length - own!.trimStart().length
+
+  for (const line of above) {
+    const trimmed = line.trimStart()
+
+    if (trimmed !== '' && line.length - trimmed.length < indent)
+      return COMPONENT_CALL.exec(trimmed)?.[1]
+  }
+
+  return undefined
+}
+
+// A prop a component call gives and the component does not declare, which TypeScript words with the props type it generated.
+const undeclaredProp: Row = (diagnostic, source, span) => {
+  const found = diagnostic.code === ASSIGNABILITY ? UNDECLARED_PROP.exec(diagnostic.message) : null
+
+  if (!found)
+    return undefined
+
+  const [, type, name] = found
+  const lineStart = source.lastIndexOf('\n', span.start - 1) + 1
+  const line = source.slice(lineStart, !source.includes('\n', lineStart) ? source.length : source.indexOf('\n', lineStart)).trimStart()
+  const isBlock = line.startsWith('@')
+
+  if (!isBlock && !COMPONENT_CALL.test(line))
+    return undefined
+
+  const component = calledComponent(source, span.start)
+  const props = declaredProps(type!)
+  const named = component === undefined ? 'the component' : `\`${component}\``
+  const attribute = isBlock || name === 'children' ? undefined : attributeNamed(source, attributeList(source, span), name!)
+  const where = attribute ?? span
+
+  const taken = isBlock ? `a \`${name}\` block` : `\`${name}\``
+  const message = `${named} does not take ${name === 'children' ? 'children' : taken}`
+
+  if (name === 'children')
+    return { message, span: where, help: `${named} has no \`slot\`, so it takes no children: add a \`slot\` line where they go, or leave them out` }
+
+  if (isBlock) {
+    const blocks = props.filter(([, kind]) => BLOCK_TYPE.test(kind)).map(([prop]) => prop)
+
+    return { message, span: where, help: `${named} has no \`${name}\` block${blocks.length === 0 ? ' and takes no blocks' : `, its blocks are ${blocks.map(block => `\`@${block}\``).join(', ')}`}: a block is a prop typed \`Snippet\`, read with \`slot ${name}\`` }
+  }
+
+  if (ISLAND_OPTIONS.has(name!))
+    return { message, span: where, help: `\`${name}\` is an option of an island, and ${named} renders on the server alone: it becomes an island once it keeps state or handles an event in the browser` }
+
+  if (name === 'class')
+    return { message, span: where, help: `${named} takes no \`class\`: put \`part="root"\` on the element it should reach (or \`part="name"\` for an inner one), or declare \`class?: string\` in its props` }
+
+  const takes = props.map(([prop]) => prop)
+
+  return { message, span: where, help: `${named} has no \`${name}\` prop${takes.length === 0 ? ' and takes no props' : `, it takes ${takes.map(prop => `\`${prop}\``).join(', ')}`}: declare it in its \`props<{ ... }>()\`` }
+}
+
+const ROWS: Row[] = [calledHandler, mistypedBind, unknownElement, undeclaredProp, reactNames, tooltipName]
 
 export function templateHint(diagnostic: TsgoDiagnostic, source: string, span: Span | undefined, tsx: string): TemplateHint | 'duplicate' | undefined {
   if (span === undefined)

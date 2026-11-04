@@ -168,7 +168,7 @@ describe('kay check', () => {
       { file: 'broken/src/routes/generic.kay', line: 7, column: 43, code: 'TS2322', message: 'Type \'"nmae"\' is not assignable to type \'"id" | "name"\'.' },
       { file: 'broken/src/routes/generic.kay', line: 10, column: 13, code: 'TS2551', message: 'Property \'toISOStrin\' does not exist on type \'Date\'. Did you mean \'toISOString\'?' },
       { file: 'broken/src/routes/head.kay', line: 2, column: 8, code: 'TS2322', message: expect.stringContaining('nmae') },
-      { file: 'broken/src/routes/lazy.kay', line: 4, column: 57, code: 'TS2322', message: expect.stringContaining('hydrate: string') },
+      { file: 'broken/src/routes/lazy.kay', line: 4, column: 57, code: 'TS2322', message: '`TodoItem` does not take `hydrate`' },
       { file: 'broken/src/routes/links.kay', line: 6, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /form/extra') },
       { file: 'broken/src/routes/links.kay', line: 9, column: 39, code: 'TS2345', message: expect.stringContaining('A layout, or a page with a server fence, sends an island its props serialized') },
       { file: 'broken/src/routes/links.kay', line: 9, column: 64, code: 'TS2345', message: expect.stringContaining('A layout, or a page with a server fence, sends an island its props serialized') },
@@ -2330,10 +2330,10 @@ describe.concurrent('kay check, edge cases', () => {
 
     try {
       expect((await check(root)).map(diagnostic => [basename(diagnostic.file), diagnostic.line, diagnostic.column, firstLine(diagnostic.message)])).toEqual([
-        ['island.kay', 14, 7, 'Type \'{ missing: any; title: string; }\' is not assignable to type \'{ title: string; count: number; }\'.'],
+        ['island.kay', 14, 7, '`Card` does not take `missing`'],
         ['island.kay', 14, 7, 'Cannot find name \'missing\'.'],
         ['island.kay', 16, 6, 'Type \'number\' is not assignable to type \'string\'.'],
-        ['static.kay', 10, 7, 'Type \'{ missing: any; title: string; }\' is not assignable to type \'{ title: string; count: number; }\'.'],
+        ['static.kay', 10, 7, '`Card` does not take `missing`'],
         ['static.kay', 10, 7, 'Cannot find name \'missing\'.'],
         ['static.kay', 12, 6, 'Type \'number\' is not assignable to type \'string\'.'],
       ])

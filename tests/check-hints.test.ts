@@ -96,6 +96,18 @@ describe('hints for the first template mistakes', () => {
     ])
   })
 
+  it('names the component and the props it takes when a call gives one it does not declare', async () => {
+    const found = await report('---\nimport Card from "../card.kay"\n---\nCard(title="a" class="x")\nCard(title="a" nope={1})\nCard(title="a")\n  @foo\n    p x\nCard(title="a")\n  p child\n', { 'src/card.kay': '---\nimport type { Snippet } from "kay"\nconst { title } = props<{ title: string, actions?: Snippet, v?: "a" | "b" }>()\n---\np {title}\nslot actions\n' })
+    const props = found.filter(d => d.code === 'TS2322')
+
+    expect(props.map(d => [d.line, d.message, d.help])).toEqual([
+      [4, '`Card` does not take `class`', '`Card` takes no `class`: put `part="root"` on the element it should reach (or `part="name"` for an inner one), or declare `class?: string` in its props'],
+      [5, '`Card` does not take `nope`', '`Card` has no `nope` prop, it takes `title`, `actions`, `v`: declare it in its `props<{ ... }>()`'],
+      [7, '`Card` does not take a `foo` block', '`Card` has no `foo` block, its blocks are `@actions`: a block is a prop typed `Snippet`, read with `slot foo`'],
+      [9, '`Card` does not take children', '`Card` has no `slot`, so it takes no children: add a `slot` line where they go, or leave them out'],
+    ])
+  })
+
   it('reports each elif once, nested or beside siblings', async () => {
     const nested = errors(await report('---\nconst a = true\n---\ndiv\n  if a\n    p a\n  elif a\n    p b\n  elif a\n    p c\n  span x\n'))
 
