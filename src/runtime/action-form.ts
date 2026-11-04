@@ -109,7 +109,7 @@ const QUOTES = /["\\]/g
 function claimedFields(name: string): Element[] {
   const host = claimedHost() as Element | undefined
 
-  return host?.querySelectorAll ? [...host.querySelectorAll(`[name="${name.replace(QUOTES, '\\// What a refused post sent for the field `name` of the form being rendered, for a component drawing a field to start from;')}"]`)] : []
+  return host?.querySelectorAll ? [...host.querySelectorAll(`[name="${name.replace(QUOTES, '\\$&')}"]`)] : []
 }
 
 // The text the server wrote into a field: a box's `value` attribute, a textarea's text, a select's chosen option, a group of radios' ticked one.
