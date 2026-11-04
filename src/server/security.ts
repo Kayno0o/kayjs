@@ -244,6 +244,34 @@ export function carryContext<T extends Response>(set: Context['set'], response: 
   return response
 }
 
+const PUBLIC_CACHE = /\bpublic\b/i
+
+function headerKey(headers: Record<string, unknown>, name: string): string | undefined {
+  return Object.keys(headers).find(key => key.toLowerCase() === name)
+}
+
+// A cookie is for the visitor it goes to, so no shared cache may keep the response it rides on, whatever the route or the page said: a `public` cache-control on a response, or on the context's headers, that carries a `set-cookie` becomes `private, no-cache`.
+// Called as the last step by the app for every route, and by a plugin that adds a cookie itself, so a response its own app does not wrap is covered too.
+export function keepCookiesPrivate(set: { headers: Record<string, unknown> }, response?: unknown): void {
+  const given = response instanceof Response ? response : undefined
+  const setCookie = headerKey(set.headers, 'set-cookie')
+  const control = headerKey(set.headers, 'cache-control')
+
+  if (given?.headers.has('set-cookie') !== true && setCookie === undefined)
+    return
+
+  if (control !== undefined && PUBLIC_CACHE.test(String(set.headers[control])))
+    set.headers[control] = 'private, no-cache'
+
+  try {
+    if (given !== undefined && PUBLIC_CACHE.test(given.headers.get('cache-control') ?? ''))
+      given.headers.set('cache-control', 'private, no-cache')
+  }
+  catch {
+    // Immutable headers: the response is one `fetch()` returned, which a route does not hand a cookie to.
+  }
+}
+
 // The same for headers built per request: the security headers go under what the response sets, and the request id on the response when it is alone on the context.
 export function ownedHeaders(set: Context['set'], headers: Record<string, string>, security: [name: string, value: string][]): Record<string, string> {
   const own = takeOwnHeaders(set)

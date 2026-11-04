@@ -1,4 +1,4 @@
-import { api, exitPreview } from 'kay/server'
+import { api, exitPreview, keepCookiesPrivate } from 'kay/server'
 
 export default api()
   // Leaves edit mode, clearing the cookie kay keeps it in.
@@ -7,6 +7,7 @@ export default api()
 
     exitPreview({ cookies })
     set.headers['set-cookie'] = cookies.toSetCookieHeaders()
+    keepCookiesPrivate(set)
 
     return { left: true }
   })

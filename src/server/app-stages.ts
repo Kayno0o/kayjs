@@ -81,7 +81,7 @@ import { routeMatch } from './route-table'
 import { kayApiPrefixes, movedApiPrefixes, READ_METHODS } from './routes'
 import { knowRuntimeRules, missingRedirector } from './runtime-redirect-api'
 import { withSavedData } from './save-data'
-import { securityHeaders, setSecurityHeaders } from './security'
+import { keepCookiesPrivate, securityHeaders, setSecurityHeaders } from './security'
 import { setSiteFacts } from './site-facts'
 import { serveSitemap } from './sitemap'
 import { markPageStale, trackPrerendered } from './stale-pages'
@@ -338,6 +338,12 @@ export function identifyRequests({ app, env, setup: { client } }: Boot): void {
       set.headers[BUILD_HEADER] = build
   })
   serveToolCallsThrough(app)
+  // The last word on caching a response that sets a cookie, whichever plugin or route set it.
+  app.mapResponse({ as: 'scoped' }, ({ responseValue, set }) => {
+    keepCookiesPrivate(set, responseValue)
+
+    return undefined
+  })
 
   if (env.base !== '')
     rebaseRedirects(app, env.base)

@@ -17,6 +17,7 @@ import { onReload } from './reload'
 import { overHttps, requestUrl } from './request-url'
 import { readPersonally } from './scope'
 import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sealWith, warnLowEntropy, weakSecrets } from './seal'
+import { keepCookiesPrivate } from './security'
 import { appSecrets, noAppSecret, useStampSecret } from './stamp'
 
 export type SessionData = Record<string, unknown>
@@ -128,8 +129,6 @@ const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => 
 
 // Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
 // The cookie is read on first use and written only when the session changed or is due an extension; it is HttpOnly, SameSite=Lax unless `sameSite` says another, and over https Secure and named `__Host-` unless shared under a domain.
-const PUBLIC_CACHE = /\bpublic\b/i
-
 export function session<Data extends object = SessionData>(options: SessionOptions = {}) {
   const fallback = options.secret === undefined ? appSecrets() : undefined
 
@@ -173,10 +172,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
 
       if (response instanceof Response) {
         response.headers.append('set-cookie', cookie)
-
-        // A cookie is for this visitor alone, so no shared cache may keep the response it rides on, whatever the page or route said.
-        if (PUBLIC_CACHE.test(response.headers.get('cache-control') ?? ''))
-          response.headers.set('cache-control', 'private, no-cache')
+        keepCookiesPrivate(context.set, response)
 
         return
       }
@@ -184,6 +180,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
       const before = context.set.headers['set-cookie']
 
       context.set.headers['set-cookie'] = [before ?? []].flat().concat(cookie)
+      keepCookiesPrivate(context.set)
     })
 
   // A key for one `purpose`, such as `'kayjs-auth'`, derived from the secret with HKDF so it says nothing of the secret or of the cookie's key; a list of 43-character texts in the order of the secrets, one for a single secret.

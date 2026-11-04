@@ -61,6 +61,7 @@ export type { AsyncRooms, AsyncRoomStore, CoalesceOptions, RoomConnection, RoomR
 export { memoryRooms, rooms, sqliteRooms } from './rooms'
 export type { Route } from './routes'
 export { safePath } from './safe-path'
+export { keepCookiesPrivate } from './security'
 export type { DeletableSessionStore, Session, SessionData, SessionMatch, SessionOptions, SessionSettings, SessionStore } from './session'
 export { memorySessions, memoryStore, session, sqliteSessions, sqliteStore } from './session'
 export type { SignOptions } from './signed'

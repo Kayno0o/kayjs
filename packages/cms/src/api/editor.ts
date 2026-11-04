@@ -1,5 +1,5 @@
 import { overHttps } from 'kay/library'
-import { api } from 'kay/server'
+import { api, keepCookiesPrivate } from 'kay/server'
 import { wording } from 'kay/words'
 import { denialsOf } from '../access'
 import { hintCookie, pageLinkModule } from '../page-link'
@@ -14,6 +14,8 @@ export default api()
     // Beside any cookie the guard already set.
     if (settings().pageLink)
       set.headers['set-cookie'] = [set.headers['set-cookie'] ?? []].flat().concat(hintCookie(overHttps(request)).serialize())
+
+    keepCookiesPrivate(set)
 
     return { label: wording('cms.page.edit', 'Edit this page'), href: screenPath(settings().prefix, '/page') }
   })

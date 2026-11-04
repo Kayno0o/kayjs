@@ -587,6 +587,20 @@ describe('sessions', () => {
     expect(quiet.headers.get('cache-control')).toBe('public, max-age=60')
   })
 
+  it('makes a public plain answer private once the session cookie rides on its headers', async () => {
+    const app = new Elysia().use(session<{ count: number }>({ secret: SECRET })).get('/', async ({ session, set }) => {
+      set.headers['Cache-Control'] = 'public, max-age=60'
+      await session.set('count', 1)
+
+      return { ok: true }
+    })
+
+    const response = await app.handle(new Request('http://localhost/'))
+
+    expect(response.headers.get('set-cookie')).toContain('kay_session=')
+    expect(response.headers.get('cache-control')).toBe('private, no-cache')
+  })
+
   it('refuses a session maxAge that is no positive duration', async () => {
     const app = new Elysia().use(session({ secret: SECRET })).get('/', async ({ session }) => {
       try {

@@ -4,7 +4,7 @@ import type { OAuthFailure } from './oauth/flow'
 import type { Auth } from './request'
 import { localPath } from 'kay'
 import { configError, underKayDev } from 'kay/library'
-import { crossSiteResponse } from 'kay/server'
+import { crossSiteResponse, keepCookiesPrivate } from 'kay/server'
 import { rootUsable } from './authorize/metadata'
 import { serveOAuthServer } from './authorize/routes'
 import { backOf, homeOf, withBack, withQuery } from './core'
@@ -56,10 +56,13 @@ export function sendCookies(context: { set: { headers: Record<string, unknown> }
     for (const cookie of cookies)
       response.headers.append('set-cookie', cookie)
 
+    keepCookiesPrivate(context.set, response)
+
     return
   }
 
   context.set.headers['set-cookie'] = [context.set.headers['set-cookie'] ?? []].flat().concat(cookies)
+  keepCookiesPrivate(context.set)
 }
 
 // The signed-in user's data as a JSON download, linked from their account page.

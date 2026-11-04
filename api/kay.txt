@@ -2699,6 +2699,9 @@ interface KayExtension<Server extends AnyElysia = AnyElysia>
   transformPage?: PageHook | undefined
   transformServedPage?: PageHook | undefined
 
+[./server] keepCookiesPrivate
+function keepCookiesPrivate(set: { headers: Record<string, unknown>; }, response?: unknown): void
+
 [./server] LiveEntry
 type LiveEntry = [id: string, key: string, text: string] | [id: string, key: string, text: string, expiresAt: number]
 
