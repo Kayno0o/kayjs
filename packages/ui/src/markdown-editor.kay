@@ -5,6 +5,7 @@ import { entriesFromDataTransfer } from '@kaynooo/utils/browser/clipboard'
 import { effect, onMount, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 import { controlledValue } from './controlled-value'
+import { fieldInvalid, keepInvalid } from './field-look'
 import { startRef } from './form-reset'
 import { enterEdit, escaped, headingEdit, imageEdit, indentEdit, linkEdit, listEdit, TOOLBAR_ACTIONS, wrapEdit } from './markdown-edit'
 import { attempt } from './toast'
@@ -23,7 +24,9 @@ const EDITS: Record<ToolbarAction, (text: string, start: number, end: number) =>
 
 const look = recipe({ parts: { wrap: 'kui-markdown', grid: 'kui-markdown-grid', root: 'kui-markdown-editor', bar: 'kui-markdown-bar', barFailed: 'kui-markdown-bar-failed', extra: 'kui-markdown-extra flex flex-wrap items-center gap-0.5' } })
 
-const { value = '', onInput, onImage, onImageError, toolbar = true, toolbarExtra, preview, previewing, onPreviewChange, previewTrusted = false, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
+const { value = '', invalid, onInput, onImage, onImageError, toolbar = true, toolbarExtra, preview, previewing, onPreviewChange, previewTrusted = false, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
+  // Marks the editor as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
+  invalid?: boolean | undefined
   // The text to start with; an editor whose parent passes other text follows it.
   value?: string | undefined
   // The text after every change, typed or applied by a shortcut, a paste or an upload.
@@ -56,6 +59,7 @@ const uploading = signal(0)
 let area: HTMLTextAreaElement | undefined
 const ref = startRef<HTMLTextAreaElement>((element) => {
   area = element
+  keepInvalid(element, () => invalid)
   element.defaultValue = untrack(() => value)
 }, rest.ref)
 // Set by Escape, so the Tab after it moves on rather than indenting.
@@ -394,7 +398,7 @@ const previewParts = () => previewClass === undefined ? undefined : { body: prev
 // The textarea comes first in the document, so the label a form field puts around the editor names it and not the first button; the bar is placed above it by the grid.
 div(part="wrap")
   div(part="grid" data-preview={previewShown() ? '' : undefined})
-    textarea.kui-field-input(part="root" {...rest} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} onInput={event => { heard(event.currentTarget.value); text = event.currentTarget.value; onInput?.(event.currentTarget.value) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
+    textarea.kui-field-input(part="root" {...rest} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} onInput={event => { heard(event.currentTarget.value); text = event.currentTarget.value; onInput?.(event.currentTarget.value) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
     if actions().length > 0 || preview || toolbarExtra
       div(part="bar" role="toolbar" aria-label={wording('ui.markdownEditor.toolbar', 'Formatting')})
         if toolbarFailed()

@@ -3,7 +3,7 @@ import { effect, markInvalid, untrack } from 'kay'
 // The utilities a Checkbox and a FormField draw with, which ContactForm's messages and kayjs-cms's field inputs take from here so a restyle of one reaches the copies.
 export const CHECKBOX = {
   root: 'kui-checkbox inline-flex cursor-pointer items-center gap-2 has-[input:disabled]:opacity-50 has-[input[aria-busy=true]]:cursor-progress has-[input:disabled:not([aria-busy=true])]:cursor-not-allowed',
-  input: 'm-0 size-4 shrink-0 cursor-[inherit] accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+  input: 'm-0 size-4 shrink-0 cursor-[inherit] accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-invalid:accent-danger aria-invalid:outline aria-invalid:outline-offset-2 aria-invalid:outline-danger aria-invalid:focus-visible:outline-2',
   label: 'text-sm text-foreground',
   hint: 'text-xs text-muted',
 }
@@ -51,3 +51,9 @@ export function keepInvalid(box: Element, invalid: () => boolean | undefined): v
 
   effect(() => markInvalid(box, keepInvalid, invalid() === true))
 }
+
+// A refused group of radios draws each radio in the danger colour, whether the group or the radio itself carries `aria-invalid`; `radios` names the group they read.
+export const RADIO_INVALID = 'aria-invalid:accent-danger aria-invalid:outline aria-invalid:outline-offset-2 aria-invalid:outline-danger group-aria-invalid/radios:accent-danger group-aria-invalid/radios:outline group-aria-invalid/radios:outline-offset-2 group-aria-invalid/radios:outline-danger'
+
+// A refused Segmented, ChipGroup or FileDrop turns its keyline, which they read from `--_control-line`, to the danger colour, whether the group carries `aria-invalid` or a FormField marked a field in it.
+export const GROUP_INVALID = 'aria-invalid:[--_control-line:var(--color-danger)] has-[input[aria-invalid=true]]:[--_control-line:var(--color-danger)]'

@@ -1,15 +1,23 @@
 ---
 import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
 import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
 import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
 import DateTimeInput from '@kaynooo/kayjs-ui/date-time-input.kay'
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
 import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
+import Rating from '@kaynooo/kayjs-ui/rating.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 import Slider from '@kaynooo/kayjs-ui/slider.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 
 // Every form control once, large and refused, each in a wrapper named after it, and a TextInput left at its defaults.
 const options = [{ value: 'a', label: 'A' }]
@@ -38,3 +46,25 @@ div#range
   RangeInput(size="lg" invalid label="Range")
 div#slider
   Slider(size="lg" invalid label="Volume" value={3})
+div#radios
+  RadioGroup(invalid label="Plan" options={options} value="a")
+div#segmented
+  Segmented(invalid label="View" options={options} value="a")
+div#chips
+  ChipGroup(invalid label="Tags" options={options} value={[]})
+div#rating
+  Rating(invalid label="Stars" value={2} onChange={() => undefined})
+div#color
+  ColorInput(invalid label="Colour" value="#000000")
+div#drop
+  FileDrop(invalid onFiles={() => undefined})
+    @content(zone)
+      button(type="button" onClick={zone.open}) Pick
+div#box
+  Checkbox(label="Terms" invalid)
+div#switch
+  Toggle(label="News" invalid)
+div#boxmsg
+  Checkbox(label="Terms" issue="Tick it")
+div#switchmsg
+  Toggle(label="News" issue="Switch it")

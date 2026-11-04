@@ -1,7 +1,7 @@
 ---
 import type { FieldSize } from './field-look'
 import type { JSX } from 'kay'
-import { effect, recipe } from 'kay'
+import { effect, postedValue, recipe } from 'kay'
 import TextInput from './text-input.kay'
 
 const look = recipe({ parts: { root: 'kui-time-input' } })
@@ -16,6 +16,9 @@ const { value, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 
   // Called with the new time, or `''` once emptied, as soon as the box holds a whole time. With `required` it never hears `''`: the box goes back to the last time when it is left empty.
   onChange?: ((value: string) => unknown) | undefined
 }>()
+
+// A box with no callback is plain: a refused post of its form, which the server renders it for, gives its time back in place of its own.
+const sent = onChange ? undefined : postedValue(rest.name)
 
 // The last whole time the box held, which a required box goes back to once left empty.
 let last = ''
@@ -45,4 +48,4 @@ function left(event: FocusEvent & { currentTarget: HTMLInputElement }) {
   rest.onBlur?.(event as never)
 }
 ---
-TextInput(part="root" {...rest} type="time" value={value} onInput={heard} onBlur={left})
+TextInput(part="root" {...rest} type="time" value={sent ?? value} onInput={heard} onBlur={left})

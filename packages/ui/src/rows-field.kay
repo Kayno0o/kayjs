@@ -23,7 +23,7 @@ const look = recipe({
 
 const NONE: never[] = []
 
-const { rows = NONE, style, columns, label, name, onChange, onAdd, onRemove, cell, min = 0, max, addLabel = wording('ui.rowsField.add', 'Add row'), removeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'style'> & {
+const { rows = NONE, style, columns, label, name, invalid, onChange, onAdd, onRemove, cell, min = 0, max, addLabel = wording('ui.rowsField.add', 'Add row'), removeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'style'> & {
   style?: string | undefined
   // The rows to start with, and the ones to show whenever the parent passes others: a field in a form posting to an action needs nothing else, and an editor keeping them in a signal writes them back in `onChange`.
   rows?: readonly Row[] | undefined
@@ -31,6 +31,8 @@ const { rows = NONE, style, columns, label, name, onChange, onAdd, onRemove, cel
   columns: readonly { key: string, label: string, placeholder?: string | undefined, type?: 'text' | 'email' | 'url' | 'tel' | 'search' | 'number' | undefined, name?: string | undefined, cell?: boolean | undefined }[]
   // Names the field for screen readers.
   label: string
+  // Marks the field as refused: its text boxes in the danger colour, with `aria-invalid` on the group. A cell drawn by `@cell` takes it from `invalid` itself.
+  invalid?: boolean | undefined
   // Inside a form, each column posts under `<name>_<key>` (or its own `name`), once per row in the order shown, so a blank cell keeps its place: an action reads them as `s.Array(s.String())` fields of one length.
   name?: string | undefined
   // Gets the new rows after every edit, an added row and a removed one. Called without a wait: it can store the rows, not refuse a change.
@@ -132,7 +134,7 @@ onFormReset(() => root, () => {
   commit(start)
 })
 ---
-div(part="root" {...rest} ref={element => root = element} role="group" aria-label={label} style={[`--_columns:${columns.length}`, style].filter(Boolean).join('; ')})
+div(part="root" {...rest} ref={element => root = element} role="group" aria-label={label} aria-invalid={invalid ? 'true' : rest['aria-invalid']} style={[`--_columns:${columns.length}`, style].filter(Boolean).join('; ')})
   if current().length > 0
     div(part="head" aria-hidden="true")
       for column of columns key={column.key}
@@ -143,8 +145,8 @@ div(part="root" {...rest} ref={element => root = element} role="group" aria-labe
         if column.cell === true && cell
           | {cell({ key: column.key, label: column.label, name: postName(column) }, entry.row, entry.index, text => edit(entry.index, column.key, text))}
         else if column.type === 'number'
-          TextInput(part="input" type="number" name={postName(column)} aria-label={`${column.label} ${entry.index + 1}`} placeholder={column.placeholder ?? column.label} value={entry.row[column.key] ?? ''} onInput={figure => edit(entry.index, column.key, figure === null ? '' : String(figure))})
+          TextInput(part="input" type="number" name={postName(column)} invalid={invalid} aria-label={`${column.label} ${entry.index + 1}`} placeholder={column.placeholder ?? column.label} value={entry.row[column.key] ?? ''} onInput={figure => edit(entry.index, column.key, figure === null ? '' : String(figure))})
         else
-          TextInput(part="input" type={column.type} name={postName(column)} aria-label={`${column.label} ${entry.index + 1}`} placeholder={column.placeholder ?? column.label} value={entry.row[column.key] ?? ''} onInput={text => edit(entry.index, column.key, text)})
+          TextInput(part="input" type={column.type} name={postName(column)} invalid={invalid} aria-label={`${column.label} ${entry.index + 1}`} placeholder={column.placeholder ?? column.label} value={entry.row[column.key] ?? ''} onInput={text => edit(entry.index, column.key, text)})
       IconButton(part="remove" icon="close" variant="ghost" size="sm" label={removeName(entry.index)} disabled={current().length <= min} onClick={() => drop(entry.index)})
   Button(part="add" icon="plus" variant="ghost" size="sm" label={addLabel} disabled={full()} onClick={add})

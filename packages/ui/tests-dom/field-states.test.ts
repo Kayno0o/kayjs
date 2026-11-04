@@ -62,3 +62,24 @@ test('invalid is held with a FormField message, which keeps the box invalid once
 
   expect(box.getAttribute('aria-invalid')).toBe('true')
 })
+
+test('every group and box control takes invalid as well, written as aria-invalid on the group or the box', async () => {
+  for (const id of ['radios', 'segmented', 'chips', 'rating'])
+    expect(await boxes(id, 'aria-invalid'), id).toEqual(['true'])
+
+  for (const id of ['color', 'drop', 'box', 'switch'])
+    expect(await boxes(id, 'aria-invalid'), id).toEqual(['true'])
+})
+
+test('a Checkbox and a Toggle show the issue they are given under the box and mark it invalid, linked by aria-describedby', async () => {
+  for (const [id, text] of [['boxmsg', 'Tick it'], ['switchmsg', 'Switch it']] as const) {
+    expect((await boxes(id, 'data-part')).includes('issue'), id).toBe(true)
+
+    const root = mounted!.root.querySelector(`#${id}`)!
+    const input = root.querySelector('input')!
+
+    expect(root.querySelector('[data-part=issue]')?.textContent, id).toBe(text)
+    expect(input.getAttribute('aria-invalid'), id).toBe('true')
+    expect(input.getAttribute('aria-describedby'), id).toBe(root.querySelector('[data-part=issues]')!.id)
+  }
+})

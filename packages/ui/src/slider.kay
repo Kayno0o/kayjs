@@ -1,7 +1,7 @@
 ---
 import type { FieldSize } from './field-look'
 import type { JSX } from 'kay'
-import { recipe } from 'kay'
+import { postedValue, recipe } from 'kay'
 import { controlledInput } from './controlled-input'
 import { fieldInvalid, fieldSize, keepInvalid, LABEL_TEXT, SLIDER_STATE } from './field-look'
 import { rangeTrack } from './range-track'
@@ -39,9 +39,13 @@ const { size = 'md', invalid, value, min = 0, max = 100, step, label, showValue 
   onChange?: ((value: number) => unknown) | undefined
 }>()
 
+// A slider with no callback is plain: a refused post of its form, which the server renders it for, gives its figure back in place of its own.
+const sent = onInput || onChange ? undefined : postedValue(rest.name)
+const posted = Number(sent)
+
 const { shown, busy, ref: sliderRef, move, change: released } = controlledInput<number>({
   control: 'Slider',
-  value: () => value,
+  value: () => sent !== undefined && Number.isFinite(posted) ? posted : value,
   onChange: () => onChange,
   read: input => Number(input.value),
   write: (input, next) => {

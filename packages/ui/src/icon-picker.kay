@@ -2,6 +2,7 @@
 import type { JSX } from 'kay'
 import type { IconChoice } from './icon-picker'
 import { batch, effect, flush, onCleanup, recipe, signal } from 'kay'
+import { fieldInvalid, keepInvalid } from './field-look'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { defaultKept, onFormReset } from './form-reset'
@@ -13,7 +14,7 @@ const DEBOUNCE_MS = 200
 
 const look = recipe({ parts: { root: 'kui-icon-picker', search: '', grid: 'kui-icon-grid', option: 'kui-icon-grid-option', empty: 'kui-icon-grid-empty', bar: 'kui-icon-grid-bar', selection: 'kui-icon-grid-selection', clear: 'kui-icon-grid-clear', error: 'kui-icon-grid-error', more: 'kui-icon-grid-more' } })
 
-const { search, icons: given, value = '', name, onChange, onSearch, onError, searchLabel = wording('ui.iconPicker.search', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.grid', 'Icons'), searchingLabel = wording('ui.iconPicker.searching', 'Searching…'), emptyLabel = wording('ui.iconPicker.empty', 'No icons found.'), errorLabel = wording('ui.iconPicker.error', 'The icons could not be loaded.'), clearLabel = wording('ui.iconPicker.clear', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.more', 'Show more'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onError'> & {
+const { search, icons: given, value = '', name, invalid, disabled = false, onChange, onSearch, onError, searchLabel = wording('ui.iconPicker.search', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.grid', 'Icons'), searchingLabel = wording('ui.iconPicker.searching', 'Searching…'), emptyLabel = wording('ui.iconPicker.empty', 'No icons found.'), errorLabel = wording('ui.iconPicker.error', 'The icons could not be loaded.'), clearLabel = wording('ui.iconPicker.clear', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.more', 'Show more'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onError'> & {
   // The icons matching `query` from the `offset`th on, at most `limit` of them: typically an action, since a whole icon set is too large to ship. A page of fewer than `limit` is the last. A rejection is logged and leaves the last grid on screen under `errorLabel`.
   search?: ((query: string, limit: number, offset: number) => Promise<IconChoice[]>) | undefined
   // A fixed set of icons instead of `search`, filtered by the text typed and paged like its answers: no action is needed for a small set. Give one of the two.
@@ -22,6 +23,10 @@ const { search, icons: given, value = '', name, onChange, onSearch, onError, sea
   value?: string | undefined
   // Submits the chosen icon's name under this name, for a picker inside a form.
   name?: string | undefined
+  // Marks the picker as refused, its search box in the danger colour, with `aria-invalid`. A FormField showing a message marks it on its own.
+  invalid?: boolean | undefined
+  // Keeps the picker from changing: the search box, the icons and the buttons are disabled, and a form posts nothing for it.
+  disabled?: boolean | undefined
   // Hands over a pick, or an empty string for a cleared one.
   onChange?: ((name: string) => unknown) | undefined
   // Called with the query each time a new search starts, the first one included, not for a page added by Show more.
@@ -152,6 +157,9 @@ onFormReset(() => searchBox, () => {
 })
 
 function choose(choice: IconChoice) {
+  if (disabled)
+    return
+
   last = choice
   pick(picked() === choice.name ? '' : choice.name)
 }
@@ -164,12 +172,12 @@ function keepEnter(event: KeyboardEvent) {
 ---
 div(part="root" {...rest} ref={ref})
   if name
-    input(type="hidden" name={name} value={picked()} ref={element => hidden = element})
-  input.kui-field-input(part="search" ref={element => searchBox = element} type="search" data-kui-search placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed = event.currentTarget.value} onKeyDown={keepEnter})
+    input(type="hidden" name={name} value={picked()} disabled={disabled} ref={element => hidden = element})
+  input.kui-field-input(part="search" ref={element => { searchBox = element; keepInvalid(element, () => invalid) }} aria-invalid={fieldInvalid(() => invalid)} disabled={disabled} type="search" data-kui-search placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed = event.currentTarget.value} onKeyDown={keepEnter})
   ul(part="grid" aria-label={gridLabel} aria-busy={pending() ? 'true' : undefined})
     for choice of icons() key={choice.name}
       li(part="item")
-        button(part="option" type="button" aria-label={nameOf(choice.name)} data-tooltip={nameOf(choice.name)} aria-pressed={picked() === choice.name ? 'true' : 'false'} onClick={() => choose(choice)})
+        button(part="option" type="button" disabled={disabled} aria-label={nameOf(choice.name)} data-tooltip={nameOf(choice.name)} aria-pressed={picked() === choice.name ? 'true' : 'false'} onClick={() => choose(choice)})
           Icon(icon={choice.icon})
     if icons().length === 0
       li(part="empty") {pending() ? searchingLabel : failed() ? errorLabel : emptyLabel}
@@ -179,8 +187,8 @@ div(part="root" {...rest} ref={ref})
         if chosen() as icon
           Icon(icon={icon})
         | {nameOf(picked())}
-        IconButton(icon="close" label={clearLabel} size="xs" variant="inline" part="clear" onClick={() => pick('')})
+        IconButton(icon="close" label={clearLabel} size="xs" variant="inline" part="clear" disabled={disabled} onClick={() => pick('')})
     if failed() && icons().length > 0
       span(part="error" role="alert") {errorLabel}
     if more()
-      button(part="more" type="button" onClick={showMore}) {moreLabel}
+      button(part="more" type="button" disabled={disabled} onClick={showMore}) {moreLabel}

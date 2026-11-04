@@ -1,24 +1,26 @@
 ---
 import type { JSX } from 'kay'
-import { recipe } from 'kay'
+import { postedValue, recipe } from 'kay'
 import { controlledInput } from './controlled-input'
-import { LABEL_TEXT } from './field-look'
+import { fieldInvalid, keepInvalid, LABEL_TEXT } from './field-look'
 
 // The swatch of both engines has no native chrome around it, in the keyline and radius of the fields.
 const look = recipe({
   parts: {
     root: 'kui-color-input inline-flex items-center gap-2',
-    input: 'size-8 shrink-0 cursor-pointer appearance-none rounded-md border-solid border-[length:var(--border-width)] border-input bg-transparent p-0.5 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-md [&::-webkit-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-md [&::-moz-color-swatch]:border-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:opacity-50',
+    input: 'size-8 shrink-0 cursor-pointer appearance-none rounded-md border-solid border-[length:var(--border-width)] border-input bg-transparent p-0.5 aria-invalid:border-danger [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-md [&::-webkit-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-md [&::-moz-color-swatch]:border-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:opacity-50',
     label: LABEL_TEXT,
     value: 'text-xs text-foreground tabular-nums',
   },
 })
 
-const { value, label, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'onInput' | 'onChange'> & {
+const { value, label, invalid, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'onInput' | 'onChange'> & {
   // The colour as `#rrggbb`, which is what the native picker and a form hold; a box whose parent passes another one follows it.
   value: string
   // Written beside the swatch and naming the input for screen readers.
   label: string
+  // Marks the swatch as refused, its keyline in the danger colour, with `aria-invalid`. A FormField showing a message marks it on its own.
+  invalid?: boolean | undefined
   // Runs once with the colour chosen as `#rrggbb`, when the picker commits it and after a form reset that moved it, not on each shade dragged over.
   // The place for a slow answer, such as a colour sent to a bulb that takes seconds to confirm it.
   // A promise holds the input busy until it settles, and puts the previous colour back when it rejects (logged) or resolves to false: a refused change never shows as made.
@@ -30,9 +32,13 @@ const { value, label, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['in
 const HEX = /^#[\da-f]{6}$/i
 const normal = (colour: string) => HEX.test(colour) ? colour.toLowerCase() : '#000000'
 
+// A box with no callback is plain: a refused post of its form, which the server renders it for, gives its colour back in place of its own.
+const sent = onChange ? undefined : postedValue(rest.name)
+
 const { shown, busy, ref: boxRef, move, change: chosen } = controlledInput<string>({
   control: 'ColorInput',
-  value: () => normal(value),
+  value: () => normal(sent ?? value),
+  start: input => keepInvalid(input, () => invalid),
   onChange: () => onChange,
   read: input => input.value,
   write: (input, next) => {
@@ -52,6 +58,6 @@ function moved(event: Event) {
 ---
 // A native colour input drawn as a swatch, so the picker, the keyboard and the form post come with it. A click while a change is under way opens nothing.
 label(part="root")
-  input({...rest} part="input" ref={boxRef} type="color" aria-label={rest['aria-label'] || label} value={shown()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onInput={moved} onChange={event => chosen(event.currentTarget)})
+  input({...rest} part="input" ref={boxRef} type="color" aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} aria-label={rest['aria-label'] || label} value={shown()} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onInput={moved} onChange={event => chosen(event.currentTarget)})
   span(part="label") {label}
   span(part="value" aria-hidden="true") {shown()}

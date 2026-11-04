@@ -1,7 +1,7 @@
 ---
 import type { FieldSize } from './field-look'
 import type { JSX, Snippet } from 'kay'
-import { effect, memo, onMount, recipe, signal, untrack } from 'kay'
+import { effect, memo, onMount, postedValue, recipe, signal, untrack } from 'kay'
 import { addDays, addMonths, clampDate, dayName, firstDayOf, isDate, monthTitle, monthWeeks, sameMonth, today, weekdays, weekEdge, withinBounds } from './date'
 import { startRef } from './form-reset'
 import Icon from './icon.kay'
@@ -58,6 +58,9 @@ const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Cho
   // Called with the new date, or `''` once emptied, however it was set: typed, picked in the calendar or reset by a form.
   onChange?: ((value: string) => unknown) | undefined
 }>()
+
+// A box with no callback is plain: a refused post of its form, which the server renders it for, gives its date back in place of its own.
+const sent = onChange ? undefined : postedValue(rest.name)
 
 // The calendar is drawn once the island runs, so the server renders the plain date field alone and a form posts it without JavaScript.
 const ready = signal(false)
@@ -240,7 +243,7 @@ const canStepBack = () => !isDate(min) || addMonths(cursor(), -1).slice(0, 7) >=
 const canStepOn = () => !isDate(max) || addMonths(cursor(), 1).slice(0, 7) <= max.slice(0, 7)
 ---
 div(ref={element => root = element})
-  TextInput({...rest} part="input" type="date" ref={ref} min={min} max={max} value={value} onInput={heard} onChange={heard})
+  TextInput({...rest} part="input" type="date" ref={ref} min={min} max={max} value={sent ?? value} onInput={heard} onChange={heard})
   if ready()
     // The panel's click is cancelled so a FormField's label, which holds it in the DOM, does not move focus to the field and close the calendar.
     Popover(part="panel" open={opened()} role="dialog" aria-label={openLabel} onOpenChange={toggled} onKeyDown={keyDown} onFocusOut={focusLeft} onClick={event => event.preventDefault()})
