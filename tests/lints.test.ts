@@ -722,7 +722,7 @@ describe('brace-in-attribute', () => {
   const head = '---\nconst name = "a"\nconst user = { name: "a" }\n---\n'
 
   it('reports a quoted attribute holding a braced name, a path or a call', () => {
-    expect(lints(`${head}a(href="/x" title="Hello {name}" alt="{user.name}" data-x="{user.name.slice(1)}") go\nCard(title="Hi {name}")\n`)).toEqual([
+    expect(lints(`${head}a(href="/x" title="Hello {name}" alt="{user.name}" data-x="{user.name.slice(1)}") go\na(href="{name}") go\n`)).toEqual([
       { code: 'brace-in-attribute', severity: 'warning', at: '{name}' },
       { code: 'brace-in-attribute', severity: 'warning', at: '{user.name}' },
       { code: 'brace-in-attribute', severity: 'warning', at: '{user.name.slice(1)}' },
@@ -730,8 +730,23 @@ describe('brace-in-attribute', () => {
     ])
   })
 
-  it('leaves an escaped brace, JSON, an object, an expression attribute and element text alone', () => {
-    expect(lints(`${head}a(title="Hello \\{name}" data-x='{"a":1}' x-data="{ open: false }" y="{open: false}" z={name}) {name}\n`)).toEqual([])
+  it('leaves a component\'s quoted prop alone, as a placeholder it fills in is the API', () => {
+    expect(lints(`${head}Carousel(slideLabel="{n} of {count}" tiles="https://t.example/{z}/{x}/{y}.png")\n`)).toEqual([])
+  })
+
+  it('leaves an escaped brace, JSON, an object, doubled braces, an expression attribute and element text alone', () => {
+    expect(lints(`${head}a(title="Hello \\{name} \\{ x}" data-x='{"a":1}' x-data="{ open: false }" y="{open: false}" w="{{name}}" z={name}) {name}\n`)).toEqual([])
+  })
+
+  it('offers the safe fix only for a name the file declares', () => {
+    const fixes = (source: string) => compileKay(source, 'list.kay', { check: true }).diagnostics.flatMap(d => d.fixes ?? []).map(fix => fix.safe)
+
+    expect(fixes(`${head}a(title="{name}") go\na(title="{user.name}") go\na(title="{stranger}") go\n`)).toEqual([true, true, false])
+    expect(fixes('---\nconst { name } = props<{ name: string }>()\n---\na(title="{name}") go\n')).toEqual([true])
+  })
+
+  it('collapses a class value running over lines in the template literal', () => {
+    expect(fixed(`${head}a(class="\n  p-1 {name}\n") go\n`)).toEqual([`${head}a(class={\`p-1 \${name}\`}) go\n`])
   })
 
   it('writes the expression for a value that is all braces and a template literal for mixed text', () => {

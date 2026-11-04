@@ -96,6 +96,18 @@ describe('hints for the first template mistakes', () => {
     ])
   })
 
+  it('recognises an import written over several lines', async () => {
+    const found = errors(await report('---\nimport {\n  card,\n} from "../card.kay"\n---\ncard(title="a") text\n', { 'src/card.kay': card }))
+
+    expect(found.filter(error => error[2] === 'TS2339').map(error => error[3])).toEqual(['components are capitalised: import it as `Card` and call `Card(...)`'])
+  })
+
+  it('names the component without its props when they are a named type', async () => {
+    const found = await report('---\nimport Card from "../card.kay"\n---\nCard(title="a" nope={1})\n', { 'src/card.kay': '---\ninterface CardProps {\n  title: string\n}\nconst { title } = props<CardProps>()\n---\np {title}\n' })
+
+    expect(found.filter(d => d.code === 'TS2322').map(d => [d.message, d.help])).toEqual([['`Card` does not take `nope`', '`Card` has no `nope` prop: declare it in its `props<{ ... }>()`']])
+  })
+
   it('names the component and the props it takes when a call gives one it does not declare', async () => {
     const found = await report('---\nimport Card from "../card.kay"\n---\nCard(title="a" class="x")\nCard(title="a" nope={1})\nCard(title="a")\n  @foo\n    p x\nCard(title="a")\n  p child\n', { 'src/card.kay': '---\nimport type { Snippet } from "kay"\nconst { title } = props<{ title: string, actions?: Snippet, v?: "a" | "b" }>()\n---\np {title}\nslot actions\n' })
     const props = found.filter(d => d.code === 'TS2322')

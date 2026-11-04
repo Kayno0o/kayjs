@@ -308,8 +308,23 @@ describe('elements', () => {
     expect(diagnosticsAt('p import this\nimport(x)\n| import x')).toEqual([])
   })
 
+  it.each([
+    ['function add(a, b) {\n  return a\n}', 'function'],
+    ['async function load() {}', 'async function'],
+    ['class Box {\n  size = 1\n}', 'class'],
+    ['interface Props {\n  a: string\n}', 'interface'],
+    ['enum Kind { A, B }', 'enum'],
+    ['type Id<T> = T', 'type'],
+  ])('reports a declaration written in a template: %p', (source, at) => {
+    expect(diagnosticsAt(source)[0]).toEqual([at, `\`${at}\` starts a declaration, which a template does not take`])
+  })
+
+  it('leaves an element or component named like a declaration keyword, and its text, alone', () => {
+    expect(diagnosticsAt('Function(a="b")\np function add(a)\np class Box\nclass(a="b") x\ntype(a="b") x\n| type Id = T\n')).toEqual([])
+  })
+
   it('reads a backslash before a brace in a quoted attribute as the brace', () => {
-    expect(element(parse('a(title="Hi \\{name} {x}")').template[0]).attributes[0]).toMatchObject({ kind: 'static', text: 'Hi {name} {x}' })
+    expect(element(parse('a(title="Hi \\{name} {x} \\{ 1 \\{2}")').template[0]).attributes[0]).toMatchObject({ kind: 'static', text: 'Hi {name} {x} { 1 {2}' })
   })
 
   it('leaves pug words inside text alone and points `each` at `for`', () => {

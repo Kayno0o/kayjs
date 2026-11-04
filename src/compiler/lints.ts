@@ -803,8 +803,10 @@ const IDENTIFIER = /^[a-z_$][\w$]*$/i
 // An opening, closing or self-closing tag, with what it holds after its name.
 const TAG = /<(\/?)([a-z][a-z\d]*)(?=[\s/>])([^<>]*)>/gi
 // `{name}`, `{user.name}` or `{count(1)}` inside a quoted attribute value, not after a backslash.
-const BRACED = /(?<!\\)\{([a-z_$][\w$]*(?:\??\.[\w$]+)*(?:\([^(){}]*\))?)\}/gi
+const BRACED = /(?<![\\{])\{([a-z_$][\w$]*(?:\??\.[\w$]+)*(?:\([^(){}]*\))?)\}(?!\})/gi
 // What a template literal would read differently than the attribute text does.
+const PATH_START = /[.(?]/
+const WHITESPACE_RUN = /\s+/g
 const UNQUOTABLE = /[`\\&]|\$\{/
 const SELF_CLOSING = /\s*\/$/
 // What `#[...]` cannot hold as written: another tag, or a bracket ending it early.
@@ -812,7 +814,7 @@ const INLINE_UNSAFE = /[[\]<]/
 // Elements whose text shows code or keyboard input, where a tag is meant as written.
 const LITERAL_TEXT = new Set(['code', 'pre', 'samp', 'kbd', 'textarea', 'script', 'style'])
 
-export const HTML_ELEMENTS = new Set(['a', 'abbr', 'address', 'article', 'aside', 'audio', 'b', 'bdi', 'bdo', 'blockquote', 'br', 'button', 'canvas', 'caption', 'cite', 'code', 'col', 'data', 'dd', 'del', 'details', 'dfn', 'dialog', 'div', 'dl', 'dt', 'em', 'embed', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'i', 'iframe', 'img', 'input', 'ins', 'kbd', 'label', 'legend', 'li', 'main', 'mark', 'menu', 'meter', 'nav', 'ol', 'optgroup', 'option', 'output', 'p', 'picture', 'pre', 'progress', 'q', 's', 'samp', 'section', 'select', 'small', 'source', 'span', 'strong', 'sub', 'summary', 'sup', 'table', 'tbody', 'td', 'textarea', 'tfoot', 'th', 'thead', 'time', 'tr', 'u', 'ul', 'var', 'video', 'wbr'])
+export const HTML_ELEMENTS = new Set(['a', 'abbr', 'address', 'article', 'aside', 'audio', 'b', 'bdi', 'bdo', 'blockquote', 'br', 'button', 'canvas', 'caption', 'cite', 'code', 'col', 'data', 'dd', 'del', 'details', 'dfn', 'dialog', 'div', 'dl', 'dt', 'em', 'embed', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'i', 'iframe', 'img', 'input', 'ins', 'kbd', 'label', 'legend', 'li', 'main', 'mark', 'menu', 'meter', 'nav', 'ol', 'optgroup', 'option', 'output', 'p', 'picture', 'pre', 'progress', 'q', 's', 'samp', 'section', 'select', 'small', 'source', 'span', 'strong', 'sub', 'summary', 'sup', 'table', 'tbody', 'td', 'textarea', 'tfoot', 'th', 'thead', 'time', 'tr', 'u', 'ul', 'var', 'video', 'wbr', 'body', 'head', 'link', 'meta', 'script', 'style', 'svg', 'title'])
 
 export function isLint(code: string | undefined): code is LintName {
   return code !== undefined && Object.hasOwn(LINTS, code)
@@ -973,13 +975,25 @@ export function templateLints(file: KayFile): Diagnostic[] {
   return [...found, ...accessibilityLints(file)]
 }
 
+// Whether the file declares `name` as a value: a `const`, a prop or import, a loop or `then` name.
+function declares(source: string, name: string): boolean {
+  const word = name.replaceAll('$', '\\$')
+
+  return new RegExp(`\\b(?:const|let|var|function|snippet|class|then|catch)\\s+${word}(?![\\w$])|^\\s*(?:const|let|var|import|for)\\b[^\\n]*[{\\[,]\\s*${word}\\s*(?:[,}\\]:=]|of\\b|as\\b)|^\\s*for\\s+[^\\n]*\\b${word}\\s+of\\b`, 'm').test(source)
+}
+
 // `title="Hello {name}"`: a quoted value is literal, so the braces would reach the page.
 function bracesInAttributes(source: string, element: ElementNode, found: Diagnostic[]) {
+  // A component's quoted prop is its own string to read, such as a `{n}` placeholder it fills in.
+  if (element.component)
+    return
+
   for (const attribute of element.attributes) {
     if (attribute.kind !== 'static')
       continue
 
-    const text = source.slice(attribute.value.start, attribute.value.end)
+    const raw = source.slice(attribute.value.start, attribute.value.end)
+    const text = raw.includes('\n') ? raw.trim().replaceAll(WHITESPACE_RUN, ' ') : raw
     const first = text.matchAll(BRACED).next().value
 
     if (!first)
@@ -989,6 +1003,8 @@ function bracesInAttributes(source: string, element: ElementNode, found: Diagnos
     const replacement = whole ? `{${first[1]}}` : `{\`${text.replaceAll(BRACED, (_, expression: string) => `\${${expression}}`)}\`}`
     const start = attribute.value.start - 1
     const end = attribute.value.end + 1
+    // The fix reads the name, so it is safe only for one the file declares.
+    const safe = declares(source, first[1]!.split(PATH_START)[0]!)
 
     found.push({
       start: attribute.value.start + first.index,
@@ -997,7 +1013,7 @@ function bracesInAttributes(source: string, element: ElementNode, found: Diagnos
       message: `\`${first[0]}\` in a quoted attribute shows as written, not as the value`,
       note: 'only template text interpolates; a quoted attribute value is a literal string',
       help: `write the attribute as ${whole || !UNQUOTABLE.test(text) ? `\`${source.slice(attribute.name.start, attribute.name.end)}=${replacement}\`` : 'an expression, `{`...`}` with a template literal'}, or \`\\{\` for a literal brace`,
-      ...whole || !UNQUOTABLE.test(text) ? { fixes: [{ title: `Write \`${replacement}\``, safe: true, edits: [{ start, end, text: replacement }] }] } : {},
+      ...whole || !UNQUOTABLE.test(text) ? { fixes: [{ title: `Write \`${replacement}\``, safe, edits: [{ start, end, text: replacement }] }] } : {},
       checkOnly: true,
     })
   }

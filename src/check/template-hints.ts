@@ -32,7 +32,7 @@ const BIND_ATTRIBUTE = /(?<![\w:$-])bind:value=\{/
 const UNKNOWN_ELEMENT = /^Property '([\w$-]+)' does not exist on type 'JSX\.IntrinsicElements'/
 const UNKNOWN_ATTRIBUTE = /Property '(\w+)' does not exist on type 'HtmlAttributes</
 const TAG_NAME = /^[\w$.:-]+$/
-const UNDECLARED_PROP = /^Type '[\s\S]*?' is not assignable to type '(\{[\s\S]*)'\.\n\s*Property '([\w$-]+)' does not exist on type '[\s\S]*'\.?$/
+const UNDECLARED_PROP = /^Type '[\s\S]*?' is not assignable to type '([\s\S]*)'\.\n\s*Property '([\w$-]+)' does not exist on type '[\s\S]*'\.?$/
 const PROP_MEMBER = /^\s*([\w$]+)\??:([\s\S]*)$/
 const COMPONENT_CALL = /^([A-Z][\w$.]*)\(/
 const ISLAND_OPTIONS = new Set(['hydrate', 'persist', 'fallback'])
@@ -260,7 +260,7 @@ const unknownElement: Row = (diagnostic, source, _span, tsx) => {
   if (new RegExp(`^[ \\t]*snippet\\s+${escaped}(?![\\w$-])`, 'm').test(source))
     return { span: found, help: `\`${name}\` is a snippet, which is rendered in braces: \`{${name}(...)}\`` }
 
-  if (new RegExp(`^[ \\t]*import\\b[^\\n]*(?<![\\w$])${escaped}(?![\\w$])`, 'm').test(source)) {
+  if (new RegExp(`^[ \\t]*import\\b[^'"\`;]*(?<![\\w$])${escaped}(?![\\w$])[^'"\`;]*['"]`, 'm').test(source)) {
     const component = name[0]!.toUpperCase() + name.slice(1)
 
     return { span: found, help: `components are capitalised: import it as \`${component}\` and call \`${component}(...)\`` }
@@ -345,6 +345,14 @@ function calledComponent(source: string, at: number): string | undefined {
   return undefined
 }
 
+// What a component takes, as the end of a sentence, or nothing when its props type is not printed out.
+function listed(names: string[] | undefined, none: string, lead: string, prefix: string): string {
+  if (names === undefined)
+    return ''
+
+  return names.length === 0 ? none : `${lead} ${names.map(name => `\`${prefix}${name}\``).join(', ')}`
+}
+
 // A prop a component call gives and the component does not declare, which TypeScript words with the props type it generated.
 const undeclaredProp: Row = (diagnostic, source, span) => {
   const found = diagnostic.code === ASSIGNABILITY ? UNDECLARED_PROP.exec(diagnostic.message) : null
@@ -361,7 +369,8 @@ const undeclaredProp: Row = (diagnostic, source, span) => {
     return undefined
 
   const component = calledComponent(source, span.start)
-  const props = declaredProps(type!)
+  // A props type the component names, `CardProps`, is not printed out, so what it takes is left unsaid.
+  const props = type!.startsWith('{') ? declaredProps(type!) : undefined
   const named = component === undefined ? 'the component' : `\`${component}\``
   const attribute = isBlock || name === 'children' ? undefined : attributeNamed(source, attributeList(source, span), name!)
   const where = attribute ?? span
@@ -373,9 +382,9 @@ const undeclaredProp: Row = (diagnostic, source, span) => {
     return { message, span: where, help: `${named} has no \`slot\`, so it takes no children: add a \`slot\` line where they go, or leave them out` }
 
   if (isBlock) {
-    const blocks = props.filter(([, kind]) => BLOCK_TYPE.test(kind)).map(([prop]) => prop)
+    const blocks = props?.filter(([, kind]) => BLOCK_TYPE.test(kind)).map(([prop]) => prop)
 
-    return { message, span: where, help: `${named} has no \`${name}\` block${blocks.length === 0 ? ' and takes no blocks' : `, its blocks are ${blocks.map(block => `\`@${block}\``).join(', ')}`}: a block is a prop typed \`Snippet\`, read with \`slot ${name}\`` }
+    return { message, span: where, help: `${named} has no \`${name}\` block${listed(blocks, ' and takes no blocks', ', its blocks are', '@')}: a block is a prop typed \`Snippet\`, read with \`slot ${name}\`` }
   }
 
   if (ISLAND_OPTIONS.has(name!))
@@ -384,9 +393,9 @@ const undeclaredProp: Row = (diagnostic, source, span) => {
   if (name === 'class')
     return { message, span: where, help: `${named} takes no \`class\`: put \`part="root"\` on the element it should reach (or \`part="name"\` for an inner one), or declare \`class?: string\` in its props` }
 
-  const takes = props.map(([prop]) => prop)
+  const takes = props?.map(([prop]) => prop)
 
-  return { message, span: where, help: `${named} has no \`${name}\` prop${takes.length === 0 ? ' and takes no props' : `, it takes ${takes.map(prop => `\`${prop}\``).join(', ')}`}: declare it in its \`props<{ ... }>()\`` }
+  return { message, span: where, help: `${named} has no \`${name}\` prop${listed(takes, ' and takes no props', ', it takes', '')}: declare it in its \`props<{ ... }>()\`` }
 }
 
 const ROWS: Row[] = [calledHandler, mistypedBind, unknownElement, undeclaredProp, reactNames, tooltipName]

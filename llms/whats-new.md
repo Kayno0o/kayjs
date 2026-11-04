@@ -21,8 +21,9 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `relativeTime` in `kay/i18n` takes its options as a function too, read at each tick: [locales](locales.md).
 - `queryParam` and a `persisted` signal kept in the query take `history: 'push'`, adding a history entry per write that Back and Forward step through: [state](islands-state-to-ids.md).
 - `persisted` calls of one name share one signal in a page and follow other tabs (`storage` event, BroadcastChannel), `sync: false` opts out: [state](islands-state-to-ids.md).
+- A static attribute's `\{` now renders `{` for every brace, where it kept the backslash.
 - `kay check` words a prop, `class`, children or `@block` a component call gives and the component does not declare, naming the component and what it takes in place of the generated type: [components](components.md).
-- `kay check` reports an unknown element once, naming the snippet (`{foo()}`), the import (components are capitalised) or the nearest HTML element it may be, and a template line starting with `import` or `export` is a compile error pointing at the script fence.
+- `kay check` reports an unknown element once, naming the snippet (`{foo()}`), the import (components are capitalised) or the nearest HTML element it may be, and a template line starting with `import`, `export` or a `function`, `class`, `interface`, `enum` or `type` declaration is a compile error pointing at the script fence.
 - The `brace-in-attribute` lint finds `title="Hello {name}"`, a quoted attribute that ships its braces as written, and `kay check --fix` writes `title={name}` or a template literal; `\{` keeps a literal brace: [lints](lints.md).
 
 ## 1.88.0
