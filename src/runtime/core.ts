@@ -1,5 +1,6 @@
 import type { CookieMap } from 'bun'
 import type { Static, TSchema } from 'elysia'
+import type { CookieDeleteOptions } from '../server/cookies'
 import type { Deferred, Locals, Redirect, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { Locale } from './i18n'
@@ -274,8 +275,8 @@ export interface RequestContext<Params extends Record<string, unknown> = Record<
   // The locale the request is served in, as `i18n` in kay.config.ts gives it; the site's `lang` without.
   locale: Locale
   params: Params
-  // Read on demand; what is set or deleted goes out as Set-Cookie headers, redirects included.
-  cookies: CookieMap
+  // Read on demand; what is set or deleted goes out as Set-Cookie headers, redirects included. A delete takes the `secure`, `sameSite` and `partitioned` the cookie was set with.
+  cookies: CookieMap & { delete: (options: CookieDeleteOptions) => void }
   // What the app's Elysia `derive`, `resolve` and `decorate` add, typed through `Register`.
   locals: Locals
   // Added to the response, whichever way the request ends.

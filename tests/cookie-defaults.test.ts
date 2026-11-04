@@ -6,7 +6,7 @@ import { setSite } from '../src/runtime/site'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
-const PAGE = '--- server\nctx.cookies.set(\'theme\', \'dark\')\nctx.cookies.set(\'loose\', \'1\', { httpOnly: false, secure: false, sameSite: \'strict\', path: \'/x\' })\nctx.cookies.set({ name: \'init\', value: \'v\' })\nctx.cookies.delete(\'old\')\nctx.cookies.delete({ name: \'older\', path: \'/o\' })\nctx.cookies.set(new Bun.Cookie(\'whole\', \'w\'))\nctx.headers.set(\'cache-control\', \'public, max-age=60\')\n---\nh1 Cookie\n'
+const PAGE = '--- server\nctx.cookies.set(\'theme\', \'dark\')\nctx.cookies.set(\'loose\', \'1\', { httpOnly: false, secure: false, sameSite: \'strict\', path: \'/x\' })\nctx.cookies.set({ name: \'init\', value: \'v\' })\nctx.cookies.delete(\'old\')\nctx.cookies.delete({ name: \'older\', path: \'/o\' })\nctx.cookies.set(new Bun.Cookie(\'whole\', \'w\'))\nctx.cookies.delete({ name: \'loosed\', path: \'/x\', secure: false, sameSite: \'strict\' })\nctx.headers.set(\'cache-control\', \'public, max-age=60\')\n---\nh1 Cookie\n'
 const ENDPOINT = 'export function GET({ cookies }) {\n  cookies.set(\'theme\', \'dark\')\n\n  return \'ok\'\n}\n'
 
 const ACTION = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const act = action(t.Object({}), ({}, { cookies, redirect, request }) => {\n  cookies.set(\'seen\', \'1\')\n  cookies.delete(\'old\')\n\n  if (request.headers.has(\'x-do\'))\n    redirect(\'/elsewhere\')\n\n  return \'ok\'\n})\n---\nform(action={act})\n  button Go\n'
@@ -67,6 +67,11 @@ describe('cookie defaults', () => {
     expect(answer.set[4]).toMatch(EXPIRED('older', '/o', ''))
     expect(answer.set[5]).toBe('whole=w; Path=/; SameSite=Lax')
     expect(answer.cache).toBe('private, no-cache')
+  })
+
+  it('deletes a cookie with the attributes it was set with, an explicit secure false clearing it without Secure', async () => {
+    expect((await cookies('always', '/cookie')).set[6]).toBe('loosed=; Path=/x; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict')
+    expect((await cookies('safe', '/cookie', {}, 'https://localhost')).set[6]).toBe('loosed=; Path=/x; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict')
   })
 
   it('follows the scheme the request came over for secure auto', async () => {

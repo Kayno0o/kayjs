@@ -43,6 +43,9 @@ export function defaultCookies(app: { onRequest: (hook: (context: { request: Req
   })
 }
 
+// What `ctx.cookies.delete` takes: the cookie's name and the `domain` and `path` it was set with, and the `secure`, `sameSite` and `partitioned` it was set with when they differ from the defaults.
+export type CookieDeleteOptions = CookieStoreDeleteOptions & Pick<CookieInit, 'secure' | 'sameSite' | 'partitioned'>
+
 const defined = (given: object): [string, unknown][] => Object.entries(given).filter(([, value]) => value !== undefined)
 
 // The cookies of a request, a cookie set without an option taking the app's default for it, `secure: 'auto'` following the scheme the request came over, as kay's own cookies do.
@@ -83,12 +86,12 @@ class DefaultedCookies extends Bun.CookieMap {
   }
 
   override delete(name: string): void
-  override delete(options: CookieStoreDeleteOptions): void
-  // Written as an expired cookie with the attributes a set would carry, as a `__Host-` or `__Secure-` cookie, or a `Secure` one, is only cleared by a header that is `Secure` too.
-  override delete(first: string | CookieStoreDeleteOptions): void {
-    const { name, domain, path } = typeof first === 'string' ? { name: first, domain: undefined, path: undefined } : first
+  override delete(options: CookieDeleteOptions): void
+  // Written as an expired cookie with the attributes a set would carry, as a `__Host-` or `__Secure-` cookie, or a `Secure` one, is only cleared by a header that is `Secure` too; the options of the set that wrote it, as `secure: false`, say how it was.
+  override delete(first: string | CookieDeleteOptions): void {
+    const { name, domain, path, ...attributes } = typeof first === 'string' ? { name: first, domain: undefined, path: undefined } : first
 
-    super.set(this.#given({ name, value: '', expires: new Date(0), ...domain == null ? {} : { domain }, ...path === undefined ? {} : { path } }) as CookieInit & { name: string, value: string })
+    super.set(this.#given({ ...Object.fromEntries(defined(attributes)), name, value: '', expires: new Date(0), ...domain == null ? {} : { domain }, ...path === undefined ? {} : { path } }) as CookieInit & { name: string, value: string })
   }
 }
 

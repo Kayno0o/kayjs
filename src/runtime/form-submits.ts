@@ -126,8 +126,20 @@ export function submitted(form: HTMLFormElement, submitter: HTMLElement | null):
 
   if (url)
     void submit(form, submitter, url)
-  else
+  else if (!swapSearch(form, submitter))
     submitNatively(form, submitter)
+}
+
+// A GET form navigates in place as a link does, so a search or a filter keeps the page's islands, scroll and focus; the same path is a change of its query.
+function swapSearch(form: HTMLFormElement, submitter: HTMLElement | null): boolean {
+  const searched = getFormUrl(form, submitter)
+
+  if (!searched)
+    return false
+
+  void followAsked(searched, searched.pathname === location.pathname ? { intent: 'query', link: form, focused: document.activeElement } : { intent: 'visit', link: form })
+
+  return true
 }
 
 function onSubmit(event: SubmitEvent): void {
@@ -142,12 +154,8 @@ function onSubmit(event: SubmitEvent): void {
   if (event.defaultPrevented)
     return
 
-  const searched = navigation.modified && event.submitter ? undefined : getFormUrl(form, event.submitter)
-
-  // A GET form navigates in place as a link does, so a search or a filter keeps the page's islands, scroll and focus; the same path is a change of its query.
-  if (searched) {
+  if (!(navigation.modified && event.submitter) && swapSearch(form, event.submitter)) {
     event.preventDefault()
-    void followAsked(searched, searched.pathname === location.pathname ? { intent: 'query', link: form, focused: document.activeElement } : { intent: 'visit', link: form })
 
     return
   }

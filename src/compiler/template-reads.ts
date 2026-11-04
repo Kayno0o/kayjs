@@ -1,7 +1,7 @@
 import type { Attribute, KayFile, Node, Span } from './ast'
 import type { Node as EstreeNode, Expression } from './estree'
 import { childBlocks, nodeExpressions, visitNodes } from './ast'
-import { parseExpression } from './estree'
+import { parseExpression, VISITOR_KEYS } from './estree'
 import { parsedBindingNames } from './pattern-names'
 import { codeOf, KAY_NAME } from './script'
 
@@ -72,6 +72,103 @@ function parameters(code: string): Set<string> | undefined {
   walk(expression, false)
 
   return names
+}
+
+// The TypeScript nodes that wrap a value, which a read of a name goes through; any other holds a type.
+const TYPED_VALUES = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion'])
+const IDENTIFIER = /(?<![\w$.])[A-Z_$][\w$]*/gi
+
+// The names an expression reads: not a member after a dot, an object key, a type or a name a function in it declares. Every word of the code when it does not parse.
+function readNames(code: string): Set<string> {
+  let expression: Expression
+
+  try {
+    expression = parseExpression(code, { lang: 'ts' })
+  }
+  catch {
+    return new Set(code.match(IDENTIFIER))
+  }
+
+  const names = new Set<string>()
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const child of value)
+        walk(child)
+
+      return
+    }
+
+    if (typeof value !== 'object' || value === null || typeof (value as { type?: unknown }).type !== 'string')
+      return
+
+    const node = value as EstreeNode & { computed?: boolean }
+
+    if (node.type === 'Identifier') {
+      names.add(node.name)
+
+      return
+    }
+
+    if (node.type.startsWith('TS') && !TYPED_VALUES.has(node.type))
+      return
+
+    for (const child of VISITOR_KEYS[node.type] ?? []) {
+      // A name written after a dot or as an object key reads nothing, unless computed.
+      if (child === 'property' && node.type === 'MemberExpression' && !node.computed)
+        continue
+
+      if (child === 'key' && !node.computed && (node.type === 'Property' || node.type === 'MethodDefinition' || node.type === 'PropertyDefinition'))
+        continue
+
+      if (child === 'typeAnnotation' || child === 'typeArguments' || child === 'typeParameters')
+        continue
+
+      walk((node as unknown as Record<string, unknown>)[child])
+    }
+  }
+
+  walk(expression)
+
+  const shadowed = parameters(code)
+
+  return shadowed ? new Set([...names].filter(name => !shadowed.has(name))) : names
+}
+
+// The names the template's expressions read that nothing in the template declares where they stand: a loop item, a snippet parameter, a `const` or a branch alias hides a script's name only inside its own block.
+export function outerReads(file: KayFile): string[] {
+  const read = new Set<string>()
+  const text = (span: Span) => file.source.slice(span.start, span.end)
+  const walk = (nodes: readonly Node[], scope: ReadonlySet<string>): void => {
+    const here = new Set(scope)
+
+    for (const node of nodes) {
+      const own = binders(node)
+
+      for (const span of nodeExpressions(node)) {
+        if (own.includes(span))
+          continue
+
+        for (const name of readNames(codeOf(text(span)))) {
+          if (!here.has(name))
+            read.add(name)
+        }
+      }
+
+      if (node.kind === 'const') {
+        for (const name of bindingNames(text(node.pattern)))
+          here.add(name)
+
+        continue
+      }
+
+      for (const [block, spans] of scopedBlocks(node))
+        walk(block, new Set([...here, ...spans.flatMap(span => bindingNames(text(span)))]))
+    }
+  }
+
+  walk(file.template, new Set())
+
+  return [...read]
 }
 
 // The names of `parsedBindingNames`, or every word of the pattern when it does not parse.

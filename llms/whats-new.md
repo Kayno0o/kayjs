@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `ctx.fail(status, data, errors)` puts a message on a named field of the action's schema (or on the form under `''`), so `error <field>`, `aria-invalid`, `add.error('field')`, the value re-fill, `ActionError.errors` and kayjs-ui `FormField` follow it with and without JavaScript: [actions](actions.md#refused-posts).
 - `for` takes any iterable: [templates](templates.md#render-a-list).
 - A client-only island shows an `@fallback` until it renders: [browser-only](browser-only.md#fallback-while-the-browser-renders).
+- `ctx.cookies.delete` takes the `secure`, `sameSite` and `partitioned` a cookie was set with: [server](server.md).
 - A `method="get"` form swaps in place: [navigation](navigation-from-code.md#full-loads-and-prefetching).
 - `security: { cookies: {} }` hardens `ctx.cookies.set`: [sessions](server.md#sessions).
 

@@ -976,7 +976,15 @@ export function ref(element: Element, target: unknown): void {
 // Renders `render`'s result as `container`'s content; returns what removes it again.
 export function render(fn: () => unknown, container: Element): () => void {
   return root((dispose) => {
-    insert(container, null, null, fn, false)
+    // What a component started before it threw is stopped, not left running with no one to dispose it.
+    try {
+      insert(container, null, null, fn, false)
+    }
+    catch (error) {
+      dispose()
+
+      throw error
+    }
 
     return () => {
       dispose()

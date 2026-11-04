@@ -9,7 +9,7 @@ import type { ImportedSignals, SignalKind } from './module-signals'
 import type { NameFindings } from './rewrite'
 import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
-import { drawIcons, elementsIn, nodeExpressions, templateFacts, visitNodes } from './ast'
+import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandCause, islandMessages, lineOf, promotionSite } from './codegen'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, openRedirects, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
@@ -21,10 +21,11 @@ import { SourceMap } from './mapping'
 import { parseExpanded } from './markdown-block'
 import { signalKind } from './module-signals'
 import { SELF } from './names'
+import { patternNames } from './pattern-names'
 import { findRewrites } from './rewrite'
 import { scopeAttribute } from './scoped-style'
-import { analyzeScript, analyzeServer, codeOf } from './script'
-import { bindingNames, templateReads } from './template-reads'
+import { analyzeScript, analyzeServer } from './script'
+import { outerReads, templateReads } from './template-reads'
 import { ISLAND_TWIN } from './twin'
 import { validate } from './validate'
 
@@ -401,8 +402,8 @@ function takeFallback(file: KayFile, filename: string, options: CompileOptions, 
   const header = imports.length === 0 ? '' : `---\n${[...new Set(imports)].join('\n')}\n---\n`
   const compiled = compileKay(header + body, filename, { output: 'html', root: options.root, component: true, scope })
   const own = new Set(script.imports.map(binding => binding.local))
-  const declared = new Set([...script.props?.bindings.map(binding => file.source.slice(binding.local.start, binding.local.end)) ?? [], ...scriptNames(file.script ? file.source.slice(file.script.start, file.script.end) : '')])
-  const reads = expressionNames(parseExpanded(header + body).file).filter(name => declared.has(name) && !own.has(name))
+  const declared = new Set([...script.props?.bindings.map(binding => file.source.slice(binding.local.start, binding.local.end)) ?? [], ...scriptNames(script)])
+  const reads = outerReads(parseExpanded(header + body).file).filter(name => declared.has(name) && !own.has(name))
 
   for (const diagnostic of compiled.diagnostics)
     file.diagnostics.push({ ...diagnostic, start: block.name.start, end: block.name.end })
@@ -417,27 +418,16 @@ function takeFallback(file: KayFile, filename: string, options: CompileOptions, 
   return { code: compiled.tsx.replace(FALLBACK_COMPONENT, 'function KayFallback('), classes: compiled.classes }
 }
 
-const EXPRESSION_NAME = /(?<![\w$.])[A-Z_$][\w$]*/gi
+// The top-level names a script declares, which a fallback reading one reads a value the server does not have.
+function scriptNames(script: ScriptAnalysis): string[] {
+  return (script.fence?.ast.body ?? []).flatMap((statement) => {
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
 
-// Every name the template's expressions read, as written: the ones a nested block takes from a script it has not.
-function expressionNames(file: KayFile): string[] {
-  const names = new Set<string>()
+    if (declaration?.type === 'VariableDeclaration')
+      return declaration.declarations.flatMap(declarator => patternNames(declarator.id))
 
-  visitNodes(file.template, (node) => {
-    for (const span of nodeExpressions(node)) {
-      for (const name of codeOf(file.source.slice(span.start, span.end)).match(EXPRESSION_NAME) ?? [])
-        names.add(name)
-    }
+    return (declaration?.type === 'FunctionDeclaration' || declaration?.type === 'ClassDeclaration') && declaration.id ? [declaration.id.name] : []
   })
-
-  return [...names]
-}
-
-const SCRIPT_DECLARATION = /\b(?:const|let|var)\s+([\w$]+|[{[][^=]*?[}\]])\s*[=:;]|\b(?:function|class)\s+([\w$]+)/g
-
-// The top-level names a script declares, by a pattern search: enough to tell a fallback reading one.
-function scriptNames(script: string): string[] {
-  return [...script.matchAll(SCRIPT_DECLARATION)].flatMap(match => match[2] === undefined ? bindingNames(match[1]!) : [match[2]])
 }
 
 // A compile error names the group of messages it belongs to, for `kay explain` to look up; a lint keeps its own name.

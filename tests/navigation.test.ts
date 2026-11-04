@@ -843,6 +843,68 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
+  it('holds a GET form submitted before the forms\' listener loaded and swaps it in place, one to another origin staying the browser\'s', async () => {
+    const fresh = await open('/kept')
+    const stalled = Promise.withResolvers<void>()
+
+    try {
+      await settled(fresh)
+      await fresh.route(/\/form-submits-[^/]*\.js$/, async (request) => {
+        await stalled.promise
+        await request.continue()
+      })
+      await fresh.evaluate(() => {
+        const state = window as { kayAlive?: boolean, kayPrevented?: boolean[] }
+
+        state.kayAlive = true
+        state.kayPrevented = []
+        window.addEventListener('submit', (event) => {
+          state.kayPrevented!.push(event.defaultPrevented)
+
+          if (!event.defaultPrevented)
+            event.preventDefault()
+        })
+        document.body.insertAdjacentHTML('beforeend', '<form class="late" action="/get-form"><input name="q" value="late"><button>Go</button></form><form class="away" action="https://example.com/search"><button>Go</button></form>')
+        document.querySelector<HTMLFormElement>('form.away')!.requestSubmit()
+        document.querySelector<HTMLFormElement>('form.late')!.requestSubmit()
+      })
+      stalled.resolve()
+      await fresh.waitFor('p.found', { text: 'Found late' })
+
+      expect(await fresh.evaluate(() => [(window as { kayAlive?: boolean }).kayAlive, location.search, (window as { kayPrevented?: boolean[] }).kayPrevented])).toEqual([true, '?q=late', [false, true]])
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
+  it('does not carry the modifier of a click into a later requestSubmit(button) that had none', async () => {
+    const fresh = await open('/get-form')
+
+    try {
+      await fresh.evaluate(() => {
+        const state = window as { kayPrevented?: boolean[] }
+
+        state.kayPrevented = []
+        window.addEventListener('submit', (event) => {
+          state.kayPrevented!.push(event.defaultPrevented)
+          event.preventDefault()
+        })
+        document.querySelector('h1')!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }))
+      })
+      await new Promise(resolve => setTimeout(resolve, 50))
+      await fresh.evaluate(() => {
+        const form = document.querySelector<HTMLFormElement>('form.same')!
+
+        form.requestSubmit(form.querySelector('button.go'))
+      })
+      expect(await fresh.evaluate(() => (window as { kayPrevented?: boolean[] }).kayPrevented)).toEqual([true])
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
   it.each([
     ['a form saying so that holds a control named enctype', 'multipart/form-data', '', '<input name="enctype" value="plain">'],
     ['a form saying so in another case', 'Multipart/Form-Data', '', ''],
@@ -913,12 +975,15 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     ['data-reload on its button', '<form method="post" action="/_kay/action/x"><button data-reload>Send</button></form>', false],
     ['target="_blank"', '<form method="post" action="/_kay/action/x" target="_blank"><button>Send</button></form>', false],
     ['formtarget="_blank"', '<form method="post" action="/_kay/action/x"><button formtarget="_blank">Send</button></form>', false],
-    ['a get', '<form action="/_kay/action/x"><button>Send</button></form>', false],
-    ['formmethod="get"', '<form method="post" action="/_kay/action/x"><button formmethod="get">Send</button></form>', false],
+    ['a get of the app', '<form action="/plain"><button>Send</button></form>', true],
+    ['formmethod="get"', '<form method="post" action="/_kay/action/x"><button formmethod="get">Send</button></form>', true],
+    ['a get to another site', '<form action="https://example.com/search"><button>Send</button></form>', false],
+    ['a get to a protocol-relative address', '<form action="//example.com/search"><button>Send</button></form>', false],
+    ['a get with data-reload', '<form action="/plain" data-reload><button>Send</button></form>', false],
     ['an action named in a query', '<form method="post" action="/plain?next=/_kay/action/x"><button>Send</button></form>', false],
     ['a page of the app', '<form method="post" action="/plain"><button>Send</button></form>', false],
     ['a post holding controls named method and target', '<form method="post" action="/_kay/action/x"><input name="method" value="put"><input name="target"><button>Send</button></form>', true],
-  ])('holds before the forms\' listener loaded only a post the swap takes: %s', async (_name, html, holds) => {
+  ])('holds before the forms\' listener loaded only a form the swap takes: %s', async (_name, html, holds) => {
     const fresh = await open('/kept')
 
     try {

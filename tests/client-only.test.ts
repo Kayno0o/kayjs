@@ -31,6 +31,7 @@ const FILES: Record<string, string> = {
   'bad.kay': '---\nconst { unit } = props<{ unit: string }>()\nconst width = window.innerWidth\n---\np {width}{unit}\n',
   'plain.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\n---\nb.plain {n()}\n',
   'skeleton.kay': '--- client\nconst { n } = props<{ n: number }>()\nconst width = window.innerWidth\n---\nb.real {n}:{width}\n@fallback\n  b.skeleton waiting\n',
+  'boom.kay': '--- client\nimport { onCleanup } from \'kay\'\n\nconst log = (globalThis as { cleaned?: string[] }).cleaned ??= []\nonCleanup(() => log.push(\'cleaned\'))\n---\np.first first\nif true\n  b.second second\n  u {(() => { throw new Error(\'midway\') })()}\n@fallback\n  i.hold held\n',
   'avatar.kay': '--- client\nconst { fallback } = props<{ fallback: string }>()\nconst width = window.innerWidth\n---\nb.av {fallback}:{width}\n',
   'page.kay': '---\nimport Avatar from \'./avatar.kay\'\nimport Chart from \'./chart.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Skeleton from \'./skeleton.kay\'\nimport Width from \'./width.kay\'\n---\nmain\n  Chart(label="sales")\n  Panel\n  Width(unit="em")\n  Plain(hydrate="client")\n  Plain(hydrate="client")\n    @fallback\n      i.hold held\n  Skeleton(n={2})\n  Skeleton(n={3})\n    @fallback\n      i.own mine\n  Avatar(fallback="hi")\n',
 }
@@ -42,7 +43,7 @@ let ids: Record<string, string>
 beforeAll(async () => {
   dir = await scratchDir('dom-')
   await Promise.all(Object.entries(FILES).map(async ([name, text]) => Bun.write(join(dir, name), text)))
-  ids = Object.fromEntries(['avatar', 'chart', 'panel', 'plain', 'skeleton', 'width'].map(name => [name, relative(process.cwd(), join(dir, `${name}.kay`))]))
+  ids = Object.fromEntries(['avatar', 'boom', 'chart', 'panel', 'plain', 'skeleton', 'width'].map(name => [name, relative(process.cwd(), join(dir, `${name}.kay`))]))
 
   const { default: Page } = await import(join(dir, 'page.kay')) as { default: () => unknown }
 
@@ -118,6 +119,39 @@ describe('client-only islands', () => {
     }
   })
 
+  it('keeps the fallback and no partial node of a client-only component that throws midway, disposing what it started', async () => {
+    const entry = join(dir, 'boom-client.ts')
+
+    await Bun.write(entry, `import { hydrateIslands } from 'kay/client'\n\nexport const ready = hydrateIslands({\n  ${JSON.stringify(ids.boom)}: () => import('./boom.kay'),\n})\n`)
+
+    const build = await Bun.build({ entrypoints: [entry], outdir: join(dir, 'boom-out'), target: 'browser', splitting: true, plugins: [kay()] })
+
+    if (!build.success)
+      throw new AggregateError(build.logs, 'client build failed')
+
+    GlobalRegistrator.register()
+
+    const errors: unknown[][] = []
+    const original = console.error
+
+    console.error = (...args: unknown[]) => void errors.push(args)
+
+    try {
+      document.body.innerHTML = `<slot data-component="${ids.boom}" data-props='[{}]' data-client><i class="hold">held</i></slot>`
+
+      const { ready } = await import(join(dir, 'boom-out', 'boom-client.js')) as { ready: Promise<void> }
+
+      await ready
+      expect(document.querySelector('slot')!.innerHTML).toBe('<i class="hold">held</i>')
+      expect(String(errors[0]?.[0] ?? '')).toContain('midway')
+      expect((globalThis as { cleaned?: string[] }).cleaned).toEqual(['cleaned'])
+    }
+    finally {
+      console.error = original
+      await GlobalRegistrator.unregister()
+    }
+  })
+
   it('names the global, the .kay line reading it and both fixes when a server render fails on a browser-only global', async () => {
     const { default: Bad } = await import(join(dir, 'bad.kay')) as { default: (props: { unit: string }) => unknown }
     const error = (() => {
@@ -181,6 +215,27 @@ describe('the fallback of a client-only component', () => {
       '`@fallback` of a `--- client` component reads `width`, which the server does not have',
       '`@fallback` of a `--- client` component reads `n`, which the server does not have',
     ])
+  })
+
+  it('reads the script\'s declarations from the parsed script: each name of a list, a default in a pattern', () => {
+    const reported = (script: string, fallback: string) => compile(`--- client\n${script}\n---\np.real\n@fallback\n  ${fallback}\n`).diagnostics.map(diagnostic => diagnostic.message.match(/reads `(\w+)`/)?.[1])
+
+    expect(reported('const a = 1, b = 2', 'b {b}')).toEqual(['b'])
+    expect(reported('const { a = 1 } = props<{ a?: number }>()', 'b {a}')).toEqual(['a'])
+    expect(reported('const [x, , y = 3, ...rest] = [1]', 'b {rest.length}')).toEqual(['rest'])
+    expect(reported('function helper() {}\nclass Thing {}', 'b {helper()}{Thing}')).toEqual(['helper', 'Thing'])
+  })
+
+  it('reports no read of a name that is not the script\'s, a const inside a script function, a template binder or an object key', () => {
+    const reported = (script: string, fallback: string) => compile(`--- client\n${script}\n---\np.real\n@fallback\n  ${fallback}\n`).diagnostics.map(diagnostic => diagnostic.message)
+
+    expect(reported('function run() { const inner = 1 }', 'b {inner}')).toEqual([])
+    expect(reported('const item = 1', 'for item of [1, 2]\n    i {item}')).toEqual([])
+    expect(reported('const width = 1', 'b {JSON.stringify({ width: 2 })}')).toEqual([])
+    expect(reported('const width = 1', 'b {[1].map(width => width)}')).toEqual([])
+    expect(reported('const width = 1', 'const width = 2\n  b {width}')).toEqual([])
+    expect(reported('const width = 1', 'b {Math.max.width}')).toEqual([])
+    expect(reported('const width = 1', 'b {width}')).toHaveLength(1)
   })
 
   it('compiles an empty block', () => {
