@@ -181,3 +181,27 @@ test('the memory counter drops no open window however many are open, so a flood 
 
   expect(rates.peek('account')!.count).toBe(1)
 })
+
+describe('two auth instances', () => {
+  test('keep the attempts they count in memory apart when the app\'s store fails', async () => {
+    const warned = spyOn(console, 'warn').mockReturnValue()
+    const gone = () => {
+      throw new Error('the database went away')
+    }
+
+    try {
+      setupStore({ rates: { hit: gone } })
+
+      const first = await registered(withoutRates())
+      const second = await registered(withoutRates())
+
+      await signIn(first.browser, WRONG)
+      await signIn(first.browser, WRONG)
+      expect(await signIn(first.browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
+      expect(await signIn(second.browser, PASSWORD)).toMatchObject({ ok: true })
+    }
+    finally {
+      warned.mockRestore()
+    }
+  })
+})

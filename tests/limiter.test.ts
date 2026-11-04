@@ -100,3 +100,26 @@ describe('limiter', () => {
     expect(() => limiter({ max: 1, window: 'soon' as never })).toThrow('window')
   })
 })
+
+describe('a derived reset', () => {
+  it('never leaves a negative count when the window closed between its two calls', async () => {
+    const memory = memoryRates()
+    let first = true
+    const racing: RateStore = {
+      async hit(key, window, weight) {
+        // The window closes right after the peek read it.
+        if (weight !== undefined && weight < 0 && first) {
+          first = false
+          await memory.reset(key)
+        }
+
+        return memory.hit(key, window, weight)
+      },
+    }
+    const limit = limiter({ max: 5, window: '1m', store: racing })
+
+    await limit.hit('k', 3)
+    await limit.reset('k')
+    expect((await limit.hit('k')).count).toBe(1)
+  })
+})

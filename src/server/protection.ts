@@ -354,6 +354,7 @@ export function limiter({ max, window, name = 'limiter', ...rest }: LimiterOptio
 }
 
 function makeLimiter({ name, max, ms, store: given, failure, memory }: { name: string, max: number, ms: number } & Pick<LimiterOptions, 'store' | 'failure' | 'memory'>): Limiter {
+  let standIn: { of: RateStore, rates: RateStore } | undefined
   // Read on each call, as the server sets the app's `store.rates` up after a library may have made its limiter.
   const store = (): RateStore => {
     const shared = given ?? appStore()?.rates
@@ -361,7 +362,17 @@ function makeLimiter({ name, max, ms, store: given, failure, memory }: { name: s
     if (shared === undefined)
       return memory ?? memoryOf(name)
 
-    return failure === 'refuse' ? shared : ratesFor(name, shared)
+    if (failure === 'refuse')
+      return shared
+
+    // A caller with a memory of its own keeps its failures apart from every other limiter's.
+    if (memory === undefined)
+      return ratesFor(name, shared)
+
+    if (standIn?.of !== shared)
+      standIn = { of: shared, rates: ratesFallingBack(name, shared, memory as FallbackMemory) }
+
+    return standIn.rates
   }
   const keyed = (key: string) => `${name}\n${key}`
 
@@ -391,8 +402,14 @@ function makeLimiter({ name, max, ms, store: given, failure, memory }: { name: s
 
       const window = await peek(key)
 
-      if (window)
-        await used.hit(keyed(key), ms, -window.count)
+      if (!window)
+        return
+
+      // The window may have closed between the two calls, which a hit of minus the count would open at a negative count.
+      const left = await used.hit(keyed(key), ms, -window.count)
+
+      if (left.count < 0)
+        await used.hit(keyed(key), ms, -left.count)
     },
     enforce: async (key, weight) => waitFor(await store().hit(keyed(key), ms, weight), max),
     refund: async (key, resetAt) => {
@@ -836,8 +853,16 @@ async function withinLimit<Result>(work: Promise<Result>): Promise<Result> {
 }
 
 // Seconds until the client may try again under `name`, in the app's `store.rates` else this process's memory, or undefined while it is under the limit: for kay's own routes.
+const overLimiters = new Map<string, Limiter>()
+
 export async function overLimit(name: string, client: string, max: number, windowMs: number): Promise<number | undefined> {
-  return makeLimiter({ name, max, ms: windowMs }).enforce(rateKey(client))
+  const id = `${name}\n${max}\n${windowMs}`
+  let counting = overLimiters.get(id)
+
+  if (!counting)
+    overLimiters.set(id, counting = makeLimiter({ name, max, ms: windowMs }))
+
+  return counting.enforce(rateKey(client))
 }
 
 // The refusal of a route over its limit whose caller reads the answer, an API module's or the MCP endpoint's: kay's beacons answer theirs with no body, as their other refusals.
