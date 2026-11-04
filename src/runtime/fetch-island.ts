@@ -1,6 +1,5 @@
 import { ApiError } from './api-error'
 import { requestIsland } from './island-request'
-import { kayLog } from './log'
 
 export interface FetchedIsland extends HTMLElement {
   // The inert copy the island replaced, which a page swap compares the next page's copy with.
@@ -92,7 +91,8 @@ export async function fetchServerIsland(element: FetchedIsland, dispose: (root: 
     catch (error) {
       if (!signal.aborted) {
         element.setAttribute('data-kay-failed', '')
-        kayLog('warn', `the server island ${element.dataset.kayServer} of ${location.pathname} was not loaded`, error)
+        // Written out rather than through kayLog, whose import would hoist log.ts into every page's eager chunk.
+        console.warn(`[kay] the server island ${element.dataset.kayServer} of ${location.pathname} was not loaded`, error)
         announce(element, 'kay:server-island-error', { error, retry })
       }
 
