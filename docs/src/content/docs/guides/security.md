@@ -365,7 +365,9 @@ export default defineConfig({
 })
 ```
 
-By default only the host of `site` and the hosts of `i18n` are answered. List more names in an array, as above for the apex beside `www`, a tunnel or a CDN host. Localhost and IP addresses always pass, so a health check or a collector reaching the server by address works. `hosts: false` turns the check off, and with no `site` nothing is refused.
+By default only the host of `site` and the hosts of `i18n` are answered. List more names in an array, as above for the apex beside `www`, a tunnel or a CDN host. `*.preview.example.com` answers one label under a domain, for preview deploys.
+
+A proxy in front must pass the real `Host` (nginx: `proxy_set_header Host $host;`). Localhost and IP addresses always pass, so a health check or a collector reaching the server by address works. `hosts: false` turns the check off, and with no `site` nothing is refused.
 
 ## A post from another site
 

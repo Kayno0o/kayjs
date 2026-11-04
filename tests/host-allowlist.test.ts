@@ -71,6 +71,20 @@ describe('security.hosts', () => {
     expect((await answer(await served({ site: 'https://shop.example', security: { csp: false } }), 'rebound.example')).status).toBe(421)
   })
 
+  it('answers one label under a `*.` entry, never the bare domain, names the fix and lets the health route through', async () => {
+    const app = await served({ site: 'https://shop.example', security: { hosts: ['*.preview.example'] } })
+
+    expect((await answer(app, 'pr-12.preview.example')).status).toBe(200)
+    expect((await answer(app, 'a.b.preview.example')).status).toBe(421)
+    expect((await answer(app, 'preview.example')).status).toBe(421)
+    expect((await answer(app, 'evilpreview.example')).status).toBe(421)
+
+    const refused = await answer(app, 'app:3000')
+
+    expect(await refused.text()).toContain('security.hosts')
+    expect((await app.handle(new Request('http://localhost/_kay/health', { headers: { host: 'app:3000' } }))).status).not.toBe(421)
+  })
+
   it('opts out with `hosts: false` or `security: false`', async () => {
     expect((await answer(await served({ site: 'https://shop.example', security: { hosts: false } }), 'rebound.example')).status).toBe(200)
     expect((await answer(await served({ site: 'https://shop.example', security: false }), 'rebound.example')).status).toBe(200)

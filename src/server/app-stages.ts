@@ -286,7 +286,7 @@ export function trustRequests({ app, env, options, served, security, filePaths, 
   const hosts = hostsToAnswer(options.security, setup.site, env)
 
   if (hosts !== undefined)
-    refuseUnknownHosts(app, { site: setup.site, hosts, localeHosts: Object.values(setup.i18n?.settings.hosts ?? {}), security })
+    refuseUnknownHosts(app, { site: setup.site, hosts, localeHosts: Object.values(setup.i18n?.settings.hosts ?? {}), security, health: options.health === false ? undefined : [options.health?.path ?? HEALTH_PATH, `${env.base}${options.health?.path ?? HEALTH_PATH}`] })
 
   if (security)
     sendSecurityHeaders(app, security, filePaths)

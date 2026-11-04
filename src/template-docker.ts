@@ -95,7 +95,7 @@ const APP_COMPOSE = `services:
       # At least 32 characters, kept out of the repository: it seals the sessions.
       KAY_SECRET: \${KAY_SECRET:?set KAY_SECRET}
       DATABASE_URL: postgres://app_rw:\${APP_DB_PASSWORD}@db:5432/app
-      # The public origin of the site, which the mailed links and the OAuth callbacks start from.
+      # The public origin of the site, which the mailed links and the OAuth callbacks start from. Its host is the one the server answers to, so the proxy in front passes the real Host header.
       SITE_URL: \${SITE_URL:?set SITE_URL}
     depends_on:
       migrate:
@@ -119,7 +119,7 @@ const SQLITE_COMPOSE = `services:
     environment:
       # At least 32 characters, kept out of the repository: it seals the sessions.
       KAY_SECRET: \${KAY_SECRET:?set KAY_SECRET}
-      # The public origin of the site, which the mailed links and the OAuth callbacks start from.
+      # The public origin of the site, which the mailed links and the OAuth callbacks start from. Its host is the one the server answers to, so the proxy in front passes the real Host header.
       SITE_URL: \${SITE_URL:?set SITE_URL}
     volumes:
       - data:/app/data
@@ -169,7 +169,7 @@ CMD ["./server"]
     ports:
       - 127.0.0.1:3000:3000
     environment:
-      # The public origin of the site: https sends HSTS, and the canonical URLs and the sitemap start from it.
+      # The public origin of the site: https sends HSTS, and the canonical URLs and the sitemap start from it. Its host is the one the server answers to, so the proxy in front passes the real Host header.
       SITE_URL: \${SITE_URL:?set SITE_URL}
 `,
     ...!has('auth') && { '.env.example': '# What production sets, for compose.prod.yaml.\nSITE_URL=\n' },
