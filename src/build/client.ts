@@ -1,6 +1,6 @@
 import type { KayConfig } from '../config'
 import type { BuildStamps } from '../dev/fingerprint'
-import type { ClientConfigKey } from '../project'
+import type { ClientBuildKey } from '../project'
 import type { ClassTable } from '../runtime/class-table'
 import type { ClientBuild, ClientManifest } from '../server/client'
 import type { FontFallback } from '../server/fonts'
@@ -52,7 +52,7 @@ import { warnBuiltThemeVariables } from './theme-vars'
 import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
 import { UI_FILE } from './ui'
 
-export interface ClientOptions extends Pick<KayConfig, ClientConfigKey> {
+export interface ClientOptions extends Pick<KayConfig, ClientBuildKey> {
   minify?: boolean | undefined
   // Links each island chunk to a map of its `.kay` sources, for the browser's devtools; the server points a map at them as it first serves it.
   // `true` links maps for development's devtools, `'external'` keeps them for the server to map the stacks islands report.

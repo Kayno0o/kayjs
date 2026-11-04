@@ -58,7 +58,7 @@ function specificity(path: string): number {
 // Refuses a request sending more than its limit, before Elysia reads the body: actions by their path, API modules by the path they are mounted at, and the routes of a module that set their own by their pattern.
 // Any other route with a body (a library's, an extension's, the jobs page) has the app-wide limit.
 export function limitBodies(app: Elysia, size: ByteSize, actionSizes: Map<string, BodyLimit>, mountSizes: Map<string, MountLimit>, routeSizes: RouteBodyLimit[] = []): void {
-  const bytes = checkLimit(size, 'maxSize')
+  const bytes = checkLimit(size, 'limits.body')
   const inBytes = ({ bytes: own, files, refuse }: BodyLimit, name: string) => ({ bytes: own === undefined ? undefined : checkLimit(own, name), files, refuse })
   const actions = new Map([...actionSizes].map(([path, limit]) => [path, inBytes(limit, `the maxSize of ${path}`)]))
   const mounts = new Map([...mountSizes].map(([path, { bytes: own, refuse }]) => [path, { bytes: own === undefined ? undefined : checkLimit(own, `the maxSize of ${path}`), refuse }]))
@@ -114,7 +114,7 @@ export function mountLimits(modules: Map<string, BodyLimit>, extensions: KayExte
   }
 
   for (const [path, bytes] of Object.entries(own ?? {})) {
-    const key = slashed(path, 'maxSizeByPath in kay.config.ts')
+    const key = slashed(path, 'limits.byPath in kay.config.ts')
 
     limits.set(key, { ...limits.get(key), bytes })
   }

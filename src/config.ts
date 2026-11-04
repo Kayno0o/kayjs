@@ -190,14 +190,14 @@ export interface DirsConfig {
 }
 
 export interface LimitsConfig {
-  // The most a request with a body to any route may send (`maxSize`), bytes or a size such as `'4mb'`, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
+  // The most a request with a body to any route may send (`limits.body`), bytes or a size such as `'4mb'`, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
   body?: ByteSize | undefined
-  // The most a request to a route of your own (`new Elysia().post()`) may send, by path: the route itself and what is under it, bytes or a size such as '50mb', in place of `maxSize`. The path is the one the server routes, without the `base`.
+  // The most a request to a route of your own (`new Elysia().post()`) may send, by path: the route itself and what is under it, bytes or a size such as '50mb', in place of `limits.body`. The path is the one the server routes, without the `base`.
   byPath?: Record<string, ByteSize> | undefined
 }
 
 export interface ServeConfig {
-  // The path the API modules, the OpenAPI document and its reference page are served under, `/api` by default: `apiPath: '/v1'` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash, not under `/_kay`; `mcp.path` and the `openapi` paths keep their own settings. Libraries read it through `apiUrl()`.
+  // The path the API modules, the OpenAPI document and its reference page are served under, `/api` by default: `serve: { apiPath: '/v1' }` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash, not under `/_kay`; `mcp.path` and the `openapi` paths keep their own settings. Libraries read it through `apiUrl()`.
   apiPath?: string | undefined
   // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip. On by default when NODE_ENV is production; `false` behind a proxy or CDN that compresses already.
   compress?: boolean | undefined
@@ -529,7 +529,7 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   needsServer?: boolean | undefined
   // Set when the extension counts visitors only after their yes on the `kay_analytics` cookie, so another extension measuring visitors, such as `vitals()`, waits for the same yes.
   asksConsent?: boolean | undefined
-  // The most a request to the extension's routes may send, by path: the route itself and what is under it, bytes or a size such as '8mb', in place of the app's `maxSize` that every other route with a body has.
+  // The most a request to the extension's routes may send, by path: the route itself and what is under it, bytes or a size such as '8mb', in place of the app's `limits.body` that every other route with a body has.
   maxSize?: Record<string, ByteSize> | undefined
   // Files a static export writes into the site, by their path, for what the extension's server would otherwise serve as a constant, such as a script every page loads: `kay build --static` runs no server plugin.
   staticFiles?: Record<string, string> | undefined
@@ -552,7 +552,7 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   // A module whose default export is `defineContext(load)` from `kay/library`, absolute or relative to the project root: `load(request)` returns the request values the extension gives every template as `ctx`, `ctx.user` or `ctx.can('admin')`, with no `--- server` fence. It runs at most once per request, ahead of the render of each page whose imports reach a template that reads `ctx`, and of no other, which is then the visitor's own as a page reading `ctx.locals` is. `defineContext({ key: load })` gives one loader per key instead, each run only for a page whose templates read that key. `kay check` and the editor type `ctx` off the module itself; two extensions giving one key stop the page.
   context?: string | undefined
   // A directory of API modules laid over the app's under `prefix`, the root by default, as `routes` is over its pages: `{ dir: 'api', prefix: 'auth' }` serves `api/session.ts` at `/api/auth/session`, unless the app has `src/api/auth/session.ts`.
-  // A prefix starting with `/_kay/` is absolute, served there whatever `apiPath` is. `former` is the prefix it had under `apiPath` before it moved: that path still answers, as the new one, for the releases the library says.
+  // A prefix starting with `/_kay/` is absolute, served there whatever `serve.apiPath` is. `former` is the prefix it had under `serve.apiPath` before it moved: that path still answers, as the new one, for the releases the library says.
   // A module may default-export a function of the `ExtensionApp` building its instance, `({ modules }) => api({ cors }).get('/', () => modules.features)`, called as the app is built, so it serves the app's `appFiles`.
   api?: { dir: string, prefix?: string | undefined, former?: string | undefined } | undefined
   // A directory of message catalogs, `<locale>.ts` each, under the app's own: a key the app translates is the app's.

@@ -23,7 +23,7 @@ export function healthTimeoutMs(config: HealthConfig | undefined): number {
 }
 
 export function shutdownSeconds(timeout: Duration): number {
-  return durationSeconds(timeout, 'shutdownTimeout')
+  return durationSeconds(timeout, 'serve.shutdownTimeout')
 }
 
 const DEFAULT_PER_MINUTE = 120
@@ -61,10 +61,10 @@ const HEADER_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 // Headers the id would overwrite or echo something else through.
 const RESERVED_HEADERS = new Set(['authorization', 'content-length', 'content-type', 'cookie', 'host', 'location', 'set-cookie'])
 
-// Refuses a `requestIdHeader` that is no header's name.
+// Refuses an `observe.requestIdHeader` that is no header's name.
 export function checkRequestIdHeader(name: string | undefined): void {
   if (name !== undefined && (!HEADER_NAME.test(name) || RESERVED_HEADERS.has(name.toLowerCase())))
-    throw new KayError('config-invalid', `kay: requestIdHeader is ${JSON.stringify(name)}; it names a header of its own, such as x-correlation-id`)
+    throw new KayError('config-invalid', `kay: observe.requestIdHeader is ${JSON.stringify(name)}; it names a header of its own, such as x-correlation-id`)
 }
 
 // Past this, a download is cut off unless `images.remoteMaxSize` says otherwise: an image worth resizing is a few megabytes.

@@ -1,6 +1,6 @@
 import type { Diagnostic } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
-import type { InternalConfig, KayConfig, LoadedConfig } from '../config'
+import type { InternalConfig, KayConfig, LoadedConfig, ObserveConfig } from '../config'
 import type { TypeScope } from './diagnose'
 import type { ProbeMemory } from './project'
 import type { ShadowFile } from './shadow'
@@ -74,7 +74,9 @@ export const CHECK_CONFIG = [
   'openapi',
 ] as const satisfies readonly (keyof KayConfig)[]
 
-export interface CheckOptions extends Pick<KayConfig, (typeof CHECK_CONFIG)[number]>, InternalConfig {
+export interface CheckOptions extends Omit<Pick<KayConfig, (typeof CHECK_CONFIG)[number]>, 'observe'>, InternalConfig {
+  // Only the request id header is checked, so the rest of the bag is not carried.
+  observe?: Pick<ObserveConfig, 'requestIdHeader'> | undefined
   tsconfig?: string | undefined
   // The tree alone is wanted, as `kay dev` writes it: the diagnostics only `kay check` reports are not looked for.
   typesOnly?: boolean | undefined
@@ -105,7 +107,9 @@ function helped({ message, help }: CheckDiagnostic): Pick<CheckDiagnostic, 'help
 
 // The loaded config's `publicEnv` goes along, as no app key: `kay check` claims `/_kay/env.js` when it is set.
 export function configCheckOptions(config: LoadedConfig): CheckOptions {
-  return { ...pickConfig(config, CHECK_CONFIG), ...config.publicEnv !== undefined && { publicEnv: config.publicEnv } }
+  const { observe, ...picked } = pickConfig(config, CHECK_CONFIG)
+
+  return { ...picked, ...observe !== undefined && { observe: { requestIdHeader: observe.requestIdHeader } }, ...config.publicEnv !== undefined && { publicEnv: config.publicEnv } }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

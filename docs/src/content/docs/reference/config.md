@@ -77,7 +77,7 @@ In `serve`, how the server answers:
 
 | Option | Effect |
 | --- | --- |
-| `serve.apiPath` | Where the API modules, the OpenAPI document and its reference page are served, `/api` by default: `apiPath: '/v1'` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash. See [API routes](/guides/api-routes) |
+| `serve.apiPath` | Where the API modules, the OpenAPI document and its reference page are served, `/api` by default: `serve: { apiPath: '/v1' }` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash. See [API routes](/guides/api-routes) |
 | `serve.compress` | Compresses responses rendered per request. On in production; `false` when a proxy or CDN does it |
 | `serve.compressionDictionary` | A server build with a prerendered page uses its 404 page as a dictionary and sends a page to a browser holding it as the difference from it. On by default; `false` builds none, so no page names one. See [Pages that send only their difference](/guides/deployment#pages-that-send-only-their-difference) |
 | `serve.shutdownTimeout` | How long a stopping server lets open requests finish, as seconds or `'30s'`. 10 seconds by default |

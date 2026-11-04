@@ -9,7 +9,7 @@ export default defineConfig({
   base: '/repo',
   robots: { disallow: ['/private'] },
   // The tests read the linked stylesheets and their files.
-  inlineStyles: false,
+  client: { inlineStyles: false },
   // The test serves the remote image from a port of its own.
   images: { maxDensity: 3, remote: process.env.KAY_TEST_REMOTE_ORIGIN ? [`${process.env.KAY_TEST_REMOTE_ORIGIN}/photos/`] : [] },
   redirects: { '/old': '/about', '/blog/:slug': '/posts/:slug', '/moved': { to: '/about', status: 302 }, '/temp': { to: '/about', permanent: false }, '/kept': { to: '/about', status: 308 } },

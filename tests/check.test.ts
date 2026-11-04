@@ -3129,7 +3129,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
     try {
       expect(await refusals(root, { base: 'docs', site: 'example.com', serve: { shutdownTimeout: '0s' }, redirects: { '/old/:slug': '/:id' } })).toEqual([
         ['kay.config.ts', 'kay: base is docs, which is no path such as /docs'],
-        ['kay.config.ts', 'kay: shutdownTimeout is \'0s\'; it takes a positive duration such as \'250ms\', \'5m\' or \'30d\''],
+        ['kay.config.ts', 'kay: serve.shutdownTimeout is \'0s\'; it takes a positive duration such as \'250ms\', \'5m\' or \'30d\''],
         ['kay.config.ts', 'kay: site is the origin the site is public at, such as https://example.com, not "example.com"'],
         ['kay.config.ts', 'kay: the redirect from /old/:slug goes to /:id, whose :id its path has none of'],
       ])

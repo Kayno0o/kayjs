@@ -66,7 +66,7 @@ export const GROUPED_KEYS = {
 
 export const CONFIG_GROUPS = ['dirs', 'limits', 'serve', 'observe', 'client'] as const
 
-const isBag = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+export const isBag = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 // The config with each key of `GROUPED_KEYS` written in its bag, unless the bag sets it already, in which case the bag wins.
 export function groupedKeys<Config extends object>(config: Config): Config {

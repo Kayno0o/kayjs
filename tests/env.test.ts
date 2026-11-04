@@ -856,10 +856,12 @@ describe('kay env against compose and .env.example', () => {
     const bad = async (config: string) => kay(['check', await project({ ...files, 'kay.config.ts': config })], process.cwd())
     const spread = { lang: 'en' }
 
-    expect((await bad('export default { lang: \'en\', trailingslash: \'always\', prefech: \'eager\' }\n')).stderr).toContain('`trailingslash`, did you mean `trailingSlash`?; `prefech`, did you mean `prefetch`?')
+    expect((await bad('export default { lang: \'en\', trailingslash: \'always\', prefech: \'eager\' }\n')).stderr).toContain('`trailingslash`, did you mean `trailingSlash`?; `prefech`, did you mean `client.prefetch`?')
     expect((await bad('export default { security: { reprots: true }, i18n: { locales: [\'en\'], defaultLocale: \'en\', mesages: \'m\' } }\n')).stderr).toContain('`security.reprots`, did you mean `security.reports`?; `i18n.mesages`, did you mean `i18n.messages`?')
     expect((await bad('export default { extensions: [{ name: \'lib\', config: { requireGuard: true } }] }\n')).stderr).toContain('the config of the extension lib has an option kay does not know: `requireGuard`, did you mean `requireGuards`?')
     expect((await bad('export default { nothing: 1 }\n')).stderr).toContain('`nothing`')
+    expect((await bad('export default { limits: \'4mb\' }\n')).stderr).toContain('`limits` in kay.config.ts is an object of options, `limits: { ... }`, not "4mb"')
+    expect((await bad('export default { serve: false, maxSize: \'4mb\' }\n')).stderr).toContain('`serve` in kay.config.ts is an object of options')
     expect((await bad('export default { lang: \'en\', offline: true, health: false, security: false }\n')).stderr).not.toContain('does not know')
     // @ts-expect-error a key kay does not know, next to valid ones
     expect(defineConfig({ lang: 'en', trailingslash: 'always' })).toBeDefined()

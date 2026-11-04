@@ -5,18 +5,18 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { CHECK_CONFIG, configCheckOptions } from '../src/check'
 import { readShadowSettings, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor } from '../src/check/shadow'
-import { CLIENT_CONFIG, clientOptionsOf, PRODUCTION, projectPaths, RENDER_CONFIG, renderOptionsOf } from '../src/project'
+import { CLIENT_BUILD_KEYS, clientOptionsOf, PRODUCTION, projectPaths, RENDER_CONFIG, renderOptionsOf } from '../src/project'
 import { scratchDir } from './scratch'
 
 // A config setting each key to a value of its own, which a view passing the key on carries unchanged.
 function marked(keys: readonly (keyof KayConfig)[]): KayConfig {
-  return Object.fromEntries(keys.map(key => [key, `${key} as configured`]))
+  return Object.fromEntries(keys.map(key => [key, key === 'observe' ? { requestIdHeader: 'observe as configured' } : `${key} as configured`]))
 }
 
 describe('the views of the config', () => {
   it.each([
     ['kay check', CHECK_CONFIG, (config: KayConfig) => configCheckOptions(config)],
-    ['the browser build', CLIENT_CONFIG, (config: KayConfig) => clientOptionsOf(config, PRODUCTION)],
+    ['the browser build', CLIENT_BUILD_KEYS, (config: KayConfig) => clientOptionsOf(config, PRODUCTION)],
     ['the renderer', RENDER_CONFIG, (config: KayConfig) => renderOptionsOf(config, PRODUCTION, { head: undefined, maxDensity: 2 })],
   ] as const)('%s takes every key its list names as written', (_, keys, view) => {
     const config = marked(keys)

@@ -253,7 +253,7 @@ Nothing is to set up. A browser without the feature, or one holding the dictiona
 
 It needs a secure context (https, or localhost) and a proxy that passes `Accept-Encoding`, `Available-Dictionary` and `Content-Encoding` through. The browser fetches the dictionary under `connect-src`, so kay adds `'self'` to yours. A `connect-src` of `'none'` stops the fetch, and pages go out as before. Development and `kay build --static` have no dictionary.
 
-To go without it, set `compressionDictionary: false` in `kay.config.ts`. The build then renders no dictionary and writes no `dcz` copy, and no page names one, so a visitor never downloads it.
+To go without it, set `serve: { compressionDictionary: false }` in `kay.config.ts`. The build then renders no dictionary and writes no `dcz` copy, and no page names one, so a visitor never downloads it.
 
 ```ts
 import { defineConfig } from 'kay/server'

@@ -98,7 +98,7 @@ export function cacheDir(root: string, ...names: string[]): string {
 }
 
 // The keys of the config the browser build takes as written, which `clientOptionsOf` passes on; `ClientOptions` declares the rest.
-export const CLIENT_CONFIG = [
+export const CLIENT_BUILD_KEYS = [
   'plugins',
   // The page directory, whose pages and layouts are where stylesheets are gathered from, and the API directory, where an island importing a module, or one under an extension's, gets where its routes are served, not its code.
   'dirs',
@@ -118,7 +118,7 @@ export const CLIENT_CONFIG = [
   'lints',
 ] as const satisfies readonly (keyof KayConfig)[]
 
-export type ClientConfigKey = (typeof CLIENT_CONFIG)[number]
+export type ClientBuildKey = (typeof CLIENT_BUILD_KEYS)[number]
 
 // How a server runs. In development it shows errors with their stack and maps and swaps islands; prebuilt, it serves the browser build `kay build` wrote rather than bundling one; under `kay dev`, each element carries its source for the inspector.
 export interface Mode {
@@ -203,7 +203,7 @@ export function writesFrench(config: Pick<KayConfig, 'lang' | 'i18n' | 'client'>
 // The browser build a config asks for. `kay build`'s (`build` given) minifies unless the config says not to; one a server or a test makes on demand does only when the config says so.
 export function clientOptionsOf(config: LoadedConfig, mode: Pick<Mode, 'dev' | 'underKayDev'>, build?: Pick<ClientOptions, 'exported' | 'report'>): ClientOptions {
   return {
-    ...pickConfig(config, CLIENT_CONFIG),
+    ...pickConfig(config, CLIENT_BUILD_KEYS),
     minify: config.minify ?? build !== undefined,
     i18n: config.i18n !== undefined,
     french: writesFrench(config),

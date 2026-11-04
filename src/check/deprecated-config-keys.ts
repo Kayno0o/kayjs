@@ -46,36 +46,74 @@ function isOptionCall(callee: CallExpression['callee'], callees: Set<string>, im
 
 const renamed = (name: string): string | undefined => Object.hasOwn(RENAMED_KEYS, name) ? RENAMED_KEYS[name as keyof typeof RENAMED_KEYS] : undefined
 
-const grouped = (name: string): readonly [string, string] | undefined => Object.hasOwn(GROUPED_KEYS, name) ? GROUPED_KEYS[name as keyof typeof GROUPED_KEYS] : undefined
+// Where a key lives now: a 1.84 rename is followed first, so `routes` is `dirs.routes` in one step.
+function grouped(name: string): readonly [string, string] | undefined {
+  const current = renamed(name) ?? name
 
-// The edits that take the `moved` properties out of an object whose properties are all written out, and put `bags` where the first of them stood: each run of removed properties goes with the separator after it, or before it at the end of the object, so commas and lines stay as written.
-function groupEdits(source: string, properties: ObjectProperty[], moved: Set<ObjectProperty>, bags: string): { start: number, end: number, text: string }[] {
+  return Object.hasOwn(GROUPED_KEYS, current) ? GROUPED_KEYS[current as keyof typeof GROUPED_KEYS] : undefined
+}
+
+interface MovedEntry { inner: string, value: string, comment: string }
+
+const TRAILING_COMMA = /^\s*,/
+const TRAILING_COMMENT = /^[ \t]*(\/\/[^\n]*|\/\*[^\n]*?\*\/)/
+const LINE_REST = /^[ \t]*\r?\n/
+const INDENT = /^[ \t]*/
+
+function movedHelp(twice: boolean, holdsBag: boolean, written: string, allWritten: boolean): string {
+  if (twice)
+    return 'a key and its old name are both written: keep one'
+
+  if (holdsBag)
+    return 'move each into the bag of the same name written beside it'
+
+  return `write ${written}${allWritten ? '' : ', in the bag a spread or computed key may give this object if it has one'}`
+}
+
+// The text of the bags, one per line, indented as the property they replace: a bag stays on one line unless a value spans lines or a key carries a comment.
+function bagsText(bags: Map<string, MovedEntry[]>, indent: string): string {
+  return [...bags].map(([group, entries]) => {
+    if (entries.every(entry => entry.comment === '' && !entry.value.includes('\n')))
+      return `${group}: { ${entries.map(entry => entry.value).join(', ')} }`
+
+    const lines = entries.map(entry => `${indent}  ${entry.value},${entry.comment === '' ? '' : ` ${entry.comment}`}`)
+
+    return `${group}: {\n${lines.join('\n')}\n${indent}}`
+  }).join(`,\n${indent}`)
+}
+
+// The edits that take the `moved` properties out of an object whose properties are all written out, and put `bags` where the first of them stood.
+// Each moved property goes alone with its own comma and its comment on the same line, a property alone on its line taking the line; what lies between properties stays. A comment goes along into its bag.
+function groupEdits(source: string, properties: ObjectProperty[], moved: Set<ObjectProperty>, bags: Map<string, MovedEntry[]>): { start: number, end: number, text: string }[] {
   const edits: { start: number, end: number, text: string }[] = []
   let inserted = false
 
-  for (let first = 0; first < properties.length; first++) {
-    if (!moved.has(properties[first]!))
+  for (const property of properties) {
+    if (!moved.has(property))
       continue
 
-    let last = first
+    const comma = TRAILING_COMMA.exec(source.slice(property.end))
+    const afterComma = property.end + (comma?.[0].length ?? 0)
+    const comment = TRAILING_COMMENT.exec(source.slice(afterComma))
+    const end = afterComma + (comment?.[0].length ?? 0)
+    const lineStart = source.lastIndexOf('\n', property.start - 1) + 1
+    const indent = INDENT.exec(source.slice(lineStart, property.start))![0]
+    const alone = source.slice(lineStart, property.start).trim() === '' && LINE_REST.test(source.slice(end))
 
-    while (last + 1 < properties.length && moved.has(properties[last + 1]!))
-      last++
+    if (!inserted) {
+      inserted = true
+      edits.push({ start: property.start, end: afterComma, text: bagsText(bags, alone ? indent : '') + (comma ? ',' : '') })
 
-    const insert = !inserted
-    const next = properties[last + 1]
-    const previous = properties[first - 1]
+      if (comment)
+        edits.push({ start: afterComma, end, text: '' })
 
-    inserted = true
+      continue
+    }
 
-    if (next !== undefined)
-      edits.push({ start: properties[first]!.start, end: next.start, text: insert ? bags + source.slice(properties[last]!.end, next.start) : '' })
-    else if (previous !== undefined)
-      edits.push({ start: previous.end, end: properties[last]!.end, text: insert ? source.slice(previous.end, properties[first]!.start) + bags : '' })
+    if (alone)
+      edits.push({ start: lineStart, end: end + LINE_REST.exec(source.slice(end))![0].length, text: '' })
     else
-      edits.push({ start: properties[first]!.start, end: properties[last]!.end, text: insert ? bags : '' })
-
-    first = last
+      edits.push({ start: property.start, end: end + (comma ? INDENT.exec(source.slice(end))![0].length : 0), text: '' })
   }
 
   return edits
@@ -141,19 +179,25 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
       const groupLevel = movedProperties[0] === undefined ? 'allow' : levelAt('deprecated-config-groups', movedProperties[0].key.start)
 
       if (movedProperties[0] !== undefined && groupLevel !== 'allow') {
-        const bags = new Map<string, string[]>()
+        const bags = new Map<string, MovedEntry[]>()
+        const targets = new Set<string>()
+        let twice = false
 
         for (const property of movedProperties) {
           const old = keyName(property)!
           const [group, inner] = grouped(old)!
           const value = property.shorthand && inner === old ? old : `${inner}: ${property.shorthand ? old : source.slice(property.value.start, property.value.end)}`
+          const after = source.slice(property.end).replace(TRAILING_COMMA, '')
+          const comment = TRAILING_COMMENT.exec(after)?.[1] ?? ''
 
-          bags.set(group, [...bags.get(group) ?? [], value])
+          twice ||= targets.has(`${group}.${inner}`)
+          targets.add(`${group}.${inner}`)
+          bags.set(group, [...bags.get(group) ?? [], { inner, value, comment }])
         }
 
         const holdsBag = [...bags.keys()].some(group => names.has(group))
         const allWritten = object.properties.every(isPlain)
-        const written = [...bags].map(([group, values]) => `${group}: { ${values.join(', ')} }`).join(', ')
+        const written = [...bags].map(([group, entries]) => `${group}: { ${entries.map(entry => entry.value).join(', ')} }`).join(', ')
         const moves = movedProperties.map((property) => {
           const [group, inner] = grouped(keyName(property)!)!
 
@@ -165,10 +209,10 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
           ...positionAt(source, movedProperties[0].key.start),
           end: movedProperties[0].key.end,
           message: `config keys are grouped by concern since 1.88, so a key is found by what it does: ${moves.join(', ')}; the old keys work until 1.91`,
-          help: holdsBag ? 'move each into the bag of the same name written beside it' : `write ${written}${allWritten ? '' : ', in the bag a spread or computed key may give this object if it has one'}`,
+          help: movedHelp(twice, holdsBag, written, allWritten),
           code: 'deprecated-config-groups',
           severity: groupLevel === 'warn' ? 'warning' : 'error',
-          ...!holdsBag && allWritten && { fixes: [{ title: 'Move the keys into their groups', edits: groupEdits(source, object.properties.filter(isPlain), new Set(movedProperties), written), safe: true }] },
+          ...!holdsBag && !twice && allWritten && { fixes: [{ title: 'Move the keys into their groups', edits: groupEdits(source, object.properties.filter(isPlain), new Set(movedProperties), bags), safe: true }] },
         })
       }
 
@@ -202,6 +246,10 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
         }
 
         const name = old === undefined ? undefined : renamed(old)
+
+        // The grouping reports a renamed key that moved into a bag, and its fix writes the final form.
+        if (old !== undefined && name !== undefined && grouped(old) !== undefined && groupLevel !== 'allow')
+          continue
 
         if (old === undefined || name === undefined)
           continue

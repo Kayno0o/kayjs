@@ -35,9 +35,9 @@ export const KAY_PREFIX = '/_kay/'
 export const OPENAPI_PATH = `${API_PREFIX}/openapi.json`
 export const REFERENCE_PATH = `${API_PREFIX}/reference`
 
-// The path the API modules, the OpenAPI document and its reference page are served under: `/api` by default, `apiPath` in kay.config.ts otherwise.
+// The path the API modules, the OpenAPI document and its reference page are served under: `/api` by default, `serve.apiPath` in kay.config.ts otherwise.
 export function apiPathOf(value: string | undefined): string {
-  return value === undefined ? API_PREFIX : servedPath(value, 'apiPath')
+  return value === undefined ? API_PREFIX : servedPath(value, 'serve.apiPath')
 }
 // Where `mcp` serves the app's tools.
 export const MCP_PATH = '/mcp'

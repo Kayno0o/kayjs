@@ -6,7 +6,7 @@ import process from 'node:process'
 import { APP_DEPENDENCIES, dependencyNames, libraryMessageExtensions, readManifest } from './build/manifests'
 import { KayError } from './compiler/errors'
 import { CONFIG_FILE } from './config'
-import { currentKeys, mergeBags, unknownConfigKeys } from './config-shape'
+import { CONFIG_GROUPS, currentKeys, isBag, mergeBags, unknownConfigKeys } from './config-shape'
 import { NATIVE_PLUGINS } from './native-plugins'
 import { publicEnvFiles } from './server/env-state'
 
@@ -133,6 +133,13 @@ function checkedConfig(config: LoadedConfig, where = CONFIG_FILE): void {
 
   if (publicEnv !== undefined)
     throw new KayError('config-invalid', `kay: \`publicEnv\` in ${where} is gone: mark the fields an island reads \`s.Public\` in \`defineEnv\` instead`)
+
+  for (const group of CONFIG_GROUPS) {
+    const bag: unknown = (config as Record<string, unknown>)[group]
+
+    if (bag !== undefined && !isBag(bag))
+      throw new KayError('config-invalid', `kay: \`${group}\` in ${where} is an object of options, \`${group}: { ... }\`, not ${JSON.stringify(bag)}`)
+  }
 
   const unknown = unknownConfigKeys(config)
 

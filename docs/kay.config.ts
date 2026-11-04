@@ -26,7 +26,7 @@ const chatCounts = sqliteRates(join(import.meta.dir, 'data/ai.sqlite'))
 const migrations = ['astro', 'sveltekit', 'nextjs', 'laravel']
 
 export default defineConfig({
-  log: false,
+  observe: { log: false },
   plugins: [tailwind],
   // Behind the host's nginx, whose address every visitor would otherwise share: the chat's limits count the visitor.
   proxy: true,
