@@ -121,7 +121,8 @@ describe('the documentation site', () => {
     expect(pages.find(page => page.slug === 'project')!.body).toContain('](/llms/server#locals)')
     // A link by path into a library, which the forge resolves from the file, is a link to the library's page.
     expect(pages.find(page => page.slug === 'content-cms')!.body).toContain('](/llms/kayjs-cms)')
-    expect(pages.find(page => page.slug === 'whats-new')!.body).toContain('](/llms/kayjs-ui-')
+    // A release moves its lines to the archive, so the link is looked for in both.
+    expect(pages.filter(page => page.slug.startsWith('whats-new')).map(page => page.body).join('\n')).toContain('](/llms/kayjs-ui-')
   })
 
   it('links every topic page of a library from its guide', async () => {
