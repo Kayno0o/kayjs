@@ -1,4 +1,4 @@
-import type { ClientConfig, DirsConfig, HealthConfig, I18nConfig, KayConfig, LimitsConfig, ObserveConfig, OfflineConfig, ProxyConfig, SecurityConfig, SeoConfig, SitemapConfig, ServeConfig } from './config'
+import type { ClientConfig, DirsConfig, HealthConfig, I18nConfig, KayConfig, LimitsConfig, ObserveConfig, OfflineConfig, ProxyConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
 import { nearest } from './nearest'
 
 // Every key the config and its nested bags take, written as records so the compiler refuses a key added to a type and missing here, or listed here and gone from the type.
