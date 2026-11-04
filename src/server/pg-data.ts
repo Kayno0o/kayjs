@@ -10,14 +10,14 @@ import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jo
 import { pgLive } from './pg-live'
 import { pgRooms } from './pg-rooms'
 import { query } from './pg-sql'
-import { pgNotifications, pgPush, pgRates, pgSessions, pgVitals } from './pg-stores'
+import { pgKv, pgNotifications, pgPush, pgRates, pgSessions, pgVitals } from './pg-stores'
 import { onReload } from './reload'
 
 // What replicas starting together take turns on while one creates the tables.
 const MIGRATION_LOCK = 'kay_data'
 
 // The tables `pgData` creates besides the jobs' ones.
-const OWN_TABLES = ['kay_sessions', 'kay_cache', 'kay_events', 'kay_rates', 'kay_meta', 'kay_vitals', 'kay_room_members', 'kay_room_processes', 'kay_room_messages', 'kay_room_state', 'kay_live', 'kay_live_events', 'kay_notifications', 'kay_push_subscriptions'] as const
+const OWN_TABLES = ['kay_sessions', 'kay_cache', 'kay_events', 'kay_rates', 'kay_meta', 'kay_vitals', 'kay_room_members', 'kay_room_processes', 'kay_room_messages', 'kay_room_state', 'kay_live', 'kay_live_events', 'kay_notifications', 'kay_push_subscriptions', 'kay_kv'] as const
 
 const OWN_INDEXES: readonly PgIndex[] = [
   { name: 'kay_sessions_expires', on: 'kay_sessions (expires)' },
@@ -28,6 +28,7 @@ const OWN_INDEXES: readonly PgIndex[] = [
   { name: 'kay_live_events_at', on: 'kay_live_events (at)' },
   { name: 'kay_notifications_user', on: 'kay_notifications (user_id, seq)' },
   { name: 'kay_notifications_expires', on: 'kay_notifications (expires)' },
+  { name: 'kay_kv_expires', on: 'kay_kv (expires_at)' },
   { name: 'kay_push_subscriptions_user', on: 'kay_push_subscriptions (user_id, at)' },
 ]
 
@@ -73,6 +74,7 @@ export async function createDataTables(source: PgJobsSource): Promise<void> {
       await tx`CREATE TABLE IF NOT EXISTS kay_live_events (seq bigserial PRIMARY KEY, origin text NOT NULL, id text NOT NULL, key text NOT NULL, at bigint NOT NULL)`
 
       await tx`CREATE TABLE IF NOT EXISTS kay_notifications (seq bigserial PRIMARY KEY, id text NOT NULL UNIQUE, user_id text NOT NULL, title text NOT NULL, url text, at bigint NOT NULL, expires bigint NOT NULL, read_at bigint)`
+      await tx`CREATE TABLE IF NOT EXISTS kay_kv (key text PRIMARY KEY, value text NOT NULL, expires_at bigint)`
       await tx`CREATE TABLE IF NOT EXISTS kay_push_subscriptions (endpoint text PRIMARY KEY, user_id text NOT NULL, p256dh text NOT NULL, auth text NOT NULL, at bigint NOT NULL)`
 
       for (const index of OWN_INDEXES)
@@ -223,7 +225,7 @@ export function pgData(source: PgJobsSource) {
     await query(db, 'SELECT 1')
   }
 
-  const stores = { sessions: pgSessions(handle), cache: pgCache(handle), jobs: jobsAfter(db, async () => handle.db()), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle), push: pgPush(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database' | 'files' | keyof StoreBase>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
+  const stores = { sessions: pgSessions(handle), cache: pgCache(handle), jobs: jobsAfter(db, async () => handle.db()), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle), push: pgPush(handle), kv: pgKv(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database' | 'files' | keyof StoreBase>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
 
   return { ...stores, ping, close, [Symbol.asyncDispose]: close }
 }

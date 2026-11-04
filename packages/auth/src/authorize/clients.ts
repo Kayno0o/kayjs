@@ -1,3 +1,4 @@
+import type { Kv } from 'kay/library'
 import type { LookupFunction } from 'node:net'
 import type { Core } from '../core'
 import { Buffer } from 'node:buffer'
@@ -12,7 +13,7 @@ import { validRedirectUris } from './uris'
 const DOCUMENT_MAX_BYTES = 10 * 1024
 const DOCUMENT_TIMEOUT_MS = 5000
 const CACHE_MS = 5 * 60 * 1000
-const CACHE_MAX = 500
+
 const NAME_MAX_LENGTH = 100
 // eslint-disable-next-line no-control-regex -- control characters are what it finds
 const CONTROL = /[\0-\x1F\x7F]/g
@@ -219,11 +220,10 @@ export async function resolveClient(core: Core, clientId: string, address: strin
   }
 
   const server = core.oauthServer
-  const now = Date.now()
-  const known = server?.documents.get(url.href)
+  const known = server && await cachedClient(server.documents, url.href)
 
-  if (known && known.expires > now)
-    return known.client
+  if (known !== undefined)
+    return known
 
   // Each read of a document is a request this server makes for whoever asked, so it is counted against them.
   if (!server || await spend(core.rates, `oauth-document:${address}`, core.limits.oauthDocument))
@@ -232,16 +232,33 @@ export async function resolveClient(core: Core, clientId: string, address: strin
   try {
     const client = clientOf(url, await server.fetchDocument(url.href))
 
-    if (client) {
-      if (server.documents.size >= CACHE_MAX)
-        server.documents.delete(server.documents.keys().next().value!)
-
-      server.documents.set(url.href, { client, expires: now + CACHE_MS })
-    }
+    if (client)
+      await cacheClient(server.documents, url.href, client)
 
     return client
   }
   catch {
     return undefined
+  }
+}
+
+// A store that fails to read or keep a document only costs the app a fetch of it.
+async function cachedClient(documents: Kv, href: string): Promise<OAuthClient | undefined> {
+  try {
+    const kept = await documents.get(href)
+
+    return kept === undefined ? undefined : JSON.parse(kept) as OAuthClient
+  }
+  catch {
+    return undefined
+  }
+}
+
+async function cacheClient(documents: Kv, href: string, client: OAuthClient): Promise<void> {
+  try {
+    await documents.set(href, JSON.stringify(client), CACHE_MS)
+  }
+  catch {
+    // Fetched again on the next ask.
   }
 }

@@ -1,7 +1,6 @@
 import process from 'node:process'
 import { logFrom } from 'kay'
-import { appSecrets, appStore, sameText } from 'kay/library'
-import { memoryRates } from 'kay/server'
+import { appSecrets, kv, sameText } from 'kay/library'
 import { bounded } from './limits'
 
 const log = logFrom('kayjs-ai')
@@ -10,7 +9,7 @@ const TICKET_MS = 10 * 60_000
 const MAX_TICKET = 1024
 // Without an app secret a ticket is good in this process only.
 const PROCESS_SECRET = crypto.randomUUID()
-const used = memoryRates()
+const tickets = kv('ai:approval')
 let warnedSecret = false
 
 function secrets(): string[] {
@@ -78,9 +77,7 @@ export function ticketAllows(ticket: string, name: string, input: Record<string,
   }
 }
 
-// Spends a ticket: true the first time it is asked, in the app's `store.rates` when it has one, so the same message posted again, a retry or a resend, cannot run the call twice. A store that fails or hangs runs no call, as the limits refuse an ask they cannot read.
+// Spends a ticket: true the first time it is asked, in the app's `store.kv` when it has one, so the same message posted again, a retry or a resend, cannot run the call twice. A store that fails or hangs runs no call, as the limits refuse an ask they cannot read.
 export async function spend(ticket: string): Promise<boolean> {
-  const window = await bounded(async () => (appStore()?.rates ?? used).hit(`ai:approval\n${new Bun.CryptoHasher('sha256').update(ticket).digest('base64url')}`, TICKET_MS))
-
-  return window.count === 1
+  return bounded(async () => tickets.once(new Bun.CryptoHasher('sha256').update(ticket).digest('base64url'), TICKET_MS))
 }

@@ -68,7 +68,7 @@ The sign-in cookie is signed with a key made from the password and your app's se
 
 In production a password is at least 12 characters and no two roles share one, or the server refuses to start. Over https the cookie is named `__Host-kay_editor_session`, which a browser takes only from the site itself; the older name is still read. A store you give must have a `peek` method.
 
-Signing out deletes the cookie and ends it on the server, so a copy of it stops working too. That is kept in the app's `store.rates` (or `{ store }`, else the memory of the process), so every server process sharing it refuses the copy; without a shared store, another process or a restart still accepts it until it expires or the password changes. 
+Signing out deletes the cookie and ends it on the server, so a copy of it stops working too. That is kept in the app's `store.kv` (or `{ kv }`, else the memory of the process), so every server process sharing it refuses the copy (`sqliteData` and `pgData` fill `store.kv`); wrong passwords are counted in `store.rates` (or `{ store }`); without a shared store, another process or a restart still accepts it until it expires or the password changes. 
 
 An empty password throws, so an unset environment variable never opens the admin. The sign-in screen at `<prefix>/sign-in` allows ten tries per visitor every quarter of an hour, and refuses every try once 100 wrong passwords came from anyone in that time.
 

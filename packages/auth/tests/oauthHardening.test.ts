@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
+import { setupStore } from '../../../src/server/app-store'
 import { documentUrl, fetchPublicDocument, plainName, privateAddress } from '../src/authorize/clients'
 import { underResource } from '../src/authorize/resource'
 import { validRedirectUri, validRedirectUris } from '../src/authorize/uris'
@@ -183,6 +184,9 @@ describe('client names', () => {
 })
 
 function server(options: { documents?: Record<string, unknown>, limits?: Record<string, { max: number, window: string }>, url?: string | null } = {}) {
+  // The documents of an earlier app are not this one's.
+  setupStore(undefined)
+
   return testApp({
     ...options.url === null ? {} : { site: options.url ?? 'http://localhost' },
     pages: auth({ plugin: false }),

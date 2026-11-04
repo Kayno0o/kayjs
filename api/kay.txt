@@ -2302,6 +2302,7 @@ interface AppStore extends StoreBase
   database?: string | undefined
   files?: FileStore | undefined
   jobs?: JobStore | undefined
+  kv?: KvStore | undefined
   live?: LiveStore | undefined
   notifications?: NotificationStore | undefined
   ping?: (() => unknown) | undefined
@@ -2718,6 +2719,25 @@ interface KayExtension<Server extends AnyElysia = AnyElysia>
   transformPage?: PageHook | undefined
   transformServedPage?: PageHook | undefined
 
+[./server] kv
+function kv(namespace: string, store?: KvStore | undefined): Kv
+
+[./server] Kv
+interface Kv
+  delete: (key: string) => Promise<boolean>
+  get: (key: string) => Promise<string | undefined>
+  once: (key: string, ttlMs: number) => Promise<boolean>
+  set: (key: string, value: string, ttlMs?: number | undefined) => Promise<void>
+
+[./server] KvStore
+interface KvStore extends StoreBase
+  close?: (() => unknown) | undefined
+  delete: (key: string) => MaybePromise<boolean>
+  get: (key: string) => MaybePromise<string | undefined>
+  once: (key: string, ttlMs: number) => MaybePromise<boolean>
+  ping?: (() => unknown) | undefined
+  set: (key: string, value: string, ttlMs?: number | undefined) => MaybePromise<void>
+
 [./server] LiveEntry
 type LiveEntry = [id: string, key: string, text: string] | [id: string, key: string, text: string, expiresAt: number]
 
@@ -2745,6 +2765,9 @@ function memoryFiles(): FileStore
 
 [./server] memoryJobs
 function memoryJobs(): JobStore
+
+[./server] memoryKv
+function memoryKv(): KvStore
 
 [./server] memoryNotifications
 function memoryNotifications(): NotificationStore
@@ -2943,6 +2966,7 @@ function pgData(source: PgJobsSource): {
   [Symbol.asyncDispose]: () => Promise<void>;
   notifications: NotificationStore;
   push: PushStore;
+  kv: KvStore;
   database?: string;
   sessions: DeletableSessionStore;
   cache: CacheStore;
@@ -3446,6 +3470,7 @@ const SNIFFED_BYTES: 4096
 function sqliteData(path: string): {
   notifications: NotificationStore;
   push: PushStore;
+  kv: KvStore;
   database?: string;
   sessions: DeletableSessionStore;
   cache: SyncCacheStore;
@@ -3458,6 +3483,9 @@ function sqliteData(path: string): {
 
 [./server] sqliteJobs
 function sqliteJobs(path: string): JobStore
+
+[./server] sqliteKv
+function sqliteKv(path: string): KvStore
 
 [./server] sqliteLive
 function sqliteLive(path: string): LiveStore

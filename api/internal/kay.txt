@@ -953,6 +953,25 @@ function keyedDigest(use: string, text: string): string
 [./library] knownAddress
 function knownAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | boolean | number | undefined): string | undefined
 
+[./library] kv
+function kv(namespace: string, store?: KvStore | undefined): Kv
+
+[./library] Kv
+interface Kv
+  delete: (key: string) => Promise<boolean>
+  get: (key: string) => Promise<string | undefined>
+  once: (key: string, ttlMs: number) => Promise<boolean>
+  set: (key: string, value: string, ttlMs?: number | undefined) => Promise<void>
+
+[./library] KvStore
+interface KvStore extends StoreBase
+  close?: (() => unknown) | undefined
+  delete: (key: string) => MaybePromise<boolean>
+  get: (key: string) => MaybePromise<string | undefined>
+  once: (key: string, ttlMs: number) => MaybePromise<boolean>
+  ping?: (() => unknown) | undefined
+  set: (key: string, value: string, ttlMs?: number | undefined) => MaybePromise<void>
+
 [./library] lazily
 function lazily(guard: Guard | LazyGuard): Guard
 

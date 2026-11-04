@@ -1,6 +1,7 @@
 import type { GuardContext } from 'kay'
 import { describe, expect, setSystemTime, test } from 'bun:test'
 import { memoryRates } from 'kay/library'
+import { memoryKv } from 'kay/server'
 import { HOST_SESSION_COOKIE, passwordGuard, Passwords, SESSION_COOKIE, sessionCookieOf, signedInBy } from '../src/password'
 
 class Denied {
@@ -313,20 +314,21 @@ describe('a guard the app wraps', () => {
 describe('a cookie copied before sign-out', () => {
   test('is refused by another process sharing the store, and by a restart', async () => {
     const store = memoryRates()
-    const first = new Passwords({ editor: 'pw-editor' }, '1h', 'one-secret', store)
-    const second = new Passwords({ editor: 'pw-editor' }, '1h', 'one-secret', store)
+    const signedOut = memoryKv()
+    const first = new Passwords({ editor: 'pw-editor' }, '1h', 'one-secret', store, signedOut)
+    const second = new Passwords({ editor: 'pw-editor' }, '1h', 'one-secret', store, signedOut)
     const cookie = first.issue('editor', false).value
 
     expect(await second.current(cookie)).toBe('editor')
     await first.revoke(cookie)
     expect(await second.current(cookie)).toBeUndefined()
-    expect(await new Passwords({ editor: 'pw-editor' }, '1h', 'one-secret', store).current(cookie)).toBeUndefined()
+    expect(await new Passwords({ editor: 'pw-editor' }, '1h', 'one-secret', store, signedOut).current(cookie)).toBeUndefined()
     expect(await second.current(second.issue('editor', false).value)).toBe('editor')
   })
 
   test('is refused when the store cannot say whether it was signed out', async () => {
-    const down = { hit: async () => Promise.reject(new Error('down')), peek: async () => Promise.reject(new Error('down')) }
-    const passwords = new Passwords({ editor: 'pw-editor' }, '1h', 's', down)
+    const down = { get: async () => Promise.reject(new Error('down')), set: async () => Promise.reject(new Error('down')), delete: async () => Promise.reject(new Error('down')), once: async () => Promise.reject(new Error('down')) }
+    const passwords = new Passwords({ editor: 'pw-editor' }, '1h', 's', undefined, down)
 
     expect(await passwords.current(passwords.issue('editor', false).value)).toBeUndefined()
   })
@@ -405,7 +407,7 @@ describe('the cookie name', () => {
 })
 
 describe('a store without peek', () => {
-  test('is refused for a store given to passwordGuard, as it could neither tell a signed-out cookie nor count the ceiling', () => {
+  test('is refused for a store given to passwordGuard, as it could not count the ceiling', () => {
     expect(() => passwordGuard('pw-editor', { store: { hit: () => ({ count: 1, resetAt: 0 }) } })).toThrow('peek')
   })
 })

@@ -1,8 +1,8 @@
 import type { Duration, Guard, RateStore } from 'kay'
-import type { LazyGuard } from 'kay/library'
+import type { Kv, KvStore, LazyGuard } from 'kay/library'
 import { createHash, createHmac, scryptSync, timingSafeEqual } from 'node:crypto'
 import { guard } from 'kay'
-import { appSecrets, appStore, configError, durationSeconds, keyedDigest, memoryRates } from 'kay/library'
+import { appSecrets, appStore, configError, durationSeconds, keyedDigest, kv, memoryRates } from 'kay/library'
 import { wording } from 'kay/words'
 import { log } from './log'
 
@@ -27,7 +27,7 @@ const KEY_SALT = 'kayjs-cms/password/v1:'
 // A password shorter than this is refused in production, where it is all that stands between the web and the admin.
 const MIN_PASSWORD_LENGTH = 12
 let warnedOfNoSecret = false
-const REVOKED = 'cms:revoked\n'
+
 const FAILURES = 'cms:sign-in-failures'
 // Wrong passwords from anyone, every quarter of an hour, past which no sign-in is tried until the window closes: the per-visitor limit does not stop a guess spread over many addresses.
 const FAILURE_CEILING = 100
@@ -39,8 +39,10 @@ export interface PasswordOptions {
   maxAge?: Duration | undefined
   // Mixed into the key the cookie is signed with, so the same password on another site signs in nowhere else; the app's own secret (`KAY_SECRET`) when left out.
   secret?: string | undefined
-  // Where signed-out cookies and wrong passwords are counted so every process sees them: the app's `store.rates`, else this process's memory.
+  // Where wrong passwords are counted so every process sees them: the app's `store.rates`, else this process's memory.
   store?: RateStore | undefined
+  // Where signed-out cookies are kept so every process refuses them: the app's `store.kv`, else this process's memory.
+  kv?: KvStore | undefined
 }
 
 // Who a password guard let a request in as, for the screens to name and the roles to read.
@@ -63,9 +65,11 @@ export class Passwords {
   private readonly revoked = new Map<string, number>()
   private readonly seconds: number
   private readonly memory = memoryRates()
+  private readonly signedOut: Kv
   private lastIssued = 0
 
-  constructor(passwords: Record<string, string>, maxAge: Duration, private readonly secret?: string, private readonly chosenStore?: RateStore) {
+  constructor(passwords: Record<string, string>, maxAge: Duration, private readonly secret?: string, private readonly chosenStore?: RateStore, chosenKv?: KvStore) {
+    this.signedOut = kv('cms:revoked', chosenKv)
     this.seconds = durationSeconds(maxAge, '`passwordGuard({ maxAge })`')
 
     if (chosenStore !== undefined && chosenStore.peek === undefined)
@@ -100,12 +104,12 @@ export class Passwords {
     }
   }
 
-  // The store that signed-out cookies and the ceiling are kept in; one without `peek` could keep neither, so it is refused.
+  // The store the ceiling is counted in; one without `peek` could not count it, so it is refused.
   private store(): RateStore & Required<Pick<RateStore, 'peek'>> {
     const store = this.chosenStore ?? appStore()?.rates ?? this.memory
 
     if (store.peek === undefined)
-      throw configError('`passwordGuard()` needs a rate store with a `peek(key)` method, to tell a signed-out cookie and count wrong passwords; add it to `store.rates`, or use `sqliteRates()`')
+      throw configError('`passwordGuard()` needs a rate store with a `peek(key)` method, to count wrong passwords; add it to `store.rates`, or use `sqliteRates()`')
 
     return store as RateStore & Required<Pick<RateStore, 'peek'>>
   }
@@ -217,9 +221,7 @@ export class Passwords {
     const signature = value?.split('.')[2] ?? ''
 
     try {
-      const window = await this.store().peek(REVOKED + keyedDigest('cms-session', signature))
-
-      return window === undefined ? role : undefined
+      return await this.signedOut.get(keyedDigest('cms-session', signature)) === undefined ? role : undefined
     }
     catch (error) {
       log.error(`the store holding signed-out cookies did not answer, so no cookie is accepted: ${error instanceof Error ? error.message : String(error)}`)
@@ -256,7 +258,7 @@ export class Passwords {
     const signature = value?.split('.')[2] ?? ''
 
     try {
-      await this.store().hit(REVOKED + keyedDigest('cms-session', signature), Math.max(1, left))
+      await this.signedOut.set(keyedDigest('cms-session', signature), '1', Math.max(1, left))
     }
     catch (error) {
       log.error(`the store did not keep a signed-out cookie, so other processes still accept it until it expires: ${error instanceof Error ? error.message : String(error)}`)
@@ -310,8 +312,8 @@ export function trackPasswords(given: Guard | LazyGuard | undefined): Guard | La
 }
 
 // A guard for a site with no users: one password, or one per role, and a sign-in screen at the admin's `/sign-in`. `cms({ guard: passwordGuard(env.EDITOR_PASSWORD) })`; a lone password signs in as `editor`.
-export function passwordGuard(passwords: string | Record<string, string>, { maxAge = DEFAULT_MAX_AGE, secret, store }: PasswordOptions = {}): Guard {
-  const known = new Passwords(typeof passwords === 'string' ? { [DEFAULT_ROLE]: passwords } : passwords, maxAge, secret, store)
+export function passwordGuard(passwords: string | Record<string, string>, { maxAge = DEFAULT_MAX_AGE, secret, store, kv: signedOut }: PasswordOptions = {}): Guard {
+  const known = new Passwords(typeof passwords === 'string' ? { [DEFAULT_ROLE]: passwords } : passwords, maxAge, secret, store, signedOut)
 
   const checked = guard(async (ctx) => {
     // A guard the app wrapped is no key of `passwordsOf`, but it runs this one, which says so for the cms guard that called it.

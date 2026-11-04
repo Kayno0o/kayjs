@@ -706,7 +706,7 @@ describe('the visitor\'s yes to a write', () => {
     const errors = spyOn(console, 'error').mockReturnValue()
 
     try {
-      setupStore({ rates: { hit: async () => new Promise<never>(Function.prototype as never) } })
+      setupStore({ kv: { get: async () => new Promise<never>(Function.prototype as never), set: async () => new Promise<never>(Function.prototype as never), delete: async () => new Promise<never>(Function.prototype as never), once: async () => new Promise<never>(Function.prototype as never) } })
       storeTimeout(30)
       fakeAi.reply({ calls: [{ name: 'book', input }] })
       fakeAi.reply('done')

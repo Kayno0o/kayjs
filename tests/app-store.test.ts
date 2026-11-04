@@ -242,7 +242,7 @@ describe('the store contract', () => {
     const server = await import('../src/server')
     const factories = Object.keys(server).filter(name => (/^(?:memory|sqlite|pg|disk|s3)[A-Z]/).test(name))
     // `Data` is a store of every kind, `Store` and `StoreAt` the session stores kept under their old names until 1.90.
-    const things = new Set(['Sessions', 'Cache', 'Live', 'Jobs', 'Rates', 'Rooms', 'Vitals', 'Notifications', 'Push', 'Files', 'Data', 'Store', 'StoreAt'])
+    const things = new Set(['Sessions', 'Cache', 'Live', 'Jobs', 'Rates', 'Rooms', 'Vitals', 'Notifications', 'Push', 'Files', 'Kv', 'Data', 'Store', 'StoreAt'])
 
     expect(factories.filter(name => !things.has(name.replace(/^(?:memory|sqlite|pg|disk|s3)/, '')))).toEqual([])
   })

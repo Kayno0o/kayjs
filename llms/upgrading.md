@@ -49,8 +49,15 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - A component (a `.kay` file that is no page, layout or special page) with a `--- server` fence is a `fence-invalid` error in `kay check` and `kay build`: move the value into the page or layout and pass it as a prop. No `deprecated` lint is possible because the old form never worked: its values became required props nobody could pass.
 ### Stores name their verbs alike
 
-- `FileStore.delete(key)` resolves with whether there was a file, `PushStore.remove` is `delete`, `JobStore.purge` is `prune`, and kayjs-ai's `ConversationStore.remove` is `delete`: a store of your own renames the method and returns the boolean. Calling `files.delete(key)` is unchanged.
-- kayjs-auth's `AuthStore`: `users.delete` and `identities.delete` resolve with a boolean, `identities.deleteForUser`, `tokens.deleteForUser`, `bearerTokens.deleteForUser` and the OAuth refresh `deleteForUser` are `erase` and answer the count, `audit.forget` is `audit.erase`, and `audit.prune` answers the count; a store of your own renames and returns them.
+- `FileStore.delete(key)` resolves with whether there was a file, `PushStore.remove` is `delete`, `JobStore.purge` is `prune`, and kayjs-ai's `ConversationStore.remove` is `delete`: a store of your own renames the method and returns the boolean.
+- kayjs-auth's `AuthStore`: `users.delete` and `identities.delete` resolve with a boolean, every `deleteForUser` is `erase` and answers a count, `audit.forget` is `audit.erase`, and `audit.prune` answers a count.
+
+### Signed-out cookies and approval tickets move to `store.kv`
+
+- kayjs-cms's signed-out cookies and kayjs-ai's spent approval tickets are kept in `store.kv` (filled by `sqliteData` and `pgData`, else the process's memory) in place of `store.rates`: `passwordGuard({ store })` counts wrong passwords only and `passwordGuard({ kv })` names the cookies' store. An app on a hand-written `store.rates` shared between processes adds a `kv` of its own (`get`, `set`, `delete`, `once`). `kay check` cannot see it.
+
+## 1.87.0
+
 
 ### A page at a collection's route prerenders
 

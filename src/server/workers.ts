@@ -78,9 +78,9 @@ export async function sharedStores(store: AppStore | undefined): Promise<AppStor
   warnOfMemoryStores(store)
 
   const { sqliteData } = await import('./sqlite-data')
-  const { cache, live, rates, rooms, vitals, notifications, push } = sqliteData(SHARED_PATH)
+  const { cache, live, rates, rooms, vitals, notifications, push, kv } = sqliteData(SHARED_PATH)
 
-  return { ...store, cache: store?.cache ?? cache, live: store?.live ?? live, rates: store?.rates ?? rates, rooms: store?.rooms ?? rooms, vitals: store?.vitals ?? vitals, notifications: store?.notifications ?? notifications, push: store?.push ?? push }
+  return { ...store, cache: store?.cache ?? cache, live: store?.live ?? live, rates: store?.rates ?? rates, rooms: store?.rooms ?? rooms, vitals: store?.vitals ?? vitals, notifications: store?.notifications ?? notifications, push: store?.push ?? push, kv: store?.kv ?? kv }
 }
 
 // `reusePort` balances connections between processes on Linux only; elsewhere one worker serves, as without the flag.
@@ -117,7 +117,7 @@ export async function runAsPrimary(argv: string[], env: Record<string, string | 
 }
 
 // The factories of the stores that keep their data in one process's memory, by the `store` key an app puts them under.
-const MEMORY_FACTORIES = { sessions: 'memorySessions', jobs: 'memoryJobs', rates: 'memoryRates', rooms: 'memoryRooms', vitals: 'memoryVitals', notifications: 'memoryNotifications', push: 'memoryPush' } as const
+const MEMORY_FACTORIES = { sessions: 'memorySessions', jobs: 'memoryJobs', rates: 'memoryRates', rooms: 'memoryRooms', vitals: 'memoryVitals', notifications: 'memoryNotifications', push: 'memoryPush', kv: 'memoryKv' } as const
 
 // A store the app built in memory is kept, and splits per worker: said once, by the first worker.
 function warnOfMemoryStores(store: AppStore | undefined): void {

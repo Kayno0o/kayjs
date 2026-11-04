@@ -5,7 +5,7 @@ import type { AuthSessionData, Core } from './core'
 import type { EmailOptions } from './email'
 import type { AuthPagesConfig, PagesHandle } from './pages'
 import type { AuthStore, LinkType, TokenType } from './store'
-import { asConfigError, configError, configuredSite, durationSeconds } from 'kay/library'
+import { asConfigError, configError, configuredSite, durationSeconds, kv } from 'kay/library'
 import { accessOf } from './access'
 import { pwnedPassword } from './breached'
 import { proofOfWork } from './captcha'
@@ -330,7 +330,7 @@ function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: strin
   if (wanted !== undefined && (options.scopes?.length ?? 0) === 0)
     log.warn('oauthServer is on but createAuth declares no `scopes`, so every OAuth token gets every scope: declare `scopes` and give routes a `scope:`')
 
-  return { fetchDocument: async url => (await import('./authorize/clients')).documentFetcher(custom)(url), documents: new Map(), defaultScopes }
+  return { fetchDocument: async url => (await import('./authorize/clients')).documentFetcher(custom)(url), documents: kv('auth:oauth-documents'), defaultScopes }
 }
 
 // On by default in production, where `false` turns it off.

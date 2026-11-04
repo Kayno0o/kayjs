@@ -5,6 +5,7 @@ import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from 'kay/server'
 import { scratchDir } from 'kay/test'
+import { setupStore } from '../../../src/server/app-store'
 import { memoryAuthStore } from '../src/memoryStore'
 import { auth } from '../src/pages'
 import { browser as browserOf, testApp } from './helpers/app'
@@ -21,6 +22,10 @@ afterEach(() => {
 
 function server(options: { documents?: Record<string, unknown>, scopes?: ('posts:read' | 'posts:write')[], defaultScopes?: ('posts:read' | 'posts:write')[], store?: ReturnType<typeof memoryAuthStore> } = {}) {
   const fetched: string[] = []
+
+  // The documents of an earlier app are not this one's.
+  setupStore(undefined)
+
   const app = testApp({
     site: 'http://localhost',
     pages: auth({ plugin: false }),

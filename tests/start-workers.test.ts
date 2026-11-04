@@ -156,7 +156,7 @@ describe('what workers share', () => {
 
       expect(shared?.cache).toBe(own)
 
-      for (const kind of ['live', 'rates', 'rooms', 'vitals', 'notifications', 'push'] as const)
+      for (const kind of ['live', 'rates', 'rooms', 'vitals', 'notifications', 'push', 'kv'] as const)
         expect(shared?.[kind]).toBeDefined()
 
       expect(shared?.sessions).toBeUndefined()

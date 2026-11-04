@@ -1,4 +1,6 @@
+import type { SQL } from 'bun'
 import type { RateStore } from '../runtime/action'
+import type { KvStore } from './kv'
 import type { Notification, NotificationStore } from './notifications'
 import type { PgHandle } from './pg-data'
 import type { PushStore } from './push-store'
@@ -166,6 +168,48 @@ export function pgRates(pg: PgHandle): RateStore {
       await query(db, 'DELETE FROM kay_rates WHERE key = $1', [hash])
     },
   }, 'the rates store', { ready: pg.db })
+}
+
+// Values by key in Postgres, shared by every replica: `once` is one statement, so only one replica takes a key however many ask at once.
+export function pgKv(pg: PgHandle): KvStore {
+  let swept = 0
+
+  const sweep = async (db: SQL) => {
+    if (Date.now() - swept > SWEEP_RATES_MS) {
+      swept = Date.now()
+      await query(db, `DELETE FROM kay_kv WHERE expires_at IS NOT NULL AND expires_at <= ${NOW}`)
+    }
+  }
+
+  return limitedStore({
+    async get(key) {
+      const db = await pg.db()
+      const [row] = await query<{ value: string }>(db, `SELECT value FROM kay_kv WHERE key = $1 AND (expires_at IS NULL OR expires_at > ${NOW})`, [key])
+
+      return row?.value
+    },
+    async set(key, value, ttlMs) {
+      const db = await pg.db()
+
+      await sweep(db)
+      await query(db, `INSERT INTO kay_kv (key, value, expires_at) VALUES ($1, $2, CASE WHEN $3::bigint IS NULL THEN NULL ELSE ${NOW} + $3::bigint END) ON CONFLICT (key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at`, [key, value, ttlMs === undefined ? null : Math.round(ttlMs)])
+    },
+    async delete(key) {
+      const db = await pg.db()
+      const [row] = await query<{ live: boolean }>(db, `DELETE FROM kay_kv WHERE key = $1 RETURNING (expires_at IS NULL OR expires_at > ${NOW}) AS live`, [key])
+
+      return row?.live === true
+    },
+    async once(key, ttlMs) {
+      const db = await pg.db()
+
+      await sweep(db)
+
+      const taken = await query<{ key: string }>(db, `INSERT INTO kay_kv (key, value, expires_at) VALUES ($1, '1', ${NOW} + $2::bigint) ON CONFLICT (key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at WHERE kay_kv.expires_at IS NOT NULL AND kay_kv.expires_at <= ${NOW} RETURNING key`, [key, Math.round(ttlMs)])
+
+      return taken.length > 0
+    },
+  }, 'the kv store', { ready: pg.db })
 }
 
 // Web Vitals counts in Postgres: one row per day, route, metric and bucket, so replicas add their views to the others' with one increment each.
