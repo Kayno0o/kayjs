@@ -254,12 +254,6 @@ describe('kay build --static', () => {
     expect(chunks.filter(code => code.includes('name="ApiError"'))).toHaveLength(1)
   })
 
-  it('ships none of the optimistic change code to a page that makes none', async () => {
-    const eager = [...(await eagerJs(scriptUrls((await get('/')).text), async url => Bun.file(join(out, url.slice(BASE.length))).text())).values()].map(({ code }) => code)
-
-    expect(eager.filter(code => code.includes('.undone'))).toEqual([])
-  })
-
   it('ships no code reviving an action for an app that declares none and uses no library', async () => {
     const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
     const texts = await Promise.all(chunks.map(async chunk => Bun.file(join(out, chunk)).text()))

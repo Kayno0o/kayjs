@@ -128,7 +128,7 @@ function onEarlySubmit(event: SubmitEvent): void {
     return
 
   // A cheaper test than the forms' listener's: what it leaves to the browser, such as a post to another site naming an action's path, still reaches it, its submit event fired again. A submit button pressed with a key held is the browser's, as a link is.
-  if (method === 'post' ? !ACTION_PATH.test(action) : method === 'dialog' || (navigation.modified === true && submitter !== null) || !swappable(new URL(action, location.href)))
+  if (method === 'post' ? !ACTION_PATH.test(action) : method === 'dialog' || (navigation.modified === true && submitter !== null) || !URL.canParse(action, location.href) || !swappable(new URL(action, location.href)))
     return
 
   event.preventDefault()

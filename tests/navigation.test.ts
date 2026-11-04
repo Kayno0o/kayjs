@@ -1022,6 +1022,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     try {
       await settled(fresh)
 
+      const problem = problems(fresh)
+
       // Listening after kay, so the event says whether kay held it, then kept from leaving the page.
       expect(await fresh.evaluate((markup) => {
         const seen: boolean[] = []
@@ -1035,6 +1037,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
 
         return seen
       }, html)).toEqual([holds])
+      expect(problem()).toEqual([])
     }
     finally {
       fresh.close()

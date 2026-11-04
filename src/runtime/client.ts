@@ -173,6 +173,29 @@ async function fetchServerIsland(registry: IslandRegistry, element: HTMLElement)
 // Only a bare file name is imported: an island's markup may come from content, and it can never name another origin or folder.
 const CHUNK_FILE = /^[^/\\:?#%]+\.js$/
 
+// Renders an island over the markup it has rather than claiming it: a fallback stays until the component has rendered beside it, and markup a failed hydration left (`clear`) is emptied first. Either is put back when the component itself throws, rather than leaving nothing.
+function renderOver(element: HTMLElement, id: string, draw: () => () => void, clear: boolean): void {
+  const markup = [...element.childNodes]
+
+  if (clear)
+    element.textContent = ''
+
+  try {
+    disposers.set(element, noted(element, draw))
+
+    if (!clear) {
+      for (const node of markup)
+        node.remove()
+    }
+  }
+  catch (failure) {
+    if (clear)
+      element.replaceChildren(...markup)
+
+    reportError(failure, id)
+  }
+}
+
 async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Promise<void> {
   const id = element.dataset.component ?? ''
   const file = element.dataset.chunk ?? ''
@@ -224,24 +247,11 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   // Counted again from where the server's were, so the ids it rendered are claimed as they are.
   const ids = element.dataset.uid ?? freshPrefix()
 
-  // Rendered over the server's markup rather than claiming it, which is left in place when the component itself throws.
-  const renderAfresh = (): void => {
-    const markup = [...element.childNodes]
-
-    element.textContent = ''
-
-    try {
-      disposers.set(element, noted(element, () => render(() => withIds(ids, () => component(props)), element)))
-    }
-    catch (failure) {
-      element.replaceChildren(...markup)
-      reportError(failure, id)
-    }
-  }
+  const draw = () => render(() => withIds(ids, () => component(props)), element)
 
   // A client-only island has no server markup to claim, only the fallback it renders over.
   if (element.dataset.client !== undefined) {
-    renderAfresh()
+    renderOver(element, id, draw, false)
   }
   else {
     root((dispose) => {
@@ -254,7 +264,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
         // Markup the island would not build, such as one a browser extension changed, can fail anywhere along the way: rendered afresh rather than left dead.
         console.error(`[kay] island ${id} did not match its server markup, rendering it again: ${error instanceof Error ? error.message : String(error)}`)
         dispose()
-        renderAfresh()
+        renderOver(element, id, draw, true)
       }
     })
   }

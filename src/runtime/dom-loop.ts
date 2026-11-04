@@ -68,7 +68,7 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
 
   renderEffect(() => {
     const items = each()
-    const list = items === false || items == null ? [] : [...items]
+    const list: readonly T[] = Array.isArray(items) ? items : Array.from(items === false || items == null ? [] : items)
     // A Map's entries are fresh pairs on every run, so with no key written they are matched by their own key.
     const keyed = items instanceof Map && key === rowKey ? entryKey : key
 

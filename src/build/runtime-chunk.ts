@@ -202,8 +202,6 @@ async function remember(slot: CacheSlot, found: { chunk: RuntimeChunk, inputs: s
 
 async function searchRuntime(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[], islands?: string[] | undefined }): Promise<{ chunk: RuntimeChunk, inputs: string[] } | undefined> {
   const used = new Map<string, Set<string>>()
-  // Every name the entry and the islands import, those of the modules with a chunk of their own too, which reach the runtime as much as the rest.
-  const imported = new Map<string, Set<string>>()
   const outer = await Bun.build({ entrypoints: [entry, ...options.islands ?? []], target: 'browser', splitting: true, define: options.define, external: ['kay', 'kay/*', ...options.external], plugins: options.plugins, metafile: true, throw: false })
 
   if (!outer.success)
@@ -218,7 +216,6 @@ async function searchRuntime(entry: string, options: { plugins: BunPlugin[], def
 
     importedNames(await output.text(), own, specifier => KAY_SPECIFIER.test(specifier) && !OWN_CHUNK.has(specifier))
     mergeNames(used, own)
-    importedNames(await output.text(), imported, specifier => KAY_SPECIFIER.test(specifier))
 
     if (entryPoint === undefined)
       continue
@@ -262,7 +259,7 @@ async function searchRuntime(entry: string, options: { plugins: BunPlugin[], def
 
     // What a lazy module takes from a file the anchor really carries goes in the chunk with the rest; the rest of what it takes stays lazy with it.
     // A file the anchor merely imports without using, as a lazy module's own class would be, stays out: adopting its names would pull it into every page.
-    const carried = await carriedFiles(imported, eager, options)
+    const carried = await carriedFiles(shared, eager, options)
 
     for (const output of inner.outputs)
       importedNames(await output.text(), shared, specifier => carried.has(specifier))
@@ -274,8 +271,8 @@ async function searchRuntime(entry: string, options: { plugins: BunPlugin[], def
   return { chunk: { dir: dirname(entry), anchor: anchorModule(shared), lazy }, inputs }
 }
 
-// The runtime files whose code is left once the bundler drops what none of the names an island or the entry imports reaches.
-async function carriedFiles(imported: Map<string, Set<string>>, eager: Set<string>, options: { define: Record<string, string>, external: string[] }): Promise<Set<string>> {
+// The runtime files whose code is left in the anchor once the bundler drops what none of the names it holds reaches; all the files the anchor could reach when the probe cannot tell.
+export async function carriedFiles(shared: Map<string, Set<string>>, eager: Set<string>, options: { define: Record<string, string>, external: string[] }): Promise<Set<string>> {
   const probe = await Bun.build({
     entrypoints: [PROBE],
     target: 'browser',
@@ -293,14 +290,16 @@ async function carriedFiles(imported: Map<string, Set<string>>, eager: Set<strin
 
           return file === undefined ? undefined : { path: file }
         })
-        build.onLoad({ filter: ANY_PATH, namespace: ANCHOR_NAMESPACE }, () => ({ contents: anchorModule(imported), loader: 'ts', resolveDir: RUNTIME_DIR }))
+        build.onLoad({ filter: ANY_PATH, namespace: ANCHOR_NAMESPACE }, () => ({ contents: anchorModule(shared), loader: 'ts', resolveDir: RUNTIME_DIR }))
       },
     }],
   })
 
-  // A failed probe keeps everything the anchor could reach.
-  if (!probe.success)
+  if (!probe.success) {
+    warnProbe('the probe build failed')
+
     return eager
+  }
 
   const { outputs } = probe.metafile!
   const carried = new Set<string>()
@@ -312,15 +311,21 @@ async function carriedFiles(imported: Map<string, Set<string>>, eager: Set<strin
 
     loaded.add(path)
 
-    for (const imported of outputs[path]?.imports ?? []) {
-      if (imported.kind === 'import-statement')
-        visit(imported.path)
+    for (const next of outputs[path]?.imports ?? []) {
+      if (next.kind === 'import-statement')
+        visit(next.path)
     }
   }
 
   for (const [path, output] of Object.entries(outputs)) {
     if (output.entryPoint?.endsWith(PROBE) === true)
       visit(path)
+  }
+
+  if (loaded.size === 0) {
+    warnProbe('the probe build has no chunk for its entry')
+
+    return eager
   }
 
   for (const path of loaded) {
@@ -331,6 +336,12 @@ async function carriedFiles(imported: Map<string, Set<string>>, eager: Set<strin
   }
 
   return carried
+}
+
+// Said in development only, where a runtime chunk bigger than it needs to be is worth finding out about.
+function warnProbe(reason: string): void {
+  if (process.env.NODE_ENV !== 'production')
+    console.warn(`kay: ${reason}, so the runtime chunk keeps every file its lazy modules share with the entry`)
 }
 
 function mergeNames(into: Map<string, Set<string>>, from: Map<string, Set<string>>): void {
