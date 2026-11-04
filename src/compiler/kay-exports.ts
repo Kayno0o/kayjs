@@ -22,6 +22,7 @@ export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
   editing: 'browser',
   effect: 'browser',
   elementSize: 'browser',
+  escapeHtml: 'shared',
   every: 'browser',
   flush: 'browser',
   focusInvalid: 'browser',

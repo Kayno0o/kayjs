@@ -1,9 +1,6 @@
 import type { EntryRef } from '../kay/contract'
-import { ApiError, call } from 'kay'
+import { ApiError, call, escapeHtml } from 'kay'
 import markdownApi from '../api/markdown'
-
-const ESCAPED: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;' }
-const SPECIAL = /[&<>]/g
 
 // The HTML the site's Markdown pipeline makes of a text, for the editor's Preview; `entry` is where the text will be saved, whose folder a relative image path is read from.
 // A text kay cannot read, such as a component not yet closed, shows why in the pane rather than failing it, as the editor is mid-typing.
@@ -15,7 +12,7 @@ export async function previewMarkdown(markdown: string, entry?: EntryRef): Promi
   }
   catch (error) {
     if (error instanceof ApiError && error.status === 422)
-      return `<p>${error.message.replace(SPECIAL, char => ESCAPED[char]!)}</p>`
+      return `<p>${escapeHtml(error.message)}</p>`
 
     throw error
   }

@@ -123,6 +123,8 @@ An extension may set these fields. Only `name` is required.
 
 A command takes `--quiet`, `--format json` and `--dry-run` like kay's own, and reads them as `quiet`, `format` and `dryRun`. It reports a failure with `fail(message)`, so `--format json` gets a document. It lists a reason in `refuses` for each of the three it does not take.
 
+Compare a secret, a signature or a code with `sameText(given, expected)` from `kay/library`: it hashes both sides first, so neither the content nor the length of the expected value shows in the time taken. Escape text for markup with `escapeHtml(text)` from `kay/library` or `kay`, which covers content and an attribute however it is quoted.
+
 A command that rewrites the app's `src/ui.ts` reads it with `uiConfigEntries(text)` from `kay/library`, which gives each entry's key and the spans of its key and value, following const objects and spreads; `kay ui eject` uses it.
 
 Type the result `KayExtension<typeof plugin>` when it has a `server` of its own, so the plugin's locals reach the app's types.

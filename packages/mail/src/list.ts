@@ -6,7 +6,7 @@ import type { SuppressionStore } from './suppressions'
 import type { Address, Mail, MailMessage } from './types'
 import process from 'node:process'
 import { s } from 'kay'
-import { configError, durationSeconds, keyedDigest, trackDetached } from 'kay/library'
+import { configError, durationSeconds, escapeHtml, keyedDigest, trackDetached } from 'kay/library'
 import { siteOrigin } from 'kay/seo'
 import { rateLimit, renderLocale, renderToString, retryLater } from 'kay/server'
 import { wording } from 'kay/words'
@@ -634,16 +634,12 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       const [title, body] = await Promise.all([renderToString(page, { part: 'title', kind }, locale === undefined ? undefined : { locale }), renderToString(page, { kind, action }, locale === undefined ? undefined : { locale })])
       const lang = locale ?? await renderLocale()
 
-      return new Response(`<!doctype html><html lang="${escapeAttribute(lang)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>${title.trim()}</title></head><body>${body}</body></html>`, {
+      return new Response(`<!doctype html><html lang="${escapeHtml(lang)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>${title.trim()}</title></head><body>${body}</body></html>`, {
         status,
         headers: { ...status === 503 && { 'retry-after': '60' }, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff' },
       })
     },
   }
-}
-
-function escapeAttribute(text: string): string {
-  return text.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;')
 }
 
 export type ListsHandle = ReturnType<typeof createLists>

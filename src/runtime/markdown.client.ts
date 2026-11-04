@@ -1,12 +1,10 @@
 import type { SafeHtml } from './checks'
 import { claiming, keepServerMarkup } from './dom'
+import { escapeMarkdownText } from './escape'
 import { ownSignal, whenHydrated } from './reactive'
 import { vouch } from './safe-html'
 
 type Marked = Element & { _$m?: string | undefined }
-
-const ESCAPED = /[&<>"]/g
-const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }
 
 const loaded = ownSignal<((markdown: string) => SafeHtml) | undefined>(undefined)
 let loading: Promise<void> | undefined
@@ -17,7 +15,7 @@ const held = new Set<string>()
 const kept = new Set<string>()
 
 // The text as written, in a paragraph, which stands in until the renderer has arrived.
-const asWritten = (markdown: string) => vouch(`<p>${markdown.replace(ESCAPED, char => ESCAPES[char]!)}</p>\n`)
+const asWritten = (markdown: string) => vouch(`<p>${escapeMarkdownText(markdown)}</p>\n`)
 
 // The renderer (marked and the sanitizer, about 17 KB gzip) is fetched by the first call outside hydration, so an island that never renders Markdown, or only the Markdown the server already drew, never loads it. A failed load is not retried, as the browser remembers it failed: the text stays as written.
 function load(): void {

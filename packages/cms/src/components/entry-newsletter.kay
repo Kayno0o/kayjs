@@ -1,7 +1,7 @@
 ---
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
-import { effect, signal, trustHtml, untrack } from 'kay'
+import { effect, escapeHtml, signal, trustHtml, untrack } from 'kay'
 import { wording } from 'kay/words'
 import type { Denials } from '../access'
 import type { MailPreview } from '../editor/newsletter'
@@ -75,6 +75,6 @@ Dialog(open={open()} title={wording('cms.newsletter.title', 'Send to the mailing
       Button(label={confirming() ? wording('cms.newsletter.confirm', 'Yes, send to {count} subscribers', { count: preview()?.subscribers ?? 0 }) : wording('cms.newsletter.send', 'Send to the list')} tone="accent" busy={busy()} disabled={busy() || preview() === undefined} onClick={send})
   if preview() as made
     p.kcms-newsletter-subject {made.subject}
-    iframe.kcms-newsletter-preview(sandbox="" title={wording('cms.newsletter.frame', 'The mail as it will be sent')} srcdoc={trustHtml(made.html ?? `<pre>${made.text.replaceAll('&', '&amp;').replaceAll('<', '&lt;')}</pre>`)})
+    iframe.kcms-newsletter-preview(sandbox="" title={wording('cms.newsletter.frame', 'The mail as it will be sent')} srcdoc={trustHtml(made.html ?? `<pre>${escapeHtml(made.text)}</pre>`)})
   else
     p {wording('cms.newsletter.loading', 'Rendering the mail')}

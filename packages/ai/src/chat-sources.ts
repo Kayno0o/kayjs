@@ -1,12 +1,11 @@
 import type { Source } from './types'
+import { escapeHtml } from 'kay'
 
 const TAG = /<[^>]*>|[^<]+/g
 const CODE_OR_LINK = /^<(\/?)(?:code|pre|a)[\s/>]/i
 // A number of one to four digits with no leading zero: `[01]` and `[12345]` stay text.
 const CITATION = /\[([1-9]\d{0,3})\]/g
-// Escaped as `markdownHtml` escapes the text it shows as written, so the reply as written reads the same.
-const ATTRIBUTE_UNSAFE = /[&"<>]/g
-const ENTITIES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' }
+
 // A source leads to a page or a file: no `javascript:` and the like, which a hostile page could have named.
 const SAFE_HREF = /^(?:https?:\/\/|mailto:|\/(?![/\\])|#)[^\s"'<>`\\]*$/i
 
@@ -24,8 +23,6 @@ export const opensApart = (href: string, here: boolean) => !(here && LOCAL_HREF.
 export function sameSources(a: readonly Source[], b: readonly Source[]): boolean {
   return a.length === b.length && a.every((source, index) => source.n === b[index]!.n && source.title === b[index]!.title && source.href === b[index]!.href)
 }
-
-export const attribute = (text: string) => text.replace(ATTRIBUTE_UNSAFE, char => ENTITIES[char]!)
 
 // The sources of a stored or streamed reply that are well-formed and lead somewhere safe, one per number.
 export function usableSources(sources: unknown): Source[] {
@@ -67,7 +64,7 @@ function runEnd(text: string, from: number, char: string): number {
   return end
 }
 
-const code = (text: string) => `<code>${attribute(text)}</code>`
+const code = (text: string) => `<code>${escapeHtml(text)}</code>`
 
 // The text as written, escaped, with its inline code spans in `<code>`: a run of backticks up to the next run of the same length, an unclosed run staying text, and an escaped backtick opening none.
 function markSpans(paragraph: string): string {
@@ -89,11 +86,11 @@ function markSpans(paragraph: string): string {
         close = runEnd(seen, next, '`')
     }
 
-    result += close === -1 ? attribute(paragraph.slice(at, end)) : attribute(paragraph.slice(at, open)) + code(paragraph.slice(open, close))
+    result += close === -1 ? escapeHtml(paragraph.slice(at, end)) : escapeHtml(paragraph.slice(at, open)) + code(paragraph.slice(open, close))
     at = close === -1 ? end : close
   }
 
-  return result + attribute(paragraph.slice(at))
+  return result + escapeHtml(paragraph.slice(at))
 }
 
 // The text as written, escaped, with its fenced blocks and code spans in `<code>`, so `linkSources` passes over them as over the formatted reply's code: a block runs from its fence line to a line of its own fence character at least as long, or to the end of the text, and a span ends with its paragraph.
@@ -166,7 +163,7 @@ export function linkSources(html: string, sources: readonly Source[]): { html: s
 
       cited.set(source.n, source)
 
-      return `<a href="${attribute(source.href)}">${whole}</a>`
+      return `<a href="${escapeHtml(source.href)}">${whole}</a>`
     })
   })
 

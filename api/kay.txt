@@ -348,6 +348,9 @@ interface ErrorShape<Data = unknown>
   message: string
   status: number
 
+[.] escapeHtml
+function escapeHtml(text: string): string
+
 [.] EventHandler
 type EventHandler<Target, E extends Event> = (event: E & { currentTarget: Target, target: globalThis.Element }) => void
 

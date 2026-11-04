@@ -1,9 +1,10 @@
 import { Buffer } from 'node:buffer'
 import { createCipheriv, randomBytes } from 'node:crypto'
-import { describe, expect, it } from 'bun:test'
+import process from 'node:process'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { s } from 'kay'
 import { acceptedLocales, asConfigError, checkAnswer, configError, durationSeconds, escapeHtml, jsonSchemaOf, matchLocale, nameUser, openWith, sameText, sealWith, uiConfigEntries, userOf, weakSecrets } from 'kay/library'
-import { escape, escapeAttribute } from '../src/runtime/escape'
+import { escape, escapeAttribute, escapeMarkdownText } from '../src/runtime/escape'
 
 const KEY = new Uint8Array(32).fill(7)
 const OTHER_KEY = new Uint8Array(32).fill(9)
@@ -28,6 +29,8 @@ describe('kay/library', () => {
     expect(escapeHtml(text)).toBe('Tom &amp; &quot;Jerry&quot; &lt;b&gt;it&#39;s&lt;/b&gt; &gt; all')
     expect(escape(text)).toBe('Tom &amp; "Jerry" &lt;b>it\'s&lt;/b> > all')
     expect(escapeAttribute(text)).toBe('Tom &amp; &quot;Jerry&quot; &lt;b>it\'s&lt;/b> > all')
+    expect(escapeMarkdownText(text)).toBe('Tom &amp; &quot;Jerry&quot; &lt;b&gt;it\'s&lt;/b&gt; &gt; all')
+    expect(escapeHtml('plain')).toBe('plain')
   })
 
   it('opens what it sealed under any of its keys and the same context, and nothing else', () => {
@@ -65,6 +68,29 @@ describe('kay/library', () => {
     expect(sameText('abc', 'abc')).toBe(true)
     expect(sameText('abc', 'abd')).toBe(false)
     expect(sameText('abc', 'abcd')).toBe(false)
+    expect(sameText('', '')).toBe(true)
+    expect(sameText('é', 'é')).toBe(true)
+  })
+
+  it('compares a differing length and a differing content in the same way', () => {
+    const crypto = process.getBuiltinModule('node:crypto')
+    const compare = spyOn(crypto, 'timingSafeEqual')
+
+    try {
+      expect(sameText('secret-value', 'secret-valuf')).toBe(false)
+      expect(sameText('a', 'a much longer expected secret')).toBe(false)
+      expect(sameText('', 'x')).toBe(false)
+      expect(compare).toHaveBeenCalledTimes(3)
+
+      for (const [a, b] of compare.mock.calls)
+        expect([a.byteLength, b.byteLength]).toEqual([32, 32])
+    }
+    finally {
+      compare.mockRestore()
+    }
+  })
+
+  it('refuses weak secrets', () => {
     expect(weakSecrets([])).toBe(true)
     expect(weakSecrets(['x'.repeat(32), 'short'])).toBe(true)
     expect(weakSecrets(['x'.repeat(32)])).toBe(false)

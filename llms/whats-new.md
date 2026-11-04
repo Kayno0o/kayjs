@@ -13,6 +13,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - In production a missing `proxy` means one proxy in front, `session()` keeps its sessions in `data/sessions.sqlite` unless `store: false` and a cron reads the config's `timeZone`; `kay new` with auth scaffolds `requireGuards: true`: [upgrading](upgrading.md).
 - kayjs-ui `Table` takes `rowHref` and `onRowClick` (a row a link or a button) and `rows` as a function or a promise with `loadingLabel`, `failureLabel`, `retryLabel`, `onLoad`, `onError`, `busy` and skeleton rows; `VirtualList` takes the same on `items`, with `itemHref` and `onItemClick`: [Table sources](../packages/ui/llms/infinite-list.md#table-and-virtuallist-sources-busy-and-row-links).
 - A `server="defer"` island takes an `@failed` block, shown when it fails to load, with a `data-kay-retry` control that retries it: [server-islands](server-islands.md).
+- `escapeHtml` is exported from `kay` as well as `kay/library`, for the browser and the server alike, and `sameText` hashes both sides before comparing, so neither the content nor the length of a secret shows in the time a check takes; kay's libraries use both in place of their own copies: [component libraries](component-libraries.md).
 
 ## 1.88.0
 

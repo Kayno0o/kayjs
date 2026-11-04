@@ -1,10 +1,10 @@
 import type { RendererObject, Token, TokenizerObject, Tokens } from 'marked'
 import type { SafeHtml } from './checks'
 import { Marked, Tokenizer } from 'marked'
+import { escapeMarkdownText as escape } from './escape'
 import { sanitizedMarkdown } from './markdown'
 import { vouch } from './safe-html'
 
-const ESCAPED = /[&<>"]/g
 const TEXT_ESCAPED = /&(?![a-z][a-z\d]{1,31};)|[<>"]/gi
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }
 const REFERENCE = /&(?:#(\d{1,7})|#x([\da-f]{1,6})|(amp|lt|gt|quot|apos|nbsp));/gi
@@ -14,11 +14,6 @@ const BARE_TASK = /^\[([ x])\]$/i
 const TRAILING_LINES = /\n+$/
 const LINE_INDENT = /^[ \t]+/gm
 const TRAILING_SPACES = /[ \t]+$/
-
-// Escaped as Bun.markdown does, which leaves `'` as it is.
-function escape(text: string): string {
-  return text.replace(ESCAPED, char => ESCAPES[char]!)
-}
 
 // Text and titles keep the named references `decode` leaves, as their characters in Bun.markdown's HTML.
 function escapeText(text: string): string {

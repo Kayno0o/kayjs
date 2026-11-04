@@ -2,7 +2,7 @@
 import type { Action, Failure, SanitizeOptions, Snippet } from 'kay'
 import type { Turn } from './chat-session'
 import type { ChatFailure, ChatMessage, ChatTurn, ChatTurnView, CodeBlock, Progress, Source, ToolCall } from './types'
-import { durationMs, effect, followLog, onCleanup, onMount, persisted, queryParam, recipe, sanitizeHtml, signal, trustHtml, untrack, withQuery } from 'kay'
+import { durationMs, effect, escapeHtml, followLog, onCleanup, onMount, persisted, queryParam, recipe, sanitizeHtml, signal, trustHtml, untrack, withQuery } from 'kay'
 import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
@@ -14,7 +14,7 @@ import { isHeldMarkdown, markdownHtml, markdownLoaded } from 'kay/markdown'
 import { wording } from 'kay/words'
 import { approvalMessage, ticketsIn, withoutApproval } from './approval-marker'
 import { MARK, MARKED, withoutMarker } from './marker'
-import { attribute, citedAsWritten, linkAsWritten, linkSources, opensApart, REL_APART } from './chat-sources'
+import { citedAsWritten, linkAsWritten, linkSources, opensApart, REL_APART } from './chat-sources'
 import { filesOf, POSTED_CHARACTERS } from './chat-history'
 import { createAttachments, fileKey } from './chat-attachments'
 import { createChatSession } from './chat-session'
@@ -286,7 +286,7 @@ function render(text: string, blocks: CodeBlock[] | undefined, sources: readonly
   return { html: trustHtml(html.replaceAll('<table>', () => {
     count++
 
-    return `<div class="kai-chat-table"${scrollable ? ` tabindex="0" role="group" aria-label="${attribute(tables === 1 ? tableLabel : `${tableLabel} ${count}`)}"` : ''}><table>`
+    return `<div class="kai-chat-table"${scrollable ? ` tabindex="0" role="group" aria-label="${escapeHtml(tables === 1 ? tableLabel : `${tableLabel} ${count}`)}"` : ''}><table>`
   }).replaceAll('</table>', '</table></div>')), cited: linked.cited }
 }
 
