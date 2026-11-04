@@ -56,7 +56,8 @@ describe('time options take a Duration', () => {
     const base = memoryAuthStore()
     const store = { ...base, audit: { ...base.audit!, prune: async (before: Date) => {
       cutoffs.push(before)
-      await base.audit!.prune(before)
+
+      return base.audit!.prune(before)
     } } }
     const { browser } = testApp({ store, audit: { maxAge: '0.4s' } })
     const now = Date.now()

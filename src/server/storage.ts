@@ -24,7 +24,8 @@ export interface FileStore extends StoreBase {
   write: (key: string, data: Blob) => Promise<void>
   // The file, or undefined when none is stored under the key.
   read: (key: string) => Promise<Blob | undefined>
-  delete: (key: string) => Promise<void>
+  // Deletes the file and answers whether there was one; a key with no file is no error.
+  delete: (key: string) => Promise<boolean>
   // Every file stored under the prefix, all of them without one, in no order, with when it was last written when the store knows; `files.list()` needs it, so a store of the app's own gives it for anything listing the files.
   list?: ((prefix?: string) => Promise<StoredFile[]>) | undefined
   // Where a store on this machine's disk keeps a file, which the image route reads in place rather than copying.
@@ -108,7 +109,11 @@ export function diskFiles(dir: string = DEFAULT_DIR): FileStore {
       return await file.exists() ? file : undefined
     },
     async delete(key) {
+      const existed = await Bun.file(path(key)).exists()
+
       await rm(path(key), { force: true })
+
+      return existed
     },
     async list(prefix = '') {
       const root = resolve(dir)
@@ -158,7 +163,11 @@ export function s3Files(options: Bun.S3Options & { publicUrl?: string | undefine
       return await bucket.exists(key) ? bucket.file(key) : undefined
     },
     async delete(key) {
+      const existed = await bucket.exists(key)
+
       await bucket.delete(key)
+
+      return existed
     },
     async list(prefix = '') {
       const found: StoredFile[] = []
@@ -193,8 +202,9 @@ export function memoryFiles(): FileStore {
     },
     // eslint-disable-next-line ts/require-await -- the interface returns a promise
     async delete(key) {
-      stored.delete(key)
       written.delete(key)
+
+      return stored.delete(key)
     },
     // eslint-disable-next-line ts/require-await -- the interface returns a promise
     async list(prefix = '') {
@@ -281,9 +291,9 @@ export const files = {
     return (await activeStore()).read(checkedKey(key, 'files.get()'))
   },
 
-  // Deletes the file, with its copy and the variants the image route made of it; a key with no file is no error.
-  async delete(key: string): Promise<void> {
-    await (await activeStore()).delete(checkedKey(key, 'files.delete()'))
+  // Deletes the file, with its copy and the variants the image route made of it, and resolves with whether there was a file; a key with no file is no error.
+  async delete(key: string): Promise<boolean> {
+    const existed = await (await activeStore()).delete(checkedKey(key, 'files.delete()'))
 
     if (current.cacheDir !== undefined)
       await rm(join(current.cacheDir, key), { force: true })
@@ -295,6 +305,8 @@ export const files = {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
         kayLog('warn', `the image variants of ${key} could not all be removed`, error)
     }
+
+    return existed
   },
 
   // The stored files, those directly in a folder alone when one is given, in no order; the store must be able to list, as the built-in ones do.

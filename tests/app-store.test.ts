@@ -186,7 +186,7 @@ describe('the store contract', () => {
 
   it('lists each store once, the store object last', () => {
     const shared = { get: () => undefined, set: () => undefined, delete: () => undefined }
-    const files = { write: async () => undefined, read: async () => undefined, delete: async () => undefined }
+    const files = { write: async () => undefined, read: async () => undefined, delete: async () => false }
     const store = { sessions: shared, files }
 
     const listed = storesOf(store)
@@ -202,7 +202,7 @@ describe('the store contract', () => {
     const failing = { get: () => undefined, set: () => undefined, delete: () => undefined, close: async () => {
       throw new Error('refused')
     } }
-    const files = { write: async () => undefined, read: async () => undefined, delete: async () => undefined, close: () => {
+    const files = { write: async () => undefined, read: async () => undefined, delete: async () => false, close: () => {
       closed.push('files')
     } }
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
@@ -223,7 +223,7 @@ describe('the store contract', () => {
   })
 
   it('reads the fileStore of before 1.87 first, then store.files, so no store factory moves files', () => {
-    const files = { write: async () => undefined, read: async () => undefined, delete: async () => undefined }
+    const files = { write: async () => undefined, read: async () => undefined, delete: async () => false }
     const old = { ...files }
 
     expect(configuredFiles({ store: { files }, fileStore: old })).toBe(old)

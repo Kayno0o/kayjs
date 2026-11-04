@@ -298,7 +298,7 @@ export function pgPush(pg: PgHandle): PushStore {
 
       return rows.map(row => ({ ...row, at: Number(row.at) }))
     },
-    async remove(endpoint, user) {
+    async delete(endpoint, user) {
       return await (user === undefined ? counted('DELETE FROM kay_push_subscriptions WHERE endpoint = $1', [endpoint]) : counted('DELETE FROM kay_push_subscriptions WHERE endpoint = $1 AND user_id = $2', [endpoint, user])) > 0
     },
     async erase(user) {

@@ -386,7 +386,7 @@ export function jobsAfter(source: PgJobsSource, before?: () => Promise<unknown>)
 
       return (await rowsOf<{ id: string }>(db`UPDATE kay_jobs SET failed = true, held_until = NULL, error = ${error}, payload = coalesce(${payload ?? null}, payload) WHERE id = ${id} AND (${until ?? null}::bigint IS NULL OR held_until = ${until ?? null}::bigint) RETURNING id`)).length === 1
     },
-    async purge(queue, before) {
+    async prune(queue, before) {
       const db = await open()
       const purged = await rowsOf<{ id: string }>(db`DELETE FROM kay_jobs WHERE queue = ${queue} AND failed AND run_at < ${before}::bigint RETURNING id`)
 

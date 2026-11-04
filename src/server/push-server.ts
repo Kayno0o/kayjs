@@ -75,7 +75,7 @@ export async function pushServer(): Promise<AnyElysia> {
 
       // Added first, so a failing store never leaves the person with neither.
       if (typeof replaces === 'string' && replaces !== subscription.endpoint)
-        await pushStore().remove(replaces, user)
+        await pushStore().delete(replaces, user)
 
       return new Response(null, { status: 204, headers: { 'cache-control': 'no-store', 'set-cookie': pushDeviceCookie(subscription.endpoint, overHttps(request)) } })
     }, { parse: 'none' })
@@ -95,7 +95,7 @@ export async function pushServer(): Promise<AnyElysia> {
       if (typeof endpoint !== 'string')
         return none(400)
 
-      await pushStore().remove(endpoint, user)
+      await pushStore().delete(endpoint, user)
 
       return new Response(null, { status: 204, headers: { 'cache-control': 'no-store', 'set-cookie': clearPushDeviceCookie(overHttps(request)) } })
     }, { parse: 'none' })

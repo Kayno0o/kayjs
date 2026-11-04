@@ -211,7 +211,7 @@ export async function resetPassword(state: RequestState, token: string, password
   }) ?? spent.record
 
   // Recovering an account ends every way into it the user did not just prove, devices included.
-  await store.tokens.deleteForUser(record.id)
+  await store.tokens.erase(record.id)
   await revokeBearerTokens(state.core, record.id)
   await notify(state, record, 'password-changed')
 
@@ -279,7 +279,7 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
   if (!record)
     return { ok: false, error: 'invalid' }
 
-  await store.tokens.deleteForUser(record.id)
+  await store.tokens.erase(record.id)
   // To the address the account left, which is the one a thief would want silent.
   await notify(state, record, 'email-changed', record.email!, spent.record.emailVerifiedAt === null ? null : spent.record.email)
 
@@ -389,7 +389,7 @@ async function spendCode(state: RequestState, type: CodeType, code: string) {
 
   await state.session.unset('authEmailCode')
   // The link the same mail carried is spent with it.
-  await core.store.tokens.deleteForUser(record.id, LINK_OF[type])
+  await core.store.tokens.erase(record.id, LINK_OF[type])
 
   return { ok: true, token: spent, record } as const
 }
@@ -475,7 +475,7 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
   const mode = type in CODE_OF ? mail.codes[type as CodedLink] : 'link'
   const content: { url?: string, code?: string } = {}
 
-  await core.store.tokens.deleteForUser(record.id, type)
+  await core.store.tokens.erase(record.id, type)
 
   if (mode !== 'code') {
     const token = randomToken() + await rememberMark(state, type)
@@ -489,7 +489,7 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
     const code = nanoid(CODE_LENGTH, DIGITS)
 
     content.code = code
-    await core.store.tokens.deleteForUser(record.id, codeType)
+    await core.store.tokens.erase(record.id, codeType)
     await core.store.tokens.create({ digest: codeDigest(core, nonce, code), type: codeType, userId: record.id, email, redirect, expiresAt: new Date(Date.now() + mail.maxAge[codeType] * 1000) })
   }
 
@@ -515,7 +515,7 @@ async function spendLink(state: RequestState, token: string, type: LinkType, cou
 
   // The code the same mail carried is spent with it.
   if (type in CODE_OF)
-    await store.tokens.deleteForUser(record.id, CODE_OF[type as CodedLink])
+    await store.tokens.erase(record.id, CODE_OF[type as CodedLink])
 
   return { ok: true, token: spent, record, remember: type === 'magic-link' ? rememberOf(token) : undefined } as const
 }
@@ -563,7 +563,7 @@ async function claim(core: Core, record: UserRecord): Promise<Partial<UserRecord
   await core.store.recoveryCodes.replace(record.id, [])
   await revokeBearerTokens(core, record.id)
   // A link the stranger asked for before, such as moving the account to their own address, would take it back.
-  await core.store.tokens.deleteForUser(record.id)
+  await core.store.tokens.erase(record.id)
 
   return { passwordHash: null, totpSecret: null, totpEnabledAt: null, sessionVersion: record.sessionVersion + 1 }
 }

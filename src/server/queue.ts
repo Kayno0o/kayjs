@@ -76,7 +76,7 @@ export interface JobStore extends StoreBase {
   // Resolves with `false` when the hold was another's and nothing was written, as `retry` does.
   fail: (id: string, error: string, payload?: string, until?: number) => MaybePromise<boolean | void>
   // Removes the failed jobs of the queue whose time came before `before`, and resolves with how many went; a store without it has them listed with `failed` and removed one by one.
-  purge?: ((queue: string, before: number) => MaybePromise<number>) | undefined
+  prune?: ((queue: string, before: number) => MaybePromise<number>) | undefined
   // The failed jobs of the queue, oldest first, `limit` of them at most when it is given.
   failed: (queue: string, limit?: number) => MaybePromise<StoredJob[]>
   // Puts a failed job back to wait, due at `runAt` with its attempts given back, for a retry from the dev tool or a jobs page; resolves with whether it did: false for a job that is not failed, or whose key a live job holds since.
@@ -320,7 +320,7 @@ export function sqliteJobs(path: string): JobStore {
     fail(id, error, payload, until) {
       return open(true)!.fail.run(error, payload ?? null, id, until ?? null, until ?? null).changes === 1
     },
-    purge(queue, before) {
+    prune(queue, before) {
       return open(false)?.purge.run(queue, before).changes ?? 0
     },
     failed(queue, limit) {
@@ -534,7 +534,7 @@ export function memoryJobs(): JobStore {
 
       return true
     },
-    purge(queue, before) {
+    prune(queue, before) {
       const purged = [...jobs.values()].filter(job => job.queue === queue && job.failed && job.runAt < before)
 
       for (const job of purged)
@@ -922,8 +922,8 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
 
     const current = store()
 
-    if (current.purge) {
-      await current.purge(name, now - keepFailed)
+    if (current.prune) {
+      await current.prune(name, now - keepFailed)
 
       return
     }

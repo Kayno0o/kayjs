@@ -107,7 +107,7 @@ export function memoryAuthStore(): AuthStore {
           .map(user => copy(user)!)
       },
       delete(id) {
-        users.delete(id)
+        const existed = users.delete(id)
 
         for (const [key, identity] of identities) {
           if (identity.userId === id)
@@ -152,6 +152,8 @@ export function memoryAuthStore(): AuthStore {
           if (invitation.invitedBy === id)
             invitation.invitedBy = null
         }
+
+        return existed
       },
       list({ search, offset, limit }) {
         const wanted = search?.toLowerCase()
@@ -190,14 +192,16 @@ export function memoryAuthStore(): AuthStore {
         if (identity)
           identities.set(key, { ...identity, ...patch })
       },
-      delete(provider, providerId) {
-        identities.delete(identityKey(provider, providerId))
-      },
-      deleteForUser(userId) {
+      delete: (provider, providerId) => identities.delete(identityKey(provider, providerId)),
+      erase(userId) {
+        let erased = 0
+
         for (const [key, identity] of identities) {
-          if (identity.userId === userId)
-            identities.delete(key)
+          if (identity.userId === userId && identities.delete(key))
+            erased++
         }
+
+        return erased
       },
     },
     tokens: {
@@ -214,11 +218,15 @@ export function memoryAuthStore(): AuthStore {
 
         return token.expiresAt.getTime() > Date.now() ? token : undefined
       },
-      deleteForUser(userId, type) {
+      erase(userId, type) {
+        let erased = 0
+
         for (const [key, token] of tokens) {
-          if (token.userId === userId && (type === undefined || token.type === type))
-            tokens.delete(key)
+          if (token.userId === userId && (type === undefined || token.type === type) && tokens.delete(key))
+            erased++
         }
+
+        return erased
       },
     },
     sessions: {
@@ -272,15 +280,32 @@ export function memoryAuthStore(): AuthStore {
         .slice(0, limit)
         .map(entry => ({ ...entry })),
       prune(before) {
-        audit = audit.filter(entry => entry.at >= before)
-      },
-      forget(userId, pseudonym) {
-        audit = audit.map((entry) => {
-          if (entry.userId === userId)
-            return { ...entry, userId: pseudonym, detail: null, ip: '', userAgent: '' }
+        const kept = audit.filter(entry => entry.at >= before)
+        const pruned = audit.length - kept.length
 
-          return entry.actorId === userId ? { ...entry, actorId: pseudonym, ip: '', userAgent: '' } : entry
+        audit = kept
+
+        return pruned
+      },
+      erase(userId, pseudonym) {
+        let erased = 0
+
+        audit = audit.map((entry) => {
+          if (entry.userId === userId) {
+            erased++
+
+            return { ...entry, userId: pseudonym, detail: null, ip: '', userAgent: '' }
+          }
+
+          if (entry.actorId !== userId)
+            return entry
+
+          erased++
+
+          return { ...entry, actorId: pseudonym, ip: '', userAgent: '' }
         })
+
+        return erased
       },
     },
     bearerTokens: {
@@ -307,11 +332,15 @@ export function memoryAuthStore(): AuthStore {
 
         return bearerTokens.delete(id)
       },
-      deleteForUser(userId) {
+      erase(userId) {
+        let erased = 0
+
         for (const [key, token] of bearerTokens) {
-          if (token.userId === userId)
-            bearerTokens.delete(key)
+          if (token.userId === userId && bearerTokens.delete(key))
+            erased++
         }
+
+        return erased
       },
     },
     oauth: {
@@ -401,11 +430,15 @@ export function memoryAuthStore(): AuthStore {
 
           dropTokens(token => token.userId === userId && token.oauth?.family === family)
         },
-        deleteForUser(userId) {
+        erase(userId) {
+          let erased = 0
+
           for (const [key, token] of oauthRefresh) {
-            if (token.userId === userId)
-              oauthRefresh.delete(key)
+            if (token.userId === userId && oauthRefresh.delete(key))
+              erased++
           }
+
+          return erased
         },
       },
     },

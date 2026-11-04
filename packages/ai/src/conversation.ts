@@ -319,7 +319,7 @@ async function answerOf(call: HeldCall, prompt: readonly Message[], named: strin
     return { owned: true, op: 'rename', id: call.id, done: await store.rename(key, renamedTitle(prompt.at(-1)?.content ?? '')) }
 
   if (call.op === 'remove')
-    return { owned: true, op: 'remove', id: call.id, done: await store.remove(key) }
+    return { owned: true, op: 'remove', id: call.id, done: await store.delete(key) }
 
   // Read before the store, so a write landing during the read shows as the revision it moved, not as no reply running.
   const under = writing.get(pendingKey(key))

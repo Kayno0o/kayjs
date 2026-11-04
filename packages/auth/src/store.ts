@@ -234,8 +234,8 @@ export interface AuthStore {
     create: (user: UserRecord) => MaybePromise<UserRecord | void>
     // The user once changed, or undefined when there is none; throws when the change takes an email or a username another user has.
     update: (id: string, patch: Partial<Omit<UserRecord, 'id' | 'createdAt'>>) => MaybePromise<UserRecord | undefined>
-    // Deletes the user with everything kayjs-auth keeps for them: identities, links, sessions, passkeys, bearer tokens, OAuth grants, codes and refresh tokens, recovery codes and memberships; invitations they sent lose their `invitedBy`.
-    delete: (id: string) => MaybePromise<void>
+    // Deletes the user with everything kayjs-auth keeps for them: identities, links, sessions, passkeys, bearer tokens, OAuth grants, codes and refresh tokens, recovery codes and memberships; invitations they sent lose their `invitedBy`. False when there is none.
+    delete: (id: string) => MaybePromise<boolean>
     // Up to `limit` guests created before `createdBefore` and holding no session, oldest first; without it guests are never pruned.
     staleGuests?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>
     // Up to `limit` users who are not guests, created before `createdBefore` with an email never verified, holding no session and no identity, oldest first; without it unverified accounts are never pruned.
@@ -252,16 +252,17 @@ export interface AuthStore {
     // Throws when that provider account is linked already.
     create: (identity: IdentityRecord) => MaybePromise<void>
     update: (provider: string, providerId: string, patch: Partial<Pick<IdentityRecord, 'accessToken' | 'refreshToken' | 'tokenExpiresAt'>>) => MaybePromise<void>
-    delete: (provider: string, providerId: string) => MaybePromise<void>
-    // Deletes every identity of the user in one query; without it kayjs-auth deletes them one by one.
-    deleteForUser?: (userId: string) => MaybePromise<void>
+    // False when there is none.
+    delete: (provider: string, providerId: string) => MaybePromise<boolean>
+    // Deletes every identity of the user in one query and answers how many went; without it kayjs-auth deletes them one by one.
+    erase?: (userId: string) => MaybePromise<number>
   }
   tokens: {
     create: (token: TokenRecord) => MaybePromise<void>
     // Deletes and answers the token when it exists, has that type and has not expired: once only, even when two requests spend it together.
     consume: (digest: string, type: TokenType) => MaybePromise<TokenRecord | undefined>
-    // Deletes the user's tokens of that type, or of every type.
-    deleteForUser: (userId: string, type?: TokenType) => MaybePromise<void>
+    // Deletes the user's tokens of that type, or of every type, and answers how many went.
+    erase: (userId: string, type?: TokenType) => MaybePromise<number>
   }
   sessions: {
     create: (session: SessionRecord) => MaybePromise<void>
@@ -287,10 +288,10 @@ export interface AuthStore {
     add: (entry: AuditRecord) => MaybePromise<void>
     // Newest first, entries of one millisecond by id descending (the library writes time-ordered ids, so that is newest written first); `before` excludes that instant, or when it names an entry's `at` and `id`, that entry and every one after it in this order.
     list: (query: { userId?: string, before?: AuditCursor, limit: number }) => MaybePromise<AuditRecord[]>
-    // Deletes the entries older than `before`.
-    prune: (before: Date) => MaybePromise<void>
-    // Strips a deleted user from the log: `userId` becomes `pseudonym` in their entries, which lose their address, browser and detail, and in the entries they acted in, which lose their address and browser.
-    forget: (userId: string, pseudonym: string) => MaybePromise<void>
+    // Deletes the entries older than `before` and answers how many went.
+    prune: (before: Date) => MaybePromise<number>
+    // Strips a deleted user from the log and answers how many entries it changed: `userId` becomes `pseudonym` in their entries, which lose their address, browser and detail, and in the entries they acted in, which lose their address and browser.
+    erase: (userId: string, pseudonym: string) => MaybePromise<number>
   }
   // Needed only with the `organizations` option, as are `members` and `invitations`.
   organizations?: {
@@ -337,8 +338,8 @@ export interface AuthStore {
     touch: (id: string, at: Date) => MaybePromise<void>
     // Deletes the user's token with that id; false when they have none.
     delete: (userId: string, id: string) => MaybePromise<boolean>
-    // Deletes every token of the user in one query; without it kayjs-auth deletes them one by one.
-    deleteForUser?: (userId: string) => MaybePromise<void>
+    // Deletes every token of the user in one query and answers how many went; without it kayjs-auth deletes them one by one.
+    erase?: (userId: string) => MaybePromise<number>
   }
   // Needed only for the OAuth server (MCP clients signing in): without it the server is off.
   oauth?: {
@@ -372,8 +373,8 @@ export interface AuthStore {
       use: (digest: string, at: Date) => MaybePromise<{ token: OAuthRefreshRecord, reused: boolean } | undefined>
       // Deletes the refresh tokens of the family and the bearer tokens issued under it.
       revokeFamily: (userId: string, family: string) => MaybePromise<void>
-      // Deletes every refresh token of the user, as signing out everywhere does.
-      deleteForUser: (userId: string) => MaybePromise<void>
+      // Deletes every refresh token of the user, as signing out everywhere does, and answers how many went.
+      erase: (userId: string) => MaybePromise<number>
     }
   }
   // Digests of the codes that sign in in place of a second factor.

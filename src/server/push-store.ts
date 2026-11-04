@@ -21,7 +21,7 @@ export interface PushStore extends StoreBase {
   // A person's subscriptions, newest first.
   list: (user: string) => PushSubscriptionRecord[] | Promise<PushSubscriptionRecord[]>
   // Deletes the subscription at an endpoint, only a person's own when `user` is given; false when none went.
-  remove: (endpoint: string, user?: string) => boolean | Promise<boolean>
+  delete: (endpoint: string, user?: string) => boolean | Promise<boolean>
   // Deletes every subscription of a person, answering how many went.
   erase: (user: string) => number | Promise<number>
 
@@ -42,7 +42,7 @@ export function memoryPush(): PushStore {
         rows.delete(row.endpoint)
     },
     list: user => [...rows.values()].filter(row => row.user === user).toReversed().map(({ user: _user, ...subscription }) => subscription),
-    remove(endpoint, user) {
+    delete(endpoint, user) {
       const row = rows.get(endpoint)
 
       if (row === undefined || (user !== undefined && row.user !== user))
@@ -92,7 +92,7 @@ export function sqlitePush(path: string): PushStore {
   return {
     add: async (user, subscription, most) => open().add(user, subscription, most),
     list: async user => open().list(user),
-    remove: async (endpoint, user) => open().remove(endpoint, user),
+    delete: async (endpoint, user) => open().delete(endpoint, user),
     erase: async user => open().erase(user),
     close: async () => {
       closed = true
@@ -120,7 +120,7 @@ function openPush(path: string): PushStore {
       trim.run(user, most)
     },
     list: user => list.all(user),
-    remove: (endpoint, user) => (user === undefined ? drop.run(endpoint) : dropOwn.run(endpoint, user)).changes > 0,
+    delete: (endpoint, user) => (user === undefined ? drop.run(endpoint) : dropOwn.run(endpoint, user)).changes > 0,
     erase: user => erase.run(user).changes,
     close: () => db.close(),
   }

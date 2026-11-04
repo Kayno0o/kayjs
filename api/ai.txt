@@ -173,9 +173,9 @@ interface ConversationKey
 
 [.] ConversationStore
 interface ConversationStore
+  delete: (key: ConversationKey) => Promise<boolean>
   get: (key: ConversationKey) => Promise<StoredConversation | undefined>
   list: (owner: string, scope: string, limit: number) => Promise<ConversationSummary[]>
-  remove: (key: ConversationKey) => Promise<boolean>
   rename: (key: ConversationKey, title: string) => Promise<boolean>
   write: (key: ConversationKey, revision: number, change: ConversationChange) => Promise<number | undefined>
 

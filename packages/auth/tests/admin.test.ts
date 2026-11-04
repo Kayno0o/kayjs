@@ -241,10 +241,10 @@ describe('admin', () => {
   test('an admin\'s deletion whose after-delete step throws still hands the organization over and strips the audit log', async () => {
     const base = memoryAuthStore()
     let strips = 0
-    const store: AuthStore = { ...base, audit: { ...base.audit!, forget: async (userId, pseudonym) => {
+    const store: AuthStore = { ...base, audit: { ...base.audit!, erase: async (userId, pseudonym) => {
       strips++
 
-      return base.audit!.forget(userId, pseudonym)
+      return base.audit!.erase(userId, pseudonym)
     } }, invitations: { ...base.invitations!, listByEmail: async () => {
       throw new Error('invitation store down')
     } } }

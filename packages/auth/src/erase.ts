@@ -157,7 +157,7 @@ async function eraseAside(core: Core, record: UserRecord): Promise<void> {
 
 async function forget(core: Core, record: UserRecord, pseudonym: string): Promise<void> {
   if (core.audit)
-    await core.store.audit?.forget(record.id, pseudonym)
+    await core.store.audit?.erase(record.id, pseudonym)
 }
 
 // Runs once the user is gone, so it also catches two owners deleted at the same moment, each having seen the other still there: an organization left empty is deleted, one left with members but no owner passes to the one who joined first.

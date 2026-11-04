@@ -105,7 +105,8 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
 
       expect(await store.identities.find('discord', '1')).toMatchObject({ accessToken: null, tokenExpiresAt: null })
 
-      await store.identities.delete('discord', '1')
+      expect(await store.identities.delete('discord', '1')).toBe(true)
+      expect(await store.identities.delete('discord', '1')).toBe(false)
 
       expect(await store.identities.find('discord', '1')).toBeUndefined()
     })
@@ -123,7 +124,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect(await store.tokens.consume('a', 'magic-link')).toBeUndefined()
       expect(await store.tokens.consume('b', 'magic-link')).toBeUndefined()
 
-      await store.tokens.deleteForUser('u1', 'verify-email')
+      await store.tokens.erase('u1', 'verify-email')
       expect(await store.tokens.consume('c', 'magic-link')).toMatchObject({ digest: 'c', type: 'magic-link', userId: 'u1', email: 'ada@example.com', redirect: '/account' })
     })
 
@@ -133,7 +134,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
 
       await store.tokens.create({ digest: 'a', type: 'magic-link', userId: 'u1', email: 'x', redirect: null, expiresAt })
       await store.tokens.create({ digest: 'b', type: 'verify-email', userId: 'u1', email: 'x', redirect: null, expiresAt })
-      await store.tokens.deleteForUser('u1', 'magic-link')
+      expect(await store.tokens.erase('u1', 'magic-link')).toBe(1)
 
       expect(await store.tokens.consume('a', 'magic-link')).toBeUndefined()
       expect(await store.tokens.consume('b', 'verify-email')).toBeDefined()
@@ -208,7 +209,8 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       await store.bearerTokens.create({ id: 't2', userId: 'u2', label: 'Laptop', digest: 'd2', scopes: null, createdAt: new Date('2026-01-01T00:00:00Z'), lastUsedAt: null, expiresAt: null })
       expect((await store.bearerTokens.findByDigestWithUser!('d2'))?.user).toEqual(await store.users.get('u2'))
       expect(await store.bearerTokens.findByDigestWithUser!('nope')).toBeUndefined()
-      await store.users.delete('u1')
+      expect(await store.users.delete('u1')).toBe(true)
+      expect(await store.users.delete('u1')).toBe(false)
       expect(await store.bearerTokens.findByDigestWithUser!('d1')).toBeUndefined()
     })
 
@@ -263,7 +265,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect((await store.audit!.list({ before: new Date('2026-01-03T00:00:00Z'), limit: 1 })).map(found => found.id)).toEqual(['a2'])
       expect(await store.audit!.list({ userId: 'u2', limit: 10 })).toEqual([entry('a2', 'u2', '2026-01-02T00:00:00Z')])
 
-      await store.audit!.prune(new Date('2026-01-02T00:00:00Z'))
+      expect(await store.audit!.prune(new Date('2026-01-02T00:00:00Z'))).toBe(1)
 
       expect((await store.audit!.list({ limit: 10 })).map(found => found.id)).toEqual(['a3', 'a2'])
     })
@@ -309,7 +311,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       await store.audit!.add(entry('a1', 'u1', null))
       await store.audit!.add(entry('a2', 'u2', 'u1'))
       await store.audit!.add(entry('a3', 'u2', null))
-      await store.audit!.forget('u1', 'gone')
+      expect(await store.audit!.erase('u1', 'gone')).toBe(2)
 
       expect(await store.audit!.list({ userId: 'u1', limit: 10 })).toEqual([])
       expect((await store.audit!.list({ userId: 'gone', limit: 10 })).map(({ id, detail, ip, userAgent, actorId }) => ({ id, detail, ip, userAgent, actorId }))).toEqual([{ id: 'a1', detail: null, ip: '', userAgent: '', actorId: null }])
@@ -393,7 +395,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect(await store.invitations!.listByOrganization('o1')).toEqual([])
     })
 
-    test('getMany answers the records found in one call, deleteForUser empties a user\'s identities and bearer tokens, and list may skip the total', async () => {
+    test('getMany answers the records found in one call, erase empties a user\'s identities and bearer tokens, and list may skip the total', async () => {
       await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
       await store.users.create(userRecord({ id: 'u2', email: 'bob@example.com' }))
       await store.organizations!.create({ id: 'o1', name: 'Acme', slug: null, createdAt: new Date() })
@@ -408,8 +410,9 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
         await store.bearerTokens.create({ id: provider, userId, label: provider, digest: provider, scopes: null, createdAt: new Date(), lastUsedAt: null, expiresAt: null })
       }
 
-      await store.identities.deleteForUser!('u1')
-      await store.bearerTokens.deleteForUser!('u1')
+      expect(await store.identities.erase!('u1')).toBe(2)
+      expect(await store.bearerTokens.erase!('u1')).toBe(2)
+      expect(await store.identities.erase!('u1')).toBe(0)
 
       expect(await store.identities.listByUser('u1')).toEqual([])
       expect(await store.bearerTokens.listByUser('u1')).toEqual([])
@@ -646,7 +649,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
         expect(await oauth.refresh.use('rt2', new Date())).toMatchObject({ reused: false })
         expect((await store.bearerTokens.listByUser('u1')).map(token => token.id).sort()).toEqual(['a2', 'plain'])
 
-        await oauth.refresh.deleteForUser('u1')
+        await oauth.refresh.erase('u1')
 
         expect(await oauth.refresh.use('rt2', new Date())).toBeUndefined()
       })

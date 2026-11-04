@@ -37,7 +37,7 @@ export async function changePassword(state: RequestState, proof: Proof, password
 
   if (updated) {
     // Links mailed before, a reset among them, no longer outrank the password just set.
-    await state.core.store.tokens.deleteForUser(updated.id)
+    await state.core.store.tokens.erase(updated.id)
     await notify(state, updated, 'password-changed')
   }
 

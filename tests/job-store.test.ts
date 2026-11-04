@@ -480,7 +480,7 @@ describe.each(kinds)('job store contract, $name', ({ name, open }) => {
     })
   })
 
-  describe('purge', () => {
+  describe('prune', () => {
     it('drops the failed jobs of the queue due before the time given and counts them, leaving live, later and other queues\' ones', async () => {
       const store = await open()
       const old = job({ runAt: 1 })
@@ -494,11 +494,11 @@ describe.each(kinds)('job store contract, $name', ({ name, open }) => {
       for (const failing of [old, recent, otherOld])
         await store.fail(failing.id, 'boom')
 
-      expect(await store.purge!('q', 100)).toBe(1)
+      expect(await store.prune!('q', 100)).toBe(1)
       expect(await store.failed('q')).toMatchObject([{ id: recent.id }])
       expect(await store.jobs!('q', { failed: false })).toMatchObject([{ id: live.id }])
       expect(await store.failed('other')).toMatchObject([{ id: otherOld.id }])
-      expect(await store.purge!('q', 100)).toBe(0)
+      expect(await store.prune!('q', 100)).toBe(0)
     })
   })
 
@@ -692,7 +692,7 @@ pgDescribe('pgJobs', () => {
     await store.add(job({ runAt: 5000 }))
     await store.fail(old.id, 'boom', '[redacted]')
     expect((await store.failed('q'))[0]?.payload).toBe('[redacted]')
-    expect(await store.purge!('q', 100)).toBe(1)
+    expect(await store.prune!('q', 100)).toBe(1)
     expect(await store.failed('q')).toEqual([])
   })
 })

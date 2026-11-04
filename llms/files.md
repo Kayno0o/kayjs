@@ -39,7 +39,7 @@ const key = await files.put(file, { folder: 'avatars', replace: user.avatar })
 
 ### Delete a stored file
 
-`files.delete(key)` deletes it, a key with no file being no error:
+`files.delete(key)` deletes it and resolves with whether there was a file, a key with no file being no error:
 
 ```ts
 import { files } from 'kay/server'
@@ -150,7 +150,7 @@ export default defineConfig({
 - `s3Files(options)` keeps them in an S3 bucket, or any service speaking its API, such as R2, Spaces or MinIO; options left out are read from `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`, as Bun's S3 client reads them, and it takes the client's own options, `virtualHostedStyle` say.
 - `/_kay/files/` streams them from the bucket, whole, and the image route copies an image it resizes once into its cache.
 - `publicUrl` is where the bucket serves its files without kay, which a static export links; `s3Files` stores each object with the type and disposition the key's extension gives, in any case, as `/_kay/files/` serves it, never the type the uploader declared: an image, video, audio, PDF or plain text shows in place, any other file (HTML, SVG, scripts) is stored as `application/octet-stream`, or `image/svg+xml` for an SVG so an `img` still shows it, with `Content-Disposition: attachment`, its `filename` escaped for a key holding a quote or a non-ASCII character (`filename*` carries the exact name). Objects written by an earlier release keep the type they were uploaded with: put them again, or set their type in the bucket. A bucket cannot be given the route's `sandbox` policy, so serve it from a host with no cookies of the app's.
-- `memoryFiles()` from `kay/server` keeps them in the process; `FileStore` is the shape of an app's own: `write`, `read` and `delete` by key, `list(prefix?)` for `files.list` to work, resolving with `{ key, modified? }` for each file under the prefix, which the built-in stores have, and `path` for one on this machine's disk, which the image route reads in place.
+- `memoryFiles()` from `kay/server` keeps them in the process; `FileStore` is the shape of an app's own: `write`, `read` and `delete` by key (`delete` resolves with whether there was a file), `list(prefix?)` for `files.list` to work, resolving with `{ key, modified? }` for each file under the prefix, which the built-in stores have, and `path` for one on this machine's disk, which the image route reads in place.
 - A script or a test that started no server reads `store.files` from the kay.config.ts where it runs.
 - Under `bun test` files stay in memory, and `testSite` gives each site a store of its own unless its options name one.
 - `kay build --static` fails on a page linking a stored file, which has no server to serve it, unless the store has a `publicUrl`: the page then links the file there, unresized.

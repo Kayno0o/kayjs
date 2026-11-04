@@ -1672,7 +1672,7 @@ describe('lifecycle', () => {
     } }
     const healthy = await pages({ root: PRODUCTION, prebuilt: false, store: { sessions: { ...shared, get: () => undefined, set: () => undefined, delete: () => undefined }, files: { ping: () => {
       pings.push('files')
-    }, write: async () => undefined, read: async () => undefined, delete: async () => undefined } } })
+    }, write: async () => undefined, read: async () => undefined, delete: async () => false } } })
     const down = await pages({ root: PRODUCTION, prebuilt: false, store: { ping: async () => {
       throw new Error('store down')
     } } })

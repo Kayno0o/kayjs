@@ -249,9 +249,7 @@ export function pgStore(db: Database): AuthStore {
 
         return rows.length === 0 ? [] : (await users.read.findMany(q => q.where({ id: { in: rows.map(row => row.id) } }).orderBy('created_at', 'asc'))).map(row => toUser(row)!)
       },
-      async delete(id) {
-        await users.write.deleteById(id)
-      },
+      delete: async id => await users.write.deleteById(id) !== null,
       async list({ search, offset, limit, total: counted = true }) {
         const [rows, total] = await Promise.all([
           users.read.findMany(q => q.andWhere(search !== undefined && (e => e.or(e.eq('id', search), e.iContains('email', search), e.iContains('username', search)))).orderBy('created_at', 'desc').orderBy('id', 'desc').offset(offset).limit(limit)),
@@ -275,12 +273,8 @@ export function pgStore(db: Database): AuthStore {
         if (!isEmpty(row))
           await identities.write.updateOne(row, { provider, provider_id: providerId })
       },
-      async delete(provider, providerId) {
-        await identities.write.deleteMany({ provider, provider_id: providerId })
-      },
-      async deleteForUser(userId) {
-        await identities.write.deleteMany({ user_id: userId })
-      },
+      delete: async (provider, providerId) => (await identities.write.deleteMany({ provider, provider_id: providerId }, { pk: true })).length > 0,
+      erase: async userId => (await identities.write.deleteMany({ user_id: userId }, { pk: true })).length,
     },
     tokens: {
       async create(token) {
@@ -292,9 +286,7 @@ export function pgStore(db: Database): AuthStore {
 
         return row && row.expires_at.getTime() > Date.now() ? toToken(row) : undefined
       },
-      async deleteForUser(userId, type) {
-        await tokens.write.deleteMany(type === undefined ? { user_id: userId } : { user_id: userId, type })
-      },
+      erase: async (userId, type) => (await tokens.write.deleteMany(type === undefined ? { user_id: userId } : { user_id: userId, type }, { pk: true })).length,
     },
     sessions: {
       async create(session) {
@@ -329,12 +321,12 @@ export function pgStore(db: Database): AuthStore {
         await audit.write.insertOne({ id: entry.id, user_id: entry.userId, event: entry.event, detail: entry.detail, ip: entry.ip, user_agent: entry.userAgent, actor_id: entry.actorId, at: entry.at })
       },
       list: async ({ userId, before, limit }) => (await audit.read.findMany(q => q.andWhere(userId !== undefined && { user_id: userId }).andWhere(before !== undefined && (e => before instanceof Date ? e.lt('at', before) : e.or(e.lt('at', before.at), e.and(e.eq('at', before.at), e.lt('id', before.id))))).orderBy('at', 'desc').orderBy('id', 'desc').limit(limit))).map(row => toAudit(row)),
-      async prune(before) {
-        await audit.write.deleteMany({ at: { lt: before } })
-      },
-      async forget(userId, pseudonym) {
-        await audit.write.updateMany({ user_id: pseudonym, detail: null, ip: '', user_agent: '' }, { user_id: userId }, { pk: true })
-        await audit.write.updateMany({ actor_id: pseudonym, ip: '', user_agent: '' }, { actor_id: userId }, { pk: true })
+      prune: async before => (await audit.write.deleteMany({ at: { lt: before } }, { pk: true })).length,
+      async erase(userId, pseudonym) {
+        const own = await audit.write.updateMany({ user_id: pseudonym, detail: null, ip: '', user_agent: '' }, { user_id: userId }, { pk: true })
+        const acted = await audit.write.updateMany({ actor_id: pseudonym, ip: '', user_agent: '' }, { actor_id: userId }, { pk: true })
+
+        return own.length + acted.length
       },
     },
     organizations: {
@@ -386,9 +378,7 @@ export function pgStore(db: Database): AuthStore {
         await bearerTokens.write.updateById(id, { last_used_at: at })
       },
       delete: async (userId, id) => await bearerTokens.write.deleteOne({ id, user_id: userId }) !== null,
-      async deleteForUser(userId) {
-        await bearerTokens.write.deleteMany({ user_id: userId })
-      },
+      erase: async userId => (await bearerTokens.write.deleteMany({ user_id: userId }, { pk: true })).length,
     },
     oauth: {
       clients: {
@@ -461,8 +451,8 @@ export function pgStore(db: Database): AuthStore {
             await bearerTokens.using(tx).write.deleteMany({ user_id: userId, oauth_family: family })
           })
         },
-        async deleteForUser(userId) {
-          await withoutMissingOAuthTables(async () => oauthRefresh.write.deleteMany({ user_id: userId }))
+        async erase(userId) {
+          return await withoutMissingOAuthTables(async () => (await oauthRefresh.write.deleteMany({ user_id: userId }, { pk: true })).length) ?? 0
         },
       },
     },

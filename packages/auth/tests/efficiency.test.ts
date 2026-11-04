@@ -227,14 +227,14 @@ describe('revoking in bulk', () => {
     log.reset()
     await ada.fetch('/sign-out-everywhere', { method: 'POST' })
 
-    expect(log.count('bearerTokens.deleteForUser')).toBe(1)
+    expect(log.count('bearerTokens.erase')).toBe(1)
     expect(log.count('bearerTokens.delete')).toBe(0)
   })
 
-  test('a store without deleteForUser still revokes every token', async () => {
+  test('a store without erase still revokes every token', async () => {
     const store = memoryAuthStore()
 
-    delete store.bearerTokens.deleteForUser
+    delete store.bearerTokens.erase
 
     const { browser } = testApp({ store })
     const ada = browser()
@@ -273,7 +273,7 @@ describe('revoking in bulk', () => {
     log.reset()
     await owner.call('password.reset', token, 'another correct horse')
 
-    expect(log.count('identities.deleteForUser')).toBe(1)
+    expect(log.count('identities.erase')).toBe(1)
     expect(log.count('identities.delete')).toBe(0)
     expect(await store.identities.listByUser(user!.id)).toEqual([])
   })

@@ -117,7 +117,7 @@ describe('pruning accounts never verified', () => {
 describe('erasing a user', () => {
   test('a store failing to strip the audit log fails the erase with the account still there', async () => {
     const base = memoryAuthStore()
-    const store: AuthStore = { ...base, audit: { ...base.audit!, forget: () => {
+    const store: AuthStore = { ...base, audit: { ...base.audit!, erase: () => {
       throw new Error('audit store down')
     } } }
     const { browser } = testApp({ store, audit: true })
@@ -292,11 +292,11 @@ describe('erasing a user, the entry recording it', () => {
   test('a failure stripping it fails the erase once the account is gone', async () => {
     const base = memoryAuthStore()
     let calls = 0
-    const store: AuthStore = { ...base, audit: { ...base.audit!, forget: async (userId, pseudonym) => {
+    const store: AuthStore = { ...base, audit: { ...base.audit!, erase: async (userId, pseudonym) => {
       if (++calls === 2)
         throw new Error('audit store down')
 
-      return base.audit!.forget(userId, pseudonym)
+      return base.audit!.erase(userId, pseudonym)
     } } }
     const { browser } = testApp({ store, audit: true })
     const ada = browser()

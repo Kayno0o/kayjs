@@ -1329,7 +1329,7 @@ describe('queue', () => {
       const store = kind === 'sqlite' ? sqliteJobs(await jobsPath()) : memoryJobs()
 
       if (kind === 'without purge')
-        store.purge = undefined
+        store.prune = undefined
 
       return queue('failing', () => {
         throw new Error('no such mailbox')
@@ -1449,7 +1449,7 @@ describe('queue', () => {
     const store = memoryJobs()
     const jobs = queue('purging', () => undefined, { store, failedTtl: '1d' })
 
-    store.purge = () => {
+    store.prune = () => {
       throw new Error('store locked')
     }
 

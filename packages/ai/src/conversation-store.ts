@@ -56,7 +56,7 @@ export interface ConversationStore {
   write: (key: ConversationKey, revision: number, change: ConversationChange) => Promise<number | undefined>
   // Answer whether the conversation was there.
   rename: (key: ConversationKey, title: string) => Promise<boolean>
-  remove: (key: ConversationKey) => Promise<boolean>
+  delete: (key: ConversationKey) => Promise<boolean>
 }
 
 export const CONVERSATIONS_FILE = 'data/ai-conversations.sqlite'
@@ -124,7 +124,7 @@ export function sqliteConversations(path: string = CONVERSATIONS_FILE): Conversa
     },
     write: async (key, revision, change) => Promise.resolve(db().write(key, revision, change)),
     rename: async ({ owner, scope, id }, title) => Promise.resolve(db().rename.run(title, owner, scope, id).changes > 0),
-    remove: async ({ owner, scope, id }) => Promise.resolve(db().remove.run(owner, scope, id).changes > 0),
+    delete: async ({ owner, scope, id }) => Promise.resolve(db().remove.run(owner, scope, id).changes > 0),
   }
 }
 

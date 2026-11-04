@@ -286,7 +286,7 @@ async function deliver(subscription: PushSubscriptionRecord, payload: Uint8Array
   const found = staticEndpoint(subscription.endpoint, production)
 
   if (found === undefined) {
-    await pushStore().remove(subscription.endpoint)
+    await pushStore().delete(subscription.endpoint)
 
     return 'dropped'
   }
@@ -301,7 +301,7 @@ async function deliver(subscription: PushSubscriptionRecord, payload: Uint8Array
       return 'sent'
 
     if (status === 404 || status === 410) {
-      await pushStore().remove(subscription.endpoint)
+      await pushStore().delete(subscription.endpoint)
 
       return 'dropped'
     }
@@ -313,7 +313,7 @@ async function deliver(subscription: PushSubscriptionRecord, payload: Uint8Array
   catch (error) {
     // Only an address that is not public ends a subscription; a lookup that failed may work on the next push.
     if (error instanceof PrivateAddressError) {
-      await pushStore().remove(subscription.endpoint)
+      await pushStore().delete(subscription.endpoint)
 
       return 'dropped'
     }
@@ -422,7 +422,7 @@ export async function forgetPushDevice(request: Request, user: string): Promise<
   try {
     for (const { endpoint } of await pushStore().list(user)) {
       if (deviceTag(endpoint) === tag)
-        await pushStore().remove(endpoint, user)
+        await pushStore().delete(endpoint, user)
     }
   }
   catch (error) {
