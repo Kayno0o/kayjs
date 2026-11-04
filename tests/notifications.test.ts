@@ -72,6 +72,11 @@ describe('the title of a notification', () => {
     expect((await notify('ada', { title: 'a'.repeat(200) })).title).toHaveLength(200)
   })
 
+  it('names the lifetime key it was given when the duration is wrong', async () => {
+    await expect(notify('ada', { title: 'x', ttl: 'soon' as never })).rejects.toThrow('notify\'s ttl')
+    await expect(notify('ada', { title: 'x', keep: 'soon' as never })).rejects.toThrow('notify\'s keep')
+  })
+
   it('needs a user id', async () => {
     await expect(notify('', { title: 'x' })).rejects.toThrow(RangeError)
     await expect(notify('a'.repeat(201), { title: 'x' })).rejects.toThrow(RangeError)

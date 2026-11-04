@@ -55,7 +55,7 @@ export interface NotifyOptions {
   url?: string | undefined
   // How long it is kept, `'90d'` by default.
   ttl?: Duration | undefined
-  // The name `ttl` had before 1.87, still read; `kay upgrade` renames it.
+  /** @deprecated The name of `ttl` before 1.87, read until 1.90; `kay upgrade` renames it. */
   keep?: Duration | undefined
   // `false` keeps the notification in the inbox alone, without the push a person who opted in would get with `push()` listed.
   push?: boolean | undefined
@@ -286,7 +286,7 @@ export async function notify(user: string, { title, url, ttl, keep, push }: Noti
     kayLog('warn', `notify() dropped the url of a notification for ${id}: only a path of the site or an http(s) URL is linked`)
 
   const at = Date.now()
-  const note: StoredNotification = { id: crypto.randomUUID(), title: text, ...link === undefined ? {} : { url: link }, at, expires: at + Math.round(durationSeconds(ttl ?? keep ?? DEFAULT_KEEP, 'notify\'s ttl') * 1000) }
+  const note: StoredNotification = { id: crypto.randomUUID(), title: text, ...link === undefined ? {} : { url: link }, at, expires: at + Math.round(durationSeconds(ttl ?? keep ?? DEFAULT_KEEP, `notify's ${ttl === undefined && keep !== undefined ? 'keep' : 'ttl'}`) * 1000) }
 
   await notificationStore().add(id, note, MOST_PER_USER)
   changed(id)

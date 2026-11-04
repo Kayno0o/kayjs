@@ -19,9 +19,9 @@ describe('deprecated-lifetimes', () => {
     const layout = '--- server\nexport const page = { revalidate: \'5m\' } satisfies PageSettings\n---\nslot\n'
     const server = 'import { notify, queue, workflow } from \'kay/server\'\n\nawait notify(\'ada\', { title: \'x\', keep: \'7d\' })\nexport const mail = queue(\'mail\', () => undefined, { keepFailed: \'7d\' })\nexport const flow = workflow(\'flow\', () => undefined, { keepFailed })\n'
     const fence = '--- server\nawait notify(\'ada\', { title: \'x\', keep: \'7d\' })\n---\np x\n'
-    const own = 'import { notify } from \'./mine\'\nimport * as kay from \'kay/server\'\n\nawait notify(\'ada\', { keep: 1 })\nexport const other = { revalidate: 1, keepFailed: 1 }\nexport const q = kay.queue(\'q\', () => undefined, { keepFailed: false })\n'
+    const own = 'import { notify } from \'./mine\'\nimport * as kay from \'kay/server\'\n\nawait notify(\'ada\', { keep: 1 })\nexport const other = { revalidate: 1, keepFailed: 1 }\nexport const q = kay.queue(\'q\', () => undefined, { keepFailed: false })\nexport const page = { revalidate: 1 }\n'
     const clash = '--- server\nexport const page = { revalidate: \'1h\', ttl: \'2h\' }\n---\np x\n'
-    const root = await project({ 'src/routes/news.kay': page, 'src/routes/_layout.kay': layout, 'src/jobs.ts': server, 'src/routes/fence.kay': fence, 'src/own.ts': own, 'src/routes/clash.kay': clash })
+    const root = await project({ 'src/routes/news.kay': page, 'src/routes/_layout.kay': layout, 'src/jobs.ts': server, 'src/routes/fence.kay': fence, 'src/own.ts': own, 'src/routes/clash.kay': clash, 'src/components/card.kay': page })
 
     try {
       const found = await deprecatedLifetimes(root, {})
@@ -44,6 +44,9 @@ describe('deprecated-lifetimes', () => {
       expect(await Bun.file(join(root, 'src/jobs.ts')).text()).toBe(server.replace('keep:', 'ttl:').replace('keepFailed: \'7d\'', 'failedTtl: \'7d\'').replace('{ keepFailed }', '{ failedTtl: keepFailed }'))
       expect(await Bun.file(join(root, 'src/routes/fence.kay')).text()).toBe(fence.replace('keep:', 'ttl:'))
       expect(await Bun.file(join(root, 'src/routes/clash.kay')).text()).toBe(clash)
+      // A `page` constant outside the routes is the app's own, in a component or a module.
+      expect(await Bun.file(join(root, 'src/components/card.kay')).text()).toBe(page)
+      expect(await Bun.file(join(root, 'src/own.ts')).text()).toContain('export const page = { revalidate: 1 }')
       expect((await deprecatedLifetimes(root, {})).map(diagnostic => diagnostic.file.slice(root.length + 1)).sort()).toEqual(['src/routes/clash.kay'])
       expect(await deprecatedLifetimes(root, { lints: { 'deprecated-lifetimes': 'allow' } })).toEqual([])
     }

@@ -51,8 +51,8 @@ describe('mails given up', () => {
     expect(await mail.failed()).toHaveLength(0)
   })
 
-  it('follow the app\'s own keepFailed', async () => {
-    const mail = failing({ keepFailed: '30d' })
+  it.each(['failedTtl', 'keepFailed'] as const)('follow the app\'s own %s', async (name) => {
+    const mail = failing({ [name]: '30d' })
 
     await mail.enqueue({ to: 'ada@example.com', subject: 'Reset', text: 'Hello' })
     await mail.drain()

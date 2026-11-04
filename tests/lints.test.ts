@@ -1161,7 +1161,7 @@ describe('deprecated-ui-callbacks', () => {
 
 describe('deprecated-lifetimes on the Chat of kayjs-ai', () => {
   const found = (template: string) => {
-    const source = `---\nimport Chat from '@kaynooo/kayjs-ai/chat.kay'\nimport Other from './other.kay'\n---\n${template}\n`
+    const source = `---\nimport Chat from '@kaynooo/kayjs-ai/chat.kay'\nimport Launcher from '@kaynooo/kayjs-ai/chat-launcher.kay'\nimport Other from './other.kay'\n---\n${template}\n`
     const result = compileKay(source, 'chat.kay', { check: true })
 
     return result.diagnostics.filter(d => d.code === 'deprecated-lifetimes').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
@@ -1170,6 +1170,10 @@ describe('deprecated-lifetimes on the Chat of kayjs-ai', () => {
   it('renames keep to history, however the value is written', () => {
     expect(found('Chat(action={reply} label="x" keep={2})')).toEqual([{ at: 'keep', fix: ['keep->history'] }])
     expect(found('Chat(action={reply} label="x" keep="2")')).toEqual([{ at: 'keep', fix: ['keep->history'] }])
+  })
+
+  it('renames the keep of a ChatLauncher too', () => {
+    expect(found('Launcher(action={reply} label="x" keep={2})')).toEqual([{ at: 'keep', fix: ['keep->history'] }])
   })
 
   it('leaves history, other components and keepOnServer alone', () => {

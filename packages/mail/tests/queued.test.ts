@@ -173,40 +173,40 @@ describe('mailers sharing a queue', () => {
   it('refuse retry and keep options that differ, as a queue has one set of them', () => {
     const queue = shared()
 
-    mailer({ from: 'a@example.com', queue: { ...queue, keepFailed: '7d' } })
+    mailer({ from: 'a@example.com', queue: { ...queue, failedTtl: '7d' } })
 
     expect(() => mailer({ from: 'b@example.com', queue: { ...queue, attempts: 3 } })).toThrow(/attempts/)
-    expect(() => mailer({ from: 'b@example.com', queue: { ...queue, keepFailed: '30d' } })).toThrow(/keepFailed/)
+    expect(() => mailer({ from: 'b@example.com', queue: { ...queue, failedTtl: '30d' } })).toThrow(/failedTtl/)
   })
 
   it('skip an option one of them leaves unset', () => {
     const queue = shared()
 
     mailer({ from: 'a@example.com', queue })
-    expect(() => mailer({ from: 'b@example.com', queue: { ...queue, keepFailed: '30d' } })).not.toThrow()
+    expect(() => mailer({ from: 'b@example.com', queue: { ...queue, failedTtl: '30d' } })).not.toThrow()
     expect(() => mailer({ from: 'c@example.com', queue })).not.toThrow()
   })
 
   it('compare each option with the last mailer that set it, whatever one between them left unset', () => {
     const queue = shared()
-    const first = mailer({ from: 'a@example.com', queue: { ...queue, keepFailed: '7d' } })
+    const first = mailer({ from: 'a@example.com', queue: { ...queue, failedTtl: '7d' } })
     const middle = mailer({ from: 'b@example.com', queue })
 
-    expect(() => mailer({ from: 'c@example.com', queue: { ...queue, keepFailed: '30d' } })).toThrow(/keepFailed/)
+    expect(() => mailer({ from: 'c@example.com', queue: { ...queue, failedTtl: '30d' } })).toThrow(/failedTtl/)
     expect([first, middle]).toHaveLength(2)
   })
 
   it('keep an earlier mailer in mind once a later one that agrees is gone', async () => {
     const queue = shared()
-    const first = mailer({ from: 'a@example.com', queue: { ...queue, keepFailed: '7d' } })
-    let second: unknown = mailer({ from: 'b@example.com', queue: { ...queue, keepFailed: '7d' } })
+    const first = mailer({ from: 'a@example.com', queue: { ...queue, failedTtl: '7d' } })
+    let second: unknown = mailer({ from: 'b@example.com', queue: { ...queue, failedTtl: '7d' } })
 
     second = undefined
     Bun.gc(true)
     // Lets the collector's finalizers run, which is when a gone mailer would be forgotten.
     await Bun.sleep(10)
 
-    expect(() => mailer({ from: 'c@example.com', queue: { ...queue, keepFailed: '30d' } })).toThrow(/keepFailed/)
+    expect(() => mailer({ from: 'c@example.com', queue: { ...queue, failedTtl: '30d' } })).toThrow(/failedTtl/)
     expect(first).toBeDefined()
     expect(second).toBeUndefined()
   })

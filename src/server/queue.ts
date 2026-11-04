@@ -108,7 +108,7 @@ export interface QueueOptions<Payload> {
   idlePoll?: Duration | undefined
   // How long a failed job is kept, its payload included, from when its last attempt was due: 30 days by default, `false` until removed.
   failedTtl?: Duration | false | undefined
-  // The name `failedTtl` had before 1.87, still read; `kay upgrade` renames it.
+  /** @deprecated The name of `failedTtl` before 1.87, read until 1.90; `kay upgrade` renames it. */
   keepFailed?: Duration | false | undefined
   // What a failed job keeps in place of its payload, such as a mail without its body: applied once it is given up, so a failed job holds no more than the app needs to see what went wrong. The payload is kept whole when it throws.
   redact?: ((payload: Payload) => Payload) | undefined

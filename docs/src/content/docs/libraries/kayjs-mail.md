@@ -169,7 +169,7 @@ To list the queued mails given up on, call `mail.failed()`.
 
 A mail given up is kept 7 days, and its body, links, headers and attachments are dropped at once, so a reset link does not stay in the job store.
 
-Its recipients, subject and the server's error stay, the error as it came: a refusal may quote a URL. Set `queue: { keepFailed: '30d' }` to keep it longer, or `redact` to keep something else. `onError` still gets the whole mail.
+Its recipients, subject and the server's error stay, the error as it came: a refusal may quote a URL. Set `queue: { failedTtl: '30d' }` to keep it longer, or `redact` to keep something else. `onError` still gets the whole mail.
 
 To erase a person, call `mail.remove({ recipient: 'ada@example.com' })`, which deletes every queued or failed mail to that address.
 
@@ -228,7 +228,7 @@ A failed send is retried, 5 times by default, each wait twice the last. A mail g
 
 Two mailers can share a queue by using the same `name`. A mail is then sent, kept and given up to `onError` by the mailer that queued it, whichever of them picks it up.
 
-They must set `attempts`, `backoff`, `keepFailed`, `lostAfter`, `idlePoll` and `concurrency` alike, since the queue has one of each, and the server stops at boot naming the one that differs.
+They must set `attempts`, `backoff`, `failedTtl`, `lostAfter`, `idlePoll` and `concurrency` alike, since the queue has one of each, and the server stops at boot naming the one that differs.
 
 ```ts
 export const mail = mailer({

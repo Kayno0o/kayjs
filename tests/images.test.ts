@@ -1235,6 +1235,38 @@ describe('pruneVariants', () => {
     expect(() => route()).not.toThrow()
   })
 
+  it('prunes the variants older than images.ttl, whatever the 30 days of the default', async () => {
+    const exists = async (dir: string, name: string) => Bun.file(join(dir, name)).exists()
+    const pruned = async (ttl: '3d' | '500d') => {
+      const dir = await cacheWith()
+      const app = new Elysia()
+
+      try {
+        serveImages(app, { clientDir: dir, cacheDir: dir, ttl })
+        app.listen(0)
+
+        // The prune at start runs apart from the listening, so the short ttl is waited for and the long one given the time to remove something.
+        if (ttl === '3d') {
+          for (let waited = 0; await exists(dir, 'old-640.webp'); waited += 20) {
+            expect(waited).toBeLessThan(3000)
+            await Bun.sleep(20)
+          }
+        }
+        else {
+          await Bun.sleep(300)
+        }
+
+        return { dir, fresh: await exists(dir, 'fresh-640.webp'), old: await exists(dir, 'old-640.webp'), older: await exists(dir, 'older-640.avif') }
+      }
+      finally {
+        await app.stop(true)
+      }
+    }
+
+    expect(await pruned('3d')).toMatchObject({ fresh: true, old: false, older: false })
+    expect(await pruned('500d')).toMatchObject({ fresh: true, old: true, older: true })
+  })
+
   it('removes the files nothing wrote for the time given, and leaves younger ones and folders alone', async () => {
     const dir = await cacheWith()
 

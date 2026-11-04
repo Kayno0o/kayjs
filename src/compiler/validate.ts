@@ -8,7 +8,7 @@ import { WIDGET_ROLES } from './aria'
 import { childBlocks, EVENT_MODIFIERS, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, serverIslandOf, templateFacts, visitNodes } from './ast'
 
 const UI_SOURCE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
-const AI_CHAT_SOURCE = '@kaynooo/kayjs-ai/chat.kay'
+const AI_CHAT_SOURCES = new Set(['@kaynooo/kayjs-ai/chat.kay', '@kaynooo/kayjs-ai/chat-launcher.kay'])
 // The `file` key `uiComponents` holds for kayjs-ai's Chat.
 const AI_CHAT = 'ai-chat'
 // A `muted` string standing as a value, alone or as an array element or ternary branch: never one compared against, passed to a call or inside a longer string.
@@ -211,7 +211,7 @@ class Validator {
 
       if (match)
         this.uiComponents.set(binding.local, match[1]!)
-      else if (binding.imported === 'default' && !binding.typeOnly && binding.source === AI_CHAT_SOURCE)
+      else if (binding.imported === 'default' && !binding.typeOnly && AI_CHAT_SOURCES.has(binding.source))
         this.uiComponents.set(binding.local, AI_CHAT)
     }
 

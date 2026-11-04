@@ -72,7 +72,7 @@ export interface MailerOptions {
   smtp?: SmtpOverrides | undefined
   // The locale mails are written in unless one names its own: their component renders `t()` in it, and the `<html lang>` of the document follows. The site's default locale (the request's, while one runs) when left out.
   locale?: string | undefined
-  // The queue `enqueue` hands mails to, `mail` unless named, retried as kay's queues are. A mail given up is kept 7 days (`keepFailed`) without its body, links, headers and attachments (`redact`); both can be set here.
+  // The queue `enqueue` hands mails to, `mail` unless named, retried as kay's queues are. A mail given up is kept 7 days (`failedTtl`) without its body, links, headers and attachments (`redact`); both can be set here.
   queue?: QueueOptions<Mail> & { name?: string | undefined } | undefined
   // Logs each mail's recipients in full rather than their count and domains, such as while setting up a site's mail.
   logRecipients?: boolean | undefined
@@ -110,7 +110,7 @@ export type Mailer = Elysia & {
   render: <P extends object>(message: MailMessage<P>) => Promise<Mail>
   // Sends every queued mail whose time has come, here and now, as a script or a test does without the server running the queue.
   drain: () => Promise<number>
-  // The queued mails given up after their last attempt, each with why it failed, kept 7 days unless `queue.keepFailed` says otherwise, with the recipients and subject but not the body.
+  // The queued mails given up after their last attempt, each with why it failed, kept 7 days unless `queue.failedTtl` says otherwise, with the recipients and subject but not the body.
   failed: () => Promise<FailedJob<Mail>[]>
   // Removes the queued mail of that id, every one, waiting or failed, sent to `{ recipient }` among its to, cc and bcc, a person's once they asked to be erased say, or every one `match` returns true for; resolves with how many went.
   remove: (match: string | { recipient: string } | ((mail: Mail) => boolean)) => Promise<number>
@@ -669,7 +669,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     told: async (hook, event) => notify(`mail.${hook}`, [({ onStart, onSuccess, onRetry, onError } as Record<typeof hook, Hook<QueueEvent> | undefined>)[hook]], event),
   }
 
-  agreeOnQueue(name, queueOptions.store, { attempts: queueOptions.attempts, backoff: queueOptions.backoff, keepFailed: queueOptions.keepFailed, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll, concurrency: queueOptions.concurrency }, owner)
+  agreeOnQueue(name, queueOptions.store, { attempts: queueOptions.attempts, backoff: queueOptions.backoff, failedTtl: queueOptions.failedTtl ?? queueOptions.keepFailed, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll, concurrency: queueOptions.concurrency }, owner)
   MAILERS.set(via, new WeakRef(owner))
   FORGOTTEN.register(owner, via)
 
@@ -680,7 +680,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const deliverQueued = async ({ via: queuedBy, ...mail }: Queued, signal: AbortSignal): Promise<Delivery> => ownerOf(queuedBy).deliver(mail, signal)
   const jobs = queue<Queued>(name, deliverQueued, {
     ...queueOptions,
-    keepFailed: queueOptions.keepFailed ?? FAILED_KEPT,
+    failedTtl: queueOptions.failedTtl ?? queueOptions.keepFailed ?? FAILED_KEPT,
     redact: queued => ownerOf(queued.via).redact(queued),
     // Always set: any mailer of the queue may claim a mail, and its owner is the one to hear of it.
     onStart: told('onStart'),

@@ -7,6 +7,8 @@ import { importsOf, walk } from './ast'
 import { scan } from './renamed-exports'
 
 const OLD_NAME = /\b(?:revalidate|keepFailed|keep)\b/
+// Page settings are read from the `.kay` files of the routes alone: a `page` constant anywhere else is the app's own.
+const ROUTE_FILE = /[\\/]routes[\\/].*\.kay$/
 const KAY_MODULES = (source: string) => source === 'kay' || source === 'kay/server'
 
 // The options object each function takes, by the place of its argument, and the key it renamed.
@@ -43,6 +45,7 @@ export async function deprecatedLifetimes(root: string, options: CheckOptions): 
 
   return scan(root, options, 'deprecated-lifetimes', OLD_NAME, ({ file, parsed, report }) => {
     const fence = file.endsWith('.kay')
+    const route = ROUTE_FILE.test(file)
 
     for (const { ast, base } of parsed) {
       const rename = (object: ObjectExpression, old: string, name: string, what: string) => {
@@ -61,7 +64,7 @@ export async function deprecatedLifetimes(root: string, options: CheckOptions): 
 
       walk(ast, (node) => {
         // A page's settings: the object `export const page = { ... }` holds.
-        if (node.type === 'ExportNamedDeclaration' && node.declaration?.type === 'VariableDeclaration') {
+        if (route && node.type === 'ExportNamedDeclaration' && node.declaration?.type === 'VariableDeclaration') {
           for (const declarator of node.declaration.declarations) {
             const init = declarator.init && unwrapped(declarator.init)
 
