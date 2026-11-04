@@ -643,6 +643,14 @@ describe('sessions', () => {
   })
 
   for (const [name, store] of [['in memory', memorySessions()], ['in sqlite', sqliteSessions(':memory:')]] as const) {
+    it(`refuses a maxAge that is no number ${name}, which the stores receive in milliseconds`, () => {
+      expect(async () => store.set('a', { userId: 1 }, Number.NaN)).toThrow('milliseconds since 1.88')
+      expect(async () => store.set('a', { userId: 1 }, '1h' as never)).toThrow('milliseconds since 1.88')
+      expect(async () => store.set('a', { userId: 1 }, Infinity)).toThrow('milliseconds since 1.88')
+    })
+  }
+
+  for (const [name, store] of [['in memory', memorySessions()], ['in sqlite', sqliteSessions(':memory:')]] as const) {
     it(`erases the sessions ${name} whose data matches, and only those`, async () => {
       await store.set('a', { userId: 1 }, 60_000)
       await store.set('b', { userId: 2 }, 60_000)

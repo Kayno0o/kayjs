@@ -52,6 +52,7 @@ describe('a bare number where milliseconds were taken', () => {
   // Never read as seconds: an unfixed `every(3000, ...)` must not turn into 3000 seconds.
   it('is refused by durationMs and optionMs', () => {
     expect(() => durationMs(3000 as never)).toThrow('takes its unit')
+    expect(() => durationMs(3000 as never)).toThrow('milliseconds since 1.88')
     expect(() => optionMs(3000 as never, '`every` interval')).toThrow('`every` interval is 3000')
     expect(() => optionMs(3000 as never, 'forgejo timeout')).toThrow('kay: forgejo timeout is 3000')
   })

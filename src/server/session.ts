@@ -1,5 +1,5 @@
 import type { Duration } from '../runtime/duration'
-import type { StoreBase } from '../runtime/store-base'
+import type { MaybePromise, StoreBase } from '../runtime/store-base'
 import { statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
@@ -26,16 +26,16 @@ export type SessionData = Record<string, unknown>
 export type SessionMatch = ((data: SessionData) => boolean) | Readonly<Record<string, string | number | boolean | null>>
 
 // A store of kay's own, whose `deleteWhere` takes either form of a match.
-export type DeletableSessionStore = SessionStore & { deleteWhere: (match: SessionMatch) => number | Promise<number> }
+export type DeletableSessionStore = SessionStore & { deleteWhere: (match: SessionMatch) => MaybePromise<number> }
 
 // Where sessions live when the cookie only carries their id; each method may answer synchronously or with a promise.
 export interface SessionStore extends StoreBase {
-  get: (id: string) => SessionData | undefined | Promise<SessionData | undefined>
+  get: (id: string) => MaybePromise<SessionData | undefined>
   // Past `maxAgeMs` milliseconds the store may forget the session.
-  set: (id: string, data: SessionData, maxAgeMs: number) => void | Promise<void>
-  delete: (id: string) => void | Promise<void>
+  set: (id: string, data: SessionData, maxAgeMs: number) => MaybePromise<void>
+  delete: (id: string) => MaybePromise<void>
   // Deletes every session whose data `match` returns true for, such as a person's once they asked to be erased or their password changed, resolving with how many went.
-  deleteWhere?: ((match: (data: SessionData) => boolean) => number | Promise<number>) | undefined
+  deleteWhere?: ((match: (data: SessionData) => boolean) => MaybePromise<number>) | undefined
 }
 
 export type SameSite = 'lax' | 'strict' | 'none'
@@ -417,6 +417,14 @@ function opened(value: string, keys: Buffer[], name: string): { sealed: Sealed, 
   }
 }
 
+// The `maxAge` a store is given, milliseconds since 1.88: one that is no number would store a session that never expires, or none.
+function storeMs(maxAge: number): number {
+  if (!Number.isFinite(maxAge))
+    throw new TypeError(`kay: a session store's maxAge is a number of milliseconds since 1.88, not ${String(maxAge)}`)
+
+  return maxAge
+}
+
 // Sessions in this process's memory: gone on restart, and each process keeps its own. Fine for development and one-process sites that can sign everyone out on deploy.
 export function memorySessions(): DeletableSessionStore {
   const sessions = new Map<string, { text: string, expires: number }>()
@@ -447,7 +455,7 @@ export function memorySessions(): DeletableSessionStore {
 
       // Deleted first, so a session written again counts as the newest.
       sessions.delete(id)
-      sessions.set(id, { text: stringify(data), expires: now + maxAge })
+      sessions.set(id, { text: stringify(data), expires: now + storeMs(maxAge) })
 
       if (sessions.size > MOST_SESSIONS)
         sessions.delete(sessions.keys().next().value!)
@@ -607,7 +615,7 @@ function openSqliteStore(path: string): { store: SqliteSessionStore, close: () =
       if (++writes % SWEEP_EVERY === 0)
         sweep.run(Date.now())
 
-      upsert.run(id, stringify(data), Date.now() + maxAge)
+      upsert.run(id, stringify(data), Date.now() + storeMs(maxAge))
     },
     delete(id) {
       remove.run(id)

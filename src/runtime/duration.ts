@@ -38,7 +38,7 @@ export function wholeSeconds(value: unknown, what: string): number {
 // kept: free
 export function durationMs(value: Duration): number {
   if (typeof value !== 'string')
-    throw new Error(`kay: a duration here takes its unit, such as '3s' or '250ms', not ${String(value)}`)
+    throw new Error(`kay: a duration here takes its unit, such as '3s' or '250ms', not ${String(value)}${typeof value === 'number' ? '; a store\'s `maxAge` and `window` are milliseconds since 1.88, so use the number as it is' : ''}`)
 
   const text = DURATION_TEXT.exec(value)
 
