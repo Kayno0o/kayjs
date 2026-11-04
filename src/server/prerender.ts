@@ -436,7 +436,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
           options.others?.push({ file: route.file, html, path: copy.path, host: copy.host, status: response.status, location: response.headers.get('location') ?? undefined })
         }
 
-        const stored: PrerenderedPage = { pattern: route.pattern, locale: copy.locale ?? locales.settings.defaultLocale, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt, revalidate, ...cacheControl !== undefined && !response.headers.has('cache-control') ? { cacheControl } : {}, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...auto && readsPathname ? { pathname: new URL(request.url).pathname } : {}, ...dataRead.length > 0 ? { reads: dataRead } : {}, ...token === pageToken(copy.key) ? {} : { token } }
+        const stored: PrerenderedPage = { pattern: route.pattern, locale: copy.locale ?? locales.settings.defaultLocale, file: name, status: response.status, headers: storedHeaders(response.headers), etag: pageEtag(html), renderedAt, revalidate, ...cacheControl !== undefined && response.status === 200 && !response.headers.has('cache-control') ? { cacheControl } : {}, ...islands.length > 0 ? { islands } : {}, ...stamps ? { stamps } : {}, ...readsSite ? { readsSite } : {}, ...auto ? { kept: true } : {}, ...auto && readsPathname ? { pathname: new URL(request.url).pathname } : {}, ...dataRead.length > 0 ? { reads: dataRead } : {}, ...token === pageToken(copy.key) ? {} : { token } }
 
         pending.push(() => {
           pages[copy.key] = stored

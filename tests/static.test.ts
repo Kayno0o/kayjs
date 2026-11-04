@@ -463,6 +463,13 @@ describe('kay build --static', () => {
     expect(nginxHeaders(headers)).toBe('add_header Content-Security-Policy "default-src \'self\'; report-uri \\"x\\"" always;\n')
     expect(nginxHeaders({})).toBe('# kay sends no security headers for this build.\n')
     expect(headersFile({ 'x-frame-options': 'SAMEORIGIN' })).toBe('/*\n  X-Frame-Options: SAMEORIGIN\n')
+    expect(headersFile(undefined)).toBe('')
+
+    const control = 'public, max-age=300'
+    const caches = new Map([['/', control], ['/repo/a:b', control], ['/repo/*', control], ['/repo/a b', control], ['/repo/ok', control], ['/repo/line', 'public\nx']])
+
+    // A path that is a pattern or holds a space is left out, and so is a value with a line break; the root is one rule, any other path two.
+    expect(headersFile(undefined, caches)).toBe(`/\n  Cache-Control: ${control}\n\n/repo/ok\n  Cache-Control: ${control}\n\n/repo/ok/\n  Cache-Control: ${control}\n`)
   })
 
   it('warns of the pages setting their own security and of CSP reports, keeps a public _headers, and writes no headers with security off', async () => {
@@ -529,6 +536,40 @@ describe('kay build --static', () => {
       expect(headers).not.toContain('/repo/about')
       // The security headers keep their block for every path, first.
       expect(headers).toStartWith('/*\n  ')
+    }
+    finally {
+      await rm(fixture, { recursive: true, force: true })
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  })
+
+  it('reads the ttl and cacheControl of a layout, keeps a header the page sets itself, writes the roots under the base and leaves the nginx include without a cache-control', async () => {
+    const fixture = await fixtureCopy('static')
+    const elsewhere = await mkdtemp(join(tmpdir(), 'kay-static-'))
+
+    try {
+      await Promise.all([
+        Bun.write(join(fixture, 'src/routes/index.kay'), '--- server\nexport const page = { prerender: true, ttl: \'30s\' }\n---\nh1 Home\n'),
+        Bun.write(join(fixture, 'src/routes/docs/_layout.kay'), '--- server\nexport const page = { ttl: \'10m\' }\n---\nslot\n'),
+        Bun.write(join(fixture, 'src/routes/docs/a.kay'), '--- server\nexport const page = { prerender: true }\n---\nh1 A\n'),
+        Bun.write(join(fixture, 'src/routes/docs/b.kay'), '--- server\nexport const page = { prerender: true, ttl: \'1m\' }\n---\nh1 B\n'),
+        Bun.write(join(fixture, 'src/routes/plain/_layout.kay'), '--- server\nexport const page = { ttl: \'1h\', cacheControl: \'public, max-age=9\' }\n---\nslot\n'),
+        Bun.write(join(fixture, 'src/routes/plain/c.kay'), '--- server\nexport const page = { prerender: true }\n---\nh1 C\n'),
+        Bun.write(join(fixture, 'src/routes/own.kay'), '--- server\nexport const page = { prerender: true, ttl: \'1h\' }\nctx.headers.set(\'cache-control\', \'no-store\')\n---\nh1 Own\n'),
+      ])
+
+      const exported = await exportSite(elsewhere, fixture)
+
+      expect(exported.errors).toBe('')
+
+      const headers = await Bun.file(join(elsewhere, '_headers')).text()
+
+      expect(headers).toContain('\n/repo\n  Cache-Control: public, max-age=0, s-maxage=30, stale-while-revalidate=30\n\n/repo/\n  Cache-Control: public, max-age=0, s-maxage=30, stale-while-revalidate=30\n')
+      expect(headers).toContain('\n/repo/docs/a\n  Cache-Control: public, max-age=0, s-maxage=600, stale-while-revalidate=600\n')
+      expect(headers).toContain('\n/repo/docs/b\n  Cache-Control: public, max-age=0, s-maxage=60, stale-while-revalidate=60\n')
+      expect(headers).toContain('\n/repo/plain/c\n  Cache-Control: public, max-age=9\n')
+      expect(headers).not.toContain('/repo/own')
+      expect((await Bun.file(join(elsewhere, 'headers.nginx.conf')).text()).toLowerCase()).not.toContain('cache-control')
     }
     finally {
       await rm(fixture, { recursive: true, force: true })

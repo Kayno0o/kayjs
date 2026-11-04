@@ -88,10 +88,10 @@ describe('pageResponder', () => {
     await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false })
     const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
     const shared = 'public, max-age=0, s-maxage=3600, stale-while-revalidate=3600'
-    const timed = new Map([['/about', new Map([['/about', { ...built('/about').get('/about')!, cacheControl: shared }]])]])
+    const timedWith = (headers: [string, string][]) => new Map([['/about', new Map([['/about', { ...built('/about').get('/about')!, cacheControl: shared, headers }]])]])
     const client = (await readClient(root))!
-    const visit = async (route: typeof about, headers: Record<string, string> = {}) => {
-      const respond = pageResponder({ client, renderOptions: {}, prerendered: timed, settings: undefined, transforms: [], served: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
+    const visit = async (route: typeof about, headers: Record<string, string> = {}, stored: [string, string][] = []) => {
+      const respond = pageResponder({ client, renderOptions: {}, prerendered: timedWith(stored), settings: undefined, transforms: [], served: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
       const response = await respond(route, {}, { request: new Request('http://localhost/about', { headers }) }, new URL('http://localhost/about'))
 
       return response.headers.get('cache-control')
@@ -101,6 +101,8 @@ describe('pageResponder', () => {
     expect(await visit(about, { cookie: 'kay_flash=x' })).toBe('private, no-store')
     expect(await visit({ ...about, guards: [{ file: '/g/_guard.ts', check: async () => undefined }] as never })).toBe('private, no-cache')
     expect(await visit(about, { 'save-data': 'on' })).toBe('public, max-age=0, must-revalidate')
+    // A header the page stored itself, as a background render may since the build, wins over the build's.
+    expect(await visit(about, {}, [['cache-control', 'no-store']])).toBe('no-store')
   })
 
   it('runs the served-page hooks on a page rendered per request alone, HTML only, and leaves the prerendered copy to transformPage', async () => {

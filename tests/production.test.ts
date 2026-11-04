@@ -967,6 +967,21 @@ describe('revalidation', () => {
       await rm(copy, { recursive: true, force: true })
     }
   })
+
+  it('refuses a cacheControl that is no one-line text, nor false', async () => {
+    for (const value of ['\'\'', '\'public\\nx\'', '5']) {
+      const copy = await fixtureCopy('production')
+
+      try {
+        await Bun.write(join(copy, 'src/routes/broken.kay'), `--- server\nexport const page = { prerender: true, ttl: '1h', cacheControl: ${value} }\n---\np Broken\n`)
+
+        await expect(refusedPrerender({ routes: resolve(copy, 'src/routes') }, await build.client(), undefined, resolve(PRODUCTION))).rejects.toMatchObject({ code: 'page-settings-invalid' })
+      }
+      finally {
+        await rm(copy, { recursive: true, force: true })
+      }
+    }
+  })
 })
 
 describe('a prerendered page posted to', () => {

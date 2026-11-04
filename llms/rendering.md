@@ -126,7 +126,7 @@ const html = await renderToString(Mail, { order }, { locale: 'fr' })
 | Image variants | 30 days, `images: { ttl }` in kay.config.ts | the ttl |
 | Feeds | 1 hour, `public, max-age=3600` | the ttl |
 | Public files | `publicCache` in kay.config.ts | a new file name |
-| A CDN's copy of a public prerendered page | `s-maxage` of the page's `ttl`, `cacheControl` overrides it | the CDN's own purge |
+| A CDN's copy of a public prerendered page | `s-maxage` of the page's `ttl`, `cacheControl` overrides it ([a CDN in front](cdn-caching.md)) | the CDN's own purge |
 
 - `invalidate(target)` takes a string key, a function over keys, a `cache()` function, a `cacheTag()`, a collection, or on the server `{ page: path }` (a path or a function over paths).
 - A lifetime is always `ttl` or a word ending in `Ttl` (`failedTtl`), a string with a unit; `keep` is only ever a boolean.

@@ -128,6 +128,8 @@ const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => 
 
 // Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
 // The cookie is read on first use and written only when the session changed or is due an extension; it is HttpOnly, SameSite=Lax unless `sameSite` says another, and over https Secure and named `__Host-` unless shared under a domain.
+const PUBLIC_CACHE = /\bpublic\b/i
+
 export function session<Data extends object = SessionData>(options: SessionOptions = {}) {
   const fallback = options.secret === undefined ? appSecrets() : undefined
 
@@ -171,6 +173,10 @@ export function session<Data extends object = SessionData>(options: SessionOptio
 
       if (response instanceof Response) {
         response.headers.append('set-cookie', cookie)
+
+        // A cookie is for this visitor alone, so no shared cache may keep the response it rides on, whatever the page or route said.
+        if (PUBLIC_CACHE.test(response.headers.get('cache-control') ?? ''))
+          response.headers.set('cache-control', 'private, no-cache')
 
         return
       }

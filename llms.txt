@@ -11,7 +11,7 @@
 - Shared values are exported from a `--- module` fence.
 - A page has no props: its data comes from its `--- server` fence.
 - `window`, `document` and other browser-only globals are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
-- Every duration is a string with its unit, `'250ms'`, `'30s'`, `'5m'`, `'1.5h'`, `'30d'` or `'2w'` (type `Duration` from `kay`); a bare number is a type error, `durationMs` gives one's milliseconds.
+- Every duration is a string with its unit, `'250ms'`, `'5m'` or `'30d'` (`Duration` from `kay`); a bare number is a type error, `durationMs` gives one's milliseconds.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
 - Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met (compile and type errors, throwing requests, islands' browser errors): read it rather than opening the browser.
 - Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`; a line starting with one is reported, with what kay writes instead.
@@ -51,7 +51,8 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Navigating from code](llms/navigation-from-code.md): `navigate`, `refresh`, `navigation`, `onBeforeNavigate`, `onNavigate`, `mount`
 - [Pages and routing](llms/routing.md): file-based routes, params, layouts, `ctx`
 - [Endpoint files, redirects, rewrites, base path](llms/routing-endpoints-and-base.md): `GET`, `redirects`, `rewrite`, `base`
-- [Prerendering and static export](llms/prerendering.md): revalidation, server islands, static export
+- [Prerendering and static export](llms/prerendering.md): server islands, static export
+- [CDN caching](llms/cdn-caching.md): `ttl`
 - [Content collections](llms/content.md): collections against a schema, entries as pages
 - [Content: Markdown to caching](llms/content-markdown-to-caching.md): Markdown, pagination, feeds, caching
 - [Loaded collections and preview mode](llms/content-cms.md): loaders for a CMS or a database, preview mode

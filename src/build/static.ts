@@ -273,7 +273,9 @@ async function writeHeaders(out: string, config: KayConfig, pages: Awaited<Retur
 
   await Bun.write(nginx, nginxHeaders(headers ?? {}))
 
-  if (!headers && caches.size === 0)
+  const text = headersFile(headers, caches)
+
+  if (text === '')
     return written
 
   if (headers && config.security !== false && config.security?.reports === true)
@@ -292,7 +294,7 @@ async function writeHeaders(out: string, config: KayConfig, pages: Awaited<Retur
     return written
   }
 
-  await Bun.write(file, headersFile(headers, caches))
+  await Bun.write(file, text)
 
   return [...written, file]
 }

@@ -572,6 +572,21 @@ describe('sessions', () => {
     expect((await visit('/peek')).text).toBe('none')
   })
 
+  it('makes a public response private once it carries the session cookie', async () => {
+    const app = new Elysia().use(session<{ count: number }>({ secret: SECRET })).get('/', async ({ session }) => {
+      await session.set('count', 1)
+
+      return new Response('page', { headers: { 'cache-control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=60' } })
+    }).get('/quiet', () => new Response('page', { headers: { 'cache-control': 'public, max-age=60' } }))
+
+    const touched = await app.handle(new Request('http://localhost/'))
+    const quiet = await app.handle(new Request('http://localhost/quiet'))
+
+    expect(touched.headers.get('set-cookie')).toContain('kay_session=')
+    expect(touched.headers.get('cache-control')).toBe('private, no-cache')
+    expect(quiet.headers.get('cache-control')).toBe('public, max-age=60')
+  })
+
   it('refuses a session maxAge that is no positive duration', async () => {
     const app = new Elysia().use(session({ secret: SECRET })).get('/', async ({ session }) => {
       try {
