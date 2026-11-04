@@ -49,7 +49,7 @@ import { readPersonally } from './scope'
 import { carryContext } from './security'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
 import { toolSettings } from './tool-settings'
-import { answered, SERVER_SPAN, traced } from './trace'
+import { answered, replyTrace, SERVER_SPAN, traced } from './trace'
 import { visitAs } from './visit'
 import { invalidWord, kayWord, schemaRefusal } from './words'
 import { onceWritten } from './writes'
@@ -177,13 +177,15 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
       // A span per call, the handler's own spans and the page it renders back nested in it.
       app.post(value.url, async context => traced(`POST ${value.url}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url, 'kay.request.id': requestId(context.request) } }), async (span) => {
         const run = async () => answeringRequest(context.request, async () => inLocale(context.request, options, async () => onceWritten(context.request, value.url, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => cachedPageUrl(context.request, () => guardedPage(context.request, page, match, options)) }))))
-        const response = await timedAction(context, ownTimeout, options, run, async () => inLocale(context.request, options, async () => failed(context.request, new Headers(), cookieJar(context.request).cookies, { action: value.url, status: 504, values: isCall(context.request) ? {} : submittedValues(context.body), errors: { '': kayWord('kay.action.timeout') } }, context.server, back)))
+        const response = await timedAction(context.request, ownTimeout, options, run, async () => inLocale(context.request, options, async () => failed(context.request, new Headers(), cookieJar(context.request).cookies, { action: value.url, status: 504, values: isCall(context.request) ? {} : submittedValues(context.body), errors: { '': kayWord('kay.action.timeout') } }, context.server, back)))
 
         if (span)
           answered(span, response.status)
 
+        replyTrace(context.request, context.set)
+
         return carryContext(context.set, response)
-      }), {
+      }, context.request), {
         body: validated(value.schema),
         transform: async (context) => {
           refuseCrossSite(context.request)
@@ -257,15 +259,15 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
 }
 
 // Runs the action under its timeout; one that ran out is reported as a server error and answered as a failed post, 504.
-async function timedAction(context: { request: Request }, own: number | false | undefined, options: ActionOptions, run: () => Promise<Response>, timedOut: () => Promise<Response>): Promise<Response> {
+async function timedAction(request: Request, own: number | false | undefined, options: ActionOptions, run: () => Promise<Response>, timedOut: () => Promise<Response>): Promise<Response> {
   try {
-    return await withTimeout(context.request, own, options.timeout, run)
+    return await withTimeout(request, own, options.timeout, run)
   }
   catch (error) {
     if (!(error instanceof RequestTimeout))
       throw error
 
-    reportServerError(error, context.request, options.onError)
+    reportServerError(error, request, options.onError)
 
     return timedOut()
   }

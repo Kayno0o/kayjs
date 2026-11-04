@@ -162,7 +162,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   if (!prerendering) {
     setupStampSecret(config.secret)
     setupPreview(config.preview, base)
-    setTracer(config.observe?.tracer)
+    setTracer(config.observe?.tracer, config.observe?.extract)
     setupStorage(configuredFiles(config), join(imageCache, 'stored'), imageCache)
     setAppRoot(root)
     // An export serves nobody, so it keeps only the database url libraries read and none of the stores: a pgData store would otherwise poll, open its connection and create its tables while the build runs, and a build with no database reachable still ends.

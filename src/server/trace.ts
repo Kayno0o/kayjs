@@ -1,10 +1,20 @@
+import type { SpanIds, TraceContext } from './trace-context'
+import { logMessage } from './log'
+import { requestRecord } from './request-record'
 import { Denied, NotFound, Redirect } from './signals'
+import { parseTraceparent, remoteContext, traceresponse, validIds } from './trace-context'
 
 // The part of OpenTelemetry's `Tracer` kay calls: an app hands `trace.getTracer('my-site')` from its own @opentelemetry/api, its SDK exporting the spans, and kay depends on neither.
 export interface Tracer {
-  startSpan: (name: string, options?: SpanOptions) => Span
-  startActiveSpan: <F extends (span: Span) => unknown>(name: string, options: SpanOptions, fn: F) => ReturnType<F>
+  startSpan: (name: string, options?: SpanOptions, context?: TraceContext) => Span
+  startActiveSpan: {
+    <F extends (span: Span) => unknown>(name: string, options: SpanOptions, fn: F): ReturnType<F>
+    <F extends (span: Span) => unknown>(name: string, options: SpanOptions, context: TraceContext, fn: F): ReturnType<F>
+  }
 }
+
+// What `observe.extract` is: reads the context a request arrives with out of its headers, `undefined` for none.
+export type TraceExtractor = (headers: Headers) => TraceContext | undefined
 
 export interface SpanOptions {
   // OpenTelemetry's SpanKind: 1 for the server span a request makes, 0 for the work inside it.
@@ -17,6 +27,8 @@ export interface Span {
   setStatus: (status: { code: number, message?: string }) => unknown
   recordException: (exception: Error | string) => unknown
   end: () => void
+  // Its trace and span ids, which the log and the `traceresponse` header carry.
+  spanContext?: () => SpanIds
 }
 
 export const SERVER_SPAN = 1
@@ -24,9 +36,53 @@ export const SERVER_SPAN = 1
 const ERROR_STATUS = 2
 
 let tracer: Tracer | undefined
+let extractor: TraceExtractor | false | undefined
 
-export function setTracer(given: Tracer | undefined): void {
+export function setTracer(given: Tracer | undefined, extract?: TraceExtractor | false): void {
   tracer = given
+  extractor = extract
+}
+
+// The parent a request's span goes under: what `observe.extract` reads, else its `traceparent` header; none when `extract` is `false`.
+function parentOf(request: Request): TraceContext | undefined {
+  if (extractor === false)
+    return undefined
+
+  if (extractor === undefined) {
+    const ids = parseTraceparent(request.headers.get('traceparent'))
+
+    return ids && remoteContext(ids)
+  }
+
+  try {
+    return extractor(request.headers)
+  }
+  catch (error) {
+    logMessage('warn', 'kay: observe.extract threw, so the request starts a trace of its own', error, request)
+
+    return undefined
+  }
+}
+
+// Notes the trace a request's span belongs to, for its log lines and its `traceresponse` header.
+export function noteTrace(request: Request, span: Span | undefined): void {
+  const ids = validIds(span?.spanContext?.())
+
+  if (ids)
+    requestRecord(request).trace = ids
+}
+
+// Sends the `traceresponse` header of a request whose span was traced, on a response or on Elysia's `set`; written here, as Elysia parses the headers of a route whose handler names them.
+export function replyTrace(request: Request, target: { headers: Headers | Record<string, string | number | undefined> }): void {
+  const ids = requestRecord(request).trace
+
+  if (!ids)
+    return
+
+  if (target.headers instanceof Headers)
+    target.headers.set('traceresponse', traceresponse(ids))
+  else
+    target.headers.traceresponse = traceresponse(ids)
 }
 
 export function tracing(): boolean {
@@ -51,12 +107,16 @@ export function answered(span: Span, status: number): void {
 }
 
 // Runs `fn` in a span the work it starts nests under, which ends as `fn` settles, recording what it throws; without a tracer it runs `fn` alone, a name given as a function never built.
-export function traced<T>(name: string | (() => string), options: SpanOptions | (() => SpanOptions), fn: (span?: Span) => T): T {
+// A `request` makes the span a server span under the trace its headers carry.
+export function traced<T>(name: string | (() => string), options: SpanOptions | (() => SpanOptions), fn: (span?: Span) => T, request?: Request): T {
   if (!tracer)
     return fn()
 
-  return tracer.startActiveSpan(typeof name === 'string' ? name : name(), typeof options === 'function' ? options() : options, (span) => {
+  const run = (span: Span) => {
     let result: T
+
+    if (request)
+      noteTrace(request, span)
 
     try {
       result = fn(span)
@@ -89,10 +149,21 @@ export function traced<T>(name: string | (() => string), options: SpanOptions | 
     }
 
     return settled() as T
-  })
+  }
+  const given = typeof options === 'function' ? options() : options
+  const parent = request && parentOf(request)
+  const title = typeof name === 'string' ? name : name()
+
+  return parent ? tracer.startActiveSpan(title, given, parent, run) : tracer.startActiveSpan(title, given, run)
 }
 
 // A span that outlives one call, such as an API route's from its first hook to its response.
-export function startSpan(name: string, options: SpanOptions): Span | undefined {
-  return tracer?.startSpan(name, options)
+export function startSpan(name: string, options: SpanOptions, request?: Request): Span | undefined {
+  const parent = request && tracer && parentOf(request)
+  const span = parent ? tracer?.startSpan(name, options, parent) : tracer?.startSpan(name, options)
+
+  if (request)
+    noteTrace(request, span)
+
+  return span
 }

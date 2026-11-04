@@ -21,7 +21,7 @@ import type { Redirects } from './server/redirects'
 import type { Rewrite } from './server/rewrite'
 import type { Prefetch } from './server/speculation'
 import type { FileStore } from './server/storage'
-import type { Tracer } from './server/trace'
+import type { TraceExtractor, Tracer } from './server/trace'
 
 // What `kay.config.ts` exports by default; `pages()`, `kay build`, `kay dev` and `kay check` all read it.
 export interface KayConfig {
@@ -218,6 +218,8 @@ export interface ObserveConfig {
   requestIdHeader?: string | undefined
   // An OpenTelemetry tracer, `trace.getTracer('my-site')` from @opentelemetry/api: a span per page request with one per load and the render in it, and one per API request. None by default, which costs nothing.
   tracer?: Tracer | undefined
+  // Reads the trace a request arrives in out of its headers, a one-liner with OpenTelemetry: `extract: headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers))`. By default kay reads the W3C `traceparent` header itself, so a tracer's server spans join the caller's trace; `false` ignores incoming traces and starts a new one per request.
+  extract?: TraceExtractor | false | undefined
   // Receives every error a load, a render, a guard or an action throws, as it is logged, and the ones islands report from the browser: the place to send them to an error tracker.
   // An error met outside any request, in a scheduled or background job or an `onStop` hook, comes with `undefined` for the request.
   // An error a hook of kay or a library threw comes with its `source`, such as `'cms.onSave'`; it is undefined for any other.

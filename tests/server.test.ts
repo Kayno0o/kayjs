@@ -1982,10 +1982,11 @@ function recordingTracer(): { tracer: Tracer, ended: RecordedSpan[] } {
   return {
     tracer: {
       startSpan: (name, options) => span(open(name, options)),
-      startActiveSpan: (name, options, fn) => {
+      startActiveSpan: (name: string, options: SpanOptions, ...rest: unknown[]) => {
         const record = open(name, options)
+        const fn = rest.at(-1) as (span: Span) => unknown
 
-        return active.run(name, () => fn(span(record))) as ReturnType<typeof fn>
+        return active.run(name, () => fn(span(record)))
       },
     },
     ended,

@@ -36,7 +36,7 @@ import { revalidateStale } from './revalidate'
 import { canonicalPath, withoutSlash } from './routes'
 import { carryContext } from './security'
 import { serveServerIslands } from './server-islands'
-import { answered, SERVER_SPAN, traced } from './trace'
+import { answered, replyTrace, SERVER_SPAN, traced } from './trace'
 
 // The params come resolved, each matcher's value in place of its text.
 export type PageResponder = (route: ServedRoute, params: Record<string, unknown>, context: RequestContext, url: URL) => Promise<Response>
@@ -238,8 +238,10 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
           if (span)
             answered(span, response.status)
 
+          replyTrace(context.request, response)
+
           return response
-        })
+        }, context.request)
       }
     }
 

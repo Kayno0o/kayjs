@@ -17,6 +17,8 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - A deferred server island that fails or times out is retried with a backoff and, if lost, keeps its inert copy with `data-kay-failed` and a `kay:server-island-error` event carrying the `ApiError` and `retry()`; `kay:server-island` follows a success, and leaving the page aborts the request: [prerendering](prerendering.md#server-islands).
 
+- A request's `traceparent` puts its server span under the caller's trace (`observe.extract` reads other formats, `false` ignores it), the response sends `traceresponse` and JSON log lines carry `trace`: [tracing](tracing.md#join-the-callers-trace).
+
 ## 1.87.0
 
 - The config's keys are grouped by concern: `dirs` (`routes`, `api`, `public`), `limits` (`body`, `byPath`), `serve` (`apiPath`, `compress`, `compressionDictionary`, `shutdownTimeout`), `observe` (`log`, `serverTiming`, `requestIdHeader`, `tracer`, `onError`) and `client` (`navigation`, `inlineStyles`, `lateStyles`, `typography`, `hydration`, `prefetch`, `saveData`), so a key is found by what it does; the flat keys work until 1.91 and `kay upgrade` moves them (`deprecated-config-groups`): [the config](project.md), [upgrading](upgrading.md#the-config-keys-are-grouped-by-concern).

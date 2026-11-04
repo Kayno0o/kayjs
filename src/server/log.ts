@@ -7,6 +7,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { describeThrown } from '../build/sourcemap'
 import { setLogSink } from '../runtime/log'
 import { requestId } from './protection'
+import { recordOf } from './request-record'
 
 // One line of the request log.
 export interface RequestEntry {
@@ -21,6 +22,8 @@ export interface RequestEntry {
   duration: number
   // What its `X-Request-Id` header says, and the messages logged while answering it.
   id: string
+  // The trace id of the request's span, when a tracer is set.
+  trace?: string
 }
 
 // One of kay's own messages, an error it caught, a warning about the app, a notice such as a shutdown, or a library's, logged through `logFrom`.
@@ -32,7 +35,7 @@ export interface MessageEntry {
   from: string
   message: string
   // The request being answered when it was logged.
-  request?: { method: string, path: string, id: string }
+  request?: { method: string, path: string, id: string, trace?: string }
   // What was thrown, its stack mapped to `.kay` lines.
   error?: { name: string, message: string, stack?: string }
 }
@@ -137,9 +140,16 @@ function messageEntry(level: LogLevel, message: string, error?: unknown, request
     level,
     from,
     message: message === '' && error instanceof Error ? error.message : message,
-    ...request && { request: { method: request.method, path: pathOf(request.url), id: requestId(request) } },
+    ...request && { request: { method: request.method, path: pathOf(request.url), id: requestId(request), ...traceOf(request) } },
     ...error !== undefined && { error: thrown(error) },
   }
+}
+
+// The trace id a request's span has, as the field its log lines carry.
+function traceOf(request: Request): { trace: string } | undefined {
+  const ids = recordOf(request)?.trace
+
+  return ids && { trace: ids.traceId }
 }
 
 function thrown(error: unknown): NonNullable<MessageEntry['error']> {
@@ -245,6 +255,6 @@ export function logRequests(app: Elysia, logger: Exclude<Logger, false>, healthP
 
     const status = statusOf(responseValue, set)
 
-    writeLine({ type: 'request', time: new Date().toISOString(), level: 'info', method: start.method, path: start.path, status, duration: Math.round((start.answered ?? performance.now()) - start.at), id: requestId(request) })
+    writeLine({ type: 'request', time: new Date().toISOString(), level: 'info', method: start.method, path: start.path, status, duration: Math.round((start.answered ?? performance.now()) - start.at), id: requestId(request), ...traceOf(request) })
   })
 }

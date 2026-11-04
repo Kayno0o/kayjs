@@ -2840,7 +2840,7 @@ interface MessageEntry
   from: string
   level: LogLevel
   message: string
-  request?: { method: string; path: string; id: string; }
+  request?: { method: string; path: string; id: string; trace?: string; }
   time: string
   type: "message"
 
@@ -3189,6 +3189,7 @@ interface RequestEntry
   path: string
   status: number
   time: string
+  trace?: string
   type: "request"
 
 [./server] requestId

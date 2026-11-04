@@ -38,7 +38,7 @@ import { requestUrl } from './request-url'
 import { apiRoutePath, withoutSlash } from './routes'
 import { markPrivate, wasReadPersonally } from './scope'
 import { carriedNames, carryContext } from './security'
-import { answered, failed, SERVER_SPAN, startSpan, tracing } from './trace'
+import { answered, failed, replyTrace, SERVER_SPAN, startSpan, tracing } from './trace'
 import { socketLimits } from './ws-limits'
 
 // What a body Elysia streams, awaits or asks for its response has: a generator, a thenable, an object with `toResponse()`.
@@ -151,7 +151,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
       const guarded = group
         // A span from the guards to the response, which the handler's own spans do not nest under: the handler runs in Elysia's call, not in one kay makes.
-        .onBeforeHandle(({ request, route: mounted }) => {
+        .onBeforeHandle(({ request, route: mounted, set }) => {
           // The module a request matched, as the first hook of its group saw it.
           const record = requestRecord(request)
 
@@ -163,10 +163,12 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
           if (tracing()) {
             // `/api/echo` rather than the `/api/echo/` a module's `/` route is mounted at.
             const route = mounted.length > 1 ? mounted.replace(TRAILING_SLASH, '') : mounted
-            const span = startSpan(`${request.method} ${route}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': request.method, 'http.route': route, 'url.path': requestUrl(request).pathname, 'kay.request.id': requestId(request) } })
+            const span = startSpan(`${request.method} ${route}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': request.method, 'http.route': route, 'url.path': requestUrl(request).pathname, 'kay.request.id': requestId(request) } }, request)
 
             if (span)
               record.apiSpan = span
+
+            replyTrace(request, set)
           }
         })
 

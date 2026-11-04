@@ -15,6 +15,26 @@ export default defineConfig({
 })
 ```
 
+### Join the caller's trace
+
+A request carrying a W3C `traceparent` header gets its server span under that parent, so a call from another service shows as one trace; kay reads the header itself, with no OpenTelemetry dependency. The response carries `traceresponse: 00-<trace id>-<span id>-<flags>` and the JSON log lines of the request (`observe: { log: 'json' }`) a `trace` field with the trace id. A header that is malformed or has an all-zero id is ignored and the request starts a trace of its own.
+
+To read another format (B3, a baggage rule), `observe: { extract }` takes a function from the request's `Headers` to a context, the OpenTelemetry one-liner being:
+
+```ts
+import { propagation, ROOT_CONTEXT, trace } from '@opentelemetry/api'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({
+  observe: {
+    tracer: trace.getTracer('my-site'),
+    extract: headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers)),
+  },
+})
+```
+
+`extract: false` ignores incoming traces. A throwing extractor is logged as a warning and the request starts its own trace. A custom `Tracer` receives the parent as the third argument of `startSpan` and `startActiveSpan(name, options, context, fn)`, only when the request carries one; its spans return `spanContext()` for the log and `traceresponse`.
+
 ## Reference
 
 ### Tracing and timing

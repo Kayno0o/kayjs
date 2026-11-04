@@ -13,6 +13,7 @@ import type { RequestContext } from './render'
 import type { Deadline } from './request-timeout'
 import type { Namer } from './request-user'
 import type { Span } from './trace'
+import type { SpanIds } from './trace-context'
 import type { Handle } from './visit'
 
 // What kay notes of a request while answering it, one record per request rather than one table per fact, each fact set only by the feature that reads it.
@@ -58,6 +59,8 @@ export class RequestRecord {
   routeReads: CacheReads | undefined = undefined
   // An API request's trace span, the module it matched and its locale state.
   apiSpan: Span | undefined = undefined
+  // The trace its server span belongs to, which its log lines and `traceresponse` carry.
+  trace: SpanIds | undefined = undefined
   apiOwner: object | undefined = undefined
   apiLocale: LocaleState | undefined = undefined
   // A post's guards' answer, its page's params and URL, whether it is cross-site and where it was posted from (null for nowhere on this site).
