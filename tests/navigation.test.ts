@@ -1532,7 +1532,11 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         })
         await own.click('a.two')
         await own.waitUntil(() => document.documentElement.getAttribute('aria-busy') === 'true')
-        await own.advance(`${PAGE_TIMEOUT_MS + 100}ms`)
+
+        // `aria-busy` is set before the lazy swap chunk arms its timer, so the clock moves on until the timeout has fired.
+        for (let tries = 0; tries < 5 && await own.evaluate(() => (window as { kayAlive?: boolean }).kayAlive === true && !(window as { kayLog?: string[] }).kayLog?.some(line => line.startsWith('error '))); tries++)
+          await own.advance(`${PAGE_TIMEOUT_MS + 100}ms`)
+
         await own.waitUntil(() => (window as { kayLog?: string[] }).kayLog!.some(line => line.startsWith('error ')) || !(window as { kayAlive?: boolean }).kayAlive)
 
         // The error reached the island before the full load took the page away, or the load beat the read: either way the page ended on the next one.
