@@ -271,6 +271,10 @@ ContactForm(server="defer" noscript="Show the contact form")
 
 Leave it off when the island's content is reachable without it. `noscript` goes only with `server="defer"`.
 
+A fetch that gets no answer in 10 seconds, or fails with a server error, is asked again after 1 and then 3 seconds, waiting for the tab to be visible and the network to be up. If it is lost, the island keeps its inert copy and gets a `data-kay-failed` attribute you can style.
+
+The page hears about it from two events on `document`: `kay:server-island` when the island is in, and `kay:server-island-error` when it is lost. The error event carries `detail.error` (an `ApiError`) and `detail.retry()`. Leaving the page cancels the request, and `aria-busy` marks the island while it loads.
+
 A layout that reads `ctx.locals`, `ctx.cookies` or `ctx.query` cannot be prerendered. A page holding a server island whose layout reads one is rendered on each request instead, and `kay build` lists it as `on request` with the file and line of the read. With `prerender: true`, or in a static export, the build fails with that file and line.
 
 ## Redirects

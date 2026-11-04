@@ -5,7 +5,8 @@ import { gunzipSync } from 'node:zlib'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { compileKay } from '../src/compiler'
-import { hydrateIslands } from '../src/runtime/client'
+import { ApiError } from '../src/runtime/api-error'
+import { disposeIslands, hydrateIslands } from '../src/runtime/client'
 import { ISLAND_HEADER } from '../src/runtime/server-islands'
 import { readManifest } from '../src/server/client'
 import { ExportError } from '../src/server/prerender'
@@ -21,6 +22,13 @@ const ACTION = /<form method="post" action="([^"]+)"/
 const DEFERRED = /<!--kay-server:1--><slot data-kay-server="1" inert>[\s\S]*?<!--\/kay-server:1-->/
 // The markers around each value an island hydrates.
 const VALUE_MARKERS = /<!--[[\]]-->/g
+
+type Announced = CustomEvent<{ id: string, error: ApiError, retry: () => void }>
+
+async function waitFor(done: () => boolean): Promise<void> {
+  for (let waited = 0; !done() && waited < 5000; waited += 10)
+    await Bun.sleep(10)
+}
 
 function stamps(html: string): string[] {
   return [...html.matchAll(STAMP)].map(match => match[1]!)
@@ -313,6 +321,105 @@ describe('a deferred server island, in the browser', () => {
       expect(slot.hasAttribute('inert')).toBe(false)
       expect(slot.querySelector('.stamp')!.textContent).toBe('fresh')
       expect(hydrated).toBe(true)
+    }
+    finally {
+      fetching.mockRestore()
+    }
+  })
+
+  // A hydrated page with one deferred island, `answers` the responses of its requests in turn.
+  async function deferred(answers: (Response | Error | 'hang')[]) {
+    const signals: (AbortSignal | null | undefined)[] = []
+    const fetching = spyOn(globalThis, 'fetch').mockImplementation((async (_input: RequestInfo | URL, init?: RequestInit) => {
+      signals.push(init?.signal)
+
+      const answer = answers.shift() ?? new Response('', { status: 500 })
+
+      if (answer === 'hang') {
+        return new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))))
+      }
+
+      if (answer instanceof Error)
+        throw answer
+
+      return answer
+    }) as typeof fetch)
+
+    document.body.innerHTML = '<slot data-kay-server="0" inert><p class="stamp">built</p></slot>'
+
+    const slot = document.querySelector<HTMLElement>('slot[data-kay-server]')!
+    const events: [string, Announced][] = []
+
+    for (const type of ['kay:server-island', 'kay:server-island-error'])
+      document.addEventListener(type, event => events.push([type, event as Announced]))
+
+    return { slot, signals, events, fetching }
+  }
+
+  it('asks again after a failed answer, and tells the page when it is in: aria-busy while loading and a kay:server-island event', async () => {
+    const { slot, signals, events, fetching } = await deferred([new Response('', { status: 503 }), new Response('<p class="stamp">fresh</p>')])
+
+    try {
+      await hydrateIslands({})
+      await waitFor(() => signals.length > 0)
+      expect(slot.getAttribute('aria-busy')).toBe('true')
+      await waitFor(() => events.length > 0)
+
+      expect(signals).toHaveLength(2)
+      expect(events.map(([type]) => type)).toEqual(['kay:server-island'])
+      expect(events[0]![1].detail.id).toBe('0')
+      expect(slot.querySelector('.stamp')!.textContent).toBe('fresh')
+      expect(slot.hasAttribute('aria-busy')).toBe(false)
+      expect(slot.hasAttribute('data-kay-failed')).toBe(false)
+    }
+    finally {
+      fetching.mockRestore()
+    }
+  })
+
+  it('keeps the inert copy of an island refused for good, marks it failed and hands the page the error and a retry', async () => {
+    const { slot, signals, events, fetching } = await deferred([new Response('no', { status: 404 }), new Response('<p class="stamp">later</p>')])
+
+    try {
+      await hydrateIslands({})
+      await waitFor(() => events.length > 0)
+
+      const [type, event] = events[0]!
+
+      expect(type).toBe('kay:server-island-error')
+      expect(signals).toHaveLength(1)
+      expect(event.detail.error).toBeInstanceOf(ApiError)
+      expect(event.detail.error.status).toBe(404)
+      expect(slot.hasAttribute('inert')).toBe(true)
+      expect(slot.hasAttribute('data-kay-failed')).toBe(true)
+      expect(slot.querySelector('.stamp')!.textContent).toBe('built')
+
+      event.detail.retry()
+      await waitFor(() => events.length > 1)
+
+      expect(events[1]![0]).toBe('kay:server-island')
+      expect(slot.hasAttribute('data-kay-failed')).toBe(false)
+      expect(slot.querySelector('.stamp')!.textContent).toBe('later')
+    }
+    finally {
+      fetching.mockRestore()
+    }
+  })
+
+  it('aborts the request of an island taken away, and reports no failure for it', async () => {
+    const { slot, signals, events, fetching } = await deferred(['hang'])
+
+    try {
+      await hydrateIslands({})
+      await waitFor(() => signals.length > 0)
+
+      disposeIslands(document.body)
+      await Bun.sleep(20)
+
+      expect(signals[0]!.aborted).toBe(true)
+      expect(events).toEqual([])
+      expect(slot.hasAttribute('data-kay-failed')).toBe(false)
+      expect(slot.hasAttribute('aria-busy')).toBe(false)
     }
     finally {
       fetching.mockRestore()

@@ -165,8 +165,8 @@ async function whenHydrating(start: (when: typeof import('./hydrate-when')) => v
 async function fetchServerIsland(registry: IslandRegistry, element: HTMLElement): Promise<void> {
   const { fetchServerIsland: fetchIt } = await import('./fetch-island')
 
-  await fetchIt(element, disposeIslands)
-  await hydrateIslands(registry, element)
+  if (await fetchIt(element, disposeIslands, () => void fetchServerIsland(registry, element)))
+    await hydrateIslands(registry, element)
 }
 
 // The chunk file the server named in an island's markup sits beside this runtime, so the page's URL and the site's base do not matter.
@@ -401,6 +401,10 @@ export function disposeIslands(root: ParentNode): void {
     disposers.delete(element)
     dispose?.()
   }
+
+  // Ends the request of a deferred server island still being fetched.
+  for (const element of root.querySelectorAll(SERVER_ISLAND))
+    element.dispatchEvent(new Event('kay:island-gone'))
 }
 
 // The clicks, inputs and changes the inline hydration script queued on the island while it waited for its chunk.
