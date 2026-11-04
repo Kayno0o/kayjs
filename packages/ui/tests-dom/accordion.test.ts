@@ -65,3 +65,13 @@ test('leaves a chord to the browser', async () => {
   for (const chord of [{ shiftKey: true }, { altKey: true }, { metaKey: true }])
     expect(key('ArrowDown', chord).defaultPrevented).toBe(false)
 })
+
+test('a level makes each section title a heading in its summary, a span without one', async () => {
+  mounted = await mountComponent(MoonAccordion, { level: 3 })
+  expect([...mounted.root.querySelectorAll('summary > h3')].map(heading => heading.textContent)).toEqual(['Mars', 'Venus', 'Earth'])
+  mounted.unmount()
+
+  mounted = await mountComponent(MoonAccordion)
+  expect(mounted.root.querySelector('summary > span.kui-heading-section')?.textContent).toBe('Mars')
+  expect(mounted.root.querySelector('h1, h2, h3, h4, h5, h6')).toBeNull()
+})

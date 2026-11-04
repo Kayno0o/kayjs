@@ -13,7 +13,7 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
 
 const look = recipe({ parts: { root: 'kui-accordion' } })
 
-const { items, multiple = false, boxed = true, value, onChange, panel, title, meta, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onChange'> & {
+const { items, level, multiple = false, boxed = true, value, onChange, panel, title, meta, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onChange'> & {
   // `open` starts a section unfolded; with one open at a time, the first one flagged wins. `disabled` keeps a section as it is, and `meta` draws a count or a state in its band, as CollapsibleSection's does.
   items: readonly { value: string, title: string, open?: boolean | undefined, disabled?: boolean | undefined, meta?: string | undefined }[]
   // The values open, which the accordion follows when the app passes a new one: a string, or an array with `multiple`. Left out, the reader alone decides after the first draw.
@@ -22,6 +22,8 @@ const { items, multiple = false, boxed = true, value, onChange, panel, title, me
   onChange?: ((value: string[]) => unknown) | undefined
   // Lets several sections stay open; by default opening one closes the others.
   multiple?: boolean | undefined
+  // Makes each section's title a heading of that level, as CollapsibleSection's `level` does.
+  level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   // Draws each section as a card, as CollapsibleSection does.
   boxed?: boolean | undefined
   // Draws each section's body: `@panel(value)`, given the item's value.
@@ -104,5 +106,5 @@ function keyDown(event: KeyboardEvent) {
 // Native details sharing a `name` close one another without script; the keys need an island.
 div(part="root" {...rest} ref={element => root = element} onKeyDown={keyDown} onClick={refuseDisabled})
   for item of items key={item.value}
-    CollapsibleSection(title={untrack(() => title?.(item.value)) ?? item.title} meta={untrack(() => meta?.(item.value)) ?? item.meta} name={multiple ? undefined : group} open={opened().has(item.value)} boxed={boxed} disabled={item.disabled} onOpenChange={now => toggled(item.value, now)})
+    CollapsibleSection(title={untrack(() => title?.(item.value)) ?? item.title} meta={untrack(() => meta?.(item.value)) ?? item.meta} level={level} name={multiple ? undefined : group} open={opened().has(item.value)} boxed={boxed} disabled={item.disabled} onOpenChange={now => toggled(item.value, now)})
       | {untrack(() => panel(item.value))}

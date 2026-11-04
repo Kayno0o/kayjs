@@ -13,9 +13,11 @@ const look = recipe({
   },
 })
 
-const { title, meta, description, actions, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'title'> & {
+const { title, level = 1, meta, description, actions, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'title'> & {
   // The page's one `h1`. A `@title` block draws markup inside it instead of the string.
   title: string | Snippet
+  // The title's heading level, `1` by default; a header over a section of the page, not the page itself, passes the level under its own.
+  level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   // Beside the title: a badge, a count, a link back.
   meta?: Snippet
   // Under the title's line: a sentence saying what the page holds. A `@description` block draws markup in its paragraph, such as a link.
@@ -27,7 +29,18 @@ const { title, meta, description, actions, ...rest } = props<Omit<JSX.IntrinsicE
 // The head of a page: its title, the actions on the whole page, and under them its description and what the children add.
 header({...rest})
   div(part="head")
-    h1(part="title") {title}
+    if level === 1
+      h1(part="title") {title}
+    else if level === 2
+      h2(part="title") {title}
+    else if level === 3
+      h3(part="title") {title}
+    else if level === 4
+      h4(part="title") {title}
+    else if level === 5
+      h5(part="title") {title}
+    else
+      h6(part="title") {title}
     if meta
       div(part="meta")
         | {meta}

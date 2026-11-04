@@ -2,9 +2,9 @@
 // kay-island
 import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
 
-const { multiple = false } = props<{ multiple?: boolean }>()
+const { multiple = false, level } = props<{ multiple?: boolean, level?: 1 | 2 | 3 | 4 | 5 | 6 }>()
 const items = [{ value: 'mars', title: 'Mars' }, { value: 'venus', title: 'Venus', open: true }, { value: 'earth', title: 'Earth' }]
 ---
-Accordion(items={items} multiple={multiple})
+Accordion(items={items} multiple={multiple} level={level})
   @panel(value)
     p {value}

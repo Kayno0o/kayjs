@@ -149,6 +149,8 @@ Button(label="Save" tone="accent" onClick={save})
 
 A title, a heading or a tab is a string by default, and a block puts markup in its place: `@title` on Card, PageHeader and the other heads, `@heading` on Dialog and SidePanel, and a block named after one entry, such as `@tab(tab)`, on Tabs, TabNav, Breadcrumb, SiteNav, Carousel and MediaGallery. Card, CardRow, Avatar, Badge and a Timeline entry take `href` and become a link. [All of them](/llms/kayjs-ui-slots-and-links).
 
+Every titled component takes `level` (1 to 6) for its heading. The defaults follow where the component usually sits: `h1` for PageHeader, `h2` for PageSection, Widget and Dialog, `h3` for Card. EmptyState, CollapsibleSection and Accordion draw a paragraph or a span until `level` makes the title a heading.
+
 ## Restyle a component
 
 A component with parts takes its `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its name, with its import path as the fallback ([Restyle a component from src/ui.ts](/essentials/styling-and-assets/#restyle-a-component-from-srcuits)):

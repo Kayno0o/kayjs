@@ -34,7 +34,7 @@
 
 ## Reference
 
-- Widget takes `level`, `h2` by default, as `Card`, `PageSection` and `EmptyState` do.
+- Heading levels: every titled component takes `level` (1 to 6) and its default is the heading it usually is under the page's `h1`. `PageHeader` `1`; `PageSection`, `Widget` and `Dialog` (2 to 6) `2`; `Card` `3`; `EmptyState` none (a paragraph until `level` makes it a heading); `CollapsibleSection` and `Accordion` none (a span in the summary until `level` makes the title a heading). Pass the level under the heading above when a component sits deeper.
 - New parts: `Tabs` and `TabNav` `badge` (and `TabNav` `icon`), `Breadcrumb` `icon`, `SiteNav` `expand`, `expandIcon` and `children`, `Card` and `CardRow` `link`, `Carousel` `link`, `ConfirmDelete` `details`, `Notice` `icon`, `body`, `actions` and `dismiss`.
 - `SiteNav` link blocks apply to the links of `children` too; the `ui.siteNav.expand` text is `Show the pages under {label}`, and `ui.notice.dismiss` is `Dismiss`.
 - `Dialog`, `SidePanel` and `ConfirmDelete` keep their strings as the names screen readers hear; a block never replaces the `aria-label`.
