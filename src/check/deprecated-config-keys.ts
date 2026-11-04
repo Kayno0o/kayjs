@@ -48,12 +48,43 @@ function grouped(name: string): readonly [string, string] | undefined {
   return Object.hasOwn(GROUPED_KEYS, name) ? GROUPED_KEYS[name as keyof typeof GROUPED_KEYS] : undefined
 }
 
-interface MovedEntry { inner: string, value: string, comment: string }
+interface MovedEntry { inner: string, value: string, comment: string, leading: string[] }
 
 const TRAILING_COMMA = /^\s*,/
 const TRAILING_COMMENT = /^[ \t]*(\/\/[^\n]*|\/\*[^\n]*?\*\/)/
 const LINE_REST = /^[ \t]*\r?\n/
 const INDENT = /^[ \t]*/
+const OWN_LINE_COMMENT = /^[ \t]*(\/\/[^\n]*|\/\*[^\n]*?\*\/)$/
+
+// Whether a property is written alone on its lines: nothing before it on its first line and nothing but a comma and a comment after it.
+function aloneOnItsLine(source: string, property: ObjectProperty): boolean {
+  const comma = TRAILING_COMMA.exec(source.slice(property.end))
+  const afterComma = property.end + (comma?.[0].length ?? 0)
+  const end = afterComma + (TRAILING_COMMENT.exec(source.slice(afterComma))?.[0].length ?? 0)
+  const lineStart = source.lastIndexOf('\n', property.start - 1) + 1
+
+  return source.slice(lineStart, property.start).trim() === '' && LINE_REST.test(source.slice(end))
+}
+
+// The comments written on their own lines right above a property alone on its line, as they sit in the source: they describe that property, so they move with it.
+function leadingComments(source: string, property: ObjectProperty): { start: number, lines: string[] } {
+  const own = source.lastIndexOf('\n', property.start - 1) + 1
+  const lines: string[] = []
+  let start = own
+
+  while (start > 0) {
+    const previous = source.lastIndexOf('\n', start - 2) + 1
+    const comment = OWN_LINE_COMMENT.exec(source.slice(previous, start - 1).trimEnd())
+
+    if (!comment)
+      break
+
+    lines.unshift(comment[1]!.trim())
+    start = previous
+  }
+
+  return { start: lines.length === 0 ? own : start, lines }
+}
 
 function movedHelp(twice: boolean, holdsBag: boolean, written: string, allWritten: boolean): string {
   if (twice)
@@ -68,10 +99,10 @@ function movedHelp(twice: boolean, holdsBag: boolean, written: string, allWritte
 // The text of the bags, one per line, indented as the property they replace: a bag stays on one line unless a value spans lines or a key carries a comment.
 function bagsText(bags: Map<string, MovedEntry[]>, indent: string): string {
   return [...bags].map(([group, entries]) => {
-    if (entries.every(entry => entry.comment === '' && !entry.value.includes('\n')))
+    if (entries.every(entry => entry.comment === '' && entry.leading.length === 0 && !entry.value.includes('\n')))
       return `${group}: { ${entries.map(entry => entry.value).join(', ')} }`
 
-    const lines = entries.map(entry => `${indent}  ${entry.value},${entry.comment === '' ? '' : ` ${entry.comment}`}`)
+    const lines = entries.map(entry => [...entry.leading.map(line => `${indent}  ${line}\n`), `${indent}  ${entry.value},${entry.comment === '' ? '' : ` ${entry.comment}`}`].join(''))
 
     return `${group}: {\n${lines.join('\n')}\n${indent}}`
   }).join(`,\n${indent}`)
@@ -94,10 +125,11 @@ function groupEdits(source: string, properties: ObjectProperty[], moved: Set<Obj
     const lineStart = source.lastIndexOf('\n', property.start - 1) + 1
     const indent = INDENT.exec(source.slice(lineStart, property.start))![0]
     const alone = source.slice(lineStart, property.start).trim() === '' && LINE_REST.test(source.slice(end))
+    const leading = alone ? leadingComments(source, property).start : lineStart
 
     if (!inserted) {
       inserted = true
-      edits.push({ start: property.start, end: afterComma, text: bagsText(bags, alone ? indent : '') + (comma ? ',' : '') })
+      edits.push({ start: alone ? leading : property.start, end: afterComma, text: (alone ? indent : '') + bagsText(bags, alone ? indent : '') + (comma ? ',' : '') })
 
       if (comment)
         edits.push({ start: afterComma, end, text: '' })
@@ -106,7 +138,7 @@ function groupEdits(source: string, properties: ObjectProperty[], moved: Set<Obj
     }
 
     if (alone)
-      edits.push({ start: lineStart, end: end + LINE_REST.exec(source.slice(end))![0].length, text: '' })
+      edits.push({ start: leading, end: end + LINE_REST.exec(source.slice(end))![0].length, text: '' })
     else
       edits.push({ start: property.start, end: end + (comma ? INDENT.exec(source.slice(end))![0].length : 0), text: '' })
   }
@@ -185,7 +217,7 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
 
           twice ||= targets.has(`${group}.${inner}`)
           targets.add(`${group}.${inner}`)
-          bags.set(group, [...bags.get(group) ?? [], { inner, value, comment }])
+          bags.set(group, [...bags.get(group) ?? [], { inner, value, comment, leading: aloneOnItsLine(source, property) ? leadingComments(source, property).lines : [] }])
         }
 
         const holdsBag = [...bags.keys()].some(group => names.has(group))

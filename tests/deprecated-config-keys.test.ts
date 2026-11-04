@@ -217,6 +217,61 @@ describe('deprecated-config-groups', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('carries the comments above a moved key into its bag, and a trailing comment of a multi-line value', async () => {
+    const config = [
+      'import { defineConfig } from \'kay/server\'',
+      '',
+      'export default defineConfig({',
+      '  // the language',
+      '  lang: \'en\',',
+      '  // where pages live',
+      '  /* and nothing else */',
+      '  routesDir: \'src/pages\',',
+      '',
+      '  // the cache',
+      '  compress: {',
+      '    level: 3,',
+      '  }, // keep it small',
+      '  // upload limit',
+      '  maxSize: \'2mb\',',
+      '})',
+      '',
+    ].join('\n')
+    const root = await project({ 'kay.config.ts': config })
+
+    try {
+      await applySafeFixes(root, await deprecatedConfigKeys(root, {}))
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe([
+        'import { defineConfig } from \'kay/server\'',
+        '',
+        'export default defineConfig({',
+        '  // the language',
+        '  lang: \'en\',',
+        '  dirs: {',
+        '    // where pages live',
+        '    /* and nothing else */',
+        '    routes: \'src/pages\',',
+        '  },',
+        '  serve: {',
+        '    // the cache',
+        '    compress: {',
+        '    level: 3,',
+        '  }, // keep it small',
+        '  },',
+        '  limits: {',
+        '    // upload limit',
+        '    body: \'2mb\',',
+        '  },',
+        '',
+        '})',
+        '',
+      ].join('\n'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('the options of pages() and testSite()', () => {
