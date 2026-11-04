@@ -246,6 +246,14 @@ describe('kay build --static', () => {
     expect(eager.filter(code => code.includes('unsaved changes'))).toEqual([])
   })
 
+  it('keeps the ApiError class a deferred server island builds out of the files loaded up front of a page with no call, and in a chunk loaded after', async () => {
+    const eager = [...(await eagerJs(scriptUrls((await get('/')).text), async url => Bun.file(join(out, url.slice(BASE.length))).text())).values()].map(({ code }) => code)
+    const chunks = await Promise.all((await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))).map(async chunk => Bun.file(join(out, chunk)).text()))
+
+    expect(eager.filter(code => code.includes('name="ApiError"'))).toEqual([])
+    expect(chunks.filter(code => code.includes('name="ApiError"'))).toHaveLength(1)
+  })
+
   it('ships no code reviving an action for an app that declares none and uses no library', async () => {
     const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
     const texts = await Promise.all(chunks.map(async chunk => Bun.file(join(out, chunk)).text()))

@@ -13,6 +13,7 @@ import { compilerFingerprint } from './fingerprint'
 // The module every entry point of the client build imports.
 export const ANCHOR = 'kay:runtime'
 const ANCHOR_NAMESPACE = 'kay-runtime'
+const PROBE = 'kay:runtime-probe'
 const RUNTIME_DIR = resolve(import.meta.dir, '../runtime')
 const PACKAGE = resolve(import.meta.dir, '../../package.json')
 // An import or a re-export of a module, its clause and specifier as Bun prints them unminified; a bare `import "x"` has no clause.
@@ -201,6 +202,8 @@ async function remember(slot: CacheSlot, found: { chunk: RuntimeChunk, inputs: s
 
 async function searchRuntime(entry: string, options: { plugins: BunPlugin[], define: Record<string, string>, external: string[], islands?: string[] | undefined }): Promise<{ chunk: RuntimeChunk, inputs: string[] } | undefined> {
   const used = new Map<string, Set<string>>()
+  // Every name the entry and the islands import, those of the modules with a chunk of their own too, which reach the runtime as much as the rest.
+  const imported = new Map<string, Set<string>>()
   const outer = await Bun.build({ entrypoints: [entry, ...options.islands ?? []], target: 'browser', splitting: true, define: options.define, external: ['kay', 'kay/*', ...options.external], plugins: options.plugins, metafile: true, throw: false })
 
   if (!outer.success)
@@ -215,6 +218,7 @@ async function searchRuntime(entry: string, options: { plugins: BunPlugin[], def
 
     importedNames(await output.text(), own, specifier => KAY_SPECIFIER.test(specifier) && !OWN_CHUNK.has(specifier))
     mergeNames(used, own)
+    importedNames(await output.text(), imported, specifier => KAY_SPECIFIER.test(specifier))
 
     if (entryPoint === undefined)
       continue
@@ -256,15 +260,77 @@ async function searchRuntime(entry: string, options: { plugins: BunPlugin[], def
     if (!inner.success)
       return undefined
 
-    // What a lazy module takes from one loaded up front goes in the chunk with the rest; the rest of what it takes stays lazy with it.
+    // What a lazy module takes from a file the anchor really carries goes in the chunk with the rest; the rest of what it takes stays lazy with it.
+    // A file the anchor merely imports without using, as a lazy module's own class would be, stays out: adopting its names would pull it into every page.
+    const carried = await carriedFiles(imported, eager, options)
+
     for (const output of inner.outputs)
-      importedNames(await output.text(), shared, specifier => eager.has(specifier))
+      importedNames(await output.text(), shared, specifier => carried.has(specifier))
   }
 
   // The files of the output directory, the entry's and its boot module, are written again by every build: the key holds what they say.
   const inputs = Object.keys(outer.metafile!.inputs).map(input => resolve(input)).filter(file => !file.startsWith(dirname(entry) + sep))
 
   return { chunk: { dir: dirname(entry), anchor: anchorModule(shared), lazy }, inputs }
+}
+
+// The runtime files whose code is left once the bundler drops what none of the names an island or the entry imports reaches.
+async function carriedFiles(imported: Map<string, Set<string>>, eager: Set<string>, options: { define: Record<string, string>, external: string[] }): Promise<Set<string>> {
+  const probe = await Bun.build({
+    entrypoints: [PROBE],
+    target: 'browser',
+    splitting: true,
+    define: options.define,
+    external: options.external,
+    metafile: true,
+    throw: false,
+    plugins: [{
+      name: 'kay-runtime-probe',
+      setup(build) {
+        build.onResolve({ filter: new RegExp(`^${RegExp.escape(PROBE)}$`) }, () => ({ path: PROBE, namespace: ANCHOR_NAMESPACE }))
+        build.onResolve({ filter: KAY_SPECIFIER }, async ({ path }) => {
+          const file = await specifierFile(path)
+
+          return file === undefined ? undefined : { path: file }
+        })
+        build.onLoad({ filter: ANY_PATH, namespace: ANCHOR_NAMESPACE }, () => ({ contents: anchorModule(imported), loader: 'ts', resolveDir: RUNTIME_DIR }))
+      },
+    }],
+  })
+
+  // A failed probe keeps everything the anchor could reach.
+  if (!probe.success)
+    return eager
+
+  const { outputs } = probe.metafile!
+  const carried = new Set<string>()
+  // The probe's chunk and those it imports statically: a lazy module's chunk is not loaded with it.
+  const loaded = new Set<string>()
+  const visit = (path: string): void => {
+    if (loaded.has(path))
+      return
+
+    loaded.add(path)
+
+    for (const imported of outputs[path]?.imports ?? []) {
+      if (imported.kind === 'import-statement')
+        visit(imported.path)
+    }
+  }
+
+  for (const [path, output] of Object.entries(outputs)) {
+    if (output.entryPoint?.endsWith(PROBE) === true)
+      visit(path)
+  }
+
+  for (const path of loaded) {
+    for (const [input, { bytesInOutput }] of Object.entries(outputs[path]?.inputs ?? {})) {
+      if (bytesInOutput > 0)
+        carried.add(resolve(input))
+    }
+  }
+
+  return carried
 }
 
 function mergeNames(into: Map<string, Set<string>>, from: Map<string, Set<string>>): void {
