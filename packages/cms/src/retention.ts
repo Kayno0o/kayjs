@@ -1,5 +1,6 @@
 import type { ContentLoader } from 'kay/content'
 import type { EntryRef } from './kay/contract'
+import { outsideRequest } from 'kay/library'
 import { isEvent, pruneActivity } from './activity'
 import { hiddenOf, rowOf, SWEEP_MARKER } from './hidden'
 import { collections, entries } from './kay/content'
@@ -137,10 +138,10 @@ export function startSweeping(): void {
 
   const sweep = () => void sweepHistory()
 
-  sweeping = setTimeout(() => {
+  sweeping = outsideRequest(() => setTimeout(() => {
     sweep()
-    setInterval(sweep, SWEEP_EVERY).unref()
-  }, FIRST_SWEEP)
+    outsideRequest(() => setInterval(sweep, SWEEP_EVERY)).unref()
+  }, FIRST_SWEEP))
   sweeping.unref()
 }
 

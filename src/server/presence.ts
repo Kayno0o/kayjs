@@ -150,7 +150,7 @@ function leave(room: string, tab: string): void {
   if (seat === undefined || --seat.refs > 0)
     return
 
-  seat.leaving = setTimeout(() => {
+  seat.leaving = outsideRequest(() => setTimeout(() => {
     seats.delete(at)
 
     try {
@@ -160,7 +160,7 @@ function leave(room: string, tab: string): void {
     catch (error) {
       kayLog('error', 'taking a tab out of a presence room failed', error)
     }
-  }, presenceGrace.ms)
+  }, presenceGrace.ms))
   seat.leaving.unref()
 }
 
