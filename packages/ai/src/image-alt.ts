@@ -1,6 +1,6 @@
 import type { CacheSlot } from 'kay/library'
 import type { ExtensionProblem, PageHook, RenderedPage } from 'kay/server'
-// Alt text drafted for the imported images of a page: one model call per image content, kept under `.kay/cache`, written into the HTML as a page is built or served.
+// Alt text drafted for the imported images of a page: one model call per image file and locale, kept under `.kay/cache`, written into the HTML as a page is built or served.
 import type { Attachment, Message } from './types'
 import { readdir } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'

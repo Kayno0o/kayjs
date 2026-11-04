@@ -45,7 +45,7 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
         db.run(`CREATE TRIGGER IF NOT EXISTS ${trigger} AFTER ${event} ON ${table} BEGIN ${body}; END`)
 
       db.run(`INSERT INTO ${counter} (collection, n) SELECT collection, 1 FROM ${table} GROUP BY collection ON CONFLICT (collection) DO UPDATE SET n = n + 1`)
-    })()
+    }).immediate()
   }
 
   const open = async (): Promise<Database> => {
