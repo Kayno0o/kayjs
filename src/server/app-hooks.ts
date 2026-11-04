@@ -33,16 +33,24 @@ export interface AppHooks {
   onStop?: Hook<Record<never, never>> | undefined
 }
 
-// The context `beforeRequest` was told, kept for the request's `onResponse`, so the user is looked up once.
-const contexts = new WeakMap<Request, HookContext>()
+interface Noted {
+  started?: number | undefined
+  context?: HookContext | undefined
+}
 
 // Registers the app's request and response hooks, none when the config sets none, so a plain app runs no extra hook per request.
 export function hookRequests(app: Elysia, { beforeRequest, onResponse }: AppHooks): void {
+  // When each request began and the context `beforeRequest` was told, kept for this app's `onResponse`, so the user is looked up once.
+  const noted = new WeakMap<Request, Noted>()
+  const note = (request: Request): Noted => noted.get(request) ?? noted.set(request, {}).get(request)!
+
   if (beforeRequest !== undefined) {
     // The transform stage runs before the body, query and params are validated, so a caller the hook refuses learns nothing from a field error.
     app.onTransform({ as: 'global' }, async (context) => {
       const { request } = context
-      const answer = await answeringRequest(request, async () => refuseWith(request, beforeRequest, { request, url: new URL(request.url), locals: context as unknown as Locals }))
+      const answer = await answeringRequest(request, async () => refuseWith(beforeRequest, { request, url: new URL(request.url), locals: context as unknown as Locals }, (told) => {
+        note(request).context = told
+      }))
 
       if (answer === undefined)
         return undefined
@@ -56,20 +64,16 @@ export function hookRequests(app: Elysia, { beforeRequest, onResponse }: AppHook
   }
 
   if (onResponse !== undefined) {
-    const started = new WeakMap<Request, number>()
-
     app.onRequest(({ request }) => {
-      started.set(request, performance.now())
+      note(request).started = performance.now()
     })
     app.onAfterResponse({ as: 'global' }, async (context) => {
       const { request, set, responseValue } = context
-      const begun = started.get(request)
-      const known = contexts.get(request)
+      const { started, context: known } = noted.get(request) ?? {}
 
-      started.delete(request)
-      contexts.delete(request)
+      noted.delete(request)
 
-      await answeringRequest(request, async () => notify('onResponse', [onResponse], { request, url: new URL(request.url), locals: context as unknown as Locals, status: statusOf(responseValue, set), duration: begun === undefined ? 0 : Math.round(performance.now() - begun) }, { context: known }))
+      await answeringRequest(request, async () => notify('onResponse', [onResponse], { request, url: new URL(request.url), locals: context as unknown as Locals, status: statusOf(responseValue, set), duration: started === undefined ? 0 : Math.round(performance.now() - started) }, { context: known }))
     })
   }
 }
@@ -90,11 +94,11 @@ export function hookLifecycle(app: Elysia, { onStart, onStop }: AppHooks): void 
 }
 
 // The response a refusing `beforeRequest` answers with, undefined when the request goes on. A hook that fails any other way, or does not finish in 10 s, refuses as a server error after it is reported: a check that cannot run lets nothing through.
-async function refuseWith(request: Request, hook: NonNullable<AppHooks['beforeRequest']>, event: RequestEvent): Promise<Response | undefined> {
+async function refuseWith(hook: NonNullable<AppHooks['beforeRequest']>, event: RequestEvent, keep: (context: HookContext) => void): Promise<Response | undefined> {
   const context = await hookContext()
   let answered: Response | undefined
 
-  contexts.set(request, context)
+  keep(context)
 
   const outcome = await decide('beforeRequest', [async (told: RequestEvent & { context: HookContext }) => {
     const answer = await hook(told)
