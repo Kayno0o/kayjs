@@ -1,4 +1,5 @@
 import type { CookieInit, CookieMap, CookieStoreDeleteOptions } from 'bun'
+import type { AnyElysia } from 'elysia'
 import type { CookieDefaults } from '../config'
 import { KayError } from '../compiler/errors'
 import { requestRecord } from './request-record'
@@ -41,15 +42,17 @@ interface CookieApp {
 
 // Records the app's cookie defaults on each request it gets, for the cookie jar to apply.
 // The cookies of an `api()` route are Elysia's own, which reads `httpOnly`, `sameSite` and `path` from the app's config, and gets `Secure` from the request here, a cookie's own option winning in both.
-export function defaultCookies(app: CookieApp, defaults: ResolvedCookieDefaults | undefined): void {
+export function defaultCookies(app: AnyElysia, defaults: ResolvedCookieDefaults | undefined): void {
   if (defaults === undefined)
     return
 
-  app.onRequest(({ request }) => {
+  const { onRequest, mapResponse, config } = app as unknown as CookieApp
+
+  onRequest.call(app, ({ request }) => {
     requestRecord(request).cookieDefaults = defaults
   })
-  app.config.cookie = { ...app.config.cookie, httpOnly: defaults.httpOnly, sameSite: defaults.sameSite, path: defaults.path }
-  app.mapResponse({ as: 'scoped' }, ({ request, set }) => {
+  config.cookie = { ...config.cookie, httpOnly: defaults.httpOnly, sameSite: defaults.sameSite, path: defaults.path }
+  mapResponse.call(app, { as: 'scoped' }, ({ request, set }) => {
     for (const cookie of Object.values(set.cookie ?? {})) {
       if (cookie.secure === undefined)
         cookie.secure = cookie.sameSite === 'none' || (defaults.secure === 'auto' ? overHttps(request) : defaults.secure)
