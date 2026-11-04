@@ -1,6 +1,74 @@
 # Upgrading, older releases
 
-What each minor release before 1.82 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+What each minor release before 1.85 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+
+## 1.84.0
+
+### kayjs-ui's `LineChart` needs chartist 2
+
+- The `chartist` peer is `^2.0.0` (was `^1.5.0`): `bun add chartist@^2` before upgrading kayjs-ui. `LineChart` draws through chartist 2's `lineChart()` with `chartist/compat`, which 1.x has not, so 1.x no longer works.
+- A `LineChart`'s `options` prop is chartist's `LineChartPresetOptions`: the 1.x options, plus `plugins`, `layers` and axis factories. An `options.axisX.type: FixedScaleAxis` (the 1.x class) still works, and `fixedScaleAxis()` replaces it. `kay check` cannot recognise a chartist version, so there is no deprecated lint.
+
+### A kayjs-ui `Rating` needs its `label`
+
+- `Rating(value={4.6})` fails `kay check`: give it the text screen readers read, as `Meter` and `Progress` already need, `Rating(value={4.6} label="Rated 4.6 out of 5")`. The `ui.rating.label` message (`{value} out of {max}`) that stood in for a missing one is gone.
+
+### kayjs-ui: `Meter`'s `fillClass` is deprecated
+
+- `Meter(fillClass="bg-warning")` becomes `Meter(class={{ fill: 'bg-warning' }})`, which replaces the fill's accent the same way. `fillClass` still works until 2.0.0 (`@deprecated`). No lint carries it: `kay check` does not resolve a library component's props in a template.
+
+### kayjs-ui: `MenuAction.danger` and `Toast.type` are deprecated
+
+- A `MenuAction` with `danger: true` becomes `tone: 'danger'`, which wins when both are given. Both still work until 2.0.0, and the editor strikes them out (`@deprecated`).
+- A read of `toasts()[n].type`, or of the `ToastType` type, becomes `tone`, where the old `'error'` is `'danger'`. 2.0.0 makes a toast `{ id, message, tone }`; `toast.error()` stays the method for a failure and pushes a `danger` toast.
+
+### kayjs-ai: a key over plain http, and `AI_PROVIDER=openai` without a key
+
+- A key sent to a plain `http://` API root that is not loopback, such as `AI_BASE_URL=http://ollama:11434/v1` on a compose network with `OPENAI_API_KEY` set, now throws until `AI_INSECURE=true` (or `insecure: true` on `openai()` and `anthropic()`) says the network is trusted; `https://` and `localhost` are unchanged, and a root with no scheme throws naming its variable.
+- `AI_PROVIDER=openai` without `OPENAI_API_KEY` throws unless `AI_BASE_URL` names a server. `kay check` cannot recognise either, as both depend on the environment, so there is no deprecated lint.
+
+### A string field of an action is bounded to 10,000 characters
+
+- A string field of an action's schema with no `maxLength` is now refused past 10,000 characters: declare a `maxLength` on a field that takes more, a long text or a pasted document say. `unbounded-string` is a warning now, so a `// kay-allow` or a level it was given stays valid.
+- A string in the `body` of an API route (a websocket's messages excepted) takes the same bound: declare a `maxLength` on one that takes more.
+
+### The `island-action` lint is gone
+
+- An island no longer needs `Action` imported to be handed an action, so `island-action` is removed: delete a `// kay-allow island-action` comment or a `lints` entry naming it, which `kay check` now reports as an unknown lint; no `deprecated` lint announces it, as an island still importing `Action` compiles and works as before. `island()` and `promote()` from `kay/island`, which compiled components call, lose their trailing `takesActions` argument, and the `PlainIslandProp` type lets an island's prop hold an action without a type for it.
+
+### The session stores are `memorySessions` and `sqliteSessions`
+
+- `memoryStore()` and `sqliteStore(path)` of `kay/server` are `memorySessions()` and `sqliteSessions(path)`, named for what they hold like `memoryJobs` and `sqliteRates`. The old names still work until 1.87; `kay upgrade` renames the imports and their uses (`deprecated-session-stores`).
+
+### kayjs-auth: `safeRedirect` is kay's `localPath`
+
+- `safeRedirect(path, fallback?)` of kayjs-auth is `localPath(path, fallback)` from `kay`, with `'/'` as the fallback `safeRedirect` defaulted to. It works until 1.87; `kay upgrade` rewrites the calls and the import (`deprecated-safe-redirect`), a fallback that is no string literal or a `safeRedirect` read as a value by hand.
+
+### `session.settings` holds durations
+
+- `session.settings.maxAge`, `absoluteMaxAge` and `browserMaxAge` are durations in whole seconds such as `'2592000s'`, where they were bare numbers of seconds. Code reading one as a number gets a type error from `kay check`; `durationMs(settings.maxAge)` from `kay` gives milliseconds. No `deprecated` lint can carry a type change.
+
+### A session sealed before kay 1.72.0 signs its visitor out once
+
+- `session()` opens a cookie with the key derived for it only, no longer with the bare SHA-256 of the secret that kay sealed under before v1.72.0. A visitor whose cookie was last written by such a kay, and never since by a later one, is signed out once. Nothing changes in the app, and no lint can carry it as it is cookie data.
+
+### A misspelled config key is refused
+
+- A key kay does not know in `kay.config.ts` (or in an extension's `config`), at its top level or in `security`, `i18n`, `seo`, `offline`, `health` and `proxy`, now stops every command with the nearest known name, where it used to leave kay's default in place. An app whose config already carries a typo starts failing: correct the key, or drop it.
+
+### Config keys are named by what they hold
+
+- `routes`, `api`, `content`, `storage`, `maxSizes` and `settings` in `kay.config.ts`, in the options of `pages()` and `testSite()` and in an extension's `config`, are `routesDir`, `apiDir`, `contentConfig`, `fileStore`, `maxSizeByPath` and `librarySettings`: a key naming a directory ends in `Dir`, one naming a file or module is `...Config`, and no two keys are a letter apart. The old names work until 1.87 and `kay check` reports them as `deprecated-config-keys`; `kay upgrade` renames them.
+
+## 1.82.0
+
+### An `ActionStream` has `ended()`
+
+- An object the app builds as an `ActionStream`, a test's fake stream say, gets a type error from `kay check` until it has `ended: () => Promise<T | undefined>`, resolving with its last value once it ran to its end and rejecting when it failed or was closed ([streaming actions](actions-from-islands.md)). A stream a call resolves with already has it.
+
+### kayjs-auth: the methods of a feature are grouped under it
+
+- `auth.listUsers()` is `auth.admin.listUsers()`, `auth.signInWithPassword(input)` is `auth.password.signIn(input)`, and so on for `password`, `email`, `magicLink`, `twoFactor`, `passkeys`, `sessions`, `tokens`, `oauthServer`, `admin` and `organizations` ([the table](../packages/auth/llms/grouped-methods.md)). The flat names work until 1.85 and are removed in 1.86; `kay upgrade` renames the calls on `auth` and `ctx.locals.auth` (`deprecated-auth-methods`), and a flat method read without a call, destructured, under `typeof` or in a template expression is renamed by hand.
 
 ## 1.81.0
 
@@ -115,28 +183,4 @@ kayjs-auth's `auth_*` tables are no longer `renamedFrom` their old names on 1.74
 
 A prop typed `Signal<T>` or `Memo<T>` is a plain value of that type now, no longer read by calling it or assigned: type a prop the child writes `Bindable<T>`, read and assign it as `open`, and bind it with `bind:open={open}`; a `Memo<T>` prop is a `T`, passed as `value={memo()}`. `kay check` reports a prop still typed `Signal<T>` or `Memo<T>` from `kay`.
 
-## 1.73.0
-
-### kayjs-cms: the editor panel is kayjs-ui's docked `SidePanel`
-
-A site's CSS written against the editor's own markup changes. `.kcms-editor-open`, `.kcms-marker-menu`, `.kcms-editor-grip` and the variables `--kcms-side`, `--kcms-bottom` and `--kcms-top` are gone: the panel is a `dialog.kcms-editor[open]` and the marker choice menu is `#kcms-marker-menu`. The editor's inner classes `.kcms-editor-head`, `-body`, `-title` and `-pending`, `.kcms-dock-side`, `.kcms-dock-bottom` and `.kcms-marker-item` are gone too. `--kcms-width` and `--kcms-height` on `html.kcms-editing` stay but now follow the panel's dock, and are `0px` along the edge it is not docked to. A collapsed editor is the `[data-part='launcher']` button of the `SidePanel` with `aria-controls="kcms-editor"` (`.kcms-editor-toggle` is gone). The bar over a page image is a floating kayjs-ui `Toolbar` (`.kcms-image-bar` stays), and its CSS rule is gone. An app that sets the word `cms.editor.label` in its catalog can drop it: the panel is named by `cms.editor.title`, and the key is ignored. See [the editor's dock](../packages/cms/llms/editor.md).
-
-### kayjs-cms: the editor's heads, bars and question are kayjs-ui parts
-
-An entry's head is a `PageSection` head: `.kcms-entry-head`, `.kcms-entry-title` and `.kcms-entry-collection` are gone for `.kcms-entry > [data-part='head']` with its `[data-part='title']` and `[data-part='subtitle']`. The buttons over a page list item are a floating `Toolbar` (`.kcms-list-bar`, `.kcms-list-start`), so `.kcms-list-caption` is `[data-part='caption']`. Stop editing's question over unsaved edits is a `Dialog`: `.kcms-editor-confirm` and `.kcms-editor-choice` are gone. A site CSS on one of them moves to the part, or to `--kui-sticky-top` for a header it must clear.
-
-### The forms deprecated in 1.69 and 1.70 are gone
-
-`deprecated-identity-key` and fourteen of the `since: '1.70'` lints go with the forms they reported: an app still on one gets a type error or an unknown option, bar a `JSX.Element` markup prop.
-
-- `// kay-allow` comments and `lints` entries naming a removed lint are an unknown lint: delete them.
-- Config: `authPages`, `authExtension` and `mailExtension` are `auth({ module })` and `mail({ module })`; `bodyLimit` is `maxSize`; `kayjs-cms/postgres` is `kayjs-cms/pg`.
-- Durations: a bare number is a type error, `DurationText` is `Duration`.
-- Names: `limit` and `visitor` of `ai()` and `ask()` are `rateLimit` and `key`, kayjs-auth's `limits` is `rateLimit`, kayjs-mail's `smtp({ rateLimit })` takes `{ max, window }`; `expires`, `expiresIn`, `rememberMaxAge`, `tokenMaxAge`, `marginMs`, `invitationMaxAge` and `session.lifetime()` are `maxAge`; `createAuth({ url, site: 'Name' })` is `site` (the origin) and `name`; `forgejo({ url })` is `baseUrl`; kayjs-mail's `lang` is `locale`; `infiniteList({ size })` is `pageSize`; `data-cms-edit-page` is `data-kcms-edit-page`.
-- kayjs-auth's `AuthMailMessage` and `MailData` have no `site` and no `expires`: a template reads `name` and `maxAge`.
-- Exports: `HydrationMismatch`, `ActionRedirect`, `CspViolation`, `RedirectRefused`, `SaveConflict` and `MailNotConfigured` end in `Error`; kayjs-mail's `Message`, `Field`, `Settings` and `defaults`, kayjs-ui's `Settings` and `defaults`, kayjs-auth's `Mail`, `Mailer` and `memoryStore` take a `Mail`, `Ui` or `Auth` prefix (`MailMessage`, `uiDefaults`, `memoryAuthStore`).
-- kayjs-auth methods: `sessions`, `tokens`, `members` and the like are `listSessions`, `listTokens`, `listMembers`; `organization` and `invitation` are `getOrganization` and `getInvitation`; `endSession`, `removePasskey`, `removeMember`, `declineInvitation`, `setLocale` and the like are `revokeSession`, `revokePasskey`, `deleteMember`, `rejectInvitation`, `updateLocale`.
-- Tests: `mountComponent('src/components/toggle.kay')` takes the imported component; `ctx.failed(action)` and `ctx.succeeded(action)` are `action.failed()` and `action.succeeded()`; a `JSX.Element` markup prop is a `Snippet`, no longer reported.
-- Hooks take one event object (`onSignUp({ user, profile })`, `onError({ error, request })`): the positional shape is no longer read.
-
-Releases before 1.73 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+Releases before 1.74 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
