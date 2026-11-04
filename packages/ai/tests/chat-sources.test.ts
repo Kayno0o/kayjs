@@ -42,6 +42,7 @@ test('a reply as written links each [n] outside its code spans and fences, escap
   expect(linkAsWritten('`<code>[1]</code>` [2]', sources).html).toBe('<p>`&lt;code&gt;[1]&lt;/code&gt;` <a href="/moon">[2]</a></p>\n')
   expect(linkAsWritten('- ~~~\n  [1]\n  ~~~\n\n> ```\n> [2]\n> ```\n\n\\`[1]\\`', sources)).toEqual({ html: '<p>- ~~~\n  [1]\n  ~~~\n\n&gt; ```\n&gt; [2]\n&gt; ```\n\n\\`<a href="https://example.com/a?x=1&amp;y=&quot;2&quot;">[1]</a>\\`</p>\n', cited: [sources[0]!] })
   expect(linkAsWritten('[1]', []).html).toBe('<p>[1]</p>\n')
+  expect(linkAsWritten("it's `a'b` [2]", sources).html).toBe('<p>it&#39;s `a&#39;b` <a href="/moon">[2]</a></p>\n')
 })
 
 test('a reply with no sources is left as it is', () => {
