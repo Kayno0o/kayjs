@@ -36,6 +36,7 @@ import { deprecatedCollectionLinks } from './deprecated-collection-links'
 import { deprecatedConfigKeys } from './deprecated-config-keys'
 import { deprecatedLifetimes } from './deprecated-lifetimes'
 import { ownFile } from './diagnose'
+import { durationSeconds } from './duration-seconds'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { apiErrorAnswers, refusalMessages } from './error-shape'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
@@ -47,7 +48,7 @@ import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
-import { sessionStores, sourceTypes } from './renamed-exports'
+import { roomTypes, sessionStores, sourceTypes } from './renamed-exports'
 import { safeRedirects } from './safe-redirect'
 import { compileShadow, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
@@ -145,6 +146,8 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => authMethods(root, options),
   async ({ root, options }) => sessionStores(root, options),
   async ({ root, options }) => sourceTypes(root, options),
+  async ({ root, options }) => roomTypes(root, options),
+  async ({ root, options }) => durationSeconds(root, options),
   async ({ root, options }) => safeRedirects(root, options),
   async ({ root, options }) => apiErrorAnswers(root, options),
   async ({ root, options }) => refusalMessages(root, options),

@@ -777,6 +777,24 @@ export const LINTS = {
     wrong: '--- server\nimport { queue } from \'kay/server\'\n\nexport const sync = queue(\'sync\', () => undefined, { onFailed: ({ error }) => console.error(error) })\n---\np x',
     right: '--- server\nimport { queue } from \'kay/server\'\n\nexport const sync = queue(\'sync\', () => undefined, { onError: ({ error }) => console.error(error) })\n---\np x',
   },
+  'deprecated-room-types': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.88',
+    site: true,
+    summary: 'An import of `AsyncRoomStore`, `AsyncRooms` or `StoreRooms` from `kay/server`, the names `rooms()` types had when only some stores answered `state` and `update` with promises: since 1.88 every one does, and they are `RoomStore` and `Rooms`. The old names work until 1.91. Found in the TypeScript files and `.kay` fences of the project; the fix renames the import and every use of it. An aliased import is renamed without its uses, and a file where the new name is already taken, or the old one is declared again, exported or read in a template, is reported with no fix.',
+    wrong: '--- server\nimport type { AsyncRooms } from \'kay/server\'\n\nexport type Game = AsyncRooms<string>\n---\np x',
+    right: '--- server\nimport type { Rooms } from \'kay/server\'\n\nexport type Game = Rooms<string>\n---\np x',
+  },
+  'deprecated-duration-seconds': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.88',
+    site: true,
+    summary: 'A call of kayjs-auth\'s `lifetime(seconds, locale)` or kay\'s `durationWords(seconds, locale)` with a number literal, since 1.88: every other duration in kay is written with its unit, `\'24h\'`, so the number of seconds is `\'86400s\'`. A number still works until 1.91. Found in the TypeScript files and `.kay` fences importing either function; the fix writes the integer as `\'<n>s\'`, and a number that is no integer literal is reported with no fix. A number held in a variable is not found.',
+    wrong: '--- server\nimport { lifetime } from \'@kaynooo/kayjs-auth\'\n\nexport const words = (locale: string) => lifetime(86400, locale)\n---\np x',
+    right: '--- server\nimport { lifetime } from \'@kaynooo/kayjs-auth\'\n\nexport const words = (locale: string) => lifetime(\'86400s\', locale)\n---\np x',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

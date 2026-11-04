@@ -242,30 +242,47 @@ export const SOURCE_TYPES: Readonly<Record<string, string>> = { StreamStatus: 'C
 
 const OLD_TYPE = /StreamStatus|ResourceStatus|ResourceFailure/
 
-// `StreamStatus`, `ResourceStatus` and `ResourceFailure` imported from `kay`, as a type or a value import: the fix renames the import and every use of it.
+// The types of `kay/server` renamed in 1.88, when the rooms stores became async only, and the name each has now.
+export const ROOM_TYPES: Readonly<Record<string, string>> = { AsyncRoomStore: 'RoomStore', AsyncRooms: 'Rooms', StoreRooms: 'Rooms' }
+
+const OLD_ROOM_TYPE = /AsyncRoomStore|AsyncRooms|StoreRooms/
+
+interface RenamedTypes {
+  lint: LintName
+  // The module the old names are imported from.
+  module: string
+  names: Readonly<Record<string, string>>
+  needle: RegExp
+  // The release that renamed them and the one that drops the old names.
+  since: string
+  until: string
+  // Whether the rename of an old name is safe to apply.
+  safe: (old: string) => boolean
+}
+
+// A type imported from `config.module` under an old name, as a type or a value import: the fix renames the import and every use of it.
 // A file where the new name is taken, the old one is declared again, exported or read in a template, or an aliased import, gets the report with no fix beyond the import itself.
-export async function sourceTypes(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  if (lintLevel('deprecated-source-types', options.lints) === 'allow')
+async function renamedTypes(root: string, options: CheckOptions, config: RenamedTypes): Promise<CheckDiagnostic[]> {
+  if (lintLevel(config.lint, options.lints) === 'allow')
     return []
 
-  return scan(root, options, 'deprecated-source-types', OLD_TYPE, ({ parsed, unparsed, report }) => {
+  return scan(root, options, config.lint, config.needle, ({ parsed, unparsed, report }) => {
     for (const { ast, base } of parsed) {
       for (const statement of ast.body) {
-        if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'kay')
+        if (statement.type !== 'ImportDeclaration' || statement.source.value !== config.module)
           continue
 
         for (const specifier of statement.specifiers) {
-          if (specifier.type !== 'ImportSpecifier' || !Object.hasOwn(SOURCE_TYPES, importedName(specifier)))
+          if (specifier.type !== 'ImportSpecifier' || !Object.hasOwn(config.names, importedName(specifier)))
             continue
 
           const old = importedName(specifier)
-          const next = SOURCE_TYPES[old]!
+          const next = config.names[old]!
           const aliased = specifier.local.name !== old || specifier.imported.start !== specifier.local.start
-          const message = `\`${old}\` is renamed \`${next}\` since 1.87, and the old name works until 1.90`
+          const message = `\`${old}\` is renamed \`${next}\` since ${config.since}, and the old name works until ${config.until}`
           const help = `rename it to \`${next}\``
           const importEdit = { start: base + specifier.imported.start, end: base + specifier.imported.start + old.length, text: next }
-          // `LoadStatus` also has `idle` and `ApiError` is a class with more members, so those two renames can need a code change.
-          const safe = old === 'StreamStatus'
+          const safe = config.safe(old)
 
           if (aliased) {
             report(importEdit.start, importEdit.end, message, help, [importEdit], safe)
@@ -280,4 +297,15 @@ export async function sourceTypes(root: string, options: CheckOptions): Promise<
       }
     }
   })
+}
+
+// `StreamStatus`, `ResourceStatus` and `ResourceFailure` imported from `kay`.
+// `LoadStatus` also has `idle` and `ApiError` is a class with more members, so those two renames can need a code change.
+export async function sourceTypes(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+  return renamedTypes(root, options, { lint: 'deprecated-source-types', module: 'kay', names: SOURCE_TYPES, needle: OLD_TYPE, since: '1.87', until: '1.90', safe: old => old === 'StreamStatus' })
+}
+
+// `AsyncRoomStore`, `AsyncRooms` and `StoreRooms` imported from `kay/server`: the same types under the names every store kind shares.
+export async function roomTypes(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+  return renamedTypes(root, options, { lint: 'deprecated-room-types', module: 'kay/server', names: ROOM_TYPES, needle: OLD_ROOM_TYPE, since: '1.88', until: '1.91', safe: () => true })
 }

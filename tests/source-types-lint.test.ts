@@ -1,8 +1,9 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { durationSeconds } from '../src/check/duration-seconds'
 import { applySafeFixes } from '../src/check/fixes'
-import { sourceTypes } from '../src/check/renamed-exports'
+import { roomTypes, sourceTypes } from '../src/check/renamed-exports'
 import { scratchDir } from './scratch'
 
 async function project(files: Record<string, string>): Promise<string> {
@@ -71,6 +72,62 @@ describe('deprecated-source-types', () => {
       expect(await read(root, 'src/aliased.ts')).toBe(aliased.replace('StreamStatus as Status', 'ConnectionStatus as Status'))
       expect(await read(root, 'src/allowed.ts')).toBe(allowed)
       expect(await sourceTypes(root, { lints: { 'deprecated-source-types': 'allow' } })).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('deprecated-room-types', () => {
+  it('renames the three old names with their uses, and leaves a name of another module', async () => {
+    const source = 'import type { AsyncRoomStore, AsyncRooms, StoreRooms } from \'kay/server\'\n\nexport type A = [AsyncRoomStore, AsyncRooms<string>, StoreRooms<string>]\n'
+    const root = await project({ 'src/a.ts': source, 'src/b.ts': 'import type { AsyncRooms } from \'./mine\'\n\nexport type B = AsyncRooms\n' })
+
+    try {
+      const found = await roomTypes(root, {})
+
+      expect(found).toHaveLength(3)
+      expect(found.every(diagnostic => diagnostic.fixes?.[0]?.safe)).toBe(true)
+      await applySafeFixes(root, found)
+      expect(await read(root, 'src/a.ts')).toBe('import type { RoomStore, Rooms, Rooms } from \'kay/server\'\n\nexport type A = [RoomStore, Rooms<string>, Rooms<string>]\n')
+      expect(await read(root, 'src/b.ts')).toContain('AsyncRooms')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports with no fix when the new name is already taken, and honours the level', async () => {
+    const taken = 'import type { AsyncRooms, Rooms } from \'kay/server\'\n\nexport type A = AsyncRooms<string> | Rooms<string>\n'
+    const root = await project({ 'src/taken.ts': taken })
+
+    try {
+      const found = await roomTypes(root, {})
+
+      expect(found).toHaveLength(1)
+      expect(found[0]?.fixes).toBeUndefined()
+      expect(await roomTypes(root, { lints: { 'deprecated-room-types': 'allow' } })).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('deprecated-duration-seconds', () => {
+  it('writes an integer literal as seconds with its unit and reports any other number with no fix', async () => {
+    const source = 'import { lifetime } from \'@kaynooo/kayjs-auth\'\nimport { durationWords as words } from \'kay/library\'\n\nexport const a = [lifetime(86400, \'en\'), words(3600, \'fr\'), lifetime(1.5, \'en\'), lifetime(\'24h\', \'en\')]\n'
+    const root = await project({ 'src/a.ts': source, 'src/b.ts': 'import { lifetime } from \'./mine\'\n\nexport const b = lifetime(5, \'en\')\n' })
+
+    try {
+      const found = await durationSeconds(root, {})
+
+      expect(found).toHaveLength(3)
+      await applySafeFixes(root, found)
+      expect(await read(root, 'src/a.ts')).toBe(source.replace('lifetime(86400', 'lifetime(\'86400s\'').replace('words(3600', 'words(\'3600s\''))
+      expect(await read(root, 'src/b.ts')).toContain('lifetime(5')
+      expect(await durationSeconds(root, { lints: { 'deprecated-duration-seconds': 'allow' } })).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })
