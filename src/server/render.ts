@@ -70,8 +70,8 @@ import { matchesEtag } from './public'
 import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } from './query'
 import { reportServerError } from './report'
 import { RequestReadError } from './request-read'
-import { requestRecord } from './request-record'
-import { requestSignal, RequestTimeout, retime } from './request-timeout'
+import { recordOf, requestRecord } from './request-record'
+import { againstDeadline, requestSignal, RequestTimeout, retime } from './request-timeout'
 import { overHttps } from './request-url'
 import { askedPath } from './rewrite'
 import { CONTEXT_LAYOUT, guardUrl, routeChain } from './routes'
@@ -459,7 +459,7 @@ async function loadChainAsync(route: ServedRoute, files: string[], rendering: Re
 
     const loadsStarted = performance.now()
     const loading = runLoads(files, modules, rendering.ctx, loaded, timings)
-    const data = loading instanceof Promise ? await loading : loading
+    const data = loading instanceof Promise ? await againstDeadline(rendering.ctx.request, loading) : loading
 
     return { files, modules, data, loaded, timings, phases: timing ? { guards, imports, loads: performance.now() - loadsStarted } : undefined, head: editing() ? undefined : await entryHeadOf(modules.at(-1)!, route, rendering.ctx) }
   }
@@ -930,6 +930,14 @@ function pageErrorOf(error: unknown, dev: boolean | undefined): PageError {
   return error instanceof Denied ? { status: error.status, message: error.message } : describeError(error, dev)
 }
 
+// The error page is answered whatever the clock said: it stops, and `ctx.signal` follows only the client leaving, so a fetch of a layout is not cut by the timeout that brought the page here.
+function calmDeadline(ctx: RequestContext): void {
+  const { request } = ctx
+
+  recordOf(request)?.deadline?.stop()
+  Object.defineProperty(ctx, 'signal', { get: () => request.signal, configurable: true })
+}
+
 // A redirect goes out as is; anything else renders the nearest special page, falling back to plain text.
 async function renderFailure(error: unknown, special: SpecialPages, rendering: Rendering, loaded: Map<string, Loaded>, client: ClientBuild, options: RenderOptions): Promise<Response> {
   if (error instanceof Redirect) {
@@ -953,6 +961,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
 
   rendering.status = pageError.status
   ;(rendering.ctx as ErrorPageContext).error = pageError
+  calmDeadline(rendering.ctx)
 
   const html = page && await renderSpecialPage(page, rendering, loaded, client, options)
 

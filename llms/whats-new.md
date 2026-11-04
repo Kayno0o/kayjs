@@ -14,8 +14,9 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A `method="get"` form swaps in place: [navigation](navigation-from-code.md#full-loads-and-prefetching).
 - `security: { cookies: {} }` hardens `ctx.cookies.set`: [sessions](server.md#sessions).
 - `serve: { timeout: '15s' }` holds a page, action, API route and endpoint to a time: past it the request answers 504 (a page through `_error.kay`), is reported to `onError`, and `ctx.signal`, new on every request context, aborts; a page, `api({ timeout })` and an action set their own: [production](production.md#request-timeouts).
+- `serve: { timeout: '15s' }` holds a page, action, API route and endpoint to a time: past it the request answers 504 (a page through `_error.kay`), is reported to `onError`, and `ctx.signal`, new on every request context, aborts; a page, `api({ timeout })` and an action set their own: [production](production.md#request-timeouts). `signal` is a new required member of `RequestContext`, `ActionContext`, `PageContext` and `ErrorPageContext`, so a context built by hand in a test needs one.
 
-- A deferred server island that fails or times out is retried with a backoff and, if lost, keeps its inert copy with `data-kay-failed` and a `kay:server-island-error` event carrying the `ApiError` and `retry()`; `kay:server-island` follows a success, and leaving the page aborts the request: [prerendering](prerendering.md#server-islands).
+- A deferred server island that fails or times out is retried with a backoff and, if lost, keeps its inert copy with `data-kay-failed` and a `kay:server-island-error` event carrying the `ApiError` and `retry()`; `kay:server-island` follows a success, and leaving the page aborts the request: [prerendering](server-islands.md#server-islands).
 
 - A request's `traceparent` puts its server span under the caller's trace (`observe.extract` reads other formats, `false` ignores it), the response sends `traceresponse` and JSON log lines carry `trace`: [tracing](tracing.md#join-the-callers-trace).
 

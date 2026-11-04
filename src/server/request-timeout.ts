@@ -1,6 +1,6 @@
 import type { Duration } from '../runtime/duration'
 import { timeoutMs } from './config-limits'
-import { requestRecord } from './request-record'
+import { recordOf, requestRecord } from './request-record'
 
 // What a request that ran past its `timeout` ends with, answered 504 through the nearest `_error.kay` for a page; logged and handed to `onError` as any server error is.
 export class RequestTimeout extends Error {
@@ -81,22 +81,39 @@ export async function withTimeout<T>(request: Request, override: number | false 
   }
 }
 
-// The same for a page, whose own `timeout` is only known once its modules are imported: the clock is there from the start and `retime` sets it. A streamed body is cut when the time is up, its headers being sent.
+// The same for a page, whose own `timeout` is only known once its modules are imported. With the app's `timeout` the clock runs from the start; without one nothing is made until the page sets its own, which `retime` arms and `againstDeadline` holds the loads to. A streamed body is cut when the time is up, its headers being sent.
 export async function withPageTimeout(request: Request, fallback: number | undefined, work: () => Promise<Response>, expired: (error: RequestTimeout) => void): Promise<Response> {
-  const deadline = deadlineOf(request)
-
-  deadline.arm(fallback)
-
   let response: Response
 
-  try {
-    response = await Promise.race([work(), deadline.expiry.promise])
-  }
-  catch (error) {
-    deadline.stop()
+  if (fallback === undefined) {
+    try {
+      response = await work()
+    }
+    catch (error) {
+      recordOf(request)?.deadline?.stop()
 
-    throw error
+      throw error
+    }
   }
+  else {
+    const deadline = deadlineOf(request)
+
+    deadline.arm(fallback)
+
+    try {
+      response = await Promise.race([work(), deadline.expiry.promise])
+    }
+    catch (error) {
+      deadline.stop()
+
+      throw error
+    }
+  }
+
+  const deadline = recordOf(request)?.deadline
+
+  if (deadline === undefined)
+    return response
 
   if (response.body === null || !requestRecord(request).streamed) {
     deadline.stop()
@@ -105,6 +122,13 @@ export async function withPageTimeout(request: Request, fallback: number | undef
   }
 
   return new Response(cut(response.body, deadline, expired), response)
+}
+
+// Holds `work` to the request's clock if it has one by now, as a page that sets its own `timeout` does once its modules are in.
+export async function againstDeadline<T>(request: Request, work: Promise<T>): Promise<T> {
+  const deadline = recordOf(request)?.deadline
+
+  return deadline === undefined ? work : Promise.race([work, deadline.expiry.promise])
 }
 
 // The page's setting overriding the app's, once known.
@@ -118,14 +142,39 @@ export function retime(request: Request, setting: Duration | false | undefined):
 // The body until the clock runs out, then an error: the client sees the connection end, and the timeout is reported.
 function cut(body: ReadableStream<Uint8Array>, deadline: Deadline, expired: (error: RequestTimeout) => void): ReadableStream<Uint8Array> {
   const reader = body.getReader()
+  const { signal } = deadline.controller
+  let ended = false
+  let release: () => void = () => undefined
 
   return new ReadableStream<Uint8Array>({
+    start(controller) {
+      const timeUp = () => {
+        ended = true
+        expired(signal.reason as RequestTimeout)
+        void reader.cancel(signal.reason)
+        controller.error(signal.reason)
+      }
+
+      if (signal.aborted) {
+        timeUp()
+
+        return
+      }
+
+      signal.addEventListener('abort', timeUp, { once: true })
+      release = () => signal.removeEventListener('abort', timeUp)
+    },
     async pull(controller) {
       try {
-        const chunk = await Promise.race([reader.read(), deadline.expiry.promise])
+        const chunk = await reader.read()
+
+        if (ended)
+          return
 
         if (chunk.done) {
+          ended = true
           deadline.stop()
+          release()
           controller.close()
         }
         else {
@@ -133,18 +182,19 @@ function cut(body: ReadableStream<Uint8Array>, deadline: Deadline, expired: (err
         }
       }
       catch (error) {
+        if (ended)
+          return
+
+        ended = true
         deadline.stop()
-
-        if (error instanceof RequestTimeout) {
-          expired(error)
-          await Promise.allSettled([reader.cancel(error)])
-        }
-
+        release()
         controller.error(error)
       }
     },
     async cancel(reason) {
+      ended = true
       deadline.stop()
+      release()
       await reader.cancel(reason)
     },
   })

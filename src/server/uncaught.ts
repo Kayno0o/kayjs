@@ -5,6 +5,7 @@ import { kayLog } from '../runtime/log'
 import { describeError, sharedContext } from './render'
 import { isUncaught, reportServerError } from './report'
 import { RequestTimeout, timedOutResponse } from './request-timeout'
+import { replyTrace } from './trace'
 
 const TEXT = 'text/plain; charset=utf-8'
 
@@ -28,11 +29,18 @@ export function answerUncaught(app: App, { dev, onError, page }: { dev: boolean,
 
     reportServerError(error, request, onError)
 
+    // The trace it ended in goes out with it, as with any other answer.
+    const sent = (response: Response) => {
+      replyTrace(request, response)
+
+      return response
+    }
+
     if (asksForPage(request)) {
       const carried = { request, ...locals }
 
       try {
-        return await page(error, sharedContext(request, () => carried))
+        return sent(await page(error, sharedContext(request, () => carried)))
       }
       // A page that cannot render without the route it would have matched falls back to the plain answer.
       catch (failure) {
@@ -41,8 +49,8 @@ export function answerUncaught(app: App, { dev, onError, page }: { dev: boolean,
     }
 
     if (error instanceof RequestTimeout)
-      return timedOutResponse()
+      return sent(timedOutResponse())
 
-    return new Response(dev ? describeError(error, true).message : 'Internal Server Error', { status: 500, headers: { 'content-type': TEXT } })
+    return sent(new Response(dev ? describeError(error, true).message : 'Internal Server Error', { status: 500, headers: { 'content-type': TEXT } }))
   })
 }

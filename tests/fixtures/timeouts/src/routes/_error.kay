@@ -1,5 +1,12 @@
 --- server
+import { seen } from '../seen'
+
 const { status, message } = ctx.error
+
+// The error page is answered whatever the clock said, so a fetch handed the signal still runs.
+seen.errorAborted = ctx.signal.aborted
+await fetch('data:text/plain,ok', { signal: ctx.signal })
 ---
 h1 Error {status}
 p.message {message}
+p fast

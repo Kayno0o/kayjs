@@ -156,7 +156,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - `ctx.signal` is on the page, guard, endpoint and action contexts, and aborts at the timeout and when the client leaves; pass it to `fetch`, a database call or anything that takes a signal, so the work stops with the request. An `api()` route reads it as `request.signal`, which aborts at the timeout too (only under a timeout).
 - A page sets its own in `export const page = { timeout: '30s' }` (the innermost layout or page wins), an `api({ timeout })` module and an action's options likewise, one route of an API module as `detail: { timeout }`; `false` is none.
 - The clock counts from the request's arrival. Work that cannot be stopped, a handler ignoring the signal, goes on after the 504. A streamed page whose headers went out is cut at the time: the body ends with an error, the status stays 200, and the timeout is reported. An API route that returns a stream or a generator is not cut, nor an event stream.
-- A job has no request, so no `ctx.signal`: `schedule` and queues take their own `timeout`.
+- A job has no request, so no `ctx.signal`: a `schedule` takes its own `timeout`, and a queue handler gets an `AbortSignal` that aborts at `lostAfter` (see [Queues](queues.md)).
 
 ### A deploy under open tabs
 

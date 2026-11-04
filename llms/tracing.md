@@ -33,7 +33,7 @@ export default defineConfig({
 })
 ```
 
-`extract: false` ignores incoming traces. A throwing extractor is logged as a warning and the request starts its own trace. A custom `Tracer` receives the parent as the third argument of `startSpan` and `startActiveSpan(name, options, context, fn)`, only when the request carries one; its spans return `spanContext()` for the log and `traceresponse`.
+`extract: false` ignores incoming traces: set it on a public edge, where outsiders could send a `traceparent` with the sampled flag and force every request to be traced. The caller's `tracestate` goes on with the parent. A throwing extractor is logged as a warning and the request starts its own trace. A custom `Tracer` receives the parent as the third argument of `startSpan` and `startActiveSpan(name, options, context, fn)`, only when the request carries one; its spans return `spanContext()` for the log and `traceresponse`.
 
 ## Reference
 

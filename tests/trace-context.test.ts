@@ -18,7 +18,8 @@ interface Started {
 }
 
 // A tracer reading its parent the way OpenTelemetry's does, from the span stored under its context key, and giving each span its parent's trace id.
-function tracer(): { tracer: Tracer, started: Started[] } {
+// `three` is a hand-written tracer declaring the three parameters kay called before 1.89; the default has OpenTelemetry's four.
+function tracer(shape: 'otel' | 'three' = 'otel'): { tracer: Tracer, started: Started[] } {
   const started: Started[] = []
   let counter = 0
   const make = (name: string, _options?: SpanOptions, context?: TraceContext): Span => {
@@ -33,11 +34,9 @@ function tracer(): { tracer: Tracer, started: Started[] } {
   return {
     tracer: {
       startSpan: make,
-      startActiveSpan: (name: string, options: SpanOptions, ...rest: unknown[]) => {
-        const fn = rest.at(-1) as (span: Span) => unknown
-
-        return fn(make(name, options, rest.length === 2 ? rest[0] as TraceContext : undefined))
-      },
+      startActiveSpan: (shape === 'three'
+        ? (name: string, options: SpanOptions, fn: (span: Span) => unknown) => fn(make(name, options))
+        : (name: string, options: SpanOptions, context: TraceContext | ((span: Span) => unknown), fn?: (span: Span) => unknown) => fn === undefined ? (context as (span: Span) => unknown)(make(name, options)) : fn(make(name, options, context as TraceContext))) as Tracer['startActiveSpan'],
     },
     started,
   }
@@ -76,6 +75,74 @@ describe('an incoming traceparent', () => {
 
     expect(started[0]!.parent).toBeUndefined()
     expect(response.headers.get('traceresponse')).toBe(`00-${'f'.repeat(32)}-0000000000000001-00`)
+  })
+
+  it('keeps a hand-written tracer of three parameters working: its span is made with the parent through startSpan', async () => {
+    const { tracer: recording, started } = tracer('three')
+    const site = await pages({ root: 'tests/fixtures/site', tracer: recording })
+    const response = await site.handle(visit({ traceparent: INCOMING }))
+
+    expect(response.status).toBe(200)
+    expect(started[0]).toMatchObject({ name: 'GET /', parent: { traceId: TRACE } })
+    expect((await site.handle(visit())).status).toBe(200)
+  })
+
+  it('carries tracestate on the remote span context', async () => {
+    const seen: unknown[] = []
+    const { tracer: recording } = tracer()
+    const spy: Tracer = { ...recording, startActiveSpan: ((name: string, options: SpanOptions, context: TraceContext | ((span: Span) => unknown), fn?: (span: Span) => unknown) => {
+      if (typeof context === 'function')
+        return recording.startActiveSpan(name, options, context)
+
+      seen.push((context.getValue(SPAN_KEY) as { spanContext: () => { traceState?: { serialize: () => string } } }).spanContext().traceState?.serialize())
+
+      return recording.startActiveSpan(name, options, fn!)
+    }) as Tracer['startActiveSpan'] }
+    const site = await pages({ root: 'tests/fixtures/site', tracer: spy })
+
+    await site.handle(visit({ traceparent: INCOMING, tracestate: 'vendor=a,other=b=c' }))
+    expect(seen).toEqual(['vendor=a,other=b=c'])
+  })
+
+  it('sends traceresponse with a 500 and with a 504 too', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const { tracer: recording } = tracer()
+      const site = await pages({ root: 'tests/fixtures/site', tracer: recording })
+      const failed = await site.handle(visit({ traceparent: INCOMING }, '/boom?fail'))
+
+      expect(failed.status).toBe(500)
+      expect(failed.headers.get('traceresponse')).toMatch(new RegExp(`^00-${TRACE}-`))
+
+      const slow = await pages({ root: 'tests/fixtures/timeouts', prebuilt: false, security: false, observe: { tracer: recording }, serve: { timeout: '50ms' } })
+      const late = await slow.handle(visit({ traceparent: INCOMING }, '/slow'))
+
+      expect(late.status).toBe(504)
+      expect(late.headers.get('traceresponse')).toMatch(new RegExp(`^00-${TRACE}-`))
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  it('warns once for a throwing extractor, and survives a redirect whose headers are immutable', async () => {
+    const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      const { tracer: recording } = tracer()
+      const site = await pages({ root: 'tests/fixtures/site', tracer: recording, observe: { tracer: recording, extract: () => {
+        throw new Error('bad')
+      } } })
+
+      await site.handle(visit({ traceparent: INCOMING }))
+      await site.handle(visit({ traceparent: INCOMING }))
+      expect(warned).toHaveBeenCalledTimes(1)
+      expect((await site.handle(visit({ traceparent: INCOMING }, '/todos/abc'))).status).toBe(302)
+    }
+    finally {
+      warned.mockRestore()
+    }
   })
 
   it('sends no traceresponse without a tracer', async () => {

@@ -7,11 +7,11 @@ import { parseTraceparent, remoteContext, traceresponse, validIds } from './trac
 // The part of OpenTelemetry's `Tracer` kay calls: an app hands `trace.getTracer('my-site')` from its own @opentelemetry/api, its SDK exporting the spans, and kay depends on neither.
 export interface Tracer {
   startSpan: (name: string, options?: SpanOptions, context?: TraceContext) => Span
-  startActiveSpan: {
-    <F extends (span: Span) => unknown>(name: string, options: SpanOptions, fn: F): ReturnType<F>
-    <F extends (span: Span) => unknown>(name: string, options: SpanOptions, context: TraceContext, fn: F): ReturnType<F>
-  }
+  // OpenTelemetry's also takes `(name, options, context, fn)`, which kay uses when a request carries a parent; a tracer declaring three parameters gets `startSpan` with the parent instead, and its span is not made the active one.
+  startActiveSpan: <F extends (span: Span) => unknown>(name: string, options: SpanOptions, fn: F) => ReturnType<F>
 }
+
+type ActiveWithParent = <F extends (span: Span) => unknown>(name: string, options: SpanOptions, context: TraceContext, fn: F) => ReturnType<F>
 
 // What `observe.extract` is: reads the context a request arrives with out of its headers, `undefined` for none.
 export type TraceExtractor = (headers: Headers) => TraceContext | undefined
@@ -37,10 +37,12 @@ const ERROR_STATUS = 2
 
 let tracer: Tracer | undefined
 let extractor: TraceExtractor | false | undefined
+let warnedExtract = false
 
 export function setTracer(given: Tracer | undefined, extract?: TraceExtractor | false): void {
   tracer = given
   extractor = extract
+  warnedExtract = false
 }
 
 // The parent a request's span goes under: what `observe.extract` reads, else its `traceparent` header; none when `extract` is `false`.
@@ -50,15 +52,19 @@ function parentOf(request: Request): TraceContext | undefined {
 
   if (extractor === undefined) {
     const ids = parseTraceparent(request.headers.get('traceparent'))
+    const state = request.headers.get('tracestate')
 
-    return ids && remoteContext(ids)
+    return ids && remoteContext(state === null ? ids : { ...ids, traceState: state })
   }
 
   try {
     return extractor(request.headers)
   }
   catch (error) {
-    logMessage('warn', 'kay: observe.extract threw, so the request starts a trace of its own', error, request)
+    if (!warnedExtract) {
+      warnedExtract = true
+      logMessage('warn', 'kay: observe.extract threw, so the request starts a trace of its own (said once)', error, request)
+    }
 
     return undefined
   }
@@ -79,10 +85,14 @@ export function replyTrace(request: Request, target: { headers: Headers | Record
   if (!ids)
     return
 
-  if (target.headers instanceof Headers)
-    target.headers.set('traceresponse', traceresponse(ids))
-  else
-    target.headers.traceresponse = traceresponse(ids)
+  try {
+    if (target.headers instanceof Headers)
+      target.headers.set('traceresponse', traceresponse(ids))
+    else
+      target.headers.traceresponse = traceresponse(ids)
+  }
+  // Headers a `Response.redirect()` made are immutable.
+  catch {}
 }
 
 export function tracing(): boolean {
@@ -154,7 +164,13 @@ export function traced<T>(name: string | (() => string), options: SpanOptions | 
   const parent = request && parentOf(request)
   const title = typeof name === 'string' ? name : name()
 
-  return parent ? tracer.startActiveSpan(title, given, parent, run) : tracer.startActiveSpan(title, given, run)
+  if (!parent)
+    return tracer.startActiveSpan(title, given, run)
+
+  if (tracer.startActiveSpan.length >= 4)
+    return (tracer.startActiveSpan as unknown as ActiveWithParent)(title, given, parent, run)
+
+  return run(tracer.startSpan(title, given, parent))
 }
 
 // A span that outlives one call, such as an API route's from its first hook to its response.

@@ -11,6 +11,8 @@ export interface SpanIds {
   traceId: string
   spanId: string
   traceFlags: number
+  // The `tracestate` header of the caller, carried on the remote span context for the vendors' own entries.
+  traceState?: string
 }
 
 const TRACEPARENT = /^00-([\da-f]{32})-([\da-f]{16})-([\da-f]{2})$/
@@ -51,8 +53,24 @@ class RemoteContext implements TraceContext {
 }
 
 // A context whose span is the remote one, which a tracer makes the parent of the server span it starts.
-export function remoteContext({ traceId, spanId, traceFlags }: SpanIds): TraceContext {
-  return new RemoteContext(new Map([[SPAN_KEY, { spanContext: () => ({ traceId, spanId, traceFlags, isRemote: true }) }]]))
+export function remoteContext({ traceId, spanId, traceFlags, traceState }: SpanIds): TraceContext {
+  return new RemoteContext(new Map([[SPAN_KEY, { spanContext: () => ({ traceId, spanId, traceFlags, isRemote: true, ...traceState !== undefined && { traceState: state(traceState) } }) }]]))
+}
+
+// OpenTelemetry's `TraceState`, read-only: what a tracer needs to pass the caller's entries on.
+function state(header: string) {
+  const entries = new Map(header.split(',').flatMap((pair) => {
+    const [key, ...value] = pair.trim().split('=')
+
+    return key === undefined || key === '' || value.length === 0 ? [] : [[key, value.join('=')] as const]
+  }))
+
+  return {
+    get: (key: string) => entries.get(key),
+    serialize: () => [...entries].map(([key, value]) => `${key}=${value}`).join(','),
+    set: () => state(header),
+    unset: () => state(header),
+  }
 }
 
 // The `traceresponse` header (W3C trace context level 2 draft) telling the caller the trace its request joined or started.

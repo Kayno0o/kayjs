@@ -6,7 +6,9 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { compileKay } from '../src/compiler'
 import { ApiError } from '../src/runtime/api-error'
-import { disposeIslands, hydrateIslands } from '../src/runtime/client'
+import { hydrateIslands } from '../src/runtime/client'
+import { requestIsland } from '../src/runtime/island-request'
+import { refetchServerIsland } from '../src/runtime/refetch-island'
 import { ISLAND_HEADER } from '../src/runtime/server-islands'
 import { readManifest } from '../src/server/client'
 import { ExportError } from '../src/server/prerender'
@@ -406,6 +408,99 @@ describe('a deferred server island, in the browser', () => {
     }
   })
 
+  it('sends no request after an abort during the wait before a retry', async () => {
+    const { slot, signals, events, fetching } = await deferred([new Response('', { status: 503 }), new Response('<p class="stamp">never</p>')])
+
+    try {
+      await hydrateIslands({})
+      await waitFor(() => signals.length > 0)
+      await Bun.sleep(50)
+      slot.remove()
+      await Bun.sleep(1300)
+
+      expect(signals).toHaveLength(1)
+      expect(events).toEqual([])
+    }
+    finally {
+      fetching.mockRestore()
+    }
+  })
+
+  it('waits for the tab to be visible before it asks again', async () => {
+    const { signals, events, fetching } = await deferred([new Response('', { status: 503 }), new Response('<p class="stamp">fresh</p>')])
+    let hidden = true
+
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden })
+
+    try {
+      await hydrateIslands({})
+      await waitFor(() => signals.length > 0)
+      await Bun.sleep(1300)
+
+      expect(signals).toHaveLength(1)
+
+      hidden = false
+      document.dispatchEvent(new Event('visibilitychange'))
+      await waitFor(() => events.length > 0)
+
+      expect(signals).toHaveLength(2)
+      expect(events[0]![0]).toBe('kay:server-island')
+    }
+    finally {
+      Reflect.deleteProperty(document, 'hidden')
+      fetching.mockRestore()
+    }
+  })
+
+  it('fails an attempt that takes longer than its timeout as an ApiError of status 0', async () => {
+    const { slot, fetching } = await deferred(['hang'])
+
+    try {
+      let error: unknown
+
+      try {
+        await requestIsland(slot, undefined, 20)
+      }
+      catch (failure) {
+        error = failure
+      }
+
+      expect(error).toBeInstanceOf(ApiError)
+      expect((error as ApiError).status).toBe(0)
+      expect((error as ApiError).message).toContain('took longer than 20 ms')
+    }
+    finally {
+      fetching.mockRestore()
+    }
+  })
+
+  it('shares the request with the refetch of a followed island: new content in, an ApiError and the old content when it fails', async () => {
+    const { slot, fetching } = await deferred([new Response('<p class="stamp">again</p>'), new Response('', { status: 503 })])
+    let disposed = 0
+
+    try {
+      await refetchServerIsland(slot, () => disposed++)
+      expect(slot.querySelector('.stamp')!.textContent).toBe('again')
+      expect(disposed).toBe(1)
+
+      let error: unknown
+
+      try {
+        await refetchServerIsland(slot, () => disposed++)
+      }
+      catch (failure) {
+        error = failure
+      }
+
+      expect((error as ApiError).status).toBe(503)
+      expect(disposed).toBe(1)
+      expect(slot.querySelector('.stamp')!.textContent).toBe('again')
+    }
+    finally {
+      fetching.mockRestore()
+    }
+  })
+
   it('aborts the request of an island taken away, and reports no failure for it', async () => {
     const { slot, signals, events, fetching } = await deferred(['hang'])
 
@@ -413,7 +508,7 @@ describe('a deferred server island, in the browser', () => {
       await hydrateIslands({})
       await waitFor(() => signals.length > 0)
 
-      disposeIslands(document.body)
+      slot.remove()
       await Bun.sleep(20)
 
       expect(signals[0]!.aborted).toBe(true)

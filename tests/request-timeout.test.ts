@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { stringify } from 'devalue'
+import { recordOf } from '../src/server/request-record'
 import { Deadline, requestSignal, RequestTimeout, withTimeout } from '../src/server/request-timeout'
 import { seen } from './fixtures/timeouts/src/seen'
 import { pages } from './shared-pages'
@@ -90,6 +91,79 @@ describe('request timeout', () => {
     expect((await get(open, '/own')).status).toBe(504)
     expect((await get(open, '/own/long')).status).toBe(200)
     expect((await get(open, '/slow')).status).toBe(200)
+  })
+})
+
+describe('the 504 page', () => {
+  it('renders _error.kay with a signal the timeout did not abort, so its fetches still run', async () => {
+    delete seen.errorAborted
+
+    const response = await page(app, '/slow')
+
+    expect(response.status).toBe(504)
+    expect(await response.text()).toContain('<p class="message">Gateway Timeout</p><p>fast</p>')
+    expect(seen.errorAborted as boolean | undefined).toBe(false)
+  })
+
+  it('shows the real message in development only', async () => {
+    const dev = await pages({ root: ROOT, prebuilt: false, security: false, dev: true, serve: { timeout: '100ms' } })
+
+    expect(await (await page(dev, '/slow')).text()).toContain('the request took longer than 100 ms')
+    expect(await (await page(app, '/slow')).text()).not.toContain('took longer')
+  })
+
+  it('is served under a base path and with a trailing slash', async () => {
+    const based = await pages({ root: ROOT, prebuilt: false, security: false, base: '/app', trailingSlash: 'always', serve: { timeout: '100ms' } })
+    const response = await page(based, '/slow/')
+
+    expect(response.status).toBe(504)
+    expect(await response.text()).toContain('<h1>Error 504</h1>')
+  })
+})
+
+describe('ctx.signal', () => {
+  it('is on a guard, and is not aborted while the request is answered in time', async () => {
+    delete seen.guard
+
+    expect((await page(app, '/guarded')).status).toBe(200)
+    expect(seen.guard).toBeInstanceOf(AbortSignal)
+    expect((seen.guard as AbortSignal | undefined)?.aborted).toBe(false)
+  })
+
+  it('aborts when the client really leaves, with the client\'s reason rather than a timeout', async () => {
+    delete seen.page
+
+    const server = open.listen(0)
+    const client = new AbortController()
+
+    try {
+      const sent = (async () => {
+        try {
+          await fetch(`http://localhost:${server.server!.port}/slow`, { signal: client.signal, headers: { accept: 'text/html' } })
+        }
+        catch {}
+      })()
+
+      await Bun.sleep(150)
+      client.abort()
+      await sent
+      await Bun.sleep(100)
+
+      const page = seen.page as AbortSignal | undefined
+
+      expect(page?.aborted).toBe(true)
+      expect(page?.reason).not.toBeInstanceOf(RequestTimeout)
+    }
+    finally {
+      await server.stop(true)
+    }
+  })
+
+  it('makes no Deadline for a request of an app with no timeout and a page that sets none', async () => {
+    const request = new Request('http://localhost/', { headers: { accept: 'text/html' } })
+
+    expect((await open.handle(request)).status).toBe(200)
+    expect(recordOf(request)?.deadline).toBeUndefined()
   })
 })
 

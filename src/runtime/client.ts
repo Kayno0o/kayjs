@@ -401,10 +401,6 @@ export function disposeIslands(root: ParentNode): void {
     disposers.delete(element)
     dispose?.()
   }
-
-  // Ends the request of a deferred server island still being fetched.
-  for (const element of root.querySelectorAll(SERVER_ISLAND))
-    element.dispatchEvent(new Event('kay:island-gone'))
 }
 
 // The clicks, inputs and changes the inline hydration script queued on the island while it waited for its chunk.

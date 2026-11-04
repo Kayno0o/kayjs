@@ -24,6 +24,10 @@ export const guarded = action(t.Object({ website: t.Optional(t.String()) }), () 
 
 export const owned = action(t.Object({ website: t.Optional(t.String()) }), () => undefined, { protect: { honeypot: 'website' }, messages: { honeypot: 'Own words' } })
 
+export const slow = action(t.Object({}), async () => {
+  await Bun.sleep(300)
+}, { timeout: '20ms' })
+
 export const boom = action(t.Object({}), () => {
   throw new Error('down')
 })
@@ -66,6 +70,10 @@ form(action={owned})
   if owned.error('website') as message
     p.refused {message}
   button Send
+form(action={slow})
+  if slow.error() as message
+    p.refused {message}
+  button Slow
 form(action={boom})
   if boom.error() as message
     p.refused {message}

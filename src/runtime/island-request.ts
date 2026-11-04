@@ -7,7 +7,9 @@ export const ISLAND_TIMEOUT_MS = 10_000
 
 // The render of a deferred server island for this visitor, or undefined when a deploy removed the page's build, which the skew check reloads for.
 // A request that gets no answer within `ISLAND_TIMEOUT_MS` or a refusal fails as an `ApiError` (status 0 for no answer); one `signal` aborts rejects with the abort and is no failure.
-export async function requestIsland(slot: HTMLElement, signal?: AbortSignal): Promise<string | undefined> {
+export async function requestIsland(slot: HTMLElement, signal?: AbortSignal, timeout = ISLAND_TIMEOUT_MS): Promise<string | undefined> {
+  signal?.throwIfAborted()
+
   const url = new URL(location.href)
   const id = slot.dataset.kayServer ?? ''
   const timer = new AbortController()
@@ -15,7 +17,7 @@ export async function requestIsland(slot: HTMLElement, signal?: AbortSignal): Pr
   const stop = setTimeout(() => {
     late = true
     timer.abort()
-  }, ISLAND_TIMEOUT_MS)
+  }, timeout)
   const abort = () => timer.abort(signal?.reason)
 
   url.searchParams.set(ISLAND_PARAM, id)
@@ -37,7 +39,7 @@ export async function requestIsland(slot: HTMLElement, signal?: AbortSignal): Pr
     if (error instanceof ApiError || signal?.aborted)
       throw error
 
-    throw new ApiError(0, late ? `kay: the server island ${id} of ${location.pathname} took longer than ${ISLAND_TIMEOUT_MS} ms` : `kay: the server island ${id} of ${location.pathname} got no answer`, undefined, {}, { cause: error })
+    throw new ApiError(0, late ? `kay: the server island ${id} of ${location.pathname} took longer than ${timeout} ms` : `kay: the server island ${id} of ${location.pathname} got no answer`, undefined, {}, { cause: error })
   }
   finally {
     clearTimeout(stop)

@@ -1,5 +1,6 @@
-import type { ApiError } from './api-error'
+import { ApiError } from './api-error'
 import { requestIsland } from './island-request'
+import { kayLog } from './log'
 
 export interface FetchedIsland extends HTMLElement {
   // The inert copy the island replaced, which a page swap compares the next page's copy with.
@@ -51,64 +52,78 @@ function announce(element: HTMLElement, type: string, detail: object): void {
 
 // A deferred server island rendered for this visitor in place of the inert copy standing in for it, asked again after a failure and a wait; resolves false when it failed for good or was aborted, true once the content is in.
 // A failure leaves the inert copy (or, for one a page swap held, the last render), marks the island `data-kay-failed` and dispatches `kay:server-island-error` with an `ApiError` and a `retry()`; success dispatches `kay:server-island`. `aria-busy` is set while it loads.
-// `dispose` ends the islands of the copy it replaces, which may have hydrated; a page swap disposing it (`kay:island-gone`) aborts the request.
+// `dispose` ends the islands of the copy it replaces, which may have hydrated; an island taken out of the document (a page swap) aborts the request.
 export async function fetchServerIsland(element: FetchedIsland, dispose: (root: ParentNode) => void, retry: () => void): Promise<boolean> {
   const controller = new AbortController()
   const { signal } = controller
-  const gone = () => controller.abort()
+  // The page swap takes the island out of the document, which ends its request; watched here, so a page with no deferred island pays nothing.
+  const watch = new MutationObserver(() => element.isConnected || controller.abort())
   const held = element._$b
   // Taken before any exit, so a fetch that fails or meets a skew leaves no node referenced.
   const focused = focusIn(element)
 
-  element.addEventListener('kay:island-gone', gone)
+  watch.observe(document, { childList: true, subtree: true })
   element.setAttribute('aria-busy', 'true')
   element.removeAttribute('data-kay-failed')
 
   try {
     let text: string | undefined
 
-    for (let attempt = 0; ; attempt++) {
-      try {
-        text = await requestIsland(element, signal)
+    try {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          text = await requestIsland(element, signal)
 
-        break
+          break
+        }
+        catch (error) {
+          const wait = RETRY_WAITS_MS[attempt]
+
+          if (signal.aborted || wait === undefined || !(error instanceof ApiError) || settled(error))
+            throw error
+
+          await pause(wait, signal)
+
+          if (signal.aborted)
+            throw error
+        }
       }
-      catch (error) {
-        const wait = RETRY_WAITS_MS[attempt]
-
-        if (signal.aborted || wait === undefined || (error as ApiError).status === undefined || settled(error as ApiError))
-          throw error
-
-        await pause(wait, signal)
+    }
+    catch (error) {
+      if (!signal.aborted) {
+        element.setAttribute('data-kay-failed', '')
+        kayLog('warn', `the server island ${element.dataset.kayServer} of ${location.pathname} was not loaded`, error)
+        announce(element, 'kay:server-island-error', { error, retry })
       }
+
+      return false
     }
 
     if (text === undefined || signal.aborted)
       return false
 
-    element._$b ??= element.innerHTML
-    dispose(element)
-    element.innerHTML = text
-    element.removeAttribute('inert')
-    focused?.()
+    // A fault of the swap itself is no network failure: the held copy comes back and the error goes on to the page's error reporting.
+    try {
+      element._$b ??= element.innerHTML
+      dispose(element)
+      element.innerHTML = text
+      element.removeAttribute('inert')
+      focused?.()
+    }
+    catch (error) {
+      if (held !== undefined)
+        element.innerHTML = held
+
+      throw error
+    }
+
     announce(element, 'kay:server-island', {})
 
     return true
   }
-  catch (error) {
-    if (held !== undefined)
-      element.innerHTML = held
-
-    if (!signal.aborted) {
-      element.setAttribute('data-kay-failed', '')
-      announce(element, 'kay:server-island-error', { error, retry })
-    }
-
-    return false
-  }
   finally {
+    watch.disconnect()
     element.removeAttribute('aria-busy')
-    element.removeEventListener('kay:island-gone', gone)
   }
 }
 

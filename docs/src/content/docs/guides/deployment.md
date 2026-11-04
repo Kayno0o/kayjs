@@ -257,11 +257,11 @@ Each page request becomes a span named after its route, with one span per load a
 
 A request that carries a `traceparent` header joins the caller's trace, so a call from another service shows as one trace. Kay reads the header itself. The response sends `traceresponse` with the trace id, and the JSON log lines of the request carry it as `trace`, so a log line leads to its trace.
 
-To read another format, set `observe.extract` to a function from the request's headers to an OpenTelemetry context, such as `headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers))`. Set it to `false` to ignore incoming traces.
+To read another format, set `observe.extract` to a function from the request's headers to an OpenTelemetry context, such as `headers => propagation.extract(ROOT_CONTEXT, Object.fromEntries(headers))`. Set it to `false` to ignore incoming traces, which a public edge should do, as anyone can send a `traceparent` that asks for sampling.
 
 `observe: { serverTiming: true }` sends a `Server-Timing` header with the time of the guards, the module imports, the loads and the render. Development always does. It covers every page rendered per request, and the server islands of a prerendered one.
 
-<ReadMore href="/llms/production#request-logs">The log fields, span attributes and the sink for your own entries are in the full production reference.</ReadMore>
+<ReadMore href="/llms/production#request-logs">The log fields and the sink for your own entries are in the full production reference, the span attributes in the tracing reference.</ReadMore>
 
 ## Behind a proxy
 
@@ -291,6 +291,6 @@ export default defineConfig({
 })
 ```
 
-<ReadMore href="/llms/production">Log entries for your own sink and span attributes are in the full production reference.</ReadMore>
+<ReadMore href="/llms/production">Log entries for your own sink are in the full production reference, span attributes in <a href="/llms/tracing">tracing</a>.</ReadMore>
 
 <ReadMore href="/llms/proxy-and-security#compression">Compression and the dictionary are in the full proxy and compression reference.</ReadMore>

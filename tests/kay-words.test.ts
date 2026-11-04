@@ -14,12 +14,13 @@ import { pages } from './shared-pages'
 const FIXTURE = 'tests/fixtures/kay-words'
 const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: 'src/messages' }
 const site = await testSite({ root: FIXTURE, i18n, maxSize: 1024 * 1024 })
-const { check, listed, guarded, owned, boom } = await import(join(import.meta.dir, 'fixtures/kay-words/src/routes/index.kay')) as {
+const { check, listed, guarded, owned, boom, slow } = await import(join(import.meta.dir, 'fixtures/kay-words/src/routes/index.kay')) as {
   check: Action<Record<string, string>, unknown>
   listed: Action<Record<string, string | string[]>, unknown>
   guarded: Action<Record<string, string>, unknown, 'website'>
   owned: Action<Record<string, string>, unknown, 'website'>
   boom: Action<Record<string, never>, unknown>
+  slow: Action<Record<string, never>, unknown>
 }
 
 const REFUSED = { name: 'ab', nick: 'abcd', code: 'y', age: '3' }
@@ -95,6 +96,23 @@ describe('kay\'s refusals in the app\'s catalogs', () => {
 
       expect(english.html).toContain('Something went wrong on our side; try again later')
       expect(french.html).toContain('Une erreur est survenue de notre côté')
+    }
+    finally {
+      error.mockRestore()
+    }
+  })
+})
+
+describe('the timeout of an action', () => {
+  it('is worded in the page\'s locale when a plain post takes too long', async () => {
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const english = await site.submit(slow, {}, { from: '/' })
+      const french = await site.submit(slow, {}, { from: '/fr' })
+
+      expect(english.html).toContain('This took too long; try again later')
+      expect(french.html).toContain('Trop long, réessayez plus tard')
     }
     finally {
       error.mockRestore()

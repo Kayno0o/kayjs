@@ -72,7 +72,7 @@ kay explain template-syntax
 | `export-needs-params` | export | A page with params whose `prerender` lists none, or that sets `prerender: false`, or lists values its matchers refuse. | [Prerendering](prerendering.md#prerendering) |
 | `export-image-route` | export | A page linking an image only the image route resizes, which no file of the export holds. | [Static export](prerendering.md#static-export) |
 | `export-site-url` | export | A page reading the site's URL when neither `site` nor SITE_URL sets it. | [Site defaults and social cards](head.md#site-defaults-and-social-cards) |
-| `export-server-render` | export | A page with something only a server renders per request: a server island, a form stamp or work challenge, a live value, a deferred island with no browser entry. | [Server islands](prerendering.md#server-islands) |
+| `export-server-render` | export | A page with something only a server renders per request: a server island, a form stamp or work challenge, a live value, a deferred island with no browser entry. | [Server islands](server-islands.md#server-islands) |
 | `export-guard` | export | A page or endpoint a guard covers, or that `requireGuards` leaves with no guard: only a server runs one per request. | [Guards](server.md#guards) |
 | `export-action` | export | A page exporting an action, which only a server can take. | [Static export](prerendering.md#static-export) |
 | `export-path-clash` | export | Two pages that would be prerendered to the same file. | [Prerendering](prerendering.md#prerendering) |
