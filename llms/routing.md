@@ -79,6 +79,7 @@ h1 Todo {id}
 - `redirect(location, status?)`, `notFound()` and `deny(status?, message?)`, which throw, written `return redirect(...)` in a guard, an endpoint or an action handler so TypeScript narrows what follows, and as a statement in a page fence; `redirect` answers 302 to a read and 303 to a post unless given a status.
 - A page adds `query`, `status`, `failed` and `succeeded`, an action `status` and `fail`; an API route reads Elysia's own context, its guards this one.
 - `params` is the route's, matched as a guard reads them, an action's those of the page it was posted from, and `locale` is the site's `lang` without `i18n` in all of them.
+- `guard` holds what the `_guard.ts` files above the route returned, typed by `kay check`, and `once(key, load)` shares one load between the loads of a request ([Guards](server.md#guards)).
 
 ### Show an error page
 
@@ -272,6 +273,7 @@ The fence's `ctx`:
 #### Loads and timing
 
 - Layout and page loads run in parallel; when several fail, the outermost one decides the response.
+- A layout cannot read its page's data, so a value they both need is returned by a guard (`ctx.guard`) or shared with `ctx.once(key, load)`, which runs the load once for the request ([Guards](server.md#guards)).
 - In development each response carries a `Server-Timing` header with the time of the guards, the import of the page's modules, the loads as a whole and each of them, and the render, shown in the browser's network panel.
 - `observe: { serverTiming: true }` in kay.config.ts sends it in production too (see [Tracing and timing](tracing.md#tracing-and-timing)).
 

@@ -269,7 +269,7 @@ export function selection<Key extends string | number>(initial?: Key): Selection
 }
 
 // What every request kay answers reads and does the same way, in a page, a layout, a guard, an endpoint and an action: who asks, where, in which locale, and how to stop with a redirect, a denial or a 404.
-export interface RequestContext<Params extends Record<string, unknown> = Record<string, string>> {
+export interface RequestContext<Params extends Record<string, unknown> = Record<string, string>, Guarded extends object = object> {
   request: Request
   url: URL
   // The locale the request is served in, as `i18n` in kay.config.ts gives it; the site's `lang` without.
@@ -279,6 +279,10 @@ export interface RequestContext<Params extends Record<string, unknown> = Record<
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, 'name'>): void, (options: CookieDeleteOptions): void } }
   // What the app's Elysia `derive`, `resolve` and `decorate` add, typed through `Register`.
   locals: Locals
+  // What the `_guard.ts` files above the route returned, merged outermost first, a later one winning a key it shares: `export default guard(async ctx => ({ org: await loadOrg(ctx) }))` gives `ctx.guard.org` to the layouts, the page and the actions below it. `kay check` types it from those files; it is empty when none returns an object.
+  guard: Guarded
+  // Runs `load` the first time this request asks for `key` and hands the same promise to every later ask, so a guard, the layouts, the page and an action loading one thing in parallel load it once; per request, never shared between visitors, and a failure is shared too.
+  once: Once
   // Aborts when the client leaves and when the request passes its `serve.timeout`: hand it to `fetch`, a database call or any work that takes one, so it stops with the request.
   signal: AbortSignal
   // Added to the response, whichever way the request ends.
@@ -291,7 +295,10 @@ export interface RequestContext<Params extends Record<string, unknown> = Record<
   deny: (status?: number, message?: string) => never
 }
 
-export interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>> extends RequestContext<Params> {
+// `ctx.once`.
+export type Once = <T>(key: string, load: () => T) => Promise<Awaited<T>>
+
+export interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>, Guarded extends object = object> extends RequestContext<Params, Guarded> {
   // The search params, read against the `query` of the page and its layouts, `export const page = { query: s.Object(...) }`, merged; a query it refuses answers 400. Their raw text is `url.searchParams`.
   query: Query
   // The response status of the page being rendered.
@@ -304,10 +311,11 @@ export type PrerenderedContext<Flag, Context> = [Flag] extends [false | null | u
   ? Context
   : boolean extends Flag
     ? Context
-    : Omit<Context, 'cookies' | 'query' | 'locals'> & {
+    : Omit<Context, 'cookies' | 'query' | 'locals' | 'guard'> & {
       cookies: { kayError: 'A prerendered page renders once, at build time, with no ctx.cookies; drop prerender from export const page to render it per request' }
       query: { kayError: 'A prerendered page renders once, at build time, with no ctx.query; drop prerender from export const page to render it per request' }
       locals: { kayError: 'A prerendered page renders once, at build time, with no ctx.locals; drop prerender from export const page to render it per request' }
+      guard: { kayError: 'A prerendered page renders once, at build time, before any guard runs, with no ctx.guard; drop prerender from export const page to render it per request' }
     }
 
 export interface PageError {
@@ -331,12 +339,20 @@ export interface CardPageContext<Params extends Record<string, unknown> = Record
 // What a `_guard.ts` decides from: who is asking, and the params of the page asked for, each matcher's value in place of its text.
 // For an action, `url` and `params` are those of the page it was posted from; for an API route, its own as Elysia hands them to the handler.
 // `Own` names locals a guard knows beyond the app's, for a library's own guard to read what its plugin adds with no cast.
+// Its `guard` holds what the guards above it returned.
 export type GuardContext<Own extends object = object> = Omit<RequestContext<RouteParams>, 'locals'> & { locals: Locals & Own }
 
-export type Guard = (ctx: GuardContext) => void | Promise<void>
+// A guard may return an object, which the guards, layouts, pages and actions below it read as `ctx.guard`.
+export type Guard<Value = unknown> = (ctx: GuardContext) => Value | Promise<Value>
+
+// What one guard hands on, nothing when it returns no object.
+export type GuardValue<G> = G extends (...args: never[]) => infer Returned ? Awaited<Returned> extends infer Value extends object ? Value : object : object
+
+// What the guards of a route hand on together, outermost first.
+export type GuardValues<Guards extends readonly unknown[]> = Guards extends readonly [infer First, ...infer Rest] ? GuardValue<First> & GuardValues<Rest> : object
 
 // What the `GET` of an endpoint file reads: `src/routes/feeds/[slug].json.ts` gets `{ slug }`, the extension left out.
-export type EndpointContext<Params extends Record<string, unknown> = Record<string, string>> = RequestContext<Params>
+export type EndpointContext<Params extends Record<string, unknown> = Record<string, string>, Guarded extends object = object> = RequestContext<Params, Guarded>
 // A string or a Blob it returns is served with the type its file's extension names; a Response goes out as it is.
 export type EndpointBody = string | Blob | Response
 
@@ -352,8 +368,8 @@ declare global {
 
 // The default export of a `_guard.ts`: runs before every page and every action in its directory and below, and lets the request through unless it redirects or denies.
 // kept: request
-export function guard<Own extends object = object>(check: (ctx: GuardContext<Own>) => void | Promise<void>): Guard {
-  return check as Guard
+export function guard<Own extends object = object, const Value extends object | void = void>(check: (ctx: GuardContext<Own>) => Value | Promise<Value>): Guard<Value> {
+  return check as Guard<Value>
 }
 
 // An `await` block takes any promise whatever made it, so this is no longer needed: it still returns the promise as a promise, handling its rejection at once.

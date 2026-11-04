@@ -71,6 +71,7 @@ import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } fr
 import { reportServerError } from './report'
 import { RequestReadError } from './request-read'
 import { recordOf, requestRecord } from './request-record'
+import { forgetOnces, guardValues, onceOf } from './request-scope'
 import { againstDeadline, requestSignal, RequestTimeoutError, retime } from './request-timeout'
 import { overHttps } from './request-url'
 import { askedPath } from './rewrite'
@@ -249,8 +250,10 @@ export async function renderPage(route: ServedRoute, context: RequestContext, pa
   const { pathname, search } = rendering.ctx.url
   // A render run again, for the user it read a value of, starts from a rendering of its own.
   const attempt = async (missed: () => void): Promise<Response> => {
-    if (rendered)
+    if (rendered) {
+      forgetOnces(context.request)
       rendering = createRendering(context, params, options, route.contextKeys)
+    }
 
     rendered = true
     rendering.guarded = options.guarded ?? route.guards.length > 0
@@ -854,6 +857,10 @@ function createRendering(context: RequestContext, params: Record<string, unknown
       },
       // The app's derive and resolve hooks ran before this handler, so the context carries what `Register` declares.
       locals: context as unknown as Locals,
+      get guard() {
+        return guardValues(request)
+      },
+      once: onceOf(request),
       get signal() {
         return requestSignal(request)
       },
@@ -870,6 +877,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
       cookies: { get: needsRequest('ctx.cookies') },
       query: { get: needsRequest('ctx.query') },
       locals: { get: needsRequest('ctx.locals') },
+      guard: { get: needsRequest('ctx.guard') },
     })
   }
 

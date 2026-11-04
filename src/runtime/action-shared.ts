@@ -158,7 +158,7 @@ export interface ProtectionMessages {
 
 // The context every request has, `params` those of the page the action was posted from, matched against the action's own route as its guards read them: scope what it touches by them, since the input is the visitor's to choose, and a layout's action gets those every page it wraps names.
 // Its `url` is that page's, as its guards read it, its `locale` that page's too, and `redirect` answers 303 unless given.
-export interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string> extends RequestContext<Params> {
+export interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string, Guarded extends object = object> extends RequestContext<Params, Guarded> {
   // Response status, for a fetch call or the redirect after a plain form post.
   status: (code: number) => void
   // `return ctx.fail(409, { message: 'Taken' })`: a plain form post gets its page rendered again, which reads it through `action.failed()`; a call throws an `ActionError` carrying `data`. A string is also the form's message, under `errors['']`.

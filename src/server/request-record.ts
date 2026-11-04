@@ -42,6 +42,9 @@ export class RequestRecord {
   // Its clock and signal, made on first use; and whether its page streams its body, which the timeout then cuts short.
   deadline: Deadline | undefined = undefined
   streamed: true | undefined = undefined
+  // What its guards returned for the layouts, the page and the actions below them (`ctx.guard`), and the loads it shares by key (`ctx.once`).
+  guardValues: Record<string, unknown> | undefined = undefined
+  memo: Map<string, Promise<unknown>> | undefined = undefined
   // The errors already reported for it, so the catch-all reports none twice.
   reported: Set<unknown> | undefined = undefined
   // Its context as kay's guards and handlers read it, copied once so they share it.

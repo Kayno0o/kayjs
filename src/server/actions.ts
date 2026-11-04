@@ -41,6 +41,7 @@ import { countSucceeded, isAgentCall, markChallenge, PRETEND, protectionRefusal,
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { recordOf, requestRecord } from './request-record'
+import { guardValues, onceOf } from './request-scope'
 import { requestSignal, RequestTimeoutError, withTimeout } from './request-timeout'
 import { LOCAL_HOST, overHttps, requestUrl } from './request-url'
 import { guardUrl } from './routes'
@@ -630,6 +631,10 @@ export async function passGuards(guards: LoadedGuard[], context: { request: Requ
       return state.jar.cookies
     },
     locals: context as unknown as Locals,
+    get guard() {
+      return guardValues(request)
+    },
+    once: onceOf(request),
     get signal() {
       return requestSignal(request)
     },
@@ -752,6 +757,10 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     },
     // The app's derive and resolve hooks ran before this handler, so the context carries what `Register` declares.
     locals: context as unknown as Locals,
+    get guard() {
+      return guardValues(request)
+    },
+    once: onceOf(request),
     get signal() {
       return requestSignal(request)
     },

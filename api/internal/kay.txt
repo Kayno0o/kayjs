@@ -1170,7 +1170,7 @@ function siteWithBase(site: string | undefined, base: string | undefined): strin
 function sourceHash(text: string): string
 
 [./library] stoppers
-function stoppers(request: Request): Pick<RequestContext<Record<string, string>>, "deny" | "notFound" | "redirect">
+function stoppers(request: Request): Pick<RequestContext<Record<string, string>, object>, "deny" | "notFound" | "redirect">
 
 [./library] ToolResult
 interface ToolResult

@@ -21,6 +21,7 @@ import { serverFacts } from './layout-facts'
 
 export { SHADOW_SETTINGS }
 const LAYOUT = '_layout.kay'
+const GUARD = '_guard.ts'
 const PARENT = '..'
 const OUTSIDE = '__'
 const WORD_CHARACTER = /[\w$]/
@@ -121,7 +122,7 @@ export function compileShadow(root: string, file: string, source: string, { rout
   }
   const queries = layoutQueries(file, source, routesDir, mounts)
   const slots = outerSlots(file, source, routesDir, mounts)
-  const { tsx, map, bodyLines, moduleLines, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerSlots: slots, outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, page: route !== undefined, component: route === undefined && existsSync(routesDir), typesOnly, insideIsland, relocateImport, lints, importedSignals: signals, ui: uiEntryOf(root, file), contextModule: contextSpecifier(file, shadowDir) })
+  const { tsx, map, bodyLines, moduleLines, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerSlots: slots, outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, outerGuards: guardTypes(file, source, routesDir, mounts, moved ? shadowDir : dirname(file)), check: true, page: route !== undefined, component: route === undefined && existsSync(routesDir), typesOnly, insideIsland, relocateImport, lints, importedSignals: signals, ui: uiEntryOf(root, file), contextModule: contextSpecifier(file, shadowDir) })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 
@@ -133,6 +134,17 @@ function contextSpecifier(file: string, shadowDir: string): string | undefined {
   const module = packageContextModule(file)
 
   return module === undefined ? undefined : relativeSpecifier(shadowDir, module.replace(TS_FILE, ''))
+}
+
+// The type of what each `_guard.ts` covering a page or a layout returns, outermost first, which its `ctx.guard` holds; none for a page that sets `guards: false`.
+// `from` is where the shadow imports them from.
+export function guardTypes(file: string, source: string, routesDir: string, mounts: RouteMount[], from: string): string[] | undefined {
+  const trees = routeTrees(routesDir, mounts)
+
+  if ((!pageRoute(file, routesDir, mounts) && basename(file) !== LAYOUT) || !trees.some(({ dir }) => file.startsWith(dir + sep)) || falseKeys(source).has('guards'))
+    return undefined
+
+  return directoriesUp(virtualDir(trees, dirname(file))).flatMap(dir => fileAt(trees, dir, GUARD) ?? []).reverse().map(guard => `(typeof import(${JSON.stringify(relativeSpecifier(from, guard.replace(TS_FILE, '')))}))["default"]`)
 }
 
 // The `query` types of the layouts above a page or a layout, which its shadow depends on besides its own source.

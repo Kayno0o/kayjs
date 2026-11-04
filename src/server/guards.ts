@@ -2,6 +2,7 @@ import type { Guard, GuardContext } from '../runtime'
 import type { GuardFile, LayoutAccess, Route, SpecialPages } from './routes'
 import { KayError } from '../compiler/errors'
 import { importModule } from './bundle'
+import { handOn, startGuardValues } from './request-scope'
 
 export interface LoadedGuard extends GuardFile {
   check: Guard
@@ -47,10 +48,13 @@ export async function loadGuard(guard: GuardFile): Promise<LoadedGuard> {
 }
 
 // Outermost first, each one awaited before the next; the first that stops the request is the answer.
+// An object a guard returns is laid over what the ones before it returned, which `ctx.guard` gives the next guard, the layouts, the page and the actions.
 export async function runGuards(guards: LoadedGuard[], ctx: GuardContext): Promise<Refusal | undefined> {
+  const values = guards.length > 0 ? startGuardValues(ctx.request) : {}
+
   for (const guard of guards) {
     try {
-      await guard.check(ctx)
+      handOn(values, await guard.check(ctx))
     }
     catch (error) {
       return { guard, error }

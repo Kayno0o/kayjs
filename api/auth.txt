@@ -1092,7 +1092,7 @@ interface GrantStore<P, G extends string>
   subjectId: (principal: P) => string
 
 [.] guard
-function guard(options?: GuardOptions): Guard
+function guard(options?: GuardOptions): Guard<void>
 
 [.] GuardOptions
 interface GuardOptions
@@ -2045,7 +2045,7 @@ function confirm(input: { token: string; }, options?: CallOptions<never> | undef
 component default
 
 [./pages/confirm-email.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ token: string | undefined; error: any; landmark: boolean; }>
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{ token: string | undefined; error: any; landmark: boolean; }>
 
 [./pages/confirm-email.kay] page
 const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
@@ -2058,7 +2058,7 @@ function accept(input: { id: string; }, options?: CallOptions<never> | undefined
 component default
 
 [./pages/invitation.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{
   auth: any;
   features: any;
   prefix: any;
@@ -2089,7 +2089,7 @@ function switchAccount(input: { id: string; }, options?: CallOptions<never> | un
 component default
 
 [./pages/magic-link.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ token: string | undefined; error: any; landmark: boolean; }>
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{ token: string | undefined; error: any; landmark: boolean; }>
 
 [./pages/magic-link.kay] page
 const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
@@ -2102,7 +2102,7 @@ function spend(input: { token: string; }, options?: CallOptions<never> | undefin
 component default
 
 [./pages/register.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{
   auth: any;
   features: any;
   prefix: any;
@@ -2151,7 +2151,7 @@ function register(input: {
 component default
 
 [./pages/reset-password.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{
   auth: any;
   features: any;
   redirect: string;
@@ -2197,7 +2197,7 @@ function emailCode(form: FormData, options?: CallOptions<never> | undefined): Pr
 function emailCode(input: { code: string; }, options?: CallOptions<never> | undefined): Promise<never>
 
 [./pages/sign-in.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{
   auth: any;
   features: any;
   prefix: any;
@@ -2270,7 +2270,7 @@ function password(input: {
 component default
 
 [./pages/two-factor.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{
   auth: any;
   features: any;
   pending: any;
@@ -2307,7 +2307,7 @@ function code(input: { code: string; }, options?: CallOptions<never> | undefined
 component default
 
 [./pages/verify-email.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{
   auth: any;
   token: string | undefined;
   user: any;

@@ -37,9 +37,9 @@ type EmptySchema = ReturnType<typeof t.Object<Record<never, never>>>
 const emptySchema = () => ({ [Symbol.for('TypeBox.Kind')]: 'Object', type: 'object', properties: {} }) as unknown as EmptySchema
 
 // `action` as `kay check` reads it in a page's server fence, whose `ctx.params` are those of the page's route: not something to write.
-export interface ActionFor<Params extends Readonly<Record<string, unknown>>> {
-  <Output, const Honeypot extends string = never>(handler: (ctx: ActionContext<Params>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): NoInputAction<Settled<Output>, Honeypot>
-  <Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext<Params, Extract<keyof Static<Schema>, string>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): ServerAction<Schema, Settled<Output>, Honeypot>
+export interface ActionFor<Params extends Readonly<Record<string, unknown>>, Guarded extends object = object> {
+  <Output, const Honeypot extends string = never>(handler: (ctx: ActionContext<Params, string, Guarded>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): NoInputAction<Settled<Output>, Honeypot>
+  <Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext<Params, Extract<keyof Static<Schema>, string>, Guarded>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): ServerAction<Schema, Settled<Output>, Honeypot>
 }
 
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.

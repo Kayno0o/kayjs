@@ -79,6 +79,8 @@ export interface GenerateOptions {
   special?: boolean | undefined
   // The type of each `query` schema the layouts above this file declare, outermost first.
   outerQueries?: string[] | undefined
+  // The type of each `_guard.ts` default export above this file, outermost first, whose returned objects its `ctx.guard` includes.
+  outerGuards?: string[] | undefined
   // A layout, whose `slot name` lines are slots the page below fills, and the module lists them.
   layoutFile?: boolean | undefined
   // The slots the layouts above this file declare, which its `@name` blocks fill: a block naming none is reported when type checking.
@@ -401,7 +403,7 @@ class ModuleShell {
     }
 
     if (server)
-      b.add(`import type { ${this.pageContextType()} as KayPageContext, PageData as KayPageData${this.declaresQuery() !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${mode === 'check' && server.page ? ', PageSettings as KayPageSettings' : ''}${this.actionsTyped ? ', ActionFor as KayActionFor' : ''} } from 'kay'\n`)
+      b.add(`import type { ${this.pageContextType()} as KayPageContext, PageData as KayPageData${this.guardValues() !== undefined ? ', GuardValues as KayGuardValues' : ''}${this.declaresQuery() !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${mode === 'check' && server.page ? ', PageSettings as KayPageSettings' : ''}${this.actionsTyped ? ', ActionFor as KayActionFor' : ''} } from 'kay'\n`)
 
     const kayHelpers: KayHelper[] = facts.actionForm ? ['formAction'] : []
 
@@ -712,6 +714,13 @@ class ModuleShell {
     return this.options.cardPage ? 'CardPageContext' : 'PageContext'
   }
 
+  // What `ctx.guard` is typed by: what the guards above the file return, when there are any; the error and card pages read none.
+  private guardValues(): string | undefined {
+    const guards = this.options.outerGuards
+
+    return guards === undefined || guards.length === 0 || this.options.errorPage || this.options.cardPage || this.options.special ? undefined : `KayGuardValues<[${guards.join(', ')}]>`
+  }
+
   // What `ctx.query` is typed by: the schemas of the layouts above and this file's own, when there are any; a special page reads its route's.
   private declaresQuery(): string | undefined {
     if (this.options.special)
@@ -814,7 +823,7 @@ class ModuleShell {
 
       if (this.actionsTyped) {
         for (const callee of server.actionCallees.filter(callee => callee.start >= span.start && callee.end <= span.end))
-          cuts.push({ at: callee.start, text: '(' }, { at: callee.end, text: ` as KayActionFor<${this.params}>)` })
+          cuts.push({ at: callee.start, text: '(' }, { at: callee.end, text: ` as KayActionFor<${this.params}${this.guardValues() !== undefined ? `, ${this.guardValues()}` : ''}>)` })
       }
 
       let at = from
@@ -839,7 +848,8 @@ class ModuleShell {
     // An unused parameter would trip `noUnusedParameters` in the user's tsconfig, so it is named `_ctx` when the fence never reads it.
     const ctx = server.body.some(span => CTX_REFERENCE.test(this.text(span))) ? 'ctx' : '_ctx'
 
-    const context = `KayPageContext<${params}${query !== undefined ? `, ${query}` : ''}>`
+    const guards = this.guardValues()
+    const context = `KayPageContext<${params}${query !== undefined || guards !== undefined ? `, ${query ?? 'Readonly<Record<string, unknown>>'}` : ''}${guards !== undefined ? `, ${guards}` : ''}>`
     const prerender = this.settingType(PRERENDER)
 
     b.add(`\nexport async function ${LOAD}(${ctx}: ${prerender !== undefined ? `KayPrerenderedContext<${prerender}, ${context}>` : context}) {\n`)

@@ -1,10 +1,10 @@
 [.] action
-function action<Output, const Honeypot extends string = never>(handler: (ctx: ActionContext<Readonly<Record<string, unknown>>, string>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): NoInputAction<Settled<Output>, Honeypot>
+function action<Output, const Honeypot extends string = never>(handler: (ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): NoInputAction<Settled<Output>, Honeypot>
 function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: (Schema & {
   params: [];
 })["static"], ctx: ActionContext<Readonly<Record<string, unknown>>, Extract<keyof (Schema & {
   params: [];
-})["static"], string>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): ServerAction<Schema, Settled<Output>, Honeypot>
+})["static"], string>, object>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): ServerAction<Schema, Settled<Output>, Honeypot>
 
 [.] Action
 interface Action<Input, Output, Honeypot extends string = never>
@@ -20,14 +20,16 @@ interface Action<Input, Output, Honeypot extends string = never>
   with: (fields: Partial<Input>) => Action<Input, Output, Honeypot>
 
 [.] ActionContext
-interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string> extends RequestContext<Params>
+interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string, Guarded extends object = object> extends RequestContext<Params, Guarded>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
   deny: (status?: number | undefined, message?: string | undefined) => never
   fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data | undefined, errors?: Partial<Record<"" | Field, string>> | undefined) => Failure<Data>
+  guard: Guarded
   headers: Headers
   locale: string
   locals: object
   notFound: () => never
+  once: Once
   params: Params
   redirect: Redirect
   request: Request
@@ -52,7 +54,7 @@ interface ActionErrorDetail
   status: number
 
 [.] ActionFor
-interface ActionFor<Params extends Readonly<Record<string, unknown>>>
+interface ActionFor<Params extends Readonly<Record<string, unknown>>, Guarded extends object = object>
 
 [.] ActionProtect
 interface ActionProtect<Field extends string = never>
@@ -192,10 +194,12 @@ interface CardPageContext<Params extends Record<string, unknown> = Record<string
   card: { title: string; image?: string | undefined; name?: string | undefined; }
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
   deny: (status?: number | undefined, message?: string | undefined) => never
+  guard: object
   headers: Headers
   locale: string
   locals: object
   notFound: () => never
+  once: Once
   params: Params
   query: Readonly<Record<string, unknown>>
   redirect: Redirect
@@ -280,17 +284,19 @@ interface ElementSize
 type EndpointBody = string | Blob | Response
 
 [.] EndpointContext
-type EndpointContext<Params extends Record<string, unknown> = Record<string, string>> = RequestContext<Params>
+type EndpointContext<Params extends Record<string, unknown> = Record<string, string>, Guarded extends object = object> = RequestContext<Params, Guarded>
 
 [.] ErrorPageContext
 interface ErrorPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
   deny: (status?: number | undefined, message?: string | undefined) => never
   error: PageError
+  guard: object
   headers: Headers
   locale: string
   locals: object
   notFound: () => never
+  once: Once
   params: Params
   query: Readonly<Record<string, unknown>>
   redirect: Redirect
@@ -383,16 +389,22 @@ interface FormSuccess<Output>
   data: Output
 
 [.] guard
-function guard<Own extends object = object>(check: (ctx: GuardContext<Own>) => Promise<void> | void): Guard
+function guard<Own extends object = object, const Value extends object | void = void>(check: (ctx: GuardContext<Own>) => Promise<Value> | Value): Guard<Value>
 
 [.] Guard
-type Guard = (ctx: GuardContext) => void | Promise<void>
+type Guard<Value = unknown> = (ctx: GuardContext) => Value | Promise<Value>
 
 [.] GuardContext
 type GuardContext<Own extends object = object> = Omit<RequestContext<RouteParams>, 'locals'> & { locals: Locals & Own }
 
 [.] guardLeave
 function guardLeave(dirty: () => boolean, options?: LeaveGuardOptions): void
+
+[.] GuardValue
+type GuardValue<G> = G extends (...args: never[]) => infer Returned ? Awaited<Returned> extends infer Value extends object ? Value : object : object
+
+[.] GuardValues
+type GuardValues<Guards extends readonly unknown[]> = Guards extends readonly [infer First, ...infer Rest] ? GuardValue<First> & GuardValues<Rest> : object
 
 [.] HoneypotOptions
 interface HoneypotOptions<Field extends string = string>
@@ -593,6 +605,9 @@ type NoInputAction<Output, Honeypot extends string = never> = ServerAction<Empty
 [.] onBeforeNavigate
 function onBeforeNavigate(fn: (event: BeforeNavigate) => Promise<boolean | void> | boolean | void): () => void
 
+[.] Once
+type Once = <T>(key: string, load: () => T) => Promise<Awaited<T>>
+
 [.] onCleanup
 function onCleanup(fn: () => void): void
 
@@ -606,13 +621,15 @@ function onNavigate(fn: (event: NavigateEvent) => unknown): () => void
 function optimistic(change: () => void): { undo: () => void; keep: () => void; }
 
 [.] PageContext
-interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>> extends RequestContext<Params>
+interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>, Guarded extends object = object> extends RequestContext<Params, Guarded>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
   deny: (status?: number | undefined, message?: string | undefined) => never
+  guard: Guarded
   headers: Headers
   locale: string
   locals: object
   notFound: () => never
+  once: Once
   params: Params
   query: Query
   redirect: Redirect
@@ -699,13 +716,15 @@ function postedValue(name: unknown, fallback?: unknown): string | undefined
 function postedValues(name: unknown, fallback?: readonly unknown[] | undefined): string[] | undefined
 
 [.] PrerenderedContext
-type PrerenderedContext<Flag, Context> = [Flag] extends [false | null | undefined] ? Context : boolean extends Flag ? Context : Omit<Context, 'cookies' | 'query' | 'locals'> & {
+type PrerenderedContext<Flag, Context> = [Flag] extends [false | null | undefined] ? Context : boolean extends Flag ? Context : Omit<Context, 'cookies' | 'query' | 'locals' | 'guard'> & {
   cookies: {
     kayError: 'A prerendered page renders once, at build time, with no ctx.cookies; drop prerender from export const page to render it per request'
   } query: {
     kayError: 'A prerendered page renders once, at build time, with no ctx.query; drop prerender from export const page to render it per request'
   } locals: {
     kayError: 'A prerendered page renders once, at build time, with no ctx.locals; drop prerender from export const page to render it per request'
+  } guard: {
+    kayError: 'A prerendered page renders once, at build time, before any guard runs, with no ctx.guard; drop prerender from export const page to render it per request'
   }
 }
 
@@ -738,7 +757,7 @@ interface ProtectionMessages
   minTime?: ((reason: MinTimeRefusal) => string) | string | undefined
   proofOfWork?: ((reason: ProofOfWorkRefusal) => string) | string | undefined
   rateLimit?: ((wait: number) => string) | string | undefined
-  serverError?: ((error: unknown, ctx: ActionContext<Readonly<Record<string, unknown>>, string>) => Promise<string> | string) | string | undefined
+  serverError?: ((error: unknown, ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Promise<string> | string) | string | undefined
 
 [.] publicEnv
 const publicEnv: Readonly<Record<never, never>>
@@ -860,13 +879,15 @@ interface RefuseOptions
 interface Register
 
 [.] RequestContext
-interface RequestContext<Params extends Record<string, unknown> = Record<string, string>>
+interface RequestContext<Params extends Record<string, unknown> = Record<string, string>, Guarded extends object = object>
   cookies: CookieMap & { delete: { (name: string, options?: Omit<CookieDeleteOptions, "name"> | undefined): void; (options: CookieDeleteOptions): void; }; }
   deny: (status?: number | undefined, message?: string | undefined) => never
+  guard: Guarded
   headers: Headers
   locale: string
   locals: object
   notFound: () => never
+  once: Once
   params: Params
   redirect: Redirect
   request: Request
@@ -1032,7 +1053,7 @@ interface Selection<Key>
 interface ServerAction<Schema extends TSchema, Output, Honeypot extends string = never> extends Action<Sendable<Static<Schema>>, Output, Honeypot>
   error: (field?: "" | Extract<keyof Sendable<(Schema & { params: []; })["static"]>, string> | Honeypot | undefined) => string | undefined
   failed: () => FormFailure<Sendable<(Schema & { params: []; })["static"]>, FailureData<Output>, Honeypot> | undefined
-  handler: (input: (Schema & { params: []; })["static"], ctx: ActionContext<Readonly<Record<string, unknown>>, string>) => Output | Promise<Output>
+  handler: (input: (Schema & { params: []; })["static"], ctx: ActionContext<Readonly<Record<string, unknown>>, string, object>) => Output | Promise<Output>
   pending: () => boolean
   progress: () => number | undefined
   protection?: ResolvedProtection
@@ -1520,6 +1541,7 @@ interface CompileOptions
   insideIsland?: boolean | undefined
   inspect?: boolean | undefined
   lints?: LintLevels | undefined
+  outerGuards?: string[] | undefined
   outerQueries?: string[] | undefined
   outerSlots?: string[] | undefined
   output?: "dom" | "html" | undefined

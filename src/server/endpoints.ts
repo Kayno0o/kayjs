@@ -14,6 +14,7 @@ import { pageSetting } from './page-settings'
 import { listedParams, pathOf } from './prerendered'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
+import { guardValues, onceOf } from './request-scope'
 import { requestSignal, RequestTimeoutError, timedOutResponse, withTimeout } from './request-timeout'
 import { routerKey } from './routes'
 import { markPrivate, readPersonally, wasReadPersonally } from './scope'
@@ -107,6 +108,10 @@ async function answer(endpoint: ServedEndpoint, context: { request: Request }, p
       return jar.cookies
     },
     locals: context as unknown as Locals,
+    get guard() {
+      return guardValues(request)
+    },
+    once: onceOf(request),
     get signal() {
       return requestSignal(request)
     },
