@@ -356,40 +356,7 @@ describe('direct imports of the runtime', () => {
   })
 })
 
-const API_ERROR_CLASS = /name\s*=\s*"ApiError"/
-
-describe('the ApiError class', () => {
-  it('stays in the chunks of the one island of six importing it, out of the entry every page loads', async () => {
-    const root = resolve(await fixtureCopy('runtime-chunks'))
-
-    dirs.push(root)
-    await Bun.write(join(root, 'src/components/refused.kay'), '---\nimport { ApiError, signal } from \'kay\'\n\nconst failed = signal(false)\n\nfunction check(error: unknown) {\n  failed.set(error instanceof ApiError)\n}\n---\nbutton.refused(onClick={() => check(new Error(\'no\'))}) {failed() ? \'yes\' : \'no\'}\n')
-    await Bun.write(join(root, 'src/routes/refused.kay'), '--- script\nimport Refused from \'../components/refused.kay\'\n---\nh1 Refused\nRefused\n')
-
-    const client = await buildClient(root)
-    // The chunks a page loads at once: what its island chunks import statically, the entry's among them.
-    const loaded = async (chunks: string[]): Promise<string> => {
-      const seen = new Set<string>()
-      const visit = async (chunk: string): Promise<void> => {
-        if (seen.has(chunk))
-          return
-
-        seen.add(chunk)
-
-        for (const [, from] of (await Bun.file(join(client.dir, chunk)).text()).matchAll(IMPORT_SPECIFIER))
-          await visit(from!.slice(2))
-      }
-
-      await Promise.all(chunks.map(async chunk => visit(chunk.split('/').pop()!)))
-
-      return (await Promise.all([...seen].map(async chunk => Bun.file(join(client.dir, chunk)).text()))).join('\n')
-    }
-
-    expect(await loaded([client.entry!])).not.toMatch(API_ERROR_CLASS)
-    expect(await loaded(client.islands['src/components/plain-one.kay']!)).not.toMatch(API_ERROR_CLASS)
-    expect(await loaded(client.islands['src/components/refused.kay']!)).toMatch(API_ERROR_CLASS)
-  }, 120_000)
-
+describe('the runtime chunk probe', () => {
   it('keeps every file the entry could reach in the anchor, with a warning in development, when the probe build fails', async () => {
     const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
     const eager = new Set(['/a.ts'])

@@ -4,12 +4,12 @@
     "files": 3
   },
   "i18n-links": {
-    "gzip": 16740,
-    "files": 3
+    "gzip": 16530,
+    "files": 2
   },
   "live-values": {
-    "gzip": 14263,
-    "files": 6
+    "gzip": 13975,
+    "files": 4
   },
   "bench-products": {
     "gzip": 10617,
