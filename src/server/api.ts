@@ -1,4 +1,4 @@
-import type { Context, TSchema } from 'elysia'
+import type { Context, TSchema, ValidationError } from 'elysia'
 import type { ExtensionApp } from '../config'
 import type { Locals } from '../runtime'
 import type { ActionTool } from '../runtime/action'
@@ -26,6 +26,7 @@ import { timeoutMs } from './config-limits'
 import { cookieJar } from './cookies'
 import { corsAdmits, corsResponse, corsRule, dropOwnGrant, grantedByKay, preflight, varyByOrigin, withCors, withoutOwnGrant } from './cors'
 import { streamReporters } from './event-stream'
+import { refusedFields } from './field-errors'
 import { loadGuard, requiredGuards } from './guards'
 import { inRouteReads, LIVE_HEADER, routeProof } from './live'
 import { answeringRequest, statusOf } from './log'
@@ -52,6 +53,7 @@ const CORS = Symbol.for('kay.cors')
 const RATE_LIMIT = Symbol.for('kay.rateLimit')
 // Where `api({ timeout })` keeps the module's timeout.
 const TIMEOUT = Symbol.for('kay.timeout')
+const ERROR_SHAPE = Symbol.for('kay.errorShape')
 
 // The requests the guards of their module let through, whose later errors are no refused input.
 const admitted = new WeakSet<Request>()
@@ -280,7 +282,12 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         })
         .use(instance)
         // After the module's own `onError`, which may answer the error itself.
-        .onError(({ request, error, code, set }) => reportThrown({ request, error, code, set }, options))
+        .onError(({ request, error, code, set }) => {
+          const refused = { request, error, code, set }
+          const shaped = (instance as { [ERROR_SHAPE]?: string })[ERROR_SHAPE] === 'elysia' ? undefined : refusedInput(refused, options)
+
+          return shaped ?? reportThrown(refused, options)
+        })
 
       letGoOfParent(instance, app)
 
@@ -488,6 +495,21 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
   return Object.keys(set.headers).length > 0 && response === given ? undefined : response
 }
 
+// Input the route's `body`, `query`, `params`, `headers` or `cookie` refused, answered as an action answers it: `{ errors, status }`, a message per field in the request's locale.
+// A mismatch of the route's own response is the route's bug and is left to the caller.
+function refusedInput({ request, error, code, set }: { request: Request, error: unknown, code: unknown, set: { status?: number | string } }, options: ActionOptions): { errors: Record<string, string>, status: 422 } | undefined {
+  if (code !== 'VALIDATION' || isResponseMismatch(error, code))
+    return undefined
+
+  const { validator } = error as ValidationError
+  const schema = (validator as { schema?: unknown }).schema ?? validator
+  const errors = inApiLocale(request, options, () => refusedFields(schema, error as ValidationError))
+
+  set.status = 422
+
+  return { errors, status: 422 }
+}
+
 // Elysia answers a response that fails its schema as validation (422), a client error for what is the route's own bug.
 function isResponseMismatch(error: unknown, code: unknown): boolean {
   return code === 'VALIDATION' && (error as { type?: unknown } | null)?.type === 'response'
@@ -692,6 +714,8 @@ export interface ApiOptions {
   rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
   // Runs none of the guards above the module, as a page's `guards: false` does; read from the `api({ guards: false })` call as written.
   guards?: false | undefined
+  // The body of a 422 for refused input: `'kay'` (the default) answers `{ errors, status }` as an action does, a message per field in the request's locale; `'elysia'` keeps Elysia's own body for clients still parsing it, and goes in 1.89.
+  errorShape?: 'kay' | 'elysia' | undefined
 }
 
 // An Elysia instance for a module under `src/api` whose handlers read what the app's `derive` and `resolve` add, typed through `Register` as `ctx.locals` is.
@@ -711,6 +735,9 @@ export function api(options: ApiOptions = {}): Elysia<'', { decorator: Empty, st
 
   if (options.rateLimit !== undefined)
     Object.defineProperty(instance, RATE_LIMIT, { value: options.rateLimit })
+
+  if (options.errorShape !== undefined)
+    Object.defineProperty(instance, ERROR_SHAPE, { value: options.errorShape })
 
   const socketRoute = instance.ws.bind(instance) as (path: string, options: SocketOptions) => unknown
 

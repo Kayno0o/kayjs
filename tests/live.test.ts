@@ -896,11 +896,8 @@ describe('call()', () => {
     const answering = (status: number, body: unknown, type = 'application/json') => served.mockImplementationOnce((async () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers: { 'content-type': type } })) as unknown as typeof fetch)
     const save = call.track(notes, '/')
 
-    answering(422, { type: 'validation', property: '/title', message: 'Too short' })
-    expect(await save({ method: 'post', body: { title: 'x' } })).toMatchObject({ ok: false, status: 422, errors: { title: 'Too short' }, data: { type: 'validation' } })
-
-    answering(422, { type: 'validation', errors: [{ path: '/a/b', message: 'One' }, { path: 'tags.0', summary: 'Two' }, { path: '/a/c', message: 'Ignored' }, { path: 'root', message: 'Whole' }] })
-    expect((await save({ method: 'post', body: { title: 'x' } }) as { errors: unknown }).errors).toEqual({ 'a': 'One', 'tags': 'Two', '': 'Whole' })
+    answering(422, { status: 422, errors: { title: 'Too short', tags: 'Two' } })
+    expect(await save({ method: 'post', body: { title: 'x' } })).toMatchObject({ ok: false, status: 422, errors: { title: 'Too short', tags: 'Two' }, data: { status: 422 } })
 
     answering(422, { type: 'validation', on: 'body', message: 'Invalid body' })
     expect((await save({ method: 'post', body: { title: 'x' } }) as { errors: unknown }).errors).toEqual({ '': 'Invalid body' })

@@ -45,7 +45,9 @@ describe('the OpenAPI document', () => {
     expect(one.responses).toEqual({
       200: { description: 'OK', content: { 'application/json': { schema: { type: 'object', required: ['id', 'name'], properties: { id: { type: 'number' }, name: { type: 'string' } } } } } },
       404: { description: 'Error', content: { 'text/plain': { schema: { const: 'Not found', type: 'string' } } } },
+      422: { description: 'Error', content: { 'application/json': { schema: { type: 'object', required: ['errors', 'status'], properties: { errors: { type: 'object', additionalProperties: { type: 'string' } }, status: { const: 422, type: 'number' } } } } } },
     })
+    expect(Object.keys((await documented()).paths['/api/files/size']!.get!.responses as object)).toEqual(['200'])
   })
 
   it('gives a body as JSON, a Date as its text, and a body holding a file as multipart', async () => {

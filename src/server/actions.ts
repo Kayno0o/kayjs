@@ -34,7 +34,7 @@ import { importModule } from './bundle'
 import { timeoutMs } from './config-limits'
 import { cookieJar } from './cookies'
 import { eventBody } from './event-stream'
-import { fieldMessage, validated } from './field-errors'
+import { fieldMessage, refusedFields, validated } from './field-errors'
 import { fileBodyLimit } from './file-limit'
 import { handOver, submittedValues, writeSuccess } from './flash'
 import { requiredGuards, runGuards, unguarded } from './guards'
@@ -48,14 +48,14 @@ import { forgetOnces, guardValues, onceOf } from './request-scope'
 import { requestSignal, RequestTimeoutError, withTimeout } from './request-timeout'
 import { LOCAL_HOST, overHttps, requestUrl } from './request-url'
 import { guardUrl } from './routes'
-import { fieldOf } from './schema-check'
+
 import { readPersonally } from './scope'
 import { carryContext } from './security'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
 import { toolSettings } from './tool-settings'
 import { answered, replyTrace, SERVER_SPAN, traced } from './trace'
 import { visitAs } from './visit'
-import { invalidWord, kayWord, schemaRefusal } from './words'
+import { kayWord } from './words'
 import { onceWritten } from './writes'
 
 export interface GuardedRequest {
@@ -1015,24 +1015,9 @@ function encodeOrExplain(value: unknown, what: string): string {
   }
 }
 
-// The `kay.invalid.*` text for what an issue refused, Elysia's own summary when the site words none; the limit it names goes in as `{min}` or `{max}`, a format as `{format}`.
-function refusalText(issue: { summary?: string | undefined, schema?: unknown, value?: unknown }): string {
-  const { kind, params } = schemaRefusal(issue)
-
-  return invalidWord(`kay.invalid.${kind}`, issue.summary, params)
-}
-
 // Input the schema refused: a message per field, the schema's own `error` when it has one, a function `error` called in the request's locale.
 async function refused(action: ServerAction<TSchema, unknown>, error: Readonly<ValidationError>, request: Request, server: Server | null, back: Back): Promise<Response> {
-  const errors: Record<string, string> = {}
-
-  for (const issue of error.all) {
-    const field = 'path' in issue ? fieldOf(issue.path) : ''
-    const own = 'schema' in issue ? (issue.schema as { error?: unknown }).error : undefined
-    const custom = ('path' in issue ? fieldMessage(action.schema, issue.path) : undefined) ?? (typeof own === 'string' ? own : undefined)
-
-    errors[field] ??= custom ?? refusalText(issue)
-  }
+  const errors = refusedFields(action.schema, error)
 
   return failed(request, new Headers(), cookieJar(request).cookies, { action: action.url, status: 422, values: submittedValues(error.value), errors }, server, back)
 }

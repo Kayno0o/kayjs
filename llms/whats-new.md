@@ -3,6 +3,9 @@
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
 ## 1.88.0
+## Unreleased
+- An API route refuses input as an action does: `{ errors, status: 422 }` with `kay.invalid.*` wording in the request's locale, listed in the OpenAPI document, read by `call()`; `api({ errorShape: 'elysia' })` keeps the old body: [upgrading](upgrading.md#an-api-route-refuses-input-as-an-action-does), [api routes](api-routes.md).
+- A tracer whose `startActiveSpan` is a rest-parameter wrapper gets its spans activated: [tracing](tracing.md).
 
 - A guard can return an object that the guards, layouts, pages and actions below it read as `ctx.guard`, typed by `kay check` from the `_guard.ts` files above the route, and `ctx.once(key, load)` shares one load between the loads of a request: [guards](server.md#guards).
 - `kay.config.ts` takes `beforeRequest`, `onResponse`, `onStart`, `onStop` and `actions: { protect, maxSize, messages, beforeRun, onSuccess, onError }`, defaults and hooks for every request and every action; an action's options take `beforeRun`, `onSuccess` and `onError` too: [hooks](hooks.md#the-apps-own-hooks).

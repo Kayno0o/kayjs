@@ -39,6 +39,8 @@ export interface MountedApi {
 
 type Schema = Record<string, unknown>
 
+const ERROR_SHAPE = Symbol.for('kay.errorShape')
+
 // A tool action as the document lists it.
 export interface DocumentedAction {
   // The name it is exported under, `addNote`.
@@ -204,7 +206,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
           ...hooks.detail?.deprecated === true && { deprecated: true },
           ...parameters(path, hooks),
           ...hooks.body !== undefined && { requestBody: { required: true, content: content(hooks.body, holdsFile(hooks.body) ? 'multipart/form-data' : 'application/json') } },
-          responses: responses(hooks.response),
+          responses: withRefusal(responses(hooks.response), hooks, module.instance),
           ...module.guards.length > 0 && { 'x-kay-guarded': true },
           ...tool && { 'x-kay-tool': tool },
         }
@@ -322,6 +324,17 @@ function responses(response: unknown): Record<string, Schema> {
   const byStatus = Object.keys(response).length > 0 && Object.keys(response).every(key => STATUS.test(key)) ? response as Record<string, unknown> : { 200: response }
 
   return Object.fromEntries(Object.entries(byStatus).map(([status, schema]) => [status, { description: status.startsWith('2') ? 'OK' : 'Error', content: content(schema, 'application/json') }]))
+}
+
+// What a route answers when its `body`, `query`, `params` or `headers` refuse the input, as an action answers it, unless the route documents its own 422 or keeps Elysia's body.
+const REFUSAL_SCHEMA = { type: 'object', required: ['errors', 'status'], properties: { errors: { type: 'object', additionalProperties: { type: 'string' } }, status: { const: 422, type: 'number' } } }
+const VALIDATED = ['body', 'query', 'params', 'headers', 'cookie'] as const
+
+function withRefusal(answers: Record<string, Schema>, hooks: Record<string, unknown>, instance: Elysia): Record<string, Schema> {
+  if (answers[422] !== undefined || (instance as { [ERROR_SHAPE]?: string })[ERROR_SHAPE] === 'elysia' || !VALIDATED.some(hook => hooks[hook] !== undefined))
+    return answers
+
+  return { ...answers, 422: { description: 'Error', content: { 'application/json': { schema: REFUSAL_SCHEMA } } } }
 }
 
 // A schema under the type it goes as: raw bytes as such, text as text, anything else as `fallback`.

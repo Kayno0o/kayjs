@@ -23,6 +23,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - `routes`, `api`, `content`, `storage`, `maxSizes` and `settings` are no longer read in `kay.config.ts`, in the options of `pages()` and `testSite()` or in an extension's `config`: a config still naming one stops every command with the unknown key, naming its replacement (`dirs.routes`, `dirs.api`, `contentConfig`, `store.files`, `limits.byPath`, `librarySettings`). `deprecated-config-keys` is gone with them.
 - `memoryStore()` and `sqliteStore(path)` of `kay/server` are gone: `memorySessions()` and `sqliteSessions(path)` (`deprecated-session-stores` is gone).
 - kayjs-auth's `safeRedirect(path, fallback?)` is gone: kay's `localPath(path, fallback)`, with `'/'` as the fallback `safeRedirect` defaulted to (`deprecated-safe-redirect` is gone). An app on 1.83 or older runs `kay upgrade`, which installs the last release that still rewrites them.
+### An API route refuses input as an action does
+
+- A route whose `body`, `query`, `params` or `headers` refuses a request answers `{ errors, status: 422 }`, a message per field in the request's locale (the schema's own `error`, else the `kay.invalid.*` text), where Elysia's `{ type: 'validation', ... }` body went before. A client parsing that body (`type`, `on`, `found`, `errors[].path`) reads `errors` instead; `ApiError.errors` of `call()` reads it already.
+- `kay check` cannot see a client's parsing, so `api({ errorShape: 'elysia' })` keeps the old body on a module until 1.89, when the option goes.
+- The island client no longer reads Elysia's validation body into `ApiError.errors`: a route kept on `errorShape: 'elysia'` gives `errors['']` with its message.
 
 ### The config keys are grouped by concern
 

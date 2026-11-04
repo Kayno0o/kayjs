@@ -13,8 +13,9 @@ describe('messageOf', () => {
     expect(messageOf({ status: 503, errors: {}, data: undefined })).toBe('HTTP 503')
   })
 
-  it('names the field a validation failure refuses, else the whole form', () => {
-    expect(fieldsOf({ type: 'validation', errors: [{ path: '/title', message: 'Too short' }, { path: '', message: 'Bad' }] })).toEqual({ 'title': 'Too short', '': 'Bad' })
+  it('reads the message per field a refused route answers, and nothing from any other answer', () => {
+    expect(fieldsOf({ status: 422, errors: { 'title': 'Too short', '': 'Bad', 'odd': 1 } })).toEqual({ 'title': 'Too short', '': 'Bad' })
+    expect(fieldsOf({ type: 'validation', errors: [{ path: '/title', message: 'Too short' }] })).toEqual({})
     expect(fieldsOf({ message: 'x' })).toEqual({})
     expect(fieldsOf('text')).toEqual({})
   })

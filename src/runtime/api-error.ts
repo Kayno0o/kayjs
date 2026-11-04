@@ -2,9 +2,6 @@ import { ApiError } from './api-error-class'
 
 export { ApiError }
 
-// The first segment of a validation path: `/title` and `title.0` name `title`.
-const FIRST_SEGMENT = /^\/?([^/.]*)/
-
 // What every failure carries, whichever source it came from (a call, a hook that stops a transition, an action's answer to it): `errors` holds a message per field, the form-wide one under '', and `data` what the server answered with.
 export interface ErrorShape<Data = unknown> {
   // The status the server answered with, 0 when no answer came.
@@ -36,21 +33,17 @@ export function actionFailed(status: number): string {
   return `Action failed with ${status}`
 }
 
-// The fields of an Elysia validation failure (all of them where it lists them, else the one it names); none for any other answer.
+// The `errors` of a refused call, a message per field, as a route and an action answer it; none for any other answer.
 export function fieldsOf(data: unknown): Record<string, string> {
-  const answer = data as { type?: unknown, property?: unknown, message?: unknown, errors?: unknown } | null
+  const fields = (data as { errors?: unknown } | null)?.errors
   const errors: Record<string, string> = {}
 
-  if (typeof answer !== 'object' || answer === null || answer.type !== 'validation')
+  if (typeof fields !== 'object' || fields === null || Array.isArray(fields))
     return errors
 
-  const issues = Array.isArray(answer.errors) ? answer.errors as { path?: unknown, message?: unknown, summary?: unknown }[] : [{ path: answer.property, message: answer.message }]
-
-  for (const issue of issues) {
-    const text = [issue.message, issue.summary, answer.message].find(found => typeof found === 'string')
-    const named = typeof issue.path === 'string' ? FIRST_SEGMENT.exec(issue.path)?.[1] : undefined
-
-    errors[named === undefined || named === 'root' ? '' : named] ??= text ?? 'Invalid'
+  for (const [name, text] of Object.entries(fields)) {
+    if (typeof text === 'string')
+      errors[name] = text
   }
 
   return errors

@@ -137,3 +137,41 @@ describe('an API handler in the request\'s locale', () => {
     }
   })
 })
+
+describe('input an API route refuses', () => {
+  const post = async (site: typeof sites.plain, path: string, body: unknown, headers: Record<string, string> = {}) => site.fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
+
+  it('answers { errors, status } with the kay.invalid wording of the request\'s locale, as an action does', async () => {
+    const english = await post(sites.plain, '/api/refused', { title: 'ab' })
+
+    expect(english.status).toBe(422)
+    expect(english.headers.get('content-type')).toContain('application/json')
+    expect(await english.json()).toEqual({ status: 422, errors: { title: expect.stringContaining('3') } })
+
+    const french = await post(sites.plain, '/api/refused', { tags: ['a', 'b'] }, { 'accept-language': 'fr' })
+
+    expect(await french.json()).toEqual({ status: 422, errors: { title: 'Requis', tags: expect.any(String) } })
+    expect((await (await post(sites.plain, '/api/refused', { title: 'ab' }, { 'accept-language': 'fr' })).json() as { errors: unknown }).errors).toEqual({ title: 'Au moins 3 caractères' })
+  })
+
+  it('refuses a query, its params and a body that is not JSON the same way', async () => {
+    expect(await (await sites.plain.fetch('/api/refused/search', { headers: { 'accept-language': 'fr' } })).json()).toEqual({ status: 422, errors: { q: 'Requis' } })
+    expect(await (await sites.plain.fetch('/api/refused/items/abc')).json()).toMatchObject({ status: 422, errors: { id: expect.any(String) } })
+    expect((await post(sites.plain, '/api/refused', 'nope')).status).toBe(422)
+  })
+
+  it('reads the schema\'s own error before kay\'s words', async () => {
+    expect(await (await post(sites.plain, '/api/refused/named', {}, { 'accept-language': 'fr' })).json()).toEqual({ status: 422, errors: { name: 'Name it' } })
+  })
+
+  it('leaves the module\'s onError to answer it', async () => {
+    expect(await (await post(sites.plain, '/api/refused-own', {})).json()).toEqual({ mine: true })
+  })
+
+  it('keeps Elysia\'s body behind errorShape: \'elysia\'', async () => {
+    const answer = await (await post(sites.plain, '/api/refused-elysia', {})).json() as { type?: string, errors?: unknown }
+
+    expect(answer.type).toBe('validation')
+    expect(Array.isArray(answer.errors)).toBe(true)
+  })
+})

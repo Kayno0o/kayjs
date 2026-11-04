@@ -2409,6 +2409,7 @@ interface ApiModule
 [./server] ApiOptions
 interface ApiOptions
   cors?: CorsOptions | false | undefined
+  errorShape?: "elysia" | "kay" | undefined
   guards?: false | undefined
   maxSize?: (() => ByteSize) | ByteSize | undefined
   rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined

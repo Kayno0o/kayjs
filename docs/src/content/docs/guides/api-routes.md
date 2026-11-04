@@ -54,7 +54,7 @@ A hook that throws before a route is chosen is answered the same way. That cover
 
 A browser asking for a page gets your `_error.kay`, or kay's own error page, and any other request gets plain text. A `Response` the hook throws is sent as given, and an `onError` of your own that answers comes first.
 
-A module's own `onError` that answers the error comes first. A body its schema refuses, or a thrown `status()`, keeps the answer Elysia gives, unlogged.
+A module's own `onError` that answers the error comes first. Input its schema refuses answers 422 with `{ errors, status }`, a message per field in the request's locale as an action does, unlogged, and the module's `onError` may answer it instead. `api({ errorShape: 'elysia' })` keeps Elysia's own body for clients still parsing it, until 1.89. A thrown `status()` keeps the answer Elysia gives, unlogged.
 
 A response that does not match the route's `response` schema is a bug in the route, so it answers 500 like a throw: logged, handed to `onError`, with `Internal Server Error` in production and the schema error in development. Input the schema refuses stays 422.
 
@@ -79,7 +79,7 @@ button(onClick={() => call(notes, '/', { method: 'post', body: { title: title() 
 
 A refusal throws an `ApiError` with its `status` and `message`. Its status is 0 when no answer came.
 
-`call.track(notes, '/')` gives a handle that answers a refusal as a result instead of throwing, as an action's `track()` does: `const result = await save({ method: 'post', body })` is `{ ok: true, data }` or `{ ok: false, status, message, errors, data }`, with `errors` a message per field for a validation failure, else the refusal's message under `''`, and `save.pending()` reads only its own calls. A call that got no answer still throws.
+`call.track(notes, '/')` gives a handle that answers a refusal as a result instead of throwing, as an action's `track()` does: `const result = await save({ method: 'post', body })` is `{ ok: true, data }` or `{ ok: false, status, message, errors, data }`, with `errors` a message per field a refused route names, else the refusal's message under `''`, and `save.pending()` reads only its own calls. A call that got no answer still throws.
 
 To show a refusal, read the `message` of the `ApiError` a call throws: it is the field messages or the `message` the route answered, else the status text, and `The server could not be reached` when no answer came. `errors` holds a message per field and `data` what the route answered. `refusalMessage(error, 'Try again')` is deprecated since 1.87.
 
@@ -134,7 +134,7 @@ export default api({ rateLimit: { max: 60, window: '1m' } })
 
 A route sets its own limit and its own `maxSize` in its `detail`. The module's limit applies to it as well.
 
-A string in a route's `body` is refused past 10,000 characters, with Elysia's usual 422, unless its schema sets a `maxLength`, an `enum` or a `const`, or it is a date. A field that takes more text sets its own: `s.String({ maxLength: 100_000 })`. The request body limit still applies on top, so raise `maxSize` too when a body can be larger than the module's.
+A string in a route's `body` is refused past 10,000 characters, with a 422, unless its schema sets a `maxLength`, an `enum` or a `const`, or it is a date. A field that takes more text sets its own: `s.String({ maxLength: 100_000 })`. The request body limit still applies on top, so raise `maxSize` too when a body can be larger than the module's.
 
 `key` counts a person instead of an address, as it does for an action. The limit counts after the guards, so a caller they refuse costs no allowance. Stores and the other options are in [Rate limits](/guides/security#rate-limits).
 

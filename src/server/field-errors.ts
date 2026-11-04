@@ -1,4 +1,6 @@
-import type { TSchema } from 'elysia'
+import type { TSchema, ValidationError } from 'elysia'
+import { fieldOf } from './schema-check'
+import { invalidWord, schemaRefusal } from './words'
 
 const withoutFunctions = new WeakMap<object, unknown>()
 
@@ -90,4 +92,26 @@ function find(node: unknown, segments: string[]): string | undefined {
 // The `error` option at a JSON pointer of the action's own schema, a field's, an item's or one of a union's branches, read in the current locale.
 export function fieldMessage(schema: unknown, pointer: string): string | undefined {
   return find(schema, pointer.split('/').slice(1).map(segmentOf))
+}
+
+// The `kay.invalid.*` text for what an issue refused, Elysia's own summary when the site words none; the limit it names goes in as `{min}` or `{max}`, a format as `{format}`.
+function refusalText(issue: { summary?: string | undefined, schema?: unknown, value?: unknown }): string {
+  const { kind, params } = schemaRefusal(issue)
+
+  return invalidWord(`kay.invalid.${kind}`, issue.summary, params)
+}
+
+// A message per field the schema refused: its own `error` when it has one, else the `kay.invalid.*` text, both in the current locale.
+export function refusedFields(schema: unknown, error: Readonly<ValidationError>): Record<string, string> {
+  const errors: Record<string, string> = {}
+
+  for (const issue of error.all) {
+    const field = 'path' in issue ? fieldOf(issue.path) : ''
+    const own = 'schema' in issue ? (issue.schema as { error?: unknown }).error : undefined
+    const custom = ('path' in issue ? fieldMessage(schema, issue.path) : undefined) ?? (typeof own === 'string' ? own : undefined)
+
+    errors[field] ??= custom ?? refusalText(issue)
+  }
+
+  return errors
 }
