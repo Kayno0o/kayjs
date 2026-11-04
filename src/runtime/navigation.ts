@@ -97,6 +97,8 @@ export const navigation: {
   localize?: (href: string) => string
   // Lands the query param writes held back to be spaced out, which run before the address is read to leave or change it.
   flush?: () => void
+  // Set by a query param kept with `history: 'push'`: whether the entry a traversal reached is one it wrote for the page shown, whose signals it then moves, leaving the page as it is.
+  traversed?: (state: unknown) => boolean
   // Development: set while `kay dev` refreshes the page for an edit, where a field the edit leaves as it was keeps what was typed into it.
   typed?: boolean
 } = { shown: '', at: 0, page: 0, current: 0, released: false, loads: 0 }

@@ -16,6 +16,8 @@ export interface Persisted<T> {
   read: () => T
   // Keeps a value the signal now holds.
   save: (value: T) => void
+  // Reads the stored value again into the signal, which a cookie needs when a page is swapped in after the server or an action set it.
+  refresh?: (() => void) | undefined
 }
 
 export type Stored<T> = { found: true, value: T } | { found: false }
@@ -50,10 +52,19 @@ export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'quer
   if (sync !== false && typeof document !== 'undefined')
     listen(key, storage, write, values, fallback as T)
 
-  return keep(store, read, write)
+  const kept = keep(store, read, write)
+
+  return storage === 'cookie' ? { ...kept, refresh: () => write(storedOr(store, fallback as T)) } : kept
+}
+
+function storedOr<T>(store: Store<T>, fallback: T): T {
+  const now = store.stored()
+
+  return now.found ? now.value : fallback
 }
 
 // The browser's channel between the tabs of one origin, shared by every cookie signal of the page; none where the browser has no BroadcastChannel.
+// The storage and message listeners are added once per distinct name, never per swap, as `persisted` shares one signal for each.
 let channel: BroadcastChannel | null | undefined
 const heard = new Map<string, (text: string | null) => void>()
 
@@ -85,9 +96,10 @@ function listen<T>(key: string, storage: Exclude<PersistStorage, 'query'>, write
   if (channel === undefined) {
     channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('kay:persisted')
     channel?.addEventListener('message', (event: MessageEvent<unknown>) => {
-      const [name, text] = event.data as [string, string]
+      const data: unknown = event.data
 
-      heard.get(name)?.(text)
+      if (Array.isArray(data) && typeof data[0] === 'string' && typeof data[1] === 'string')
+        heard.get(data[0])?.(data[1])
     })
   }
 

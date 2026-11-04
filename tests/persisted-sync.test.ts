@@ -118,3 +118,45 @@ describe('persisted signals of one name in a page', () => {
     globalThis.BroadcastChannel = saved
   })
 })
+
+describe('persisted signals without a channel, or before hydration', () => {
+  beforeAll(() => GlobalRegistrator.register())
+  afterAll(async () => GlobalRegistrator.unregister())
+
+  it('writes a cookie without a BroadcastChannel in a module of its own', async () => {
+    const saved = globalThis.BroadcastChannel
+
+    // @ts-expect-error -- a browser without one
+    delete globalThis.BroadcastChannel
+
+    try {
+      const path = '../src/runtime/persist.ts?no-channel'
+      const fresh = await import(path) as typeof import('../src/runtime/persist')
+      let value = 'a'
+      const kept = fresh.keepValue('plain', 'cookie', () => value, (next) => {
+        value = next
+      }, undefined, undefined, true, 'a')
+
+      expect(() => kept.save('b')).not.toThrow()
+    }
+    finally {
+      globalThis.BroadcastChannel = saved
+    }
+  })
+
+  it('applies a storage event that arrives before the signal is first read', () => {
+    const early = persisted('early', 'none', { storage: 'local' })
+
+    window.dispatchEvent(new StorageEvent('storage', { storageArea: localStorage, key: 'early', newValue: encodeValue('set') }))
+    expect(early()).toBe('set')
+  })
+
+  it('ignores a channel message that is not a name and a text', () => {
+    const odd = persisted('odd', 'a')
+
+    fromOtherTab('nonsense')
+    fromOtherTab([1, 2])
+    fromOtherTab(null)
+    expect(odd()).toBe('a')
+  })
+})

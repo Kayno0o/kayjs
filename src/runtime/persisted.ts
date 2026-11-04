@@ -20,7 +20,7 @@ export interface PersistedOptions<T> extends SignalOptions<T> {
 }
 
 // The signals of a page by storage and name, so islands persisting one name hold one value.
-const sharedSignals = new Map<string, object>()
+const sharedSignals = new Map<string, { signal: object, refresh?: (() => void) | undefined }>()
 
 // What a signal kept in the query takes besides: how a write reaches the history.
 export interface QueryHistoryOptions {
@@ -43,8 +43,12 @@ export function persisted<T>(name: string, value: PlainValue<T>, options?: Persi
   const shared = storage !== 'query' && options?.sync !== false && typeof document !== 'undefined'
   const known = shared ? sharedSignals.get(id) : undefined
 
-  if (known)
-    return known as Signal<T>
+  if (known) {
+    // A cookie may have changed since the signal was made, by a response or the server.
+    known.refresh?.()
+
+    return known.signal as Signal<T>
+  }
 
   const [own, write] = createSignal<T>(value, options)
   // The same as `queryParam(name)`, `value` standing for the param left out.
@@ -55,7 +59,7 @@ export function persisted<T>(name: string, value: PlainValue<T>, options?: Persi
   })
 
   if (shared)
-    sharedSignals.set(id, made)
+    sharedSignals.set(id, { signal: made, refresh: kept.refresh })
 
   return made
 }

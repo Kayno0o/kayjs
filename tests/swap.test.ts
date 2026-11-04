@@ -560,7 +560,6 @@ describe('page swap, checking a form in the browser', () => {
       tab.set('b')
       tab.set('c')
       expect(push).toHaveBeenCalledTimes(2)
-      expect(replace).not.toHaveBeenCalled()
       expect(location.search).toBe('?tab=c')
       expect(navigation.at).toBe(5)
       expect(navigation.shown).toBe('http://localhost/tabs?tab=c')
@@ -571,27 +570,19 @@ describe('page swap, checking a form in the browser', () => {
       expect(push).toHaveBeenCalledTimes(3)
       expect(location.search).toBe('?tab=c&plain=x&page=2')
 
-      let swapped = false
-      const spy = () => {
-        swapped = true
-      }
-
-      window.addEventListener('popstate', spy)
-
       // Back to the entry before, which had no page and no plain param.
       setURL('http://localhost/tabs?tab=b')
-      window.dispatchEvent(new PopStateEvent('popstate', { state: { kay: true, at: 4 } }))
+      expect(navigation.traversed?.({ kayq: navigation.page })).toBe(true)
       expect<unknown[]>([tab(), page(), plain()]).toEqual(['b', 1, undefined])
-      expect(navigation.at).toBe(4)
       expect(navigation.shown).toBe('http://localhost/tabs?tab=b')
-      expect(swapped).toBe(false)
 
-      // An entry kay did not write is left to the navigation.
+      // An entry kay did not write, or one written for a page since swapped out, is left to the navigation.
       setURL('http://localhost/tabs?tab=z')
-      window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
-      expect(swapped).toBe(true)
+      expect(navigation.traversed?.(null)).toBe(false)
+      expect(navigation.traversed?.({ kay: true })).toBe(false)
+      navigation.page++
+      expect(navigation.traversed?.({ kayq: navigation.page - 1 })).toBe(false)
       expect(tab()).toBe('b')
-      window.removeEventListener('popstate', spy)
     }
     finally {
       document.head.innerHTML = ''
@@ -599,6 +590,36 @@ describe('page swap, checking a form in the browser', () => {
       replace.mockRestore()
       timers.restore()
     }
+  })
+
+  it('does not add an entry for a push that leaves the address as it is', () => {
+    const push = spyOn(history, 'pushState')
+
+    try {
+      setURL('http://localhost/same?tab=a')
+      const tab = queryParam('tab', { history: 'push' })
+
+      tab.set('a')
+      expect(push).not.toHaveBeenCalled()
+      tab.set('b')
+      tab.set('b')
+      expect(push).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      push.mockRestore()
+    }
+  })
+
+  it('reads a shared cookie signal again when a page brings it, the cookie having changed since', () => {
+    document.cookie = `swapped=${encodeURIComponent(encodeValue('one'))}; path=/`
+    const first = persisted('swapped', 'none')
+
+    expect(first()).toBe('one')
+    document.cookie = `swapped=${encodeURIComponent(encodeValue('two'))}; path=/`
+    expect(persisted('swapped', 'none')).toBe(first)
+    expect(first()).toBe('two')
+    document.cookie = 'swapped=; path=/; max-age=0'
+    expect(persisted('swapped', 'none')()).toBe('none')
   })
 
   it('keeps replacing the entry without the history option', () => {

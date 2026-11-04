@@ -291,7 +291,7 @@ function onPopState(event: PopStateEvent): void {
   if (saved?.at !== undefined)
     navigation.at = saved.at
 
-  if (pageKey(url) === navigation.shown) {
+  if (pageKey(url) === navigation.shown || navigation.traversed?.(saved)) {
     restoreScroll(swap.saved, url.hash)
 
     return

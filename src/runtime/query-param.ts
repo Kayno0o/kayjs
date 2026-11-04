@@ -129,52 +129,41 @@ let queuedOn = ''
 // A pending write asked for its own entry.
 let pushing = false
 
-// The addresses of this page that kay wrote or started from, the entries a traversal between them only moves the params of.
-const owned = new Set<string>()
 let watching = false
 
+// An entry kay wrote for the page now shown carries the page's number, so a swap to other content, by `navigate()` or a link, makes the entries before it foreign again.
+const MARK = 'kayq'
+
 function watch(): void {
-  const url = new URL(location.href)
-
-  if (!sameDocument(url))
-    owned.clear()
-
-  owned.add(pageKey(url))
-
   if (!watching) {
     watching = true
-    // Capturing, so it runs before the navigation's own listener, which would swap the page for an address it does not show.
-    addEventListener('popstate', traversed, true)
+    // The navigation's own popstate handler asks, after its leave guards, whether the entry reached is one kay wrote.
+    navigation.traversed = traversed
   }
 }
 
-// Whether `url` is the page shown or another address of its path.
-function sameDocument(url: URL): boolean {
-  return navigation.shown === '' || new URL(navigation.shown).pathname === url.pathname
+function marked(state: unknown): object {
+  return { ...state as object | null, [MARK]: navigation.page }
 }
 
-function traversed(event: PopStateEvent): void {
-  const url = new URL(location.href)
-  const key = pageKey(url)
+// Whether `state` is an entry of the page shown that kay wrote: then the signals read the address they reached, and the page stays.
+function traversed(state: unknown): boolean {
+  if ((state as Record<string, unknown> | null)?.[MARK] !== navigation.page)
+    return false
 
-  if (key === navigation.shown || !owned.has(key) || navigation.shown === '' || !sameDocument(url))
-    return
-
-  event.stopImmediatePropagation()
-  pending.clear()
   clearTimeout(timer)
   timer = undefined
-  navigation.shown = key
-
-  const saved = event.state as { at?: number } | null
-
-  if (saved?.at !== undefined)
-    navigation.at = saved.at
+  pending.clear()
+  pushing = false
+  retrying = false
+  navigation.shown = pageKey(new URL(location.href))
 
   for (const reread of followed)
     reread()
 
   addressChanged()
+
+  return true
 }
 
 function saveParam(name: string, value: unknown, fallback: unknown, push: boolean): void {
@@ -243,22 +232,19 @@ function flush(): void {
   pushing = false
 
   try {
-    if (push) {
+    if (push && url.href !== location.href) {
+      // The entry left is marked too, so Back to it follows the signals.
+      history.replaceState(marked(history.state), '')
       navigation.at++
-      history.pushState(historyState(), '', url)
+      history.pushState(marked(historyState()), '', url)
       pushed = true
     }
-    else {
-      history.replaceState(history.state, '', url)
+    else if (!push) {
+      history.replaceState(watching ? marked(history.state) : history.state, '', url)
     }
 
-    if (watching) {
-      if (!sameDocument(url))
-        owned.clear()
-
-      owned.add(pageKey(url))
+    if (watching)
       navigation.shown = pageKey(url)
-    }
 
     addressChanged()
     pending.clear()
