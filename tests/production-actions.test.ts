@@ -849,7 +849,7 @@ describe('request body limits', () => {
   // Held in a variable so tsc leaves the .kay import to Bun.
   const NOTES = './fixtures/production/src/routes/notes.kay'
   const MB = 1024 * 1024
-  const serve = async (maxSize?: ByteSize) => pages({ root: FIXTURE, prebuilt: false, maxSize })
+  const serve = async (maxSize?: ByteSize) => pages({ root: FIXTURE, prebuilt: false, limits: { body: maxSize } })
   // Sent in chunks, with no Content-Length to go by.
   const chunked = (size: number) => new ReadableStream<Uint8Array>({
     start(controller) {
@@ -923,6 +923,6 @@ describe('request body limits', () => {
   })
 
   it.each([0, -1, 1.5, '0kb', '-1kb', '1.5b', '1gb', 'big', ''])('refuses a limit of %p, as the server boots', async (maxSize) => {
-    await expect(serve(maxSize as ByteSize)).rejects.toThrow('kay: maxSize')
+    await expect(serve(maxSize as ByteSize)).rejects.toThrow('kay: limits.body')
   })
 })

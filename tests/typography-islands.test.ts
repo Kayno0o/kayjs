@@ -88,7 +88,7 @@ describe('the French spaces in the text an island writes', () => {
     const locales = (list: string[]) => ({ locales: list, defaultLocale: list[0]! })
 
     expect([{ lang: 'fr' }, { lang: 'fr-CA' }, { lang: 'FR' }, { i18n: locales(['en', 'fr']) }, { i18n: locales(['en', 'fr-BE']) }].map(config => french(config))).toEqual([true, true, true, true, true])
-    expect([{}, { lang: 'en' }, { lang: 'fro' }, { lang: 'fr', typography: false }, { i18n: locales(['en', 'de']) }, { lang: 'fr', i18n: locales(['en', 'de']) }, { i18n: locales(['en', 'fr']), typography: false }].map(config => french(config))).toEqual([false, false, false, false, false, false, false])
+    expect([{}, { lang: 'en' }, { lang: 'fro' }, { lang: 'fr', client: { typography: false } }, { i18n: locales(['en', 'de']) }, { lang: 'fr', i18n: locales(['en', 'de']) }, { i18n: locales(['en', 'fr']), client: { typography: false } }].map(config => french(config))).toEqual([false, false, false, false, false, false, false])
     expect(clientOptionsOf({ lang: 'fr', base: '/docs' }, { dev: true, underKayDev: true }).french).toBe(true)
   })
 })
@@ -109,7 +109,7 @@ describe('what the island spacing costs', () => {
     // Each site builds into the one output the sites of a process share, so it is measured before the next is made.
     const sized = async (options: Parameters<typeof testSite>[0]) => eager(await made({ minify: true, ...options }))
     const plain = await sized({ lang: 'en' })
-    const silent = await sized({ lang: 'fr', typography: false })
+    const silent = await sized({ lang: 'fr', client: { typography: false } })
     const spaced = await sized({ lang: 'fr' })
 
     expect(Math.abs(silent - plain)).toBeLessThanOrEqual(12)
@@ -172,7 +172,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a French p
 
     expect(await ships(french.page)).toBe(true)
 
-    for (const options of [{ lang: 'en' }, {}, { lang: 'fr', typography: false }, { i18n: { locales: ['en', 'de'], defaultLocale: 'en', messages } }]) {
+    for (const options of [{ lang: 'en' }, {}, { lang: 'fr', client: { typography: false } }, { i18n: { locales: ['en', 'de'], defaultLocale: 'en', messages } }]) {
       const { page } = await open(options)
 
       expect(await ships(page), JSON.stringify(options)).toBe(false)
