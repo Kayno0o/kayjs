@@ -1386,7 +1386,8 @@ describe('content security policy', () => {
     // The install capture is hashed per response, and the shared build holds the install-offer fixture's island, so streamed pages carry it here.
     const inline = pagesHtml.flatMap(html => [...html.matchAll(EVERY_INLINE_SCRIPT)].map(match => match[1]!)).filter(script => script !== INSTALL_OFFER)
 
-    expect(new Set(inline).size).toBe(5)
+    // The speculation rules come in two forms, with and without the nearest `data-prefetch` selector, a streamed page carrying the first.
+    expect(new Set(inline).size).toBe(6)
     for (const script of inline)
       expect(hashes).toContain(`'sha256-${new Bun.CryptoHasher('sha256').update(script).digest('base64')}'`)
   })
@@ -1394,7 +1395,12 @@ describe('content security policy', () => {
 
 describe('prefetch', () => {
   it('prefetches the pages links point at on hover, leaving out the urls kay serves itself, the API, downloads, nofollow and opted-out links', async () => {
-    const rules = JSON.parse(SPECULATION.exec((await get('/about')).html)![1]!) as unknown
+    const about = (await get('/about')).html
+
+    expect(about).toContain(speculationRules('moderate', '', '/api', false))
+    expect(about).not.toContain('data-prefetch')
+
+    const rules = JSON.parse(SPECULATION.exec(speculationRules('moderate'))![1]!) as unknown
 
     const selector = (rules as { prefetch: { where: { and: { not?: { selector_matches?: string } }[] } }[] }).prefetch[0]!.where.and.at(-1)!.not!.selector_matches!
 
@@ -1404,6 +1410,7 @@ describe('prefetch', () => {
       where: { and: [{ href_matches: '/*' }, { not: { href_matches: '/_kay/*' } }, { not: { href_matches: '/api/*' } }, { not: { href_matches: '/api' } }, { not: { selector_matches: selector } }] },
       eagerness: 'moderate',
     }] })
+    expect(speculationRules('moderate', '', '/api', false)).toContain('"selector_matches":"[data-no-prefetch], [download], [rel~=nofollow]"')
     expect(speculationRules('eager')).toContain('"eagerness":"eager"')
     expect(speculationRules(false)).toBe('')
 

@@ -18,19 +18,23 @@ const OPTED_OUT = Array.from({ length: (NESTING + 1) / 2 }, (_, at) => `:is(${ch
 
 // Under a mount point or a moved API, one script per setting, base and API path, made once.
 const MOUNTED = new Map<string, string>()
-const RULES = new Map<Prefetch, string>((['conservative', 'moderate', 'eager'] as const).map(eagerness => [eagerness, rules(eagerness)]))
+const RULES = new Map<string, string>((['conservative', 'moderate', 'eager'] as const).flatMap(eagerness => [[eagerness, rules(eagerness, true)], [`${eagerness}\nflat`, rules(eagerness, false)]]))
 
 // Browsers without speculation rules ignore the script, so a link still loads as usual there.
 // Under a mount point, only its own pages are prefetched.
-export function speculationRules(prefetch: Prefetch = 'moderate', base = '', apiPath = '/api'): string {
-  if ((base === '' && apiPath === '/api') || prefetch === false)
-    return RULES.get(prefetch) ?? ''
+// A page with no `data-prefetch` anywhere in it passes `nearest: false` and goes without the nearest-`data-prefetch` selector, which is most of the script.
+export function speculationRules(prefetch: Prefetch = 'moderate', base = '', apiPath = '/api', nearest = true): string {
+  if (prefetch === false)
+    return ''
 
-  const key = `${prefetch}\n${base}\n${apiPath}`
+  if (base === '' && apiPath === '/api')
+    return RULES.get(nearest ? prefetch : `${prefetch}\nflat`) ?? ''
+
+  const key = `${prefetch}\n${base}\n${apiPath}\n${nearest}`
   let script = MOUNTED.get(key)
 
   if (script === undefined)
-    MOUNTED.set(key, script = rules(prefetch, base, apiPath))
+    MOUNTED.set(key, script = rules(prefetch, nearest, base, apiPath))
 
   return script
 }
@@ -41,8 +45,8 @@ export function prefetchMeta(prefetch: Prefetch = 'moderate'): string {
 }
 
 // Never kay's own routes or the API, as the page swap leaves them too, nor a download or a link search engines are told not to follow, as a sign-out link often is.
-function rules(eagerness: Exclude<Prefetch, false>, base = '', apiPath = '/api'): string {
-  const where = { and: [{ href_matches: `${base}/*` }, { not: { href_matches: `${base}/_kay/*` } }, { not: { href_matches: `${base}${apiPath}/*` } }, { not: { href_matches: `${base}${apiPath}` } }, { not: { selector_matches: `[data-no-prefetch], ${OPTED_OUT}, [download], [rel~=nofollow]` } }] }
+function rules(eagerness: Exclude<Prefetch, false>, nearest: boolean, base = '', apiPath = '/api'): string {
+  const where = { and: [{ href_matches: `${base}/*` }, { not: { href_matches: `${base}/_kay/*` } }, { not: { href_matches: `${base}${apiPath}/*` } }, { not: { href_matches: `${base}${apiPath}` } }, { not: { selector_matches: `[data-no-prefetch], ${nearest ? `${OPTED_OUT}, ` : ''}[download], [rel~=nofollow]` } }] }
 
   return `<script type="speculationrules">${JSON.stringify({ prefetch: [{ source: 'document', where, eagerness }] })}</script>`
 }

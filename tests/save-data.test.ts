@@ -18,7 +18,7 @@ const FONTS = [
   { family: 'Display', src: 'tests/fixtures/seo/src/fonts/display.woff2', weight: '100 900', preload: true },
   { family: 'Body', src: './tests/fixtures/seo/src/fonts/body-italic.woff', style: 'italic' as const, display: 'block' as const },
 ]
-const RULES = speculationRules('moderate')
+const RULES = speculationRules('moderate', '', '/api', false)
 const PRELOAD = /<link[^>]*rel="preload"[^>]*as="font"[^>]*>/
 const ON = { 'save-data': 'on' }
 
@@ -162,7 +162,7 @@ describe.each([
       const full = await (await app.handle(request(path))).text()
       const saving = await (await app.handle(request(path, ON))).text()
 
-      expect(full).toContain(speculationRules('moderate', '/docs'))
+      expect(full).toContain(speculationRules('moderate', '/docs', '/api', false))
       expect(saving).not.toContain('speculationrules')
       expect(saving).not.toMatch(PRELOAD)
     }

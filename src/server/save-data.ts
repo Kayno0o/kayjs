@@ -43,7 +43,7 @@ export function withSavedData(respond: PageResponder, options: RenderOptions): P
   if (!pagesVary(options))
     return respond
 
-  const rules = speculationRules(options.client?.prefetch, options.base, options.serve?.apiPath)
+  const rules = [true, false].map(nearest => speculationRules(options.client?.prefetch, options.base, options.serve?.apiPath, nearest))
   const meta = prefetchMeta(options.client?.prefetch)
   const fonts = options.fontCss === undefined ? undefined : { full: options.fontCss, light: lightFontCss(options.fontCss) }
   // The chunks as the page names them, under the mount point.
@@ -52,8 +52,13 @@ export function withSavedData(respond: PageResponder, options: RenderOptions): P
   const lighter = (head: string) => {
     let lightened = withoutIslandPreloads(head.replace(FONT_PRELOAD, ''), chunks)
 
-    if (rules !== '')
-      lightened = lightened.replace(rules, () => '').replace(meta, () => '')
+    for (const script of rules) {
+      if (script !== '')
+        lightened = lightened.replace(script, () => '')
+    }
+
+    if (meta !== '')
+      lightened = lightened.replace(meta, () => '')
 
     return fonts === undefined ? lightened : lightened.replace(fonts.full, () => fonts.light)
   }
