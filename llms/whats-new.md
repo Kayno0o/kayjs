@@ -18,6 +18,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui: Breadcrumb, Pagination, FormField (`hint`, `required`), PageSection (`sticky`) and RelativeTime (`options`) follow a prop the parent changes after render; a script read of a destructured prop runs once, as [components](components.md#props) says; [the components](../packages/ui/llms/tables-navigation-and-layout.md) are unchanged to use.
 - kayjs-ui: [Breadcrumb, Pagination, FormField, PageSection and the other layout components](../packages/ui/llms/tables-navigation-and-layout.md), RelativeTime, SubscribeForm (`noticeText`, `privacy`, `wordingId`) and CommandPalette (`resultsLabel`, `siteSearchMore`) follow a prop the parent changes after render; a script read of a destructured prop runs once, as [components](components.md#props) says.
 - `relativeTime` in `kay/i18n` takes its options as a function too, read at each tick: [locales](locales.md).
+- `queryParam` and a `persisted` signal kept in the query take `history: 'push'`, adding a history entry per write that Back and Forward step through: [state](islands-state-to-ids.md).
 
 ## 1.88.0
 

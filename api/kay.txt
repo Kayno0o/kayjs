@@ -719,8 +719,10 @@ interface PageSettings
 type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Props['class' & keyof Props] : never : never
 
 [.] persisted
-function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, "maxAge" | "values"> & { storage: "query"; }): Signal<T>
-function persisted<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, "maxAge"> & {
+function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, "maxAge" | "values"> & QueryHistoryOptions & {
+  storage: "query";
+}): Signal<T>
+function persisted<boolean | const T extends string | number>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, "maxAge"> & QueryHistoryOptions & {
   storage: "query";
   values: readonly T[];
 }): Signal<T>
@@ -831,11 +833,15 @@ type PushSubscribeResult = PushState | 'needs-gesture' | 'signed-out' | 'failed'
 [.] QueryChanges
 type QueryChanges = Readonly<Record<string, string | number | null | undefined>>
 
+[.] QueryHistoryOptions
+interface QueryHistoryOptions
+  history?: "push" | "replace" | undefined
+
 [.] QueryOf
 type QueryOf<Schema> = Schema extends TSchema ? Static<Schema> : never
 
 [.] queryParam
-function queryParam<T = string | undefined>(name: string): Signal<T>
+function queryParam<T = string | undefined>(name: string, options?: QueryHistoryOptions | undefined): Signal<T>
 
 [.] QueuedJob
 interface QueuedJob<Payload = unknown, Progress = unknown>

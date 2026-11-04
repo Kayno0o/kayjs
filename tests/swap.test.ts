@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { t, ValidationError } from 'elysia'
 import { clientDir } from '../src/build/assets'
 import { resolveProject } from '../src/project'
-import { navigate, persisted, signal } from '../src/runtime'
+import { navigate, persisted, queryParam, signal } from '../src/runtime'
 import { action } from '../src/runtime/action'
 import { hydrateIslands } from '../src/runtime/client'
 import { hydrate, HydrationMismatchError } from '../src/runtime/dom'
@@ -535,6 +535,85 @@ describe('page swap, checking a form in the browser', () => {
       expect(location.pathname + location.search).toBe('/elsewhere')
     }
     finally {
+      timers.restore()
+    }
+  })
+
+  it('adds a history entry per write for history: push, at once, and follows a traversal between the entries without a swap', () => {
+    const timers = throttled()
+    const push = spyOn(history, 'pushState')
+    const replace = spyOn(history, 'replaceState')
+
+    try {
+      document.head.innerHTML = '<script type="application/json" data-kay-query>{"page":{"type":"integer","default":1}}</script>'
+      setURL('http://localhost/tabs?tab=a')
+      navigation.shown = 'http://localhost/tabs?tab=a'
+      navigation.at = 3
+      tick(1000)
+
+      const tab = queryParam('tab', { history: 'push' })
+      const page = persisted<number>('page', 1, { storage: 'query', history: 'push' })
+      const plain = queryParam('plain')
+
+      expect<unknown[]>([tab(), page()]).toEqual(['a', 1])
+
+      tab.set('b')
+      tab.set('c')
+      expect(push).toHaveBeenCalledTimes(2)
+      expect(replace).not.toHaveBeenCalled()
+      expect(location.search).toBe('?tab=c')
+      expect(navigation.at).toBe(5)
+      expect(navigation.shown).toBe('http://localhost/tabs?tab=c')
+
+      // A replace write waiting is carried by the next push.
+      plain.set('x')
+      page.set(2)
+      expect(push).toHaveBeenCalledTimes(3)
+      expect(location.search).toBe('?tab=c&plain=x&page=2')
+
+      let swapped = false
+      const spy = () => {
+        swapped = true
+      }
+
+      window.addEventListener('popstate', spy)
+
+      // Back to the entry before, which had no page and no plain param.
+      setURL('http://localhost/tabs?tab=b')
+      window.dispatchEvent(new PopStateEvent('popstate', { state: { kay: true, at: 4 } }))
+      expect<unknown[]>([tab(), page(), plain()]).toEqual(['b', 1, undefined])
+      expect(navigation.at).toBe(4)
+      expect(navigation.shown).toBe('http://localhost/tabs?tab=b')
+      expect(swapped).toBe(false)
+
+      // An entry kay did not write is left to the navigation.
+      setURL('http://localhost/tabs?tab=z')
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+      expect(swapped).toBe(true)
+      expect(tab()).toBe('b')
+      window.removeEventListener('popstate', spy)
+    }
+    finally {
+      document.head.innerHTML = ''
+      push.mockRestore()
+      replace.mockRestore()
+      timers.restore()
+    }
+  })
+
+  it('keeps replacing the entry without the history option', () => {
+    const timers = throttled()
+    const push = spyOn(history, 'pushState')
+
+    try {
+      setURL('http://localhost/replaced')
+      tick(1000)
+      queryParam('r').set('1')
+      persisted('r2', '', { storage: 'query', history: 'replace' }).set('2')
+      expect(push).not.toHaveBeenCalled()
+    }
+    finally {
+      push.mockRestore()
       timers.restore()
     }
   })

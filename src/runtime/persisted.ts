@@ -17,19 +17,25 @@ export interface PersistedOptions<T> extends SignalOptions<T> {
   values?: readonly T[] | undefined
 }
 
+// What a signal kept in the query takes besides: how a write reaches the history.
+export interface QueryHistoryOptions {
+  // `replace`, the default, takes the current entry's place, throttled; `push` adds an entry, written at once, which Back and Forward step through and the signal follows.
+  history?: 'push' | 'replace' | undefined
+}
+
 // A signal whose value is kept across pages and visits under `name`, the cookie's or the localStorage key's, or in the URL under the query param `name`, which the default leaves out.
 // A string unless `T` says otherwise, for a param the page's `query` schema reads as another type: the URL holds text.
 // kept: local, it reads the request's cookie or query, so it is free only where every call says `storage: 'local'`, kept in `localStorage` and read once the page has hydrated.
-export function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, 'maxAge' | 'values'> & { storage: 'query' }): Signal<T>
+export function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, 'maxAge' | 'values'> & QueryHistoryOptions & { storage: 'query' }): Signal<T>
 // `values` types the signal as their union, and the default must be one of them.
-export function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, 'maxAge'> & { storage: 'query', values: readonly T[] }): Signal<T>
+export function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, 'maxAge'> & QueryHistoryOptions & { storage: 'query', values: readonly T[] }): Signal<T>
 export function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: PersistedOptions<T> & { storage?: 'cookie' | undefined, values: readonly T[] } | Omit<PersistedOptions<T>, 'maxAge'> & { storage: 'local', values: readonly T[] }): Signal<T>
 export function persisted<T>(name: string, value: PlainValue<T>, options?: Omit<PersistedOptions<T>, 'values'> & { storage?: 'cookie' | undefined } | Omit<PersistedOptions<T>, 'maxAge' | 'values'> & { storage: 'local' }): Signal<T>
-export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T>): Signal<T> {
+export function persisted<T>(name: string, value: PlainValue<T>, options?: PersistedOptions<T> & QueryHistoryOptions): Signal<T> {
   const [own, write] = createSignal<T>(value, options)
   const storage = options?.storage ?? 'cookie'
   // The same as `queryParam(name)`, `value` standing for the param left out.
-  const kept = storage === 'query' ? keepParam(name, own, write, value as T, options?.values) : keepValue(name, storage, own, write, options?.maxAge, options?.values)
+  const kept = storage === 'query' ? keepParam(name, own, write, value as T, options?.values, options?.history) : keepValue(name, storage, own, write, options?.maxAge, options?.values)
 
   return withSetter(kept.read, (next) => {
     write(next)
@@ -40,9 +46,10 @@ export function persisted<T>(name: string, value: PlainValue<T>, options?: Persi
 // A signal holding the page's query param `name`, read as the `query` schemas of the page and its layouts read it, so `queryParam<number>('page')` holds a number; the schema's default when the param is left out or refused, which writing leaves out of the URL.
 // Without a schema naming the param, its text, as `persisted(name, '', { storage: 'query' })` keeps it.
 // kept: request
-export function queryParam<T = string | undefined>(name: string): Signal<T> {
+// `queryParam('tab', { history: 'push' })` adds a history entry for each write instead of taking the current one's place.
+export function queryParam<T = string | undefined>(name: string, options?: QueryHistoryOptions): Signal<T> {
   const [own, write] = createSignal<T>(undefined as T)
-  const kept = keepParam(name, own, write)
+  const kept = keepParam(name, own, write, undefined, undefined, options?.history)
 
   return withSetter(kept.read, (next) => {
     write(next)

@@ -1,7 +1,8 @@
 import type { Persisted, Stored } from './persist'
-import { navigation, pageKey } from './navigation'
+import { historyState, navigation, pageKey } from './navigation'
 import { pageData } from './page-data'
 import { keep } from './persist'
+import { onCleanup } from './reactive'
 import { addressChanged } from './with-query'
 
 // What the server sends of one param of the page's `query` schema, enough to read its text as the schema does without the schema itself.
@@ -75,14 +76,35 @@ function fromText(rule: ParamRule, text: string): unknown {
   return rule.enum === undefined || rule.enum.includes(value) ? value : REFUSED
 }
 
+// The signals kept in the query, each reading its param again from the address a traversal reached between entries kay wrote.
+const followed = new Set<() => void>()
+
 // What `queryParam` reads and keeps, around the signal's own `read`: the server reads the request's param, the browser the page's address once, then each write takes the current history entry's place.
 // A param left out reads as the signal's own value, `fallback` for `persisted(name, fallback, { storage: 'query' })`, which writing it leaves out too.
 // A value outside `values` reads as the param left out.
-export function keepParam<T>(name: string, read: () => T, write: (value: T) => void, fallback?: T, values?: readonly unknown[]): Persisted<T> {
+// `history: 'push'` adds an entry for each write instead, which Back and Forward step through, the signal following.
+export function keepParam<T>(name: string, read: () => T, write: (value: T) => void, fallback?: T, values?: readonly unknown[], history?: 'push' | 'replace'): Persisted<T> {
+  const stored = () => found<T>(readParam(pageRules(), name, new URL(location.href).searchParams), values)
+  const push = history === 'push'
+
+  if (typeof document !== 'undefined') {
+    const reread = () => {
+      const now = stored()
+
+      write(now.found ? now.value : fallback as T)
+    }
+
+    followed.add(reread)
+    onCleanup(() => followed.delete(reread))
+
+    if (push)
+      watch()
+  }
+
   return keep<T>({
     request: scope => found(scope.param(name), values),
-    stored: () => found(readParam(pageRules(), name, new URL(location.href).searchParams), values),
-    save: value => saveParam(name, value, fallback),
+    stored,
+    save: value => saveParam(name, value, fallback, push),
   }, read, write)
 }
 
@@ -104,12 +126,65 @@ let lastWrite = 0
 let retrying = false
 // The page the pending values were set on, which a traversal or a swap may have left by the time they are written.
 let queuedOn = ''
+// A pending write asked for its own entry.
+let pushing = false
 
-function saveParam(name: string, value: unknown, fallback: unknown): void {
+// The addresses of this page that kay wrote or started from, the entries a traversal between them only moves the params of.
+const owned = new Set<string>()
+let watching = false
+
+function watch(): void {
+  const url = new URL(location.href)
+
+  if (!sameDocument(url))
+    owned.clear()
+
+  owned.add(pageKey(url))
+
+  if (!watching) {
+    watching = true
+    // Capturing, so it runs before the navigation's own listener, which would swap the page for an address it does not show.
+    addEventListener('popstate', traversed, true)
+  }
+}
+
+// Whether `url` is the page shown or another address of its path.
+function sameDocument(url: URL): boolean {
+  return navigation.shown === '' || new URL(navigation.shown).pathname === url.pathname
+}
+
+function traversed(event: PopStateEvent): void {
+  const url = new URL(location.href)
+  const key = pageKey(url)
+
+  if (key === navigation.shown || !owned.has(key) || navigation.shown === '' || !sameDocument(url))
+    return
+
+  event.stopImmediatePropagation()
+  pending.clear()
+  clearTimeout(timer)
+  timer = undefined
+  navigation.shown = key
+
+  const saved = event.state as { at?: number } | null
+
+  if (saved?.at !== undefined)
+    navigation.at = saved.at
+
+  for (const reread of followed)
+    reread()
+
+  addressChanged()
+}
+
+function saveParam(name: string, value: unknown, fallback: unknown, push: boolean): void {
   if (pending.size === 0)
     queuedOn = pageKey(new URL(location.href))
 
   pending.set(name, [value, fallback])
+
+  if (push)
+    pushing = true
 
   if (!navigation.flush) {
     navigation.flush = flush
@@ -117,11 +192,12 @@ function saveParam(name: string, value: unknown, fallback: unknown): void {
     addEventListener('visibilitychange', flush)
   }
 
-  if (timer === undefined) {
+  // An entry of its own is written at once, past the gap: it follows a click, not a drag.
+  if (push || timer === undefined) {
     // A monotonic clock, which no change of the system's time holds a write back by.
     const wait = lastWrite + WRITE_GAP - performance.now()
 
-    if (wait <= 0)
+    if (wait <= 0 || push)
       flush()
     else
       timer = setTimeout(flush, wait)
@@ -129,6 +205,7 @@ function saveParam(name: string, value: unknown, fallback: unknown): void {
 }
 
 // Takes the current history entry's place, keeping its state, which holds kay's place in history: writing as the visitor types adds no entry to go back through.
+// A write asking for `history: 'push'` adds an entry instead, with the writes waiting.
 // A list as the param repeated; nothing, blank text or the default leaves it out, so a page left as it was keeps its plain address.
 function flush(): void {
   clearTimeout(timer)
@@ -140,6 +217,7 @@ function flush(): void {
   const url = new URL(location.href)
 
   if (pageKey(url) !== queuedOn) {
+    pushing = false
     pending.clear()
     retrying = false
 
@@ -159,13 +237,37 @@ function flush(): void {
     }
   }
 
+  const push = pushing
+  let pushed = false
+
+  pushing = false
+
   try {
-    history.replaceState(history.state, '', url)
+    if (push) {
+      navigation.at++
+      history.pushState(historyState(), '', url)
+      pushed = true
+    }
+    else {
+      history.replaceState(history.state, '', url)
+    }
+
+    if (watching) {
+      if (!sameDocument(url))
+        owned.clear()
+
+      owned.add(pageKey(url))
+      navigation.shown = pageKey(url)
+    }
+
     addressChanged()
     pending.clear()
     retrying = false
   }
   catch {
+    if (push && !pushed)
+      navigation.at--
+
     // Refused by the browser's limit: tried once more after the gap, the address behind the signals until then.
     if (retrying) {
       pending.clear()
@@ -173,6 +275,7 @@ function flush(): void {
     }
     else {
       retrying = true
+      pushing = push
       timer = setTimeout(flush, WRITE_GAP)
     }
   }
