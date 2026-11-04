@@ -153,3 +153,14 @@ export async function callAction<Output>(form: HTMLFormElement, action: Action<n
     return undefined
   }
 }
+
+// The messages shown for one field: those its form's last call was refused with under `name`, then the page's own `issue`. Read in a component's script, where the form's context is.
+export function fieldIssues(name: () => string | undefined, issue: () => string | undefined): () => string[] {
+  const refused = formIssues.use()
+
+  return () => {
+    const field = name()
+
+    return [field === undefined ? undefined : refused?.()[field], issue()].filter(message => message !== undefined)
+  }
+}

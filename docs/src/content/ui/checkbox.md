@@ -17,3 +17,9 @@ description: A labelled checkbox, native so it submits inside a form, with an op
 ## Async change
 
 Return a promise from `onChange` to hold the box busy until it settles. If the promise rejects or resolves to `false`, the box goes back, so a refused change never shows as made.
+
+## Messages and refusals
+
+`name` and `issue` show a message under the box, as a [FormField](/ui/form-field) shows one: inside a FormDialog the message its call was refused with for `name` appears there, and `issue` takes a message of the page's own, such as `add.error('terms')` after a plain form post. A message marks the box invalid, and `invalid` marks it without one.
+
+Inside a form posting to an action, a box with no `onChange` starts from what a refused post sent, so a page working without JavaScript shows the choice again.

@@ -13,3 +13,7 @@ description: An on and off switch, a real checkbox that submits inside a form.
 Return a promise from `onChange` to hold the switch busy until it settles. If it rejects or resolves to `false`, the switch goes back to where it was.
 
 <Demo name="toggle/busy" />
+
+## Messages and refusals
+
+`name` and `issue` show a message under the switch, as a [FormField](/ui/form-field) shows one, and mark it invalid; `invalid` marks it without a message. Inside a form posting to an action, a switch with no `onChange` starts from what a refused post sent.
