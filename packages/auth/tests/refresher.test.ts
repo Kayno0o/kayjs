@@ -2,6 +2,7 @@ import type { RefreshStage, StoredCredential } from '../src/oauth/refresher'
 import type { OAuthTokens } from '../src/oauth/types'
 import { describe, expect, test } from 'bun:test'
 import { OAuthExchangeError } from '../src/oauth/client'
+import { sealTokens } from '../src/oauth/flow'
 import { createOAuthTokenRefresher, createTokenRefresher } from '../src/oauth/refresher'
 
 const MIN = 60_000
@@ -47,6 +48,28 @@ describe('createTokenRefresher', () => {
     // Second call is served from cache, so no second exchange.
     expect(await refresher.getValidToken({ id: 'u1' })).toBe('fresh')
     expect(calls()).toBe(1)
+  })
+
+  test('epoch milliseconds from a store or a provider written before 1.88 still count as a date', async () => {
+    const fresh = setup({ accessToken: 'live', expiresAt: (Date.now() + 10 * MIN) as never }, async () => null)
+
+    expect(await fresh.refresher.getValidToken({ id: 'u1' })).toBe('live')
+    expect(fresh.calls()).toBe(0)
+
+    const stale = setup({ accessToken: 'old', refreshToken: 'r', expiresAt: (Date.now() + 1000) as never }, async () => ({ accessToken: 'fresh', expiresAt: (Date.now() + 10 * MIN) as never }))
+
+    expect(await stale.refresher.getValidToken({ id: 'u1' })).toBe('fresh')
+    expect(await stale.refresher.getValidToken({ id: 'u1' })).toBe('fresh')
+    expect(stale.calls()).toBe(1)
+  })
+
+  test('sealTokens stores a date whatever the provider gave', () => {
+    const core = { keys: { encrypt: (value: string) => value } } as never
+    const at = Date.now() + 10 * MIN
+
+    expect(sealTokens(core, 'p', 'id', { accessToken: 'a', expiresAt: at as never }).tokenExpiresAt).toEqual(new Date(at))
+    expect(sealTokens(core, 'p', 'id', { accessToken: 'a', expiresAt: new Date(at) }).tokenExpiresAt).toEqual(new Date(at))
+    expect(sealTokens(core, 'p', 'id', { accessToken: 'a' }).tokenExpiresAt).toBeNull()
   })
 
   test('margin is a duration', async () => {

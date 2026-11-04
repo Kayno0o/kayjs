@@ -51,7 +51,8 @@ export function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>) {
       if (cached && cached.expiresAt <= now)
         cache.delete(key)
 
-      if (stored.expiresAt.getTime() > now + margin)
+      // `new Date` also reads the epoch milliseconds a store or provider written before 1.88 gives.
+      if (new Date(stored.expiresAt).getTime() > now + margin)
         return stored.accessToken
 
       if (stored.refreshToken == null || stored.refreshToken === '')
@@ -79,7 +80,7 @@ export function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>) {
           }
 
           if (result.expiresAt !== undefined)
-            cache.set(key, { accessToken: result.accessToken, expiresAt: result.expiresAt.getTime() })
+            cache.set(key, { accessToken: result.accessToken, expiresAt: new Date(result.expiresAt).getTime() })
 
           return result.accessToken
         }

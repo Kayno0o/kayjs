@@ -298,7 +298,8 @@ export function sealTokens(core: Core, provider: string, providerId: string, tok
   return {
     accessToken: tokens ? core.keys.encrypt(tokens.accessToken, context) : null,
     refreshToken: tokens?.refreshToken === undefined ? null : core.keys.encrypt(tokens.refreshToken, context),
-    tokenExpiresAt: tokens?.expiresAt ?? null,
+    // A provider written before 1.88 may still give epoch milliseconds, which `new Date` reads as it does a date.
+    tokenExpiresAt: tokens?.expiresAt === undefined ? null : new Date(tokens.expiresAt),
   }
 }
 
