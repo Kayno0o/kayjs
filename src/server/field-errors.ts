@@ -3,6 +3,7 @@ import { fieldOf } from './schema-check'
 import { invalidWord, schemaRefusal } from './words'
 
 const withoutFunctions = new WeakMap<object, unknown>()
+const withFunctions = new WeakMap<object, unknown>()
 
 // The text an `error` option gives a field, a string or the string a function returns; a function that throws or returns anything else gives none, so the field keeps its default wording.
 // A function is called where the caller runs, which is inside the request's locale.
@@ -59,10 +60,19 @@ export function validated(schema: TSchema): TSchema {
   if (!hasErrorFunction(schema))
     return schema
 
-  if (!withoutFunctions.has(schema))
-    withoutFunctions.set(schema, stripped(schema))
+  if (!withoutFunctions.has(schema)) {
+    const copy = stripped(schema)
+
+    withoutFunctions.set(schema, copy)
+    withFunctions.set(copy as object, schema)
+  }
 
   return withoutFunctions.get(schema) as TSchema
+}
+
+// The schema `validated` was given, for the `error` functions it dropped; any other schema is its own.
+export function withErrorFunctions(schema: unknown): unknown {
+  return typeof schema === 'object' && schema !== null && withFunctions.has(schema) ? withFunctions.get(schema) : schema
 }
 
 const segmentOf = (segment: string): string => segment.replaceAll('~1', '/').replaceAll('~0', '~')
@@ -102,10 +112,21 @@ function refusalText(issue: { summary?: string | undefined, schema?: unknown, va
 }
 
 // A message per field the schema refused: its own `error` when it has one, else the `kay.invalid.*` text, both in the current locale.
+// An issue of a Standard Schema validator has no TypeBox schema: its dotted path names the field and its own message is the text.
 export function refusedFields(schema: unknown, error: Readonly<ValidationError>): Record<string, string> {
-  const errors: Record<string, string> = {}
+  const errors: Record<string, string> = Object.create(null) as Record<string, string>
 
   for (const issue of error.all) {
+    if (!('schema' in issue)) {
+      const standard = issue as { path?: string, summary?: string, message?: string }
+      const dot = standard.path?.indexOf('.') ?? -1
+      const named = dot < 0 ? standard.path : standard.path?.slice(0, dot)
+
+      errors[named === undefined || named === 'root' ? '' : named] ??= standard.summary ?? standard.message ?? 'Invalid value'
+
+      continue
+    }
+
     const field = 'path' in issue ? fieldOf(issue.path) : ''
     const own = 'schema' in issue ? (issue.schema as { error?: unknown }).error : undefined
     const custom = ('path' in issue ? fieldMessage(schema, issue.path) : undefined) ?? (typeof own === 'string' ? own : undefined)
@@ -114,4 +135,12 @@ export function refusedFields(schema: unknown, error: Readonly<ValidationError>)
   }
 
   return errors
+}
+
+// Where `api({ errorShape })` keeps the module's choice.
+export const ERROR_SHAPE = Symbol.for('kay.errorShape')
+
+// Whether a module keeps Elysia's own body for refused input.
+export function keepsElysiaShape(instance: object): boolean {
+  return (instance as { [ERROR_SHAPE]?: string })[ERROR_SHAPE] === 'elysia'
 }

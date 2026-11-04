@@ -22,7 +22,7 @@ const app = new Elysia()
 await serveApi(app, [
   { file: join(import.meta.dir, '../src/api/entries.ts'), mount: '/api/cms/entries', guards: [], open: true },
   { file: join(import.meta.dir, '../src/api/markdown.ts'), mount: '/api/cms/markdown', guards: [], open: true },
-], { i18n: { settings: { locales: ['en'], defaultLocale: 'en' }, translations: new Map() } } as unknown as ActionOptions)
+], { i18n: { settings: { locales: ['en'], defaultLocale: 'en' }, translations: new Map([['en', { locale: 'en', messages: new Map() }]]) } } as unknown as ActionOptions)
 
 const post = async (path: string, body: object) => app.handle(new Request(`http://site.test${path}`, { method: 'POST', headers: { 'content-type': 'application/json', 'origin': 'http://site.test' }, body: JSON.stringify(body) }))
 

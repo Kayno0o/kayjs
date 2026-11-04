@@ -126,8 +126,8 @@ button(onClick={() => messages.send({ text: text() })}) Send
 
 ### Refused input
 
-- A route whose `body`, `query`, `params` or `headers` refuses a request answers 422 `{ errors, status }` as an action does: a message per field, the schema's own `error` else the `kay.invalid.*` text, in the request's locale, unlogged. The OpenAPI document lists that 422.
-- A module's own `onError` that answers it comes first. `api({ errorShape: 'elysia' })` keeps Elysia's own body until 1.89, for clients still parsing it; `call()` then reads no field from it, only the message under `''`.
+- A route whose `body`, `query`, `params` or `headers` refuses a request answers 422 `{ errors, status }` as an action does: a message per field, the schema's own `error` else the `kay.invalid.*` text, in the request's locale, unlogged. A Standard Schema validator names the field by the first segment of its path and speaks with its own message; a file of the wrong type answers `kay.action.invalidFile`. The OpenAPI document lists that 422.
+- A module's own `onError` that answers it comes first. `api({ errorShape: 'elysia' })` keeps Elysia's own body until 1.90, for clients still parsing it; `call()` then reads no field from it, only the message under `''`.
 
 ### Event streams
 

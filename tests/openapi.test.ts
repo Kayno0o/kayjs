@@ -29,7 +29,7 @@ describe('the OpenAPI document', () => {
 
     expect(document.info).toEqual({ title: 'Shop', version: '2.1.0' })
     expect(document.servers).toEqual([{ url: '/shop' }])
-    expect(Object.keys(document.paths).sort()).toEqual(['/api/files', '/api/files/any', '/api/files/bytes', '/api/files/raw/{wildcard}', '/api/files/size', '/api/files/{name}', '/api/items', '/api/items/photo', '/api/items/{id}', '/api/private'])
+    expect(Object.keys(document.paths).sort()).toEqual(['/api/files', '/api/files/any', '/api/files/bytes', '/api/files/raw/{wildcard}', '/api/files/size', '/api/files/{name}', '/api/items', '/api/items/photo', '/api/items/{id}', '/api/private', '/api/refusals-elysia', '/api/refusals/bare', '/api/refusals/own'])
     expect(Object.keys(document.paths['/api/items/{id}']!)).toEqual(['get'])
   })
 
@@ -48,6 +48,16 @@ describe('the OpenAPI document', () => {
       422: { description: 'Error', content: { 'application/json': { schema: { type: 'object', required: ['errors', 'status'], properties: { errors: { type: 'object', additionalProperties: { type: 'string' } }, status: { const: 422, type: 'number' } } } } } },
     })
     expect(Object.keys((await documented()).paths['/api/files/size']!.get!.responses as object)).toEqual(['200'])
+  })
+
+  it('lists the 422 of refused input unless the route documents its own, takes no input, or keeps Elysia\'s body', async () => {
+    const { paths } = await documented()
+    const answers = (path: string, method: string) => (paths[path]![method] as { responses: Record<string, unknown> }).responses
+
+    expect(Object.keys(answers('/api/refusals/own', 'post'))).toEqual(['200', '422'])
+    expect(answers('/api/refusals/own', 'post')[422]).toMatchObject({ content: { 'application/json': { schema: { properties: { mine: expect.anything() } } } } })
+    expect(Object.keys(answers('/api/refusals/bare', 'get'))).toEqual(['200'])
+    expect(Object.keys(answers('/api/refusals-elysia', 'post'))).toEqual(['200'])
   })
 
   it('gives a body as JSON, a Date as its text, and a body holding a file as multipart', async () => {

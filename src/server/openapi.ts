@@ -9,6 +9,7 @@ import { NON_ROOT_TRAILING_SLASH } from '../runtime/base'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
 import { API_PREFIX, KAY_PREFIX, openApiPaths } from './api-modules'
+import { keepsElysiaShape } from './field-errors'
 import { sharedContext } from './render'
 import { apiRoutePath } from './routes'
 import { markPrivate } from './scope'
@@ -38,8 +39,6 @@ export interface MountedApi {
 }
 
 type Schema = Record<string, unknown>
-
-const ERROR_SHAPE = Symbol.for('kay.errorShape')
 
 // A tool action as the document lists it.
 export interface DocumentedAction {
@@ -328,10 +327,10 @@ function responses(response: unknown): Record<string, Schema> {
 
 // What a route answers when its `body`, `query`, `params` or `headers` refuse the input, as an action answers it, unless the route documents its own 422 or keeps Elysia's body.
 const REFUSAL_SCHEMA = { type: 'object', required: ['errors', 'status'], properties: { errors: { type: 'object', additionalProperties: { type: 'string' } }, status: { const: 422, type: 'number' } } }
-const VALIDATED = ['body', 'query', 'params', 'headers', 'cookie'] as const
+const VALIDATED = ['body', 'query', 'params', 'headers'] as const
 
 function withRefusal(answers: Record<string, Schema>, hooks: Record<string, unknown>, instance: Elysia): Record<string, Schema> {
-  if (answers[422] !== undefined || (instance as { [ERROR_SHAPE]?: string })[ERROR_SHAPE] === 'elysia' || !VALIDATED.some(hook => hooks[hook] !== undefined))
+  if (answers[422] !== undefined || keepsElysiaShape(instance) || !VALIDATED.some(hook => hooks[hook] !== undefined))
     return answers
 
   return { ...answers, 422: { description: 'Error', content: { 'application/json': { schema: REFUSAL_SCHEMA } } } }

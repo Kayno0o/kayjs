@@ -26,7 +26,7 @@ import { timeoutMs } from './config-limits'
 import { cookieJar } from './cookies'
 import { corsAdmits, corsResponse, corsRule, dropOwnGrant, grantedByKay, preflight, varyByOrigin, withCors, withoutOwnGrant } from './cors'
 import { streamReporters } from './event-stream'
-import { refusedFields } from './field-errors'
+import { ERROR_SHAPE, keepsElysiaShape, refusedFields, validated, withErrorFunctions } from './field-errors'
 import { loadGuard, requiredGuards } from './guards'
 import { inRouteReads, LIVE_HEADER, routeProof } from './live'
 import { answeringRequest, statusOf } from './log'
@@ -40,6 +40,7 @@ import { apiRoutePath, withoutSlash } from './routes'
 import { markPrivate, wasReadPersonally } from './scope'
 import { carriedNames, carryContext } from './security'
 import { answered, failed, replyTrace, SERVER_SPAN, startSpan, tracing } from './trace'
+import { kayWord } from './words'
 import { socketLimits } from './ws-limits'
 
 // What a body Elysia streams, awaits or asks for its response has: a generator, a thenable, an object with `toResponse()`.
@@ -53,7 +54,9 @@ const CORS = Symbol.for('kay.cors')
 const RATE_LIMIT = Symbol.for('kay.rateLimit')
 // Where `api({ timeout })` keeps the module's timeout.
 const TIMEOUT = Symbol.for('kay.timeout')
-const ERROR_SHAPE = Symbol.for('kay.errorShape')
+// The inputs of a route Elysia validates, whose schemas are read for their `error` in the request's locale.
+const INPUTS = ['body', 'query', 'params', 'headers']
+const BODY_PREFIX = /^body\./
 
 // The requests the guards of their module let through, whose later errors are no refused input.
 const admitted = new WeakSet<Request>()
@@ -134,6 +137,14 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       // A string in a route's body takes the default bound an action's does; a model named by a string, another library's validator and a websocket's messages, which have limits of their own, are left as written.
       if (hooks && route.method !== 'WS' && typeof hooks.body === 'object' && hooks.body !== null && !('~standard' in hooks.body))
         hooks.body = withDefaultBounds(hooks.body as TSchema)
+
+      // The `error` functions of an input schema are called by kay in the request's locale, never by Elysia outside it.
+      for (const input of INPUTS) {
+        const schema = (hooks as Record<string, unknown> | undefined)?.[input]
+
+        if (route.method !== 'WS' && typeof schema === 'object' && schema !== null && !('~standard' in schema))
+          (hooks as Record<string, unknown>)[input] = validated(schema as TSchema)
+      }
 
       // Whichever way the module chains its `.ws()` (in a group, a guard or a used plugin), every websocket route is held to its limits.
       if (hooks && route.method === 'WS')
@@ -284,7 +295,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         // After the module's own `onError`, which may answer the error itself.
         .onError(({ request, error, code, set }) => {
           const refused = { request, error, code, set }
-          const shaped = (instance as { [ERROR_SHAPE]?: string })[ERROR_SHAPE] === 'elysia' ? undefined : refusedInput(refused, options)
+          const shaped = keepsElysiaShape(instance) ? undefined : refusedInput(refused, options)
 
           return shaped ?? reportThrown(refused, options)
         })
@@ -495,14 +506,22 @@ function carriedOver(set: { status?: number | string, headers: Record<string, un
   return Object.keys(set.headers).length > 0 && response === given ? undefined : response
 }
 
-// Input the route's `body`, `query`, `params`, `headers` or `cookie` refused, answered as an action answers it: `{ errors, status }`, a message per field in the request's locale.
+// Input the route's `body`, `query`, `params` or `headers` refused, answered as an action answers it: `{ errors, status }`, a message per field in the request's locale.
 // A mismatch of the route's own response is the route's bug and is left to the caller.
 function refusedInput({ request, error, code, set }: { request: Request, error: unknown, code: unknown, set: { status?: number | string } }, options: ActionOptions): { errors: Record<string, string>, status: 422 } | undefined {
+  if (code === 'INVALID_FILE_TYPE') {
+    const field = (error as { property: string }).property.replace(BODY_PREFIX, '')
+
+    set.status = 422
+
+    return { errors: inApiLocale(request, options, () => ({ [field]: kayWord('kay.action.invalidFile') })), status: 422 }
+  }
+
   if (code !== 'VALIDATION' || isResponseMismatch(error, code))
     return undefined
 
   const { validator } = error as ValidationError
-  const schema = (validator as { schema?: unknown }).schema ?? validator
+  const schema = withErrorFunctions((validator as { schema?: unknown }).schema ?? validator)
   const errors = inApiLocale(request, options, () => refusedFields(schema, error as ValidationError))
 
   set.status = 422
@@ -714,7 +733,7 @@ export interface ApiOptions {
   rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
   // Runs none of the guards above the module, as a page's `guards: false` does; read from the `api({ guards: false })` call as written.
   guards?: false | undefined
-  // The body of a 422 for refused input: `'kay'` (the default) answers `{ errors, status }` as an action does, a message per field in the request's locale; `'elysia'` keeps Elysia's own body for clients still parsing it, and goes in 1.89.
+  // The body of a 422 for refused input: `'kay'` (the default) answers `{ errors, status }` as an action does, a message per field in the request's locale; `'elysia'` keeps Elysia's own body for clients still parsing it, and goes in 1.90.
   errorShape?: 'kay' | 'elysia' | undefined
 }
 

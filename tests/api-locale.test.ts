@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from 'bun:test'
 import { inRequestLocale } from '../src/server/api'
+import { refusedFields } from '../src/server/field-errors'
 import { testSite } from '../src/test'
 
 const FIXTURE = 'tests/fixtures/api-locale'
@@ -173,5 +174,43 @@ describe('input an API route refuses', () => {
 
     expect(answer.type).toBe('validation')
     expect(Array.isArray(answer.errors)).toBe(true)
+  })
+})
+
+describe('input an API route refuses, other validators and edge cases', () => {
+  const post = async (path: string, body: unknown, headers: Record<string, string> = {}) => sites.plain.fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
+
+  it('names the field of a Standard Schema validator from its dotted path, with its own message', async () => {
+    expect(await (await post('/api/refused-schemas/standard', {})).json()).toEqual({ status: 422, errors: { title: 'Title needed', nested: 'Number needed' } })
+  })
+
+  it('calls an error function in the request\'s locale, and a throwing one falls to the kay words', async () => {
+    const worded = await post('/api/refused-schemas/worded', {}, { 'accept-language': 'fr' })
+
+    expect(await worded.json()).toEqual({ status: 422, errors: { name: 'Refusé' } })
+    expect((await post('/api/refused-schemas/worded', {})).status).toBe(422)
+
+    const throwing = await post('/api/refused-schemas/throwing', {}, { 'accept-language': 'fr' })
+
+    expect(throwing.status).toBe(422)
+    expect(await throwing.json()).toEqual({ status: 422, errors: { name: 'Requis' } })
+  })
+
+  it('keeps a __proto__ field', () => {
+    const fields = refusedFields({}, { all: [{ path: '/__proto__', summary: 'Expected string', schema: {}, value: 1 }] } as never)
+
+    expect(Object.keys(fields)).toEqual(['__proto__'])
+    expect(JSON.stringify(fields)).toBe('{"__proto__":"Expected string"}')
+  })
+
+  it('answers a file of the wrong type as an action does', async () => {
+    const form = new FormData()
+
+    form.set('photo', new File(['not a png'], 'a.png', { type: 'image/png' }))
+
+    const response = await sites.plain.fetch('/api/refused-schemas/photo', { method: 'POST', body: form })
+
+    expect(response.status).toBe(422)
+    expect(await response.json()).toEqual({ status: 422, errors: { photo: 'Invalid file type' } })
   })
 })

@@ -54,7 +54,7 @@ A hook that throws before a route is chosen is answered the same way. That cover
 
 A browser asking for a page gets your `_error.kay`, or kay's own error page, and any other request gets plain text. A `Response` the hook throws is sent as given, and an `onError` of your own that answers comes first.
 
-A module's own `onError` that answers the error comes first. Input its schema refuses answers 422 with `{ errors, status }`, a message per field in the request's locale as an action does, unlogged, and the module's `onError` may answer it instead. `api({ errorShape: 'elysia' })` keeps Elysia's own body for clients still parsing it, until 1.89. A thrown `status()` keeps the answer Elysia gives, unlogged.
+A module's own `onError` that answers the error comes first. Input its schema refuses answers 422 with `{ errors, status }`, a message per field in the request's locale as an action does, unlogged, and the module's `onError` may answer it instead. `api({ errorShape: 'elysia' })` keeps Elysia's own body for clients still parsing it, until 1.90. A thrown `status()` keeps the answer Elysia gives, unlogged.
 
 A response that does not match the route's `response` schema is a bug in the route, so it answers 500 like a throw: logged, handed to `onError`, with `Internal Server Error` in production and the schema error in development. Input the schema refuses stays 422.
 
