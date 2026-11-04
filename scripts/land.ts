@@ -8,7 +8,7 @@ import { librariesToTest, libraryDependencies } from './library-dependents'
 import { addedMarkers } from './merge-markers'
 import { describeSamples, describeScope, sampleScope, scopeMemory } from './scope-memory'
 import { readersOf, WHOLE_SUITE } from './source-readers'
-import { stepCommand } from './step-command'
+import { nicedCommand, slotPrefix } from './step-command'
 import { subprocessTests } from './subprocess-tests'
 import { crashedWorkers, failedTests } from './test-failures'
 
@@ -57,9 +57,9 @@ function fail(message: string, code: number): never {
   process.exit(code)
 }
 
-// `flock` on the lock file running a shell that says it holds it and keeps it while its stdin stays open, so a landing killed at any point frees it.
-async function holder(lock: string, wait: boolean) {
-  const child = Bun.spawn(['flock', ...wait ? [] : ['-n'], lock, 'sh', '-c', 'echo held; cat >/dev/null'], { stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' })
+// A lock command (`flock` on a lock file, `slot` for a slot) running a shell that says it holds it and keeps it while its stdin stays open, so a landing killed at any point frees it.
+async function holder(command: string[]) {
+  const child = Bun.spawn([...command, 'sh', '-c', 'echo held; cat >/dev/null'], { stdin: 'pipe', stdout: 'pipe', stderr: 'inherit' })
   let said = ''
 
   for await (const chunk of child.stdout) {
@@ -78,14 +78,14 @@ async function holder(lock: string, wait: boolean) {
 // The landing lock, taken once the checks passed: a landing already holding it is waited for.
 async function takeLock() {
   const lock = join((await $`git rev-parse --git-common-dir`.text()).trim(), 'kay-land.lock')
-  const free = await holder(lock, false)
+  const free = await holder(['flock', '-n', lock])
 
   if (free.held)
     return free.release
 
   console.log('waiting for another landing to finish')
 
-  return (await holder(lock, true)).release
+  return (await holder(['flock', lock])).release
 }
 
 // Waits for `work` for at most `ms`, and leaves no timer behind: a pending `Bun.sleep` would keep the landing alive for its whole length once it is done.
@@ -102,8 +102,24 @@ async function settledWithin(work: Promise<void>, ms: number) {
   }
 }
 
+// The named lock the test runs hold one at a time machine-wide, whatever the number of sessions landing, as each run starts a worker per core.
+const TESTS_LOCK = 'kay-land-tests'
+
+// Runs one step once `slot` lets it, so the time it queues is not the time it runs, which STEP_LIMIT_MS counts.
+async function step(label: string, argv: string[], cwd = '.', lock?: string) {
+  const prefix = slotPrefix(lock)
+  const held = prefix === undefined ? undefined : await holder(prefix)
+
+  try {
+    await run(label, argv, cwd)
+  }
+  finally {
+    await held?.release()
+  }
+}
+
 // Runs one step in a process group of its own, its output going to the log as it comes, and fails the landing on its failed tests and last lines, or on where it stood once it ran past STEP_LIMIT_MS.
-async function step(label: string, argv: string[], cwd = '.') {
+async function run(label: string, argv: string[], cwd: string) {
   const started = performance.now()
   const before = scopeMemory()
   const sampler = sampleScope()
@@ -112,7 +128,7 @@ async function step(label: string, argv: string[], cwd = '.') {
   await appendFile(LOG, `$ ${label}\n`)
 
   // Its stderr into its stdout, so one pipe keeps their lines in the order they were written, the shell's own included, which says why a command could not start.
-  const child = Bun.spawn(['sh', '-c', 'exec 2>&1; exec "$@"', 'sh', ...stepCommand(argv)], { cwd, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit', detached: true })
+  const child = Bun.spawn(['sh', '-c', 'exec 2>&1; exec "$@"', 'sh', ...nicedCommand(argv)], { cwd, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit', detached: true })
   let output = ''
   let hung = false
   const limit = setTimeout(() => {
@@ -173,10 +189,10 @@ async function step(label: string, argv: string[], cwd = '.') {
 // A test step, as KAY_LAND_SHARDS runs one after another when the suite outgrows the session's memory (a worker keeps the global of each file that loaded a native addon, oven-sh/bun#46561).
 async function sharded(label: string, argv: string[]) {
   if (SHARDS === 1)
-    return step(label, argv)
+    return step(label, argv, '.', TESTS_LOCK)
 
   for (let shard = 1; shard <= SHARDS; shard++)
-    await step(`${label}, shard ${shard} of ${SHARDS}`, [...argv, `--shard=${shard}/${SHARDS}`])
+    await step(`${label}, shard ${shard} of ${SHARDS}`, [...argv, `--shard=${shard}/${SHARDS}`], '.', TESTS_LOCK)
 }
 
 if ((await $`git status --porcelain`.text()).trim() !== '')
@@ -275,7 +291,7 @@ async function verify(): Promise<string> {
     }
 
     if (readers.size > 0)
-      await step('tests reading the changed files', [BUN, 'run', 'test', ...readers, WORKERS])
+      await step('tests reading the changed files', [BUN, 'run', 'test', ...readers, WORKERS], '.', TESTS_LOCK)
   }
 
   for (const name of libraries) {
