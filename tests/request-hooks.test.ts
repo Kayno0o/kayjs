@@ -1,10 +1,12 @@
 import { rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { refuse } from '../src/runtime/refuse'
 import { shutdown } from '../src/server/lifecycle'
+import { nameUser } from '../src/server/request-user'
+import { scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -319,5 +321,198 @@ describe('the request hooks in every corner', () => {
     order.push('stopped')
     expect(await slow).toBe('slow')
     expect(order).toEqual(['extension', 'config', 'stopped'])
+  })
+})
+
+describe('the request hooks on refusals, timeouts, re-renders and sign-ins', () => {
+  const answers: { path: string, status: number, userId: string | undefined }[] = []
+  const calls: string[] = []
+  const state = globalThis as { onceRuns?: number, signedIn?: string }
+  let dir = ''
+  let app: Awaited<ReturnType<typeof pages>>
+
+  const get = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers }))
+  const post = async (path: string, headers: Record<string, string> = {}, body = stringify({})) => app.handle(new Request(`http://localhost${path}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'referer': 'http://localhost/', ...headers }, body }))
+
+  beforeAll(async () => {
+    dir = await scratchDir('request-hooks-more-')
+    await Promise.all([
+      Bun.write(join(dir, 'routes/index.kay'), `--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+const runs = globalThis as { onceRuns?: number, signedIn?: string }
+const bump = () => (runs.onceRuns = (runs.onceRuns ?? 0) + 1)
+const n = await ctx.once('n', bump)
+
+export const fail = action(t.Object({}), async (_input, ctx) => {
+  await ctx.once('n', bump)
+
+  return ctx.fail(422, 'No')
+})
+export const signIn = action(t.Object({}), () => {
+  runs.signedIn = 'ada'
+
+  return 'in'
+})
+---
+p.n {n}
+`),
+      Bun.write(join(dir, 'routes/slow.kay'), '--- server\nawait Bun.sleep(400)\n---\np late\n'),
+      Bun.write(join(dir, 'routes/streamed.kay'), '--- server\nconst later = Bun.sleep(400).then(() => \'late comments\')\n---\np first\nawait later then text\n  p.comments {text}\n'),
+      Bun.write(join(dir, 'api/items.ts'), 'import { t } from \'elysia\'\nimport { api } from \'kay/server\'\n\nexport default api({ guards: false }).post(\'/\', ({ body }) => body.n, { body: t.Object({ n: t.Number() }) })\n'),
+    ])
+    app = await pages({
+      root: dir,
+      routes: 'routes',
+      api: 'api',
+      prebuilt: false,
+      security: false,
+      serve: { timeout: '100ms' },
+      observe: { log: false },
+      extensions: [{ name: 'who', server: new Elysia({ name: 'who' }).derive({ as: 'global' }, ({ request }) => {
+        nameUser(request, () => state.signedIn)
+
+        return {}
+      }) }],
+      beforeRequest: ({ request, url }) => {
+        calls.push(url.pathname)
+
+        if (request.headers.has('x-limit'))
+          return new Response('Slow down', { status: 429, headers: { 'retry-after': '7', 'x-reason': 'limit' } })
+
+        return request.headers.has('x-refuse') ? false : undefined
+      },
+      onResponse: ({ url, status, context }) => void answers.push({ path: url.pathname, status, userId: context.userId }),
+    })
+  })
+
+  afterAll(async () => rm(dir, { recursive: true, force: true }))
+
+  it('answers a refused action and API route with the refusal\'s status, body, headers and a matching length', async () => {
+    const action = app.routes.find(route => route.method === 'POST' && route.path.includes('/fail'))?.path ?? ''
+
+    for (const response of [await post(action, { 'x-limit': '1' }), await post('/api/items', { 'x-limit': '1' }, '{"n":"x"}')]) {
+      const body = await response.arrayBuffer()
+
+      expect(response.status).toBe(429)
+      expect(new TextDecoder().decode(body)).toBe('Slow down')
+      expect(response.headers.get('retry-after')).toBe('7')
+      expect(response.headers.get('x-reason')).toBe('limit')
+      expect(Number(response.headers.get('content-length') ?? body.byteLength)).toBe(body.byteLength)
+    }
+
+    const refused = await post('/api/items', { 'x-refuse': '1' }, '{"n":"x"}')
+
+    expect([refused.status, await refused.text()]).toEqual([403, 'Refused'])
+  })
+
+  it('loads the ctx.once values of a page again when it renders after a failed action', async () => {
+    state.onceRuns = 0
+
+    expect(await (await get('/')).text()).toContain('<p class="n">1</p>')
+
+    const action = app.routes.find(route => route.method === 'POST' && route.path.includes('/fail'))?.path ?? ''
+    const failed = await app.handle(new Request(`http://localhost${action}?kay_back=%2F`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'origin': 'http://localhost', 'referer': 'http://localhost/' }, body: '' }))
+    const rendered = failed.status >= 300 && failed.status < 400 ? await get('/', { cookie: failed.headers.getSetCookie().map(cookie => cookie.slice(0, cookie.indexOf(';'))).join('; ') }) : failed
+
+    expect(await rendered.text()).toContain('<p class="n">3</p>')
+    expect(state.onceRuns).toBe(3)
+  })
+
+  it('tells onResponse a request cut by serve.timeout as 504, and a streamed page as the 200 its headers went out with', async () => {
+    answers.length = 0
+
+    const slow = await get('/slow')
+
+    expect(slow.status).toBe(504)
+    await slow.text()
+
+    const streamed = await get('/streamed')
+
+    expect(streamed.status).toBe(200)
+    await expect(streamed.text()).rejects.toBeInstanceOf(Error)
+    await Bun.sleep(20)
+    expect(answers.find(entry => entry.path === '/slow')?.status).toBe(504)
+    expect(answers.find(entry => entry.path === '/streamed')?.status).toBe(200)
+  })
+
+  it('tells onResponse the user as the request began, not the one a sign-in action made', async () => {
+    answers.length = 0
+    state.signedIn = undefined
+
+    const action = app.routes.find(route => route.method === 'POST' && route.path.includes('/signIn'))?.path ?? ''
+
+    expect((await post(action)).status).toBe(200)
+    expect(state.signedIn).toBe('ada')
+    await Bun.sleep(20)
+    expect(answers.find(entry => entry.path === action)).toEqual({ path: action, status: 200, userId: undefined })
+    state.signedIn = undefined
+  })
+})
+
+describe('the request hooks under a locale prefix and on a prerendered page', () => {
+  it('see the prefixed path, and refuse before the page is served', async () => {
+    const dir = await scratchDir('request-hooks-locale-')
+    const seen: string[] = []
+    const answered: { path: string, status: number }[] = []
+
+    try {
+      await Promise.all([
+        Bun.write(join(dir, 'routes/index.kay'), 'h1 Home\n'),
+        ...['en', 'fr'].map(async locale => Bun.write(join(dir, `src/messages/${locale}.ts`), 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ home: \'Home\' })\n')),
+      ])
+
+      const app = await pages({
+        root: dir,
+        routes: 'routes',
+        prebuilt: false,
+        security: false,
+        observe: { log: false },
+        i18n: { locales: ['en', 'fr'], defaultLocale: 'en' },
+        beforeRequest: ({ request, url }) => {
+          seen.push(url.pathname)
+
+          return request.headers.has('x-refuse') ? false : undefined
+        },
+        onResponse: ({ url, status }) => void answered.push({ path: url.pathname, status }),
+      })
+      const get = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers }))
+
+      expect((await get('/fr')).status).toBe(200)
+      expect((await get('/fr', { 'x-refuse': '1' })).status).toBe(403)
+      await Bun.sleep(20)
+      expect(seen).toEqual(['/fr', '/fr'])
+      expect(answered.map(entry => entry.status)).toEqual([200, 403])
+      expect(answered.every(entry => entry.path === '/fr')).toBe(true)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('run for a prerendered hit, and a refusal stops it', async () => {
+    const build = await scratchBuild({}, false, resolve('tests/fixtures/production'))
+    const seen: string[] = []
+    const answered: number[] = []
+
+    try {
+      await build.prerender({})
+
+      const app = await build.serve({ root: 'tests/fixtures/production', security: false, beforeRequest: ({ request, url }) => {
+        seen.push(url.pathname)
+
+        return request.headers.has('x-refuse') ? false : undefined
+      }, onResponse: ({ status }) => void answered.push(status) })
+
+      expect((await app.handle(new Request('http://localhost/news'))).status).toBe(200)
+      expect((await app.handle(new Request('http://localhost/news', { headers: { 'x-refuse': '1' } }))).status).toBe(403)
+      await Bun.sleep(20)
+      expect(seen).toEqual(['/news', '/news'])
+      expect(answered).toEqual([200, 403])
+    }
+    finally {
+      await build.remove()
+    }
   })
 })
