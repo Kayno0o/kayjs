@@ -854,7 +854,7 @@ describe('what stops a page from being kept', () => {
 
   it('names what stops a page found while it renders: a stale copy and a path two pages share', async () => {
     const root = await project({
-      'src/routes/revalidated.kay': '--- server\nexport const page = { revalidate: \'1h\' }\n---\np Revalidated\n',
+      'src/routes/revalidated.kay': '--- server\nexport const page = { ttl: \'1h\' }\n---\np Revalidated\n',
       'src/routes/a.kay': 'p A\n',
       'src/routes/[id].kay': '--- server\nexport const page = { prerender: [{ id: \'a\' }] }\n---\np Item\n',
     })
@@ -864,7 +864,7 @@ describe('what stops a page from being kept', () => {
     const { document } = await reported(root)
     const stops = Object.fromEntries(document.built.routes.map(route => [route.route, route.stop]))
 
-    expect(stops['/revalidated']).toBe('src/routes/revalidated.kay sets `revalidate`, which has a stale copy render again for every visitor')
+    expect(stops['/revalidated']).toBe('src/routes/revalidated.kay sets `ttl`, which has a stale copy render again for every visitor')
     expect(stops['/a']).toBe('src/routes/a.kay would share its prerendered file a.html with /a')
   }, 120_000)
 
@@ -1383,7 +1383,7 @@ describe('a layout reading ctx.locals', () => {
       'src/routes/deep/_layout.kay': '--- server\nconst { locals } = ctx\n---\nheader {locals.who}\nslot\n',
       'src/routes/deep/index.kay': 'h1 Deep\n',
       'src/routes/part/index.kay': '---\nimport Who from \'../../who.kay\'\n---\nWho\n',
-      'src/who.kay': '--- server\nconst who = ctx.locals.who\n---\np {who}\n',
+      'src/who.kay': 'p {ctx.locals.who}\n',
       'src/routes/plain.kay': 'h1 Plain\n',
     })
 
