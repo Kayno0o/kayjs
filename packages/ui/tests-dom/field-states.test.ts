@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import CheckboxIssue from '../tests/fixture/src/components/checkbox-issue.kay'
 import FieldStates from '../tests/fixture/src/components/field-states.kay'
 import InvalidToggle from '../tests/fixture/src/components/invalid-toggle.kay'
 import { click } from './dom'
@@ -67,7 +68,9 @@ test('every group and box control takes invalid as well, written as aria-invalid
   for (const id of ['radios', 'segmented', 'chips', 'rating'])
     expect(await boxes(id, 'aria-invalid'), id).toEqual(['true'])
 
-  for (const id of ['color', 'drop', 'box', 'switch'])
+  expect(new Set(await boxes('rows', 'aria-invalid'))).toEqual(new Set(['true']))
+
+  for (const id of ['color', 'drop', 'box', 'switch', 'markdown', 'icons'])
     expect(await boxes(id, 'aria-invalid'), id).toEqual(['true'])
 })
 
@@ -82,4 +85,61 @@ test('a Checkbox and a Toggle show the issue they are given under the box and ma
     expect(input.getAttribute('aria-invalid'), id).toBe('true')
     expect(input.getAttribute('aria-describedby'), id).toBe(root.querySelector('[data-part=issues]')!.id)
   }
+})
+
+test('every refused control draws a danger look: the stylesheet field class, or a class answering aria-invalid or data-refused with the danger colour', async () => {
+  mounted ??= await mountComponent(FieldStates, {})
+
+  for (const id of [...CONTROLS, 'radios', 'segmented', 'chips', 'rating', 'color', 'drop', 'box', 'switch', 'rows', 'markdown', 'icons']) {
+    const classes = [...mounted.root.querySelectorAll(`#${id} [class]`)].map(element => element.getAttribute('class')).join(' ')
+
+    expect(classes, id).toMatch(/kui-field-input|(?:aria-invalid|data-refused|has-\[input\[aria-invalid)[^ ]*danger|danger[^ ]*(?:aria-invalid|data-refused)/)
+  }
+})
+
+test('a disabled IconPicker disables its search box and icons, and a refused one stays enabled', async () => {
+  mounted ??= await mountComponent(FieldStates, {})
+
+  const off = [...mounted.root.querySelectorAll('#iconsoff input, #iconsoff button')] as HTMLInputElement[]
+
+  expect(off.length).toBeGreaterThan(0)
+  expect(off.every(element => element.disabled)).toBe(true)
+  expect((mounted.root.querySelector('#icons input.kui-field-input') as HTMLInputElement).disabled).toBe(false)
+})
+
+test('an issue arriving after the island started shows under a Checkbox and a Toggle declaring none at first', async () => {
+  mounted = await mountComponent(CheckboxIssue, {})
+
+  expect(mounted.root.querySelector('#box [data-part=issue]')).toBeNull()
+
+  click(mounted.root.querySelector('#say'))
+  await settle()
+
+  for (const id of ['box', 'switch']) {
+    expect(mounted.root.querySelector(`#${id} [data-part=issue]`)?.textContent, id).toBe('Tick it')
+    expect(mounted.root.querySelector(`#${id} input`)?.getAttribute('aria-invalid'), id).toBe('true')
+  }
+})
+
+test('a FormField of the same name around a Checkbox shows the message once', async () => {
+  mounted = await mountComponent(CheckboxIssue, {})
+
+  expect(mounted.root.querySelectorAll('#wrapped [data-part=issue]').length).toBe(1)
+})
+
+test('a Checkbox declaring a name follows its parent for checked, label, hint, indeterminate and invalid', async () => {
+  mounted = await mountComponent(CheckboxIssue, {})
+
+  const input = mounted.root.querySelector('#live input') as HTMLInputElement
+
+  expect(mounted.root.querySelector('#live [data-part=label]')?.textContent).toBe('Before')
+
+  click(mounted.root.querySelector('#flip'))
+  await settle()
+
+  expect(input.checked).toBe(true)
+  expect(input.indeterminate).toBe(true)
+  expect(input.getAttribute('aria-invalid')).toBe('true')
+  expect(mounted.root.querySelector('#live [data-part=label]')?.textContent).toBe('Changed')
+  expect(mounted.root.querySelector('#live [data-part=hint]')?.textContent).toBe('Changed')
 })

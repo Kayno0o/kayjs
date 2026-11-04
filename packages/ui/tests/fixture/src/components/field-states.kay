@@ -1,4 +1,5 @@
 ---
+import { trustHtml } from 'kay'
 import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
 import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
 import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
@@ -7,6 +8,9 @@ import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
 import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
 import DateTimeInput from '@kaynooo/kayjs-ui/date-time-input.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
+import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
+import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
 import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
 import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
 import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
@@ -21,6 +25,8 @@ import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 
 // Every form control once, large and refused, each in a wrapper named after it, and a TextInput left at its defaults.
 const options = [{ value: 'a', label: 'A' }]
+const icons = [{ name: 'tabler:star', icon: { 'viewBox': '0 0 24 24', 'width': '1em', 'height': '1em', 'aria-hidden': 'true' as const, 'innerHTML': trustHtml('<path d="M0 0"/>') } }]
+const columns = [{ key: 'name', label: 'Name' }]
 ---
 div#text
   TextInput(size="lg" invalid)
@@ -68,3 +74,11 @@ div#boxmsg
   Checkbox(label="Terms" issue="Tick it")
 div#switchmsg
   Toggle(label="News" issue="Switch it")
+div#rows
+  RowsField(invalid label="Rows" columns={columns} rows={[{ name: 'a' }]})
+div#markdown
+  MarkdownEditor(invalid)
+div#icons
+  IconPicker(invalid icons={icons})
+div#iconsoff
+  IconPicker(disabled icons={icons})
