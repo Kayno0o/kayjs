@@ -37,7 +37,7 @@ async function until(ready: () => boolean): Promise<void> {
 const hostile = decodeURIComponent('%00hall%00')
 
 describe('a room named by a visitor', () => {
-  it('refuses a name past 256 characters in join, members, publish, state and update, and takes one of 256', () => {
+  it('refuses a name past 256 characters in join, members, publish, state and update, and takes one of 256', async () => {
     const live = rooms<string, string, number>({ state: () => 0 })
     const [ada] = [connection()]
     const long = 'r'.repeat(257)
@@ -45,8 +45,8 @@ describe('a room named by a visitor', () => {
     expect(() => live.join(ada, long, 'ada')).toThrow('a room name has at most 256 characters')
     expect(() => live.members(long)).toThrow('at most 256')
     expect(() => live.publish(long, 'hi')).toThrow('at most 256')
-    expect(() => live.state(long)).toThrow('at most 256')
-    expect(() => live.update(long, state => state)).toThrow('at most 256')
+    await expect(live.state(long)).rejects.toThrow('at most 256')
+    await expect(live.update(long, state => state)).rejects.toThrow('at most 256')
     live.join(ada, 'r'.repeat(256), 'ada')
     expect(live.members('r'.repeat(256))).toEqual(['ada'])
     expect(live.roomsOf(ada)).toEqual(['r'.repeat(256)])
