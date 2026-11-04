@@ -110,7 +110,7 @@ form-action 'self';
 frame-ancestors 'self'
 ```
 
-- Every inline script kay writes is the same on every page, bar the speculation rules, which come in two forms (the short one for a page with no `data-prefetch`, the full one otherwise) and are both hashed: the hydration bootstrap, the speculation rules, the swap of streamed blocks, with `offline` the service worker's registration, and, in development, live reload and what keeps the problems kay logs, the errors nothing caught and the sources the policy blocked until the dev tool loads.
+- Every inline script kay writes is the same on every page: the hydration bootstrap, the speculation rules, the swap of streamed blocks, with `offline` the service worker's registration, and, in development, live reload and what keeps the problems kay logs, the errors nothing caught and the sources the policy blocked until the dev tool loads. The speculation rules are the one script that comes in two forms, the short one for a page with no `data-prefetch` and the full one otherwise, and the policy hashes both.
 - The policy allows them by hash, with no `'unsafe-inline'` and no nonce.
 - `security` in `kay.config.ts` adjusts it:
 

@@ -45,6 +45,22 @@ describe('the speculation rules of a page', () => {
   })
 })
 
+describe('the speculation rules under a base path and an API path', () => {
+  const body = (script: string) => script.slice('<script type="speculationrules">'.length, -'</script>'.length)
+
+  it.each([true, false])('keep to the pages of the base and leave its API and kay\'s routes out, with nearest %p, both hashed', (nearest) => {
+    const script = speculationRules('moderate', '/app', '/rest', nearest)
+    const { prefetch } = JSON.parse(body(script)) as { prefetch: { where: { and: Record<string, unknown>[] } }[] }
+    const matches = prefetch[0]!.where.and.flatMap(clause => [(clause.href_matches ?? (clause.not as Record<string, unknown> | undefined)?.href_matches) as string | undefined]).filter(match => match !== undefined)
+
+    expect(matches).toEqual(['/app/*', '/app/_kay/*', '/app/rest/*', '/app/rest'])
+    expect(script).not.toBe(speculationRules('moderate', '', '/api', nearest))
+    expect(script.includes('data-prefetch')).toBe(nearest)
+    expect(inlineScriptHashes({ base: '/app', apiPath: '/rest' })).toContain(`'sha256-${new Bun.CryptoHasher('sha256').update(body(script)).digest('base64')}'`)
+    expect(inlineScriptHashes()).not.toContain(`'sha256-${new Bun.CryptoHasher('sha256').update(body(script)).digest('base64')}'`)
+  })
+})
+
 describe('a prerendered page', () => {
   let build: Awaited<ReturnType<typeof scratchBuild>>
 
