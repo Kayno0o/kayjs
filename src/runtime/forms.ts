@@ -27,6 +27,11 @@ const style = (form: HTMLFormElement): CSSStyleDeclaration => Reflect.get(HTMLEl
 
 type Swapper = typeof import('./page-swap')
 
+// Tells an island's `listen(form, ...)` how the post goes, while the form is still the one on the page: `kay:action-start` (before the post, with the fields as `data`, for an optimistic change), then `kay:action-success` or `kay:action-error`.
+function announce(form: HTMLFormElement, type: 'start' | 'success' | 'error', detail: { action: string, data?: FormData }): void {
+  form.dispatchEvent(new CustomEvent(`kay:action-${type}`, { bubbles: true, detail }))
+}
+
 let checks: Promise<typeof import('./validate')> | undefined
 let swapModule: Promise<Swapper> | undefined
 
@@ -161,6 +166,7 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
     const work = document.querySelector(`[${WORK_SCRIPT}]`) ? await (await import('./work.client')).spendWork(action, undefined, form, data) : undefined
     const body = multipart ? data : urlEncoded(data)
 
+    announce(form, 'start', { action, data })
     response = await post(url, body, form, work, delivery)
 
     // A challenge an island's call spent, or one gone stale, is refused with a fresh one: solved, the form goes again once.
@@ -170,6 +176,8 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
     }
   }
   catch {
+    announce(form, 'error', { action: withoutBase(url.pathname) })
+
     // A post that reached the server has run its action, only the answer was lost: the page loads rather than the form posting again.
     if (delivery.reached) {
       // A visitor who went elsewhere meanwhile is left there.
@@ -196,6 +204,8 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
   // The visitor went to another page meanwhile: the answer is the one they left's, and the action has run.
   if (navigation.visits !== navigated)
     return
+
+  announce(form, response.redirect !== null ? 'success' : 'error', { action: withoutBase(url.pathname) })
 
   // Sent once: from here on a failure loads the page rather than posting again.
   if (response.redirect !== null) {

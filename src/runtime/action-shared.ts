@@ -1,5 +1,6 @@
 import type { Static, TSchema } from 'elysia'
 import type { ActionError, FAILURE } from './action-error'
+import type { ApiError } from './api-error'
 import type { ByteSize } from './byte-size'
 import type { CallResult } from './call-result'
 import type { ErrorStatus, RouteParams } from './checks'
@@ -229,9 +230,39 @@ export type Outcome
   = | { action: string, succeeded?: undefined, status: number, values: Record<string, string>, errors: Record<string, string>, data?: unknown }
     | { action: string, succeeded: true, data: unknown }
 
-export interface CallOptions {
+// Something a call can refresh in place of the page: a `resource()`, or any object with a `refresh()`.
+export interface Refreshable {
+  refresh: () => unknown
+}
+
+// How a call tries again: `times` more posts after the first, `delay` before the first of them, doubling after each, and `when` to tell the failures worth another try from the rest; by default a call that got no answer or a timeout, and a 502, 503 or 504.
+export interface RetryOptions {
+  times: number
+  delay?: Duration | undefined
+  when?: ((error: ApiError) => boolean) | undefined
+}
+
+// How calls over one action, or one `track()` handle, share the wire: `parallel` posts each at once (the default), `serial` posts a call once the earlier ones settled, `latest` aborts the earlier calls still in flight, which reject with an `AbortError`.
+export type CallQueue = 'parallel' | 'serial' | 'latest'
+
+export interface CallOptions<Output = unknown> {
   // Whether the page shows what the call changed once it succeeded, its loads run again as `refresh()` runs them; on unless `false`, and only where the page swap runs.
-  refresh?: boolean | undefined
+  // A `resource()`, or a list of them, refreshes those alone and leaves the page, whether or not the page swap runs: `refresh: cart`.
+  refresh?: boolean | Refreshable | readonly Refreshable[] | undefined
+  // How calls over the same action, or the same `track()` handle, queue.
+  queue?: CallQueue | undefined
+  // Aborts the post once it waited this long for the answer (not while it queues), rejecting with a `TimeoutError`; the change `optimistic` showed goes back.
+  timeout?: Duration | undefined
+  // Posts again when the call fails in a way worth another try, a number being `{ times }`. A post that reached the server may have run, so use it for a handler that tolerates being run twice.
+  retry?: number | RetryOptions | undefined
+  // Called when the call is made, before its post is sent; the hooks never fail the call, a throw is logged.
+  onStart?: ((event: { input: unknown }) => unknown) | undefined
+  // Called with what the handler returned.
+  onSuccess?: ((event: { data: Output }) => unknown) | undefined
+  // Called with the failure, as an `ApiError`: not for an abort or a redirect.
+  onError?: ((event: { error: ApiError }) => unknown) | undefined
+  // Called once the call is over, whichever way, after `onSuccess` or `onError`; an abort or a redirect has `error` set to what was thrown.
+  onSettled?: ((event: { data?: Output | undefined, error?: ApiError | undefined }) => unknown) | undefined
   // Shows the change at once, as the call goes: the signals it writes go back to what they held if the call fails, unless something wrote them since.
   optimistic?: (() => void) | undefined
   // Aborts the call: it rejects with the signal's reason, and the change `optimistic` showed goes back.
@@ -254,14 +285,15 @@ export interface TrackedCall<Input, Result> extends Source<LoadStatus> {
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
 export interface Action<Input, Output, Honeypot extends string = never> {
   // A form's fields, read as a plain form post reads them: `add(new FormData(form))`. First, so a call matching neither is reported against the typed input below, naming its wrong field, and `Parameters<typeof add>` reads that one.
-  (form: FormData, options?: CallOptions): Promise<Answer<Success<Output>>>
-  (input: Input, options?: CallOptions): Promise<Answer<Success<Output>>>
+  (form: FormData, options?: CallOptions<Answer<Success<Output>>>): Promise<Answer<Success<Output>>>
+  (input: Input, options?: CallOptions<Answer<Success<Output>>>): Promise<Answer<Success<Output>>>
   // Whether a call this page made is still in flight, read reactively: `button(disabled={add.pending()})`.
   readonly pending: () => boolean
   // Resolves once no call of this action is in flight, whichever way they went, so an island that did not await its writes can wait for them: `await add.settled()`. A stream counts until it ends. Never rejects.
   readonly settled: () => Promise<void>
   // A handle for the calls of one island, one row or one button: `const save = add.track()`, then `await save(input)` resolves with `{ ok, data }` or the refusal, and `save.pending()` reads only its own calls.
-  readonly track: () => TrackedCall<Input, CallResult<Answer<Success<Output>>, FailureData<Output>>>
+  // `track({ queue: 'latest' })` sets how the handle's own calls queue, in place of each call's `queue` option.
+  readonly track: (options?: { queue?: CallQueue | undefined }) => TrackedCall<Input, CallResult<Answer<Success<Output>>, FailureData<Output>>>
   // How much of the last call carrying files the browser sent, from 0 to 1, while it uploads; undefined otherwise: `progress(value={upload.progress()})`.
   readonly progress: () => number | undefined
   // How the form post the page renders for went, refused, as `failed()` reads it; in an island, how its last call went, read reactively.

@@ -331,7 +331,29 @@ button(onClick={() => move({ id, to: 'done' }, { optimistic: () => column = 'don
 p {column()}
 ```
 
-The call still throws when it fails. While it runs, `pending()` follows its own request. Let one call finish before the next on the same signal, as `move.pending()` tells, or a failure may leave the earlier value.
+The call still throws when it fails. While it runs, `pending()` follows its own request. Calls over one signal can overlap: each failure puts the signal back to what it held before that call, whichever order they fail in. To order the calls themselves, see [Queuing calls](#queuing-calls).
+
+A form posting in place, `form(action={move})`, tells an island how it went through three events on the form, which bubble: `kay:action-start` before the post, with the fields in `event.detail.data`, then `kay:action-success` or `kay:action-error`. Listen on the form with `listen(form, 'kay:action-start', ...)` to show a change at once, and put it back on `kay:action-error`.
+
+### Refreshing less
+
+Pass a `resource()`, or a list of them, as `refresh` to refresh those and leave the rest of the page alone: `add({ title }, { refresh: [cart, count] })`. It works where the page swap does not run too.
+
+### Waiting, trying again and knowing how it went
+
+- `timeout: '5s'` aborts a post the server has not answered in that time. The call rejects with a `TimeoutError` and `pending()` clears. The time counts from the post, not from the wait in a queue.
+- `retry: 2` posts again, up to twice, after a call that got no answer, a timeout or a 502, 503 or 504. `retry: { times: 2, delay: '1s', when: error => error.status === 429 }` sets the pause, which doubles each time, and which failures are worth another try. A post that reached the server may have run, so use it for a handler that tolerates running twice.
+- `onStart`, `onSuccess`, `onError` and `onSettled` observe the call. Each gets one object (`{ input }`, `{ data }`, `{ error }` with an `ApiError`, `{ data, error }`). An abort and a redirect are no error. A hook that throws is logged and never fails the call.
+
+```ts
+await save(card, { timeout: '8s', retry: 2, onError: ({ error }) => toast(error.message) })
+```
+
+### Queuing calls
+
+`queue` says what a call does about the others over the same action: `'parallel'` posts at once (the default), `'serial'` waits for the earlier calls to settle, and `'latest'` aborts the earlier calls still in flight, which reject with an `AbortError` and put their `optimistic` change back. A typing search wants `latest`, a counter that must be added up in order wants `serial`.
+
+`add.track({ queue: 'latest' })` sets it for the calls made through that handle, which then order apart from the rest of the action. An aborted call is no failure of the handle.
 
 ### Aborting a call
 

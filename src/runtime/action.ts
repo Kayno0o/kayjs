@@ -17,7 +17,7 @@ export { SETTLED } from './action-owner'
 export type { Caller, Settles } from './action-owner'
 export { honeypotField, minTimeOf, resolveProtection, workOf } from './action-protection'
 export { isAction } from './action-shared'
-export type { Action, ActionContext, ActionProtect, ActionProtection, ActionRateLimit, ActionStream, ActionTool, Answer, CallOptions, CallResult, Failure, FailureData, FailureOf, FailuresOf, FieldErrors, Final, FormFailure, FormSuccess, HoneypotOptions, InputOf, MinTimeOptions, MinTimeRefusal, Outcome, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, ResolvedProtection, ResultOf, Sendable, ServerAction, Settled, Success, SuccessOf, TrackedCall } from './action-shared'
+export type { Action, ActionContext, ActionProtect, ActionProtection, ActionRateLimit, ActionStream, ActionTool, Answer, CallOptions, CallQueue, CallResult, Failure, FailureData, FailureOf, FailuresOf, FieldErrors, Final, FormFailure, FormSuccess, HoneypotOptions, InputOf, MinTimeOptions, MinTimeRefusal, Outcome, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, Refreshable, ResolvedProtection, ResultOf, RetryOptions, Sendable, ServerAction, Settled, Success, SuccessOf, TrackedCall } from './action-shared'
 
 const UNSAFE_URL_CHARACTERS = /[^\w/.-]/g
 // A module outside the root, as a linked library is, has `..` segments in its path, which a URL would resolve away.
@@ -28,7 +28,7 @@ export function actionUrl(moduleId: string, name: string): string {
 }
 
 // What an action with no input takes: no fields, so `add()` calls it.
-export type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions) => Promise<Answer<Success<Output>>>)
+export type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions<Answer<Success<Output>>>) => Promise<Answer<Success<Output>>>)
 
 // An empty object schema built by hand: `t.Object({})` would carry Elysia into the islands importing this module, and TypeBox reads a schema by this symbol.
 type EmptySchema = ReturnType<typeof t.Object<Record<never, never>>>

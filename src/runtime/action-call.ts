@@ -1,17 +1,19 @@
 import type { Caller } from './action-owner'
-import type { Action, ActionStream, CallOptions, Outcome, TrackedCall } from './action-shared'
+import type { Action, ActionStream, CallOptions, CallQueue, Outcome, Refreshable, TrackedCall } from './action-shared'
+import type { ApiError } from './api-error'
 import { encodeCall } from './action-encode'
 import { ActionError, ActionRedirectError } from './action-error'
 import { withFields } from './action-form'
 import { closeWithCaller, onStreamEnd, SETTLED } from './action-owner'
 import { ACTION } from './action-shared'
-import { actionFailed, messageOf } from './api-error'
+import { actionFailed, apiErrorOf, messageOf } from './api-error'
 import { withBase } from './base'
 import { skew } from './build'
 import { trackCalls, whenIdle } from './call-result'
+import { durationMs } from './duration'
 import { leave, mayLeave, navigation, prefetched } from './navigation'
 import { pageData } from './page-data'
-import { getOwner, liveOwner, ownSignal, undoable, untrack } from './reactive'
+import { getOwner, liveOwner, ownSignal, released, undoable, untrack } from './reactive'
 import { reload } from './stale'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { ACTION_PREFIX, ACTION_TYPE, decodeServerValue, malformed, serverWritten } from './wire'
@@ -23,6 +25,66 @@ declare const KAY_BROWSER: true | undefined
 export const OUTCOME_SCRIPT = 'data-kay-outcome'
 
 const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
+// The answers of a server that is down or overloaded for the moment, which a retry may get past.
+const BUSY_STATUSES = new Set([502, 503, 504])
+const RETRY_DELAY_MS = 500
+
+// The calls of an action, or of one `track()` handle, that `queue` orders: `tail` settles when the last `serial` call is done, `latest` is the call in flight a newer one aborts.
+interface Lane {
+  tail: Promise<unknown>
+  queue?: CallQueue | undefined
+  latest?: AbortController | undefined
+}
+
+function superseded(): DOMException {
+  return new DOMException('Superseded by a later call', 'AbortError')
+}
+
+function isAbort(error: unknown): boolean {
+  return (error as { name?: unknown } | null)?.name === 'AbortError'
+}
+
+// Waits for the calls ahead, giving up at once when this one is aborted meanwhile.
+async function queued(before: Promise<unknown>, signal: AbortSignal | undefined): Promise<void> {
+  signal?.throwIfAborted()
+
+  await (signal === undefined
+    ? before
+    : Promise.race([before, new Promise<never>((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))]))
+}
+
+async function pause(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  signal?.throwIfAborted()
+
+  await new Promise<void>((resolve, reject) => {
+    const id = setTimeout(resolve, ms)
+
+    signal?.addEventListener('abort', () => {
+      clearTimeout(id)
+      reject(signal.reason)
+    }, { once: true })
+  })
+}
+
+function retryOf(retry: CallOptions['retry']): { times: number, delay: number, when: (error: ApiError) => boolean } {
+  const options = typeof retry === 'number' ? { times: retry } : retry
+
+  return {
+    times: options?.times ?? 0,
+    delay: options?.delay === undefined ? RETRY_DELAY_MS : durationMs(options.delay),
+    when: options?.when ?? (error => error.status === 0 || BUSY_STATUSES.has(error.status)),
+  }
+}
+
+// A hook never fails the call it observes: a throw, or a rejection, is logged.
+async function hooked<Event>(hook: ((event: Event) => unknown) | undefined, event: Event): Promise<void> {
+  try {
+    await hook?.(event)
+  }
+  catch (error) {
+    console.error(error)
+  }
+}
 
 // On the server, the form post the request being answered carries: null for none, undefined outside a request.
 let requestOutcome: (() => Outcome | null | undefined) | undefined
@@ -96,42 +158,102 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
   }
   const read = (value: unknown) => ({ value, enumerable: true })
 
-  const call = async (input: unknown, options?: CallOptions) => {
+  const actionLane: Lane = { tail: Promise.resolve() }
+
+  const run = async (lane: Lane, input: unknown, options?: CallOptions) => {
     // The page the call was made on, whose outcome it is even once the visitor went elsewhere.
     const page = navigation.page
     const visits = navigation.visits
     const left = () => navigation.visits !== visits
     // The island calling, from its setup or a handler, whose end ends a stream the call answers with; else the page, as long as no other path is shown.
     const caller: Caller = { owner: liveOwner(getOwner()), arrivals: navigation.arrivals }
+    const mode = options?.queue ?? lane.queue ?? 'parallel'
 
     const turn = ++started
 
     shift(1)
     called(page, null)
+    void hooked(options?.onStart, { input })
 
     let undo: (() => void) | undefined
     let posted = false
     let sent = false
+    let timedOut = false
     // A stream keeps the call in flight until it ends.
     let streaming = false
+    let answer: unknown
+    let failure: unknown
+    let release: (() => void) | undefined
     // Started before the caller goes on, so a navigation it starts next supersedes the refresh rather than the other way round; a site with `navigation: false` shows a call's effects itself.
     const refreshPage = () => {
-      if (options?.refresh !== false && !left() && navigation.hooks)
-        void refreshed()
+      const scope = options?.refresh
+
+      if (scope === false || left())
+        return
+
+      if (scope === undefined || scope === true) {
+        if (navigation.hooks)
+          void refreshed()
+      }
+      else {
+        void refreshedIn([scope].flat())
+      }
     }
+    const later = mode === 'latest' ? new AbortController() : undefined
 
     try {
       undo = options?.optimistic ? undoable(options.optimistic) : undefined
 
-      const data = await post(url(), input, setProgress, options?.signal, () => {
-        sent = true
-      }, left, caller, options?.headers)
+      if (later) {
+        lane.latest?.abort(superseded())
+        lane.latest = later
+      }
+
+      if (mode === 'serial') {
+        const before = lane.tail
+
+        lane.tail = Promise.all([before, new Promise<void>((resolve) => {
+          release = resolve
+        })])
+        await queued(before, options?.signal)
+      }
+
+      const attempts = retryOf(options?.retry)
+
+      for (let attempt = 0; ; attempt++) {
+        // The wait for the answer is bounded from the post's start, and each try has its own.
+        const timeout = options?.timeout === undefined ? undefined : new AbortController()
+        const timer = timeout && setTimeout(() => {
+          timedOut = true
+          timeout.abort(new DOMException(`The server did not answer in ${options!.timeout}`, 'TimeoutError'))
+        }, durationMs(options!.timeout!))
+        const cancel = AbortSignal.any([options?.signal, later?.signal, timeout?.signal].filter(item => item !== undefined))
+
+        try {
+          answer = await post(url(), input, setProgress, cancel, () => {
+            sent = true
+          }, left, caller, options?.headers)
+
+          break
+        }
+        catch (error) {
+          if (attempt >= attempts.times || options?.signal?.aborted === true || later?.signal.aborted === true || !attempts.when(apiErrorOf(error)))
+            throw error
+
+          await pause(attempts.delay * 2 ** attempt, options?.signal)
+        }
+        finally {
+          clearTimeout(timer)
+        }
+      }
 
       posted = true
+      release?.()
+      release = undefined
 
-      streaming = onStreamEnd(data, (status) => {
+      streaming = onStreamEnd(answer, (status) => {
         if (status === 'done') {
-          called(page, { action: url(), succeeded: true, data: untrack((data as ActionStream<unknown>).last) }, turn)
+          called(page, { action: url(), succeeded: true, data: untrack((answer as ActionStream<unknown>).last) }, turn)
           refreshPage()
         }
 
@@ -139,34 +261,53 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
       })
 
       if (!streaming) {
-        called(page, { action: url(), succeeded: true, data }, turn)
+        called(page, { action: url(), succeeded: true, data: answer }, turn)
         refreshPage()
       }
 
-      return data
+      void hooked(options?.onSuccess, { data: answer })
+
+      return answer
     }
     catch (error) {
+      failure = error
+
       // A redirect leaves the page as it is until the next one shows.
       if (!posted && !(error instanceof ActionRedirectError))
         undo?.()
 
-      // The server may have run a call aborted once it was sent, which the page then shows as it stands.
-      if (sent && options?.signal?.aborted === true)
+      // The server may have run a call aborted or timed out once it was sent, which the page then shows as it stands.
+      if (sent && (options?.signal?.aborted === true || timedOut))
         refreshPage()
 
       if (error instanceof ActionError && !(error instanceof ActionRedirectError))
         called(page, { action: url(), status: error.status, values: {}, errors: error.errors, data: error.data }, turn)
 
+      if (!(error instanceof ActionRedirectError) && !isAbort(error))
+        void hooked(options?.onError, { error: apiErrorOf(error) })
+
       throw error
     }
     finally {
+      release?.()
+
+      if (undo)
+        released(undo)
+
       if (!streaming)
         shift(-1)
 
       if (turn === started)
         setProgress(undefined)
+
+      if (lane.latest === later)
+        lane.latest = undefined
+
+      void hooked(options?.onSettled, failure === undefined ? { data: answer } : { error: apiErrorOf(failure) })
     }
   }
+
+  const call = async (input: unknown, options?: CallOptions) => run(actionLane, input, options)
 
   return {
     call,
@@ -182,7 +323,11 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
       }),
       error: read((field = '') => failed()?.errors[field]),
       refused: read((error: unknown) => error instanceof ActionError && refusedAt.get(error) === url()),
-      track: read(() => tracked(call, url)),
+      track: read((handle?: { queue?: CallQueue }) => {
+        const lane: Lane = { tail: Promise.resolve(), queue: handle?.queue }
+
+        return tracked(async (input, options) => run(lane, input, options), url)
+      }),
       with: read((fields: Record<string, unknown>) => withFields(call, fields)),
     },
   }
@@ -315,6 +460,13 @@ async function refreshed(): Promise<void> {
     await api.refresh()
   else
     reload()
+}
+
+// What a call limited its refresh to, `refresh()`ed together; one that throws or fails is that source's to show.
+async function refreshedIn(sources: readonly Refreshable[]): Promise<void> {
+  await Promise.allSettled(sources.map(async (source) => {
+    await source.refresh()
+  }))
 }
 
 // Through the swap once it took over the app's links; a site with `navigation: false` loads the page, asking the leave guards first as `navigate()` would.

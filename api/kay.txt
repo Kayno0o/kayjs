@@ -15,7 +15,7 @@ interface Action<Input, Output, Honeypot extends string = never>
   refused: (error: unknown) => error is ActionError<FailureData<Output>>
   settled: () => Promise<void>
   succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
-  track: () => TrackedCall<Input, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
+  track: (options?: undefined | { queue?: CallQueue | undefined; }) => TrackedCall<Input, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
   url: string
   with: (fields: Partial<Input>) => Action<Input, Output, Honeypot>
 
@@ -146,16 +146,26 @@ function call<Module, const Path extends CallPath<Module>, const M extends CallM
 type CallMethod<Node> = Exclude<RouteKey<Node>, 'subscribe'>
 
 [.] CallOptions
-interface CallOptions
+interface CallOptions<Output = unknown>
   headers?: Record<string, string> | undefined
+  onError?: ((event: { error: ApiError<unknown>; }) => unknown) | undefined
+  onSettled?: ((event: { data?: Output | undefined; error?: ApiError<unknown> | undefined; }) => unknown) | undefined
+  onStart?: ((event: { input: unknown; }) => unknown) | undefined
+  onSuccess?: ((event: { data: Output; }) => unknown) | undefined
   optimistic?: (() => void) | undefined
-  refresh?: boolean | undefined
+  queue?: CallQueue | undefined
+  refresh?: Refreshable | boolean | readonly Refreshable[] | undefined
+  retry?: RetryOptions | number | undefined
   signal?: AbortSignal | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [.] CallPath
 type CallPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends {
   path: infer Path, node: infer Node
 } ? [CallMethod<Node>] extends [never] ? never : Path : never : never
+
+[.] CallQueue
+type CallQueue = 'parallel' | 'serial' | 'latest'
 
 [.] CallResult
 type CallResult<Data, Failed> = | { ok: true, data: Data } | ({ ok: false } & ErrorShape<Failed>)
@@ -555,7 +565,7 @@ const navigation: { status: () => NavigationState; pending: () => boolean; to: (
 type NavigationState = 'idle' | 'loading' | 'swapping'
 
 [.] NoInputAction
-type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions) => Promise<Answer<Success<Output>>>)
+type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions<Answer<Success<Output>>>) => Promise<Answer<Success<Output>>>)
 
 [.] onBeforeNavigate
 function onBeforeNavigate(fn: (event: BeforeNavigate) => Promise<boolean | void> | boolean | void): () => void
@@ -802,6 +812,10 @@ function reducedMotion(fallback?: boolean): () => boolean
 [.] refresh
 function refresh(): Promise<void>
 
+[.] Refreshable
+interface Refreshable
+  refresh: () => unknown
+
 [.] refusalMessage
 function refusalMessage(error: unknown, fallback: string): string
 
@@ -869,6 +883,12 @@ type ResourcePath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found 
 
 [.] ResourceStatus
 type ResourceStatus = Exclude<LoadStatus, 'idle'>
+
+[.] RetryOptions
+interface RetryOptions
+  delay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  times: number
+  when?: ((error: ApiError<unknown>) => boolean) | undefined
 
 [.] root
 function root<T>(fn: (dispose: () => void) => T): T
@@ -990,7 +1010,11 @@ interface ServerAction<Schema extends TSchema, Output, Honeypot extends string =
   schema: Schema
   settled: () => Promise<void>
   succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
-  track: () => TrackedCall<Sendable<(Schema & { params: []; })["static"]>, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
+  track: (options?: undefined | {
+  queue?: CallQueue | undefined;
+}) => TrackedCall<Sendable<(Schema & {
+  params: [];
+})["static"]>, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
   url: string
   with: (fields: Partial<Sendable<(Schema & { params: []; })["static"]>>) => Action<Sendable<(Schema & { params: []; })["static"]>, Output, Honeypot>
 
