@@ -10,6 +10,7 @@ import { configError, durationSeconds, keyedDigest, trackDetached } from 'kay/li
 import { siteOrigin } from 'kay/seo'
 import { rateLimit, renderLocale, renderToString, retryLater } from 'kay/server'
 import { wording } from 'kay/words'
+import { listsHome } from './app-lists'
 import { normalizeAddress } from './list-address'
 import { listRegistry } from './list-registry'
 import { LIST_FILE } from './list-store'
@@ -44,7 +45,7 @@ export interface ListConfirmProps {
 }
 
 export interface ListOptions {
-  // The SQLite file holding the lists, `data/mail-list.sqlite` unless given (in memory under `bun test`), shared by every list naming the same one.
+  // The SQLite file holding the lists, the app's database or `data/mail-list.sqlite` unless given (in memory under `bun test`), shared by every list naming the same one.
   file?: string | undefined
   // Keeps the lists elsewhere than in SQLite, such as `pgLists(db)` for a site on Postgres or on several servers; not with `file`.
   store?: ListStore | undefined
@@ -211,11 +212,22 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
   }
 
   const entries = new Map<string, Entry>()
-  // Skipped under `bun test` unless the test names it.
-  const defaultFile = fallback.file ?? (process.env.NODE_ENV === 'test' ? undefined : LIST_FILE)
-  const stores = listRegistry({ file: defaultFile, store: fallback.store })
+  // The mailer's `listStore`, else the app's database, else the default file; none of the last two under `bun test` unless the test names a file.
+  const home = () => fallback.file !== undefined || fallback.store !== undefined || process.env.NODE_ENV === 'test' ? undefined : listsHome()
+  const defaultFile = () => fallback.file ?? (process.env.NODE_ENV === 'test' ? undefined : home()?.file)
+  const defaultStore = (): ListStore | undefined => fallback.store ?? home()?.store
+  const stores = listRegistry({ file: defaultFile, store: defaultStore })
   // A mailer without a `suppressionStore` keeps them where its lists do, else in the default file, in their table alone until a list opens the file.
-  const defaultSuppressions = sqliteSuppressions(defaultFile ?? ':memory:')
+  const defaultSuppressionsFor = new Map<string, SuppressionStore>()
+  const defaultSuppressions = (): SuppressionStore => {
+    const file = defaultFile() ?? ':memory:'
+    let found = defaultSuppressionsFor.get(file)
+
+    if (found === undefined)
+      defaultSuppressionsFor.set(file, found = sqliteSuppressions(file))
+
+    return found
+  }
   const suppressions = suppressionsOf({
     write: () => {
       if (fallback.suppressions !== undefined)
@@ -223,10 +235,10 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
       const keepers = stores.known().filter(keepsSuppressions)
 
-      return keepers.length > 0 ? keepers : [defaultSuppressions]
+      return keepers.length > 0 ? keepers : [defaultSuppressions()]
     },
     // What a list store or the default file kept stays in force.
-    read: () => [...stores.known(), defaultSuppressions],
+    read: () => [...stores.known(), defaultSuppressions()],
   })
   const addressLimit = rateLimit('kmail-list-address', { max: 3, window: '1h' })
   // Across every address of one list, which the per-IP limit alone does not stop from a botnet.
@@ -240,9 +252,9 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     if (options.store !== undefined && options.file !== undefined)
       throw configError(`mail.list(${JSON.stringify(name)}): give a store or a file, not both`)
 
-    const file = options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : LIST_FILE)
-    const chosen = options.store ?? (options.file === undefined ? fallback.store : undefined)
-    const lists = { get: (): ListStore => chosen ?? stores.open(file) }
+    const file = () => options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : defaultFile() ?? LIST_FILE)
+    const chosen = () => options.store ?? (options.file === undefined ? defaultStore() : undefined)
+    const lists = { get: (): ListStore => chosen() ?? stores.open(file()) }
 
     const pace = { batch: options.pace?.batch ?? 20, every: options.pace?.every ?? '1m' }
 
@@ -415,7 +427,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       },
     }
 
-    const opened = (): ListStore | undefined => chosen ?? stores.existing(file)
+    const opened = (): ListStore | undefined => chosen() ?? stores.existing(file())
 
     return { list, source: options.store ?? options.file, get lists() {
       return lists.get()

@@ -247,3 +247,17 @@ describe('the store contract', () => {
     expect(factories.filter(name => !things.has(name.replace(/^(?:memory|sqlite|pg|disk|s3)/, '')))).toEqual([])
   })
 })
+
+describe('appDatabase', () => {
+  it('reads the database of the store: a SQLite file by its path, else a url, and nothing without one', async () => {
+    const { appDatabase } = await import('../src/server/app-database')
+
+    expect(appDatabase()).toBeUndefined()
+    setupStore({ database: 'sqlite:///srv/app/data/app.sqlite' })
+    expect(appDatabase()).toEqual({ kind: 'sqlite', path: '/srv/app/data/app.sqlite' })
+    setupStore({ database: 'postgres://u@db/app' })
+    expect(appDatabase()).toEqual({ kind: 'pg', url: 'postgres://u@db/app' })
+    setupStore({ rates: undefined })
+    expect(appDatabase()).toBeUndefined()
+  })
+})

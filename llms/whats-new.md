@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- kayjs-mail, kayjs-ai and kayjs-cms keep their data in the database of the app's `store`, old local files still read; `pgConversations` and `/pg`, `/sqlite` entries are new: [upgrading](upgrading.md).
+
 ## 1.87.0
 
 - The config's keys are grouped by concern: `dirs` (`routes`, `api`, `public`), `limits` (`body`, `byPath`), `serve` (`apiPath`, `compress`, `compressionDictionary`, `shutdownTimeout`), `observe` (`log`, `serverTiming`, `requestIdHeader`, `tracer`, `onError`) and `client` (`navigation`, `inlineStyles`, `lateStyles`, `typography`, `hydration`, `prefetch`, `saveData`), so a key is found by what it does; the flat keys work until 1.91 and `kay upgrade` moves them (`deprecated-config-groups`): [the config](project.md), [upgrading](upgrading.md#the-config-keys-are-grouped-by-concern).

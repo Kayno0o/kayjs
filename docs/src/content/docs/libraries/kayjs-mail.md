@@ -305,7 +305,7 @@ The schema's field messages (`mail.contact.errors`) and ContactForm's labels (`m
 
 ## A mailing list
 
-`mail.list()` is the site's mailing list. It keeps its subscribers in kay's own store, the file `data/mail-list.sqlite`, so there is nothing to declare and no adapter to write. A site with several lists gives each a name, `mail.list('news')`.
+`mail.list()` is the site's mailing list. It keeps its subscribers in your app's own database, the Postgres of `pgData` or the SQLite file of `sqliteData`, else the file `data/mail-list.sqlite` (kept where it exists), so there is nothing to declare and no adapter to write. A site with several lists gives each a name, `mail.list('news')`.
 
 ```kay
 --- server
@@ -343,7 +343,7 @@ A restart or a deploy in the middle carries on where it stopped, and nobody gets
 
 Every mail ends with an unsubscribe link in the subscriber's language, and carries the `List-Unsubscribe` and `List-Unsubscribe-Post` headers, so Gmail and Yahoo show their one-click button. Opening the link only asks for confirmation, so a mail scanner unsubscribes no one. Unsubscribing needs no sign-in and deletes the address.
 
-On Postgres, or on several servers, give the mailer a store: `mailer({ listStore: pgLists(db) })`, where `db` is what `pgData` takes. A single list can name its own with `mail.list('news', { store })`. The same three `kay_mail_*` tables are created when missing.
+An app whose `store` is `pgData(url)` needs nothing more. To keep the lists elsewhere, give the mailer a store: `mailer({ listStore: pgLists(db) })` (from `@kaynooo/kayjs-mail/pg`), where `db` is what `pgData` takes. A single list can name its own with `mail.list('news', { store })`. The same three `kay_mail_*` tables are created when missing.
 
 If your database role cannot create tables, the owner runs `createMailListTables(db)` once, and you list `mailListTables` in pg-orm's `ignoreTables`.
 
@@ -369,7 +369,7 @@ From then on a mail to that address is skipped and logged, from a form, the queu
 
 A complaint is about the mail it reported, so it stops only bulk mail: a list's and any mail sent with `unsubscribe`. A password reset or a sign-in code still reaches the address. A bounce stops every mail. A skipped mail is not an error: the queue does not retry it. `mail.suppression(address)` says why an address is not mailed, `mail.unsuppress(address)` mails it again, and `mail.erase(address)` clears it with the rest of a person.
 
-Suppressions are kept with the mailing lists, or in `data/mail-list.sqlite` when there are none, made by the first one. A site on several servers with no list keeps them in Postgres instead, with `mailer({ suppressionStore: pgSuppressions(db) })`, where `db` is what `pgData` takes. `sqliteSuppressions(path)` names another SQLite file, and any object with `suppress`, `suppressed` and `lift` is a store.
+Suppressions are kept with the mailing lists, or in your app's database (else `data/mail-list.sqlite`) when there are none, made by the first one. A site on several servers with no list keeps them in Postgres instead, with `mailer({ suppressionStore: pgSuppressions(db) })`, where `db` is what `pgData` takes. `sqliteSuppressions(path)` names another SQLite file, and any object with `suppress`, `suppressed` and `lift` is a store.
 
 Mail servers also answer a failed delivery with a report mail (a DSN). Pipe those, and the replies to your mails, to `POST /_kay/mail/inbound` with `Authorization: Bearer` and `MAIL_INBOUND_SECRET`. A report suppresses the recipients it names, but only when it returns a mail your app sent to that address, which needs `KAY_SECRET`. Any other message goes to the function you give the mailer:
 

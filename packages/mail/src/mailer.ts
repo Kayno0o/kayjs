@@ -80,7 +80,7 @@ export interface MailerOptions {
   logSubjects?: boolean | undefined
   // Where the mailing lists live unless a list names its own `store` or `file`, such as `pgLists(db)` for a site on Postgres. It is also where a link of a list this process has not declared yet looks, and what `mail.erase` reaches, so declare it here rather than on each list.
   listStore?: ListStore | undefined
-  // Where bounces and complaints are kept, such as `pgSuppressions(db)` for a site on several servers with no list. Without it they go where the lists keep theirs, else in `data/mail-list.sqlite`, made by the first one.
+  // Where bounces and complaints are kept, such as `pgSuppressions(db)` for a site on several servers with no list. Without it they go where the lists keep theirs, else in the app's database or `data/mail-list.sqlite`, made by the first one.
   suppressionStore?: SuppressionStore | undefined
   // The secrets of the routes where a provider reports bounces and complaints (`/_kay/mail/events/<provider>`) and a mail server hands over delivery reports and replies (`/_kay/mail/inbound`), `MAIL_EVENTS_<PROVIDER>` and `MAIL_INBOUND_SECRET` in the environment unless given here. A route without its secret answers 404.
   events?: EventSecrets | undefined
@@ -114,7 +114,7 @@ export type Mailer = Elysia & {
   failed: () => Promise<FailedJob<Mail>[]>
   // Removes the queued mail of that id, every one, waiting or failed, sent to `{ recipient }` among its to, cc and bcc, a person's once they asked to be erased say, or every one `match` returns true for; resolves with how many went.
   remove: (match: string | { recipient: string } | ((mail: Mail) => boolean)) => Promise<number>
-  // A mailing list of the site, `default` when unnamed, made on the first call and the same afterwards. It keeps its subscribers in kay's own store (`data/mail-list.sqlite`), mounts the confirmation and unsubscribe links, and sends through this mailer's queue.
+  // A mailing list of the site, `default` when unnamed, made on the first call and the same afterwards. It keeps its subscribers in the app's own database (`data/mail-list.sqlite` when the app's `store` names none), mounts the confirmation and unsubscribe links, and sends through this mailer's queue.
   list: (name?: string, options?: ListOptions) => MailingList
   // Stops mailing the address (a bounce unless `reason` says a complaint), as a provider's report does: later sends skip it, and it leaves every list. Resolves false for a string that is no address.
   suppress: (address: string, reason?: SuppressionReason) => Promise<boolean>

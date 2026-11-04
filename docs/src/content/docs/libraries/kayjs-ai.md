@@ -238,7 +238,7 @@ If your `ask` has `outlive: true`, a reply still running when the page reloads p
 
 When the visitor's session lapses, the chat keeps the conversation it shows, says so with `signedOutLabel`, and posts it whole from then on.
 
-The conversations are kept in `data/ai-conversations.sqlite` unless you give `ai({ conversations })` a store of your own. What they hold is personal data: name it in your privacy notice and delete a user's rows when you erase their account.
+The conversations are kept in your app's own database (the Postgres of `pgData`, the SQLite file of `sqliteData`), else in `data/ai-conversations.sqlite`, unless you give `ai({ conversations })` a store of your own. What they hold is personal data: name it in your privacy notice and delete a user's rows when you erase their account.
 
 <ReadMore href="/llms/kayjs-ai-chat-conversations">How the server holds and replays the history, the list's words and parts, and the store.</ReadMore>
 

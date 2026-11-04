@@ -18,6 +18,8 @@
   },
   "exports": {
     "./add": "./src/add.ts",
+    "./pg": "./src/pg.ts",
+    "./sqlite": "./src/sqlite.ts",
     "./chat.kay": "./src/chat.kay",
     "./chat-launcher.kay": "./src/chat-launcher.kay",
     "./chat-calls.kay": "./src/chat-calls.kay",

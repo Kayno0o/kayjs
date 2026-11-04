@@ -1,13 +1,13 @@
 import type { ContentLoader } from 'kay/content'
 import type { LoaderOptions, Row, SavedEntry } from './shared'
 import { SQL } from 'bun'
-import { existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
+import { contentUrl, existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
 
 export type { LoaderOptions, SeedEntry } from './shared'
 
 export interface PgLoaderOptions extends LoaderOptions {
-  // A connection URL, or the Bun `SQL` the app already has: a pg-orm app passes `db.sql`.
-  sql: string | SQL
+  // A connection URL, or the Bun `SQL` the app already has: a pg-orm app passes `db.sql`. The app's `store: pgData(url)` when left out.
+  sql?: string | SQL | undefined
 }
 
 // Any statement runner of Bun's SQL: the client, or a transaction's.
@@ -42,8 +42,9 @@ export function pgLoader(options: PgLoaderOptions): ContentLoader {
   // The rows' count and the sum of the transactions that wrote them move with an insert, an update and a delete, whoever made them, but also with a `VACUUM FREEZE` or any rewrite of the rows that changed nothing; so the rows are read and hashed only when it moves, and what is reported is that hash.
   let moved: string | undefined
   let fingerprint = ''
-  const watching = watcher(name, `${scopeOf(options.sql)}/${table}`, options.watch, '2s', async (force) => {
-    const client = clientOf(options.sql)
+  const sqlOf = () => options.sql ?? contentUrl()
+  const watching = watcher(name, `${scopeOf(options.sql ?? 'the app\'s store')}/${table}`, options.watch, '2s', async (force) => {
+    const client = clientOf(sqlOf())
     const [row] = await client.unsafe<{ signature: string }[]>(`SELECT count(*)::text || ':' || coalesce(sum(xmin::text::bigint), 0)::text AS signature FROM ${table} WHERE collection = $1`, [name])
 
     if (force || row!.signature !== moved) {
@@ -57,7 +58,7 @@ export function pgLoader(options: PgLoaderOptions): ContentLoader {
   })
 
   const open = async (): Promise<SQL> => {
-    const client = clientOf(options.sql)
+    const client = clientOf(sqlOf())
 
     await client.begin(async (tx) => {
       await tx.unsafe('SELECT pg_advisory_xact_lock($1)', [LOCK])

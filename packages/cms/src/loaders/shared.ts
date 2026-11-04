@@ -1,6 +1,43 @@
 import type { ContentLoader, LoadedEntry } from 'kay/content'
+import { existsSync } from 'node:fs'
+import process from 'node:process'
 import { ContentChangedError, contentKey } from 'kay/content'
-import { configError, durationSeconds, invalidateLocally, onKeysInvalidated, outsideRequest } from 'kay/library'
+import { appDatabase, configError, durationSeconds, invalidateLocally, onKeysInvalidated, outsideRequest } from 'kay/library'
+import { log } from '../log'
+
+// Where a SQLite loader keeps its table when the app's store names no SQLite file.
+const CONTENT_FILE = 'data/content.sqlite'
+// What the file was called before 1.88 gave every default data file the `.sqlite` extension: an app whose entries are in it keeps it.
+const LEGACY_CONTENT_FILE = 'data/content.db'
+let warned = false
+
+// The SQLite file of a loader given none: the file of the app's `store` (`sqliteData`), else `data/content.sqlite`; a `data/content.db` or `data/content.sqlite` that exists keeps being read so an app upgrading loses no entry. Production warns once when the entries go to a local file the store does not name.
+export function contentFile(): string {
+  const database = appDatabase()
+  const file = existsSync(LEGACY_CONTENT_FILE) ? LEGACY_CONTENT_FILE : CONTENT_FILE
+
+  if (database?.kind === 'sqlite' && !existsSync(file))
+    return database.path
+
+  if (!warned && process.env.NODE_ENV === 'production') {
+    warned = true
+    log.warn(database === undefined
+      ? `a content loader keeps its entries in ${file}, a SQLite file: set the app's \`store\` (\`sqliteData\` or \`pgData\`) in kay.config.ts, or give the loader a \`database\`, for a database that outlives a deploy`
+      : `a content loader keeps its entries in ${file}, which exists or is not the app's database: to use the app's database, move the entries into it (or delete the file when it holds none)`)
+  }
+
+  return file
+}
+
+// The Postgres url of a loader given no `sql`: the one of the app's `store`, `pgData(url)`.
+export function contentUrl(): string {
+  const database = appDatabase()
+
+  if (database?.kind !== 'pg')
+    throw configError('pgLoader has no `sql`, and the app\'s `store` names no Postgres: give the loader a connection URL or a Bun `SQL`, or set `store: pgData(url)` in kay.config.ts')
+
+  return database.url
+}
 
 // An entry a loader holds from its first start: the app's initial content.
 export interface SeedEntry {

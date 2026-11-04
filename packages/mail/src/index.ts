@@ -10,6 +10,7 @@ export type { Logo, MailSettings, Palette } from './defaults'
 export { default as mailDefaults } from './defaults'
 export type { EventSecrets, Suppression, SuppressionReason } from './events'
 export type { BroadcastStatus, ListConfirmProps, ListMessage, ListOptions, MailingList, Subscription } from './list'
+// pgLists, createMailListTables, mailListTables, pgSuppressions, createMailSuppressionTable and sqliteSuppressions moved to `@kaynooo/kayjs-mail/pg` and `/sqlite` in 1.88; the root keeps them until 1.91.
 export { createMailListTables, mailListTables, pgLists } from './list-pg'
 export type { Broadcast, BroadcastProgress, ListStore, Subscriber } from './list-store'
 export type { Mailer, MailerOptions, MailExtensionOptions } from './mailer'

@@ -40,7 +40,7 @@ const PRESETS = {
 /** The hooks an app keeps in `src/auth.ts` as `export const hooks`, or hands to `auth({ hooks })`. */
 export type AuthHooks = Partial<Pick<AuthOptions<AuthSessionData, string>, 'allow' | 'authorize' | 'exportData' | 'locate' | 'onAuthEvent' | 'onDelete' | 'onSignUp' | 'profileFields'>>
 
-/** Where kayjs-auth keeps its data when `store` is left out: a pg-orm database at `url`, the database of the app's `store` in kay.config.ts when it names one, else a SQLite file `data/auth.db`. */
+/** Where kayjs-auth keeps its data when `store` is left out: a pg-orm database at `url`, the database of the app's `store` in kay.config.ts when it names one, else a SQLite file `data/auth.sqlite` (`data/auth.db` where an app already has it). */
 export interface StoreUrl {
   url: string
 }
@@ -145,7 +145,9 @@ function foreignTables(names: readonly string[]): RegExp {
   return new RegExp(`^(?!(?:${names.join('|')})$)`)
 }
 
-const OWN_FILE = 'data/auth.db'
+const OWN_FILE = 'data/auth.sqlite'
+// What the file was called before 1.88 gave every default data file the `.sqlite` extension: an app whose users are in it keeps it.
+const LEGACY_OWN_FILE = 'data/auth.db'
 const warned = new Set<string>()
 
 async function storeOf(store: StoreOption | undefined, root: string, shared: string | undefined, exporting: boolean | undefined): Promise<AuthStore> {
@@ -164,12 +166,13 @@ async function storeOf(store: StoreOption | undefined, root: string, shared: str
 
   // The database of the app's own `store` when it names one, so `sqliteData` or `pgData(url)` in kay.config.ts is the only place to say where the data lives.
   // An app whose users are already in `data/auth.db` keeps them there, so an upgrade loses no one.
-  const kept = given === undefined && shared !== undefined && existsSync(resolve(root, OWN_FILE))
+  const file = existsSync(resolve(root, LEGACY_OWN_FILE)) ? LEGACY_OWN_FILE : OWN_FILE
+  const kept = given === undefined && shared !== undefined && existsSync(resolve(root, file))
   const url = kept ? undefined : given ?? shared
 
   if (kept && !warned.has(root)) {
     warned.add(root)
-    log.warn(`auth() keeps its users in ${OWN_FILE}, which exists, though the app's store names a database: to use that database, move the users into it and set KAYJS_AUTH_DATABASE_URL to its url (or delete the file when it holds none)`)
+    log.warn(`auth() keeps its users in ${file}, which exists, though the app's store names a database: to use that database, move the users into it and set KAYJS_AUTH_DATABASE_URL to its url (or delete the file when it holds none)`)
   }
 
   let orm: typeof import('@kaynooo/pg-orm')
@@ -183,7 +186,7 @@ async function storeOf(store: StoreOption | undefined, root: string, shared: str
     throw configError('the store of auth() is a pg-orm database, and @kaynooo/pg-orm is not installed: install it, or give `store` an AuthStore', { cause: error })
   }
 
-  const db = new orm.Database({ url: underRoot(url ?? 'sqlite://data/auth.db', root), tables: [...pg.authTables] })
+  const db = new orm.Database({ url: underRoot(url ?? `sqlite://${file}`, root), tables: [...pg.authTables] })
 
   await db.sync(!kept && url !== undefined && shared !== undefined && sameDatabase(url, shared, root) ? { ignoreTables: [foreignTables(pg.authTables.map(table => table.name))] } : undefined)
 
@@ -275,7 +278,7 @@ export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<
   const mailer = await emailOf(email, app)
 
   if (store === undefined && app.database === undefined && process.env.NODE_ENV === 'production' && filled(process.env.KAYJS_AUTH_DATABASE_URL) === undefined)
-    log.warn('auth() keeps its users in data/auth.db, a SQLite file: set the app\'s `store` (`sqliteData` or `pgData`) in kay.config.ts, KAYJS_AUTH_DATABASE_URL, or auth\'s `store`, for a database that outlives a deploy')
+    log.warn('auth() keeps its users in data/auth.sqlite, a SQLite file: set the app\'s `store` (`sqliteData` or `pgData`) in kay.config.ts, KAYJS_AUTH_DATABASE_URL, or auth\'s `store`, for a database that outlives a deploy')
 
   const made = createAuth({
     ...hooks,

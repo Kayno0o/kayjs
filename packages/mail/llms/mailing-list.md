@@ -4,7 +4,7 @@
 
 ### Let visitors subscribe
 
-`mail.list()` is the site's mailing list, kept in kay's own store with nothing to declare: `data/mail-list.sqlite` (in memory under `bun test`), created by the first query, so building or checking an app makes no file. `.form()` gives the arguments of `action`, as `contactForm` does:
+`mail.list()` is the site's mailing list, kept in the app's own database with nothing to declare: the Postgres of `store: pgData(url)` or the SQLite file of `sqliteData(path)`, else `data/mail-list.sqlite` (in memory under `bun test`), created by the first query, so building or checking an app makes no file. A `data/mail-list.sqlite` that exists keeps being read, so an app upgrading loses no subscriber, and production warns once when the lists go to a local file. `.form()` gives the arguments of `action`, as `contactForm` does:
 
 ```kay
 --- server
@@ -52,7 +52,8 @@ await mail.list().status(id) // { done, sent, failed, retrying, unsure, waiting 
 - Tables: `kay_mail_subscribers`, `kay_mail_broadcasts`, `kay_mail_deliveries`. Replicas on several machines need the SQLite file shared, or Postgres:
 
 ```ts
-import { mailer, pgLists } from '@kaynooo/kayjs-mail'
+import { mailer } from '@kaynooo/kayjs-mail'
+import { pgLists } from '@kaynooo/kayjs-mail/pg'
 
 export const mail = mailer({ listStore: pgLists(db) }) // db: a Bun SQL, a pg-orm Database or a connection URL, as pgData takes
 ```

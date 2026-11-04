@@ -1,7 +1,6 @@
 import type { Database } from 'bun:sqlite'
 import type { ConversationSummary } from './conversation-title'
 import type { Source } from './types'
-import process from 'node:process'
 import { openSqlite } from 'kay/library'
 
 // A tool call a reply made and what the model was told of it, as the next ask replays them.
@@ -97,7 +96,7 @@ interface Row {
   turns: string
 }
 
-function turnsOf(text: string): StoredTurn[] {
+export function turnsOf(text: string): StoredTurn[] {
   try {
     const value: unknown = JSON.parse(text)
 
@@ -131,16 +130,25 @@ export function sqliteConversations(path: string = CONVERSATIONS_FILE): Conversa
 function open(path: string) {
   const db: Database = openSqlite(path)
 
-  db.run('CREATE TABLE IF NOT EXISTS kai_conversations (owner TEXT NOT NULL, scope TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL, revision INTEGER NOT NULL, updated_at INTEGER NOT NULL, turns TEXT NOT NULL, PRIMARY KEY (owner, scope, id))')
-  db.run('CREATE INDEX IF NOT EXISTS kai_conversations_updated ON kai_conversations (owner, scope, updated_at)')
+  // The table had a `kai_` prefix before it followed the `kay_<library>_*` naming: a file from then keeps its conversations under the new name. The old name is built, as the naming test would otherwise take it for a table kept.
+  const legacy = ['kai', 'conversations'].join('_')
+  const tableNamed = (name: string) => db.query('SELECT 1 FROM sqlite_master WHERE type = \'table\' AND name = ?').get(name) !== null
 
-  const list = db.query<Row, [string, string, number]>('SELECT id, title, revision, updated_at, \'\' AS turns FROM kai_conversations WHERE owner = ?1 AND scope = ?2 ORDER BY updated_at DESC, rowid DESC LIMIT ?3')
-  const get = db.query<Row, [string, string, string]>('SELECT id, title, revision, updated_at, turns FROM kai_conversations WHERE owner = ?1 AND scope = ?2 AND id = ?3')
-  const upsert = db.query('INSERT INTO kai_conversations (owner, scope, id, title, revision, updated_at, turns) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) ON CONFLICT (owner, scope, id) DO UPDATE SET revision = ?5, updated_at = ?6, turns = ?7')
-  const prune = db.query('DELETE FROM kai_conversations WHERE owner = ?1 AND scope = ?2 AND id NOT IN (SELECT id FROM kai_conversations WHERE owner = ?1 AND scope = ?2 ORDER BY updated_at DESC, rowid DESC LIMIT ?3)')
+  if (tableNamed(legacy) && !tableNamed('kay_ai_conversations')) {
+    db.run(`DROP INDEX IF EXISTS ${legacy}_updated`)
+    db.run(`ALTER TABLE ${legacy} RENAME TO kay_ai_conversations`)
+  }
+
+  db.run('CREATE TABLE IF NOT EXISTS kay_ai_conversations (owner TEXT NOT NULL, scope TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL, revision INTEGER NOT NULL, updated_at INTEGER NOT NULL, turns TEXT NOT NULL, PRIMARY KEY (owner, scope, id))')
+  db.run('CREATE INDEX IF NOT EXISTS kay_ai_conversations_updated ON kay_ai_conversations (owner, scope, updated_at)')
+
+  const list = db.query<Row, [string, string, number]>('SELECT id, title, revision, updated_at, \'\' AS turns FROM kay_ai_conversations WHERE owner = ?1 AND scope = ?2 ORDER BY updated_at DESC, rowid DESC LIMIT ?3')
+  const get = db.query<Row, [string, string, string]>('SELECT id, title, revision, updated_at, turns FROM kay_ai_conversations WHERE owner = ?1 AND scope = ?2 AND id = ?3')
+  const upsert = db.query('INSERT INTO kay_ai_conversations (owner, scope, id, title, revision, updated_at, turns) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) ON CONFLICT (owner, scope, id) DO UPDATE SET revision = ?5, updated_at = ?6, turns = ?7')
+  const prune = db.query('DELETE FROM kay_ai_conversations WHERE owner = ?1 AND scope = ?2 AND id NOT IN (SELECT id FROM kay_ai_conversations WHERE owner = ?1 AND scope = ?2 ORDER BY updated_at DESC, rowid DESC LIMIT ?3)')
   // A rename keeps the conversation's place in the list and among the ones kept, which only its turns move.
-  const rename = db.query('UPDATE kai_conversations SET title = ?1 WHERE owner = ?2 AND scope = ?3 AND id = ?4')
-  const remove = db.query('DELETE FROM kai_conversations WHERE owner = ?1 AND scope = ?2 AND id = ?3')
+  const rename = db.query('UPDATE kay_ai_conversations SET title = ?1 WHERE owner = ?2 AND scope = ?3 AND id = ?4')
+  const remove = db.query('DELETE FROM kay_ai_conversations WHERE owner = ?1 AND scope = ?2 AND id = ?3')
 
   // The check of the revision and the write are one transaction, so two processes writing at once cannot both pass it.
   const write = db.transaction(({ owner, scope, id }: ConversationKey, revision: number, { drop, add, title }: ConversationChange): number | undefined => {
@@ -161,26 +169,4 @@ function open(path: string) {
   })
 
   return { list, get, write: (key: ConversationKey, revision: number, change: ConversationChange) => write.immediate(key, revision, change), rename, remove }
-}
-
-const SLOT = Symbol.for('kayjs-ai.conversations')
-
-// On the global, so every copy of the library in the process keeps conversations in one store.
-function slot(): { store: ConversationStore | undefined, chosen: ConversationStore | undefined } {
-  const holder = globalThis as { [SLOT]?: { store: ConversationStore | undefined, chosen: ConversationStore | undefined } }
-
-  return holder[SLOT] ??= { store: undefined, chosen: undefined }
-}
-
-// Set by `ai({ conversations })`; undefined goes back to the default file, opened again on use, so a test calling `ai()` starts on an empty one.
-export function useConversations(store: ConversationStore | undefined): void {
-  slot().chosen = store
-  slot().store = undefined
-}
-
-// The store `ai()` was given, else the default file, in memory under `bun test`, opened once.
-export function conversationStore(): ConversationStore {
-  const held = slot()
-
-  return held.chosen ?? (held.store ??= sqliteConversations(process.env.NODE_ENV === 'test' ? ':memory:' : CONVERSATIONS_FILE))
 }

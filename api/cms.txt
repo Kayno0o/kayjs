@@ -906,7 +906,7 @@ function pgLoader(options: PgLoaderOptions): ContentLoader<unknown>
 interface PgLoaderOptions extends LoaderOptions
   name: string
   seed?: (() => Promise<readonly SeedEntry[]> | readonly SeedEntry[]) | readonly SeedEntry[] | undefined
-  sql: SQL | string
+  sql?: SQL | string | undefined
   table?: string | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
@@ -955,7 +955,7 @@ function sqliteLoader(options: SqliteLoaderOptions): ContentLoader<unknown>
 
 [./sqlite] SqliteLoaderOptions
 interface SqliteLoaderOptions extends LoaderOptions
-  database: Database | string
+  database?: Database | string | undefined
   name: string
   seed?: (() => Promise<readonly SeedEntry[]> | readonly SeedEntry[]) | readonly SeedEntry[] | undefined
   table?: string | undefined

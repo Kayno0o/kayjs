@@ -42,7 +42,7 @@ export interface AiOptions extends AskHooks {
   budget?: BudgetOptions | false | undefined
   // Who a signed-in visitor is, such as their id: counted in place of their address, and the owner of the conversations a `Chat` keeps on the server, and in place of the user a library such as kayjs-auth names. Left out, that user counts, else the address.
   key?: ((request: Request) => string | undefined | Promise<string | undefined>) | undefined
-  // Where the conversations of a `Chat` with `keepOnServer` are kept: `sqliteConversations('data/ai-conversations.sqlite')` unless given (in memory under `bun test`).
+  // Where the conversations of a `Chat` with `keepOnServer` are kept: the app's database (`pgConversations`, or the SQLite file of `sqliteData`) or `data/ai-conversations.sqlite` unless given (in memory under `bun test`).
   conversations?: ConversationStore | undefined
   // Drafts the `alt` of each imported image a server-rendered page shows with none, once per image content, and `kay check` lists the drafts for review. Off by default, as it sends the images to the model. `{ reviewed }` names the images (`team-abc.png`, as `kay check` prints them) whose draft was reviewed, which `kay check` stops listing.
   imageAlt?: boolean | { reviewed?: string[] | undefined } | undefined

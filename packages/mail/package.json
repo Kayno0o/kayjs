@@ -23,6 +23,8 @@
   "exports": {
     "./*.kay": "./src/*.kay",
     "./add": "./src/add.ts",
+    "./pg": "./src/pg.ts",
+    "./sqlite": "./src/sqlite.ts",
     "./test": "./src/test.ts",
     ".": {
       "types": "./types/index.d.ts",

@@ -984,6 +984,18 @@ component default
   untitledLabel?: string | undefined
   variant?: "bubble" | "plain" | undefined
 
+[./pg] conversationTable
+const conversationTable: "kay_ai_conversations"
+
+[./pg] createConversationTable
+function createConversationTable(source: PgJobsSource): Promise<void>
+
+[./pg] pgConversations
+function pgConversations(source: PgJobsSource): ConversationStore & { close: () => Promise<void>; }
+
+[./sqlite] sqliteConversations
+function sqliteConversations(path?: string): ConversationStore
+
 [./test] aiTest
 function aiTest(): AiTest
 

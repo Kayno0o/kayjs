@@ -3,16 +3,16 @@ import type { LoaderOptions, Row, SavedEntry } from './shared'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { Database } from 'bun:sqlite'
-import { existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
+import { contentFile, existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
 
 export type { LoaderOptions, SeedEntry } from './shared'
 
 export interface SqliteLoaderOptions extends LoaderOptions {
-  // The database file, created with its folder when missing, or a `bun:sqlite` `Database` the app opened.
-  database: string | Database
+  // The database file, created with its folder when missing, or a `bun:sqlite` `Database` the app opened. The file of the app's `store: sqliteData(path)` when left out, else `data/content.sqlite`.
+  database?: string | Database | undefined
 }
 
-// A collection's entries kept in one SQLite table of JSON entries: `collection(sqliteLoader({ name: 'posts', database: 'data/content.db', seed }), { schema })`. The table is created, and the seed written, when the first read or save comes; a save of several entries is one transaction.
+// A collection's entries kept in one SQLite table of JSON entries: `collection(sqliteLoader({ name: 'posts', seed }), { schema })`. The table is created, and the seed written, when the first read or save comes; a save of several entries is one transaction.
 export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
   const { name, ttl } = options
   const table = tableOf(options.table)
@@ -22,7 +22,7 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
   // `data_version` moves when another connection committed, a process or the `sqlite3` tool, in any table of the file; the collection's rows are read and hashed only then, so a write to another collection or table invalidates nothing.
   let version: number | undefined
   let fingerprint = ''
-  const watching = watcher(name, `${scopeOf(options.database)}/${table}`, options.watch, '1s', (force) => {
+  const watching = watcher(name, `${scopeOf(options.database ?? 'the app\'s store')}/${table}`, options.watch, '1s', (force) => {
     const now = opened!.query<{ data_version: number }, []>('PRAGMA data_version').get()!.data_version
 
     if (force || now !== version) {
@@ -37,7 +37,7 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
     if (opened !== undefined)
       return opened
 
-    const { database } = options
+    const database = options.database ?? contentFile()
     const db = typeof database === 'string' ? connection(database) : database
 
     db.run(`CREATE TABLE IF NOT EXISTS ${table} (collection TEXT NOT NULL, place TEXT NOT NULL, data TEXT NOT NULL, body TEXT, PRIMARY KEY (collection, place))`)

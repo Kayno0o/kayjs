@@ -1,6 +1,5 @@
-import type { ContentLoader } from 'kay/content'
 import type { EntryRef } from './kay/contract'
-import { outsideRequest } from 'kay/library'
+import { kv, outsideRequest } from 'kay/library'
 import { isEvent, pruneActivity } from './activity'
 import { hiddenOf, rowOf, SWEEP_MARKER } from './hidden'
 import { collections, entries } from './kay/content'
@@ -40,10 +39,21 @@ async function loadedNames(): Promise<string[]> {
   return (await collections({ counts: false })).filter(collection => collection.kind === 'loaded').map(collection => collection.name)
 }
 
-async function readMarks(history: ContentLoader): Promise<Marks | undefined> {
-  const marks = (await rowOf(history, SWEEP_MARKER))?.data as Partial<Marks> | undefined
+// The marks live in the app store's kv, so a collection on a loader with no write of its own to spare keeps them with the app's other shared state. One that cannot be read or written only costs the next sweep a full read.
+const sweepMarks = kv('cms-sweep')
 
-  return typeof marks?.full === 'number' ? marks as Marks : undefined
+async function readMarks(name: string): Promise<Marks | undefined> {
+  try {
+    const saved = await sweepMarks.get(name)
+    const found = saved === undefined ? undefined : JSON.parse(saved) as Partial<Marks>
+
+    return typeof found?.full === 'number' ? found as Marks : undefined
+  }
+  catch (error) {
+    log.warn(`the sweep marks of ${name} could not be read, so it is swept in full`, error)
+
+    return undefined
+  }
 }
 
 // Drops what the trash and the history may no longer keep: the trash past `history.trash`, the revisions and activity past `history.maxAge`. Never throws.
@@ -76,7 +86,7 @@ async function sweepCollection(name: string, cutoff: number | undefined, request
   const now = Date.now()
   const kept = settings().history?.trash
   const store = hiddenOf(name, 'history')
-  const marks = store === undefined || requested === true ? undefined : await readMarks(store)
+  const marks = store === undefined || requested === true ? undefined : await readMarks(name)
   const everything = requested === true || (requested === undefined && (marks === undefined || now - marks.full >= FULL_AFTER))
   const next: Marks = { full: everything ? now : marks?.full ?? 0 }
   const trash = hiddenOf(name, 'trash')
@@ -125,8 +135,20 @@ async function sweepCollection(name: string, cutoff: number | undefined, request
       next.full = marks?.full ?? 0
   }
 
-  if (store !== undefined && JSON.stringify(next) !== JSON.stringify(marks))
-    await store.save!({ slug: SWEEP_MARKER, data: next })
+  if (store === undefined)
+    return
+
+  try {
+    if (JSON.stringify(next) !== JSON.stringify(marks))
+      await sweepMarks.set(name, JSON.stringify(next))
+
+    // The marks were rows of the history store before they moved to the kv: one left behind goes with the first full sweep.
+    if (everything && await rowOf(store, SWEEP_MARKER) !== undefined)
+      await store.remove?.({ slug: SWEEP_MARKER })
+  }
+  catch (error) {
+    log.warn(`the sweep marks of ${name} could not be saved, so the next sweep reads it in full`, error)
+  }
 }
 
 let sweeping: ReturnType<typeof setTimeout> | undefined

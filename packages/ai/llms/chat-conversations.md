@@ -54,11 +54,12 @@ Chat(action={reply} conversations fill)
 
 ### The store
 
-- By default the conversations are kept in `data/ai-conversations.sqlite`, opened by the first one stored, in memory under `bun test`. An owner keeps at most 200 conversations under one action, the least recently updated going first, and a conversation its 500 latest turns.
-- `ai({ conversations })` takes a store of your own, a `ConversationStore` (`list`, `get`, `write`, `rename`, `remove`, each async): `write(key, revision, change)` applies `{ drop, add, title }` only when the conversation is still at `revision` (0 for a new one) and answers the new revision, or `undefined` when another write came first. A store keeps every field of a turn as given, `steps` (the tool calls of a reply) included, or replay is lost without an error. The turns `add` holds name the Chat's reply that wrote them (`reply`), which the store keeps with each turn and `get` gives back, so a tab whose write lost is refused its next send; a store dropping it lets that send through. `sqliteConversations(path)` builds the default on another file.
+- By default the conversations are kept in the app's own database: the Postgres of `store: pgData(url)` (`pgConversations`) or the SQLite file of `sqliteData(path)`, in a `kay_ai_conversations` table; an app with no such store uses `data/ai-conversations.sqlite`, opened by the first one stored, in memory under `bun test`. A `data/ai-conversations.sqlite` that exists keeps being read, and production warns once when conversations go to a local file. An owner keeps at most 200 conversations under one action, the least recently updated going first, and a conversation its 500 latest turns.
+- `ai({ conversations })` takes a store of your own, a `ConversationStore` (`list`, `get`, `write`, `rename`, `remove`, each async): `write(key, revision, change)` applies `{ drop, add, title }` only when the conversation is still at `revision` (0 for a new one) and answers the new revision, or `undefined` when another write came first. A store keeps every field of a turn as given, `steps` (the tool calls of a reply) included, or replay is lost without an error. The turns `add` holds name the Chat's reply that wrote them (`reply`), which the store keeps with each turn and `get` gives back, so a tab whose write lost is refused its next send; a store dropping it lets that send through. `sqliteConversations(path)` from `@kaynooo/kayjs-ai/sqlite` builds the SQLite one on another file, and `pgConversations(db)` from `@kaynooo/kayjs-ai/pg` the Postgres one (`db` a Bun `SQL`, a pg-orm `Database` or a url; the table is made on first use, or by the owner with `createConversationTable(db)` and listed as `conversationTable` in pg-orm's `ignoreTables`). The root keeps `sqliteConversations` until 1.91.
 
 ```ts
-import { ai, sqliteConversations } from '@kaynooo/kayjs-ai'
+import { ai } from '@kaynooo/kayjs-ai'
+import { sqliteConversations } from '@kaynooo/kayjs-ai/sqlite'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({ extensions: [ai({ conversations: sqliteConversations('data/chats.sqlite') })] })

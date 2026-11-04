@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, setSystemTime, spyOn, test } from 'bun:test'
 import { s } from 'kay'
 import { collection } from 'kay/content'
+import { kv } from 'kay/library'
 import { registerCollections } from '../../../src/content/edit'
 import { activityOf } from '../src/activity'
 import * as activity from '../src/activity'
@@ -48,9 +49,10 @@ function spyOnLoads(): () => { trash: number, activity: number } {
   return () => ({ ...reads })
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   configure({})
   notes()
+  await kv('cms-sweep').delete('notes')
 })
 
 afterEach(() => {
@@ -206,9 +208,9 @@ describe('sweepHistory', () => {
 })
 
 async function marker(): Promise<{ full: number, trash?: { places: string[], rev: string }, activity?: { oldest: number } } | undefined> {
-  const row = (await hiddenOf('notes', 'history', { anyway: true })!.load({ preview: true })).find(found => found.slug === SWEEP_MARKER)
+  const saved = await kv('cms-sweep').get('notes')
 
-  return row?.data as never
+  return saved === undefined ? undefined : JSON.parse(saved) as never
 }
 
 describe('the sweep marker', () => {
@@ -304,6 +306,17 @@ describe('the sweep marker', () => {
     await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
     await sweepHistory()
     expect(await marker()).toEqual({ full: expect.any(Number) } as never)
+  })
+
+  test('is saved in the app store\'s kv, and a row of the history store from before it goes with the first full sweep', async () => {
+    const history = hiddenOf('notes', 'history', { anyway: true })!
+
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await history.save!({ slug: SWEEP_MARKER, data: { full: 0 } })
+    await sweepHistory()
+
+    expect((await marker())?.full).toBeGreaterThan(0)
+    expect((await history.load({ preview: true })).some(row => row.slug === SWEEP_MARKER)).toBe(false)
   })
 
   test('is not an entry, an erasure nor an editor', async () => {

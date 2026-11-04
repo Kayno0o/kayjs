@@ -757,6 +757,12 @@ interface AnswerIssue
   message: string
   path: string
 
+[./library] appDatabase
+function appDatabase(): AppDatabase | undefined
+
+[./library] AppDatabase
+type AppDatabase = { kind: 'sqlite', path: string } | { kind: 'pg', url: string }
+
 [./library] appModules
 function appModules(root: string, { name, appFiles }: Pick<KayExtension<AnyElysia>, "appFiles" | "name">): Promise<Record<string, Record<string, unknown> | undefined>>
 

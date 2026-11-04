@@ -281,7 +281,7 @@ describe('the store', () => {
       process.env.NODE_ENV = 'test'
     }
 
-    expect(existsSync(join(root, 'data/auth.db'))).toBe(true)
+    expect(existsSync(join(root, 'data/auth.sqlite'))).toBe(true)
   })
 
   describe('inferred from the app\'s store', () => {
@@ -322,7 +322,7 @@ describe('the store', () => {
       await withAppTable()
       await inDevelopment(async () => registerOn({}, `sqlite://${shared()}`))
 
-      expect(existsSync(join(root, 'data/auth.db'))).toBe(false)
+      expect(existsSync(join(root, 'data/auth.sqlite'))).toBe(false)
       expect(tables().names).toContain('kay_users')
       expect(tables().things).toEqual([{ id: 'kept' }])
     })
@@ -389,7 +389,7 @@ describe('the store', () => {
       })
 
       expect(tables().names).not.toContain('kay_users')
-      expect(existsSync(join(root, 'data/auth.db'))).toBe(false)
+      expect(existsSync(join(root, 'data/auth.sqlite'))).toBe(false)
     })
 
     test('stays in memory under test, so a test never writes into the app\'s database', async () => {

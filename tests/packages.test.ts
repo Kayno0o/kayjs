@@ -621,3 +621,55 @@ describe('the release\'s failure path', () => {
     expect(await git('status', '--porcelain')).toBe('')
   })
 })
+
+// A library keeping data in SQL names where: `/pg` and `/sqlite` entries beside its root, which imports no driver, so an app on Postgres loads no SQLite and the reverse.
+describe('the libraries that keep data in SQL', () => {
+  const keepers = libraries.filter(({ manifest }) => ['@kaynooo/kayjs-mail', '@kaynooo/kayjs-ai', '@kaynooo/kayjs-cms'].includes(manifest.name))
+  const DRIVER = /^import (?!type\b)[^'"\n]*from ['"](?:bun:sqlite|bun|@kaynooo\/pg-orm)['"]/gm
+  const RELATIVE = /(?:from|import)\s+['"](\.[^'"]+)['"]/g
+
+  // The value imports of a driver among the modules the root reaches through relative imports.
+  async function driverImports(folder: string, entry: string): Promise<string[]> {
+    const seen = new Set<string>()
+    const found: string[] = []
+    const queue = [entry]
+
+    while (queue.length > 0) {
+      const path = queue.pop()!
+
+      if (seen.has(path) || !path.endsWith('.ts'))
+        continue
+
+      seen.add(path)
+
+      const file = Bun.file(`${folder}/${path}`)
+      const text = await file.exists() ? await file.text() : ''
+
+      if (DRIVER.test(text))
+        found.push(path)
+
+      DRIVER.lastIndex = 0
+
+      for (const [, relative] of text.matchAll(RELATIVE)) {
+        const resolved = new URL(`${relative!}${relative!.endsWith('.ts') ? '' : '.ts'}`, `file:///${path}`).pathname.slice(1)
+
+        queue.push(resolved)
+      }
+    }
+
+    return found
+  }
+
+  it.each(keepers)('$manifest.name has /pg and /sqlite entries', async ({ path }) => {
+    const exports = (await Bun.file(path).json() as { exports: Record<string, unknown> }).exports
+
+    for (const subpath of ['./pg', './sqlite']) {
+      expect(typeof exports[subpath]).toBe('string')
+      expect(await Bun.file(`${path.replace('package.json', '')}${(exports[subpath] as string).slice(2)}`).exists()).toBe(true)
+    }
+  })
+
+  it.each(keepers)('$manifest.name has a root that imports no driver', async ({ path }) => {
+    expect(await driverImports(path.replace('/package.json', ''), 'src/index.ts')).toEqual([])
+  })
+})
