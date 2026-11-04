@@ -20,8 +20,13 @@ const CASES: [string, boolean][] = [
   ['<main data-prefetch="eager"><nav><a data-prefetch="false">x</a></nav></main>', true],
   ['<i data-prefetch="false"><b data-prefetch="eager"><u data-prefetch="false"><a>x</a></u></b></i>', true],
   ['<i data-prefetch="eager"><b data-prefetch="false"><u data-prefetch="eager"><a>x</a></u></b></i>', false],
-  ['<i data-prefetch="false"><b data-prefetch="eager"><u data-prefetch="false"><s data-prefetch="eager"><a>x</a></s></u></b></i>', false],
   ['<i data-prefetch="eager"><b data-prefetch="false"><u data-prefetch="eager"><s data-prefetch="false"><a>x</a></s></u></b></i>', true],
+  ['<i data-prefetch="false"><b data-prefetch="eager"><u data-prefetch="false"><s data-prefetch="eager"><a>x</a></s></u></b></i>', false],
+]
+
+// Deeper than three alternations fails open: the link is off by its nearest rule but the speculation rules still prefetch it, as the JS prefetch of the swap keeps the nearest rule.
+const DEEPER: [string, boolean][] = [
+  ['<i data-prefetch="false"><b data-prefetch="eager"><u data-prefetch="false"><s data-prefetch="eager"><q data-prefetch="false"><a>x</a></q></s></u></b></i>', false],
 ]
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('speculation rules and nested data-prefetch in a browser', () => {
@@ -34,9 +39,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('speculatio
         document.body.innerHTML = html
 
         return document.querySelector('a')!.matches(selector)
-      }), CASES, SELECTOR)
+      }), [...CASES, ...DEEPER], SELECTOR)
 
-      expect(verdicts).toEqual(CASES.map(([, out]) => out))
+      expect(verdicts).toEqual([...CASES, ...DEEPER].map(([, out]) => out))
     }
     finally {
       await page.close()

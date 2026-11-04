@@ -1396,9 +1396,12 @@ describe('prefetch', () => {
   it('prefetches the pages links point at on hover, leaving out the urls kay serves itself, the API, downloads, nofollow and opted-out links', async () => {
     const rules = JSON.parse(SPECULATION.exec((await get('/about')).html)![1]!) as unknown
 
+    const selector = (rules as { prefetch: { where: { and: { not?: { selector_matches?: string } }[] } }[] }).prefetch[0]!.where.and.at(-1)!.not!.selector_matches!
+
+    expect(selector).toMatch(/^\[data-no-prefetch\], .*, \[download\], \[rel~=nofollow\]$/)
     expect(rules).toEqual({ prefetch: [{
       source: 'document',
-      where: { and: [{ href_matches: '/*' }, { not: { href_matches: '/_kay/*' } }, { not: { href_matches: '/api/*' } }, { not: { href_matches: '/api' } }, { not: { selector_matches: expect.stringMatching(/^\[data-no-prefetch\], .*, \[download\], \[rel~=nofollow\]$/) as unknown as string } }] },
+      where: { and: [{ href_matches: '/*' }, { not: { href_matches: '/_kay/*' } }, { not: { href_matches: '/api/*' } }, { not: { href_matches: '/api' } }, { not: { selector_matches: selector } }] },
       eagerness: 'moderate',
     }] })
     expect(speculationRules('eager')).toContain('"eagerness":"eager"')

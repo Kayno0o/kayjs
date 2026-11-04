@@ -3,7 +3,7 @@ export type Prefetch = 'conservative' | 'moderate' | 'eager' | false
 
 const OFF = '[data-prefetch=false]'
 const ON = '[data-prefetch]:not([data-prefetch=false])'
-const NESTING = 7
+const NESTING = 3
 
 // The chain of `data-prefetch` elements from the root down to a link, alternating off and on, written as a selector: the link itself may be the last of the chain.
 function chain(length: number): string {
@@ -13,7 +13,7 @@ function chain(length: number): string {
   return [[...steps, `a${last}`].join(' '), [...steps, last, 'a'].join(' ')].join(', ')
 }
 
-// A link follows its nearest `data-prefetch`, itself or an ancestor. CSS cannot ask for the nearest, but the chain of off and on elements above a link, squeezed to alternate, ends on off exactly when its longest subsequence starting on off has an odd length, so the selector lists each odd length that the next one does not reach, up to a nesting of NESTING.
+// A link follows its nearest `data-prefetch`, itself or an ancestor. CSS cannot ask for the nearest, but the chain of off and on elements above a link, squeezed to alternate, ends on off exactly when its longest subsequence starting on off has an odd length, so the selector lists each odd length that the next one does not reach, up to a nesting of NESTING levels (off in on, on in off, off in on in off) to keep the selector, which every page carries, short. Deeper nesting fails open: a link marked off under three or more alternations is still prefetched by these rules, while the JS prefetch keeps the nearest rule.
 const OPTED_OUT = Array.from({ length: (NESTING + 1) / 2 }, (_, at) => `:is(${chain(at * 2 + 1)}):not(:is(${chain(at * 2 + 2)}))`).join(', ')
 
 // Under a mount point or a moved API, one script per setting, base and API path, made once.
