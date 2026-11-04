@@ -117,6 +117,16 @@ async function wakeForms(form?: HTMLFormElement, posted?: { submitter: HTMLEleme
 }
 
 // A post to an action, or a GET to an address of this site, before the forms' listener runs, as from a form an island rendered that nothing focused, held until the listener loads.
+// Whether a form's action swaps in place, false for one no URL parses; a try rather than URL.canParse, which the supported browsers lack.
+function swappableAction(action: string): boolean {
+  try {
+    return swappable(new URL(action, location.href))
+  }
+  catch {
+    return false
+  }
+}
+
 function onEarlySubmit(event: SubmitEvent): void {
   const form = event.target as HTMLFormElement
   const { submitter } = event
@@ -128,7 +138,7 @@ function onEarlySubmit(event: SubmitEvent): void {
     return
 
   // A cheaper test than the forms' listener's: what it leaves to the browser, such as a post to another site naming an action's path, still reaches it, its submit event fired again. A submit button pressed with a key held is the browser's, as a link is.
-  if (method === 'post' ? !ACTION_PATH.test(action) : method === 'dialog' || (navigation.modified === true && submitter !== null) || !URL.canParse(action, location.href) || !swappable(new URL(action, location.href)))
+  if (method === 'post' ? !ACTION_PATH.test(action) : method === 'dialog' || (navigation.modified === true && submitter !== null) || !swappableAction(action))
     return
 
   event.preventDefault()
