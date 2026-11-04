@@ -101,6 +101,7 @@ describe('the process memory fallback and a closed store', () => {
       expect(told()).toBe(1)
       await kv('other').get('a')
       expect(told()).toBe(1)
+      expect(String(warn.mock.calls.find(([message]) => String(message).includes('has no kv'))?.[0])).toContain('"warned" first')
 
       setupStore({ kv: memoryKv() })
       await kv('warned').get('a')

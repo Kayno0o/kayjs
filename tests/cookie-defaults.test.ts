@@ -14,6 +14,9 @@ const REDIRECT = '--- server\nctx.cookies.set(\'went\', \'1\')\nctx.redirect(\'/
 
 const API = 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', ({ cookie }) => {\n  cookie.theme!.value = \'dark\'\n  cookie.loose!.set({ value: \'1\', httpOnly: false, secure: false, sameSite: \'strict\', path: \'/x\' })\n\n  return \'ok\'\n})\n'
 
+const OWN = 'import { Elysia } from \'elysia\'\n\nexport default new Elysia({ cookie: { httpOnly: false, path: \'/own\' } }).get(\'/\', ({ cookie }) => {\n  cookie.theme!.value = \'dark\'\n\n  return \'ok\'\n})\n'
+const GONE = 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', ({ cookie }) => {\n  cookie.theme!.remove()\n\n  return \'ok\'\n})\n'
+
 const GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ cookies }) => {\n  cookies.set(\'guarded\', \'1\')\n})\n'
 
 // An expired cookie with the attributes a set would carry, so a `Secure` or `__Host-` one is cleared.
@@ -40,11 +43,14 @@ describe('cookie defaults', () => {
       Bun.write(join(dir, 'routes/act/index.kay'), ACTION),
       Bun.write(join(dir, 'routes/go.kay'), REDIRECT),
       Bun.write(join(dir, 'api/jar.ts'), API),
+      Bun.write(join(dir, 'api/own.ts'), OWN),
+      Bun.write(join(dir, 'api/gone.ts'), GONE),
     ])
 
     const base = { root: dir, routesDir: 'routes', apiDir: 'api', prebuilt: false }
 
     servers.plain = await pages({ ...base, security: false })
+    servers.off = await pages({ ...base, security: { cookies: false } })
     servers.safe = await pages({ ...base, security: { cookies: {} } })
     servers.mounted = await pages({ ...base, base: '/app', security: { cookies: {} } })
     servers.custom = await pages({ ...base, security: { cookies: { sameSite: 'none', path: '/shop', httpOnly: false } } })
@@ -143,6 +149,14 @@ describe('cookie defaults', () => {
     expect((await cookies('mounted', '/api/jar')).set[0]).toBe('theme=dark; Path=/app; HttpOnly; SameSite=Lax')
     expect((await cookies('custom', '/api/jar')).set[0]).toBe('theme=dark; Path=/shop; Secure; SameSite=None')
     expect((await cookies('always', '/api/jar')).set[0]).toBe('theme=dark; Path=/; HttpOnly; Secure; SameSite=Lax')
+  })
+
+  it('hardens a removal, leaves a module\'s own cookie config unread, and does nothing with the defaults off', async () => {
+    expect((await cookies('safe', '/api/gone', { headers: { cookie: 'theme=old' } })).set[0]).toMatch(/^theme=; Max-Age=0; Path=\/; Expires=[^;]+; HttpOnly; SameSite=Lax$/)
+    // Elysia composes every module under the app's config, so a module's own `cookie` config is not read, defaults or none.
+    expect((await cookies('plain', '/api/own')).set).toEqual(['theme=dark; Path=/'])
+    expect((await cookies('safe', '/api/own')).set).toEqual(['theme=dark; Path=/; HttpOnly; SameSite=Lax'])
+    expect((await cookies('off', '/api/jar')).set).toEqual(['theme=dark; Path=/', 'loose=1; Path=/x; SameSite=Strict'])
   })
 
   it('applies to a page that redirects', async () => {

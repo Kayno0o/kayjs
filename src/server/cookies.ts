@@ -1,5 +1,5 @@
 import type { CookieInit, CookieMap, CookieStoreDeleteOptions } from 'bun'
-import type { AnyElysia } from 'elysia'
+
 import type { CookieDefaults } from '../config'
 import { KayError } from '../compiler/errors'
 import { requestRecord } from './request-record'
@@ -34,32 +34,33 @@ export function cookieDefaults(setting: CookieDefaults | false | undefined, base
   return { httpOnly, sameSite, secure, path }
 }
 
-interface CookieApp {
-  onRequest: (hook: (context: { request: Request }) => void) => unknown
-  mapResponse: (options: { as: 'scoped' }, hook: (context: { request: Request, set: { cookie?: Record<string, { secure?: boolean, sameSite?: unknown }> | undefined } }) => undefined) => unknown
-  config: { cookie?: object | undefined }
-}
-
 // Records the app's cookie defaults on each request it gets, for the cookie jar to apply.
 // The cookies of an `api()` route are Elysia's own, which reads `httpOnly`, `sameSite` and `path` from the app's config, and gets `Secure` from the request here, a cookie's own option winning in both.
-export function defaultCookies(app: AnyElysia, defaults: ResolvedCookieDefaults | undefined): void {
+export function defaultCookies(app: { onRequest: (hook: (context: { request: Request }) => void) => unknown, config: { cookie?: object | undefined } }, defaults: ResolvedCookieDefaults | undefined): void {
   if (defaults === undefined)
     return
 
-  const { onRequest, mapResponse, config } = app as unknown as CookieApp
-
-  onRequest.call(app, ({ request }) => {
+  app.onRequest(({ request }) => {
     requestRecord(request).cookieDefaults = defaults
   })
-  config.cookie = { ...config.cookie, httpOnly: defaults.httpOnly, sameSite: defaults.sameSite, path: defaults.path }
-  mapResponse.call(app, { as: 'scoped' }, ({ request, set }) => {
+  // Elysia reads `config.cookie` when it compiles a route, after this runs, so the defaults reach every route of the app.
+  app.config.cookie = { ...app.config.cookie, httpOnly: defaults.httpOnly, sameSite: defaults.sameSite, path: defaults.path }
+}
+
+// The `mapResponse` that fills the `Secure` of an Elysia cookie that gives none, from the request, or undefined for an app with no cookie defaults.
+// Registered after the cache guard, which must stay the first `mapResponse`; this one never answers.
+export function secureCookies(defaults: ResolvedCookieDefaults | undefined): ((context: { request: Request, set: { cookie?: Record<string, { secure?: boolean | undefined, sameSite?: unknown }> | undefined } }) => undefined) | undefined {
+  if (defaults === undefined)
+    return undefined
+
+  return ({ request, set }) => {
     for (const cookie of Object.values(set.cookie ?? {})) {
       if (cookie.secure === undefined)
         cookie.secure = cookie.sameSite === 'none' || (defaults.secure === 'auto' ? overHttps(request) : defaults.secure)
     }
 
     return undefined
-  })
+  }
 }
 
 // What `ctx.cookies.delete` takes: the cookie's name and the `domain` and `path` it was set with, and the `secure`, `sameSite` and `partitioned` it was set with when they differ from the defaults.

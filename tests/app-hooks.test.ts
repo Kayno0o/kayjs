@@ -211,6 +211,23 @@ describe('the hooks pagesApp registers', () => {
     expect(pinned(answers)).toMatchSnapshot()
   })
 
+  it('keeps the cookie cache guard ahead of every other mapResponse, whichever stages the config adds', async () => {
+    const app = await pages({ root, prebuilt: false, site: 'https://x.example', compress: true, log: quiet, extensions, security: { cookies: {} }, redirects: { '/old': '/' } })
+    const mapResponses = hooksOf(app).filter(({ type }) => type === 'mapResponse').map(({ container }) => sourceOf(container.fn))
+
+    expect(mapResponses.length).toBeGreaterThan(2)
+    expect(mapResponses[0]).toContain('keepCookiesPrivate(set, responseValue)')
+
+    // Elysia ends the chain at the first hook that returns a value, so no hook ahead of the guard may.
+    const { run } = recorder(app)
+
+    for (const path of ['/', '/old', '/missing', '/api/items', '/hello.txt']) {
+      const { hooks } = await run(new Request(`${SITE}${path}`, { headers: { 'accept-encoding': 'gzip' } }))
+
+      expect(hooks.find(hook => hook.startsWith('mapResponse:')), path).toContain('keepCookiesPrivate(set, responseValue)')
+    }
+  })
+
   it('runs under a base with trailing slashes, in the order pinned', async () => {
     const app = await pages({ root, prebuilt: false, base: '/shop', trailingSlash: 'always', log: quiet, extensions, redirects: { '/old': '/' } })
     const { run, pinned } = recorder(app)

@@ -67,6 +67,7 @@ function aloneOnItsLine(source: string, property: ObjectProperty): boolean {
 }
 
 // The comments written on their own lines right above a property alone on its line, as they sit in the source: they describe that property, so they move with it.
+// Only one-line comments count; a block comment spanning lines stays behind where the property stood.
 function leadingComments(source: string, property: ObjectProperty): { start: number, lines: string[] } {
   const own = source.lastIndexOf('\n', property.start - 1) + 1
   const lines: string[] = []
