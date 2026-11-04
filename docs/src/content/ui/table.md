@@ -44,7 +44,9 @@ The `@bulk(keys, clear)` block draws the page's bulk actions beside the count wh
 
 ## Rows as links
 
-`rowHref(row)` makes each row a link and `onRowClick(row, event)` a button, or hears the click of a link row. The first cell holds a real anchor or button stretched over the row, named `Open <first column's text>` (`openRowLabel(row)`), so middle click and open in a new tab work. The checkbox, the toggle and the links and buttons the cells draw stay clickable above it, so ticking a row never navigates. The link covers the row, so its text cannot be selected with the mouse and a `tooltip` on the row's own content does not show; put them on a control.
+`rowHref(row)` makes each row a link and `onRowClick(row, event)` a button, or hears the click of a link row. The first cell holds a real anchor or button stretched over the row, named `Open <first column's text>` (`openRowLabel(row)`), so middle click and open in a new tab work. The checkbox, the toggle and the links and buttons the cells draw stay clickable above it, so ticking a row never navigates.
+
+The link covers the row, so its text cannot be selected with the mouse and a `tooltip` on the row's own content does not show; put them on a control.
 
 ## Row key
 
