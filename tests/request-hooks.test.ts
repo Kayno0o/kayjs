@@ -439,15 +439,15 @@ p.n {n}
 
   it('tells onResponse the user as the request began, not the one a sign-in action made', async () => {
     answers.length = 0
-    state.signedIn = undefined
+    delete state.signedIn
 
     const action = app.routes.find(route => route.method === 'POST' && route.path.includes('/signIn'))?.path ?? ''
 
     expect((await post(action)).status).toBe(200)
-    expect(state.signedIn).toBe('ada')
+    expect(state.signedIn as string | undefined).toBe('ada')
     await Bun.sleep(20)
     expect(answers.find(entry => entry.path === action)).toEqual({ path: action, status: 200, userId: undefined })
-    state.signedIn = undefined
+    delete state.signedIn
   })
 })
 
