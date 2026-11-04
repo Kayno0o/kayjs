@@ -8,7 +8,7 @@ const ROOT = join(import.meta.dir, '..')
 const PASSWORD = 'correct horse battery'
 const RAW_KEY = /\bauth\.[a-z]+(?:\.[a-zA-Z]+)+\b/
 
-const site = await testSite({ root: ROOT, browser: { path: browserPath() }, onError: () => undefined })
+const site = await testSite({ root: ROOT, browser: { path: browserPath() }, observe: { onError: () => undefined } })
 
 async function register(email: string) {
   const page = await site.open('/auth/register?redirect=%2Fauth%2Faccount%2Fsecurity')

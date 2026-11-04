@@ -55,7 +55,7 @@ function held() {
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat island in a browser', () => {
   beforeAll(async () => {
-    site = await testSite({ root: ROOT, browser: { path }, onError: () => undefined })
+    site = await testSite({ root: ROOT, browser: { path }, observe: { onError: () => undefined } })
   }, 120_000)
 
   test('a message streams its reply in as markdown, and the history is posted whole with the next one', async () => {
