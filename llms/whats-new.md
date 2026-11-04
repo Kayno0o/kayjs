@@ -14,6 +14,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui `Table` takes `rowHref` and `onRowClick` (a row a link or a button) and `rows` as a function or a promise with `loadingLabel`, `failureLabel`, `retryLabel`, `onLoad`, `onError`, `busy` and skeleton rows; `VirtualList` takes the same on `items`, with `itemHref` and `onItemClick`: [Table sources](../packages/ui/llms/infinite-list.md#table-and-virtuallist-sources-busy-and-row-links).
 - A `server="defer"` island takes an `@failed` block, shown when it fails to load, with a `data-kay-retry` control that retries it: [server-islands](server-islands.md).
 - `escapeHtml` is exported from `kay` as well as `kay/library`, for the browser and the server alike, and `sameText` hashes both sides before comparing, so neither the content nor the length of a secret shows in the time a check takes; kay's libraries use both in place of their own copies: [component libraries](component-libraries.md).
+- kayjs-ui: Breadcrumb, Pagination, FormField (`hint`, `required`), PageSection (`sticky`) and RelativeTime (`options`) follow a prop the parent changes after render; a script read of a destructured prop runs once, as [components](components.md#props) says.
 
 ## 1.88.0
 

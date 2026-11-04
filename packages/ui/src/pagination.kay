@@ -67,9 +67,9 @@ const { of, page, pages, offset, limit, more, url, param, siblings = 1, step, la
   step?: Snippet<[direction: 'previous' | 'next']> | undefined
 }>()
 
-const total = of?.pages ?? pages ?? 0
+const total = () => of?.pages ?? pages ?? 0
 // The page as one that exists, whatever the query held.
-const shown = () => currentPage(of?.page ?? page ?? 1, total)
+const shown = () => currentPage(of?.page ?? page ?? 1, total())
 // The page on screen, for a pagination given no `url`: a page rendered once at build time does not have one.
 function address() {
   try {
@@ -106,18 +106,18 @@ if steps() as open
       else
         span(part="step" aria-label={step ? nextLabel : undefined}) {words('next')}
 
-else if total > 1
+else if total() > 1
   nav(part="root" {...rest} aria-label={label})
     if shown() > 1
       a(part="step" href={href(shown() - 1)} rel="prev" aria-label={step ? previousLabel : undefined}) {words('previous')}
     else
       span(part="step" aria-label={step ? previousLabel : undefined}) {words('previous')}
-    for item, index of pageItems(shown(), total, siblings) key={index}
+    for item, index of pageItems(shown(), total(), siblings) key={index}
       if item === 'gap'
         span(part="gap" aria-hidden="true") …
       else
         a(part="page" href={href(item)} aria-current={item === shown() ? 'page' : undefined}) {item}
-    if shown() < total
+    if shown() < total()
       a(part="step" href={href(shown() + 1)} rel="next" aria-label={step ? nextLabel : undefined}) {words('next')}
     else
       span(part="step" aria-label={step ? nextLabel : undefined}) {words('next')}

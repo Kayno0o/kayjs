@@ -1,0 +1,52 @@
+---
+import { signal } from 'kay'
+import Breadcrumb from '@kaynooo/kayjs-ui/breadcrumb.kay'
+import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
+import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
+import DateTimeInput from '@kaynooo/kayjs-ui/date-time-input.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
+import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
+import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import RelativeTime from '@kaynooo/kayjs-ui/relative-time.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import Slider from '@kaynooo/kayjs-ui/slider.kay'
+import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
+
+// Every prop here is passed from one signal the test flips, to see the component follow it: `later()` is false at first, true after the button is pressed.
+const later = signal(false)
+const options = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]
+const trail = (count: number) => Array.from({ length: count }, (_, index) => ({ label: `Page ${index}`, href: `/p${index}` }))
+---
+button#go(type="button" onClick={() => later = true}) Go
+div#text
+  TextInput(value={later() ? 'two' : 'one'} invalid={later()} placeholder={later() ? 'later' : 'first'} aria-label={later() ? 'Later' : 'First'} disabled={later()})
+div#area
+  Textarea(value={later() ? 'two' : 'one'} invalid={later()} placeholder={later() ? 'later' : 'first'} aria-label={later() ? 'Later' : 'First'} disabled={later()})
+div#select
+  Select(options={options} value={later() ? 'b' : 'a'} invalid={later()} aria-label={later() ? 'Later' : 'First'} disabled={later()})
+div#slider
+  Slider(label="Volume" value={later() ? 8 : 3} invalid={later()} disabled={later()})
+div#color
+  ColorInput(label="Colour" value={later() ? '#ff0000' : '#000000'} invalid={later()} disabled={later()})
+div#time
+  TimeInput(value={later() ? '10:30' : '08:00'} invalid={later()} aria-label={later() ? 'Later' : 'First'} disabled={later()})
+div#date
+  DateInput(value={later() ? '2026-02-03' : '2026-01-02'} invalid={later()} aria-label={later() ? 'Later' : 'First'} disabled={later()})
+div#datetime
+  DateTimeInput(value={later() ? '2026-02-03T10:30' : '2026-01-02T08:00'} invalid={later()} aria-label={later() ? 'Later' : 'First'} disabled={later()})
+div#rating
+  Rating(label="Stars" value={later() ? 4 : 2} invalid={later()} onChange={() => undefined})
+div#crumbs
+  Breadcrumb(label="Trail" items={trail(later() ? 5 : 2)})
+div#pages
+  Pagination(pages={later() ? 9 : 3} page={1} url="/list")
+div#field
+  FormField(label="Name" hint={later() ? 'A hint' : undefined} required={later()})
+    input#field-input
+div#section
+  PageSection(title="Title" sticky={later()})
+div#time-ago
+  RelativeTime(date={new Date(0)} options={later() ? { style: 'short' } : undefined})

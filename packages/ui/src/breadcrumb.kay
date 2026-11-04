@@ -29,9 +29,9 @@ const { items, label, structured = false, item, ...rest } = props<Omit<JSX.Intri
   structured?: boolean | undefined
 }>()
 
-const last = items.length - 1
+const last = () => items.length - 1
 // From four items on, a phone keeps the first and the last two: the middle gives way to an ellipsis.
-const collapses = items.length > 3
+const collapses = () => items.length > 3
 ---
 snippet inside(crumb: (typeof items)[number])
   if crumb.icon
@@ -46,12 +46,12 @@ if structured
 nav(part="root" {...rest} aria-label={label})
   ol(part="list")
     for crumb, index of items key={index}
-      if collapses && index === 1
+      if collapses() && index === 1
         li(part="more" aria-hidden="true") …
-      li(part="item" data-middle={collapses && index > 0 && index < last - 1 ? '' : undefined})
-        if index < last && crumb.href !== undefined
+      li(part="item" data-middle={collapses() && index > 0 && index < last() - 1 ? '' : undefined})
+        if index < last() && crumb.href !== undefined
           a(part="link" href={crumb.href})
             | {inside(crumb)}
         else
-          span(part="text" aria-current={index === last ? 'page' : undefined})
+          span(part="text" aria-current={index === last() ? 'page' : undefined})
             | {inside(crumb)}

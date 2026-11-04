@@ -56,6 +56,8 @@ Import what comes from another entry, such as `cached` from `kay/cache`, and `ka
 
 Declare props once with `props<T>()`. Destructure them, with defaults, and they stay reactive.
 
+A read at the top of the script runs once. If `const last = items.length - 1` keeps the first length, write it as a function, `const last = () => items.length - 1`, and read `last()`.
+
 A page has no props. Its data comes from its `--- server` fence.
 
 A prop can hold an action, typed `Action<never, unknown>` for any action (see [Forms and actions](/essentials/forms-and-actions)), or a component, typed `Component<Props>` from `kay` and used by its capitalised name: `const { Icon } = props<{ Icon: Component }>()`, then `Icon` as a tag. An icon is drawn with `svg({...icon})`; see [Draw an icon or a component chosen by a value](/essentials/templates#draw-an-icon-or-a-component-chosen-by-a-value).

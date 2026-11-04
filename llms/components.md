@@ -202,7 +202,7 @@ ul
 - Props are declared once, at the top level, with the `props<T>()` macro.
 - Destructure one level deep and read nested fields as `todo.title`. `const all = props<T>()` also works and reads as `all.todo`.
 - Defaults go in the destructuring. A default applies only to an `undefined` prop (`null` stays `null`), and runs only then, once per component, the first time the prop is read.
-- Props stay reactive: the compiler turns each destructured name into a live read.
+- Props stay reactive: the compiler turns each destructured name into a live read. A read at the top of the script, outside a function, `memo` or `effect`, runs once, so `const last = items.length - 1` keeps the first length: write `const last = () => items.length - 1` and read `last()`.
 - Props are read-only.
 - A prop holding an action is typed `Action<never, unknown>`, or `NoInputAction<unknown>` for one without input; see [Pass an action to a component](actions-from-islands.md#pass-an-action-to-a-component).
 - A prop holding a component is typed `Component<Props>` from `kay` and drawn by its capitalised name, one holding an icon with `svg({...icon})`; see [Draw an icon or a component chosen by a value](templates.md#draw-an-icon-or-a-component-chosen-by-a-value).
