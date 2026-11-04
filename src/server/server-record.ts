@@ -52,6 +52,7 @@ function isRecord(record: ServerRecord): boolean {
     && Object.values(record.files).every(found => isObject(found) && inBuild(found.file) && LOADERS.has(found.loader) && typeof found.hash === 'string' && (found.map === undefined || inBuild(found.map)))
     && Object.values(record.covered).every(hash => typeof hash === 'string')
     && Array.isArray(record.replaced) && record.replaced.every(file => typeof file === 'string')
+    // `..` entries stay on purpose (an extension mount outside the root, a workspace package): they only serve as page-dir prefixes.
     && (record.pages === undefined || (Array.isArray(record.pages) && record.pages.every(dir => typeof dir === 'string' && !isAbsolute(dir))))
     && Object.values(record.icons).every(inBuild)
 }
