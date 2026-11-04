@@ -237,7 +237,7 @@ export function pgData(source: PgJobsSource) {
     await query(db, 'SELECT 1')
   }
 
-  const stores = { sessions: pgSessions(handle), cache: pgCache(handle), jobs: jobsAfter(db, async () => handle.db()), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle), push: pgPush(handle), kv: pgKv(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database' | 'files' | keyof StoreBase>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
+  const stores = { sessions: pgSessions(handle), cache: pgCache(handle), jobs: jobsAfter(db, async () => handle.db()), rates: pgRates(handle), rooms: pgRooms(handle), vitals: pgVitals(handle), live: pgLive(handle), ...typeof source === 'string' && { database: source }, notifications: pgNotifications(handle), push: pgPush(handle), kv: pgKv(handle) } satisfies { [Kind in Exclude<keyof AppStore, 'database' | 'sql' | 'files' | keyof StoreBase>]-?: NonNullable<AppStore[Kind]> } & { sessions: DeletableSessionStore }
 
-  return { ...stores, ping, close, [Symbol.asyncDispose]: close }
+  return { ...stores, sql: db, ping, close, [Symbol.asyncDispose]: close }
 }

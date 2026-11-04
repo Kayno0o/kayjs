@@ -3,6 +3,7 @@ import { s } from 'kay'
 import { collection } from 'kay/content'
 import { kv } from 'kay/library'
 import { registerCollections } from '../../../src/content/edit'
+import { setupStore } from '../../../src/server/app-store'
 import { activityOf } from '../src/activity'
 import * as activity from '../src/activity'
 import { hiddenOf, SWEEP_MARKER } from '../src/hidden'
@@ -317,6 +318,34 @@ describe('the sweep marker', () => {
 
     expect((await marker())?.full).toBeGreaterThan(0)
     expect((await history.load({ preview: true })).some(row => row.slug === SWEEP_MARKER)).toBe(false)
+  })
+
+  test('costs a failing kv a full sweep and a line in the log, never the sweep itself', async () => {
+    const SINK = Symbol.for('kay.log')
+    const global = globalThis as { [SINK]?: unknown }
+    const sink = global[SINK]
+    const lines: string[] = []
+    const broken = async (): Promise<never> => {
+      throw new Error('kv down')
+    }
+
+    global[SINK] = (_level: string, message: string, _error?: unknown, _request?: Request, from?: string) => {
+      if (from === 'kayjs-cms')
+        lines.push(message)
+    }
+    setupStore({ kv: { get: broken, set: broken, delete: broken, once: broken } })
+    configure({ history: { maxAge: '1d' } })
+
+    try {
+      await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+      await sweepHistory()
+      expect(lines.some(line => line.includes('could not be read'))).toBe(true)
+      expect(lines.some(line => line.includes('could not be saved'))).toBe(true)
+    }
+    finally {
+      global[SINK] = sink
+      setupStore(undefined)
+    }
   })
 
   test('is not an entry, an erasure nor an editor', async () => {

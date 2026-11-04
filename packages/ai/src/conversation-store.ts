@@ -46,7 +46,7 @@ export interface ConversationChange {
   title: string
 }
 
-// Where `ask` keeps the conversations of a Chat with `keepOnServer`: `sqliteConversations(path)` by default, or one of the app's own given to `ai({ conversations })`.
+// Where `ask` keeps the conversations of a Chat with `keepOnServer`: `pgConversations(db)` or `sqliteConversations(path)`, or one of the app's own given to `ai({ conversations })`; left out, the database of the app's `store`.
 export interface ConversationStore {
   // The owner's conversations under `scope`, the most recently updated first, `limit` at most.
   list: (owner: string, scope: string, limit: number) => Promise<ConversationSummary[]>
@@ -134,10 +134,24 @@ function open(path: string) {
   const legacy = ['kai', 'conversations'].join('_')
   const tableNamed = (name: string) => db.query('SELECT 1 FROM sqlite_master WHERE type = \'table\' AND name = ?').get(name) !== null
 
-  if (tableNamed(legacy) && !tableNamed('kay_ai_conversations')) {
+  // Two processes opening the file at once take turns: the check is made again inside the write lock, and a new table another process made empty first is replaced by the old one.
+  const migrate = db.transaction(() => {
+    if (!tableNamed(legacy))
+      return
+
+    if (tableNamed('kay_ai_conversations')) {
+      if (db.query('SELECT 1 FROM kay_ai_conversations LIMIT 1').get() !== null)
+        return
+
+      db.run('DROP TABLE kay_ai_conversations')
+    }
+
     db.run(`DROP INDEX IF EXISTS ${legacy}_updated`)
     db.run(`ALTER TABLE ${legacy} RENAME TO kay_ai_conversations`)
-  }
+  })
+
+  if (tableNamed(legacy))
+    migrate.immediate()
 
   db.run('CREATE TABLE IF NOT EXISTS kay_ai_conversations (owner TEXT NOT NULL, scope TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL, revision INTEGER NOT NULL, updated_at INTEGER NOT NULL, turns TEXT NOT NULL, PRIMARY KEY (owner, scope, id))')
   db.run('CREATE INDEX IF NOT EXISTS kay_ai_conversations_updated ON kay_ai_conversations (owner, scope, updated_at)')

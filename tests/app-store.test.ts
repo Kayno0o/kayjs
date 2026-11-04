@@ -256,7 +256,11 @@ describe('appDatabase', () => {
     setupStore({ database: 'sqlite:///srv/app/data/app.sqlite' })
     expect(appDatabase()).toEqual({ kind: 'sqlite', path: '/srv/app/data/app.sqlite' })
     setupStore({ database: 'postgres://u@db/app' })
-    expect(appDatabase()).toEqual({ kind: 'pg', url: 'postgres://u@db/app' })
+    expect(appDatabase()).toEqual({ kind: 'pg', source: 'postgres://u@db/app' })
+    const sql = {} as import('bun').SQL
+
+    setupStore({ sql })
+    expect(appDatabase()).toEqual({ kind: 'pg', source: sql })
     setupStore({ rates: undefined })
     expect(appDatabase()).toBeUndefined()
   })

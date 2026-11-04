@@ -2310,6 +2310,7 @@ interface AppStore extends StoreBase
   rates?: RateStore | undefined
   rooms?: RoomStore | undefined
   sessions?: SessionStore | undefined
+  sql?: SQL | undefined
   vitals?: VitalsStore | undefined
 
 [./server] AsyncRooms
@@ -2945,6 +2946,7 @@ interface PagesOptions extends KayConfig
 
 [./server] pgData
 function pgData(source: PgJobsSource): {
+  sql: SQL;
   ping: () => Promise<void>;
   close: () => Promise<void>;
   [Symbol.asyncDispose]: () => Promise<void>;

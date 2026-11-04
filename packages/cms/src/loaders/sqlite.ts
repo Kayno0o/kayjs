@@ -19,19 +19,9 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
   const key = seededKey(name)
   let opened: Database | undefined
   let ready: Promise<Database> | undefined
-  // `data_version` moves when another connection committed, a process or the `sqlite3` tool, in any table of the file; the collection's rows are read and hashed only then, so a write to another collection or table invalidates nothing.
-  let version: number | undefined
-  let fingerprint = ''
-  const watching = watcher(name, `${scopeOf(options.database ?? 'the app\'s store')}/${table}`, options.watch, '1s', (force) => {
-    const now = opened!.query<{ data_version: number }, []>('PRAGMA data_version').get()!.data_version
-
-    if (force || now !== version) {
-      version = now
-      fingerprint = String(Bun.hash(opened!.query<Row, [string]>(`SELECT place, data, body FROM ${table} WHERE collection = ? ORDER BY place`).all(name).map(row => `${row.place}\u0000${row.data}\u0000${row.body ?? ''}`).join('\u0001')))
-    }
-
-    return fingerprint
-  })
+  const counter = `${table.slice(0, -1)}_changes"`
+  // Triggers on the table count the writes of each collection, whoever made them, a process or the `sqlite3` tool; the signature is that count alone, so the other writes of a file shared with the app's sessions, rates and jobs cost the watcher nothing.
+  const watching = watcher(name, `${scopeOf(options.database ?? 'the app\'s store')}/${table}`, options.watch, '1s', () => String(opened!.query<{ n: number }, [string]>(`SELECT n FROM ${counter} WHERE collection = ?`).get(name)?.n ?? 0))
 
   const open = async (): Promise<Database> => {
     if (opened !== undefined)
@@ -41,6 +31,10 @@ export function sqliteLoader(options: SqliteLoaderOptions): ContentLoader {
     const db = typeof database === 'string' ? connection(database) : database
 
     db.run(`CREATE TABLE IF NOT EXISTS ${table} (collection TEXT NOT NULL, place TEXT NOT NULL, data TEXT NOT NULL, body TEXT, PRIMARY KEY (collection, place))`)
+    db.run(`CREATE TABLE IF NOT EXISTS ${counter} (collection TEXT PRIMARY KEY, n INTEGER NOT NULL)`)
+
+    for (const [event, row] of [['INSERT', 'NEW'], ['UPDATE', 'NEW'], ['DELETE', 'OLD']] as const)
+      db.run(`CREATE TRIGGER IF NOT EXISTS ${table.slice(0, -1)}_changes_${event.toLowerCase()}" AFTER ${event} ON ${table} BEGIN INSERT INTO ${counter} (collection, n) VALUES (${row}.collection, 1) ON CONFLICT (collection) DO UPDATE SET n = n + 1; END`)
 
     if (options.seed !== undefined && db.query(`SELECT 1 FROM ${table} WHERE collection = ?`).get(key) === null) {
       const seed = await seedEntries(options.seed)

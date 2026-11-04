@@ -12,7 +12,7 @@ import { existsSync } from 'node:fs'
 import { normalize, resolve } from 'node:path'
 import process from 'node:process'
 import { s } from 'kay'
-import { configError } from 'kay/library'
+import { appStore, configError } from 'kay/library'
 import { session } from 'kay/server'
 import { log } from './log'
 import { memoryAuthStore } from './memoryStore'
@@ -62,7 +62,7 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
   cookie?: string | undefined
   // Providers by the name their routes take: `{ github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (a preset: github, discord, google, microsoft or gitlab), an object adds options to a preset, and a full `OAuthApp` is an app of any provider.
   oauth?: Record<string, true | PresetApp | OAuthApp> | undefined
-  // The users' data: a pg-orm database at `{ url }`, the store itself, or a function building it. `KAYJS_AUTH_DATABASE_URL` when set, else the database of the app's `store` (`sqliteData(path)`, `pgData(url)`), else `data/auth.db` (SQLite).
+  // The users' data: a pg-orm database at `{ url }`, the store itself, or a function building it. `KAYJS_AUTH_DATABASE_URL` when set, else the database of the app's `store` (`sqliteData(path)`, `pgData(url)`), else `data/auth.sqlite` (SQLite; `data/auth.db` where it exists).
   store?: StoreOption | undefined
   // Mail for verification, resets and magic links. Left out, `src/mail.ts` exporting kayjs-mail's `mail` sends them; `false` sends none.
   email?: EmailOptions | false | undefined
@@ -76,7 +76,7 @@ export type OwnPlugin<Role extends string, Prefix extends string, Scope extends 
 
 // The name kayjs-mail's `mail()` extension lists itself by.
 export const MAIL_EXTENSION = '@kaynooo/kayjs-mail'
-// A relative SQLite path: `sqlite://data/auth.db`, not `sqlite:///srv/auth.db` or `sqlite://:memory:`.
+// A relative SQLite path: `sqlite://data/auth.sqlite`, not `sqlite:///srv/auth.db` or `sqlite://:memory:`.
 const SQLITE_FILE = /^sqlite:(?:\/\/)?(?![/:])([^?]+)$/
 
 function isPreset(app: true | PresetApp | OAuthApp): app is true | PresetApp {
@@ -88,7 +88,7 @@ export function ownEnv(options: Pick<OwnOptions, 'oauth' | 'store'>) {
   const names = Object.entries(options.oauth ?? {}).filter(([, app]) => isPreset(app) && (app === true || app.clientId === undefined || app.clientSecret === undefined)).map(([name]) => name)
 
   return s.Object({
-    ...options.store === undefined && { KAYJS_AUTH_DATABASE_URL: s.Optional(s.String({ description: 'the database kayjs-auth keeps its users in, a Postgres or SQLite url; the one of the app\'s store, else data/auth.db (SQLite), when unset' })) },
+    ...options.store === undefined && { KAYJS_AUTH_DATABASE_URL: s.Optional(s.String({ description: 'the database kayjs-auth keeps its users in, a Postgres or SQLite url; the one of the app\'s store, else data/auth.sqlite (SQLite; data/auth.db where it exists), when unset' })) },
     ...Object.fromEntries(names.flatMap(name => [
       [`${name.toUpperCase()}_CLIENT_ID`, s.String({ description: `the ${name} OAuth app's client id`, requiredInProduction: true })],
       [`${name.toUpperCase()}_CLIENT_SECRET`, s.String({ description: `the ${name} OAuth app's client secret`, requiredInProduction: true })],
@@ -277,8 +277,13 @@ export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<
   const hooks = loadHooks ? (await loadHooks()).hooks : conventionalHooks(app.modules.hooks)
   const mailer = await emailOf(email, app)
 
-  if (store === undefined && app.database === undefined && process.env.NODE_ENV === 'production' && filled(process.env.KAYJS_AUTH_DATABASE_URL) === undefined)
-    log.warn('auth() keeps its users in data/auth.sqlite, a SQLite file: set the app\'s `store` (`sqliteData` or `pgData`) in kay.config.ts, KAYJS_AUTH_DATABASE_URL, or auth\'s `store`, for a database that outlives a deploy')
+  if (store === undefined && app.database === undefined && process.env.NODE_ENV === 'production' && filled(process.env.KAYJS_AUTH_DATABASE_URL) === undefined) {
+    const file = existsSync(resolve(app.root, LEGACY_OWN_FILE)) ? LEGACY_OWN_FILE : OWN_FILE
+
+    log.warn(appStore()?.sql === undefined
+      ? `auth() keeps its users in ${file}, a SQLite file: set the app's \`store\` (\`sqliteData\` or \`pgData\`) in kay.config.ts, KAYJS_AUTH_DATABASE_URL, or auth's \`store\`, for a database that outlives a deploy`
+      : `auth() keeps its users in ${file}, a SQLite file, because pgData was given a connection and names no url: set KAYJS_AUTH_DATABASE_URL or pass auth({ store: pgStore(db) }) for a database that outlives a deploy`)
+  }
 
   const made = createAuth({
     ...hooks,

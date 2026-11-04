@@ -1,3 +1,4 @@
+import type { SQL } from 'bun'
 import type { RateStore } from '../runtime/action'
 import type { CacheStore } from '../runtime/cache'
 import type { LiveStore } from '../runtime/live-value'
@@ -26,6 +27,8 @@ export interface AppStore extends StoreBase {
   vitals?: VitalsStore | undefined
   // The url of the database these stores keep their data in, `sqlite:///abs/path` for `sqliteData` and the url `pgData` was given, for a library keeping tables of its own there: kayjs-auth keeps its users in it. Left out for a store built by hand, and for `pgData` given a connection.
   database?: string | undefined
+  // The Postgres connection `pgData` works through, the pool it opened from a url or the one the app handed in: a library keeping tables of its own there uses it instead of opening a pool.
+  sql?: SQL | undefined
   notifications?: NotificationStore | undefined
   push?: PushStore | undefined
   files?: FileStore | undefined
@@ -33,7 +36,7 @@ export interface AppStore extends StoreBase {
 }
 
 // Every kind of store an `AppStore` holds, by its key: a record, so a key added to `AppStore` and left out here is a type error.
-const KIND_KEYS: Record<Exclude<keyof AppStore, 'database' | keyof StoreBase>, true> = { sessions: true, cache: true, live: true, jobs: true, rates: true, rooms: true, vitals: true, notifications: true, push: true, files: true, kv: true }
+const KIND_KEYS: Record<Exclude<keyof AppStore, 'database' | 'sql' | keyof StoreBase>, true> = { sessions: true, cache: true, live: true, jobs: true, rates: true, rooms: true, vitals: true, notifications: true, push: true, files: true, kv: true }
 const KINDS = Object.keys(KIND_KEYS) as (keyof typeof KIND_KEYS)[]
 
 // Each store an `AppStore` holds, then the object itself, each once however many keys name it: what `health` pings and a stop closes, the object last so a `pgData` closes its connection after the rooms dropped this process's members through it.

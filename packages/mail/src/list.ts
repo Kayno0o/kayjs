@@ -10,7 +10,7 @@ import { configError, durationSeconds, keyedDigest, trackDetached } from 'kay/li
 import { siteOrigin } from 'kay/seo'
 import { rateLimit, renderLocale, renderToString, retryLater } from 'kay/server'
 import { wording } from 'kay/words'
-import { listsHome } from './app-lists'
+import { listsHome, warnLocalLists } from './app-lists'
 import { normalizeAddress } from './list-address'
 import { listRegistry } from './list-registry'
 import { LIST_FILE } from './list-store'
@@ -213,9 +213,9 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
   const entries = new Map<string, Entry>()
   // The mailer's `listStore`, else the app's database, else the default file; none of the last two under `bun test` unless the test names a file.
-  const home = () => fallback.file !== undefined || fallback.store !== undefined || process.env.NODE_ENV === 'test' ? undefined : listsHome()
-  const defaultFile = () => fallback.file ?? (process.env.NODE_ENV === 'test' ? undefined : home()?.file)
-  const defaultStore = (): ListStore | undefined => fallback.store ?? home()?.store
+  const fallbackHome = () => fallback.file !== undefined || fallback.store !== undefined || process.env.NODE_ENV === 'test' ? undefined : listsHome()
+  const defaultFile = () => fallback.file ?? fallbackHome()?.file
+  const defaultStore = (): ListStore | undefined => fallback.store ?? fallbackHome()?.store
   const stores = listRegistry({ file: defaultFile, store: defaultStore })
   // A mailer without a `suppressionStore` keeps them where its lists do, else in the default file, in their table alone until a list opens the file.
   const defaultSuppressionsFor = new Map<string, SuppressionStore>()
@@ -235,7 +235,15 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
       const keepers = stores.known().filter(keepsSuppressions)
 
-      return keepers.length > 0 ? keepers : [defaultSuppressions()]
+      if (keepers.length > 0)
+        return keepers
+
+      const home = fallbackHome()
+
+      if (home !== undefined)
+        warnLocalLists(home)
+
+      return [defaultSuppressions()]
     },
     // What a list store or the default file kept stays in force.
     read: () => [...stores.known(), defaultSuppressions()],
@@ -254,7 +262,21 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
     const file = () => options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : defaultFile() ?? LIST_FILE)
     const chosen = () => options.store ?? (options.file === undefined ? defaultStore() : undefined)
-    const lists = { get: (): ListStore => chosen() ?? stores.open(file()) }
+    const lists = {
+      get: (): ListStore => {
+        const given = chosen()
+
+        if (given !== undefined)
+          return given
+
+        const home = options.file === undefined ? fallbackHome() : undefined
+
+        if (home !== undefined)
+          warnLocalLists(home)
+
+        return stores.open(file())
+      },
+    }
 
     const pace = { batch: options.pace?.batch ?? 20, every: options.pace?.every ?? '1m' }
 

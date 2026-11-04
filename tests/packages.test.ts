@@ -625,39 +625,53 @@ describe('the release\'s failure path', () => {
 // A library keeping data in SQL names where: `/pg` and `/sqlite` entries beside its root, which imports no driver, so an app on Postgres loads no SQLite and the reverse.
 describe('the libraries that keep data in SQL', () => {
   const keepers = libraries.filter(({ manifest }) => ['@kaynooo/kayjs-mail', '@kaynooo/kayjs-ai', '@kaynooo/kayjs-cms'].includes(manifest.name))
-  const DRIVER = /^import (?!type\b)[^'"\n]*from ['"](?:bun:sqlite|bun|@kaynooo\/pg-orm)['"]/gm
-  const RELATIVE = /(?:from|import)\s+['"](\.[^'"]+)['"]/g
+  const DRIVERS = new Set(['bun:sqlite', 'bun', '@kaynooo/pg-orm'])
+  const SCRIPT_IMPORT = /(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
+  const transpiler = new Bun.Transpiler({ loader: 'ts' })
 
-  // The value imports of a driver among the modules the root reaches through relative imports.
+  // The file a relative specifier names: the path itself, with an extension, or a folder's index.
+  async function resolved(from: string, specifier: string): Promise<string | undefined> {
+    const base = new URL(specifier, `file://${from}`).pathname
+
+    for (const candidate of [base, `${base}.ts`, `${base}/index.ts`]) {
+      if (candidate.match(/\.(?:ts|kay)$/) !== null && await Bun.file(candidate).exists())
+        return candidate
+    }
+
+    return undefined
+  }
+
+  // The driver modules the entry reaches through relative imports loaded with it (static, re-export, side effect), `.kay` files read by their import lines. A type-only import is not one, and a dynamic `import()` is loaded when used, which keeps a driver off the process that never needs it.
   async function driverImports(folder: string, entry: string): Promise<string[]> {
     const seen = new Set<string>()
-    const found: string[] = []
-    const queue = [entry]
+    const found = new Set<string>()
+    const queue = [`${folder}/${entry}`]
 
     while (queue.length > 0) {
       const path = queue.pop()!
 
-      if (seen.has(path) || !path.endsWith('.ts'))
+      if (seen.has(path))
         continue
 
       seen.add(path)
 
-      const file = Bun.file(`${folder}/${path}`)
-      const text = await file.exists() ? await file.text() : ''
+      const code = await Bun.file(path).text()
+      const specifiers = path.endsWith('.kay') ? [...code.matchAll(SCRIPT_IMPORT)].map(match => match[1]!) : transpiler.scanImports(code).filter(scanned => scanned.kind !== 'dynamic-import').map(scanned => scanned.path)
 
-      if (DRIVER.test(text))
-        found.push(path)
+      for (const specifier of specifiers) {
+        if (DRIVERS.has(specifier)) {
+          found.add(`${path.slice(folder.length + 1)}: ${specifier}`)
+        }
+        else if (specifier.startsWith('.')) {
+          const next = await resolved(path, specifier)
 
-      DRIVER.lastIndex = 0
-
-      for (const [, relative] of text.matchAll(RELATIVE)) {
-        const resolved = new URL(`${relative!}${relative!.endsWith('.ts') ? '' : '.ts'}`, `file:///${path}`).pathname.slice(1)
-
-        queue.push(resolved)
+          if (next !== undefined)
+            queue.push(next)
+        }
       }
     }
 
-    return found
+    return [...found]
   }
 
   it.each(keepers)('$manifest.name has /pg and /sqlite entries', async ({ path }) => {
@@ -669,7 +683,16 @@ describe('the libraries that keep data in SQL', () => {
     }
   })
 
-  it.each(keepers)('$manifest.name has a root that imports no driver', async ({ path }) => {
-    expect(await driverImports(path.replace('/package.json', ''), 'src/index.ts')).toEqual([])
+  it.each(libraries)('$manifest.name has a root and a /test entry that import no driver', async ({ path }) => {
+    const folder = `${process.cwd()}/${path.replace('/package.json', '')}`
+    const exports = (await Bun.file(path).json() as { exports?: Record<string, unknown> }).exports ?? {}
+    const entries = ['./test'].flatMap(subpath => typeof exports[subpath] === 'string' ? [(exports[subpath]).slice(2)] : [])
+    const root = exports['.'] as { default?: string } | string | undefined
+    const main = typeof root === 'string' ? root : root?.default
+
+    expect(main).toBeDefined()
+
+    for (const entry of [main!.slice(2), ...entries])
+      expect(await driverImports(folder, entry)).toEqual([])
   })
 })

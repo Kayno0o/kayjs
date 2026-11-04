@@ -44,7 +44,8 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - kayjs-mail lists and suppressions, kayjs-ai conversations and kayjs-cms loaders given no `database`/`sql` default to the database of the app's `store` (`pgData(url)`, `sqliteData(path)`) where they used `data/mail-list.sqlite`, `data/ai-conversations.sqlite` or nothing: an existing default file keeps being read, so nothing moves by itself, and to move onto the app's database copy the `kay_mail_*`, `kay_ai_conversations` or `kay_content` tables over and delete the file. A SQLite file `kai_conversations` becomes `kay_ai_conversations` when kayjs-ai opens it, so SQL erasing a user's conversations names the new table.
 - `pgLists`, `pgSuppressions`, `sqliteSuppressions` and `sqliteConversations` are imported from `@kaynooo/kayjs-mail/pg`, `@kaynooo/kayjs-mail/sqlite`, `@kaynooo/kayjs-ai/sqlite` (with the new `pgConversations` in `/pg`); the root keeps the old names until 1.91. `kay check` cannot tell an import it should move, so no lint ships: change the import path.
 - New apps default to `data/auth.sqlite` and `data/content.sqlite` where it was `.db`; a `data/auth.db` or `data/content.db` that exists is still used.
-- kayjs-cms keeps its history sweep marks in the app store's `kv`: the `\u0002sweep` row of each history store is removed by the first full sweep.
+- kayjs-cms keeps its history sweep marks in the app store's `kv`: the `\u0002sweep` row of each history store is removed by the first full sweep. An app with no `store.kv` sweeps in full at every restart.
+- The libraries follow `pgData(db)` through the connection it was given, kayjs-auth apart (its pg-orm database cannot use it: name `auth({ store: pgStore(db) })` or `KAYJS_AUTH_DATABASE_URL`). `appDatabase()` answers `{ kind: 'pg', source }` with `source` that connection or the url.
 
 ### Durations and dates where a number stood
 

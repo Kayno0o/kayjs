@@ -1,7 +1,7 @@
 import type { ContentLoader } from 'kay/content'
 import type { LoaderOptions, Row, SavedEntry } from './shared'
 import { SQL } from 'bun'
-import { contentUrl, existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
+import { contentSource, existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
 
 export type { LoaderOptions, SeedEntry } from './shared'
 
@@ -42,7 +42,7 @@ export function pgLoader(options: PgLoaderOptions): ContentLoader {
   // The rows' count and the sum of the transactions that wrote them move with an insert, an update and a delete, whoever made them, but also with a `VACUUM FREEZE` or any rewrite of the rows that changed nothing; so the rows are read and hashed only when it moves, and what is reported is that hash.
   let moved: string | undefined
   let fingerprint = ''
-  const sqlOf = () => options.sql ?? contentUrl()
+  const sqlOf = () => options.sql ?? contentSource()
   const watching = watcher(name, `${scopeOf(options.sql ?? 'the app\'s store')}/${table}`, options.watch, '2s', async (force) => {
     const client = clientOf(sqlOf())
     const [row] = await client.unsafe<{ signature: string }[]>(`SELECT count(*)::text || ':' || coalesce(sum(xmin::text::bigint), 0)::text AS signature FROM ${table} WHERE collection = $1`, [name])

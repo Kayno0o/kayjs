@@ -61,3 +61,80 @@ describe('the default store', () => {
     }
   })
 })
+
+const LEGACY = ['kai', 'conversations'].join('_')
+
+function legacyFile(file: string, createNew: boolean): void {
+  const old = new Database(file)
+
+  old.run(`CREATE TABLE ${LEGACY} (owner TEXT NOT NULL, scope TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL, revision INTEGER NOT NULL, updated_at INTEGER NOT NULL, turns TEXT NOT NULL, PRIMARY KEY (owner, scope, id))`)
+  old.run(`INSERT INTO ${LEGACY} VALUES ('ann', '/a', 'c1', 'Kept', 3, 5, '[]')`)
+
+  if (createNew)
+    old.run('CREATE TABLE kay_ai_conversations (owner TEXT NOT NULL, scope TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL, revision INTEGER NOT NULL, updated_at INTEGER NOT NULL, turns TEXT NOT NULL, PRIMARY KEY (owner, scope, id))')
+
+  old.close()
+}
+
+describe('two processes opening a file from before 1.88', () => {
+  it('both read the conversations, the second finding the table renamed', async () => {
+    const file = join(await scratchDir('ai-two'), 'two.sqlite')
+
+    legacyFile(file, false)
+
+    const [first, second] = [sqliteConversations(file), sqliteConversations(file)]
+
+    expect((await first.get({ owner: 'ann', scope: '/a', id: 'c1' }))?.title).toBe('Kept')
+    expect((await second.get({ owner: 'ann', scope: '/a', id: 'c1' }))?.title).toBe('Kept')
+  })
+
+  it('moves the old rows over a new table another process made empty first', async () => {
+    const file = join(await scratchDir('ai-empty-new'), 'empty.sqlite')
+
+    legacyFile(file, true)
+    expect((await sqliteConversations(file).get({ owner: 'ann', scope: '/a', id: 'c1' }))?.title).toBe('Kept')
+  })
+})
+
+describe('the default store on the app\'s Postgres connection', () => {
+  it('uses the connection pgData works through and makes no local file, and warns once in production only for a local file', async () => {
+    const root = await scratchDir('ai-sql')
+    const cwd = process.cwd()
+    const mode = process.env.NODE_ENV
+    const sql = new Bun.SQL('postgres://user@127.0.0.1:1/app')
+    const SINK = Symbol.for('kay.log')
+    const global = globalThis as { [SINK]?: unknown }
+    const sink = global[SINK]
+    const lines: string[] = []
+
+    process.env.NODE_ENV = 'production'
+    process.chdir(root)
+    global[SINK] = (_level: string, message: string, _error?: unknown, _request?: Request, from?: string) => {
+      if (from === 'kayjs-ai')
+        lines.push(message)
+    }
+
+    try {
+      const { conversationStore, useConversations } = await import('../src/conversation-home')
+
+      useConversations(undefined)
+      setupStore({ sql })
+      expect(conversationStore()).toBe(conversationStore())
+      expect('close' in conversationStore()).toBe(true)
+      expect(lines).toEqual([])
+
+      setupStore(undefined)
+      conversationStore()
+      conversationStore()
+      expect(lines).toHaveLength(1)
+      expect(lines[0]).toContain('data/ai-conversations.sqlite')
+      useConversations(undefined)
+    }
+    finally {
+      global[SINK] = sink
+      process.chdir(cwd)
+      process.env.NODE_ENV = mode ?? 'test'
+      await sql.close()
+    }
+  })
+})

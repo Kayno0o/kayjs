@@ -1,3 +1,4 @@
+import type { ContentLoader } from 'kay/content'
 import type { EntryRef } from './kay/contract'
 import { kv, outsideRequest } from 'kay/library'
 import { isEvent, pruneActivity } from './activity'
@@ -39,8 +40,10 @@ async function loadedNames(): Promise<string[]> {
   return (await collections({ counts: false })).filter(collection => collection.kind === 'loaded').map(collection => collection.name)
 }
 
-// The marks live in the app store's kv, so a collection on a loader with no write of its own to spare keeps them with the app's other shared state. One that cannot be read or written only costs the next sweep a full read.
+// The marks live in the app store's kv, shared by every process of an app on `sqliteData` or `pgData`; without a `store.kv` they are kept in this process only, so every restart sweeps in full. One that cannot be read or written only costs the next sweep a full read.
 const sweepMarks = kv('cms-sweep')
+// The history stores looked at once for the marker row the sweeps kept there before 1.88.
+const legacyChecked = new WeakSet<ContentLoader>()
 
 async function readMarks(name: string): Promise<Marks | undefined> {
   try {
@@ -143,8 +146,12 @@ async function sweepCollection(name: string, cutoff: number | undefined, request
       await sweepMarks.set(name, JSON.stringify(next))
 
     // The marks were rows of the history store before they moved to the kv: one left behind goes with the first full sweep.
-    if (everything && await rowOf(store, SWEEP_MARKER) !== undefined)
-      await store.remove?.({ slug: SWEEP_MARKER })
+    if (everything && !legacyChecked.has(store)) {
+      legacyChecked.add(store)
+
+      if (await rowOf(store, SWEEP_MARKER) !== undefined)
+        await store.remove?.({ slug: SWEEP_MARKER })
+    }
   }
   catch (error) {
     log.warn(`the sweep marks of ${name} could not be saved, so the next sweep reads it in full`, error)

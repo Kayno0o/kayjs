@@ -1,3 +1,4 @@
+import type { SQL } from 'bun'
 import type { ContentLoader, LoadedEntry } from 'kay/content'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
@@ -19,6 +20,10 @@ export function contentFile(): string {
   if (database?.kind === 'sqlite' && !existsSync(file))
     return database.path
 
+  // Under `bun test` a loader with no database of its own keeps its entries in memory, as the other libraries do, so a test site writes no file into the working directory.
+  if (process.env.NODE_ENV === 'test')
+    return ':memory:'
+
   if (!warned && process.env.NODE_ENV === 'production') {
     warned = true
     log.warn(database === undefined
@@ -29,14 +34,14 @@ export function contentFile(): string {
   return file
 }
 
-// The Postgres url of a loader given no `sql`: the one of the app's `store`, `pgData(url)`.
-export function contentUrl(): string {
+// The connection of a loader given no `sql`: the one `pgData` of the app's `store` works through.
+export function contentSource(): SQL | string {
   const database = appDatabase()
 
   if (database?.kind !== 'pg')
     throw configError('pgLoader has no `sql`, and the app\'s `store` names no Postgres: give the loader a connection URL or a Bun `SQL`, or set `store: pgData(url)` in kay.config.ts')
 
-  return database.url
+  return database.source
 }
 
 // An entry a loader holds from its first start: the app's initial content.

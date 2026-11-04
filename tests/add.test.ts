@@ -115,6 +115,20 @@ it('stops on a file it does not recognise with the edit to make by hand, writing
   }
 })
 
+it('names data/auth.sqlite too when it holds the users', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
+
+  try {
+    await createProject(dir, { kay: '^1.0.0', features: PRESETS.app.features })
+    await mkdir(join(dir, 'data'))
+    await Bun.write(join(dir, 'data/auth.sqlite'), '')
+    await expect(addFeatures(dir, ['postgres'], { install: false })).rejects.toThrow('data/auth.sqlite holds the users postgres would leave behind')
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
+})
+
 it('does not swap an app on SQLite for Postgres behind its back', async () => {
   const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
 
