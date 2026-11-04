@@ -7,6 +7,7 @@ import { effect, onCleanup, recipe, signal, uid, untrack } from 'kay'
 import { enabledIndex, exactOption, matchingOptions, offersCreate } from './combobox'
 import { defaultKept, onFormReset, startRef } from './form-reset'
 import { wording } from 'kay/words'
+import { labelText } from './label-text'
 
 // 'kui-field-input' is the field's name for the skins and an app's CSS, which the input takes its look from.
 const look = recipe({
@@ -24,7 +25,7 @@ const look = recipe({
 // A remote search waits this long after the last key.
 const DEBOUNCE_MS = 200
 
-const { size = 'md', invalid, id, options, value = '', valueLabel, label, name, minLength = 1, create = false, createLabel = (text: string) => wording('ui.combobox.create', 'Create "{text}"', { text }), loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, open, onOpenChange, onChange, onCreate, onInput, onLoad, onError, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'onInput' | 'onLoad' | 'onError' | 'disabled' | 'role' | 'minLength'> & {
+const { size = 'md', invalid, id, options, value = '', valueLabel, label, name, minLength = 1, create = false, createLabel, loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, open, onOpenChange, onChange, onCreate, onInput, onLoad, onError, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'onInput' | 'onLoad' | 'onError' | 'disabled' | 'role' | 'minLength'> & {
   // The input's size: `md` by default, `sm` and `lg` change its padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
@@ -45,7 +46,7 @@ const { size = 'md', invalid, id, options, value = '', valueLabel, label, name, 
   minLength?: number | undefined
   // Offers what was typed as a new option when no option bears its label. Picking it hands the text as the value, and `onCreate` the text.
   create?: boolean | undefined
-  createLabel?: ((text: string) => string) | undefined
+  createLabel?: string | ((text: string) => string) | undefined
   loadingLabel?: string | undefined
   emptyLabel?: string | undefined
   failureLabel?: string | undefined
@@ -436,6 +437,6 @@ div(part="root")
         else
           | {option.label}
     if offered()
-      li(part="option" id={optionId(rows().length)} role="option" aria-selected={active() === rows().length ? 'true' : 'false'} data-create="" onClick={() => pick(rows().length)}) {createLabel(text().trim())}
+      li(part="option" id={optionId(rows().length)} role="option" aria-selected={active() === rows().length ? 'true' : 'false'} data-create="" onClick={() => pick(rows().length)}) {createLabel === undefined ? wording('ui.combobox.create', 'Create "{text}"', { text: text().trim() }) : labelText(createLabel, { text: text().trim() }, text().trim())}
   // Read out as the list loads and settles, which otherwise changes in silence.
   p(part="status" role="status") {status()}

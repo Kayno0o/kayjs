@@ -1615,6 +1615,9 @@ interface PageAt<Row>
 [./lib/infinite-list] RowChange
 type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
 
+[./lib/label-text] labelText
+function labelText<Args extends unknown[]>(label: ((...args: Args) => string) | string, values: Record<string, number | string>, ...args: Args): string
+
 [./lib/locked-button] lockedButton
 function lockedButton<T extends object>(attributes: T): T & { "type": "button"; "aria-disabled": "true"; }
 

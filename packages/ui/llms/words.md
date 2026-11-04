@@ -22,6 +22,8 @@ ui: { sidePanel: { close: 'Fermer' } }
 - A message may hold the placeholders its English shows, `{n}` or `{count}`, and a count may be written as plural forms: `rowCount: { one: '{count} ligne', other: '{count} lignes' }`.
 - The French lives in `src/messages/fr.ts` of the package, declared by `"kay": { "messages": "./src/messages" }` in its package.json; an app overrides any key in its own `src/messages/fr.ts`, which lays over it key by key.
 - `kay check` leaves `ui.*` keys out of its comparison between locales, so a French block needs no English twin; a key a locale lacks reads the English.
+- A `*Label` prop is text: a string, or where the text depends on what it names (a count, a typed text, a row), a function of it, `createLabel(text)`, `resultsLabel(count)`, `selectedLabel(count)`, `removeLabel(index)`, `loadedLabel(count)`. A string fills the placeholders the English shows (`{count}`, `{text}`, `{n}`); markup goes in a block (Steps' `@step`), never in a `*Label`.
+- BellInbox's announcement is `ui.bellInbox.announce` and SubscribeForm's email label `ui.subscribeForm.label`; a catalog still wording `ui.bell.new` or `ui.subscribeForm.email` is read first until 1.91.
 - CommandPalette's `recentLabel` names the heading the recently followed links sit under.
 - ContributionGraph's month names and the day and month a LineChart draws on its axis follow the page's locale; `en` keeps `5 Jan`.
 - RangeInput's and DateRangeInput's `{label}` fill the messages of the same name.
@@ -35,7 +37,8 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.audioPlayer.*`: `chapters` (`Chapters`), `failure` (`Could not play the audio.`), `link` (`Open {title}`), `next` (`Next chapter`), `pause` (`Pause`), `play` (`Play`), `previous` (`Previous chapter`), `seek` (`Position`), `transcript` (`Transcript`)
 - `ui.barChart.*`: `empty` (`No data yet.`), `total` (`Total`)
 - `ui.barList.*`: `empty` (`No data yet.`)
-- `ui.bell.*`: `empty` (`No notifications`), `label` (`Notifications`), `markAll` (`Mark all as read`), `unread` (`{label}, {count} unread`, `{label}, 1 unread` for one), `unreadMark` (`(unread)`, read by screen readers beside an unread item), `new` (`New notification: {title}`, announced when one arrives)
+- `ui.bell.*`: `empty` (`No notifications`), `label` (`Notifications`), `markAll` (`Mark all as read`), `unread` (`{label}, {count} unread`, `{label}, 1 unread` for one), `unreadMark` (`(unread)`, read by screen readers beside an unread item)
+- `ui.bellInbox.*`: `announce` (`New notification: {title}`, announced when one arrives)
 - `ui.carousel.*`: `dot` (`Go to slide {n}`), `label` (`Carousel`), `next` (`Next slide`), `pause` (`Pause`), `play` (`Play`), `previous` (`Previous slide`), `slide` (`Slide {n} of {count}`)
 - `ui.combobox.*`: `create` (`Create "{text}"`), `empty` (`No match`), `failure` (`Could not load the options`), `loading` (`Loading…`), `results` (`{count} results`, `1 result` for one)
 - `ui.commandPalette.*`: `empty` (`No results`), `label` (`Search`), `placeholder` (`Search`), `recent` (`Recent`), `results` (`{count} results, `1 result` for one`), `search` (`Found`), `searchError` (`The search failed`), `siteSearchError` (`The pages could not be searched`), `siteSearch` (`In the pages`), `siteSearchMore` (`{count} more matches`, `1 more match` for one)
@@ -68,7 +71,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.siteNav.*`: `expand` (`Show the pages under {label}`), `menu` (`Menu`)
 - `ui.splitLayout.*`: `back` (`Back`), `resize` (`Resize list`)
 - `ui.steps.*`: `done` (`completed`), `error` (`has an error`), `skipped` (`skipped`)
-- `ui.subscribeForm.*`: `email` (`Email`), `notice` (`We use your address to send you the mails of this site, until you unsubscribe with the link in each one.`), `privacy` (`Privacy policy`), `sent` (`Almost done: open the mail we just sent you and confirm your address.`), `submit` (`Subscribe`)
+- `ui.subscribeForm.*`: `label` (`Email`), `notice` (`We use your address to send you the mails of this site, until you unsubscribe with the link in each one.`), `privacy` (`Privacy policy`), `sent` (`Almost done: open the mail we just sent you and confirm your address.`), `submit` (`Subscribe`)
 - `ui.table.*`: `details` (`Details`), `expandRow` (`Details of {row}`), `export` (`Export CSV`), `failure` (`Could not load the rows.`), `filter` (`Filter`), `loading` (`Loading…`), `openRow` (`Open {row}`), `retry` (`Try again`), `rowCount` (`{count} rows, `1 row` for one`), `selectAll` (`Select all`), `selectRow` (`Select {row}`), `selected` (`{count} selected`)
 - `ui.toaster.*`: `dismiss` (`Dismiss notification`)
 - `ui.treeView.*`: `failure` (`Could not load.`, beside a branch whose children failed), `retry` (`Try again`)

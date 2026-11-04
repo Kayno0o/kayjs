@@ -6,13 +6,18 @@ const WORD = /\bwording\('ui\.([\w.]+)'/g
 const LISTED = /`ui\.(\w+)\.\*`: (.*)/g
 const PROP = /`(\w+)` \(/g
 
+// Keys read first for the apps whose catalogs still word them, until 1.91; the library words and lists their replacements.
+const LEGACY = new Set(['bell.new', 'subscribeForm.email'])
+
 // Every `ui.*` key the components look up, from their sources.
 async function used(): Promise<Set<string>> {
   const keys = new Set<string>()
 
   for (const path of await Array.fromAsync(new Bun.Glob('src/**/*.{kay,ts}').scan({ cwd: ROOT }))) {
-    for (const [, key] of (await Bun.file(join(ROOT, path)).text()).matchAll(WORD))
-      keys.add(key!)
+    for (const [, key] of (await Bun.file(join(ROOT, path)).text()).matchAll(WORD)) {
+      if (!LEGACY.has(key!))
+        keys.add(key!)
+    }
   }
 
   return keys

@@ -505,6 +505,7 @@ component default
   boxed?: boolean | undefined
   class?: string | undefined | { root?: string | undefined; }
   items: readonly { value: string; title: string; open?: boolean | undefined; disabled?: boolean | undefined; meta?: string | undefined; }[]
+  level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   meta?: ((value: string) => Element) | undefined
   multiple?: boolean | undefined
   onChange?: ((value: string[]) => unknown) | undefined
@@ -922,6 +923,7 @@ component default
   body?: string | undefined;
 }
   disabled?: boolean | undefined
+  level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   meta?: Element
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
@@ -947,7 +949,7 @@ component default
   status?: string | undefined;
 }
   create?: boolean | undefined
-  createLabel?: ((text: string) => string) | undefined
+  createLabel?: ((text: string) => string) | string | undefined
   disabled?: boolean | undefined
   emptyLabel?: string | undefined
   failureLabel?: string | undefined
@@ -1003,7 +1005,7 @@ component default
   placeholder?: string | undefined
   recent?: string[] | undefined
   recentLabel?: string | undefined
-  resultsLabel?: ((count: number) => string) | undefined
+  resultsLabel?: ((count: number) => string) | string | undefined
   search?: ((query: string) => PromiseLike<PaletteEntry[]>) | undefined
   searchError?: string | undefined
   searchLabel?: string | undefined
@@ -1145,6 +1147,7 @@ component default
   today?: string | undefined;
 }
   day?: ((iso: string, state: { selected: boolean; today: boolean; outside: boolean; disabled: boolean; }) => Element) | undefined
+  disabledDay?: ((iso: string) => boolean) | undefined
   firstDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | undefined
   invalid?: boolean | undefined
   isDisabled?: ((iso: string) => boolean) | undefined
@@ -1167,6 +1170,7 @@ component default
   class?: string | undefined | { root?: string | undefined; separator?: string | undefined; }
   day?: ((iso: string, state: { selected: boolean; today: boolean; outside: boolean; disabled: boolean; }) => Element) | undefined
   disabled?: boolean | undefined
+  disabledDay?: ((iso: string) => boolean) | undefined
   firstDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | undefined
   fromLabel?: string | undefined
   fromName?: string | undefined
@@ -1544,7 +1548,7 @@ component default
 }
   failureLabel?: string | undefined
   list: InfiniteList<unknown>
-  loadedLabel?: ((count: number) => string) | undefined
+  loadedLabel?: ((count: number) => string) | string | undefined
   loadingLabel?: string | undefined
   margin?: number | undefined
   moreLabel?: string | undefined
@@ -1753,7 +1757,7 @@ component default
   placement?: PopoverPlacement | undefined
   search?: boolean | undefined
   searchLabel?: string | undefined
-  selectedLabel?: ((count: number) => string) | undefined
+  selectedLabel?: ((count: number) => string) | string | undefined
   size?: FieldSize | undefined
   value?: readonly Value[] | undefined
   valueLabels?: Readonly<Record<string, string>> | undefined
@@ -1799,6 +1803,7 @@ component default
   description?: string | undefined;
 }
   description?: Element
+  level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   meta?: Element
   title: Element
 
@@ -2010,7 +2015,7 @@ component default
   onAdd?: ((row: Row, index: number) => unknown) | undefined
   onChange?: ((rows: Row[]) => unknown) | undefined
   onRemove?: ((row: Row, index: number) => unknown) | undefined
-  removeLabel?: ((index: number) => string) | undefined
+  removeLabel?: ((index: number) => string) | string | undefined
   rows?: readonly Row[] | undefined
   style?: string | undefined
 
@@ -2325,7 +2330,8 @@ component default
   onSelect?: ((key: string) => unknown) | undefined
   param?: string | undefined
   skippedLabel?: string | undefined
-  stepLabel?: ((step: StepItem<string>, state: "current" | "done" | "upcoming") => Element) | undefined
+  step?: ((step: StepItem<string>, state: "current" | "done" | "upcoming") => Element) | undefined
+  stepLabel?: ((step: StepItem<string>, state: "current" | "done" | "upcoming") => Element) | ((step: StepItem<string>, state: "current" | "done" | "upcoming") => string) | undefined
   steps: readonly StepItem<string>[]
   url?: URL | string | undefined
 

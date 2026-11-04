@@ -10,7 +10,7 @@ import Notice from './notice.kay'
 
 const look = recipe({ parts: { root: 'kui-subscribe-form', notice: FIELD_MESSAGE.hint } })
 
-const { action, noticeText, label = wording('ui.subscribeForm.email', wording('mail.list.form.email', 'Email')), submitLabel = wording('ui.subscribeForm.submit', wording('mail.list.form.submit', 'Subscribe')), sentLabel = wording('ui.subscribeForm.sent', wording('mail.list.form.sent', 'Almost done: open the mail we just sent you and confirm your address.')), privacyLabel = wording('ui.subscribeForm.privacy', wording('mail.list.form.privacy', 'Privacy policy')), privacy, wordingId, onSent, onError, sent } = props<{
+const { action, noticeText, label = wording('ui.subscribeForm.email', wording('ui.subscribeForm.label', wording('mail.list.form.email', 'Email'))), submitLabel = wording('ui.subscribeForm.submit', wording('mail.list.form.submit', 'Subscribe')), sentLabel = wording('ui.subscribeForm.sent', wording('mail.list.form.sent', 'Almost done: open the mail we just sent you and confirm your address.')), privacyLabel = wording('ui.subscribeForm.privacy', wording('mail.list.form.privacy', 'Privacy policy')), privacy, wordingId, onSent, onError, sent } = props<{
   // The action `mail.list().form()` from kayjs-mail gives, or any with an `email` field.
   action: Action<never, unknown>
   // The labels read the `ui.subscribeForm.*` messages, then kayjs-mail's `mail.list.form` ones in the page's language, English and French, which these replace.

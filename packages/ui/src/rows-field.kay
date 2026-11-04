@@ -4,6 +4,7 @@ import { announce } from './announce'
 import { defaultKept, onFormReset } from './form-reset'
 import { effect, flush, postedValues, recipe, signal, untrack } from 'kay'
 import { wording } from 'kay/words'
+import { labelText } from './label-text'
 import Button from './button.kay'
 import IconButton from './icon-button.kay'
 import TextInput from './text-input.kay'
@@ -47,7 +48,7 @@ const { rows = NONE, style, columns, label, name, invalid, onChange, onAdd, onRe
   max?: number | undefined
   addLabel?: string | undefined
   // Names the button removing the row at `index` (from 0), such as `Remove header 2`.
-  removeLabel?: ((index: number) => string) | undefined
+  removeLabel?: string | ((index: number) => string) | undefined
 }>()
 
 let root: HTMLElement | undefined
@@ -91,7 +92,7 @@ effect(() => {
 
 const entries = () => current().map((row, index) => ({ row, index, id: ids()[index] ?? index }))
 const full = () => max !== undefined && current().length >= max
-const removeName = (index: number) => removeLabel?.(index) ?? wording('ui.rowsField.remove', 'Remove row {n}', { n: index + 1 })
+const removeName = (index: number) => removeLabel === undefined ? wording('ui.rowsField.remove', 'Remove row {n}', { n: index + 1 }) : labelText(removeLabel, { n: index + 1, index }, index)
 const boxes = () => [...root?.querySelectorAll<HTMLElement>('[data-part=row]') ?? []]
 
 function commit(next: readonly Row[]) {

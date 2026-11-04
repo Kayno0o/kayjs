@@ -20,7 +20,7 @@ const look = recipe({
   },
 })
 
-const { steps, current, url, done = [], param = 'step', label, doneLabel = wording('ui.steps.done', 'completed'), errorLabel = wording('ui.steps.error', 'has an error'), skippedLabel = wording('ui.steps.skipped', 'skipped'), onSelect, stepLabel, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children' | 'onSelect'> & {
+const { steps, current, url, done = [], param = 'step', label, doneLabel = wording('ui.steps.done', 'completed'), errorLabel = wording('ui.steps.error', 'has an error'), skippedLabel = wording('ui.steps.skipped', 'skipped'), onSelect, step: drawStep, stepLabel, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children' | 'onSelect'> & {
   steps: readonly StepItem[]
   // The key of the step on screen, which `currentStep(ctx.url, keys, done)` reads off the URL.
   current: string
@@ -39,8 +39,10 @@ const { steps, current, url, done = [], param = 'step', label, doneLabel = wordi
   skippedLabel?: string | undefined
   // Called with the key of the step a plain click picks, for a wizard an island drives with no navigation. With a `url` the step stays a link, so a middle click or a new tab still opens its address, and a plain click calls this instead of following it.
   onSelect?: ((key: string) => unknown) | undefined
-  // Replaces the text of a step; the number, the state words and the link around it stay.
-  stepLabel?: Snippet<[step: StepItem, state: 'current' | 'done' | 'upcoming']> | undefined
+  // Draws a step in place of its `label`: `@step(step, state)`; the number, the state words and the link around it stay.
+  step?: Snippet<[step: StepItem, state: 'current' | 'done' | 'upcoming']> | undefined
+  // The text of a step in place of its `label`, from the step and its state. A block drawing markup is `@step`; `@stepLabel` as a block works until 1.91.
+  stepLabel?: ((step: StepItem, state: 'current' | 'done' | 'upcoming') => string) | Snippet<[step: StepItem, state: 'current' | 'done' | 'upcoming']> | undefined
 }>()
 
 const at = () => steps.findIndex(step => step.key === current)
@@ -65,7 +67,9 @@ snippet body(step: StepItem, index: number, shown: 'current' | 'done' | 'upcomin
     else
       | {index + 1}
   span(part="label")
-    if stepLabel
+    if drawStep
+      | {drawStep(step, shown)}
+    else if stepLabel
       | {stepLabel(step, shown)}
     else
       | {step.label}

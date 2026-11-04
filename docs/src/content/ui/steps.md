@@ -86,4 +86,4 @@ else
 Steps(steps={STEPS} current={step()} done={done()} label="Booking" onSelect={key => step = key})
 ```
 
-A step may carry `state: 'error'` or `'skipped'` (the item gets `data-outcome`, and a screen reader hears `errorLabel` or `skippedLabel`), an `icon` in place of its number, and `linkable` to be reachable before it is done, for a flow that can be entered at any step. `stepLabel(step, state)` is a block that draws the text of a step; the number, the state words and the link around it stay.
+A step may carry `state: 'error'` or `'skipped'` (the item gets `data-outcome`, and a screen reader hears `errorLabel` or `skippedLabel`), an `icon` in place of its number, and `linkable` to be reachable before it is done, for a flow that can be entered at any step. `@step(step, state)` is a block that draws the markup of a step, and `stepLabel(step, state)` a function that returns its text (the old `@stepLabel` block works until 1.91); the number, the state words and the link around it stay.

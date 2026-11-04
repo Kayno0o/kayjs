@@ -8,6 +8,7 @@ import Icon from './icon.kay'
 import { OUTSIDE } from './outside'
 import { isPaletteLink, paletteHits, paletteMatches, paletteSections, splitMatches, withRecent } from './palette'
 import { wording } from 'kay/words'
+import { labelText } from './label-text'
 
 const DEBOUNCE_MS = 200
 
@@ -67,7 +68,7 @@ const { open = false, onOpenChange, size = 'md', entries, groups = [], recent = 
   // The heading the recently followed links sit under.
   recentLabel?: string | undefined
   // How many rows a query lists, as screen readers hear it.
-  resultsLabel?: ((count: number) => string) | undefined
+  resultsLabel?: string | ((count: number) => string) | undefined
   // How many more times a section found holds the words searched for, past the line shown.
   siteSearchMore?: ((count: number) => string) | undefined
   // Rows for a query the app looks up itself, such as a server's: called once typing pauses, with the query trimmed, and its rows are listed under `searchLabel` after the entries and the site's sections. An answer for an older query is dropped; a rejection shows `searchError`. An action works as is.
@@ -88,7 +89,7 @@ interface Row {
 }
 
 const id = uid()
-const counted = resultsLabel ?? ((count: number) => wording('ui.commandPalette.results', count === 1 ? '1 result' : '{count} results', { count }))
+const counted = (count: number) => resultsLabel === undefined ? wording('ui.commandPalette.results', count === 1 ? '1 result' : '{count} results', { count }) : labelText(resultsLabel, { count }, count)
 const countedMore = siteSearchMore ?? ((count: number) => wording('ui.commandPalette.siteSearchMore', count === 1 ? '1 more match' : '{count} more matches', { count }))
 const shown = signal(open)
 const followedRecently = signal<string[]>(recent)

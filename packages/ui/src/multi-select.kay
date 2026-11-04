@@ -12,6 +12,7 @@ import Icon from './icon.kay'
 import { pickedLabels, pickedShown, selectionSummary, toggledValue } from './multi-select'
 import Popover from './popover.kay'
 import { wording } from 'kay/words'
+import { labelText } from './label-text'
 
 // The checkbox's own ring is too small to find, so the row the keyboard stands on takes the menu's tint and accent bar; forced colours paint the transparent outline instead.
 const look = recipe({
@@ -79,7 +80,7 @@ const { size = 'md', invalid, id, options, value = [], label, placeholder = word
   onLoad?: ((options: readonly MultiSelectOption<Value>[], query: string) => unknown) | undefined
   onError?: ((error: unknown, query: string) => unknown) | undefined
   // What the trigger reads once several are picked, `3 selected` by default.
-  selectedLabel?: ((count: number) => string) | undefined
+  selectedLabel?: string | ((count: number) => string) | undefined
   // Submits each picked value under this name, for a control inside a form.
   name?: string | undefined
   // Draws each option in place of its label (and icon): `@option(option)`. The input stays named by the option's `label`, and keeps its checked and disabled state.
@@ -136,7 +137,7 @@ const pool = (): readonly MultiSelectOption<Value>[] => {
 
 const waiting = () => remote && query().trim().length >= minLength && answered() !== query()
 const searchable = () => remote || (search ?? listed().length > SEARCH_FROM)
-const summary = () => selectionSummary(pool(), picked(), placeholder, selectedLabel ?? (count => wording('ui.multiSelect.selected', '{count} selected', { count })))
+const summary = () => selectionSummary(pool(), picked(), placeholder, count => selectedLabel === undefined ? wording('ui.multiSelect.selected', '{count} selected', { count }) : labelText(selectedLabel, { count }, count))
 
 const shown = () => {
   const needle = query().trim().toLowerCase()

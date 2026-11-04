@@ -23,8 +23,8 @@ export default defineMessages({
       markAll: 'Tout marquer comme lu',
       unread: { one: '{label}, {count} non lue', other: '{label}, {count} non lues' },
       unreadMark: '(non lue)',
-      new: 'Nouvelle notification : {title}',
     },
+    bellInbox: { announce: 'Nouvelle notification : {title}' },
     carousel: {
       dot: 'Aller à la diapositive {n}',
       label: 'Carrousel',
@@ -163,7 +163,7 @@ export default defineMessages({
     splitLayout: { back: 'Retour', resize: 'Redimensionner la liste' },
     steps: { done: 'terminée', error: 'en erreur', skipped: 'ignorée' },
     subscribeForm: {
-      email: 'E-mail',
+      label: 'E-mail',
       notice: 'Nous utilisons votre adresse pour vous envoyer les mails de ce site, jusqu\'à ce que vous vous désabonniez avec le lien de chacun.',
       privacy: 'Politique de confidentialité',
       sent: 'Presque fini : ouvrez le mail que nous venons de vous envoyer et confirmez votre adresse.',

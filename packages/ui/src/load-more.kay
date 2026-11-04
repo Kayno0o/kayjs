@@ -4,6 +4,7 @@ import type { InfiniteList } from './infinite-list'
 import Button from './button.kay'
 import WhenVisible from './when-visible.kay'
 import { wording } from 'kay/words'
+import { labelText } from './label-text'
 
 const look = recipe({ parts: { root: 'kui-load-more', failed: 'kui-load-more-failed', loading: 'kui-load-more-loading', announced: 'sr-only' } })
 
@@ -19,7 +20,7 @@ const { list, margin, loadingLabel = wording('ui.loadMore.loading', 'Loading mor
   button?: boolean | undefined
   moreLabel?: string | undefined
   // What a screen reader hears once rows were added, from how many: "3 more loaded" by default.
-  loadedLabel?: ((count: number) => string) | undefined
+  loadedLabel?: string | ((count: number) => string) | undefined
 }>()
 
 // Rows added by the last page, told to screen readers beside the visible status.
@@ -39,7 +40,7 @@ effect(() => {
   seen = total
 })
 
-const loaded = () => added() > 0 ? (loadedLabel?.(added()) ?? wording('ui.loadMore.loaded', '{count} more loaded', { count: added() })) + (flip() ? '\u200B' : '') : ''
+const loaded = () => added() > 0 ? (loadedLabel === undefined ? wording('ui.loadMore.loaded', '{count} more loaded', { count: added() }) : labelText(loadedLabel, { count: added() }, added())) + (flip() ? '\u200B' : '') : ''
 ---
 // The end of an infinite list: the sentinel, or a button under `button`, while there are more rows, a status while a page loads, and an alert with a retry once a page failed, which loads no other until it is pressed.
 div(part="root")

@@ -42,7 +42,7 @@ test('with onSelect and no url a done or linkable step is a button, picking it r
   expect(mounted.root.querySelector('#plain [aria-current="step"]')?.textContent).toContain('current: Review')
 })
 
-test('a step carries its state to the page and to screen readers, its icon in place of the number, and a stepLabel block draws its text', async () => {
+test('a step carries its state to the page and to screen readers, its icon in place of the number, and a step block draws its text', async () => {
   mounted = await mountComponent(StepsWizard, { picks: [] })
 
   const items = [...mounted.root.querySelectorAll('#plain [data-part="item"]')]
