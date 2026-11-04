@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { typeAwareSlices } from '../eslint.slices'
 import { dropStaleLintCache } from './lint-cache'
 
-const HEAP_MB = 1536
+const HEAP_MB = 2048
 const keslint = join(import.meta.dir, '../node_modules/.bin/keslint')
 const rest = ['.', '--ignore-pattern', 'packages/**', ...typeAwareSlices.flat().flatMap(glob => ['--ignore-pattern', glob])]
 // Each process caches in a file of its own: ESLint drops from a cache the files its run did not lint.
