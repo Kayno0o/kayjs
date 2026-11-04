@@ -355,9 +355,9 @@ describe('stored images', () => {
 
   it('drop the social card drawn on a stored image once it is deleted', async () => {
     const store = memoryFiles()
-    const app = await pages({ site: 'https://storage.example', root: ROOT, routes: 'src/card-routes', fonts: [{ family: 'Archivo Black', src: resolve('tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2') }], prebuilt: false, security: false, storage: store })
+    const app = await pages({ site: 'https://storage.example', root: ROOT, fonts: [{ family: 'Archivo Black', src: resolve('tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2') }], prebuilt: false, security: false, storage: store })
     const key = await files.put(await hero())
-    const html = await (await app.handle(new Request(`http://localhost/?key=${encodeURIComponent(key)}`))).text()
+    const html = await (await app.handle(new Request(`http://localhost/card?key=${encodeURIComponent(key)}`))).text()
     const card = (/<meta property="og:image" content="https:\/\/storage\.example([^"]+)">/).exec(html)![1]!.replaceAll('&amp;', '&')
     const variants = cacheDir(resolve(ROOT), `images${testWorker()}`)
     const made = async () => new Set((await readdir(variants)).filter(name => name.endsWith('.jpg')))
