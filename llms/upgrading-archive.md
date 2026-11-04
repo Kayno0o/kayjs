@@ -1,6 +1,35 @@
 # Upgrading, older releases
 
-What each minor release before 1.85 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+What each minor release before 1.87 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+
+## 1.86.0
+
+### kayjs-auth: the flat methods are gone
+
+- The flat `Auth` methods deprecated in 1.82 (`auth.listUsers()`, `auth.signInWithPassword(input)`, `auth.invite(ref, email)`) no longer exist, and the `deprecated-auth-methods` lint goes with them; `missing-captcha` reads the grouped calls only. Call the grouped method ([the table](../packages/auth/llms/grouped-methods.md)): an app still on a flat name upgrades to 1.85 first, where `kay upgrade` renames the calls, then to 1.86.
+
+### The prebuilt auth pages write a main landmark
+
+- The sign-in, register, reset, two-factor, verify, confirm, magic-link, invitation and OAuth pages and the account and admin layouts now write their content in a `main`. An app whose layout already wraps pages in a `main` sets `auth({ pages: { main: false } })` (or `createAuth`) once, and the pages write a `div` instead: left as it is, the page holds two `main` landmarks. No lint recognises it, so none ships with this change.
+
+### A usage error exits 2
+
+- A command line `kay` cannot take (an unknown command, an unknown option, an argument too many or missing, a `refuse(reason)` of an extension command) exits 2 and prints `error: kay <command>: <reason>` with a `hint:` line, where it exited 1 and printed the reason and the usage. A script or CI step testing for exit 1 on a bad command line tests for 2; a command that ran and failed still exits 1. `kay <command> --help` prints the options with a line each after the usage, and `kay i18n` alone, a group with no command named, is the same error, `kay i18n --help` lists the group. No lint recognises a command line, so none ships with this.
+- An extension command that begins with the words of another extension's (`db` and `db migrate`) stops the command, as the shorter would be a group of the longer: rename one.
+
+### A module a mounted component imports is the test's own instance
+
+- `mountComponent` no longer runs the project's modules afresh on every mount: a module of the project or a package, a signal store or a `persisted()` signal declared in a module included, is the one the test imports, so its state carries over to the next mount and test. A test that relied on a store starting empty resets it in `afterEach` (`count.set(0)`), and one that wrote `writePersisted` before each mount of a module-level `persisted()` sets the signal instead after the first. A signal declared in the component's own `.kay` file starts fresh as before. `kay check` cannot recognise a test, so there is no deprecated lint.
+
+## 1.85.0
+
+### kayjs-ui's `LineChart` needs chartist 2.2
+
+- The `chartist` peer is `^2.2.0` (was `^2.0.0`): `bun update chartist` before upgrading kayjs-ui. `kay check` cannot recognise a chartist version, so there is no deprecated lint.
+
+### kayjs-auth reads no `attempts` counter
+
+- The `attempts` counter a store gave before 1.81 is no longer read, and `deprecated-auth-attempts` is gone with it: a store literal typed `AuthStore` still holding one gets a type error from `kay check`. Drop it, attempts then counting in the app's `store.rates`, else in memory, or give `rates`, a kay `RateStore` with `peek` and `reset` over the store's own database. `kay upgrade` on 1.84 drops `attempts: memoryAuthStore().attempts`.
 
 ## 1.84.0
 
