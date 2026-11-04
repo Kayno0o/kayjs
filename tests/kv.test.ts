@@ -90,7 +90,7 @@ describe('the process memory fallback and a closed store', () => {
     expect(await flags.get('599')).toBe('v')
   })
 
-  it('warns once per namespace when the app names stores but no kv, and not when it names one or none', async () => {
+  it('warns once per process, whatever the namespaces, when the app names stores but no kv, and not when it names one or none', async () => {
     const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
     const told = () => warn.mock.calls.filter(([message]) => String(message).includes('has no kv')).length
 
@@ -100,13 +100,13 @@ describe('the process memory fallback and a closed store', () => {
       await kv('warned').get('a')
       expect(told()).toBe(1)
       await kv('other').get('a')
-      expect(told()).toBe(2)
+      expect(told()).toBe(1)
 
       setupStore({ kv: memoryKv() })
       await kv('warned').get('a')
       setupStore(undefined)
       await kv('warned').get('a')
-      expect(told()).toBe(2)
+      expect(told()).toBe(1)
     }
     finally {
       warn.mockRestore()

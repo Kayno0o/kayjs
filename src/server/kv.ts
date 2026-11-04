@@ -167,8 +167,8 @@ export function sqliteKv(path: string): KvStore {
 
 let fallback: { store: KvStore, setups: number } | undefined
 
-// The namespaces already told, in the store setup they were told for.
-let warned: { namespaces: Set<string>, setups: number } | undefined
+// The store setup already told once, whichever namespace asked first.
+let warnedSetups: number | undefined
 
 function inMemoryKv(namespace: string): KvStore {
   if (fallback?.setups !== storeSetups())
@@ -176,12 +176,9 @@ function inMemoryKv(namespace: string): KvStore {
 
   // An app that names stores but no `kv` shares nothing between its processes through this one: a signed-out cookie or a single-use ticket is known to the process that took it only.
   if (appStore() !== undefined) {
-    if (warned?.setups !== storeSetups())
-      warned = { namespaces: new Set(), setups: storeSetups() }
-
-    if (!warned.namespaces.has(namespace)) {
-      warned.namespaces.add(namespace)
-      kayLog('warn', `the app's store has no kv, so "${namespace}" (signed-out cookies, single-use tickets, fetched documents) is kept in this process only: add kv to the store, which sqliteData and pgData fill`)
+    if (warnedSetups !== storeSetups()) {
+      warnedSetups = storeSetups()
+      kayLog('warn', `the app's store has no kv, so values a library keeps across requests, "${namespace}" first (signed-out cookies, single-use tickets, fetched documents), are kept in this process only: add kv to the store, which sqliteData and pgData fill`)
     }
   }
 
