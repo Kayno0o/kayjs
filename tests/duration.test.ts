@@ -62,6 +62,10 @@ describe('duration words', () => {
     expect([86_400, 7 * 86_400, 3600, 90 * 60, 900, 45, 2 * 86_400 + 1].map(seconds => durationWords(seconds, 'en'))).toEqual(['24 hours', '7 days', '1 hour', '90 minutes', '15 minutes', '45 seconds', '172,801 seconds'])
   })
 
+  it('takes a duration as it takes seconds', () => {
+    expect((['24h', '7d', '1h', '90m', '15m', '45s', '1500ms'] as const).map(duration => durationWords(duration, 'en'))).toEqual(['24 hours', '7 days', '1 hour', '90 minutes', '15 minutes', '45 seconds', '1.5 seconds'])
+  })
+
   it('words it in French, with its plurals', () => {
     expect([86_400, 7 * 86_400, 3600, 7200, 600, 1].map(seconds => durationWords(seconds, 'fr').replace(/\s/g, ' '))).toEqual(['24 heures', '7 jours', '1 heure', '2 heures', '10 minutes', '1 seconde'])
   })

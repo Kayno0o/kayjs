@@ -1,3 +1,4 @@
+import type { Duration } from 'kay'
 import type { AuthLinkKind, AuthMailData, AuthMailKind, AuthMailWording, AuthNoticeKind } from 'kay/library/auth-mails'
 import type { EmailCore } from './email'
 import { durationWords, escapeHtml as escape, trackDetached } from 'kay/library'
@@ -30,8 +31,8 @@ export interface AuthMailMessage extends MailContent {
   code?: string
   // The language it is written in, one of the `locales` option's.
   locale: string
-  // How many seconds its link and its code work, for the ones it carries.
-  maxAge?: { link?: number, code?: number } | undefined
+  // How long its link and its code work, for the ones it carries, as durations such as `'24h'`.
+  maxAge?: { link?: Duration, code?: Duration } | undefined
 }
 
 // One address on one mailing list, as kayjs-mail's `subscriptions` answers it.
@@ -90,7 +91,7 @@ function linkMail(words: AuthMailWording, data: MailData, subject: string, lead:
   }
 }
 
-// A lifetime in seconds as words in a language: `24 hours`, `7 days`, `1 heure`, from kay's `durationWords`.
+// A lifetime, a duration such as `'24h'` (a number of seconds still works until 1.91), as words in a language: `24 hours`, `7 days`, `1 heure`, from kay's `durationWords`.
 export const lifetime = durationWords
 
 // How long what the mail carries works, a magic link being usable once.

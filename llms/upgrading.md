@@ -18,7 +18,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - On a page running kay's script, `prefetch: 'eager'` fetched on hover with no delay and never on load; it now fetches the links scrolled into view, three at a time, as the setting says elsewhere. An app that wants the old timing sets `'moderate'`. `kay check` cannot see which timing an app meant, so no lint ships with this.
 ### `rooms()` state and `update` always resolve
 
-- `rooms()`'s `state(room)` and `update(room, change)` return promises whatever the store, as every other store answers: `await` them (`const { cells } = await games.update(room, ...)`, a `coalesce` `read` that reads `state` is `async`). `RoomStore.state` and `update` return promises too, so a hand-written store makes them `async`. `AsyncRoomStore`, `AsyncRooms` and `StoreRooms` stay as deprecated names of `RoomStore` and `Rooms`. An error in a change, a refused room name, now rejects instead of throwing. `kay check` cannot see a call that ignores the promise, so TypeScript (and the `no-floating-promises` rule) is what finds them.
+- `rooms()`'s `state(room)` and `update(room, change)` return promises whatever the store, as every other store answers: `await` them (`const { cells } = await games.update(room, ...)`, a `coalesce` `read` that reads `state` is `async`). `RoomStore.state` and `update` return promises too, so a hand-written store makes them `async`. `AsyncRoomStore`, `AsyncRooms` and `StoreRooms` stay as deprecated names. A refused room name now rejects instead of throwing. `kay check` cannot see a call that ignores the promise, so TypeScript and `no-floating-promises` find them.
 
 ### Checkbox and Toggle with a `name` or an `issue` sit in a wrapper
 
@@ -26,7 +26,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - No lint can recognise it: the change is in the markup a component renders.
 ### A store receives durations as milliseconds
 
-- `SessionStore.set(id, data, maxAge)` and `RateStore.hit(key, window, weight)` are given `maxAge` and `window` in milliseconds, a number, where they were `Duration` strings (`'2592000s'`, `'60000ms'`): a store of your own drops its `durationMs(...)` call and uses the number (`redis.pexpire(key, window)`), and a test calling a kay store passes `60_000` where it passed `'60s'`. kay's own stores, kayjs-auth, kayjs-ai and kayjs-cms are changed. `kay check` cannot see a store written by hand, and a string given to a number-reading store fails at its first call, so TypeScript is what finds them; options an app writes stay `Duration`s.
+- `SessionStore.set(id, data, maxAge)` and `RateStore.hit(key, window, weight)` are given `maxAge` and `window` in milliseconds, a number, where they were `Duration` strings (`'2592000s'`, `'60000ms'`): a store of your own drops its `durationMs(...)` call and uses the number (`redis.pexpire(key, window)`), and a test calling a kay store passes `60_000` where it passed `'60s'`. kay's own stores and the libraries are changed. `kay check` cannot see a store written by hand, so TypeScript finds them; options an app writes stay `Duration`s.
 
 ## 1.87.0
 
@@ -49,12 +49,17 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - A component (a `.kay` file that is no page, layout or special page) with a `--- server` fence is a `fence-invalid` error in `kay check` and `kay build`: move the value into the page or layout and pass it as a prop. No `deprecated` lint is possible because the old form never worked: its values became required props nobody could pass.
 ### Stores name their verbs alike
 
-- `FileStore.delete(key)` resolves with whether there was a file, `PushStore.remove` is `delete`, `JobStore.purge` is `prune`, and kayjs-ai's `ConversationStore.remove` is `delete`: a store of your own renames the method and returns the boolean.
-- kayjs-auth's `AuthStore`: `users.delete` and `identities.delete` resolve with a boolean, every `deleteForUser` is `erase` and answers a count, `audit.forget` is `audit.erase`, and `audit.prune` answers a count.
+- `FileStore.delete(key)` resolves with whether there was a file, `PushStore.remove` is `delete`, `JobStore.purge` is `prune` and kayjs-ai's `ConversationStore.remove` is `delete`: a store of your own renames and returns the boolean.
+- kayjs-auth's `AuthStore`: `users.delete` and `identities.delete` answer a boolean, every `deleteForUser` is `erase` and `audit.forget` is `audit.erase`, answering counts, as `audit.prune` does.
 
 ### Signed-out cookies and approval tickets move to `store.kv`
 
-- kayjs-cms's signed-out cookies and kayjs-ai's spent approval tickets are kept in `store.kv` (filled by `sqliteData` and `pgData`, else the process's memory) in place of `store.rates`: `passwordGuard({ store })` counts wrong passwords only and `passwordGuard({ kv })` names the cookies' store. An app on a hand-written `store.rates` shared between processes adds a `kv` of its own (`get`, `set`, `delete`, `once`). `kay check` cannot see it.
+- kayjs-cms's signed-out cookies and kayjs-ai's spent approval tickets are kept in `store.kv` (filled by `sqliteData` and `pgData`, else the process's memory), not `store.rates`: `passwordGuard({ store })` counts wrong passwords only and `passwordGuard({ kv })` names the cookies' store. An app on a hand-written `store.rates` shared between processes adds a `kv` of its own.
+
+### Durations and dates where a number stood
+
+- kayjs-auth's mail `maxAge` is `{ link: '24h', code: '10m' }`, durations where seconds stood: `lifetime(value, locale)` takes both until 1.91. OAuth `expiresAt` (`OAuthTokens`, `StoredCredential`, the `exchange` result) is a `Date`: a custom provider returns `new Date(...)`.
+- kayjs-ai's provider `embed`, `speak` and `transcribe` get `timeout` as a `Duration`, not milliseconds.
 
 ## 1.87.0
 

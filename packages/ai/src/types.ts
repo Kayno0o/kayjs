@@ -161,8 +161,8 @@ export interface TranscribeRequest {
   model: string
   // An ISO 639-1 code such as `fr`, left out to let the model tell.
   language: string | undefined
-  // How long the whole call may take, in milliseconds.
-  timeout: number
+  // How long the whole call may take.
+  timeout: Duration
 }
 
 export interface SpeakRequest {
@@ -171,14 +171,14 @@ export interface SpeakRequest {
   voice: string | undefined
   speed: number | undefined
   format: AudioFormat | undefined
-  timeout: number
+  timeout: Duration
 }
 
 export interface EmbedRequest {
   input: string[]
   model: string
   dimensions: number | undefined
-  timeout: number
+  timeout: Duration
 }
 
 // Any action exported by a page module, whatever its input and honeypot.

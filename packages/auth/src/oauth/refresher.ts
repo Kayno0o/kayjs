@@ -11,7 +11,7 @@ const REFUSED_STATUSES = new Set([400, 401])
 export interface StoredCredential {
   accessToken?: string | null | undefined
   refreshToken?: string | null | undefined
-  expiresAt?: number | null | undefined
+  expiresAt?: Date | null | undefined
 }
 
 export interface TokenRefresherDeps<K, S> {
@@ -20,7 +20,7 @@ export interface TokenRefresherDeps<K, S> {
   /** Reads the subject's stored credential. */
   load: (subject: S) => StoredCredential
   /** Performs the refresh + persistence; returns the new token, or `null` when refresh failed. */
-  exchange: (subject: S) => Promise<{ accessToken: string, expiresAt?: number | undefined } | null>
+  exchange: (subject: S) => Promise<{ accessToken: string, expiresAt?: Date | undefined } | null>
   /** How long before expiry to refresh, `'5m'` by default. */
   margin?: Duration | undefined
 }
@@ -51,7 +51,7 @@ export function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>) {
       if (cached && cached.expiresAt <= now)
         cache.delete(key)
 
-      if (stored.expiresAt > now + margin)
+      if (stored.expiresAt.getTime() > now + margin)
         return stored.accessToken
 
       if (stored.refreshToken == null || stored.refreshToken === '')
@@ -79,7 +79,7 @@ export function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>) {
           }
 
           if (result.expiresAt !== undefined)
-            cache.set(key, { accessToken: result.accessToken, expiresAt: result.expiresAt })
+            cache.set(key, { accessToken: result.accessToken, expiresAt: result.expiresAt.getTime() })
 
           return result.accessToken
         }

@@ -157,7 +157,7 @@ export function setUp<C extends Call>(call: C, options: CallOptions) {
   if (method === undefined)
     throw new AiError('unsupported', `${chosen.provider.name} has no ${CALLS[call].what}`)
 
-  const timeout = Math.min(MAX_TIMER_MS, Math.ceil(durationSeconds(options.timeout ?? DEFAULT_CALL_TIMEOUT, `${call}({ timeout })`) * 1000))
+  const timeout: Duration = `${Math.min(MAX_TIMER_MS, Math.ceil(durationSeconds(options.timeout ?? DEFAULT_CALL_TIMEOUT, `${call}({ timeout })`) * 1000))}ms`
   const signals = [currentRequest()?.signal, options.signal].filter(signal => signal !== undefined)
 
   return { send: method as NonNullable<Provider[C]>, model, voice: chosen.voice, timeout, signal: AbortSignal.any(signals) }

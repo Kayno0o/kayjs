@@ -51,7 +51,7 @@ describe('kayjs-auth\'s own mails', () => {
   for (const [locale, words] of Object.entries(AUTH_MAIL_WORDING)) {
     test(`write each kind's lines in ${locale}, with nothing left to fill`, () => {
       for (const kind of [...AUTH_LINK_KINDS, ...AUTH_NOTICE_KINDS]) {
-        const data = { name: 'Site', email: 'ada@example.com', locale, maxAge: { link: 3600, code: 600 }, ...AUTH_MAIL_SAMPLES[kind] }
+        const data = { name: 'Site', email: 'ada@example.com', locale, maxAge: { link: '1h', code: '10m' } as const, ...AUTH_MAIL_SAMPLES[kind] }
         const { subject, text, html } = builtInTemplates[locale]![kind](data)
         const lead = words[kind].lead.replaceAll('{site}', 'Site').replaceAll('{email}', data.email).replaceAll('{detail}', data.detail ?? '').replaceAll('{what}', words.link)
 

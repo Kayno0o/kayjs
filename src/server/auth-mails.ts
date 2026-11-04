@@ -1,4 +1,6 @@
-// kayjs-auth's mails, which kayjs-auth sends and kayjs-mail renders: their kinds, what each carries and their wording in each language shipped, read by both so neither depends on the other. Not API, like `kay/library`; it imports nothing, as kayjs-mail's French catalog imports it and `kay check` imports catalogs.
+// kayjs-auth's mails, which kayjs-auth sends and kayjs-mail renders: their kinds, what each carries and their wording in each language shipped, read by both so neither depends on the other. Not API, like `kay/library`; it imports only types, as kayjs-mail's French catalog imports it and `kay check` imports catalogs.
+
+import type { Duration } from '../runtime/duration'
 
 // A link to follow or a code to type, then news of a change to the account.
 export const AUTH_LINK_KINDS = ['verify-email', 'reset-password', 'magic-link', 'change-email', 'invitation', 'account-exists'] as const
@@ -17,8 +19,8 @@ export interface AuthMailData {
   detail?: string | undefined
   // The language to write in, one of the `locales` option's.
   locale: string
-  // How many seconds the mail's link and its code work, for the ones it carries: `{ link: 86400, code: 600 }`. `lifetime(seconds, locale)` words them.
-  maxAge?: { link?: number, code?: number } | undefined
+  // How long the mail's link and its code work, for the ones it carries, as durations: `{ link: '24h', code: '10m' }`. `lifetime(duration, locale)` words them.
+  maxAge?: { link?: Duration, code?: Duration } | undefined
 }
 
 const LINK = 'https://example.com/auth?token=sample'

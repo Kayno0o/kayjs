@@ -466,8 +466,9 @@ class Validator {
     if (this.options.check && !element.component)
       this.accessibility(element)
 
-    if (this.options.check && element.component)
+    if (this.options.check && element.component) {
       this.deprecatedUiTone(element)
+    }
 
     if (foreign && !element.component && RAW_TEXT.has(element.name) && this.dynamicContent(element))
       this.error(element.tag, `A \`${element.name}\` inside \`svg\` or \`math\` takes static text only`, { note: `HTML reads its content as markup there, so a value could add elements`, help: `write its text as it is, or move the \`${element.name}\` out of the \`svg\`` })

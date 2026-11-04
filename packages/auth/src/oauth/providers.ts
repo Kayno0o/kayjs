@@ -367,7 +367,7 @@ function parseStandardTokens(raw: unknown): OAuthTokens {
   return {
     accessToken: answer.access_token,
     refreshToken: answer.refresh_token ?? undefined,
-    expiresAt: typeof answer.expires_in === 'number' ? Date.now() + answer.expires_in * 1000 : undefined,
+    expiresAt: typeof answer.expires_in === 'number' ? new Date(Date.now() + answer.expires_in * 1000) : undefined,
     scope: answer.scope ?? undefined,
     tokenType: answer.token_type ?? undefined,
     idToken: typeof answer.id_token === 'string' ? answer.id_token : undefined,

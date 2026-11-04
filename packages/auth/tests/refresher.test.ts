@@ -8,7 +8,7 @@ const MIN = 60_000
 
 interface Subject { id: string }
 
-function setup(stored: StoredCredential, exchange: () => Promise<{ accessToken: string, expiresAt?: number } | null>) {
+function setup(stored: StoredCredential, exchange: () => Promise<{ accessToken: string, expiresAt?: Date } | null>) {
   let calls = 0
   const refresher = createTokenRefresher<string, Subject>({
     key: s => s.id,
@@ -27,9 +27,9 @@ describe('createTokenRefresher', () => {
   // Credentials the refresher answers from what is stored, never reaching the exchange.
   test.each<[string, StoredCredential, string | null]>([
     ['a non-expiring credential passes the stored token through', { accessToken: 'gh', expiresAt: null }, 'gh'],
-    ['a missing access token yields null', { accessToken: null, expiresAt: Date.now() + MIN }, null],
-    ['a token still outside the refresh margin is returned as-is', { accessToken: 'live', expiresAt: Date.now() + 10 * MIN }, 'live'],
-    ['an expiring token with no refresh token yields null', { accessToken: 'old', expiresAt: Date.now() + 1000 }, null],
+    ['a missing access token yields null', { accessToken: null, expiresAt: new Date(Date.now() + MIN) }, null],
+    ['a token still outside the refresh margin is returned as-is', { accessToken: 'live', expiresAt: new Date(Date.now() + 10 * MIN) }, 'live'],
+    ['an expiring token with no refresh token yields null', { accessToken: 'old', expiresAt: new Date(Date.now() + 1000) }, null],
   ])('%s without an exchange', async (_name, stored, token) => {
     const { refresher, calls } = setup(stored, async () => null)
 
@@ -39,8 +39,8 @@ describe('createTokenRefresher', () => {
 
   test('an expiring token with a refresh token is exchanged and cached', async () => {
     const { refresher, calls } = setup(
-      { accessToken: 'old', refreshToken: 'r', expiresAt: Date.now() + 1000 },
-      async () => ({ accessToken: 'fresh', expiresAt: Date.now() + 10 * MIN }),
+      { accessToken: 'old', refreshToken: 'r', expiresAt: new Date(Date.now() + 1000) },
+      async () => ({ accessToken: 'fresh', expiresAt: new Date(Date.now() + 10 * MIN) }),
     )
 
     expect(await refresher.getValidToken({ id: 'u1' })).toBe('fresh')
@@ -50,15 +50,15 @@ describe('createTokenRefresher', () => {
   })
 
   test('margin is a duration', async () => {
-    const stored: StoredCredential = { accessToken: 'old', refreshToken: 'r', expiresAt: Date.now() + 10 * MIN }
+    const stored: StoredCredential = { accessToken: 'old', refreshToken: 'r', expiresAt: new Date(Date.now() + 10 * MIN) }
 
-    const refresher = createTokenRefresher<string, Subject>({ key: s => s.id, load: () => stored, exchange: async () => ({ accessToken: 'fresh', expiresAt: Date.now() + 60 * MIN }), margin: '15m' })
+    const refresher = createTokenRefresher<string, Subject>({ key: s => s.id, load: () => stored, exchange: async () => ({ accessToken: 'fresh', expiresAt: new Date(Date.now() + 60 * MIN) }), margin: '15m' })
 
     expect(await refresher.getValidToken({ id: 'u1' })).toBe('fresh')
   })
 
   test('a failed refresh yields null and does not cache', async () => {
-    const stored: StoredCredential = { accessToken: 'old', refreshToken: 'r', expiresAt: Date.now() + 1000 }
+    const stored: StoredCredential = { accessToken: 'old', refreshToken: 'r', expiresAt: new Date(Date.now() + 1000) }
     const { refresher, calls } = setup(stored, async () => null)
 
     expect(await refresher.getValidToken({ id: 'u1' })).toBeNull()
@@ -68,7 +68,7 @@ describe('createTokenRefresher', () => {
 
   test('an exception during refresh propagates and does not cache', async () => {
     const { refresher, calls } = setup(
-      { accessToken: 'old', refreshToken: 'r', expiresAt: Date.now() + 1000 },
+      { accessToken: 'old', refreshToken: 'r', expiresAt: new Date(Date.now() + 1000) },
       async () => { throw new Error('network down') },
     )
 
@@ -79,19 +79,19 @@ describe('createTokenRefresher', () => {
   })
 
   test('concurrent refreshes for the same subject dedup to one exchange', async () => {
-    let resolve!: (v: { accessToken: string, expiresAt?: number }) => void
-    const gate = new Promise<{ accessToken: string, expiresAt?: number }>((r) => {
+    let resolve!: (v: { accessToken: string, expiresAt?: Date }) => void
+    const gate = new Promise<{ accessToken: string, expiresAt?: Date }>((r) => {
       resolve = r
     })
     const { refresher, calls } = setup(
-      { accessToken: 'old', refreshToken: 'r', expiresAt: Date.now() + 1000 },
+      { accessToken: 'old', refreshToken: 'r', expiresAt: new Date(Date.now() + 1000) },
       async () => gate,
     )
 
     const a = refresher.getValidToken({ id: 'u1' })
     const b = refresher.getValidToken({ id: 'u1' })
 
-    resolve({ accessToken: 'fresh', expiresAt: Date.now() + 10 * MIN })
+    resolve({ accessToken: 'fresh', expiresAt: new Date(Date.now() + 10 * MIN) })
 
     expect(await a).toBe('fresh')
     expect(await b).toBe('fresh')
@@ -116,11 +116,11 @@ function oauthSetup(stored: StoredCredential, refreshTokens: (refreshToken: stri
   return { refresher, saves, errors }
 }
 
-const EXPIRING: StoredCredential = { accessToken: 'old', refreshToken: 'r', expiresAt: Date.now() + 1000 }
+const EXPIRING: StoredCredential = { accessToken: 'old', refreshToken: 'r', expiresAt: new Date(Date.now() + 1000) }
 
 describe('createOAuthTokenRefresher', () => {
   test('refreshes through the oauth client with the stored refresh token and persists the new tokens', async () => {
-    const expiresAt = Date.now() + 10 * MIN
+    const expiresAt = new Date(Date.now() + 10 * MIN)
     const seen: string[] = []
     const { refresher, saves, errors } = oauthSetup(EXPIRING, async (refreshToken) => {
       seen.push(refreshToken)
@@ -159,7 +159,7 @@ describe('createOAuthTokenRefresher', () => {
       if (calls === 1)
         throw new OAuthExchangeError(502, 'OAuth token request failed (discord): The operation timed out.')
 
-      return { accessToken: 'fresh', expiresAt: Date.now() + 10 * MIN }
+      return { accessToken: 'fresh', expiresAt: new Date(Date.now() + 10 * MIN) }
     })
 
     expect(await refresher.getValidToken({ id: 'u1' })).toBeNull()
@@ -171,7 +171,7 @@ describe('createOAuthTokenRefresher', () => {
     const writeError = new Error('db down')
     const { refresher, errors } = oauthSetup(
       EXPIRING,
-      async () => ({ accessToken: 'fresh', expiresAt: Date.now() + 10 * MIN }),
+      async () => ({ accessToken: 'fresh', expiresAt: new Date(Date.now() + 10 * MIN) }),
       () => { throw writeError },
     )
 
@@ -194,7 +194,7 @@ describe('createOAuthTokenRefresher', () => {
 
   test('a credential with no refresh token never reaches the oauth client', async () => {
     let called = false
-    const { refresher, saves } = oauthSetup({ accessToken: 'old', expiresAt: Date.now() + 1000 }, async () => {
+    const { refresher, saves } = oauthSetup({ accessToken: 'old', expiresAt: new Date(Date.now() + 1000) }, async () => {
       called = true
 
       return { accessToken: 'fresh' }

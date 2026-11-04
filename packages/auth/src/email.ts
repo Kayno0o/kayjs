@@ -462,9 +462,9 @@ async function spendResend(state: RequestState, id: string, limit: 'resend' | 'e
   return undefined
 }
 
-// The seconds the link and the code of a mail work, for the ones it carries.
+// How long the link and the code of a mail work, for the ones it carries.
 function lifetimesOf(mail: EmailCore, type: LinkType, content: { url?: string, code?: string }): MailData['maxAge'] {
-  return { ...content.url === undefined ? {} : { link: mail.maxAge[type] }, ...content.code === undefined ? {} : { code: mail.maxAge[CODE_OF[type as CodedLink]] } }
+  return { ...content.url === undefined ? {} : { link: `${mail.maxAge[type]}s` }, ...content.code === undefined ? {} : { code: `${mail.maxAge[CODE_OF[type as CodedLink]]}s` } }
 }
 
 // One live link and code per kind and user: a new one replaces the last. A code goes only with the nonce of the session that asked for it.

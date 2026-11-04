@@ -26,6 +26,12 @@ describe('lifetime words', () => {
     expect([lifetime(86_400, 'fr'), lifetime(3600, 'fr'), lifetime(600, 'fr')].map(words => words.replace(/\s/g, ' '))).toEqual(['24 heures', '1 heure', '10 minutes'])
     expect(lifetime(600, 'not a locale')).toBe('10 minutes')
   })
+
+  test('takes a duration, or seconds until 1.91', () => {
+    expect([lifetime('24h', 'en'), lifetime('7d', 'en'), lifetime('90m', 'en'), lifetime('1800s', 'en'), lifetime('45s', 'en')]).toEqual(['24 hours', '7 days', '90 minutes', '30 minutes', '45 seconds'])
+    expect(lifetime('10m', 'fr')).toBe(lifetime(600, 'fr'))
+    expect(() => lifetime('soon' as never, 'en')).toThrow('durationWords()')
+  })
 })
 
 describe('email.maxAge', () => {
@@ -81,7 +87,7 @@ describe('email.maxAge', () => {
     expect(of('magic-link', 'ada@example.com').text).toContain('The link works for 2 hours, once. The code works for 5 minutes')
     expect(of('magic-link', 'fr@example.com').text).toContain('Le lien est valable 2 heures, une seule fois. Le code est valable 5 minutes')
     expect(of('change-email').text).toContain('The link works for 3 hours.')
-    expect(seen).toEqual([{ link: 1800 }])
+    expect(seen).toEqual([{ link: '1800s' }])
   })
 
   test('a reset link lives its set time and no longer', async () => {

@@ -1,3 +1,4 @@
+import type { Duration } from 'kay'
 import type { Timeouts } from './types'
 import { optionMs, parseEvents } from 'kay/library'
 import { AiError } from './errors'
@@ -103,10 +104,10 @@ export async function refusal(name: string, response: Response, secret?: string)
   return new AiError('invalid', `${name} refused the request (${status})${detail}`, { status })
 }
 
-// Posts one request and reads its answer with `read`, both within `timeout` milliseconds; an answer that is no success throws what the provider said.
-export async function exchange<T>(name: string, url: string, init: { headers: Record<string, string>, body: BodyInit }, timeout: number, signal: AbortSignal, read: (response: Response) => Promise<T>, secret?: string): Promise<T> {
+// Posts one request and reads its answer with `read`, both within `timeout`; an answer that is no success throws what the provider said.
+export async function exchange<T>(name: string, url: string, init: { headers: Record<string, string>, body: BodyInit }, timeout: Duration, signal: AbortSignal, read: (response: Response) => Promise<T>, secret?: string): Promise<T> {
   const late = new AbortController()
-  const timer = setTimeout(() => late.abort(), timeout)
+  const timer = setTimeout(() => late.abort(), optionMs(timeout, 'the call timeout'))
 
   try {
     const response = await fetch(url, { method: 'POST', headers: init.headers, body: init.body, signal: AbortSignal.any([signal, late.signal]), redirect: 'error' })
@@ -123,7 +124,7 @@ export async function exchange<T>(name: string, url: string, init: { headers: Re
       throw error
 
     if (late.signal.aborted)
-      throw new AiError('timeout', `${name} did not answer within ${timeout} ms`, { cause: error })
+      throw new AiError('timeout', `${name} did not answer within ${timeout}`, { cause: error })
 
     throw new AiError('network', `${name} could not be reached (${error instanceof Error ? error.message : String(error)})`, { cause: error })
   }

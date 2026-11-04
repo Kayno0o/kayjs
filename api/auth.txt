@@ -298,7 +298,16 @@ interface AuthMailMessage extends MailContent
   html: string
   kind: AuthMailKind
   locale: string
+<<<<<<< HEAD
   maxAge?: undefined | { link?: number; code?: number; }
+||||||| parent of 037707e (feat(auth)!: durations and dates where a number stood)
+  maxAge?: { link?: number; code?: number; } | undefined
+=======
+  maxAge?: {
+  link?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`;
+  code?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`;
+} | undefined
+>>>>>>> 037707e (feat(auth)!: durations and dates where a number stood)
   name: string
   subject: string
   text: string
@@ -1154,7 +1163,7 @@ type IssueTokenResult = { ok: true, token: string, id: string } | { ok: false, e
 type Level = 'read' | 'write'
 
 [.] lifetime
-function lifetime(seconds: number, locale: string): string
+function lifetime(duration: number | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, locale: string): string
 
 [.] Limit
 interface Limit
@@ -1372,7 +1381,7 @@ interface OAuthTokenRefresherDeps<K, S>
 [.] OAuthTokens
 interface OAuthTokens
   accessToken: string
-  expiresAt?: number | undefined
+  expiresAt?: Date | undefined
   idToken?: string | undefined
   refreshToken?: string | undefined
   scope?: string | undefined
@@ -1833,9 +1842,19 @@ interface SignInOptions
 
 [.] StoredCredential
 interface StoredCredential
+<<<<<<< HEAD
   accessToken?: null | string | undefined
   expiresAt?: null | number | undefined
   refreshToken?: null | string | undefined
+||||||| parent of 037707e (feat(auth)!: durations and dates where a number stood)
+  accessToken?: string | null | undefined
+  expiresAt?: number | null | undefined
+  refreshToken?: string | null | undefined
+=======
+  accessToken?: string | null | undefined
+  expiresAt?: Date | null | undefined
+  refreshToken?: string | null | undefined
+>>>>>>> 037707e (feat(auth)!: durations and dates where a number stood)
 
 [.] StoreUrl
 interface StoreUrl
@@ -1860,7 +1879,13 @@ interface TokenRecord
 
 [.] TokenRefresherDeps
 interface TokenRefresherDeps<K, S>
+<<<<<<< HEAD
   exchange: (subject: S) => Promise<null | { accessToken: string; expiresAt?: number | undefined; }>
+||||||| parent of 037707e (feat(auth)!: durations and dates where a number stood)
+  exchange: (subject: S) => Promise<{ accessToken: string; expiresAt?: number | undefined; } | null>
+=======
+  exchange: (subject: S) => Promise<{ accessToken: string; expiresAt?: Date | undefined; } | null>
+>>>>>>> 037707e (feat(auth)!: durations and dates where a number stood)
   key: (subject: S) => K
   load: (subject: S) => StoredCredential
   margin?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined

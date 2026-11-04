@@ -265,7 +265,7 @@ export async function providerToken(state: RequestState, provider: string): Prom
     credential: {
       accessToken: core.keys.decrypt(identity.accessToken, context),
       refreshToken: identity.refreshToken === null ? null : core.keys.decrypt(identity.refreshToken, context),
-      expiresAt: identity.tokenExpiresAt?.getTime() ?? null,
+      expiresAt: identity.tokenExpiresAt,
     },
   })
 }
@@ -298,7 +298,7 @@ export function sealTokens(core: Core, provider: string, providerId: string, tok
   return {
     accessToken: tokens ? core.keys.encrypt(tokens.accessToken, context) : null,
     refreshToken: tokens?.refreshToken === undefined ? null : core.keys.encrypt(tokens.refreshToken, context),
-    tokenExpiresAt: tokens?.expiresAt === undefined ? null : new Date(tokens.expiresAt),
+    tokenExpiresAt: tokens?.expiresAt ?? null,
   }
 }
 

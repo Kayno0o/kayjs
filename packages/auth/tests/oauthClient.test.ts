@@ -62,7 +62,7 @@ describe('createOAuthClient.exchangeCode', () => {
 
     expect(tokens.accessToken).toBe('at')
     expect(tokens.refreshToken).toBe('rt')
-    expect(tokens.expiresAt).toBeGreaterThan(Date.now())
+    expect(tokens.expiresAt!.getTime()).toBeGreaterThan(Date.now())
 
     const body = calls[0]!.init!.body as URLSearchParams
 

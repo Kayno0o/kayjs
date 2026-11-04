@@ -1,8 +1,8 @@
-/** Normalized OAuth credentials. `expiresAt` is absolute ms; `undefined` = non-expiring (e.g. GitHub classic tokens). */
+/** Normalized OAuth credentials. `expiresAt` is a `Date`; `undefined` = non-expiring (e.g. GitHub classic tokens). */
 export interface OAuthTokens {
   accessToken: string
   refreshToken?: string | undefined
-  expiresAt?: number | undefined
+  expiresAt?: Date | undefined
   scope?: string | undefined
   tokenType?: string | undefined
   /** The OpenID Connect ID token, checked before anything is read from it. */
