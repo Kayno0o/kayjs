@@ -52,7 +52,7 @@ describe('what a guard hands on', () => {
       Bun.write(join(dir, 'api/sock.ts'), 'import { api } from \'kay/server\'\n\nexport default api<{ who: string }>().ws(\'/\', { message(ws) {\n  ws.send(JSON.stringify(ws.data.guard))\n} })\n'),
       Bun.write(join(dir, 'api/open.ts'), 'import { api } from \'kay/server\'\n\nexport default api({ guards: false })\n  .get(\'/\', ({ guard }) => ({ keys: Object.keys(guard) }))\n'),
     ])
-    app = await pages({ root: dir, dirs: { routes: 'routes' }, api: 'api', prebuilt: false })
+    app = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -138,7 +138,8 @@ describe('what a guard hands on', () => {
     app.listen({ port: 0, hostname: '127.0.0.1' })
 
     try {
-      const socket = new WebSocket(`ws://127.0.0.1:${app.server?.port}/api/sock`, { headers: { 'x-who': 'dee' } })
+      // Bun's client takes headers, which the WebSocket type this checkout resolves does not declare.
+      const socket = new WebSocket(`ws://127.0.0.1:${app.server?.port}/api/sock`, { headers: { 'x-who': 'dee' } } as never)
       const reply = new Promise<string>((resolve, reject) => {
         socket.addEventListener('message', event => resolve(String(event.data)))
         socket.addEventListener('error', () => reject(new Error('the socket failed')))

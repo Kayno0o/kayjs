@@ -383,8 +383,7 @@ p.n {n}
     ])
     app = await pages({
       root: dir,
-      routes: 'routes',
-      api: 'api',
+      dirs: { routes: 'routes', api: 'api' },
       prebuilt: false,
       security: false,
       serve: { timeout: '100ms' },
@@ -512,7 +511,7 @@ describe('the request hooks under a locale prefix and on a prerendered page', ()
 
       const app = await pages({
         root: dir,
-        routes: 'routes',
+        dirs: { routes: 'routes' },
         prebuilt: false,
         security: false,
         observe: { log: false },
