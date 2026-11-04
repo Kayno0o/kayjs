@@ -144,7 +144,10 @@ export function guardTypes(file: string, source: string, routesDir: string, moun
   if ((!pageRoute(file, routesDir, mounts) && basename(file) !== LAYOUT) || !trees.some(({ dir }) => file.startsWith(dir + sep)) || falseKeys(source).has('guards'))
     return undefined
 
-  return directoriesUp(virtualDir(trees, dirname(file))).flatMap(dir => fileAt(trees, dir, GUARD) ?? []).reverse().map(guard => `(typeof import(${JSON.stringify(relativeSpecifier(from, guard.replace(TS_FILE, '')))}))["default"]`)
+  // An extension's outer layout sits outside every tree and wraps the root, as the router places it.
+  const at = trees.some(tree => tree.outer === file) ? '' : virtualDir(trees, dirname(file))
+
+  return directoriesUp(at).flatMap(dir => fileAt(trees, dir, GUARD) ?? []).reverse().map(guard => `(typeof import(${JSON.stringify(relativeSpecifier(from, guard.replace(TS_FILE, '')))}))["default"]`)
 }
 
 // The `query` types of the layouts above a page or a layout, which its shadow depends on besides its own source.
