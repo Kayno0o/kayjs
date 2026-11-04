@@ -18,10 +18,10 @@ Settings live in a `kay.config.ts` at the root that `export default`s its config
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  routesDir: 'src/routes',
+  dirs: { routes: 'src/routes' },
   lang: 'en',
   minify: true,
-  prefetch: 'moderate',
+  client: { prefetch: 'moderate' },
   plugins: [],
 })
 ```
@@ -84,10 +84,10 @@ export const app = new Elysia()
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  routesDir: 'src/routes',
+  dirs: { routes: 'src/routes' },
   lang: 'en',
   minify: true,
-  prefetch: 'moderate',
+  client: { prefetch: 'moderate' },
   plugins: [],
 })
 ```

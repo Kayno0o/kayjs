@@ -8,7 +8,7 @@ import process from 'node:process'
 import { clientDir, KAY_DIR, outputDir, testWorker, underKayDev } from './build/assets'
 import { TSCONFIG } from './build/files'
 import { pickConfig } from './config'
-import { renamedKeys } from './config-shape'
+import { currentKeys } from './config-shape'
 import { isFrench } from './runtime/french'
 import { IMAGE_WIDTHS, parseWidths } from './runtime/image'
 import { basePath } from './server/base'
@@ -56,14 +56,14 @@ export interface ProjectPaths {
   report: string
 }
 
-export function projectPaths(root: string, config: Pick<KayConfig, 'routesDir' | 'publicDir' | 'apiDir' | 'contentConfig' | 'entry'> = {}): ProjectPaths {
+export function projectPaths(root: string, config: Pick<KayConfig, 'dirs' | 'contentConfig' | 'entry'> = {}): ProjectPaths {
   const absolute = resolve(root)
 
   return {
     root: absolute,
-    routes: resolve(absolute, config.routesDir ?? 'src/routes'),
-    public: resolve(absolute, config.publicDir ?? 'public'),
-    api: resolve(absolute, config.apiDir ?? 'src/api'),
+    routes: resolve(absolute, config.dirs?.routes ?? 'src/routes'),
+    public: resolve(absolute, config.dirs?.public ?? 'public'),
+    api: resolve(absolute, config.dirs?.api ?? 'src/api'),
     entry: resolve(absolute, config.entry ?? 'src/server.ts'),
     content: resolve(absolute, config.contentConfig ?? CONTENT_CONFIG),
     cache: join(absolute, KAY_DIR, 'cache'),
@@ -100,22 +100,16 @@ export function cacheDir(root: string, ...names: string[]): string {
 // The keys of the config the browser build takes as written, which `clientOptionsOf` passes on; `ClientOptions` declares the rest.
 export const CLIENT_CONFIG = [
   'plugins',
-  // Page directory relative to the root: its pages and layouts are where stylesheets are gathered from.
-  'routesDir',
+  // The page directory, whose pages and layouts are where stylesheets are gathered from, and the API directory, where an island importing a module, or one under an extension's, gets where its routes are served, not its code.
+  'dirs',
   // The libraries whose routes the app mounts, built as its own pages are.
   'extensions',
-  // API directory relative to the root: an island importing a module there, or under an extension's, gets where its routes are served, not its code.
-  'apiDir',
   // Where the API is mounted, `/api` by default: the stubs an island imports hold it.
-  'apiPath',
+  'serve',
   // The app's own modules for its libraries' settings, as `kay.config.ts` gives them.
   'librarySettings',
-  // Swaps pages in place: the entry is built whether or not any component is interactive, for the pages posting forms to actions.
-  'navigation',
-  // How far ahead of the viewport an island marked `hydrate="visible"` starts to hydrate, and a deferred server island starts to load, as CSS root margins; `200px` and `100% 0px` by default.
-  'hydration',
-  // Every page loads the whole stylesheet, so the build has no class to warn of.
-  'lateStyles',
+  // `navigation` swaps pages in place: the entry is built whether or not any component is interactive, for the pages posting forms to actions. `hydration` is how far ahead of the viewport an island marked `hydrate="visible"` starts to hydrate, and a deferred server island starts to load. `lateStyles`: every page loads the whole stylesheet, so the build has no class to warn of.
+  'client',
   // A page opened from a search hit marks the words searched for.
   'search',
   // The self-hosted fonts: each family is followed by a metric-matched fallback in the stylesheets' font stacks.
@@ -163,16 +157,11 @@ export function registersWorker(config: Pick<KayConfig, 'offline' | 'extensions'
 // The keys of the config every page renders with as written, which `renderOptionsOf` passes on; `RenderOptions` declares the rest.
 export const RENDER_CONFIG = [
   'lang',
-  'prefetch',
   // Where the API is mounted, which pages are never prefetched under.
-  'apiPath',
-  'onError',
-  // Whether pages load the whole stylesheet after paint, so no class lacks its rule.
-  'lateStyles',
-  // `false` leaves a French page's spaces as they were typed.
-  'typography',
-  // `false` serves every visitor the same page; else a visitor asking for less data gets one without font preloads and speculation rules.
-  'saveData',
+  'serve',
+  'observe',
+  // `prefetch`, `lateStyles` (pages load the whole stylesheet after paint, so no class lacks its rule), `typography` (`false` leaves a French page's spaces as they were typed) and `saveData` (`false` serves every visitor the same page).
+  'client',
 ] as const satisfies readonly (keyof KayConfig)[]
 
 export type RenderConfigKey = (typeof RENDER_CONFIG)[number]
@@ -189,7 +178,7 @@ function customWidths(widths: number[] | undefined): number[] | undefined {
 
 // How every page renders, served or prerendered alike.
 export function renderOptionsOf(config: KayConfig, mode: Pick<Mode, 'dev' | 'devRoutes'>, built: { head: SeoHead | undefined, maxDensity: number, editor?: string | undefined, contexts?: string[] | undefined, fontCss?: string | undefined, islandPreloads?: RenderOptions['islandPreloads'] }): RenderOptions {
-  return { ...pickConfig(config, RENDER_CONFIG), dev: mode.dev, devTools: mode.devRoutes, serverTiming: config.serverTiming ?? mode.dev, sameTabLinks: config.links?.outside === 'same-tab', linkSchemes: linkSchemes(config), fontCss: config.saveData === false ? undefined : built.fontCss, islandPreloads: config.saveData === false ? undefined : built.islandPreloads, head: built.head, base: basePath(config.base), maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: registersWorker(config, mode), installOffer: pushListed(config), editor: built.editor, contexts: built.contexts }
+  return { ...pickConfig(config, RENDER_CONFIG), dev: mode.dev, devTools: mode.devRoutes, serverTiming: config.observe?.serverTiming ?? mode.dev, sameTabLinks: config.links?.outside === 'same-tab', linkSchemes: linkSchemes(config), fontCss: config.client?.saveData === false ? undefined : built.fontCss, islandPreloads: config.client?.saveData === false ? undefined : built.islandPreloads, head: built.head, base: basePath(config.base), maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: registersWorker(config, mode), installOffer: pushListed(config), editor: built.editor, contexts: built.contexts }
 }
 
 // A project as every entry point takes it: where it is, its config, where it keeps each part and how it runs.
@@ -201,14 +190,14 @@ export interface Project<Config extends KayConfig = KayConfig> {
 }
 
 export function resolveProject<Config extends KayConfig>(root: string, config: Config, mode: Mode = PRODUCTION): Project<Config> {
-  const named = renamedKeys(config)
+  const named = currentKeys(config)
 
   return { root: resolve(root), config: named, paths: projectPaths(root, named), mode }
 }
 
 // Whether the islands of an app write French spaces: a French `lang` or locale, and `typography` not off.
-export function writesFrench(config: Pick<KayConfig, 'lang' | 'i18n' | 'typography'>): boolean {
-  return config.typography !== false && (config.i18n ? config.i18n.locales.some(isFrench) : config.lang !== undefined && isFrench(config.lang))
+export function writesFrench(config: Pick<KayConfig, 'lang' | 'i18n' | 'client'>): boolean {
+  return config.client?.typography !== false && (config.i18n ? config.i18n.locales.some(isFrench) : config.lang !== undefined && isFrench(config.lang))
 }
 
 // The browser build a config asks for. `kay build`'s (`build` given) minifies unless the config says not to; one a server or a test makes on demand does only when the config says so.

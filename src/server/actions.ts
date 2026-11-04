@@ -1,7 +1,7 @@
 import type { CookieMap } from 'bun'
 import type { Elysia, TSchema, ValidationError } from 'elysia'
 import type { Server } from 'elysia/universal'
-import type { KayConfig } from '../config'
+import type { ObserveConfig } from '../config'
 import type { GuardContext, Locals, RouteParams } from '../runtime'
 import type { ActionContext, RateKeyContext, ServerAction } from '../runtime/action'
 import type { Locale } from '../runtime/i18n'
@@ -95,7 +95,7 @@ const BODY_PREFIX = /^body\./
 export interface ActionOptions {
   // Shows a failed action's message instead of a generic one.
   dev?: boolean | undefined
-  onError?: KayConfig['onError'] | undefined
+  onError?: ObserveConfig['onError'] | undefined
   // An action runs in the locale of the page it was sent from, or the site's one language without `i18n`; an endpoint, which has no locale prefix, in the default one.
   i18n: I18n
   // Where the site is mounted, which the page a refused form post came from is served under.

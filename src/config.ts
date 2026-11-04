@@ -25,18 +25,20 @@ import type { Tracer } from './server/trace'
 
 // What `kay.config.ts` exports by default; `pages()`, `kay build`, `kay dev` and `kay check` all read it.
 export interface KayConfig {
-  // Page directory, relative to the root. Defaults to `src/routes`.
-  routesDir?: string | undefined
+  // Where the project keeps its parts, relative to the root.
+  dirs?: DirsConfig | undefined
+  // What a request may carry.
+  limits?: LimitsConfig | undefined
+  // How the server answers: where the API is mounted, compression and the stop.
+  serve?: ServeConfig | undefined
+  // What an app watches the server by: its log, timing, request ids, traces and errors.
+  observe?: ObserveConfig | undefined
+  // What pages ship to the browser and how it behaves there: navigation, styles, typography, hydration, prefetching and Save-Data.
+  client?: ClientConfig | undefined
   /** @deprecated Renamed `routesDir` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
   routes?: string | undefined
-  // Elysia modules mounted under `/api` by their path, relative to the root: `src/api/chat.ts` serves `/api/chat`. Defaults to `src/api`.
-  apiDir?: string | undefined
   /** @deprecated Renamed `apiDir` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
   api?: string | undefined
-  // The path the API modules, the OpenAPI document and its reference page are served under, `/api` by default: `apiPath: '/v1'` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash, not under `/_kay`; `mcp.path` and the `openapi` paths keep their own settings. Libraries read it through `apiUrl()`.
-  apiPath?: string | undefined
-  // Files served as they are at their path, relative to the root. Defaults to `public`.
-  publicDir?: string | undefined
   // How long a browser keeps a file of `public/` without asking again, by the path it is served at, as a glob: `{ '/fonts/**': '365d', '**/*.png': '30d' }`; the first pattern a path matches decides, and a file none names keeps revalidating through its ETag on every visit. Ignored by `kay dev`, so an edit shows at once.
   publicCache?: Record<string, Duration> | undefined
   minify?: boolean | undefined
@@ -69,10 +71,6 @@ export interface KayConfig {
   security?: SecurityConfig | false | undefined
   // The proxies in front of the server, `true` for one and a number for that many, which the client's address that rate limits count is read through. Without it, or with `false`, the address the server was reached from is the client, so behind a proxy every visitor counts as that proxy.
   proxy?: ProxyConfig | number | boolean | undefined
-  // The most a request with a body to any route may send (`maxSize`), bytes or a size such as `'4mb'`, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
-  maxSize?: ByteSize | undefined
-  // The most a request to a route of your own (`new Elysia().post()`) may send, by path: the route itself and what is under it, bytes or a size such as '50mb', in place of `maxSize`. The path is the one the server routes, without the `base`.
-  maxSizeByPath?: Record<string, ByteSize> | undefined
   /** @deprecated Renamed `maxSizeByPath` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
   maxSizes?: Record<string, ByteSize> | undefined
   // Every page, action, endpoint and API module of the app answers 403 unless a `_guard.ts` covers it or it sets `guards: false`, in its `page` or its `api()` options; `kay check` reports each such route. A library's routes keep the guards it gives them.
@@ -83,22 +81,12 @@ export interface KayConfig {
   openapi?: boolean | OpenApiConfig | undefined
   // Serves an MCP endpoint at `/mcp` over Streamable HTTP, or at `mcp: { path: '/tools' }`, for an agent to call the app: a tool per API route that sets `tool` in its `detail`, and per action that sets `tool` on its protection. A call runs through the same guards, rate limits and `ctx.locals` as a fetch would.
   mcp?: boolean | McpConfig | undefined
-  // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip. On by default when NODE_ENV is production; `false` behind a proxy or CDN that compresses already.
-  compress?: boolean | undefined
-  // A server build with a prerendered page uses its 404 page as a compression dictionary, sending a page to a browser that fetched it as the difference from it; `false` builds none, so no page names it and the build writes no `.dcz` copy.
-  compressionDictionary?: boolean | undefined
   // The route a load balancer or a container polls, `/_kay/health` unless `path` names another, or `false` for none.
   health?: HealthConfig | false | undefined
   // Serves `/metrics` in the Prometheus text format for a collector: requests by method, route and status, their durations, scheduled runs, cache reads and live connections. Read only from this machine or a private network by a request no proxy forwarded, or from anywhere with the `Authorization: Bearer` token `KAY_METRICS_TOKEN` holds; `{ path }` moves it. Off by default, and under `kay dev`.
   metrics?: boolean | MetricsConfig | undefined
   // Serves a page of the app's queues at `/_kay/jobs` in production: each queue's waiting, running and failed jobs with payload and error, and a button to retry or delete one. It mounts only with a `guard`, a kay guard or a list of them such as `ctx => ctx.locals.auth.requireAdmin()`, which runs on every request, and without one the boot stops. `{ path }` moves it. Off by default, and under `kay dev`, whose dev tool has a Jobs tab.
   jobs?: JobsConfig | undefined
-  // One line per request on stdout, on by default when NODE_ENV is production, `false` for none; `'json'` writes it and kay's own messages as one JSON object each instead, and a function receives them all.
-  log?: Logger | undefined
-  // A `Server-Timing` header on each page rendered per request, timing its guards, the import of its modules, its loads and its render for the browser's network panel: on in development, off otherwise unless set.
-  serverTiming?: boolean | undefined
-  // An OpenTelemetry tracer, `trace.getTracer('my-site')` from @opentelemetry/api: a span per page request with one per load and the render in it, and one per API request. None by default, which costs nothing.
-  tracer?: Tracer | undefined
   // Serves a request from another path, query included, such as a host's pages from a section: `url => url.hostname === 'blog.example.com' ? `/blog${url.pathname}` : undefined`. The browser keeps its URL.
   rewrite?: Rewrite | undefined
   // Old paths sent elsewhere with a 308, or a 307 with `permanent: false`, or the 301 or 302 older clients and some crawlers expect with `status`: `{ '/blog/:slug': '/posts/:slug', '/docs/*': '/guide/*', '/old': { to: '/new', status: 301 } }`. `kay check` reports a target no page serves.
@@ -107,8 +95,6 @@ export interface KayConfig {
   runtimeRedirects?: { hosts?: string[] | undefined } | undefined
   // What the live values' connections may cost one client address: how many at once and how many opened a minute.
   live?: LiveConfig | undefined
-  // The header a request's id comes in on from a trusted proxy and goes out on, `x-request-id` by default: `'x-correlation-id'`.
-  requestIdHeader?: string | undefined
   // The locales pages are served in, each under its prefix or on its own domain, with messages in `src/messages/<locale>.ts`.
   i18n?: I18nConfig | undefined
   // The IANA time zone dates are written in, `Europe/Paris`: `formatDate` and the dates of kay's own screens, on the server and in the islands alike, unless a call names its own `timeZone`. The server's and the visitor's zone by default.
@@ -126,22 +112,6 @@ export interface KayConfig {
   content?: string | undefined
   // How every collection's Markdown compiles; a collection's own option of the same name wins.
   markdown?: MarkdownConfig | undefined
-  // How long a stopping server gives open requests and streams to finish before closing them, a string such as '30s'; 10 seconds by default.
-  shutdownTimeout?: Duration | undefined
-  // Swaps the next page in place when a link or a form of the site is followed from a page with islands or forms posting to actions, so islands marked `persist` live on; on by default. `false` loads every page as a plain site does.
-  navigation?: boolean | undefined
-  // Whether a page's stylesheets are written into its head instead of linked, in production: the first paint waits for no stylesheet request, while every page carries them again, since no cache keeps them. Unset, a page inlines them while together they compress under about 14 KB and links them above; `true` and `false` force one way.
-  inlineStyles?: boolean | undefined
-  // Whether a page that inlines its own rules also links the whole stylesheet, loaded after the first paint: the rules of a class the build cannot read, one an island sets from a value or a server builds from data, then still apply, at the cost of the whole sheet's bytes on every first visit. Off by default, so a page ships only its own rules, and the build warns of a class it cannot read.
-  lateStyles?: boolean | undefined
-  // Whether a page in French (a `lang` of `fr` or `fr-...`) has the plain space before `: ; ! ?` and inside `« »` in its text, `alt`, `title`, `aria-label` and description made non-breaking, so a mark never wraps alone. On by default, `false` leaves the text as it was typed. Islands write the same spaces in the browser, in an app whose `lang` or `i18n` locales are French.
-  typography?: boolean | undefined
-  // How far ahead of the viewport islands start to load, as CSS root margins: `visible` for an island marked `hydrate="visible"` (`'200px'` by default), `serverIslands` for a deferred server island (`'100% 0px'`, a screen ahead, by default).
-  hydration?: { visible?: string | undefined, serverIslands?: string | undefined } | undefined
-  // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
-  prefetch?: Prefetch | undefined
-  // Whether a visitor sending `Save-Data: on` gets a lighter site by itself: image variants one width narrower, no font preloads, fonts shown only when cached, no speculation rules; `Save-Data` or `prefers-reduced-data` in the browser also stops the prefetch and has an island with no `hydrate` wait until it scrolls near. On by default, `false` serves everyone alike.
-  saveData?: boolean | undefined
   // Bun plugins the browser build runs, such as Tailwind's.
   plugins?: BunPlugin[] | undefined
   // The app's own module for a kay library's settings, by the library's name: `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.
@@ -160,16 +130,113 @@ export interface KayConfig {
   storage?: FileStore | undefined
   // Where the app keeps what outlives one process, for every feature naming no store of its own: `session()`'s data, `cached` values, `live()` values, queued jobs and schedule locks, rate limit counts, the tabs a page's `presence()` lists and the Web Vitals `vitals()` counts and the notifications `notify()` stores, and the files `files` from `kay/server` keeps in `files`, which only the app writes: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`. `sqliteData('data/app.sqlite')` keeps all but the files in one file; `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications, files }` takes stores of your own, each optional, Redis say, and each may have `ping` for `health` and `close` for a stop. Without it sessions travel in their cookie, jobs stay in `data/jobs.sqlite` and the others in memory.
   store?: AppStore | undefined
-  // Receives every error a load, a render, a guard or an action throws, as it is logged, and the ones islands report from the browser: the place to send them to an error tracker.
-  // An error met outside any request, in a scheduled or background job or an `onStop` hook, comes with `undefined` for the request.
-  // An error a hook of kay or a library threw comes with its `source`, such as `'cms.onSave'`; it is undefined for any other.
-  onError?: ((event: { error: unknown, request: Request | undefined, source?: string | undefined }) => void | Promise<void>) | undefined
   // The files `kay env` and `kay check` compare the declared variables with: a compose file or several, and the example env file (`{ compose: 'compose.prod.yaml', example: '.env.example' }`). Each variable production needs must be set by a compose service and listed in the example, and each one the example lists must be declared. `false` turns the comparison off, the default one against the root compose files and `.env.example` included.
   env?: { compose?: string | string[] | undefined, example?: string | undefined } | false | undefined
   // The app's own checks, which `kay check` runs with its own: each gets `{ root, routes, report }` and reports problems with `report({ level, message, file, line })`, which join kay's in every format and count toward the exit code. A check that throws, or does not finish within 30 seconds, is reported as an error and the others still run.
   checks?: ProjectCheck[] | undefined
+  /** @deprecated Moved under `dirs` in 1.88 as `dirs: { routes }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  routesDir?: string | undefined
+  /** @deprecated Moved under `dirs` in 1.88 as `dirs: { api }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  apiDir?: string | undefined
+  /** @deprecated Moved under `dirs` in 1.88 as `dirs: { public }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  publicDir?: string | undefined
+  /** @deprecated Moved under `limits` in 1.88 as `limits: { body }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  maxSize?: ByteSize | undefined
+  /** @deprecated Moved under `limits` in 1.88 as `limits: { byPath }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  maxSizeByPath?: Record<string, ByteSize> | undefined
+  /** @deprecated Moved under `serve` in 1.88 as `serve: { apiPath }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  apiPath?: string | undefined
+  /** @deprecated Moved under `serve` in 1.88 as `serve: { compress }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  compress?: boolean | undefined
+  /** @deprecated Moved under `serve` in 1.88 as `serve: { compressionDictionary }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  compressionDictionary?: boolean | undefined
+  /** @deprecated Moved under `serve` in 1.88 as `serve: { shutdownTimeout }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  shutdownTimeout?: Duration | undefined
+  /** @deprecated Moved under `observe` in 1.88 as `observe: { log }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  log?: Logger | undefined
+  /** @deprecated Moved under `observe` in 1.88 as `observe: { serverTiming }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  serverTiming?: boolean | undefined
+  /** @deprecated Moved under `observe` in 1.88 as `observe: { requestIdHeader }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  requestIdHeader?: string | undefined
+  /** @deprecated Moved under `observe` in 1.88 as `observe: { tracer }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  tracer?: Tracer | undefined
+  /** @deprecated Moved under `observe` in 1.88 as `observe: { onError }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  onError?: ((event: { error: unknown, request: Request | undefined, source?: string | undefined }) => void | Promise<void>) | undefined
+  /** @deprecated Moved under `client` in 1.88 as `client: { navigation }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  navigation?: boolean | undefined
+  /** @deprecated Moved under `client` in 1.88 as `client: { inlineStyles }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  inlineStyles?: boolean | undefined
+  /** @deprecated Moved under `client` in 1.88 as `client: { lateStyles }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  lateStyles?: boolean | undefined
+  /** @deprecated Moved under `client` in 1.88 as `client: { typography }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  typography?: boolean | undefined
+  /** @deprecated Moved under `client` in 1.88 as `client: { hydration }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  hydration?: { visible?: string | undefined, serverIslands?: string | undefined } | undefined
+  /** @deprecated Moved under `client` in 1.88 as `client: { prefetch }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  prefetch?: Prefetch | undefined
+  /** @deprecated Moved under `client` in 1.88 as `client: { saveData }`; the old key works until 1.91, and `kay upgrade` moves it. */
+  saveData?: boolean | undefined
   // What libraries add to the app, each listed once: `extensions: [auth()]`.
   extensions?: KayExtension[] | undefined
+}
+
+export interface DirsConfig {
+  // Page directory, relative to the root. Defaults to `src/routes`.
+  routes?: string | undefined
+  // Elysia modules mounted under `/api` by their path, relative to the root: `src/api/chat.ts` serves `/api/chat`. Defaults to `src/api`.
+  api?: string | undefined
+  // Files served as they are at their path, relative to the root. Defaults to `public`.
+  public?: string | undefined
+}
+
+export interface LimitsConfig {
+  // The most a request with a body to any route may send (`maxSize`), bytes or a size such as `'4mb'`, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
+  body?: ByteSize | undefined
+  // The most a request to a route of your own (`new Elysia().post()`) may send, by path: the route itself and what is under it, bytes or a size such as '50mb', in place of `maxSize`. The path is the one the server routes, without the `base`.
+  byPath?: Record<string, ByteSize> | undefined
+}
+
+export interface ServeConfig {
+  // The path the API modules, the OpenAPI document and its reference page are served under, `/api` by default: `apiPath: '/v1'` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash, not under `/_kay`; `mcp.path` and the `openapi` paths keep their own settings. Libraries read it through `apiUrl()`.
+  apiPath?: string | undefined
+  // Compresses the pages rendered per request, action results, and any Response the app's routes registered after `pages()` return, with brotli or gzip. On by default when NODE_ENV is production; `false` behind a proxy or CDN that compresses already.
+  compress?: boolean | undefined
+  // A server build with a prerendered page uses its 404 page as a compression dictionary, sending a page to a browser that fetched it as the difference from it; `false` builds none, so no page names it and the build writes no `.dcz` copy.
+  compressionDictionary?: boolean | undefined
+  // How long a stopping server gives open requests and streams to finish before closing them, a string such as '30s'; 10 seconds by default.
+  shutdownTimeout?: Duration | undefined
+}
+
+export interface ObserveConfig {
+  // One line per request on stdout, on by default when NODE_ENV is production, `false` for none; `'json'` writes it and kay's own messages as one JSON object each instead, and a function receives them all.
+  log?: Logger | undefined
+  // A `Server-Timing` header on each page rendered per request, timing its guards, the import of its modules, its loads and its render for the browser's network panel: on in development, off otherwise unless set.
+  serverTiming?: boolean | undefined
+  // The header a request's id comes in on from a trusted proxy and goes out on, `x-request-id` by default: `'x-correlation-id'`.
+  requestIdHeader?: string | undefined
+  // An OpenTelemetry tracer, `trace.getTracer('my-site')` from @opentelemetry/api: a span per page request with one per load and the render in it, and one per API request. None by default, which costs nothing.
+  tracer?: Tracer | undefined
+  // Receives every error a load, a render, a guard or an action throws, as it is logged, and the ones islands report from the browser: the place to send them to an error tracker.
+  // An error met outside any request, in a scheduled or background job or an `onStop` hook, comes with `undefined` for the request.
+  // An error a hook of kay or a library threw comes with its `source`, such as `'cms.onSave'`; it is undefined for any other.
+  onError?: ((event: { error: unknown, request: Request | undefined, source?: string | undefined }) => void | Promise<void>) | undefined
+}
+
+export interface ClientConfig {
+  // Swaps the next page in place when a link or a form of the site is followed from a page with islands or forms posting to actions, so islands marked `persist` live on; on by default. `false` loads every page as a plain site does.
+  navigation?: boolean | undefined
+  // Whether a page's stylesheets are written into its head instead of linked, in production: the first paint waits for no stylesheet request, while every page carries them again, since no cache keeps them. Unset, a page inlines them while together they compress under about 14 KB and links them above; `true` and `false` force one way.
+  inlineStyles?: boolean | undefined
+  // Whether a page that inlines its own rules also links the whole stylesheet, loaded after the first paint: the rules of a class the build cannot read, one an island sets from a value or a server builds from data, then still apply, at the cost of the whole sheet's bytes on every first visit. Off by default, so a page ships only its own rules, and the build warns of a class it cannot read.
+  lateStyles?: boolean | undefined
+  // Whether a page in French (a `lang` of `fr` or `fr-...`) has the plain space before `: ; ! ?` and inside `« »` in its text, `alt`, `title`, `aria-label` and description made non-breaking, so a mark never wraps alone. On by default, `false` leaves the text as it was typed. Islands write the same spaces in the browser, in an app whose `lang` or `i18n` locales are French.
+  typography?: boolean | undefined
+  // How far ahead of the viewport islands start to load, as CSS root margins: `visible` for an island marked `hydrate="visible"` (`'200px'` by default), `serverIslands` for a deferred server island (`'100% 0px'`, a screen ahead, by default).
+  hydration?: { visible?: string | undefined, serverIslands?: string | undefined } | undefined
+  // When the browser fetches a page a link points at before it is followed: `moderate`, the default, on hover. A link with `data-no-prefetch` never is.
+  prefetch?: Prefetch | undefined
+  // Whether a visitor sending `Save-Data: on` gets a lighter site by itself: image variants one width narrower, no font preloads, fonts shown only when cached, no speculation rules; `Save-Data` or `prefers-reduced-data` in the browser also stops the prefetch and has an island with no `hydrate` wait until it scrolls near. On by default, `false` serves everyone alike.
+  saveData?: boolean | undefined
 }
 
 // A problem an app's own check reports; `level` is `'error'` unless it says `'warning'`, `file` is relative to the project and defaults to kay.config.ts, and `line` and `column` default to 1.
@@ -520,6 +587,11 @@ export const CONFIG_FILE = 'kay.config.ts'
 
 // The nested bags whose own keys are checked as the config's are, by the key holding them and the shape they take.
 interface NestedBags {
+  dirs: DirsConfig
+  limits: LimitsConfig
+  serve: ServeConfig
+  observe: ObserveConfig
+  client: ClientConfig
   security: SecurityConfig
   i18n: I18nConfig
   seo: SeoConfig

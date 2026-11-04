@@ -273,7 +273,7 @@ The fence's `ctx`:
 
 - Layout and page loads run in parallel; when several fail, the outermost one decides the response.
 - In development each response carries a `Server-Timing` header with the time of the guards, the import of the page's modules, the loads as a whole and each of them, and the render, shown in the browser's network panel.
-- `serverTiming: true` in kay.config.ts sends it in production too (see [Tracing and timing](production.md#tracing-and-timing)).
+- `observe: { serverTiming: true }` in kay.config.ts sends it in production too (see [Tracing and timing](production.md#tracing-and-timing)).
 
 #### Special pages
 
@@ -304,7 +304,7 @@ p.status {todo.done ? 'Done' : 'Open'}
 
 #### Error reporting
 
-- Each error kay logs while answering a request, from a load, a render, a guard, an action, an API route, an `onRequest` hook, a param matcher, `rewrite`, a streamed block without `catch` or a `try` block's, also goes to the `onError` option of `kay.config.ts` or `pages()`, the place to send it to an error tracker. An error a hook of kay or a library threw comes with a `source` naming it, such as `'cms.onSave'`.
+- Each error kay logs while answering a request, from a load, a render, a guard, an action, an API route, an `onRequest` hook, a param matcher, `rewrite`, a streamed block without `catch` or a `try` block's, also goes to the `observe.onError` option of `kay.config.ts` or `pages()`, the place to send it to an error tracker. An error a hook of kay or a library threw comes with a `source` naming it, such as `'cms.onSave'`.
 - The response does not wait for a promise it returns, and an error it throws is logged.
 - An error met outside any request, in a `schedule`, `background` or queue job that ran out of attempts, or an `onStop` hook, goes to `onError` too, with `undefined` for the request, and kay waits 10 seconds at most for it, so a tracker that hangs holds neither a queue worker nor a shutdown.
 - An island's error reaches it as a `BrowserError` (see [Error fallbacks](islands-state-to-ids.md#error-fallbacks)).
@@ -314,6 +314,6 @@ p.status {todo.done ? 'Done' : 'Open'}
 import { defineConfig, requestId } from 'kay/server'
 
 export default defineConfig({
-  onError: ({ error, request }) => tracker.capture(error, request && { path: new URL(request.url).pathname, id: requestId(request) }),
+  observe: { onError: ({ error, request }) => tracker.capture(error, request && { path: new URL(request.url).pathname, id: requestId(request) }) },
 })
 ```

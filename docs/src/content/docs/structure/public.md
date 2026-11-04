@@ -24,6 +24,6 @@ An HTML file is also served without its `.html`, as a static host does, and an `
 
 A file sharing its path with a page, an endpoint, a redirect or an API route stops the server at boot.
 
-Set `publicDir` in [`kay.config.ts`](/structure/kay-config) to use another folder.
+Set `dirs.public` in [`kay.config.ts`](/structure/kay-config) to use another folder.
 
 <ReadMore href="/essentials/styling-and-assets#public-files">Public files and imported assets in the styling guide.</ReadMore>

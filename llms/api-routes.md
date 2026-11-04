@@ -115,11 +115,11 @@ Point an MCP client at `https://example.com/mcp`. `addNote` is the tool `add_not
 
 ### API modules
 
-Each `.ts` module under `src/api/`, the `apiDir` option of `kay.config.ts` naming another directory, exports an Elysia instance by default, which `pages()` mounts at `/api` plus its path there, with nothing to register: `src/api/chat.ts` serves its routes under `/api/chat`, `src/api/index.ts` under `/api`.
+Each `.ts` module under `src/api/`, the `dirs.api` option of `kay.config.ts` naming another directory, exports an Elysia instance by default, which `pages()` mounts at `/api` plus its path there, with nothing to register: `src/api/chat.ts` serves its routes under `/api/chat`, `src/api/index.ts` under `/api`.
 
 Files and directories starting with `_`, and `.test.ts` files, are left out.
 
-`apiPath: '/v1'` in `kay.config.ts` mounts every module, the OpenAPI document and the reference page under `/v1` instead of `/api` (an absolute path of plain segments, no trailing slash, outside `/_kay`; `mcp.path` and the `openapi` paths keep their own), and islands, the service worker's network list, the prefetch rules and the libraries follow it. `apiUrl(module, path, options)` from `kay` gives where a route is served (under `base` in the browser; on the server the module must be mounted, so a page using it renders per request, never prerendered) for code that needs a URL rather than a call (a handler passes its `request` instead of the module, `apiUrl(request, '/image')`, to name a route of the module it runs in, which a reference inside its own chain cannot); a script importing no module reads the `kay-api` meta every page carries once `apiPath` moves it.
+`serve: { apiPath: '/v1' }` in `kay.config.ts` mounts every module, the OpenAPI document and the reference page under `/v1` instead of `/api` (an absolute path of plain segments, no trailing slash, outside `/_kay`; `mcp.path` and the `openapi` paths keep their own), and islands, the service worker's network list, the prefetch rules and the libraries follow it. `apiUrl(module, path, options)` from `kay` gives where a route is served (under `base` in the browser; on the server the module must be mounted, so a page using it renders per request, never prerendered) for code that needs a URL rather than a call (a handler passes its `request` instead of the module, `apiUrl(request, '/image')`, to name a route of the module it runs in, which a reference inside its own chain cannot); a script importing no module reads the `kay-api` meta every page carries once `serve.apiPath` moves it.
 
 ```ts
 import { s } from 'kay'

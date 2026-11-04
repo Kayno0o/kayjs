@@ -55,7 +55,7 @@ function refuseOptions(options: PagesOptions): void {
   if (options.health !== false)
     healthTimeoutMs(options.health)
 
-  checkRequestIdHeader(options.requestIdHeader)
+  checkRequestIdHeader(options.observe?.requestIdHeader)
   checkTimeZone(options.timeZone)
   checkProxy(options.proxy)
 

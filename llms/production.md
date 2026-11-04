@@ -4,13 +4,13 @@
 
 ### Log requests as JSON for a log collector
 
-`log: 'json'` in kay.config.ts writes one JSON object per line, requests included, on stdout for info and on stderr for warnings and errors:
+`observe: { log: 'json' }` in kay.config.ts writes one JSON object per line, requests included, on stdout for info and on stderr for warnings and errors:
 
 ```ts
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  log: 'json',
+  observe: { log: 'json' },
 })
 ```
 
@@ -37,7 +37,7 @@ import { trace } from '@opentelemetry/api'
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  tracer: trace.getTracer('my-site'),
+  observe: { tracer: trace.getTracer('my-site') },
 })
 ```
 
@@ -130,7 +130,7 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - With NODE_ENV=production, a server's first line, once it listens, says where it listens and what runs: `kay: listening on http://localhost:3000, kay 1.30.0 in production, 12 pages prerendered`.
 - Then every request kay or the app's routes registered after `.use(await pages())` answer is logged to stdout as one line: `GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw`, the method, the path without its query string, which may carry tokens, the status, the milliseconds until the response was made, a streamed one's headers, and the request's id.
 - kay's own `/_kay/` routes, assets included (an extension's API modules served there, kayjs-cms's `/_kay/cms`, are logged), and the health route, wherever `health.path` puts it, are left out.
-- `true` in kay.config.ts's `log` logs them outside production too, `false` never.
+- `true` in kay.config.ts's `observe.log` logs them outside production too, `false` never.
 - kay's own messages, an error it caught, a warning about the app, a shutdown notice, go out in any mode, as `kay: ` and the message, an error's source-mapped stack on the lines below.
 - `log` sets the format of both: `'json'` writes one JSON object per line for a log collector, on stdout for info and on stderr for warnings and errors, and a function receives each entry instead, typed `LogEntry` from `kay/server`:
   - a request, `{ type: 'request', time, level: 'info', method, path, status, duration, id }`;
@@ -138,13 +138,13 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - A library logs through the same setting with `logFrom` from `kay`: `const log = logFrom('kayjs-mail')`, then `log.info(message)`, `log.warn(message)` or `log.error(message, error)`.
 - Its lines read `kayjs-mail: ` and the message, headed by the request being answered as kay's are, in a page, an action, an endpoint or a guard, though not in an API module's handler or a socket, which Elysia runs outside any call kay makes, and carry `from: 'kayjs-mail'` as JSON or in the entry a log function receives.
 - Outside a server, in the browser or a script, they go to the console as `[kayjs-mail] message`.
-- Every response carries its request's id as `X-Request-Id`, time-ordered, made by kay unless `proxy` is set and the proxy passed one on in that header; `requestIdHeader: 'x-correlation-id'` in kay.config.ts names another header for both.
+- Every response carries its request's id as `X-Request-Id`, time-ordered, made by kay unless `proxy` is set and the proxy passed one on in that header; `observe: { requestIdHeader: 'x-correlation-id' }` in kay.config.ts names another header for both.
 - An error logged while answering a request is headed by the request, `kay: GET /blog/hello, request AZnLe0vUe9qD0uXq9vLwZw`, then its stack, so a line from a user or a log search finds both.
 - `requestId(request)` from `kay/server` gives it, in `onError` or a route, and a server span carries it as `kay.request.id`.
 
 ### Tracing and timing
 
-- `serverTiming: true` in kay.config.ts sends the `Server-Timing` header development sends on every page rendered per request in production too: `guards;dur=0.4, import;dur=0.2, loads;dur=12.6, load-0;desc="src/routes/_layout.kay";dur=3.1, load-1;desc="src/routes/blog/[slug].kay";dur=12.4, render;dur=1.8`: the guards (on a route that has any), the import of the page's modules and its loads as a whole, which run at once, then each load, layouts first, then the render.
+- `observe: { serverTiming: true }` in kay.config.ts sends the `Server-Timing` header development sends on every page rendered per request in production too: `guards;dur=0.4, import;dur=0.2, loads;dur=12.6, load-0;desc="src/routes/_layout.kay";dur=3.1, load-1;desc="src/routes/blog/[slug].kay";dur=12.4, render;dur=1.8`: the guards (on a route that has any), the import of the page's modules and its loads as a whole, which run at once, then each load, layouts first, then the render.
 - Anyone loading the page reads it, page file names included.
 - A prerendered page has none, but one with server islands carries the timings of the loads and render that filled them.
 - `tracer` takes an OpenTelemetry tracer, which kay calls without depending on OpenTelemetry: the app installs `@opentelemetry/api` and an SDK exporting the spans, as `@opentelemetry/sdk-trace-node` with an OTLP exporter, registered before the server starts, then passes `tracer: trace.getTracer('my-site')`.
@@ -172,9 +172,9 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - `health: { path: '/up', check: async () => await db.ping() }` in kay.config.ts moves it and adds a check: one returning `false`, throwing, or taking over 5 s answers 503, the error logged.
 - `health: false` leaves the route out.
 - An executable `kay build --compile` made checks a server it started, rather than starting one, when run as `./server --health`: it exits with 0 when the health route on `PORT`, 3000 by default, at `HOST` when it names an address and on loopback otherwise, answers 200, else 1, for a container image with no curl: `HEALTHCHECK CMD ["./server", "--health"]`.
-- On SIGTERM, SIGINT or SIGHUP, a server that listens stops taking connections, lets open requests finish, ends every open event stream (live values, presence, `stream()`) and, once no request is left, every websocket (close code 1001), so browsers reconnect to the next instance, then runs the app's `onStop` hooks and exits with 0. A queue handler or schedule ignoring its signal is given 3 seconds (at most 40% of `shutdownTimeout`), all of them together, then its job is handed back untouched, and the `store` config's `rooms` store is closed so a stopped replica leaves no member behind (a store given only to `rooms({ store })` is not).
+- On SIGTERM, SIGINT or SIGHUP, a server that listens stops taking connections, lets open requests finish, ends every open event stream (live values, presence, `stream()`) and, once no request is left, every websocket (close code 1001), so browsers reconnect to the next instance, then runs the app's `onStop` hooks and exits with 0. A queue handler or schedule ignoring its signal is given 3 seconds (at most 40% of `serve.shutdownTimeout`), all of them together, then its job is handed back untouched, and the `store` config's `rooms` store is closed so a stopped replica leaves no member behind (a store given only to `rooms({ store })` is not).
 - New connections are refused from the signal on, so a load balancer stops sending any; a client on a connection kept alive gets 503 from the health route meanwhile.
-- Requests still open after `shutdownTimeout`, 10 seconds by default, are closed and the process exits with 1.
+- Requests still open after `serve.shutdownTimeout`, 10 seconds by default, are closed and the process exits with 1.
 - `kay dev` restarts at once instead.
 
 ### A deploy under open tabs
@@ -222,7 +222,7 @@ new Elysia()
 - Stopping on a signal waits for a scheduled run in progress, and for every `onStop` hook the app registers, async ones included, in turn.
 - `shutdown(app)` from `kay/server` stops a server the same way, as a test does; Elysia's own `app.stop()` does not wait for the hooks.
 - A production server (`NODE_ENV=production`) locks every schedule by default, named `auto:<schedule>:<hash of the job's source>` (a twin with the same schedule and source takes `#2` by start order, which every process of one app shares), so each run happens once across processes sharing the store; a dev or test server runs each schedule in every process. `lock: false` opts out. If the store cannot give that default lock, one warning is logged and the run goes on unlocked, once per process; a `lock` the app named skips the run instead.
-- A run still going after `timeout` (`'10m'` by default, `false` for none) is logged as failed and left, so it no longer blocks the next run; a stop aborts the signal and waits at most 3 s (less with a short `shutdownTimeout`) for a run ignoring it, without reporting it. The job takes an `AbortSignal` that aborts at the timeout and as the server stops. Every job is called with the signal, so one with an optional first parameter gets it. The lock name hashes the job's source, so during a rolling deploy old and new builds with changed jobs both run.
+- A run still going after `timeout` (`'10m'` by default, `false` for none) is logged as failed and left, so it no longer blocks the next run; a stop aborts the signal and waits at most 3 s (less with a short `serve.shutdownTimeout`) for a run ignoring it, without reporting it. The job takes an `AbortSignal` that aborts at the timeout and as the server stops. Every job is called with the signal, so one with an optional first parameter gets it. The lock name hashes the job's source, so during a rolling deploy old and new builds with changed jobs both run.
 - `schedule(cron, [jobA, jobB])` gives each job of the list that schedule, and `schedule({ '* * * * *': [jobA, jobB], '@hourly': jobC, '30s': jobD }, options)` several schedules at once, each key checked as a literal schedule is and `tz` read by the crons alone, all in one plugin: with several jobs, `lock` names each `<lock>:<its schedule>:<its place in that schedule's list>`, `report:@hourly:0`.
 - `schedule(cron, job, { boot: true })` runs the jobs once as the server starts too, the first scheduled run waiting for it and a stop too, so a job needing a first run does not start itself by hand; processes starting within the same minute (the schedule's length if shorter) run it once, two either side of the boundary possibly twice (it takes the lock `<lock>:boot` for a slot of a minute at most, a skipped one is logged), while a restart minutes later runs it again, each restart of `kay dev`, `kay render` and `--verify` included.
 - `schedule(cron, job, { lock: 'weekly-report' })` runs each time once across every process sharing the job store ([Queues](queues.md)), the first to reach it taking it; `store` names another store than the default one.

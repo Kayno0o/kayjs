@@ -1,5 +1,5 @@
 import type { Elysia as App } from 'elysia'
-import type { KayConfig } from '../config'
+import type { ObserveConfig } from '../config'
 import type { RequestContext } from './render'
 import { kayLog } from '../runtime/log'
 import { describeError, sharedContext } from './render'
@@ -17,7 +17,7 @@ function asksForPage(request: Request): boolean {
 // Answers an error no route caught, thrown by an `onRequest` hook, a param matcher, `rewrite` or an extension's hook, as a 500 that is logged and handed to `onError`.
 // Without it Elysia answers 200 with the error's message in production; a `Response` thrown on purpose is answered as given, and any `onError` of the app's own, registered earlier, answers first.
 // The handler destructures what it reads: Elysia takes one handed the whole context for a reader of the body and parses every body for it. The rest is what the app's derive hooks added, which the error page reads as `ctx.locals`; the spread stays last and outside any call, since Elysia reads `locals,` or `locals)` in the source as the whole context being handed on.
-export function answerUncaught(app: App, { dev, onError, page }: { dev: boolean, onError: KayConfig['onError'], page: (error: unknown, context: RequestContext) => Promise<Response> }): void {
+export function answerUncaught(app: App, { dev, onError, page }: { dev: boolean, onError: ObserveConfig['onError'], page: (error: unknown, context: RequestContext) => Promise<Response> }): void {
   app.onError({ as: 'global' }, async ({ request, error, code, ...locals }) => {
     if (error instanceof Response)
       return error

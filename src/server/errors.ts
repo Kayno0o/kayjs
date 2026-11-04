@@ -1,5 +1,5 @@
 import type { Elysia } from 'elysia'
-import type { KayConfig } from '../config'
+import type { ObserveConfig } from '../config'
 import { isCrossSite } from './actions'
 import { clientAddress, overLimit } from './protection'
 import { reportServerError } from './report'
@@ -38,7 +38,7 @@ export class BrowserError extends Error {
 }
 
 // Takes the browser's reports, their stacks mapped to `.kay` lines through `mapStack`: in production the build's kept maps, under `kay dev` the chunks', logged and handed to `onError` as `BrowserError`s; another site's, a flood from one client, or anything too big is refused.
-export function serveErrorReports(app: Elysia, onError: KayConfig['onError'], mapStack?: (stack: string) => Promise<string>): void {
+export function serveErrorReports(app: Elysia, onError: ObserveConfig['onError'], mapStack?: (stack: string) => Promise<string>): void {
   app.post(ERROR_REPORTS, async ({ request, server }) => {
     if (isCrossSite(request))
       return new Response(null, { status: 403 })

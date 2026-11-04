@@ -33,29 +33,25 @@ export type { ShadowTypes } from './shadow-types'
 export const CHECK_CONFIG = [
   // The server entry relative to the root, `src/server.ts` by default: the `app` it exports types `ctx.locals` and the app routes links may point at.
   'entry',
-  // Page directory relative to the root, so `ctx.params` is typed per route.
-  'routesDir',
+  // The page directory, so `ctx.params` is typed per route, the public file directory, whose files links may point at, and the API directory, whose modules' GET routes links may point at.
+  'dirs',
   // The libraries whose routes the app mounts, which links may point at too.
   'extensions',
-  // Public file directory relative to the root, whose files links may point at.
-  'publicDir',
-  // API directory relative to the root, whose modules' GET routes links may point at, and where they are mounted, `/api` by default.
-  'apiDir',
-  'apiPath',
+  // Where the API is mounted, `/api` by default, and how long a stopping server waits, which the server refuses at boot when it cannot read it.
+  'serve',
   // The app's own modules for its libraries' settings, checked against the defaults they replace.
   'librarySettings',
   // The content config relative to the root, whose collections' entries are read against their schemas.
   'contentConfig',
   // The config's redirects, whose targets on the site must be a page or a public file.
   'redirects',
-  // Where the site is mounted, the origin it is public at and how long a stopping server waits, which the server refuses at boot when it cannot read them.
+  // Where the site is mounted and the origin it is public at, which the server refuses at boot when it cannot read them.
   'base',
   'site',
-  'shutdownTimeout',
-  // The settings with a value the server refuses at boot when it cannot read it.
+  // The settings with a value the server refuses at boot when it cannot read it: the request id header lies in `observe`.
   'health',
   'live',
-  'requestIdHeader',
+  'observe',
   'timeZone',
   'budget',
   // The config's locales: links may carry their prefixes, `t()` reads the default locale's messages, and every other locale's must match them.

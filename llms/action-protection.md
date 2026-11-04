@@ -111,9 +111,9 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 
 ### Body limit
 
-- A request with a body to any route, a library's, an extension's or the jobs page included, sends at most `maxSize`, 1 MB unless kay.config.ts sets another: `maxSize: '4mb'`, a size as `budget` takes it (`'800b'`, `'512kb'`, `'1.5mb'`) or a number of bytes.
+- A request with a body to any route, a library's, an extension's or the jobs page included, sends at most `limits.body`, 1 MB unless kay.config.ts sets another: `limits: { body: '4mb' }`, a size as `budget` takes it (`'800b'`, `'512kb'`, `'1.5mb'`) or a number of bytes.
 - An action raises or lowers it for itself, `action(schema, handler, { maxSize: '20mb' })`, and an API module for its routes, `api({ maxSize })`, a size or a function kay reads when it mounts the module (a library reading its own settings).
 - A bigger request is refused before anything reads it, from its `Content-Length`, or, sent in chunks without one, as soon as it passes the limit.
 - A plain form post goes back to its page with `errors['']` saying the most it may send, an island's call throws `ActionError` with status 413 and that error, and an API route answers 413.
-- A route of an extension raises its own through the extension's `maxSize` ([Component libraries](component-libraries.md)); a route you add with `new Elysia().post()` has the app's, and `maxSizeByPath: { '/upload': '50mb' }` in kay.config.ts sets one for a path (the route and what is under it, the `base` left out) without raising the rest. For the path of an `api()` module it wins over the module's `maxSize` (the module's own cors grant stays on the 413), while a route's `detail.maxSize` still wins over both.
+- A route of an extension raises its own through the extension's `maxSize` ([Component libraries](component-libraries.md)); a route you add with `new Elysia().post()` has the app's, and `limits: { byPath: { '/upload': '50mb' } }` in kay.config.ts sets one for a path (the route and what is under it, the `base` left out) without raising the rest. For the path of an `api()` module it wins over the module's `maxSize` (the module's own cors grant stays on the 413), while a route's `detail.maxSize` still wins over both.
 - Bun's own cap, 128 MB unless `new Elysia({ serve: { maxRequestBodySize } })` sets another, still holds over any `maxSize`.

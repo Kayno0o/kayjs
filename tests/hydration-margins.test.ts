@@ -17,9 +17,9 @@ describe('hydration margins', () => {
 
     try {
       for (const visible of ['10rem', '200', '5vh', '1px 2px 3px 4px 5px', ''])
-        await expect(buildClient(dir, { hydration: { visible } })).rejects.toThrow(/hydration\.visible/)
+        await expect(buildClient(dir, { client: { hydration: { visible } } })).rejects.toThrow(/hydration\.visible/)
 
-      await expect(buildClient(dir, { hydration: { serverIslands: 'a screen' } })).rejects.toThrow(/hydration\.serverIslands/)
+      await expect(buildClient(dir, { client: { hydration: { serverIslands: 'a screen' } } })).rejects.toThrow(/hydration\.serverIslands/)
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -27,25 +27,25 @@ describe('hydration margins', () => {
   }, 60_000)
 
   it('refuses it before reading the sources', async () => {
-    await expect(buildClient('tests/fixtures/no-such-project', { hydration: { visible: '10rem' } })).rejects.toThrow(/hydration\.visible/)
-    await expect(buildClient('tests/fixtures/no-such-project', { hydration: { serverIslands: '5vh' } })).rejects.toThrow(/hydration\.serverIslands/)
+    await expect(buildClient('tests/fixtures/no-such-project', { client: { hydration: { visible: '10rem' } } })).rejects.toThrow(/hydration\.visible/)
+    await expect(buildClient('tests/fixtures/no-such-project', { client: { hydration: { serverIslands: '5vh' } } })).rejects.toThrow(/hydration\.serverIslands/)
   })
 
   it('hands the config\'s margins to the browser build', () => {
-    expect(clientOptionsOf({ hydration: { visible: '50px' } }, { dev: false, underKayDev: false }).hydration).toEqual({ visible: '50px' })
-    expect(clientOptionsOf({}, { dev: false, underKayDev: false }).hydration).toBeUndefined()
+    expect(clientOptionsOf({ client: { hydration: { visible: '50px' } } }, { dev: false, underKayDev: false }).client?.hydration).toEqual({ visible: '50px' })
+    expect(clientOptionsOf({}, { dev: false, underKayDev: false }).client?.hydration).toBeUndefined()
   })
 
   it('keeps 200px and a screen ahead unless the config sets a margin, and writes the one it sets', async () => {
     const dir = resolve(await fixtureCopy('navigation'))
 
     try {
-      const plain = await scripts((await buildClient(dir, { navigation: true })).dir)
+      const plain = await scripts((await buildClient(dir, { client: { navigation: true } })).dir)
 
       expect(plain).toContain('200px')
       expect(plain).toContain('100% 0px')
 
-      const set = await scripts((await buildClient(dir, { navigation: true, hydration: { visible: '640px', serverIslands: '300% 0px' } })).dir)
+      const set = await scripts((await buildClient(dir, { client: { navigation: true, hydration: { visible: '640px', serverIslands: '300% 0px' } } })).dir)
 
       expect(set).toContain('640px')
       expect(set).toContain('300% 0px')

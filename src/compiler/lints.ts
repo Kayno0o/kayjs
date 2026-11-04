@@ -662,6 +662,15 @@ export const LINTS = {
     wrong: 'export default defineConfig({ fileStore: s3Files() })',
     right: 'export default defineConfig({ store: { files: s3Files() } })',
   },
+  'deprecated-config-groups': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.88',
+    site: true,
+    summary: 'A config key that 1.88 grouped by concern, written flat: `routesDir`, `apiDir` and `publicDir` are `dirs: { routes, api, public }`, `maxSize` and `maxSizeByPath` are `limits: { body, byPath }`, `apiPath`, `compress`, `compressionDictionary` and `shutdownTimeout` are `serve`, `log`, `serverTiming`, `requestIdHeader`, `tracer` and `onError` are `observe`, and `navigation`, `inlineStyles`, `lateStyles`, `typography`, `hydration`, `prefetch` and `saveData` are `client`. The old keys keep working until 1.91, a key written in its bag winning. Found in the object `kay.config.ts` exports, in the options of `pages()` and `testSite()` and in an extension\'s `config`. `kay upgrade` writes the bags; an object with a bag of the same name already, or a spread, is reported with no fix.',
+    wrong: 'export default defineConfig({ routesDir: \'src/pages\', compress: false, navigation: false })',
+    right: 'export default defineConfig({ dirs: { routes: \'src/pages\' }, serve: { compress: false }, client: { navigation: false } })',
+  },
   'deprecated-auth-account-methods': {
     level: 'warn',
     group: 'deprecated',
@@ -809,6 +818,7 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.82', removedIn: '1.86' },
   { since: '1.84' },
   { since: '1.87' },
+  { since: '1.88' },
 ]
 
 // The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.

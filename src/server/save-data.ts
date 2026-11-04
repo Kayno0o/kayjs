@@ -17,13 +17,13 @@ export function savesData(request: Request): boolean {
 }
 
 // Whether this request gets the lighter page: it asks for less data, and the pages vary on it.
-export function savesLess(request: Request, options: Pick<RenderOptions, 'saveData' | 'prefetch' | 'fontCss' | 'islandPreloads'>): boolean {
+export function savesLess(request: Request, options: Pick<RenderOptions, 'client' | 'fontCss' | 'islandPreloads'>): boolean {
   return pagesVary(options) && savesData(request)
 }
 
 // Whether pages differ for a visitor saving data: they carry something to leave out, and the `saveData` config key leaves the behavior on.
-export function pagesVary({ saveData, prefetch, fontCss, islandPreloads }: Pick<RenderOptions, 'saveData' | 'prefetch' | 'fontCss' | 'islandPreloads'>): boolean {
-  return saveData !== false && (prefetch !== false || fontCss !== undefined || (islandPreloads?.drop.size ?? 0) > 0)
+export function pagesVary({ client, fontCss, islandPreloads }: Pick<RenderOptions, 'client' | 'fontCss' | 'islandPreloads'>): boolean {
+  return client?.saveData !== false && (client?.prefetch !== false || fontCss !== undefined || (islandPreloads?.drop.size ?? 0) > 0)
 }
 
 // The chunks a page preloads for its eager islands and for nothing else: not the entry's, nor the code waiting for the viewport.
@@ -43,8 +43,8 @@ export function withSavedData(respond: PageResponder, options: RenderOptions): P
   if (!pagesVary(options))
     return respond
 
-  const rules = speculationRules(options.prefetch, options.base, options.apiPath)
-  const meta = prefetchMeta(options.prefetch)
+  const rules = speculationRules(options.client?.prefetch, options.base, options.serve?.apiPath)
+  const meta = prefetchMeta(options.client?.prefetch)
   const fonts = options.fontCss === undefined ? undefined : { full: options.fontCss, light: lightFontCss(options.fontCss) }
   // The chunks as the page names them, under the mount point.
   const base = options.base ?? ''

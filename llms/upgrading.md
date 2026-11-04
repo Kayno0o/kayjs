@@ -2,6 +2,14 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.88.0
+
+### The config keys are grouped by concern
+
+- Twenty-one top-level keys of `kay.config.ts` (and of the options of `pages()` and `testSite()` and of an extension's `config`) move into five bags: `dirs: { routes, api, public }` (was `routesDir`, `apiDir`, `publicDir`), `limits: { body, byPath }` (was `maxSize`, `maxSizeByPath`), `serve: { apiPath, compress, compressionDictionary, shutdownTimeout }`, `observe: { log, serverTiming, requestIdHeader, tracer, onError }` and `client: { navigation, inlineStyles, lateStyles, typography, hydration, prefetch, saveData }`. The flat keys work until 1.91, a key written in its bag winning over the same flat key; `kay check` reports them as `deprecated-config-groups` and `kay upgrade` writes the bags, unless the object has a bag of that name already or a spread, where the keys move by hand. `publicCache`, `images`, `seo`, `store`, `live`, `links`, `base` and `trailingSlash` stay where they are.
+- The options of `pages()` and `testSite()` merge into the config one bag deep: `testSite({ client: { navigation: false } })` keeps the config's other `client` keys, where a flat `navigation: false` and the config's `prefetch` were separate keys anyway.
+- Code reading the config in an extension or a test (`config.maxSize`, `options.apiPath`) reads `config.limits?.body` and `config.serve?.apiPath`. `CheckOptions`, `ClientOptions` and `RenderOptions` carry the bags (`dirs`, `serve`, `client`, `observe`) where they carried the flat keys.
+
 ## 1.87.0
 
 ### `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `publicEnv` and `defineUi` no longer make a component an island

@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { deprecatedConfigKeys } from '../src/check/deprecated-config-keys'
 import { applySafeFixes } from '../src/check/fixes'
-import { RENAMED_KEYS, renamedKeys, unknownConfigKeys } from '../src/config-shape'
+import { currentKeys, GROUPED_KEYS, groupedKeys, mergeBags, RENAMED_KEYS, renamedKeys, unknownConfigKeys } from '../src/config-shape'
 import { localizedEntry, writeDraftEntry } from '../src/server/entry-drafts'
 import { missingTranslations } from '../src/server/translations'
 import { scratchDir } from './scratch'
@@ -29,8 +29,8 @@ describe('the renamed config keys', () => {
 
   it('knows the old names as keys, and suggests the new ones only', () => {
     expect(unknownConfigKeys({ routes: 'a', apiDir: 'b' })).toEqual([])
-    expect(unknownConfigKeys({ routsDir: 'a', storag: 'b' })).toEqual(['`routsDir`, did you mean `routesDir`?', '`storag`, did you mean `fileStore`?'])
-    expect(unknownConfigKeys({ routs: 'a', setting: {}, maxSize: 1, contnt: 'x' })).toEqual(['`routs`, did you mean `routesDir`?', '`setting`, did you mean `librarySettings`?', '`contnt`, did you mean `contentConfig`?'])
+    expect(unknownConfigKeys({ routsDir: 'a', storag: 'b' })).toEqual(['`routsDir`, did you mean `dirs.routes`?', '`storag`, did you mean `fileStore`?'])
+    expect(unknownConfigKeys({ routs: 'a', setting: {}, maxSize: 1, contnt: 'x' })).toEqual(['`routs`, did you mean `dirs.routes`?', '`setting`, did you mean `librarySettings`?', '`contnt`, did you mean `contentConfig`?'])
     expect(Object.values(RENAMED_KEYS).every(name => !Object.hasOwn(RENAMED_KEYS, name))).toBe(true)
   })
 })
@@ -44,7 +44,7 @@ describe('deprecated-config-keys', () => {
     const root = await project({ 'kay.config.ts': config, 'src/server.ts': server, 'src/site.ts': test, 'src/other.ts': other })
 
     try {
-      const found = await deprecatedConfigKeys(root, {})
+      const found = (await deprecatedConfigKeys(root, {})).filter(diagnostic => diagnostic.code !== 'deprecated-config-groups')
 
       expect(found.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.line, diagnostic.severity, diagnostic.fixes === undefined]).sort()).toEqual([
         ['kay.config.ts', 4, 'warning', false],
@@ -63,7 +63,7 @@ describe('deprecated-config-keys', () => {
       expect(await Bun.file(join(root, 'src/site.ts')).text()).toBe(test)
       expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe(other)
       expect((await deprecatedConfigKeys(root, {})).filter(diagnostic => diagnostic.code === 'deprecated-config-keys').map(diagnostic => diagnostic.file.slice(root.length + 1))).toEqual(['src/site.ts'])
-      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-config-keys': 'allow', 'deprecated-file-store': 'allow' } })).toEqual([])
+      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-config-keys': 'allow', 'deprecated-file-store': 'allow', 'deprecated-config-groups': 'allow' } })).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -99,7 +99,7 @@ describe('deprecated-file-store', () => {
       expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe(other)
       expect(await Bun.file(join(root, 'src/spread.ts')).text()).toBe(spread)
       expect((await deprecatedConfigKeys(root, {})).map(diagnostic => diagnostic.file.slice(root.length + 1)).filter(file => file !== 'src/spread.ts')).toEqual(['src/server.ts'])
-      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-config-keys': 'allow', 'deprecated-file-store': 'allow' } })).toEqual([])
+      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-config-keys': 'allow', 'deprecated-file-store': 'allow', 'deprecated-config-groups': 'allow' } })).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -141,6 +141,87 @@ describe('deprecated-config-keys beyond pages() and testSite() by name', () => {
       await applySafeFixes(root, found)
       expect(await Bun.file(join(root, 'src/a.ts')).text()).toBe(aliased.replace('routes', 'routesDir'))
       expect(await Bun.file(join(root, 'src/lib.ts')).text()).toBe(extension.replace('storage: undefined', 'store: { files: undefined }'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('the grouped config keys', () => {
+  it('moves each flat key into its bag, the bag winning when both are set, and leaves the rest alone', () => {
+    expect(groupedKeys<object>({ routesDir: 'a', apiDir: 'b', publicDir: 'c', maxSize: '2mb', maxSizeByPath: { '/up': '9mb' }, apiPath: '/v1', compress: false, log: false, tracer: undefined, navigation: false, saveData: false, lang: 'en' })).toEqual({
+      lang: 'en',
+      dirs: { routes: 'a', api: 'b', public: 'c' },
+      limits: { body: '2mb', byPath: { '/up': '9mb' } },
+      serve: { apiPath: '/v1', compress: false },
+      observe: { log: false, tracer: undefined },
+      client: { navigation: false, saveData: false },
+    })
+    expect(groupedKeys<object>({ routesDir: 'old', dirs: { routes: 'new', api: 'x' } })).toEqual({ dirs: { routes: 'new', api: 'x' } })
+    expect(groupedKeys<object>({ compress: false, serve: { compress: undefined, apiPath: '/v1' } })).toEqual({ serve: { compress: false, apiPath: '/v1' } })
+    expect(groupedKeys<object>({ compress: false, serve: 'not a bag' })).toEqual({ serve: 'not a bag' })
+
+    const untouched = { lang: 'en', dirs: { routes: 'a' } }
+
+    expect(groupedKeys(untouched)).toBe(untouched)
+  })
+
+  it('reads the 1.84 names into the bags too', () => {
+    expect(currentKeys<object>({ routes: 'a', api: 'b', maxSizes: { '/x': 1 } })).toEqual({ dirs: { routes: 'a', api: 'b' }, limits: { byPath: { '/x': 1 } } })
+  })
+
+  it('names every flat key once, in a bag that takes it', () => {
+    const bags = { dirs: ['routes', 'api', 'public'], limits: ['body', 'byPath'], serve: ['apiPath', 'compress', 'compressionDictionary', 'shutdownTimeout'], observe: ['log', 'serverTiming', 'requestIdHeader', 'tracer', 'onError'], client: ['navigation', 'inlineStyles', 'lateStyles', 'typography', 'hydration', 'prefetch', 'saveData'] }
+
+    expect(Object.values(GROUPED_KEYS).every(([group, name]) => bags[group].includes(name))).toBe(true)
+    expect(Object.values(GROUPED_KEYS).length).toBe(Object.values(bags).flat().length)
+  })
+
+  it('lays the options of a call over the config one bag deep, an undefined option leaving the config\'s value', () => {
+    expect(mergeBags({ client: { navigation: true, prefetch: false }, dirs: { routes: 'a' }, lang: 'en' }, { client: { navigation: false, prefetch: undefined }, lang: undefined, minify: true })).toEqual({ client: { navigation: false, prefetch: false }, dirs: { routes: 'a' }, lang: 'en', minify: true })
+    expect(mergeBags({ dirs: { routes: 'a' } }, { dirs: undefined })).toEqual({ dirs: { routes: 'a' } })
+    expect(mergeBags({}, { serve: { compress: false } })).toEqual({ serve: { compress: false } })
+  })
+
+  it('checks the keys of each bag, and offers a flat key where it lives now', () => {
+    expect(unknownConfigKeys({ dirs: { routes: 'a' }, limits: { body: 1 }, serve: { compress: true }, observe: { log: false }, client: { saveData: false } })).toEqual([])
+    expect(unknownConfigKeys({ dirs: { route: 'a' }, client: { saveDat: false }, limits: { max: 1 } })).toEqual(['`dirs.route`, did you mean `dirs.routes`?', '`limits.max`', '`client.saveDat`, did you mean `client.saveData`?'])
+    expect(unknownConfigKeys({ routsDir: 'a', compres: false })).toEqual(['`routsDir`, did you mean `dirs.routes`?', '`compres`, did you mean `serve.compress`?'])
+  })
+})
+
+describe('deprecated-config-groups', () => {
+  it('reports the flat keys of an object once, and --fix writes their bags where the first stood', async () => {
+    const config = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'en\',\n  routesDir: \'src/pages\',\n  compress: false,\n  publicDir: \'static\',\n  navigation: false,\n  onError: ({ error }) => { console.error(error) },\n  minify: true,\n})\n'
+    const last = 'import { pages } from \'kay/server\'\n\nconst apiPath = \'/v1\'\nexport const app = pages({ minify: true, apiPath, maxSize: \'2mb\', })\n'
+    const only = 'import { testSite } from \'kay/test\'\n\nexport const site = testSite({ prefetch: false })\n'
+    const beside = 'import { pages } from \'kay/server\'\n\nexport const app = pages({ serve: { compress: true }, compress: false, log: false })\n'
+    const spread = 'import { pages } from \'kay/server\'\n\nconst base = {}\nexport const a = pages({ ...base, compress: false })\n'
+    const other = 'import { pages } from \'./mine\'\n\nexport const x = pages({ compress: false })\nexport const routes = { log: 1 }\n'
+    const root = await project({ 'kay.config.ts': config, 'src/server.ts': last, 'src/site.ts': only, 'src/beside.ts': beside, 'src/spread.ts': spread, 'src/other.ts': other })
+
+    try {
+      const found = (await deprecatedConfigKeys(root, {})).filter(diagnostic => diagnostic.code === 'deprecated-config-groups')
+
+      expect(found.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.line, diagnostic.severity, diagnostic.fixes === undefined]).sort()).toEqual([
+        ['kay.config.ts', 5, 'warning', false],
+        ['src/beside.ts', 3, 'warning', true],
+        ['src/server.ts', 4, 'warning', false],
+        ['src/site.ts', 3, 'warning', false],
+        ['src/spread.ts', 4, 'warning', true],
+      ])
+      expect(found.find(diagnostic => diagnostic.file.endsWith('kay.config.ts'))!.message).toBe('config keys are grouped by concern since 1.88, so a key is found by what it does: `routesDir` is `dirs.routes`, `compress` is `serve.compress`, `publicDir` is `dirs.public`, `navigation` is `client.navigation`, `onError` is `observe.onError`; the old keys work until 1.91')
+
+      await applySafeFixes(root, found)
+      expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'en\',\n  dirs: { routes: \'src/pages\', public: \'static\' }, serve: { compress: false }, client: { navigation: false }, observe: { onError: ({ error }) => { console.error(error) } },\n  minify: true,\n})\n')
+      expect(await Bun.file(join(root, 'src/server.ts')).text()).toBe('import { pages } from \'kay/server\'\n\nconst apiPath = \'/v1\'\nexport const app = pages({ minify: true, serve: { apiPath }, limits: { body: \'2mb\' }, })\n')
+      expect(await Bun.file(join(root, 'src/site.ts')).text()).toBe('import { testSite } from \'kay/test\'\n\nexport const site = testSite({ client: { prefetch: false } })\n')
+      expect(await Bun.file(join(root, 'src/beside.ts')).text()).toBe(beside)
+      expect(await Bun.file(join(root, 'src/spread.ts')).text()).toBe(spread)
+      expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe(other)
+      expect((await deprecatedConfigKeys(root, {})).filter(diagnostic => diagnostic.code === 'deprecated-config-groups').map(diagnostic => diagnostic.file.slice(root.length + 1)).sort()).toEqual(['src/beside.ts', 'src/spread.ts'])
+      expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-config-groups': 'allow', 'deprecated-config-keys': 'allow', 'deprecated-file-store': 'allow' } })).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })

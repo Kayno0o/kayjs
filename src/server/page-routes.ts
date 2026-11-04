@@ -149,7 +149,7 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
     if (hasFlash(context.request, renderOptions.base ?? '') || handedOverFlash(context.request))
       return forVisitor(render)
 
-    const revalidating = revalidateStale(page, async () => prerender(route, params, url, key), error => reportServerError(error, context.request, renderOptions.onError))
+    const revalidating = revalidateStale(page, async () => prerender(route, params, url, key), error => reportServerError(error, context.request, renderOptions.observe?.onError))
 
     if (revalidating)
       await revalidating

@@ -49,7 +49,7 @@ When several `beforeX` hooks are set, each sees what the one before changed, and
 
 ## When an `onX` hook throws
 
-The transition has already happened, so the error never undoes it. The error is logged and handed to the `onError` of `kay.config.ts` with a `source` naming the hook, such as `cms.onSave`. Kay waits up to 10 seconds for a hook, then leaves it running, reports that it was late, and goes on. All the `onX` hooks of one transition run in order, even when one throws.
+The transition has already happened, so the error never undoes it. The error is logged and handed to the `observe.onError` of `kay.config.ts` with a `source` naming the hook, such as `cms.onSave`. Kay waits up to 10 seconds for a hook, then leaves it running, reports that it was late, and goes on. All the `onX` hooks of one transition run in order, even when one throws.
 
 Hooks that must not slow an answer, such as the ones of a streamed reply, run detached: kay does not wait for them at all.
 

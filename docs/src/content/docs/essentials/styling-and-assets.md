@@ -69,11 +69,11 @@ A class your server builds from data, such as `class={tone}`, is read too. When 
 
 #### Load the whole stylesheet anyway
 
-If you would rather not list classes, set `lateStyles` in `kay.config.ts`.
+If you would rather not list classes, set `client.lateStyles` in `kay.config.ts`.
 
 ```ts
 export default defineConfig({
-  lateStyles: true,
+  client: { lateStyles: true },
 })
 ```
 
@@ -83,10 +83,10 @@ A page that shows Markdown counts the classes the Markdown, the scripts that wri
 
 When you move to another page without a reload, the next page's rules come with it. A route with a copy of its own loads it before the page paints.
 
-Set `inlineStyles` in `kay.config.ts` to force one way.
+Set `client.inlineStyles` in `kay.config.ts` to force one way.
 
 ```ts
-export default defineConfig({ inlineStyles: false })
+export default defineConfig({ client: { inlineStyles: false } })
 ```
 
 `true` inlines every page's styles, whatever their size. `false` links them all.

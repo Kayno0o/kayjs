@@ -190,7 +190,7 @@ describe.each([
   })
 
   it('answers everyone alike with saveData off, varying on nothing', async () => {
-    const { app, remove } = await served({ saveData: false })
+    const { app, remove } = await served({ client: { saveData: false } })
 
     try {
       const saving = await app.handle(request('/about', ON))
@@ -279,7 +279,7 @@ describe('the page wrapper', () => {
 
       controller.close()
     },
-  }), { status, headers }), { prefetch: 'moderate' })
+  }), { status, headers }), { client: { prefetch: 'moderate' } })
   const ask = async (respond: ReturnType<typeof answering>, headers: Record<string, string> = ON, method = 'GET') => respond({} as never, {}, { request: new Request('http://localhost/', { headers, method }) }, new URL('http://localhost/'))
 
   it('finds the end of the head split across chunks, or in the middle of a character', async () => {
@@ -296,7 +296,7 @@ describe('the page wrapper', () => {
         controller.enqueue(bytes.subarray(cut))
         controller.close()
       },
-    }), { headers: { 'content-type': 'text/html' } }), { prefetch: 'moderate' })
+    }), { headers: { 'content-type': 'text/html' } }), { client: { prefetch: 'moderate' } })
 
     expect(await (await ask(split)).text()).toBe(text)
   })
@@ -325,7 +325,7 @@ describe('the page wrapper', () => {
 
   it('leaves what is no page alone, a HEAD answer without a body included', async () => {
     const json = await ask(answering(['{}'], { 'content-type': 'application/json' }))
-    const head = await ask(withSavedData(async () => new Response(null, { headers: { 'content-type': 'text/html' } }), { prefetch: 'moderate' }), ON, 'HEAD')
+    const head = await ask(withSavedData(async () => new Response(null, { headers: { 'content-type': 'text/html' } }), { client: { prefetch: 'moderate' } }), ON, 'HEAD')
 
     expect(varies(json)).toEqual([''])
     expect(head.status).toBe(200)
@@ -335,11 +335,11 @@ describe('the page wrapper', () => {
   it('is no wrapper at all when there is nothing to leave out, or the config says so', async () => {
     const respond = async () => new Response('x')
 
-    expect(withSavedData(respond, { prefetch: false })).toBe(respond)
-    expect(withSavedData(respond, { saveData: false })).toBe(respond)
-    expect(withSavedData(respond, { prefetch: false, fontCss: '@font-face{}' })).not.toBe(respond)
-    expect(withSavedData(respond, { prefetch: false, islandPreloads: { drop: new Set(), wait: [] } })).toBe(respond)
-    expect(withSavedData(respond, { prefetch: false, islandPreloads: { drop: new Set(['/_kay/a.js']), wait: [] } })).not.toBe(respond)
+    expect(withSavedData(respond, { client: { prefetch: false } })).toBe(respond)
+    expect(withSavedData(respond, { client: { saveData: false } })).toBe(respond)
+    expect(withSavedData(respond, { client: { prefetch: false }, fontCss: '@font-face{}' })).not.toBe(respond)
+    expect(withSavedData(respond, { client: { prefetch: false }, islandPreloads: { drop: new Set(), wait: [] } })).toBe(respond)
+    expect(withSavedData(respond, { client: { prefetch: false }, islandPreloads: { drop: new Set(['/_kay/a.js']), wait: [] } })).not.toBe(respond)
   })
 })
 

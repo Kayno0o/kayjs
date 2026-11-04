@@ -188,7 +188,7 @@ describe('lateStyles', () => {
       await Bun.write(join(dir, 'src/components/runtime.kay'), '---\nfunction paint(event: MouseEvent) {\n  (event.currentTarget as HTMLElement).classList.add(String(Date.now()))\n}\n---\nbutton.runtime(onClick={paint}) paint\n')
       await Bun.write(join(dir, 'src/routes/runtime.kay'), '---\nimport Runtime from \'../components/runtime.kay\'\n---\nh1 Runtime\nRuntime\n')
 
-      const built = await buildClient(dir, { plugins: [tailwind], lateStyles: true })
+      const built = await buildClient(dir, { plugins: [tailwind], client: { lateStyles: true } })
 
       expect(warned).toEqual([])
       expect(built.unresolved).toEqual([])

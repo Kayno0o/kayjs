@@ -162,7 +162,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   if (!prerendering) {
     setupStampSecret(config.secret)
     setupPreview(config.preview, base)
-    setTracer(config.tracer)
+    setTracer(config.observe?.tracer)
     setupStorage(configuredFiles(config), join(imageCache, 'stored'), imageCache)
     setAppRoot(root)
     // An export serves nobody, so it keeps only the database url libraries read and none of the stores: a pgData store would otherwise poll, open its connection and create its tables while the build runs, and a build with no database reachable still ends.
@@ -210,7 +210,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   const client = await loadingClient
 
   if (!mode.dev)
-    await chooseInlineStyles(client, base, config.inlineStyles, [...styleChains(routes), ...cardPage === undefined ? [] : [[cardPage.file]]], config.offline === undefined || config.offline === false, config.lateStyles === true)
+    await chooseInlineStyles(client, base, config.client?.inlineStyles, [...styleChains(routes), ...cardPage === undefined ? [] : [[cardPage.file]]], config.offline === undefined || config.offline === false, config.client?.lateStyles === true)
 
   // Cards are drawn in the fonts the head just wrote, rather than those a `fonts.json` held before.
   const headAndCards = async () => {

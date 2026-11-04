@@ -46,7 +46,7 @@ function openApiServed(openapi: CheckOptions['openapi'], apiPath: string | undef
 }
 
 export function kayPaths(options: CheckOptions): string[] {
-  return [...KAY_PATHS, ...openApiServed(options.openapi, options.apiPath)]
+  return [...KAY_PATHS, ...openApiServed(options.openapi, options.serve?.apiPath)]
 }
 const UNWRITABLE = /[%?#]/
 // What a browser percent-encodes in a path it is given: spaces, controls and anything outside ASCII.

@@ -205,7 +205,7 @@ function kayRoutes(root: string, config: LoadedConfig): Listed[] {
   const enabled = config.openapi === false ? undefined : config.openapi
   const openapi = enabled === true ? {} : enabled
   const mcpAt = mcpPath(config.mcp)
-  const documented = openApiPaths(openapi, apiPathOf(config.apiPath))
+  const documented = openApiPaths(openapi, apiPathOf(config.serve?.apiPath))
 
   return [
     ...config.health === false ? [] : [kay(config.health?.path ?? HEALTH_PATH, 'health check')],

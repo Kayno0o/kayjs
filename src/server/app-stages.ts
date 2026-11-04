@@ -165,7 +165,7 @@ interface BootInput {
 export function bootOf(input: BootInput) {
   const { env, project: { config: options }, setup: { client, scripts, styles, locales } } = input
   // Hashed as they go out, under the mount point.
-  const compressing = options.compress ?? env.production
+  const compressing = options.serve?.compress ?? env.production
   // The browser fetches the dictionary under `connect-src`, so it joins the policy as what an island needs does: the app's own sources, unless it removed the directive or set it to 'none'.
   const dictionaryUsed = compressing && !env.dev && client.dictionary !== undefined
   const directives = dictionaryUsed ? { ...client.directives, 'connect-src': [...new Set([...client.directives?.['connect-src'] ?? [], '\'self\''])] } : client.directives
@@ -175,7 +175,7 @@ export function bootOf(input: BootInput) {
   const metrics: Claim | undefined = metricsConfig && { path: metricsConfig.path ?? METRICS_PATH, owner: 'the metrics route', kind: 'kay' }
   // Offered, so an app file at the path keeps it; the check is served once every claim is in, and only where it still holds the path.
   const health: Claim | undefined = options.health === false ? undefined : { path: options.health?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
-  const log: Logger = options.log ?? env.production
+  const log: Logger = options.observe?.log ?? env.production
   // The routes later stages register, which the dev tool's Routes tab reads when it answers, as it registers before them.
   const registered: { extensions: OwnRoutes['extensions'], actions: boolean, api: MountedApi[] } = { extensions: [], actions: false, api: [] }
 
@@ -264,7 +264,7 @@ export function inlinePageStyles(client: ClientBuild): string[] {
 
 // Who the request is from and whether it may come: the proxy it came through, the server's own mark, the proxy key, the hosts, then the security headers on every answer.
 export function trustRequests({ app, env, options, served, security, filePaths, setup, mcpAt, mcpKey, metrics, log }: Boot): void {
-  setRequestIdHeader(options.requestIdHeader)
+  setRequestIdHeader(options.observe?.requestIdHeader)
   trustProxy(app, options.proxy)
   // Before the key check reads the mark, and dropped from the request there, so no handler reads it.
   app.onRequest(({ request }) => {
@@ -305,7 +305,7 @@ export function compressAnswers({ app, env, options, setup: { client }, compress
 
   // Development builds none, so its pages are served as they are.
   const dictionary = env.dev ? undefined : servedDictionary(client, env.base)
-  const onError = options.onError
+  const onError = options.observe?.onError
 
   // eslint-disable-next-line ts/promise-function-async -- Elysia sends an empty body when a mapResponse promise resolves to undefined
   app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue, fixed, error => reportServerError(error, request, onError), dictionary) : undefined)
@@ -324,7 +324,7 @@ export function logAnswers({ app, options, log }: Boot): void {
 // The app's rewrite, with the API paths a library moved; returns the mounts it reads, which the API modules fill once they are served.
 export function rewriteAnswers({ app, env, options }: Boot): string[] {
   const apiMountsServed: string[] = []
-  const rewrite = withMovedApi(options.rewrite, movedApiPrefixes(options.extensions), apiPathOf(options.apiPath), env.base, apiMountsServed)
+  const rewrite = withMovedApi(options.rewrite, movedApiPrefixes(options.extensions), apiPathOf(options.serve?.apiPath), env.base, apiMountsServed)
 
   if (rewrite)
     rewriteRequests(app, rewrite, app)
@@ -378,7 +378,7 @@ export function kayEndpoints({ app, env, options, served, lifecycle, health, met
 // `kay dev` restarts the process on every change, so it has nothing to wait for.
 export function stopOnSignals({ app, options, lifecycle }: Boot): void {
   app.onStart(refuseProcessKey)
-  stopOnSignal(app, lifecycle, options.shutdownTimeout)
+  stopOnSignal(app, lifecycle, options.serve?.shutdownTimeout)
 }
 
 // Every route of the dev tool, before the extensions, so none runs their hooks; the Routes tab reads what later stages registered when it answers.
@@ -488,7 +488,7 @@ export async function buildFiles({ app, env, setup: { client }, security, filePa
 
 // The options actions, API modules, endpoints and kay's guarded routes share.
 export function actionOptionsOf({ env, options, setup, late }: Boot, skipBroken: boolean): ActionOptions {
-  return { skipBroken, dev: env.dev, onError: options.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.requireGuards, cors: options.cors }
+  return { skipBroken, dev: env.dev, onError: options.observe?.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.requireGuards, cors: options.cors }
 }
 
 // The actions, the API modules and the endpoints, then the jobs page, after the extensions whose derived values the guards read through `ctx.locals`.
@@ -517,7 +517,7 @@ export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api }: Served
   const { app, env, options, served, setup: { client }, table, hasPreview, mcpAt } = boot
   // Claimed before kay's own files, which give way to them.
   const openapi = openApiSettings(options.openapi)
-  const apiAt = apiPathOf(options.apiPath)
+  const apiAt = apiPathOf(options.serve?.apiPath)
   const servesOpenApi = openapi !== undefined && (openapi.dev !== true || env.devRoutes)
 
   knowRedirects(Object.keys(options.redirects ?? {}))
@@ -541,7 +541,7 @@ export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api }: Served
     }
   }
 
-  limitBodies(app, options.maxSize ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), mountLimits(api.limits, options.extensions, options.maxSizeByPath, servers), api.routeLimits)
+  limitBodies(app, options.limits?.body ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), mountLimits(api.limits, options.extensions, options.limits?.byPath, servers), api.routeLimits)
 
   return { openapi, apiAt, servesOpenApi, metadataPaths }
 }
@@ -568,13 +568,13 @@ export async function apiDocuments(boot: Boot, { toolActions, apiModules, api }:
 
 // The routes the browser reports to: errors, with their stack mapped back to the source, then live values, policy violations and previews.
 export function reports({ app, options, setup: { i18n, site, collections }, hasPreview, mapStack }: Boot) {
-  useAppOnError(options.onError)
-  serveErrorReports(app, options.onError, mapStack)
+  useAppOnError(options.observe?.onError)
+  serveErrorReports(app, options.observe?.onError, mapStack)
 
   serveLive(app, options.live)
 
   if (options.security !== undefined && options.security !== false && options.security.reports === true)
-    serveViolationReports(app, options.onError, i18n?.settings.hosts === undefined ? site : undefined)
+    serveViolationReports(app, options.observe?.onError, i18n?.settings.hosts === undefined ? site : undefined)
 
   if (hasPreview) {
     servePreview(app)
@@ -595,7 +595,7 @@ async function imageRouteOf({ project: { root }, options, env, setup: { source, 
     avif: env.dev ? undefined : avifQuality(options.images),
     aspects: options.images?.aspects,
     ttl: options.images?.ttl,
-    saveData: options.saveData,
+    saveData: options.client?.saveData,
     remote: remoteImages(join(imageCache, 'remote'), await remotePatterns(options.images?.remote), imageCache, undefined, remoteLimits(options.images)),
     security,
     resolve: lookup && { find: async (src: string, ctx: GuardContext) => {
@@ -684,7 +684,7 @@ export async function siteFiles(boot: Boot) {
   const { app, env, options, served, routes, log, dictionaryUsed, project: { root, paths, mode }, setup: { source, client, site, i18n, locales, collections, appManifest } } = boot
 
   if (site !== undefined)
-    serveSitemap(app, served, routes, site, { dev: env.dev, onError: options.onError, trailingSlash: env.trailingSlash, locales: i18n?.settings, robots: options.robots, base: env.base, ttl: options.sitemap?.ttl })
+    serveSitemap(app, served, routes, site, { dev: env.dev, onError: options.observe?.onError, trailingSlash: env.trailingSlash, locales: i18n?.settings, robots: options.robots, base: env.base, ttl: options.sitemap?.ttl })
 
   const favicon = faviconSource(root, options.favicon, options.manifest)
 
@@ -694,7 +694,7 @@ export async function siteFiles(boot: Boot) {
   const prerendered = await loadPrerendered(client, dictionaryUsed)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
-  await serveServiceWorker(app, served, { client, offline: offlineOf(options, env) && options.offline !== false ? options.offline : undefined, base: env.base, apiPath: options.apiPath, trailingSlash: env.trailingSlash, lang: options.lang, typography: options.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path), push: pushListed(options) })
+  await serveServiceWorker(app, served, { client, offline: offlineOf(options, env) && options.offline !== false ? options.offline : undefined, base: env.base, apiPath: options.serve?.apiPath, trailingSlash: env.trailingSlash, lang: options.lang, typography: options.client?.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path), push: pushListed(options) })
   // A server answering from a build does it in its own process; a static export is written once and `kay dev` shows every entry.
   const publishing = env.serving ? await watchPublishing(collections) : NOT_PUBLISHING
 
@@ -742,6 +742,6 @@ export async function pageRoutes(boot: Boot, { redirects, publicServed, redirect
 
   pageFor.unmatched = unmatched
 
-  answerUncaught(app, { dev: env.dev, onError: options.onError, page: uncaught })
+  answerUncaught(app, { dev: env.dev, onError: options.observe?.onError, page: uncaught })
   agreeOnWildcards(app)
 }

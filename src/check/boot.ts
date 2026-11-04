@@ -47,7 +47,8 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
     }
   }
 
-  const { base, site, shutdownTimeout, budget } = options
+  const { base, site, budget } = options
+  const shutdownTimeout = options.serve?.shutdownTimeout
 
   refused(config, () => basePath(base))
 
@@ -64,7 +65,7 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
 
   refused(config, () => liveLimits(options.live))
   refused(config, () => remoteLimits(options.images))
-  refused(config, () => checkRequestIdHeader(options.requestIdHeader))
+  refused(config, () => checkRequestIdHeader(options.observe?.requestIdHeader))
   refused(config, () => checkTimeZone(options.timeZone))
 
   refused(config, () => checkBudget(budget))

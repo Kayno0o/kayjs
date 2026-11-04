@@ -15,7 +15,7 @@ export default defineConfig({
     headers: { 'strict-transport-security': 'max-age=63072000; includeSubDomains' },
   },
   proxy: true,
-  maxSize: '4mb',
+  limits: { body: '4mb' },
 })
 ```
 
@@ -272,15 +272,15 @@ Any route that takes a body accepts 1 MB at most, an action, an API route, a lib
 
 ```ts
 export default defineConfig({
-  maxSize: '4mb',
+  limits: { body: '4mb' },
 })
 ```
 
 Raise it for one action in its third argument, `{ maxSize: '20mb' }`, for an API module with `api({ maxSize })`, or for one route with `detail: { maxSize }`. A form that takes files usually needs this.
 
-A form post goes back to its page with a message, an island's call throws an `ActionError` with status 413, and an API route answers 413. A route you add yourself with `new Elysia().post()` takes the same limit. `maxSizeByPath: { '/upload': '50mb' }` in the config sets one for a path, the route and what is under it, without raising the rest. A library that needs more for one route declares it itself. Bun's own cap of 128 MB still holds over any `maxSize`.
+A form post goes back to its page with a message, an island's call throws an `ActionError` with status 413, and an API route answers 413. A route you add yourself with `new Elysia().post()` takes the same limit. `limits: { byPath: { '/upload': '50mb' } }` in the config sets one for a path, the route and what is under it, without raising the rest. A library that needs more for one route declares it itself. Bun's own cap of 128 MB still holds over any `maxSize`.
 
-A `maxSizeByPath` entry at the path of an API module wins over the module's own `maxSize`, and the module's CORS grant stays on the 413. A route's `detail: { maxSize }` still wins over both.
+A `limits.byPath` entry at the path of an API module wins over the module's own `maxSize`, and the module's CORS grant stays on the 413. A route's `detail: { maxSize }` still wins over both.
 
 <ReadMore href="/llms/action-protection#body-limit">The refusal message in your own words, and the cap on routes that are not actions or API routes.</ReadMore>
 

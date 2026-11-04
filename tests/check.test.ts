@@ -3127,7 +3127,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n' })
 
     try {
-      expect(await refusals(root, { base: 'docs', site: 'example.com', shutdownTimeout: '0s', redirects: { '/old/:slug': '/:id' } })).toEqual([
+      expect(await refusals(root, { base: 'docs', site: 'example.com', serve: { shutdownTimeout: '0s' }, redirects: { '/old/:slug': '/:id' } })).toEqual([
         ['kay.config.ts', 'kay: base is docs, which is no path such as /docs'],
         ['kay.config.ts', 'kay: shutdownTimeout is \'0s\'; it takes a positive duration such as \'250ms\', \'5m\' or \'30d\''],
         ['kay.config.ts', 'kay: site is the origin the site is public at, such as https://example.com, not "example.com"'],
@@ -3135,7 +3135,7 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
       ])
       expect(await refusals(root, { redirects: { old: '/' } })).toEqual([['kay.config.ts', 'kay: the redirect from old needs a path starting with /']])
       expect(await refusals(root, { redirects: { '/a*b': '/' } })).toEqual([['kay.config.ts', 'kay: the redirect from /a*b has a*b, neither a :param nor a final *']])
-      expect(await refusals(root, { base: '/docs/', site: 'https://example.com', shutdownTimeout: '30s', redirects: { '/old/*': '/*' } })).toEqual([])
+      expect(await refusals(root, { base: '/docs/', site: 'https://example.com', serve: { shutdownTimeout: '30s' }, redirects: { '/old/*': '/*' } })).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })

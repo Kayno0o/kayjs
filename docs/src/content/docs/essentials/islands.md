@@ -121,7 +121,7 @@ Comments(postId={post.id} hydrate="visible")
 
 `hydrate="load"`, the default, hydrates the island as soon as the page loads. `hydrate="visible"` waits until the island scrolls near the viewport. `hydrate="idle"` waits until the browser is idle. A page with such an island, or with a deferred server island, loads the code that does the waiting along with the page, so it is ready sooner.
 
-`hydration: { visible: '640px' }` in `kay.config.ts` changes how early that is, `200px` before the viewport by default, and `hydration.serverIslands` does the same for a deferred server island, a screen ahead by default. Both are CSS root margins.
+`client: { hydration: { visible: '640px' } }` in `kay.config.ts` changes how early that is, `200px` before the viewport by default, and `client.hydration.serverIslands` does the same for a deferred server island, a screen ahead by default. Both are CSS root margins.
 
 A click on an island that is still loading is replayed once it hydrates, so the visitor loses nothing.
 
@@ -347,7 +347,7 @@ a(href="/logout" data-no-prefetch) Sign out
 
 A form posting to an action posts without a reload and shows the page the post leads to. A refused post keeps the scroll and the typed values.
 
-With `navigation: false` in `kay.config.ts`, every page loads fully and only pages with islands ship a script. A form then posts as the browser would, and names its page in a `kay_back` query parameter. A refused post renders that page again with the message, and one that goes through goes back to it.
+With `client: { navigation: false }` in `kay.config.ts`, every page loads fully and only pages with islands ship a script. A form then posts as the browser would, and names its page in a `kay_back` query parameter. A refused post renders that page again with the message, and one that goes through goes back to it.
 
 <ReadMore href="/llms/navigation#navigation">How focus moves on back and forward, the other cases that load a page fully, and how a refused post focuses its field.</ReadMore>
 

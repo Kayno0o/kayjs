@@ -166,8 +166,8 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
 
   const run = async (changed: string[] | null): Promise<SessionBuild> => {
     await stamps?.begin(changed)
-    rootMargin(options.hydration?.visible, '200px', 'visible')
-    rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')
+    rootMargin(options.client?.hydration?.visible, '200px', 'visible')
+    rootMargin(options.client?.hydration?.serverIslands, '100% 0px', 'serverIslands')
 
     const references = referencesOf(options.extensions)
 
@@ -498,7 +498,7 @@ export async function islandClassTableOf(root: string, sources: Pick<ClientSourc
 
 // `inputs` holds the modules of each chunk, `maps` the source maps written.
 async function bundleIslands(root: string, islands: Map<string, string>, actionForms: boolean, actionProps: boolean, options: ClientOptions, classTable?: ClassTable, islandTable?: ClassTable): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }> {
-  const navigation = options.navigation ?? true
+  const navigation = options.client?.navigation ?? true
 
   if (islands.size === 0 && !navigation)
     return { manifest: { entryImports: [], islands: {} }, inputs: {}, maps: [] }
@@ -547,7 +547,7 @@ async function bundleIslands(root: string, islands: Map<string, string>, actionF
   ].join('\n'))
 
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build; a build for development, not NODE_ENV, asks for theirs.
-  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), 'KAY_STATIC_EXPORT': options.exported === true ? 'true' : 'undefined', 'KAY_NAV_ENTRY': 'undefined', 'KAY_FRENCH': options.french === true ? 'true' : 'undefined', 'KAY_I18N': options.i18n === true ? 'true' : 'undefined', 'KAY_NO_ACTION_PROPS': options.hot !== true && !actionProps ? 'true' : 'undefined', 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
+  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), 'KAY_STATIC_EXPORT': options.exported === true ? 'true' : 'undefined', 'KAY_NAV_ENTRY': 'undefined', 'KAY_FRENCH': options.french === true ? 'true' : 'undefined', 'KAY_I18N': options.i18n === true ? 'true' : 'undefined', 'KAY_NO_ACTION_PROPS': options.hot !== true && !actionProps ? 'true' : 'undefined', 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.client?.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.client?.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
   const external = publicEnv !== undefined ? [publicEnv] : []
   const plugins = (anchor?: string, anchored?: ReadonlySet<string>, direct?: boolean) => [withoutStyles(), api, kay({ target: 'dom', root, localeLinks: options.i18n === true, cacheDir: projectPaths(root).cache, settings: options.librarySettings, anchor, anchored, direct, inspect: options.inspect, api: trees, external, classTable }), ...options.plugins ?? []]
 
@@ -555,7 +555,7 @@ async function bundleIslands(root: string, islands: Map<string, string>, actionF
 
   // Without the registry in the boot, each island is an entry point of its own.
   const islandFiles = options.hot ? [] : [...islands.values()]
-  const chunk = await runtimeChunk(entryFile, { plugins: plugins(), define, external, islands: islandFiles, cache: { file: join(projectPaths(root).cache, `runtime-search-${options.hot ? 'dev' : 'build'}.json`), key: `${JSON.stringify([options.librarySettings, options.inspect, options.navigation, trees, islandFiles])}\0${await Bun.file(bootFile).text()}` } })
+  const chunk = await runtimeChunk(entryFile, { plugins: plugins(), define, external, islands: islandFiles, cache: { file: join(projectPaths(root).cache, `runtime-search-${options.hot ? 'dev' : 'build'}.json`), key: `${JSON.stringify([options.librarySettings, options.inspect, options.client?.navigation, trees, islandFiles])}\0${await Bun.file(bootFile).text()}` } })
 
   // In development the entry keeps its own code, the islands it imports by their hashed names included: the runtime's chunk then stays as it was through an edit of an island, which swaps in alone.
   // A second entry point importing the runtime alone has Bun give it that chunk of its own, which it would otherwise merge into the entry's.
@@ -720,7 +720,7 @@ async function bundleStyles(root: string, { pages, libraries, classes, shorthand
     own: file => !file.startsWith(KAY_SOURCE) && !file.includes(`${sep}node_modules${sep}`) && !libraries.some(library => file.startsWith(`${library.dir}${sep}`) || file.startsWith(`${library.realDir}${sep}`)),
     islands: islands.values(),
     // A development build links the whole stylesheet and warns in the browser instead. What runs on the server is the prerendered pages' to vouch for, which `kay build` weighs once they are rendered.
-    unresolved: options.hot === true || options.lateStyles === true
+    unresolved: options.hot === true || options.client?.lateStyles === true
       ? undefined
       : (found) => {
         warnUnresolved(root, found.filter(unresolved => unresolved.client), new Set(islands.values()))

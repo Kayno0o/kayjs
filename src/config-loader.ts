@@ -6,7 +6,7 @@ import process from 'node:process'
 import { APP_DEPENDENCIES, dependencyNames, libraryMessageExtensions, readManifest } from './build/manifests'
 import { KayError } from './compiler/errors'
 import { CONFIG_FILE } from './config'
-import { renamedKeys, unknownConfigKeys } from './config-shape'
+import { currentKeys, mergeBags, unknownConfigKeys } from './config-shape'
 import { NATIVE_PLUGINS } from './native-plugins'
 import { publicEnvFiles } from './server/env-state'
 
@@ -96,7 +96,7 @@ async function importConfig(root: string, fresh = false): Promise<KayConfig> {
 
   checkedConfig(config)
 
-  return renamedKeys(config)
+  return currentKeys(config)
 }
 
 const MODULE_DIRECTORY = /^.*\/node_modules\//
@@ -173,7 +173,7 @@ function withExtensions<Config extends KayConfig>(config: Config): Config {
 
     checkedConfig(extension.config, `the config of the extension ${extension.name}`)
 
-    return [renamedKeys(extension.config)]
+    return [currentKeys(extension.config)]
   })
 
   const merged = layers.length === 0 ? config : underlay(layers.reduce<KayConfig>((under, layer) => underlay(under, layer) as KayConfig, {}), config) as Config
@@ -280,5 +280,5 @@ export async function withConfig<Options extends KayConfig>(root: string, option
 
 // `config` is as `kay.config.ts` writes it, so the extensions the options name lie under it rather than the file's.
 export function mergeConfig<Options extends KayConfig>(config: KayConfig, options: Options): KayConfig & Options {
-  return withSiteUrl(withExtensions({ ...renamedKeys(config), ...Object.fromEntries(Object.entries(renamedKeys(options)).filter(([, value]) => value !== undefined)) } as KayConfig & Options))
+  return withSiteUrl(withExtensions(mergeBags(currentKeys(config), currentKeys(options)) as KayConfig & Options))
 }

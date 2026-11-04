@@ -46,7 +46,7 @@ export async function configHead(root: string, config: KayConfig, clientDir: str
     styles.push(fonts.css)
 
     // The copy a visitor saving data gets, which the policy lets through by its hash too.
-    if (config.saveData !== false)
+    if (config.client?.saveData !== false)
       styles.push(lightFontCss(fonts.css))
   }
 

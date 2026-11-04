@@ -1,5 +1,5 @@
 import type { Elysia } from 'elysia'
-import type { KayConfig, RobotsConfig, TrailingSlash } from '../config'
+import type { ObserveConfig, RobotsConfig, TrailingSlash } from '../config'
 import type { Collection } from '../content'
 import type { Duration } from '../runtime/duration'
 import type { LocaleSettings } from '../runtime/i18n'
@@ -53,7 +53,7 @@ const DEGRADED_MS = 60 * 1000
 
 export interface SitemapOptions {
   dev?: boolean | undefined
-  onError?: KayConfig['onError'] | undefined
+  onError?: ObserveConfig['onError'] | undefined
   trailingSlash?: TrailingSlash | undefined
   locales?: LocaleSettings | undefined
   robots?: RobotsConfig | false | undefined

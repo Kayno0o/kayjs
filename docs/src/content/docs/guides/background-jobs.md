@@ -49,7 +49,7 @@ In a rolling deploy, old and new builds with a changed job both run, as their lo
 
 An app running one process sets `KAY_LOCK_SCHEDULES=false` once, and no schedule locks unless it names a `lock`. `{ enabled: false }` on a schedule or on `background(work, { enabled })` adds nothing, so a job that needs an optional service is switched by its setting, `{ enabled: ZIGBEE_URL !== undefined }`, with no conditional plugin around it.
 
-A run that takes longer than `timeout`, 10 minutes by default, is logged as failed and left behind, so a job that never settles does not block the next run. A shutdown aborts the signal and waits at most 3 seconds, less with a short `shutdownTimeout`, for a run that ignores it.
+A run that takes longer than `timeout`, 10 minutes by default, is logged as failed and left behind, so a job that never settles does not block the next run. A shutdown aborts the signal and waits at most 3 seconds, less with a short `serve.shutdownTimeout`, for a run that ignores it.
 
 The job is called with the signal, so a job with an optional first parameter gets it. The job gets an `AbortSignal` as its argument, aborted at the timeout and when the server stops; `timeout: false` sets no limit.
 

@@ -248,7 +248,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
       // onError is the app's for requests it answers; the build logs what a prerendered page throws, and takes a read of the request for its own to judge.
       const refusal: { read?: RequestReadError } = {}
       // Guards run when the page is served, for whoever asks; the build renders what they let through.
-      const render = async (awaits?: AwaitNote[]) => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, onError: judged(refusal), prerendering: true, awaits, guarded: guardedPage(route, config.requireGuards) })
+      const render = async (awaits?: AwaitNote[]) => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, observe: { ...renderOptions.observe, onError: judged(refusal) }, prerendering: true, awaits, guarded: guardedPage(route, config.requireGuards) })
       const inLocale = async (awaits?: AwaitNote[]) => runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), async () => render(awaits))
       // The ids a page draws keep apart from those of the page it is swapped for, so each page has a token of its own, the same on every render and build; the body is read within it, as a stream draws its ids as it is read.
       // Taken in the order the pages are judged in, as rendering one at a time took them.
@@ -459,7 +459,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     const request = new Request('http://localhost/_kay-dictionary')
     const token = pageToken('/_kay-dictionary', tokens)
     const render = async () => withPageToken(token, async () => {
-      const response = await renderUnmatched(await source.fallback(project, mounts), { request }, client, { ...renderOptions, onError: judged({}), prerendering: true })
+      const response = await renderUnmatched(await source.fallback(project, mounts), { request }, client, { ...renderOptions, observe: { ...renderOptions.observe, onError: judged({}) }, prerendering: true })
 
       return response.status === 404 && response.headers.get('content-type')?.startsWith('text/html') === true ? response.text() : ''
     })
@@ -545,7 +545,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     await dropOrphanCopies(client, dir, pages)
 
   // A static host cannot answer by what the browser holds, so only a server build has a dictionary, and one with a prerendered page, whose layouts the build renders already.
-  const dictionary = options.exportAll || config.compressionDictionary === false || Object.keys(pages).length === 0 ? undefined : await writeDictionary(client.dir, await renderedMissing())
+  const dictionary = options.exportAll || config.serve?.compressionDictionary === false || Object.keys(pages).length === 0 ? undefined : await writeDictionary(client.dir, await renderedMissing())
 
   await writeManifest(root, { ...manifest, pages, site, ...dictionary ? { dictionary } : {}, ...restyles > 0 && client.styleUses ? { styleUses: styleUsesOf(root, client.styleUses) } : {} }, output)
   client.pages = new Map(Object.entries(pages))

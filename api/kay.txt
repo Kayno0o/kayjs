@@ -2422,6 +2422,11 @@ const dataTables: readonly string[]
 
 [./server] defineConfig
 function defineConfig<Config extends KayConfig>(config: Config & UnknownKeys<Config, KayConfig> & {
+  dirs?: UnknownKeys<"dirs" extends keyof Config ? Config[keyof Config & "dirs"] : unknown, DirsConfig>;
+  limits?: UnknownKeys<"limits" extends keyof Config ? Config[keyof Config & "limits"] : unknown, LimitsConfig>;
+  serve?: UnknownKeys<"serve" extends keyof Config ? Config[keyof Config & "serve"] : unknown, ServeConfig>;
+  observe?: UnknownKeys<"observe" extends keyof Config ? Config[keyof Config & "observe"] : unknown, ObserveConfig>;
+  client?: UnknownKeys<"client" extends keyof Config ? Config[keyof Config & "client"] : unknown, ClientConfig>;
   security?: UnknownKeys<"security" extends keyof Config ? Config[keyof Config & "security"] : unknown, SecurityConfig>;
   i18n?: UnknownKeys<"i18n" extends keyof Config ? Config[keyof Config & "i18n"] : unknown, I18nConfig>;
   seo?: UnknownKeys<"seo" extends keyof Config ? Config[keyof Config & "seo"] : unknown, SeoConfig>;
@@ -2605,11 +2610,13 @@ interface KayConfig
   base?: string | undefined
   budget?: BudgetConfig | undefined
   checks?: ProjectCheck[] | undefined
+  client?: ClientConfig | undefined
   compress?: boolean | undefined
   compressionDictionary?: boolean | undefined
   content?: string | undefined
   contentConfig?: string | undefined
   cors?: CorsOptions | undefined
+  dirs?: DirsConfig | undefined
   entry?: string | undefined
   env?: false | { compose?: string | string[] | undefined; example?: string | undefined; } | undefined
   extensions?: KayExtension<AnyElysia>[] | undefined
@@ -2626,6 +2633,7 @@ interface KayConfig
   lang?: string | undefined
   lateStyles?: boolean | undefined
   librarySettings?: Record<string, string> | undefined
+  limits?: LimitsConfig | undefined
   links?: { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; } | undefined
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
@@ -2639,6 +2647,7 @@ interface KayConfig
   metrics?: boolean | MetricsConfig | undefined
   minify?: boolean | undefined
   navigation?: boolean | undefined
+  observe?: ObserveConfig | undefined
   offline?: boolean | OfflineConfig | undefined
   onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => void | Promise<void>) | undefined
   openapi?: boolean | OpenApiConfig | undefined
@@ -2661,6 +2670,7 @@ interface KayConfig
   secret?: string | string[] | undefined
   security?: false | SecurityConfig | undefined
   seo?: SeoConfig | undefined
+  serve?: ServeConfig | undefined
   serverTiming?: boolean | undefined
   settings?: Record<string, string> | undefined
   shutdownTimeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
@@ -2841,12 +2851,14 @@ interface PagesOptions extends KayConfig
   base?: string | undefined
   budget?: BudgetConfig | undefined
   checks?: ProjectCheck[] | undefined
+  client?: ClientConfig | undefined
   compress?: boolean | undefined
   compressionDictionary?: boolean | undefined
   content?: string | undefined
   contentConfig?: string | undefined
   cors?: CorsOptions | undefined
   dev?: boolean | undefined
+  dirs?: DirsConfig | undefined
   entry?: string | undefined
   env?: false | { compose?: string | string[] | undefined; example?: string | undefined; } | undefined
   extensions?: KayExtension<AnyElysia>[] | undefined
@@ -2863,6 +2875,7 @@ interface PagesOptions extends KayConfig
   lang?: string | undefined
   lateStyles?: boolean | undefined
   librarySettings?: Record<string, string> | undefined
+  limits?: LimitsConfig | undefined
   links?: { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; } | undefined
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
@@ -2876,6 +2889,7 @@ interface PagesOptions extends KayConfig
   metrics?: boolean | MetricsConfig | undefined
   minify?: boolean | undefined
   navigation?: boolean | undefined
+  observe?: ObserveConfig | undefined
   offline?: boolean | OfflineConfig | undefined
   onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => void | Promise<void>) | undefined
   openapi?: boolean | OpenApiConfig | undefined
@@ -2900,6 +2914,7 @@ interface PagesOptions extends KayConfig
   secret?: string | string[] | undefined
   security?: false | SecurityConfig | undefined
   seo?: SeoConfig | undefined
+  serve?: ServeConfig | undefined
   serverTiming?: boolean | undefined
   settings?: Record<string, string> | undefined
   shutdownTimeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
@@ -3844,12 +3859,14 @@ interface TestOptions extends PagesOptions
   browser?: boolean | BrowserOptions | undefined
   budget?: BudgetConfig | undefined
   checks?: ProjectCheck[] | undefined
+  client?: ClientConfig | undefined
   compress?: boolean | undefined
   compressionDictionary?: boolean | undefined
   content?: string | undefined
   contentConfig?: string | undefined
   cors?: CorsOptions | undefined
   dev?: boolean | undefined
+  dirs?: DirsConfig | undefined
   entry?: string | undefined
   env?: false | { compose?: string | string[] | undefined; example?: string | undefined; } | undefined
   extensions?: KayExtension<AnyElysia>[] | undefined
@@ -3868,6 +3885,7 @@ interface TestOptions extends PagesOptions
   lang?: string | undefined
   lateStyles?: boolean | undefined
   librarySettings?: Record<string, string> | undefined
+  limits?: LimitsConfig | undefined
   links?: { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; } | undefined
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
@@ -3883,6 +3901,7 @@ interface TestOptions extends PagesOptions
   metrics?: boolean | MetricsConfig | undefined
   minify?: boolean | undefined
   navigation?: boolean | undefined
+  observe?: ObserveConfig | undefined
   offline?: boolean | OfflineConfig | undefined
   onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => void | Promise<void>) | undefined
   openapi?: boolean | OpenApiConfig | undefined
@@ -3908,6 +3927,7 @@ interface TestOptions extends PagesOptions
   secret?: string | string[] | undefined
   security?: false | SecurityConfig | undefined
   seo?: SeoConfig | undefined
+  serve?: ServeConfig | undefined
   serverTiming?: boolean | undefined
   settings?: Record<string, string> | undefined
   shutdownTimeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined

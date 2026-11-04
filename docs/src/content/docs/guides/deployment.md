@@ -168,7 +168,7 @@ The check runs at most once every three seconds, however often the route is poll
 
 On SIGTERM, SIGINT or SIGHUP the server stops taking connections, lets open requests finish and ends the event streams and websockets that never would, such as live values and presence, so browsers reconnect to the next instance. It then calls the `close` of each store, so a replica leaves no presence member and no connection behind.
 
-A queue job whose handler ignores its signal is handed back after 3 seconds, or less with a short `shutdownTimeout`, and the rooms store lets go of this replica's members. The server then runs the `onStop` hooks and exits. Requests still open after `shutdownTimeout`, 10 seconds by default, are closed.
+A queue job whose handler ignores its signal is handed back after 3 seconds, or less with a short `serve.shutdownTimeout`, and the rooms store lets go of this replica's members. The server then runs the `onStop` hooks and exits. Requests still open after `serve.shutdownTimeout`, 10 seconds by default, are closed.
 
 ## Several workers
 
@@ -188,7 +188,7 @@ With `NODE_ENV=production`, the server's first line says where it listens, the k
 GET /blog/hello 200 12ms AZnLe0vUe9qD0uXq9vLwZw
 ```
 
-An error logged while answering the request starts with the same id. `requestId(request)` from `kay/server` gives it to `onError`. Behind a proxy set in `proxy`, an `X-Request-Id` the proxy passed on is kept, and `requestIdHeader: 'x-correlation-id'` in kay.config.ts names another header for both.
+An error logged while answering the request starts with the same id. `requestId(request)` from `kay/server` gives it to `onError`. Behind a proxy set in `proxy`, an `X-Request-Id` the proxy passed on is kept, and `observe: { requestIdHeader: 'x-correlation-id' }` in kay.config.ts names another header for both.
 
 Set `log: 'json'` to write these lines, and kay's own errors and warnings, as one JSON object each. Use it for a log collector.
 
@@ -225,14 +225,13 @@ Set `tracer` to an OpenTelemetry tracer from the `@opentelemetry/api` and SDK th
 import { trace } from '@opentelemetry/api'
 
 export default defineConfig({
-  log: 'json',
-  tracer: trace.getTracer('my-site'),
+  observe: { log: 'json', tracer: trace.getTracer('my-site') },
 })
 ```
 
 Each page request becomes a span named after its route, with one span per load and one for the render inside it. Each action and API request becomes a span too.
 
-`serverTiming: true` sends a `Server-Timing` header with the time of the guards, the module imports, the loads and the render. Development always does. It covers every page rendered per request, and the server islands of a prerendered one.
+`observe: { serverTiming: true }` sends a `Server-Timing` header with the time of the guards, the module imports, the loads and the render. Development always does. It covers every page rendered per request, and the server islands of a prerendered one.
 
 <ReadMore href="/llms/production#request-logs">The log fields, span attributes and the sink for your own entries are in the full production reference.</ReadMore>
 
@@ -260,7 +259,7 @@ To go without it, set `compressionDictionary: false` in `kay.config.ts`. The bui
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  compressionDictionary: false,
+  serve: { compressionDictionary: false },
 })
 ```
 

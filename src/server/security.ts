@@ -1,7 +1,6 @@
 import type { Context } from 'elysia'
-import type { KayConfig, SecurityConfig } from '../config'
+import type { ClientConfig, KayConfig, SecurityConfig, ServeConfig } from '../config'
 import type { PageSecurity } from '../runtime'
-import type { Prefetch } from './speculation'
 import { pushListed, registersWorker } from '../project'
 import { BUILD_HEADER } from '../runtime/swap'
 import { basePath } from './base'
@@ -11,15 +10,15 @@ import { CSP_ENDPOINT, CSP_REPORTS } from './violations'
 
 export interface SecurityOptions {
   security?: SecurityConfig | false | undefined
-  prefetch?: Prefetch | undefined
-  apiPath?: string | undefined
+  client?: ClientConfig | undefined
+  serve?: ServeConfig | undefined
   dev?: boolean | undefined
   // The origin the site is public at: HSTS is sent when it is https.
   site?: string | undefined
   base?: string | undefined
   offline?: KayConfig['offline'] | undefined
   extensions?: KayConfig['extensions'] | undefined
-  lateStyles?: KayConfig['lateStyles'] | undefined
+
   // The sources the islands need, added to kay's directives and the app's own: see ClientManifest.
   islands?: Record<string, string[]> | undefined
   // The inline scripts and styles kay writes in every head, such as the fonts' rules.
@@ -103,7 +102,7 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
 
   const { csp, reports, reportOnly } = options.security ?? {}
   const base = basePath(options.base)
-  const hashes = [...inlineScriptHashes({ prefetch: options.prefetch, apiPath: options.apiPath, dev: options.dev, base, offline: registersWorker(options, { dev: options.dev === true }), installOffer: pushListed(options), lateStyles: options.lateStyles }), ...(options.scripts ?? []).map(sourceHash)]
+  const hashes = [...inlineScriptHashes({ prefetch: options.client?.prefetch, apiPath: options.serve?.apiPath, dev: options.dev, base, offline: registersWorker(options, { dev: options.dev === true }), installOffer: pushListed(options), lateStyles: options.client?.lateStyles }), ...(options.scripts ?? []).map(sourceHash)]
   const styles = [...new Set((options.styles ?? []).map(sourceHash))]
   const reportTo = reports === true ? `${base}${CSP_REPORTS}` : reports
 

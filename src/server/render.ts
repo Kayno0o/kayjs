@@ -646,7 +646,7 @@ export interface RenderedServerIslands {
 export async function renderServerIslands(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions, path: Set<unknown> | undefined, skip?: ServerIslandMode): Promise<RenderedServerIslands | Response> {
   const rendering = createRendering(context, params, options, route.contextKeys)
   const { request } = rendering.ctx
-  const report = (error: unknown) => reportServerError(error, request, options.onError)
+  const report = (error: unknown) => reportServerError(error, request, options.observe?.onError)
   const own = withEditor(route, options)
 
   return withOutcome(rendering.outcome, async () => {
@@ -682,7 +682,7 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
       const within = (view: () => unknown) => inScope(() => withServerIslands({ ...islands, inside: 1 }, () => renderBlock(view, undefined, chunks)))
       // The prerendered page holds the checks of the forms it rendered, not of those in a block that settles per request.
       const posts = client.entry !== undefined && client.navigation === true
-      const polish = typographyFor(localeState()?.locale ?? options.lang ?? DEFAULT_LANG, options.typography)
+      const polish = typographyFor(localeState()?.locale ?? options.lang ?? DEFAULT_LANG, options.client?.typography)
       const settled = await Promise.all(islands.html.map(async (html) => {
         const forms = new Set<Action<never, unknown>>()
         const markup = await settleBlocks(html, deferred, within, (rendered) => {
@@ -924,7 +924,7 @@ async function renderFailure(error: unknown, special: SpecialPages, rendering: R
   const denied = error instanceof Denied
 
   if (!notFound && !denied)
-    reportServerError(error, rendering.ctx.request, options.onError)
+    reportServerError(error, rendering.ctx.request, options.observe?.onError)
 
   // A page that found no entry because its end date passed answers that it is gone for good.
   const pageError: PageError = notFound && askedForEndedEntry() ? { status: 410, message: 'Gone' } : pageErrorOf(error, options.dev)
@@ -970,7 +970,7 @@ async function renderSpecialPage(page: SpecialPage, rendering: Rendering, loaded
       return renderDocument(files, modules, loading instanceof Promise ? await loading : loading, client, rendering, withEditor(page, options))
     }
     catch (error) {
-      reportServerError(error, rendering.ctx.request, options.onError)
+      reportServerError(error, rendering.ctx.request, options.observe?.onError)
     }
   }
 
@@ -1027,7 +1027,7 @@ function renderDocument(files: string[], modules: PageModule[], data: Record<str
   const rules = queryRules(chainQuery(files, modules))
 
   // A page a persisted signal's cookie shaped is told apart by it in any cache.
-  return inServerScope(rendering.ctx.request, error => reportServerError(error, rendering.ctx.request, options.onError), () => documentOf(files, modules, data, client, rendering, options, rules, entry), () => rendering.headers.append('vary', 'cookie'), rules)
+  return inServerScope(rendering.ctx.request, error => reportServerError(error, rendering.ctx.request, options.observe?.onError), () => documentOf(files, modules, data, client, rendering, options, rules, entry), () => rendering.headers.append('vary', 'cookie'), rules)
 }
 
 // The page inside its layouts, each through `component`, so what a layout provides reaches its page.
@@ -1146,7 +1146,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const state = localeState()
   // Without `i18n` the page may say its own language; with it, the locale decides.
   const lang = (state === undefined || state.implicit ? head.lang : undefined) ?? state?.locale ?? options.lang ?? DEFAULT_LANG
-  const polish = typographyFor(state?.locale ?? options.lang ?? DEFAULT_LANG, options.typography)
+  const polish = typographyFor(state?.locale ?? options.lang ?? DEFAULT_LANG, options.client?.typography)
   const body = polish ? polish(markup) : markup
   const headHtml = polish ? polish(head.html) : head.html
   // The browser's form check words a refusal as the server does, so a page with a checked form sends the `kay.invalid.*` messages too.
@@ -1156,7 +1156,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const keepsInstallOffer = client.installs?.some(id => streamed || defers || islands.used.has(id)) === true && !(options.offline && options.installOffer)
   const opening = `${htmlOpen(lang, head.root)}<head>${headStart(head)}`
   const sheets = stylesheets(client, styled)
-  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, hasIslands || streamed, options.sameTabLinks === true)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${shipsEntry && client.navigation === true ? prefetchMeta(options.prefetch) : speculationRules(options.prefetch, options.base, options.apiPath)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '', options.installOffer === true) : ''}${keepsInstallOffer ? `<script>${INSTALL_OFFER}</script>` : ''}${options.dev && options.devTools ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, hasIslands || streamed, options.sameTabLinks === true)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${shipsEntry && client.navigation === true ? prefetchMeta(options.client?.prefetch) : speculationRules(options.client?.prefetch, options.base, options.serve?.apiPath)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '', options.installOffer === true) : ''}${keepsInstallOffer ? `<script>${INSTALL_OFFER}</script>` : ''}${options.dev && options.devTools ? devScripts(client, styled, options.client?.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const written = opening + sheets + closing
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 
@@ -1167,7 +1167,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   }
 
   // A deferred module would wait for the whole stream; an async one hydrates the islands already there as soon as it loads.
-  return streamDocument(shipsEntry ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, shipsEntry, error => reportServerError(error, rendering.ctx.request, options.onError), { hydration: hasIslands, forms: posts ? forms : undefined, words: checked !== '', locale: hasIslands || (checked !== '' && words.size > 0), dev: options.dev, polish })
+  return streamDocument(shipsEntry ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, shipsEntry, error => reportServerError(error, rendering.ctx.request, options.observe?.onError), { hydration: hasIslands, forms: posts ? forms : undefined, words: checked !== '', locale: hasIslands || (checked !== '' && words.size > 0), dev: options.dev, polish })
 }
 
 function htmlOpen(lang: string, attributes: string): string {
@@ -1181,7 +1181,7 @@ function headStart(head: RenderedHead): string {
 
 // What the islands read off the page: the mount point, where the API is when `apiPath` moved it (for a script that imports no API module, as a library's loader), and the image settings that are not the default.
 function kayMetas(options: RenderOptions, hasIslands: boolean): string {
-  const base = (options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : '') + (options.apiPath !== undefined && options.apiPath !== '/api' ? `<meta name="kay-api" content="${escapeAttribute(options.apiPath)}">` : '') + (options.saveData === false ? '<meta name="kay-save-data" content="off">' : '') + (options.sameTabLinks === true ? '<meta name="kay-same-tab-links">' : '') + (options.linkSchemes !== undefined && options.linkSchemes.length > 0 ? `<meta name="${LINK_SCHEMES_META}" content="${escapeAttribute(options.linkSchemes.join(','))}">` : '')
+  const base = (options.base !== undefined && options.base !== '' ? `<meta name="kay-base" content="${escapeAttribute(options.base)}">` : '') + (options.serve?.apiPath !== undefined && options.serve?.apiPath !== '/api' ? `<meta name="kay-api" content="${escapeAttribute(options.serve?.apiPath)}">` : '') + (options.client?.saveData === false ? '<meta name="kay-save-data" content="off">' : '') + (options.sameTabLinks === true ? '<meta name="kay-same-tab-links">' : '') + (options.linkSchemes !== undefined && options.linkSchemes.length > 0 ? `<meta name="${LINK_SCHEMES_META}" content="${escapeAttribute(options.linkSchemes.join(','))}">` : '')
 
   if (!hasIslands)
     return base
