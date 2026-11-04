@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { ActionError, ApiError } from 'kay'
-import { fieldsOf, messageOf } from '../src/runtime/api-error'
+import { failed, fieldsOf, messageOf, textOf, unreachable } from '../src/runtime/api-error'
 import { issueMessage } from '../src/runtime/local'
 
 describe('messageOf', () => {
@@ -17,6 +17,26 @@ describe('messageOf', () => {
     expect(fieldsOf({ type: 'validation', errors: [{ path: '/title', message: 'Too short' }, { path: '', message: 'Bad' }] })).toEqual({ 'title': 'Too short', '': 'Bad' })
     expect(fieldsOf({ message: 'x' })).toEqual({})
     expect(fieldsOf('text')).toEqual({})
+  })
+})
+
+describe('textOf and the failure factory', () => {
+  it('reads an answer on its own: its message, the text, else the fallback', () => {
+    expect(textOf({ message: 'Data' }, 'Fallback')).toBe('Data')
+    expect(textOf('Text', 'Fallback')).toBe('Text')
+    expect(textOf({ message: '' }, 'Fallback')).toBe('Fallback')
+    expect(textOf(undefined, 'Fallback')).toBe('Fallback')
+    expect(textOf(null, 'Fallback')).toBe('Fallback')
+  })
+
+  it('builds the failure a source has no answer behind, the cause kept', () => {
+    const cause = new Error('socket')
+    const error = failed(0, 'The connection was lost', cause)
+
+    expect([error instanceof ApiError, error.status, error.message, error.errors, error.data, error.cause]).toEqual([true, 0, 'The connection was lost', {}, undefined, cause])
+    expect(failed(403, 'Refused').status).toBe(403)
+    expect(unreachable(cause).message).toBe('The server could not be reached')
+    expect(unreachable(cause).cause).toBe(cause)
   })
 })
 

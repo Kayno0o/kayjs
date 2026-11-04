@@ -1,5 +1,5 @@
 import type { CallResult } from './call-result'
-import { ApiError, apiErrorOf, fieldsOf, messageOf } from './api-error'
+import { ApiError, apiErrorOf, failed, refused, textOf, unreachable } from './api-error'
 import { withBase } from './base'
 import { trackCalls } from './call-result'
 import { connection, listenerSet } from './connection'
@@ -202,7 +202,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
       if (event.code >= REFUSED_CODES && event.code < REFUSED_CODES + 1000) {
         const reason = event.reason
 
-        link.fail(new ApiError(event.code - REFUSED_CODES, reason === '' ? `The server closed the connection with ${event.code}` : reason))
+        link.fail(failed(event.code - REFUSED_CODES, reason === '' ? `The server closed the connection with ${event.code}` : reason))
 
         return
       }
@@ -251,7 +251,7 @@ async function refusalOf(response: Response): Promise<ApiError> {
   }
   catch {}
 
-  const message = messageOf({ status: response.status, errors: {}, data }, response.statusText)
+  const message = textOf(data, response.statusText || `HTTP ${response.status}`)
 
   return new ApiError(response.status, message, data, { '': message })
 }
@@ -269,7 +269,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
       return 'done'
 
     if (event === ERROR_EVENT) {
-      link.fail(new ApiError(0, 'The stream failed on the server'))
+      link.fail(failed(0, 'The stream failed on the server'))
 
       return 'failed'
     }
@@ -281,7 +281,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
     }
     catch (error) {
       console.error('kay: an event stream sent a value that does not decode', error)
-      link.fail(new ApiError(0, 'The stream sent a value that does not decode', undefined, {}, { cause: error }))
+      link.fail(failed(0, 'The stream sent a value that does not decode', error))
 
       return 'failed'
     }
@@ -337,7 +337,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
     if (ended)
       link.set(ended)
     else
-      link.lost(failure ?? (reconnect ? undefined : new ApiError(0, 'The connection was lost')))
+      link.lost(failure ?? (reconnect ? undefined : failed(0, 'The connection was lost')))
   }
 
   return {
@@ -644,19 +644,6 @@ export async function readAnswer(response: Response, signal?: AbortSignal): Prom
 
     throw new ApiError(response.status, `kay: the route answered JSON that does not parse: ${text.slice(0, 80)}`, text)
   }
-}
-
-// What a call that got no answer throws: kay's wording, with what the browser said as the cause.
-function unreachable(failure: unknown): ApiError {
-  return new ApiError(0, 'The server could not be reached', undefined, {}, { cause: failure })
-}
-
-// A route's refusal: its message is read off the answer, `errors` holds the fields a validation failure names, else the message under ''.
-function refused(response: Response, answer: unknown): ApiError {
-  const fields = fieldsOf(answer)
-  const message = messageOf({ status: response.status, errors: fields, data: answer }, response.statusText)
-
-  return new ApiError(response.status, message, answer, Object.keys(fields).length === 0 ? { '': message } : fields)
 }
 
 // Reads a GET route of a module under `src/api` from an island, once it is in the page, typed from the route. Options given as a function are read reactively: the route is asked again when a signal they read changes, and an answer a newer request overtook is dropped.
