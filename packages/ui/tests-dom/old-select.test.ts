@@ -19,8 +19,10 @@ test('onSelect still fires on a Timeline and a Table until 1.90, and is left unh
   click(mounted.root.querySelector('#old button'))
   click(mounted.root.querySelector('#both button'))
   click(mounted.root.querySelector('#table tbody input[type=checkbox]'))
+  click(mounted.root.querySelector('#tree [role=treeitem]'))
+  click(mounted.root.querySelector('#treeboth [role=treeitem]'))
   await settle()
 
-  expect(old).toEqual(['timeline:a', 'table:1'])
-  expect(fresh).toEqual(['both:b'])
+  expect(old).toEqual(['timeline:a', 'table:1', 'tree:x'])
+  expect(fresh).toEqual(['both:b', 'treeboth:y'])
 })

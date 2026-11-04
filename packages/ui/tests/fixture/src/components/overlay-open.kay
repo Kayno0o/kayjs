@@ -8,7 +8,7 @@ import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
 
 // Overlays opened from a button, to read focus, the typing guard, the close link and what FormDialog and CommandPalette pass on.
 const { onClosed } = props<{ onClosed: (name: string) => void }>()
-const names = ['fields', 'bare', 'auto', 'esc', 'both', 'ddirty', 'pdirty', 'dtype', 'dfooter', 'ptype', 'pfooter', 'form', 'lazy', 'plazy'] as const
+const names = ['fields', 'bare', 'auto', 'esc', 'both', 'ddirty', 'pdirty', 'dtype', 'dfooter', 'ptype', 'pfooter', 'form', 'lazy', 'plazy', 'kept'] as const
 const shown = signal<Record<string, boolean>>({})
 const shut = (name: string) => () => { shown = { ...shown(), [name]: false }; onClosed(name) }
 const save = Object.assign(async () => 'ok', { pending: () => false, url: '/_kay/action/form/rename' }) as unknown as Action<never, string>
@@ -50,6 +50,8 @@ Dialog#lazy(open={shown().lazy === true} title="Lazy" onOpenChange={shut('lazy')
 SidePanel#plazy(open={shown().plazy === true} title="Lazy" onOpenChange={shut('plazy')})
   if shown().plazy === true
     input#plazy-input
+SidePanel#kept(open={shown().kept === true} title="Kept" onOpenChange={shut('kept')})
+  input#kept-input
 CommandPalette#palette(entries={[]} size="sm")
 FormDialog#form(open={shown().form === true} title="Form" action={save} submitLabel="Save" failure="Failed" size="lg" closeLabel="Shut" level={3} onOpenChange={shut('form')})
   @actions

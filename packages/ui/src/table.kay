@@ -250,9 +250,7 @@ function commit(keys: RowKeyValue<Row, Key>[]) {
   const wanted = new Set(keys)
   const chosen = rows().filter(row => wanted.has(rowKeyOf(row, rowKey)))
 
-  const heard = onSelectedChange ?? onSelect
-
-  heard?.(keys, chosen)
+  onSelectedChange ? onSelectedChange(keys, chosen) : onSelect?.(keys, chosen)
 }
 
 function toggleRow(key: RowKeyValue<Row, Key>) {

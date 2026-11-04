@@ -40,7 +40,7 @@ test('opening a Dialog focuses the first control of its body, not the close butt
 test('a body drawn by the same signal that opens the overlay still takes the focus, on every reopen', async () => {
   const { dialog, open } = await page()
 
-  for (const [id, input] of [['lazy', 'lazy-input'], ['plazy', 'plazy-input']] as const) {
+  for (const [id, input] of [['lazy', 'lazy-input'], ['plazy', 'plazy-input'], ['kept', 'kept-input']] as const) {
     for (let round = 0; round < 2; round++) {
       await open(id)
       expect(dialog(id).open, `${id} ${round}`).toBe(true)

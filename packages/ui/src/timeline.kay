@@ -41,9 +41,7 @@ function pick(entry: TimelineEntry<Key>) {
   const next = picked() === entry.key ? undefined : entry.key
 
   picked = next
-  const heard = onSelectedChange ?? onSelect
-
-  heard?.(next, entry)
+  onSelectedChange ? onSelectedChange(next, entry) : onSelect?.(next, entry)
 }
 ---
 ol(part="root" {...rest} aria-label={label})

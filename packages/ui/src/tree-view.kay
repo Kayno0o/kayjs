@@ -157,9 +157,7 @@ function toggle(id: TreeId) {
 function pick(row: TreeRow<Id>) {
   current = row.node.id
   focused = row.node.id
-  const heard = onSelectedChange ?? onSelect
-
-  heard?.(row.node.id, row.node)
+  onSelectedChange ? onSelectedChange(row.node.id, row.node) : onSelect?.(row.node.id, row.node)
 }
 
 // A branch's chevron opens or closes it, the rest of the row selects it, the row's own controls excepted; the keyboard does both through the row itself.

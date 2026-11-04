@@ -1,5 +1,6 @@
 ---
 import Table from '@kaynooo/kayjs-ui/table.kay'
+import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 import Timeline from '@kaynooo/kayjs-ui/timeline.kay'
 
 // The names before 1.87, which still work until 1.90.
@@ -9,3 +10,5 @@ const { onOld, onNew } = props<{ onOld: (name: string) => void, onNew: (name: st
 Timeline#old(label="Day" entries={[{ key: 'a', time: '1', text: 'A' }]} onSelect={key => onOld(`timeline:${key}`)})
 Timeline#both(label="Both" entries={[{ key: 'b', time: '1', text: 'B' }]} onSelect={key => onOld(`both:${key}`)} onSelectedChange={key => onNew(`both:${key}`)})
 Table#table(columns={[{ key: 'name', header: 'Name' }]} rows={[{ id: 1, name: 'Io' }]} rowKey="id" selectable onSelect={keys => onOld(`table:${keys}`)})
+TreeView#tree(label="Tree" nodes={[{ id: 'x', label: 'X' }]} onSelect={id => onOld(`tree:${id}`)})
+TreeView#treeboth(label="Both" nodes={[{ id: 'y', label: 'Y' }]} onSelect={id => onOld(`treeboth:${id}`)} onSelectedChange={id => onNew(`treeboth:${id}`)})
