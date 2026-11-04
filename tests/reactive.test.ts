@@ -5,7 +5,8 @@ import { stringify } from 'devalue'
 import { batch, debounced, effect, every, flush, linked, listen, memo, onCleanup, onMount, root, selection, signal, untrack, watch } from '../src/runtime'
 import { ActionError, ActionRedirectError, actionStub } from '../src/runtime/action'
 import { navigation } from '../src/runtime/navigation'
-import { createSignal, hydrationEnded, hydrationStarted, ownSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded, whenHydrated } from '../src/runtime/reactive'
+import { undoable } from '../src/runtime/optimistic'
+import { createSignal, hydrationEnded, hydrationStarted, ownSignal, recordSignals, renderEffect, renderOnServer, unrecorded, whenHydrated } from '../src/runtime/reactive'
 import { inServerScope } from '../src/server/scope'
 import { eventually, turn } from './helpers/eventually'
 
@@ -1001,6 +1002,17 @@ describe('optimistic changes', () => {
     expect(a()).toBe(1)
     outer()
     expect(a()).toBe(1)
+  })
+
+  it('keep a later change that wrote the value the signal already held when an earlier one is undone, and put the signal back once it is undone too', () => {
+    const a = signal(0)
+    const first = undoable(() => a.set(1))
+    const second = undoable(() => a.set(1))
+
+    first()
+    expect(a()).toBe(1)
+    second()
+    expect(a()).toBe(0)
   })
 
   it('undo what a change made inside another wrote when the outer one throws after it', () => {

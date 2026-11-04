@@ -6,6 +6,7 @@ import { turn } from './helpers/eventually'
 
 let reactive: typeof import('../src/runtime/reactive')
 let actionStub: typeof import('../src/runtime/action').actionStub
+let optimistic: typeof import('../src/runtime/optimistic').optimistic
 
 type Call = (input: object, options?: CallOptions) => Promise<unknown>
 type Stub = Call & { pending: () => boolean, track: (options?: { queue?: string }) => Call & { status: () => string, error: () => unknown } }
@@ -15,6 +16,7 @@ beforeAll(async () => {
 
   reactive = await import('../src/runtime/reactive')
   ;({ actionStub } = await import('../src/runtime/action'))
+  ;({ optimistic } = await import('../src/runtime/optimistic'))
 })
 
 afterAll(async () => {
@@ -647,16 +649,16 @@ describe('optimistic changes of calls in flight', () => {
 
   it('end where they began for the optimistic() helper, whose kept change is the one after it to build on', () => {
     const [value, setValue] = reactive.createSignal(1)
-    const change = reactive.optimistic(() => setValue(2))
+    const change = optimistic(() => setValue(2))
 
     change.undo()
     expect(value()).toBe(1)
 
-    const kept = reactive.optimistic(() => setValue(3))
+    const kept = optimistic(() => setValue(3))
 
     kept.keep()
 
-    const later = reactive.optimistic(() => setValue(4))
+    const later = optimistic(() => setValue(4))
 
     kept.undo()
     expect(value()).toBe(4)

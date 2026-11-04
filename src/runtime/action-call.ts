@@ -12,8 +12,9 @@ import { skew } from './build'
 import { trackCalls, whenIdle } from './call-result'
 import { durationSeconds, isZeroDuration } from './duration'
 import { leave, mayLeave, navigation, prefetched } from './navigation'
+import { released, undoable } from './optimistic'
 import { pageData } from './page-data'
-import { getOwner, liveOwner, ownSignal, released, undoable, untrack } from './reactive'
+import { getOwner, liveOwner, ownSignal, untrack } from './reactive'
 import { reload } from './stale'
 import { FAILURE_HEADER, OUTCOME_SCRIPT, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { ACTION_PREFIX, ACTION_TYPE, decodeServerValue, malformed, serverWritten } from './wire'
@@ -302,6 +303,7 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
           break
         }
         catch (error) {
+          // Only the upload path says `sent: false`, as `fetch` gives no such signal and `onSent` has run before it: the default retry of an unsent post covers an upload alone.
           if (attempt >= attempts.times || whole.signal?.aborted === true || !attempts.again(error, sentNow && (error as { sent?: unknown } | null)?.sent !== false))
             throw error
 
