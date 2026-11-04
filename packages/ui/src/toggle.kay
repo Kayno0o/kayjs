@@ -3,7 +3,8 @@ import type { JSX } from 'kay'
 import { postedChecked, recipe, uid } from 'kay'
 import { controlledCheckbox } from './controlled-checkbox'
 import { CHECKBOX, FIELD_MESSAGE, fieldInvalid, keepInvalid } from './field-look'
-import { fieldIssues } from './forms'
+import { fieldIssues, fieldNamed } from './forms'
+import { without } from './props-without'
 
 // The track reads the input before it, named so a toggle inside another peer is left alone.
 const look = recipe({
@@ -19,7 +20,7 @@ const look = recipe({
   },
 })
 
-const { checked, label, hint, name, issue, invalid, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'role' | 'checked' | 'class' | 'children' | 'onChange'> & {
+const given = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'role' | 'checked' | 'class' | 'children' | 'onChange'> & {
   // Whether it starts on; a switch whose parent passes another value follows it. Inside a form posting to an action, a switch with no `onChange` takes the refused post's choice in its place.
   checked?: boolean | undefined
   // Shown next to the switch; omit it and pass `aria-label` instead to keep the switch label-only for screen readers.
@@ -37,23 +38,34 @@ const { checked, label, hint, name, issue, invalid, onChange, ...rest } = props<
   onChange?: ((checked: boolean) => unknown) | undefined
 }>()
 
-const sent = onChange ? undefined : postedChecked(name, rest.value as string | number | undefined)
-const messages = fieldIssues(() => name, () => issue)
-const marked = () => invalid === true || messages().length > 0
-const shown = name !== undefined || issue !== undefined
-const issuesId = uid()
+// Read through `given`, never destructured, so each prop stays live; `name` is read once, as the field a control posts as.
+const name = given.name
+const rest = without(given, 'checked', 'label', 'hint', 'name', 'issue', 'invalid', 'onChange', 'class', ...look.variants)
 
-const { on, busy, ref, change } = controlledCheckbox({ control: 'Toggle', checked: () => sent ?? checked ?? false, onChange: () => onChange, start: element => keepInvalid(element, marked), appRef: rest.ref })
+const sent = given.onChange ? undefined : postedChecked(name, rest.value as string | number | undefined, given.checked ?? false)
+// Whether the page passed `issue` or `invalid`, even as undefined for now, as `issue={add.error('terms')}` does.
+const shown = name !== undefined || 'issue' in given
+const checking = shown || 'invalid' in given
+// A FormField naming the same field shows its messages itself.
+const framed = checking ? fieldNamed.use() : undefined
+const messages = checking ? fieldIssues(() => framed?.() === name ? undefined : name, () => given.issue) : () => []
+const marked = () => given.invalid === true || messages().length > 0
+const issuesId = shown ? uid() : ''
+
+const { on, busy, ref, change } = controlledCheckbox({ control: 'Toggle', checked: () => sent ?? given.checked ?? false, onChange: () => given.onChange, start: (element) => {
+  if (checking)
+    keepInvalid(element, marked)
+}, appRef: rest.ref })
 ---
 // A real checkbox, so it submits inside a form like any other. A click while a change is under way flips nothing.
 snippet control()
   label(part="root")
     input({...rest} name={name} part="input" ref={ref} type="checkbox" role="switch" checked={on()} aria-invalid={fieldInvalid(marked) ?? rest['aria-invalid']} aria-describedby={[rest['aria-describedby'], messages().length > 0 ? issuesId : undefined].filter(id => id).join(' ') || undefined} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
     span(part="track")
-    if label
-      span(part="label") {label}
-    if hint !== undefined
-      span(part="hint") {hint}
+    if given.label
+      span(part="label") {given.label}
+    if given.hint !== undefined
+      span(part="hint") {given.hint}
 if shown
   div(part="field")
     {control()}

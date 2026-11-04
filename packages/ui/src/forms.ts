@@ -3,6 +3,9 @@ import { ActionError, context, describeField, effect, focusInvalid, markInvalid,
 import { answerMessage } from './internal/answer-message'
 import { toast } from './toast'
 
+// The name of the FormField around a control, which shows that field's messages: a Checkbox or Toggle of the same name leaves them to it.
+export const fieldNamed = context<(() => string | undefined) | undefined>(undefined)
+
 // The messages a FormDialog's last call was refused with, by field name, which each FormField inside it reads for its own `name`.
 export const formIssues = context<(() => Record<string, string>) | undefined>(undefined)
 

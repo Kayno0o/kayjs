@@ -1,0 +1,23 @@
+---
+import { signal } from 'kay'
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
+
+// A Checkbox and a Toggle whose `issue` one button sets after the island started with none, and a FormField of the same `name` around a Checkbox.
+const issue = signal<string>()
+const ticked = signal(false)
+const text = signal('Before')
+const mixed = signal(false)
+---
+button#say(type="button" onClick={() => issue = 'Tick it'}) Say
+div#box
+  Checkbox(label="Terms" issue={issue()})
+div#switch
+  Toggle(label="News" issue={issue()})
+div#wrapped
+  FormField(label="Terms" name="terms" issue="Required")
+    Checkbox(name="terms" label="I agree")
+button#flip(type="button" onClick={() => { ticked = !ticked(); text = 'Changed'; mixed = true }}) Flip
+div#live
+  Checkbox(label={text()} hint={text()} checked={ticked()} indeterminate={mixed()} invalid={mixed()} name="live")

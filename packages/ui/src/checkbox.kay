@@ -3,11 +3,12 @@ import type { JSX } from 'kay'
 import { effect, postedChecked, recipe, uid, untrack } from 'kay'
 import { controlledCheckbox } from './controlled-checkbox'
 import { CHECKBOX, FIELD_MESSAGE, fieldInvalid, keepInvalid } from './field-look'
-import { fieldIssues } from './forms'
+import { fieldIssues, fieldNamed } from './forms'
+import { without } from './props-without'
 
 const look = recipe({ parts: { root: CHECKBOX.root, input: CHECKBOX.input, label: CHECKBOX.label, hint: CHECKBOX.hint, field: 'inline-flex flex-col items-start gap-1', issues: FIELD_MESSAGE.issues, issue: FIELD_MESSAGE.issue } })
 
-const { checked, indeterminate = false, label, hint, name, issue, invalid, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'class' | 'children' | 'onChange'> & {
+const given = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'class' | 'children' | 'onChange'> & {
   // Whether it starts ticked; a box whose parent passes another value follows it. Inside a form posting to an action, a box with no `onChange` takes the refused post's choice in its place.
   checked?: boolean | undefined
   // Neither ticked nor not, for a box standing over a partly ticked set; a click toggles it from `checked`, and the box stays drawn so while the parent keeps it.
@@ -27,42 +28,51 @@ const { checked, indeterminate = false, label, hint, name, issue, invalid, onCha
   onChange?: ((checked: boolean) => unknown) | undefined
 }>()
 
+// Read through `given`, never destructured, so each prop stays live; `name` is read once, as the field a control posts as.
+const name = given.name
+const rest = without(given, 'checked', 'indeterminate', 'label', 'hint', 'name', 'issue', 'invalid', 'onChange', 'class', ...look.variants)
+
 let box: HTMLInputElement | undefined
 
-const sent = onChange ? undefined : postedChecked(name, rest.value as string | number | undefined)
-const messages = fieldIssues(() => name, () => issue)
-const marked = () => invalid === true || messages().length > 0
-const shown = name !== undefined || issue !== undefined
-const issuesId = uid()
+const sent = given.onChange ? undefined : postedChecked(name, rest.value as string | number | undefined, given.checked ?? false)
+// Whether the page passed `issue` or `invalid`, even as undefined for now, as `issue={add.error('terms')}` does.
+const shown = name !== undefined || 'issue' in given
+const checking = shown || 'invalid' in given
+// A FormField naming the same field shows its messages itself.
+const framed = checking ? fieldNamed.use() : undefined
+const messages = checking ? fieldIssues(() => framed?.() === name ? undefined : name, () => given.issue) : () => []
+const marked = () => given.invalid === true || messages().length > 0
+const issuesId = shown ? uid() : ''
 
 const { on, busy, ref, change } = controlledCheckbox({
   control: 'Checkbox',
-  checked: () => sent ?? checked ?? false,
-  onChange: () => onChange,
+  checked: () => sent ?? given.checked ?? false,
+  onChange: () => given.onChange,
   start: (element) => {
     box = element
-    element.indeterminate = untrack(() => indeterminate)
-    keepInvalid(element, marked)
+    element.indeterminate = untrack(() => given.indeterminate ?? false)
+    if (checking)
+      keepInvalid(element, marked)
   },
   // The click cleared it, whatever the parent still says.
-  settled: input => input.indeterminate = indeterminate,
+  settled: input => input.indeterminate = given.indeterminate ?? false,
   appRef: rest.ref,
 })
 
 // A property only, which no attribute sets.
 effect(() => {
   if (box)
-    box.indeterminate = indeterminate
+    box.indeterminate = given.indeterminate ?? false
 })
 ---
 // A native checkbox, so it submits inside a form and the keyboard and screen readers know it. A click while a change is under way ticks nothing.
 snippet control()
   label(part="root")
     input({...rest} name={name} part="input" ref={ref} type="checkbox" checked={on()} aria-invalid={fieldInvalid(marked) ?? rest['aria-invalid']} aria-describedby={[rest['aria-describedby'], messages().length > 0 ? issuesId : undefined].filter(id => id).join(' ') || undefined} aria-busy={busy() ? 'true' : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => change(event.currentTarget)})
-    if label
-      span(part="label") {label}
-    if hint !== undefined
-      span(part="hint") {hint}
+    if given.label
+      span(part="label") {given.label}
+    if given.hint !== undefined
+      span(part="hint") {given.hint}
 if shown
   div(part="field")
     {control()}

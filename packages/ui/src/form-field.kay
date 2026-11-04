@@ -2,7 +2,7 @@
 import type { Snippet } from 'kay'
 import { recipe } from 'kay'
 import { FIELD_MESSAGE, LABEL_TEXT } from './field-look'
-import { fieldIssues, fieldLinks } from './forms'
+import { fieldIssues, fieldLinks, fieldNamed } from './forms'
 
 // One wrapping row, the label taking no box of its own: the head and the action share the first line, the action wrapping under the head rather than over the control, and the rest take a line each.
 // A floated legend is no longer the fieldset's rendered legend, so it sits in the row like the label's head, its padding zeroed so an app's own `legend` styles do not indent it.
@@ -43,6 +43,8 @@ const { label, name, issue, hint, required = false, group = false, size = 'md', 
 const small = () => size === 'sm'
 const reports = () => !small() || name !== undefined || issue !== undefined
 const messages = fieldIssues(() => name, () => issue)
+
+fieldNamed.provide(() => name)
 const links = fieldLinks(group, hint !== undefined && hint !== '', messages, required)
 ---
 // The control, as children, takes the `kui-field-input` look with no class of its own.
