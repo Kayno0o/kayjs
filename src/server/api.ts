@@ -33,7 +33,7 @@ import { apiLimitWait, checkApiLimit, requestId, tooManyRequests } from './prote
 import { sharedContext } from './render'
 import { isUncaught, reportServerError } from './report'
 import { recordOf, requestRecord } from './request-record'
-import { requestSignal, RequestTimeout, timedOutResponse, withTimeout } from './request-timeout'
+import { requestSignal, RequestTimeoutError, timedOutResponse, withTimeout } from './request-timeout'
 import { requestUrl } from './request-url'
 import { apiRoutePath, withoutSlash } from './routes'
 import { markPrivate, wasReadPersonally } from './scope'
@@ -377,7 +377,7 @@ async function answeredLate(request: Request, onError: ActionOptions['onError'],
     return await run()
   }
   catch (error) {
-    if (!(error instanceof RequestTimeout))
+    if (!(error instanceof RequestTimeoutError))
       throw error
 
     reportServerError(error, request, onError)

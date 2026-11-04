@@ -4,7 +4,7 @@ import type { RequestContext } from './render'
 import { kayLog } from '../runtime/log'
 import { describeError, sharedContext } from './render'
 import { isUncaught, reportServerError } from './report'
-import { RequestTimeout, timedOutResponse } from './request-timeout'
+import { RequestTimeoutError, timedOutResponse } from './request-timeout'
 import { replyTrace } from './trace'
 
 const TEXT = 'text/plain; charset=utf-8'
@@ -48,7 +48,7 @@ export function answerUncaught(app: App, { dev, onError, page }: { dev: boolean,
       }
     }
 
-    if (error instanceof RequestTimeout)
+    if (error instanceof RequestTimeoutError)
       return sent(timedOutResponse())
 
     return sent(new Response(dev ? describeError(error, true).message : 'Internal Server Error', { status: 500, headers: { 'content-type': TEXT } }))

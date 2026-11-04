@@ -41,7 +41,7 @@ import { countSucceeded, isAgentCall, markChallenge, PRETEND, protectionRefusal,
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { recordOf, requestRecord } from './request-record'
-import { requestSignal, RequestTimeout, withTimeout } from './request-timeout'
+import { requestSignal, RequestTimeoutError, withTimeout } from './request-timeout'
 import { LOCAL_HOST, overHttps, requestUrl } from './request-url'
 import { guardUrl } from './routes'
 import { fieldOf } from './schema-check'
@@ -264,7 +264,7 @@ async function timedAction(request: Request, own: number | false | undefined, op
     return await withTimeout(request, own, options.timeout, run)
   }
   catch (error) {
-    if (!(error instanceof RequestTimeout))
+    if (!(error instanceof RequestTimeoutError))
       throw error
 
     reportServerError(error, request, options.onError)

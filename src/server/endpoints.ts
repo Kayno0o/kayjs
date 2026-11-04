@@ -14,7 +14,7 @@ import { pageSetting } from './page-settings'
 import { listedParams, pathOf } from './prerendered'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
-import { requestSignal, RequestTimeout, timedOutResponse, withTimeout } from './request-timeout'
+import { requestSignal, RequestTimeoutError, timedOutResponse, withTimeout } from './request-timeout'
 import { routerKey } from './routes'
 import { markPrivate, readPersonally, wasReadPersonally } from './scope'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
@@ -69,7 +69,7 @@ async function timedOut(request: Request, { onError }: ActionOptions, run: () =>
     return await run()
   }
   catch (error) {
-    if (!(error instanceof RequestTimeout))
+    if (!(error instanceof RequestTimeoutError))
       throw error
 
     reportServerError(error, request, onError)

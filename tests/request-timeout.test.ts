@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { stringify } from 'devalue'
 import { recordOf } from '../src/server/request-record'
-import { Deadline, requestSignal, RequestTimeout, withTimeout } from '../src/server/request-timeout'
+import { Deadline, requestSignal, RequestTimeoutError, withTimeout } from '../src/server/request-timeout'
 import { seen } from './fixtures/timeouts/src/seen'
 import { pages } from './shared-pages'
 
@@ -28,9 +28,9 @@ describe('request timeout', () => {
 
     expect(response.status).toBe(504)
     expect(await response.text()).toContain('<h1>Error 504</h1>')
-    expect(reported.at(0)).toBeInstanceOf(RequestTimeout)
+    expect(reported.at(0)).toBeInstanceOf(RequestTimeoutError)
     expect(seen.page?.aborted).toBe(true)
-    expect(seen.page?.reason).toBeInstanceOf(RequestTimeout)
+    expect(seen.page?.reason).toBeInstanceOf(RequestTimeoutError)
   })
 
   it('answers a request that is not for a page with plain text', async () => {
@@ -55,8 +55,8 @@ describe('request timeout', () => {
     const response = await page(app, '/streamed')
 
     expect(response.status).toBe(200)
-    await expect(response.text()).rejects.toBeInstanceOf(RequestTimeout)
-    expect(reported.at(0)).toBeInstanceOf(RequestTimeout)
+    await expect(response.text()).rejects.toBeInstanceOf(RequestTimeoutError)
+    expect(reported.at(0)).toBeInstanceOf(RequestTimeoutError)
   })
 
   it('answers an action 504 as a failed call, with ctx.signal aborted', async () => {
@@ -66,7 +66,7 @@ describe('request timeout', () => {
 
     expect(response.status).toBe(504)
     expect(seen.action?.aborted).toBe(true)
-    expect(reported.at(0)).toBeInstanceOf(RequestTimeout)
+    expect(reported.at(0)).toBeInstanceOf(RequestTimeoutError)
   })
 
   it('lets an action set its own timeout or none', async () => {
@@ -152,7 +152,7 @@ describe('ctx.signal', () => {
       const page = seen.page as AbortSignal | undefined
 
       expect(page?.aborted).toBe(true)
-      expect(page?.reason).not.toBeInstanceOf(RequestTimeout)
+      expect(page?.reason).not.toBeInstanceOf(RequestTimeoutError)
     }
     finally {
       await server.stop(true)
@@ -168,11 +168,11 @@ describe('ctx.signal', () => {
 })
 
 describe('Deadline', () => {
-  it('rejects with a RequestTimeout and aborts the signal when the time is up', async () => {
+  it('rejects with a RequestTimeoutError and aborts the signal when the time is up', async () => {
     const request = new Request('http://localhost/')
     const signal = requestSignal(request)
 
-    await expect(withTimeout(request, 20, undefined, async () => Bun.sleep(200))).rejects.toBeInstanceOf(RequestTimeout)
+    await expect(withTimeout(request, 20, undefined, async () => Bun.sleep(200))).rejects.toBeInstanceOf(RequestTimeoutError)
     expect(signal.aborted).toBe(true)
   })
 
@@ -190,7 +190,7 @@ describe('Deadline', () => {
 
     await Bun.sleep(30)
     deadline.arm(40)
-    await expect(deadline.expiry.promise).rejects.toBeInstanceOf(RequestTimeout)
+    await expect(deadline.expiry.promise).rejects.toBeInstanceOf(RequestTimeoutError)
   })
 
   it('runs work with no timeout as it is', async () => {

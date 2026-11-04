@@ -71,7 +71,7 @@ import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } fr
 import { reportServerError } from './report'
 import { RequestReadError } from './request-read'
 import { recordOf, requestRecord } from './request-record'
-import { againstDeadline, requestSignal, RequestTimeout, retime } from './request-timeout'
+import { againstDeadline, requestSignal, RequestTimeoutError, retime } from './request-timeout'
 import { overHttps } from './request-url'
 import { askedPath } from './rewrite'
 import { CONTEXT_LAYOUT, guardUrl, routeChain } from './routes'
@@ -924,7 +924,7 @@ function pageErrorOf(error: unknown, dev: boolean | undefined): PageError {
   if (error instanceof NotFound)
     return { status: 404, message: 'Not Found' }
 
-  if (error instanceof RequestTimeout)
+  if (error instanceof RequestTimeoutError)
     return { status: 504, message: dev ? error.message : 'Gateway Timeout' }
 
   return error instanceof Denied ? { status: error.status, message: error.message } : describeError(error, dev)

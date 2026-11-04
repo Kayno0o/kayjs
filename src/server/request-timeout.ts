@@ -3,17 +3,17 @@ import { timeoutMs } from './config-limits'
 import { recordOf, requestRecord } from './request-record'
 
 // What a request that ran past its `timeout` ends with, answered 504 through the nearest `_error.kay` for a page; logged and handed to `onError` as any server error is.
-export class RequestTimeout extends Error {
+export class RequestTimeoutError extends Error {
   constructor(readonly ms: number) {
     super(`the request took longer than ${ms} ms`)
-    this.name = 'RequestTimeout'
+    this.name = 'RequestTimeoutError'
   }
 }
 
 // A request's clock and its signal: aborted by the timeout, and by the client leaving through `request.signal`.
 export class Deadline {
   readonly controller = new AbortController()
-  // Rejects with the `RequestTimeout` when the time is up; nobody waiting for it is no unhandled rejection.
+  // Rejects with the `RequestTimeoutError` when the time is up; nobody waiting for it is no unhandled rejection.
   readonly expiry = Promise.withResolvers<never>()
   signal: AbortSignal | undefined
   private readonly started = performance.now()
@@ -41,7 +41,7 @@ export class Deadline {
   }
 
   private expire(ms: number): void {
-    const error = new RequestTimeout(ms)
+    const error = new RequestTimeoutError(ms)
 
     this.controller.abort(error)
     this.expiry.reject(error)
@@ -61,7 +61,7 @@ export function requestSignal(request: Request): AbortSignal {
   return deadline.signal ??= AbortSignal.any([request.signal, deadline.controller.signal])
 }
 
-// Runs `work` and gives its answer, or throws a `RequestTimeout` once `ms` passed, aborting `ctx.signal`; the work is left running, as it cannot be stopped from outside, and sees the signal.
+// Runs `work` and gives its answer, or throws a `RequestTimeoutError` once `ms` passed, aborting `ctx.signal`; the work is left running, as it cannot be stopped from outside, and sees the signal.
 // `override` is the route's own setting, `false` for none, in place of `fallback`, the app's.
 export async function withTimeout<T>(request: Request, override: number | false | undefined, fallback: number | undefined, work: () => Promise<T>): Promise<T> {
   const ms = override === false ? undefined : override ?? fallback
@@ -82,7 +82,7 @@ export async function withTimeout<T>(request: Request, override: number | false 
 }
 
 // The same for a page, whose own `timeout` is only known once its modules are imported. With the app's `timeout` the clock runs from the start; without one nothing is made until the page sets its own, which `retime` arms and `againstDeadline` holds the loads to. A streamed body is cut when the time is up, its headers being sent.
-export async function withPageTimeout(request: Request, fallback: number | undefined, work: () => Promise<Response>, expired: (error: RequestTimeout) => void): Promise<Response> {
+export async function withPageTimeout(request: Request, fallback: number | undefined, work: () => Promise<Response>, expired: (error: RequestTimeoutError) => void): Promise<Response> {
   let response: Response
 
   if (fallback === undefined) {
@@ -140,7 +140,7 @@ export function retime(request: Request, setting: Duration | false | undefined):
 }
 
 // The body until the clock runs out, then an error: the client sees the connection end, and the timeout is reported.
-function cut(body: ReadableStream<Uint8Array>, deadline: Deadline, expired: (error: RequestTimeout) => void): ReadableStream<Uint8Array> {
+function cut(body: ReadableStream<Uint8Array>, deadline: Deadline, expired: (error: RequestTimeoutError) => void): ReadableStream<Uint8Array> {
   const reader = body.getReader()
   const { signal } = deadline.controller
   let ended = false
@@ -150,7 +150,7 @@ function cut(body: ReadableStream<Uint8Array>, deadline: Deadline, expired: (err
     start(controller) {
       const timeUp = () => {
         ended = true
-        expired(signal.reason as RequestTimeout)
+        expired(signal.reason as RequestTimeoutError)
         void reader.cancel(signal.reason)
         controller.error(signal.reason)
       }

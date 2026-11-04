@@ -3195,9 +3195,9 @@ interface RequestEntry
 [./server] requestId
 function requestId(request: Request): string
 
-[./server] RequestTimeout
-class RequestTimeout
-  new (ms: number): RequestTimeout
+[./server] RequestTimeoutError
+class RequestTimeoutError
+  new (ms: number): RequestTimeoutError
   ms: number
 
 [./server] retryLater
