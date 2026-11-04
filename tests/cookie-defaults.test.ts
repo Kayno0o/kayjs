@@ -12,6 +12,8 @@ const ENDPOINT = 'export function GET({ cookies }) {\n  cookies.set(\'theme\', \
 const ACTION = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const act = action(t.Object({}), ({}, { cookies, redirect, request }) => {\n  cookies.set(\'seen\', \'1\')\n  cookies.delete(\'old\')\n\n  if (request.headers.has(\'x-do\'))\n    redirect(\'/elsewhere\')\n\n  return \'ok\'\n})\n---\nform(action={act})\n  button Go\n'
 const REDIRECT = '--- server\nctx.cookies.set(\'went\', \'1\')\nctx.redirect(\'/elsewhere\')\n---\nh1 Gone\n'
 
+const API = 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', ({ cookie }) => {\n  cookie.theme!.value = \'dark\'\n  cookie.loose!.set({ value: \'1\', httpOnly: false, secure: false, sameSite: \'strict\', path: \'/x\' })\n\n  return \'ok\'\n})\n'
+
 const GUARD = 'import { guard } from \'kay\'\n\nexport default guard(({ cookies }) => {\n  cookies.set(\'guarded\', \'1\')\n})\n'
 
 // An expired cookie with the attributes a set would carry, so a `Secure` or `__Host-` one is cleared.
@@ -37,6 +39,7 @@ describe('cookie defaults', () => {
       Bun.write(join(dir, 'routes/guarded/index.kay'), 'h1 Guarded\n'),
       Bun.write(join(dir, 'routes/act/index.kay'), ACTION),
       Bun.write(join(dir, 'routes/go.kay'), REDIRECT),
+      Bun.write(join(dir, 'api/jar.ts'), API),
     ])
 
     const base = { root: dir, routesDir: 'routes', apiDir: 'api', prebuilt: false }
@@ -131,6 +134,15 @@ describe('cookie defaults', () => {
 
     expect(redirected.status).toBe(303)
     expect(redirected.set[0]).toBe('seen=1; Path=/; HttpOnly; SameSite=Lax')
+  })
+
+  it('applies to an api() route with no wiring, a cookie\'s own option winning', async () => {
+    expect((await cookies('plain', '/api/jar')).set).toEqual(['theme=dark; Path=/', 'loose=1; Path=/x; SameSite=Strict'])
+    expect((await cookies('safe', '/api/jar')).set).toEqual(['theme=dark; Path=/; HttpOnly; SameSite=Lax', 'loose=1; Path=/x; SameSite=Strict'])
+    expect((await cookies('safe', '/api/jar', {}, 'https://localhost')).set).toEqual(['theme=dark; Path=/; HttpOnly; Secure; SameSite=Lax', 'loose=1; Path=/x; SameSite=Strict'])
+    expect((await cookies('mounted', '/api/jar')).set[0]).toBe('theme=dark; Path=/app; HttpOnly; SameSite=Lax')
+    expect((await cookies('custom', '/api/jar')).set[0]).toBe('theme=dark; Path=/shop; Secure; SameSite=None')
+    expect((await cookies('always', '/api/jar')).set[0]).toBe('theme=dark; Path=/; HttpOnly; Secure; SameSite=Lax')
   })
 
   it('applies to a page that redirects', async () => {

@@ -21,6 +21,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `for` takes any iterable: [templates](templates.md#render-a-list).
 - A client-only island shows an `@fallback` until it renders: [browser-only](browser-only.md#fallback-while-the-browser-renders).
 - `ctx.cookies.delete` takes the `secure`, `sameSite` and `partitioned` a cookie was set with: [server](server.md#sessions).
+- The cookies of an `api()` route get the `security.cookies` defaults too, with no wiring and a cookie's own option winning: [server](server.md#sessions).
 - A `method="get"` form swaps in place: [navigation](navigation-from-code.md#full-loads-and-prefetching).
 - `security: { cookies: {} }` hardens `ctx.cookies.set`: [sessions](server.md#sessions).
 - `serve: { timeout: '15s' }` holds a page, action, API route and endpoint to a time: past it the request answers 504 (a page through `_error.kay`), is reported to `onError`, and `ctx.signal`, new on every request context, aborts; a page, `api({ timeout })` and an action set their own: [production](production.md#request-timeouts). `signal` is a new required member of `RequestContext`, `ActionContext`, `PageContext` and `ErrorPageContext`, so a context built by hand in a test needs one.

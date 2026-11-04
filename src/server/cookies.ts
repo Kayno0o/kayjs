@@ -33,13 +33,29 @@ export function cookieDefaults(setting: CookieDefaults | false | undefined, base
   return { httpOnly, sameSite, secure, path }
 }
 
+interface CookieApp {
+  onRequest: (hook: (context: { request: Request }) => void) => unknown
+  mapResponse: (options: { as: 'scoped' }, hook: (context: { request: Request, set: { cookie?: Record<string, { secure?: boolean, sameSite?: unknown }> | undefined } }) => undefined) => unknown
+  config: { cookie?: object | undefined }
+}
+
 // Records the app's cookie defaults on each request it gets, for the cookie jar to apply.
-export function defaultCookies(app: { onRequest: (hook: (context: { request: Request }) => void) => unknown }, defaults: ResolvedCookieDefaults | undefined): void {
+// The cookies of an `api()` route are Elysia's own, which reads `httpOnly`, `sameSite` and `path` from the app's config, and gets `Secure` from the request here, a cookie's own option winning in both.
+export function defaultCookies(app: CookieApp, defaults: ResolvedCookieDefaults | undefined): void {
   if (defaults === undefined)
     return
 
   app.onRequest(({ request }) => {
     requestRecord(request).cookieDefaults = defaults
+  })
+  app.config.cookie = { ...app.config.cookie, httpOnly: defaults.httpOnly, sameSite: defaults.sameSite, path: defaults.path }
+  app.mapResponse({ as: 'scoped' }, ({ request, set }) => {
+    for (const cookie of Object.values(set.cookie ?? {})) {
+      if (cookie.secure === undefined)
+        cookie.secure = cookie.sameSite === 'none' || (defaults.secure === 'auto' ? overHttps(request) : defaults.secure)
+    }
+
+    return undefined
   })
 }
 

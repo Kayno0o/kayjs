@@ -161,6 +161,7 @@ export default api()
 - A redirect or a denial from a guard answers the request, and the cookies and headers it sets go out with the route's response.
 - A route serving, by its method or `all`, the path of a page, a public file, an endpoint, a redirect or a feed stops the server.
 - `kay check` leaves that to the boot, which `kay build` runs, since listing the routes takes running the modules.
+- A route's cookies (`cookie` in its handler) get the `security.cookies` defaults of kay.config.ts (`httpOnly`, `sameSite`, `path` the `base`, `Secure` by the request), with a cookie's own option winning (see [Sessions](server.md#sessions)).
 - `api({ guards: false })` runs none of the guards above the module, as a public webhook under a guarded directory needs.
 - On a site with `requireGuards`, a module no guard covers answers 403 unless it sets `guards: false` (see [Guards](server.md#guards)).
 - A library's API modules, laid over `src/api` under a prefix by its extension, serve as if they were the app's, behind its guards, an app module at the same path replacing one (see [Extensions](component-libraries.md#extensions)).
