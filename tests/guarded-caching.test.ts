@@ -33,7 +33,8 @@ describe('a guarded route is private', () => {
       Bun.write(join(dir, 'api/seen.ts'), 'import { api, memorySessions, session } from \'kay/server\'\n\nexport default api()\n  .use(session({ secret: \'a-secret-of-at-least-32-characters-long\', store: memorySessions() }))\n  .get(\'/\', async ({ session }) => String(await session.get(\'user\') ?? \'none\'))\n'),
       Bun.write(join(dir, 'documented/_guard.ts'), GUARD),
       Bun.write(join(dir, 'documented/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => ({ ok: true }))\n'),
-      Bun.write(join(dir, 'api/cookie.ts'), 'import { api } from \'kay/server\'\n\nexport default api()\n  .get(\'/\', ({ set }) => {\n    set.headers[\'cache-control\'] = \'public, max-age=60\'\n    set.headers[\'set-cookie\'] = \'theme=dark; Path=/\'\n\n    return { ok: true }\n  })\n  .get(\'/own\', () => new Response(\'own\', { headers: { \'cache-control\': \'public, max-age=60\', \'set-cookie\': \'theme=dark; Path=/\' } }))\n  .get(\'/plain\', ({ set }) => {\n    set.headers[\'cache-control\'] = \'public, max-age=60\'\n\n    return { ok: true }\n  })\n'),
+      Bun.write(join(dir, 'api/cookie.ts'), 'import { api } from \'kay/server\'\n\nexport default api()\n  .get(\'/\', ({ set }) => {\n    set.headers[\'cache-control\'] = \'public, max-age=60\'\n    set.headers[\'set-cookie\'] = \'theme=dark; Path=/\'\n\n    return { ok: true }\n  })\n  .get(\'/own\', () => new Response(\'own\', { headers: { \'cache-control\': \'public, max-age=60\', \'set-cookie\': \'theme=dark; Path=/\' } }))\n  .get(\'/big\', ({ set }) => {\n    set.headers[\'set-cookie\'] = \'theme=dark; Path=/\'\n\n    return new Response(\'<p>\'.repeat(2000), { headers: { \'content-type\': \'text/html\', \'cache-control\': \'public, max-age=60\' } })\n  })\n  .get(\'/shared\', ({ set }) => {\n    set.headers[\'cache-control\'] = \'s-maxage=60\'\n    set.headers[\'set-cookie\'] = \'theme=dark; Path=/\'\n\n    return { ok: true }\n  })\n  .get(\'/plain\', ({ set }) => {\n    set.headers[\'cache-control\'] = \'public, max-age=60\'\n\n    return { ok: true }\n  })\n'),
+      Bun.write(join(dir, 'routes/cookie.kay'), '--- server\nctx.headers.set(\'cache-control\', \'public, max-age=60\')\nctx.cookies.set(\'theme\', \'dark\')\n---\nh1 Cookie\n'),
       Bun.write(join(dir, 'api/open.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => ({ ok: true }))\n'),
     ])
 
@@ -43,10 +44,19 @@ describe('a guarded route is private', () => {
     servers.production = await pages({ root: dir, routes, api, prebuilt: false, security: false })
     servers.dev = await pages({ root: dir, routes, api, prebuilt: false, security: false, dev: true })
     servers.documented = await pages({ root: dir, routes, api: 'documented', prebuilt: false, security: false, openapi: { reference: true } })
+    servers.compressed = await pages({ root: dir, routes, api, prebuilt: false, security: false, compress: true })
     servers.mounted = await pages({ root: dir, routes, api, prebuilt: false, security: false, base: '/app' })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
+
+  it('keeps the cookie guard ahead of compression, which answers first for a body worth compressing', async () => {
+    const response = await servers.compressed!.handle(new Request('http://localhost/api/cookie/big', { headers: { 'accept-encoding': 'gzip' } }))
+
+    expect(response.headers.get('content-encoding')).toBe('gzip')
+    expect(response.headers.get('set-cookie')).toContain('theme=dark')
+    expect(response.headers.get('cache-control')).toBe('private, no-cache')
+  })
 
   it('marks the API document and reference page behind a guard, and their refusals', async () => {
     for (const path of ['/api/openapi.json', '/api/reference']) {
@@ -101,6 +111,9 @@ describe('a guarded route is private', () => {
       expect((await answer(name, `${base}/api/cookie`))[1]).toBe('private, no-cache')
       expect((await answer(name, `${base}/api/cookie/own`))[1]).toBe('private, no-cache')
       expect((await answer(name, `${base}/api/cookie/plain`))[1]).toBe('public, max-age=60')
+      expect((await answer(name, `${base}/api/cookie/shared`))[1]).toBe('private, no-cache')
+      // A page of the app, which the pages stage answers.
+      expect((await answer(name, `${base}/cookie`))[1]).toBe('private, no-cache')
     })
 
     it('leaves a route no guard covers alone', async () => {

@@ -1,4 +1,5 @@
-import { api, exitPreview, keepCookiesPrivate } from 'kay/server'
+import { keepCookiesPrivate } from 'kay/library'
+import { api, exitPreview } from 'kay/server'
 
 export default api()
   // Leaves edit mode, clearing the cookie kay keeps it in.

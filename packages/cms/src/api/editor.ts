@@ -1,5 +1,5 @@
-import { overHttps } from 'kay/library'
-import { api, keepCookiesPrivate } from 'kay/server'
+import { keepCookiesPrivate, overHttps } from 'kay/library'
+import { api } from 'kay/server'
 import { wording } from 'kay/words'
 import { denialsOf } from '../access'
 import { hintCookie, pageLinkModule } from '../page-link'

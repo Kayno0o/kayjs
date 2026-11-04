@@ -283,6 +283,13 @@ export function trustRequests({ app, env, options, served, security, filePaths, 
 // The redirect of a missing page, then compression: scoped, so the app's own routes are compressed too; what is encoded already, as the build's copies are, goes as it is.
 // Returns the redirector, whose second hook goes before the page routes.
 export function compressAnswers({ app, env, options, setup: { client }, compressing }: Boot) {
+  // The first `mapResponse`, since Elysia ends the chain at the first hook that answers (the redirector, compression): the last word on caching a response that sets a cookie, whichever plugin or route set it.
+  app.mapResponse({ as: 'scoped' }, ({ responseValue, set }) => {
+    keepCookiesPrivate(set, responseValue)
+
+    return undefined
+  })
+
   const redirector = env.exported ? undefined : missingRedirector({ trailingSlash: env.trailingSlash, base: env.base })
 
   // Before compression, whose `mapResponse` would answer a compressed 404 page first; a redirect it answers skips the later `mapResponse` hooks, as the request log's timing and the dev tool's recording of the response.
@@ -338,12 +345,6 @@ export function identifyRequests({ app, env, setup: { client } }: Boot): void {
       set.headers[BUILD_HEADER] = build
   })
   serveToolCallsThrough(app)
-  // The last word on caching a response that sets a cookie, whichever plugin or route set it.
-  app.mapResponse({ as: 'scoped' }, ({ responseValue, set }) => {
-    keepCookiesPrivate(set, responseValue)
-
-    return undefined
-  })
 
   if (env.base !== '')
     rebaseRedirects(app, env.base)

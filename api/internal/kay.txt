@@ -941,6 +941,9 @@ interface KayCommand extends Omit<Command, 'run'>
   run: (parsed: Parsed, refuse: (reason?: string | undefined) => number, project: CommandProject) => number | Promise<number>
   usage: string
 
+[./library] keepCookiesPrivate
+function keepCookiesPrivate(set: { headers: Record<string, unknown>; }, response?: unknown): void
+
 [./library] keyedDigest
 function keyedDigest(use: string, text: string): string
 
