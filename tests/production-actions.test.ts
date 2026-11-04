@@ -148,6 +148,20 @@ describe('action protection', () => {
     expect((await site.submit(enquire, { message: 'fail' }, { from: '/enquiry' })).html).toContain('<p id="enquire-error" class="error">Not sent; try again later</p>')
   })
 
+  it('puts a message ctx.fail is given for a field on that field, for a call and for a form post', async () => {
+    const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
+    const site = await testSite({ root: FIXTURE, security: false })
+    const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }
+    const taken = await app.handle(new Request(`http://localhost${enquire.url}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-kay-action': '1', 'x-forwarded-for': '203.0.113.32' }, body: stringify({ message: 'taken' }) }))
+    const html = (await site.submit(enquire, { message: 'taken' }, { from: '/enquiry' })).html
+
+    expect(taken.status).toBe(409)
+    expect(parse(await taken.text())).toEqual({ errors: { message: 'Already sent' }, data: undefined })
+    expect(html).toContain('<p id="enquire-message-error" class="error">Already sent</p>')
+    expect(html).toContain('aria-invalid="true"')
+    expect(html).toContain('value="taken"')
+  })
+
   it('answers a thrown refuse() as it answers ctx.fail, with its message, field errors and data', async () => {
     const app = await pages({ root: FIXTURE, prebuilt: false, proxy: { hops: 1 } })
     const { enquire } = await import(ENQUIRY) as { enquire: Action<{ message: string }, number> }

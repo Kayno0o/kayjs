@@ -314,7 +314,7 @@ export function checkComment({ name, text }: Comment): CommentErrors {
 }
 ```
 
-- The handler checks them, `src/routes/guestbook.kay`.
+- The handler checks them, `src/routes/guestbook.kay`, and `ctx.fail(status, data, errors)` puts a message on each field it names, so `error name`, `aria-invalid` and `comment.error('name')` follow it as for a field the schema refused.
 - A string field with no `maxLength` is refused past 10,000 characters, and `kay check` asks a name, an email or a title for a tighter one (`unbounded-string`):
 
 ```kay
@@ -332,7 +332,7 @@ export const comment = action(newComment, (input, ctx) => {
   const errors = checkComment(input)
 
   if (Object.keys(errors).length > 0)
-    return ctx.fail(422, { errors })
+    return ctx.fail(422, undefined, errors)
 
   return { name: input.name.trim() }
 })
@@ -352,7 +352,7 @@ import { comment } from '../routes/guestbook.kay'
 import { checkComment } from '../comment'
 import type { CommentErrors } from '../comment'
 
-const errors = signal<CommentErrors>(comment.failed()?.data?.errors ?? {})
+const errors = signal<CommentErrors>(comment.failed()?.errors ?? {})
 const thanked = signal(comment.succeeded()?.data.name ?? '')
 
 async function submit(event: SubmitEvent) {

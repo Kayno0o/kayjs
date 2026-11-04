@@ -1,4 +1,4 @@
-import type { Failure } from './action-shared'
+import type { Failure, FieldErrors } from './action-shared'
 import { actionFailed, ApiError, messageOf } from './api-error'
 
 export const FAILURE = Symbol.for('kay.failure')
@@ -28,12 +28,12 @@ export class ActionRedirectError extends ActionError {
   }
 }
 
-export function failure<Data>(status: number, data: Data): Failure<Data> {
+export function failure<Data>(status: number, data: Data, errors?: FieldErrors): Failure<Data> {
   // A call reads a success status as the handler's result, so a failure must not carry one.
   if (!Number.isInteger(status) || status < 400 || status > 599)
     throw new RangeError(`kay: ctx.fail takes an error status, from 400 to 599, not ${status}`)
 
-  return { [FAILURE]: true, status, data }
+  return { [FAILURE]: true, status, data, errors }
 }
 
 export function isFailure(value: unknown): value is Failure<unknown> {

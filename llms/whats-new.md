@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-mail, kayjs-ai and kayjs-cms keep their data in the database of the app's `store`, old local files still read; `pgConversations` and `/pg`, `/sqlite` entries are new: [upgrading](upgrading.md).
+- `ctx.fail(status, data, errors)` puts a message on a named field of the action's schema (or on the form under `''`), so `error <field>`, `aria-invalid`, `add.error('field')`, the value re-fill, `ActionError.errors` and kayjs-ui `FormField` follow it with and without JavaScript: [actions](actions.md#refused-posts).
 
 ## 1.87.0
 

@@ -1,8 +1,10 @@
 [.] action
-function action<Output, const Honeypot extends string = never>(handler: (ctx: ActionContext<Readonly<Record<string, unknown>>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): NoInputAction<Settled<Output>, Honeypot>
+function action<Output, const Honeypot extends string = never>(handler: (ctx: ActionContext<Readonly<Record<string, unknown>>, string>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): NoInputAction<Settled<Output>, Honeypot>
 function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: (Schema & {
   params: [];
-})["static"], ctx: ActionContext<Readonly<Record<string, unknown>>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): ServerAction<Schema, Settled<Output>, Honeypot>
+})["static"], ctx: ActionContext<Readonly<Record<string, unknown>>, Extract<keyof (Schema & {
+  params: [];
+})["static"], string>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): ServerAction<Schema, Settled<Output>, Honeypot>
 
 [.] Action
 interface Action<Input, Output, Honeypot extends string = never>
@@ -18,10 +20,10 @@ interface Action<Input, Output, Honeypot extends string = never>
   with: (fields: Partial<Input>) => Action<Input, Output, Honeypot>
 
 [.] ActionContext
-interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams> extends RequestContext<Params>
+interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string> extends RequestContext<Params>
   cookies: CookieMap
   deny: (status?: number | undefined, message?: string | undefined) => never
-  fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data | undefined) => Failure<Data>
+  fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data | undefined, errors?: Partial<Record<"" | Field, string>> | undefined) => Failure<Data>
   headers: Headers
   locale: string
   locals: object
@@ -303,6 +305,7 @@ type ExtensionServersOf<Config> = Config extends { extensions?: readonly (infer 
 [.] Failure
 interface Failure<Data>
   data: Data
+  errors?: Partial<Record<string, string>> | undefined
   status: number
 
 [.] FailureData
@@ -310,6 +313,9 @@ type FailureData<Output> = unknown extends Output ? unknown : [Extract<Output, F
 
 [.] FailureOf
 type FailureOf<Target> = Target extends Action<infer Input, unknown> ? FormFailure<Input, FailuresOf<Target>, Extract<HoneypotOf<Target>, string>> : never
+
+[.] FieldErrors
+type FieldErrors<Field extends string = string> = Partial<Record<Field | '', string>>
 
 [.] FieldName
 type FieldName<Target> = Target extends Action<infer Input, unknown> ? Extract<keyof Input, string> | HoneypotOf<Target> : string
@@ -694,7 +700,7 @@ interface ProtectionMessages
   minTime?: ((reason: MinTimeRefusal) => string) | string | undefined
   proofOfWork?: ((reason: ProofOfWorkRefusal) => string) | string | undefined
   rateLimit?: ((wait: number) => string) | string | undefined
-  serverError?: ((error: unknown, ctx: ActionContext<Readonly<Record<string, unknown>>>) => Promise<string> | string) | string | undefined
+  serverError?: ((error: unknown, ctx: ActionContext<Readonly<Record<string, unknown>>, string>) => Promise<string> | string) | string | undefined
 
 [.] publicEnv
 const publicEnv: Readonly<Record<never, never>>
@@ -976,7 +982,7 @@ interface Selection<Key>
 interface ServerAction<Schema extends TSchema, Output, Honeypot extends string = never> extends Action<Sendable<Static<Schema>>, Output, Honeypot>
   error: (field?: "" | Extract<keyof Sendable<(Schema & { params: []; })["static"]>, string> | Honeypot | undefined) => string | undefined
   failed: () => FormFailure<Sendable<(Schema & { params: []; })["static"]>, FailureData<Output>, Honeypot> | undefined
-  handler: (input: (Schema & { params: []; })["static"], ctx: ActionContext<Readonly<Record<string, unknown>>>) => Output | Promise<Output>
+  handler: (input: (Schema & { params: []; })["static"], ctx: ActionContext<Readonly<Record<string, unknown>>, string>) => Output | Promise<Output>
   pending: () => boolean
   progress: () => number | undefined
   protection?: ResolvedProtection

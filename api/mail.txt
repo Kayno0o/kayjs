@@ -75,7 +75,7 @@ interface BroadcastStatus extends BroadcastProgress
   waiting: number
 
 [.] contactForm
-function contactForm<const Extra extends Record<string, TSchema> = Record<never, TSchema>, const Honeypot extends string = "website", const Consent extends boolean = false>(mail: Pick<Mailer, "enqueue">, options?: ContactOptions<Extra, Honeypot, Consent>): [schema: ContactSchema<Extra, Consent>, handler: (input: ContactInput<Extra, Consent>, ctx: ActionContext<Readonly<Record<string, unknown>>>) => Promise<Failure<string> | undefined>, protection: ActionProtection<Honeypot>]
+function contactForm<const Extra extends Record<string, TSchema> = Record<never, TSchema>, const Honeypot extends string = "website", const Consent extends boolean = false>(mail: Pick<Mailer, "enqueue">, options?: ContactOptions<Extra, Honeypot, Consent>): [schema: ContactSchema<Extra, Consent>, handler: (input: ContactInput<Extra, Consent>, ctx: ActionContext<Readonly<Record<string, unknown>>, string>) => Promise<Failure<string> | undefined>, protection: ActionProtection<Honeypot>]
 
 [.] ContactInput
 type ContactInput<Extra extends Record<string, TSchema> = Record<never, TSchema>, Consent extends boolean = false> = {
@@ -284,7 +284,7 @@ interface MailingList
   form: () => [schema: SubscribeSchema, handler: (input: {
   email: string;
   wording?: string | undefined;
-}, ctx: ActionContext<Readonly<Record<string, unknown>>>) => Promise<Failure<string> | undefined>, protection: ActionProtection<string>]
+}, ctx: ActionContext<Readonly<Record<string, unknown>>, string>) => Promise<Failure<string> | undefined>, protection: ActionProtection<string>]
   name: string
   preview: <P extends object>(message: ListMessage<P>) => Promise<{ subject: string; html: string | undefined; text: string; }>
   send: <P extends object>(message: ListMessage<P>) => Promise<{ id: string; recipients: number; }>

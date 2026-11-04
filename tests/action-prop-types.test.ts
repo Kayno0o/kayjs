@@ -137,3 +137,17 @@ describe('an action call with an optional field', () => {
     expect([calls, input]).toHaveLength(2)
   })
 })
+
+describe('the fields ctx.fail puts a message on', () => {
+  it('are the schema\'s keys and the form under an empty name', () => {
+    const register = action(t.Object({ email: t.String() }), (input, ctx) => {
+      ctx.fail(409, undefined, { 'email': 'Taken', '': 'Not registered' })
+      // @ts-expect-error not a field of the schema
+      ctx.fail(409, undefined, { name: 'Taken' })
+
+      return ctx.fail(409, undefined, { email: input.email })
+    })
+
+    expect(register).toBeDefined()
+  })
+})

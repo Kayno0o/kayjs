@@ -154,17 +154,22 @@ export interface ProtectionMessages {
 
 // The context every request has, `params` those of the page the action was posted from, matched against the action's own route as its guards read them: scope what it touches by them, since the input is the visitor's to choose, and a layout's action gets those every page it wraps names.
 // Its `url` is that page's, as its guards read it, its `locale` that page's too, and `redirect` answers 303 unless given.
-export interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams> extends RequestContext<Params> {
+export interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams, Field extends string = string> extends RequestContext<Params> {
   // Response status, for a fetch call or the redirect after a plain form post.
   status: (code: number) => void
   // `return ctx.fail(409, { message: 'Taken' })`: a plain form post gets its page rendered again, which reads it through `action.failed()`; a call throws an `ActionError` carrying `data`. A string is also the form's message, under `errors['']`.
-  fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data) => Failure<Data>
+  // `errors` puts a message on a field of the schema, or on the form under `''`: `return ctx.fail(409, undefined, { email: 'Already taken' })`, which `error email`, `aria-invalid`, `add.error('email')` and an `ActionError`'s `errors` follow as for a field the schema refused.
+  fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data, errors?: FieldErrors<Field>) => Failure<Data>
 }
+
+// A message per field of the action's schema, and under `''` one for the whole form.
+export type FieldErrors<Field extends string = string> = Partial<Record<Field | '', string>>
 
 export interface Failure<Data> {
   readonly [FAILURE]: true
   readonly status: number
   readonly data: Data
+  readonly errors?: FieldErrors | undefined
 }
 
 export type Success<Output> = Exclude<Output, Failure<unknown>>

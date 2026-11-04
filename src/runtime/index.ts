@@ -1,5 +1,5 @@
 export { s } from '#schema'
-export type { Action, ActionContext, ActionFor, ActionProtect, ActionProtection, ActionRateLimit, ActionStream, Answer, CallOptions, CallResult, Failure, FailureData, FailureOf, FieldName, FormFailure, FormSuccess, HoneypotOptions, InputOf, MinTimeOptions, MinTimeRefusal, NoInputAction, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, ResolvedProtection, ServerAction, Success, SuccessOf, TrackedCall } from './action'
+export type { Action, ActionContext, ActionFor, ActionProtect, ActionProtection, ActionRateLimit, ActionStream, Answer, CallOptions, CallResult, Failure, FailureData, FailureOf, FieldErrors, FieldName, FormFailure, FormSuccess, HoneypotOptions, InputOf, MinTimeOptions, MinTimeRefusal, NoInputAction, ProofOfWorkOptions, ProofOfWorkRefusal, ProtectionMessages, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, ResolvedProtection, ServerAction, Success, SuccessOf, TrackedCall } from './action'
 export { action, ActionError, ActionRedirectError, postedChecked, postedValue, postedValues } from './action'
 export type { ErrorShape } from './api-error'
 export { localPath, withBase } from './base'

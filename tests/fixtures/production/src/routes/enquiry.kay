@@ -13,6 +13,9 @@ export const enquire = action(t.Object({ message: t.String({ maxLength: 200 }) }
   if (message === 'refuse')
     refuse('Needs a summary', { errors: { message: 'required' }, data: 7 })
 
+  if (message === 'taken')
+    return ctx.fail(409, undefined, { message: 'Already sent' })
+
   if (message === 'away')
     ctx.redirect('/contact')
 
@@ -23,6 +26,7 @@ const sent = enquire.succeeded()
 ---
 form(action={enquire})
   input(name="message" aria-label="Message")
+  error message
   button Send
 if enquire.error() as message
   p.error {message}

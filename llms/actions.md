@@ -210,6 +210,7 @@ form(action={add})
 - `values` is what the form posted (fields named like a password left out).
 - `errors` is a message per refused field, the schema's `error` option when set.
 - `data` is what `ctx.fail` received.
+- `return ctx.fail(409, undefined, { email: 'Already taken' })` puts a message on a field, typed from the schema's keys, with `''` for the form's own; it joins a string `data` and the schema's messages, so `error email`, `aria-invalid`, `add.error('email')`, the value re-fill and an island's `ActionError.errors` (and a kayjs-ui `FormField` named `email`) follow it with and without JavaScript.
 - A string passed to `ctx.fail` is the form's message too, under `errors['']` where a rate limit's refusal sits: `return ctx.fail(502, 'Not sent; try again later')`, read by `add.error()`.
 - The page renders as a visit of it would, through the app's plugins and the page's guards, and nothing the visitor typed is lost however long it is.
 - Reloading it posts again, as after any form a server answers in place.

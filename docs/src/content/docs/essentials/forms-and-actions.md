@@ -211,6 +211,8 @@ if add.failed()?.data as data
   p.error {data.message}
 ```
 
+To blame a field, give `ctx.fail` the messages as a third argument: `return ctx.fail(409, undefined, { email: 'Already taken' })`. The names are the schema's fields, and `''` is the form's own message. The field then shows it as if the schema had refused it: an `error email` line, `aria-invalid`, `add.error('email')` and the value the visitor typed, with or without JavaScript. A call throws an `ActionError` whose `errors` carry it.
+
 A handler that throws is logged, and the form shows `Something went wrong on our side; try again later`. The handler needs no `try`/`catch` of its own.
 
 To word it yourself, give the action `{ messages: { serverError: 'Not sent; write to hello@example.com instead' } }`. When the text depends on something loaded per request, such as an address kept in a collection, give a function, sync or async, that is handed the error and the action's `ctx`: `serverError: async (error, ctx) => (await settings.one()).contactText`.

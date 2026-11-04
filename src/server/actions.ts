@@ -3,7 +3,7 @@ import type { Elysia, TSchema, ValidationError } from 'elysia'
 import type { Server } from 'elysia/universal'
 import type { ObserveConfig } from '../config'
 import type { GuardContext, Locals, RouteParams } from '../runtime'
-import type { ActionContext, RateKeyContext, ServerAction } from '../runtime/action'
+import type { ActionContext, FieldErrors, RateKeyContext, ServerAction } from '../runtime/action'
 import type { Locale } from '../runtime/i18n'
 import type { LocaleState } from '../runtime/locale-state'
 import type { BodyLimit } from './body'
@@ -731,7 +731,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
       status = code
     },
     ...stoppers(request),
-    fail: <Data>(code: number, data?: Data) => failure(code, data as Data),
+    fail: <Data>(code: number, data?: Data, errors?: FieldErrors) => failure(code, data as Data, errors),
   }
 
   try {
@@ -741,7 +741,7 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
 
     // A string passed to `ctx.fail` is the form's message, read where a rate limit's is.
     if (isFailure(result))
-      return await failed(request, headers, jar.cookies, { action: action.url, status: result.status, values: submittedValues(context.body), errors: typeof result.data === 'string' ? { '': result.data } : {}, data: result.data }, context.server, back)
+      return await failed(request, headers, jar.cookies, { action: action.url, status: result.status, values: submittedValues(context.body), errors: { ...typeof result.data === 'string' ? { '': result.data } : {}, ...result.errors }, data: result.data }, context.server, back)
 
     // A call reads a stream as it comes; a plain form post or an agent gets its last value, as a handler returning it would.
     const streams = isAsyncIterable(result) && isCall(request) && !isAgentCall(request)
