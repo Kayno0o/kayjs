@@ -1,5 +1,6 @@
 import type { HeadElement, HistoryState, NavigationHooks, Swap } from './navigation'
 import { dirtyGuard, dropScrollSave, historyState, leave, mayLeave, navigation, onScroll, pageKey, restoreScroll, saveScroll, swappable } from './navigation'
+import { savesDataInBrowser } from './save-data'
 
 // Swaps pages in place: a link or a form of the app fetches the next page from the server and puts it in this one, islands marked `persist` kept alive.
 // Everything here runs in the browser only, started by the entry; without JavaScript links and forms load pages as they always did.
@@ -22,7 +23,7 @@ const heldForms = new WeakSet<HTMLFormElement>()
 let held: { url: URL, delta: number } | undefined
 // A traversal the guards let through, made again.
 let passing = false
-// How eagerly the page prefetches, as its `kay-prefetch` meta says, until the first pointer or focus on a link loads the code prefetching by it.
+// How eagerly the page prefetches, as its `kay-prefetch` meta says, until the code prefetching by it loads: at the start for an `eager` page or one with a link asking for it, else on the first pointer or focus on a link.
 let rules: string | undefined
 let prefetchModule: Promise<typeof import('./prefetch')> | undefined
 
@@ -46,7 +47,7 @@ export function startNavigation(given: NavigationHooks): void {
     history.replaceState(historyState(), '')
   }
 
-  // The swap would never use what the browser prefetches for a full load, so a page shipping it carries no speculation rules and it prefetches the same links itself, from code loaded once a link is first pointed at.
+  // The swap would never use what the browser prefetches for a full load, so a page shipping it carries no speculation rules and it prefetches the same links itself, from code loaded at the start for an `eager` page and otherwise once a link is first pointed at.
   rules = document.querySelector<HTMLMetaElement>(PREFETCH)?.content
 
   if (rules !== undefined) {
@@ -154,7 +155,7 @@ async function wakePrefetch(event?: Event): Promise<void> {
 
 // An `eager` page, or one with a link asking for it, prefetches from the start, not from the first touch of a link; the loaded code follows the pages after.
 function wakeEager(): void {
-  if (!prefetchModule && (rules === 'eager' || document.querySelector('[data-prefetch=eager]')))
+  if (!prefetchModule && (rules === 'eager' || document.querySelector('[data-prefetch=eager]')) && !savesDataInBrowser())
     void wakePrefetch()
 }
 

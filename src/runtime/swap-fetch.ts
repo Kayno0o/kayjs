@@ -16,7 +16,8 @@ const POLICY_PARAMS = /;.*/
 // Fetches a link's page ahead of the click, kept a few seconds for it.
 // A link opting out, or a `rel=nofollow` one such as a sign-out, which may do something once fetched, is followed when clicked, never ahead.
 export function prefetch(url: URL, link: Element): void {
-  if (link.closest('[data-no-prefetch],[data-prefetch=false],[rel~=nofollow]'))
+  // The nearest `data-prefetch` decides, so an inner `eager` link stays prefetched under a container saying `false`.
+  if (link.closest('[data-no-prefetch],[rel~=nofollow]') || link.closest('[data-prefetch]')?.getAttribute('data-prefetch') === 'false')
     return
 
   const key = pageKey(url)

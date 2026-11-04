@@ -336,7 +336,7 @@ Links, `navigate()` and back and forward wait for the answer. A reload or a clos
 
 The `prefetch` setting says when a page is fetched before a click: `moderate` on hover (the default), `conservative` on press, `eager` as soon as it can, `false` never. On a page running kay's script, `eager` fetches the links that scroll into view, three at a time; on one without, the browser fetches every link at once.
 
-A link or a container takes its own level with `data-prefetch="eager"`, `"moderate"` or `"conservative"` where kay's script runs, and `data-prefetch="false"` opts out everywhere:
+A link or a container takes its own level with `data-prefetch="eager"`, `"moderate"` or `"conservative"` where kay's script runs, and `data-prefetch="false"` opts out everywhere. The nearest one wins, and none does anything under `prefetch: false`:
 
 ```kay
 nav(data-prefetch="eager")

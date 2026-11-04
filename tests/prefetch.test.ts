@@ -129,6 +129,164 @@ describe('pages fetched ahead of a click', () => {
     })
   })
 
+  describe('keeping up with the page', () => {
+    let runs = 200
+
+    const observers: { notify: (entries: { isIntersecting: boolean, target: Element }[]) => void, observed: Element[] }[] = []
+
+    it('finds the links added after the load, drops the ones scrolled past, and frees the slot of a hung page', async () => {
+      const { prefetched } = await import('../src/runtime/navigation')
+      const fetched = spyOn(globalThis, 'fetch').mockImplementation((async () => new Promise<Response>(() => undefined)) as unknown as typeof fetch)
+
+      globalThis.IntersectionObserver = class {
+        entry = { notify: (_: { isIntersecting: boolean, target: Element }[]) => undefined, observed: [] as Element[] }
+
+        constructor(callback: (entries: { isIntersecting: boolean, target: Element }[]) => void) {
+          this.entry.notify = callback
+          observers.push(this.entry)
+        }
+
+        observe(target: Element) {
+          this.entry.observed.push(target)
+        }
+
+        unobserve() {
+          return undefined
+        }
+      } as unknown as typeof IntersectionObserver
+
+      try {
+        document.body.innerHTML = '<a href="/first">x</a>'
+
+        const { startPrefetch } = await import(`../src/runtime/prefetch.ts?run=${++runs}`) as typeof import('../src/runtime/prefetch')
+
+        startPrefetch('eager')
+
+        const { observed, notify } = observers.at(-1)!
+
+        expect(observed).toHaveLength(1)
+        document.body.insertAdjacentHTML('beforeend', '<a href="/later">y</a>')
+        await new Promise(done => setTimeout(done, 200))
+        expect(observed.map(link => link.getAttribute('href'))).toEqual(['/first', '/later'])
+
+        const [first, later] = observed as HTMLAnchorElement[]
+
+        document.body.insertAdjacentHTML('beforeend', '<a href="/c">c</a><a href="/d">d</a><a href="/e">e</a>')
+        await new Promise(done => setTimeout(done, 200))
+
+        const rest = observed.slice(2) as HTMLAnchorElement[]
+
+        notify([first!, later!, ...rest].map(target => ({ isIntersecting: true, target })))
+        // The last two leave the viewport before their turn.
+        notify(rest.slice(1).map(target => ({ isIntersecting: false, target })))
+        await new Promise(done => setTimeout(done, 20))
+        expect(fetched).toHaveBeenCalledTimes(3)
+      }
+      finally {
+        fetched.mockRestore()
+        prefetched.clear()
+        document.body.replaceChildren()
+      }
+    })
+  })
+
+  describe('waking from the navigation code', () => {
+    let runs = 300
+
+    const meta = (content: string) => {
+      document.head.insertAdjacentHTML('beforeend', `<meta name="kay-prefetch" content="${content}">`)
+    }
+
+    const wake = async () => {
+      const { navigation } = await import('../src/runtime/navigation')
+      const { startNavigation } = await import(`../src/runtime/navigate.ts?wire=${++runs}`) as typeof import('../src/runtime/navigate')
+      const added = spyOn(document, 'addEventListener')
+
+      navigation.hooks = undefined
+      startNavigation({ hydrate: () => undefined, dispose: () => undefined })
+      await new Promise(done => setTimeout(done, 50))
+
+      // The navigation code listens to `kay:navigate` twice; the prefetch code adds a third.
+      const heard = () => added.mock.calls.map(call => call[0]).filter(type => type === 'kay:navigate').length
+
+      return { heard, added }
+    }
+
+    const clean = () => {
+      document.head.querySelector('meta[name="kay-prefetch"]')?.remove()
+      document.head.querySelector('meta[name="kay-save-data"]')?.remove()
+      document.body.replaceChildren()
+      Reflect.deleteProperty(navigator, 'connection')
+    }
+
+    it('loads the prefetch code at the start on an eager page', async () => {
+      meta('eager')
+
+      const { heard, added } = await wake()
+
+      try {
+        expect(heard()).toBe(3)
+      }
+      finally {
+        added.mockRestore()
+        clean()
+      }
+    })
+
+    it('loads it for an eager link on a moderate page, and not for a moderate page without one', async () => {
+      meta('moderate')
+
+      const plain = await wake()
+
+      expect(plain.heard()).toBe(2)
+      plain.added.mockRestore()
+      document.body.innerHTML = '<a href="/x" data-prefetch="eager">x</a>'
+
+      const asking = await wake()
+
+      try {
+        expect(asking.heard()).toBe(3)
+      }
+      finally {
+        asking.added.mockRestore()
+        clean()
+      }
+    })
+
+    it('wakes again on kay:navigate when the shown page has an eager link', async () => {
+      meta('moderate')
+
+      const { heard, added } = await wake()
+
+      try {
+        expect(heard()).toBe(2)
+        document.body.innerHTML = '<a href="/x" data-prefetch="eager">x</a>'
+        document.dispatchEvent(new Event('kay:navigate'))
+        await new Promise(done => setTimeout(done, 50))
+        expect(heard()).toBeGreaterThan(2)
+      }
+      finally {
+        added.mockRestore()
+        clean()
+      }
+    })
+
+    it('loads nothing for a visitor asking for less data', async () => {
+      Object.defineProperty(navigator, 'connection', { value: { saveData: true }, configurable: true })
+      meta('eager')
+
+      const { heard, added } = await wake()
+
+      try {
+        expect(heard()).toBe(2)
+      }
+      finally {
+        added.mockRestore()
+        clean()
+      }
+    })
+  })
+
   describe('for a visitor asking for less data', () => {
     let runs = 0
 

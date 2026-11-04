@@ -1398,7 +1398,7 @@ describe('prefetch', () => {
 
     expect(rules).toEqual({ prefetch: [{
       source: 'document',
-      where: { and: [{ href_matches: '/*' }, { not: { href_matches: '/_kay/*' } }, { not: { href_matches: '/api/*' } }, { not: { href_matches: '/api' } }, { not: { selector_matches: '[data-no-prefetch], [data-prefetch=false], [data-prefetch=false] a, [download], [rel~=nofollow]' } }] },
+      where: { and: [{ href_matches: '/*' }, { not: { href_matches: '/_kay/*' } }, { not: { href_matches: '/api/*' } }, { not: { href_matches: '/api' } }, { not: { selector_matches: '[data-no-prefetch], a[data-prefetch=false], [data-prefetch=false] a:not([data-prefetch], [data-prefetch]:not([data-prefetch=false]) a), [download], [rel~=nofollow]' } }] },
       eagerness: 'moderate',
     }] })
     expect(speculationRules('eager')).toContain('"eagerness":"eager"')
