@@ -112,7 +112,7 @@ pgDescribe('pgData live values', () => {
   pgIt('is a kind of pgData, filling every kind of the app store', async () => {
     const data = pgData(await fresh())
 
-    expect(Object.keys(data).sort()).toEqual(['cache', 'close', 'jobs', 'live', 'notifications', 'ping', 'push', 'rates', 'rooms', 'sessions', 'vitals'])
+    expect(Object.keys(data).sort()).toEqual(['cache', 'close', 'jobs', 'kv', 'live', 'notifications', 'ping', 'push', 'rates', 'rooms', 'sessions', 'vitals'])
   })
 
   pgIt('keeps a value of each user under the user\'s id, however it is spelled', async () => {
