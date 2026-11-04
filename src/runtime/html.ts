@@ -537,14 +537,19 @@ export function show<T>(value: T, render: (value: () => Truthy<T>) => string, fa
 
 // A `for`: each row's markup, or the fallback's when there is nothing to list.
 // In an island a row reads its item, and a keyed row its index, through functions, as the browser build of the same template does.
-export function loop<T>(each: readonly T[] | null | undefined | false, render: (item: T | (() => T), index: number | (() => number)) => string, fallback?: () => string, accessors?: 'keyed' | 'positional'): string {
-  if (each == null || each === false || each.length === 0) {
+export function loop<T>(each: Iterable<T> | null | undefined | false, render: (item: T | (() => T), index: number | (() => number)) => string, fallback?: () => string, accessors?: 'keyed' | 'positional'): string {
+  if (each == null || each === false)
+    return fallback?.() ?? ''
+
+  const list = Array.isArray(each) ? each as readonly T[] : Array.from(each)
+
+  if (list.length === 0) {
     const markup = fallback?.() ?? ''
 
-    return fieldMarks.marking === undefined || each == null || each === false ? markup : markedList(each, markup)
+    return fieldMarks.marking === undefined ? markup : markedList(each, markup)
   }
 
-  return fieldMarks.marking === undefined ? rows(each, render, accessors) : markedList(each, rows(each, render, accessors))
+  return fieldMarks.marking === undefined ? rows(list, render, accessors) : markedList(each, rows(list, render, accessors))
 }
 
 function rows<T>(each: readonly T[], render: (item: T | (() => T), index: number | (() => number)) => string, accessors?: 'keyed' | 'positional'): string {

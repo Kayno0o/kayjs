@@ -125,6 +125,18 @@ describe('loop', () => {
     expect(loop(null, () => 'x', () => 'none')).toBe('none')
     expect(loop([], () => 'x')).toBe('')
   })
+
+  it('takes any iterable: a Set, a Map, a generator', () => {
+    function* letters() {
+      yield 'a'
+      yield 'b'
+    }
+
+    expect(loop(new Set(['a', 'b']), (item, index) => `${item as string}${index as number}`)).toBe('a0b1')
+    expect(loop(new Map([['a', 1], ['b', 2]]), item => (item as [string, number]).join('='))).toBe('a=1b=2')
+    expect(loop(letters(), (item, index) => `${item as string}${index as number}`)).toBe('a0b1')
+    expect(loop(new Set<string>(), () => 'x', () => 'none')).toBe('none')
+  })
 })
 
 describe('selectOptions', () => {

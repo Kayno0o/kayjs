@@ -454,7 +454,7 @@ export class JsxTemplate {
     const positional = keyedByPosition(node, this.src)
 
     b.wrap(node, () => {
-      b.add('{(() => { const kayEach = (')
+      b.add('{(() => { const kayEach = KayList(')
 
       b.addSource(node.each)
 

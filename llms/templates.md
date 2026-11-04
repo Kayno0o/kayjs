@@ -35,6 +35,8 @@ ul
 
 A destructured item reads like a `const` pattern: `for { id, name } of rows` and `for [key, count] of Object.entries(totals)`, with an index after it (`for [key, count], i of entries`) and a `key={...}` as usual.
 
+The list is any iterable, or `null`, `undefined` or `false` for none: an array (the fast path), a `Set`, a `Map` (`for [id, user] of users`), `map.keys()` or a generator. A non-iterable is one error at the expression. Rows are matched from the items as read once per render, so a generator is read once.
+
 ### Pick a block by a value
 
 `match` renders the block of the first `when` listing a value equal to it, else the `else` block:

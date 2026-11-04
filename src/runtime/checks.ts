@@ -39,9 +39,11 @@ export interface IslandBrand { readonly [ISLAND]: true }
 
 // What an interactive component's default export is; only islands take `hydrate`.
 // What a static parent passes an island besides its props: when it hydrates, and whether it lives on across navigations, `persist` keeping it by its component, `persist="key"` by a key of its own.
+// `fallback` is the markup a client-only use (`hydrate="client"`) shows on the server until the browser renders the island, written as an `@fallback` block.
 export interface IslandOptions {
   hydrate?: HydrateWhen | undefined
   persist?: boolean | string | undefined
+  fallback?: JSX.Element | undefined
 }
 
 export type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Element) & IslandBrand
@@ -326,10 +328,10 @@ export type ComponentClass<List extends readonly unknown[]> = [PartsObject<List[
 // What the template's control flow and dynamic tags read as in the code the type checker reads: a `for` block is called on the spot with a row of its list, so TypeScript narrows it where the browser build hands accessors.
 export interface TemplateHelpers {
   For: {
-    <T>(props: { each: readonly T[] | null | undefined | false, keyed: (item: T) => unknown, fallback?: JSX.Element, children: JSX.Element }): JSX.Element
-    <T>(props: { each: readonly T[] | null | undefined | false, keyed: false, fallback?: JSX.Element, children: JSX.Element }): JSX.Element
+    <T>(props: { each: Iterable<T> | null | undefined | false, keyed: (item: T) => unknown, fallback?: JSX.Element, children: JSX.Element }): JSX.Element
+    <T>(props: { each: Iterable<T> | null | undefined | false, keyed: false, fallback?: JSX.Element, children: JSX.Element }): JSX.Element
   }
-  staticFor: <T>(each: readonly T[] | null | undefined | false, rendered: JSX.Element, fallback?: JSX.Element) => JSX.Element
+  staticFor: <T>(each: Iterable<T> | null | undefined | false, rendered: JSX.Element, fallback?: JSX.Element) => JSX.Element
   Dynamic: <Tag>(props: { component: Tag } & PropsOf<Tag>) => JSX.Element
   componentClass: <const List extends readonly unknown[]>(list: List) => ComponentClass<List>
   partClass: (props: unknown, part: string) => unknown

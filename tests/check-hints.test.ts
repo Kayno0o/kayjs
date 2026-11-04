@@ -53,6 +53,12 @@ describe('hints for the first template mistakes', () => {
     ])
   })
 
+  it('takes any iterable in a for and reports a non-iterable once, at its expression', async () => {
+    const found = errors(await report('---\nconst tags = new Set(["a"])\nconst pairs = new Map([["a", 1]])\nfunction* count() { yield 1 }\n---\nfor tag of tags\n  p {tag.length}\nfor [name, n] of pairs\n  p {name}{n.toFixed()}\nfor n of count()\n  p {n}\nfor key of pairs.keys()\n  p {key.length}\nfor bad of 5\n  p {bad}\n'))
+
+    expect(found.map(error => [error[0], error[1]])).toEqual([[14, 12]])
+  })
+
   it('names else if once for elif', async () => {
     const found = await report('---\nconst a = true\n---\nif a\n  p a\nelif a\n  p b\n')
 

@@ -21,7 +21,7 @@ export function rowKey(item: unknown): unknown {
 
 // A `for`: one row per item, matched to the rows of the last render by key, or by position when `keyed` is false.
 // A row reads its item through a function, and its index through one too when keyed, so a row kept across renders follows the new values.
-export function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => readonly T[] | null | undefined | false, key: ((item: T) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: () => unknown): void {
+export function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => Iterable<T> | null | undefined | false, key: ((item: T) => unknown) | false, render: (item: () => T, index: (() => number) | number) => unknown, fallback?: () => unknown): void {
   const region = new Region(element, start, end)
   // The fallback, and whether the loop rendered before, so the rows it makes then play their enter phase.
   const empty = blockIn(region)
@@ -66,7 +66,7 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
 
   renderEffect(() => {
     const items = each()
-    const list = items === false || items == null ? [] : items
+    const list = items === false || items == null ? [] : listed(items)
 
     untrack(() => {
       const entering = empty.rendered
@@ -96,6 +96,11 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
       empty.rendered = true
     })
   })
+}
+
+// An array as it is, any other iterable read once.
+function listed<T>(items: Iterable<T>): readonly T[] {
+  return Array.isArray(items) ? items as readonly T[] : Array.from(items)
 }
 
 function reconcileRows<T>(region: Region, previous: Row[], list: readonly T[], key: ((item: T) => unknown) | false, makeRow: (item: T, index: number, key: unknown) => Row): Row[] {
