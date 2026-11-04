@@ -189,11 +189,56 @@ describe('sessions', () => {
       expect(await (await plain({ store: false }).handle(new Request('http://localhost/peek', { headers: { cookie } }))).text()).toBe('1')
     })
 
-    it('keeps its sessions in data/sessions.sqlite outside a test, as jobs keep data/jobs.sqlite', async () => {
-      const source = await Bun.file(join(import.meta.dir, '../src/server/session.ts')).text()
+    // A production process in a folder of its own, so the default file is the real one.
+    async function inProduction(prepare: string, script: string) {
+      const cwd = await scratchDir('session-default-')
+      const entry = join(cwd, 'run.ts')
 
-      expect(source).toContain('sqliteSessions(DEFAULT_SESSIONS_PATH)')
-      expect(source).toContain('DEFAULT_SESSIONS_PATH = \'data/sessions.sqlite\'')
+      await Bun.write(entry, `import { Elysia } from 'elysia'
+import { session } from ${JSON.stringify(join(import.meta.dir, '../src/server/session'))}
+import { existsSync } from 'node:fs'
+${prepare}
+const app = new Elysia().use(session({ secret: 'x'.repeat(10) + 'aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bC2eF4' }))
+  .get('/set', async ({ session }) => { await session.set('n', 1); return 'ok' })
+  .get('/peek', async ({ session }) => String(await session.get('n') ?? 'none'))
+  .get('/out', async ({ session }) => { await session.destroy(); return 'out' })
+${script}`)
+
+      const run = Bun.spawnSync([process.execPath, entry], { cwd, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+
+      return { cwd, out: run.stdout.toString(), err: run.stderr.toString(), code: run.exitCode }
+    }
+
+    it('keeps its sessions in data/sessions.sqlite in production, revoking one wherever its cookie is, and says the file is this machine\'s', async () => {
+      const { out, code } = await inProduction('', `
+const url = (path: string) => \`https://localhost\${path}\`
+const first = await app.handle(new Request(url('/set')))
+const cookie = first.headers.get('set-cookie')!.split(';')[0]!
+const ask = async (path: string) => (await app.handle(new Request(url(path), { headers: { cookie } }))).text()
+const before = await ask('/peek')
+await ask('/out')
+console.log(JSON.stringify({ before, after: await ask('/peek'), file: existsSync('data/sessions.sqlite') }))
+process.exit(0)`)
+
+      expect(code).toBe(0)
+      expect(JSON.parse(out.trim().split('\n').at(-1)!)).toEqual({ before: '1', after: 'none', file: true })
+      expect(out).toContain('a file of this machine')
+      expect(out).toContain('store: false')
+    })
+
+    it('answers a data folder that cannot be written with an error naming store: false', async () => {
+      const { out } = await inProduction('await Bun.write(\'data\', \'a file where the folder goes\')', `
+try {
+  await app.handle(new Request('https://localhost/set'))
+  console.log('no error')
+}
+catch (error) {
+  console.log(String(error))
+}
+process.exit(0)`)
+
+      expect(out).toContain('data/sessions.sqlite')
+      expect(out).toContain('store: false')
     })
   })
 

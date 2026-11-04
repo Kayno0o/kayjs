@@ -3,7 +3,7 @@ import { KayError } from '../compiler/errors'
 // A size in bytes, or a string with its unit: `'20kb'`, `'1.5mb'`, `'800b'`; decimals are fine, zero, a negative number or an exponent is refused when the build starts and by `kay check`, which the type cannot say.
 export type ByteSize = number | `${number}${'b' | 'kb' | 'mb'}`
 
-const SIZE_TEXT = /^(\d+(?:\.\d+)?)(b|kb|mb)$/i
+export const SIZE_TEXT = /^(\d+(?:\.\d+)?)(b|kb|mb)$/i
 const UNIT_BYTES = { b: 1, kb: 1024, mb: 1024 * 1024 }
 
 // The bytes a size stands for; `what` names the option in the error anything else throws.

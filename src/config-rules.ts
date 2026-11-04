@@ -1,4 +1,6 @@
 import { nearest } from './nearest'
+import { SIZE_TEXT } from './runtime/byte-size'
+import { DURATION_TEXT } from './runtime/duration'
 
 // A check of one config value: what it accepts, in words, and the problems it finds in a value of the right kind.
 // `keys` is set on an option bag, whose own keys are checked for typos too.
@@ -17,9 +19,22 @@ export type Rule = true | Check
 
 export const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
-// How a value reads in a message, short and without its contents when it is big.
-export function shown(value: unknown): string {
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null)
+const SECRET_KEY = /secret|key|token|password/i
+const SHOWN_LENGTH = 40
+
+// How a value reads in a message, short and without its contents when it is big or when its key names a secret.
+export function shown(value: unknown, path = ''): string {
+  if (typeof value === 'number')
+    return String(value)
+
+  if (typeof value === 'string') {
+    if (SECRET_KEY.test(path.slice(path.lastIndexOf('.') + 1)))
+      return 'a string'
+
+    return JSON.stringify(value.length > SHOWN_LENGTH ? `${value.slice(0, SHOWN_LENGTH)}...` : value)
+  }
+
+  if (typeof value === 'boolean' || value === null)
     return JSON.stringify(value)
 
   if (Array.isArray(value))
@@ -31,7 +46,7 @@ export function shown(value: unknown): string {
 export function problem(path: string, value: unknown, expected: string, words?: readonly string[]): string {
   const near = typeof value === 'string' && words !== undefined ? nearest(value, words) : undefined
 
-  return `\`${path}\` is ${shown(value)}, expected ${expected}${near === undefined ? '' : `; did you mean ${JSON.stringify(near)}?`}`
+  return `\`${path}\` is ${shown(value, path)}, expected ${expected}${near === undefined ? '' : `; did you mean ${JSON.stringify(near)}?`}`
 }
 
 function check(expected: string, accepts: (value: unknown) => boolean, run?: (value: unknown, path: string, out: string[]) => void, extra: { keys?: Record<string, Rule> | undefined, words?: readonly string[] | undefined } = {}): Check {
@@ -53,6 +68,8 @@ const listed = (words: readonly string[]): string => words.length === 1 ? JSON.s
 export const str = check('a string', value => typeof value === 'string')
 export const bool = check('true or false', value => typeof value === 'boolean')
 export const num = check('a number', value => typeof value === 'number' && Number.isFinite(value))
+// A number that may be Infinity, for a limit whose documented value for no limit it is.
+export const numOrInfinity = check('a number', value => typeof value === 'number' && !Number.isNaN(value))
 export const fn = check('a function', value => typeof value === 'function')
 export const obj = check('an object', isRecord)
 
@@ -60,13 +77,10 @@ export const lit = (given: boolean): Check => check(String(given), value => valu
 
 export const oneOf = (...words: string[]): Check => check(`one of ${listed(words)}`, value => typeof value === 'string' && words.includes(value), undefined, { words })
 
-const DURATION = /^\d+(?:\.\d+)?(?:ms|[smhdw])$/
-const BYTES = /^\d+(?:\.\d+)?(?:b|kb|mb)$/i
-
 // A duration text such as '250ms' or '5m'; whether a zero is allowed is left to the feature that reads it.
-export const duration = check('a duration such as \'250ms\', \'5m\' or \'30d\'', value => typeof value === 'string' && DURATION.test(value))
+export const duration = check('a duration such as \'250ms\', \'5m\' or \'30d\'', value => typeof value === 'string' && DURATION_TEXT.test(value))
 // A size in bytes: a number, or a text with its unit such as '20kb'.
-export const bytes = check('a size such as 4096 or \'20kb\'', value => (typeof value === 'number' && Number.isFinite(value) && value >= 0) || (typeof value === 'string' && BYTES.test(value)))
+export const bytes = check('a size such as 4096 or \'20kb\'', value => (typeof value === 'number' && Number.isFinite(value) && value >= 0) || (typeof value === 'string' && SIZE_TEXT.test(value)))
 
 export function list(item: Rule): Check {
   return check('a list', Array.isArray, (value, path, out) => {

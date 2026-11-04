@@ -126,6 +126,25 @@ export function acceptCookieData(): void {
 // The store of a `session()` with neither its own nor the app's, made on first use.
 let defaultSessions: SessionStore | undefined
 const DEFAULT_SESSIONS_PATH = 'data/sessions.sqlite'
+
+// The file a session() with no store keeps its sessions in, opened as the server starts in production: a folder that cannot be written is an error that names the way out, not a 500 on every request.
+function openDefaultSessions(): SessionStore {
+  if (defaultSessions !== undefined)
+    return defaultSessions
+
+  try {
+    defaultSessions = sqliteSessions(DEFAULT_SESSIONS_PATH)
+  }
+  catch (error) {
+    throw new KayError('config-invalid', `kay: sessions are kept in ${DEFAULT_SESSIONS_PATH} when no store is given, and that file cannot be opened (${error instanceof Error ? error.message : String(error)}); make \`data/\` writable, give \`session({ store })\` or the app's \`store.sessions\` a shared store, or set \`store: false\` to keep them in the cookie`)
+  }
+
+  if (process.env.NODE_ENV === 'production')
+    kayLog('info', `sessions are kept in ${DEFAULT_SESSIONS_PATH}, a file of this machine: servers sharing KAY_SECRET behind one balancer do not share them; give \`store.sessions\` a shared store, or set \`store: false\` to keep them in the cookie`)
+
+  return defaultSessions
+}
+
 const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => void }>()
 
 // Sessions for kay pages and plain Elysia routes alike, as `session` in the context: `ctx.locals.session` in a page, an action or a guard.
@@ -158,9 +177,13 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (options.sameSite !== undefined && !SAME_SITE.has(options.sameSite))
     throw new KayError('config-invalid', `kay: the session sameSite is ${JSON.stringify(options.sameSite)}, which is none of 'lax', 'strict' and 'none'`)
 
-  const config: SessionConfig = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store === false ? undefined : options.store ?? appStore()?.sessions ?? (config.revokedElsewhere ? undefined : (defaultSessions ??= process.env.NODE_ENV === 'test' ? memorySessions() : sqliteSessions(DEFAULT_SESSIONS_PATH))), keys, revokedElsewhere: false }
+  const config: SessionConfig = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store === false ? undefined : options.store ?? appStore()?.sessions ?? (config.revokedElsewhere ? undefined : openDefaultSessions()), keys, revokedElsewhere: false }
 
   const plugin = new Elysia({ name: 'kay/session', seed: config.name })
+    .onStart(() => {
+      if (process.env.NODE_ENV === 'production')
+        config.store()
+    })
     .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) }))
     .onAfterHandle({ as: 'scoped' }, async (context) => {
       const cookie = await context.session.commit()

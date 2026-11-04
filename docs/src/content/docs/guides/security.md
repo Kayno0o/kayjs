@@ -285,7 +285,7 @@ A `limits.byPath` entry at the path of an API module wins over the module's own 
 
 ## Trust a proxy
 
-Behind nginx, Caddy or Cloudflare, every request comes from the proxy. In production, kay counts one proxy in front for a request from a private address that carries `X-Forwarded-For`, so a single nginx or Caddy needs nothing. Say it when there are more, or when there are none.
+Behind nginx, Caddy or Cloudflare, every request comes from the proxy. In production, kay counts one proxy in front for a request from a private address that carries `X-Forwarded-For`, so a single nginx or Caddy works, and kay warns once that it guessed. Say `proxy: 1` to confirm it, `proxy: 2` when there are more, and `proxy: false` when there are none: a server reached directly through a private address, such as a Docker bridge, would otherwise let a visitor choose their own address.
 
 ```ts
 export default defineConfig({

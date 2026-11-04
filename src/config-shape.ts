@@ -1,7 +1,7 @@
 import type { BudgetConfig } from './build/budget'
 import type { ActionsConfig, CardConfig, ClientConfig, CookieDefaults, DirsConfig, FaviconConfig, HealthConfig, I18nConfig, ImagesConfig, JobsConfig, KayConfig, LimitsConfig, LiveConfig, ManifestConfig, MarkdownConfig, MetricsConfig, ObserveConfig, OfflineConfig, PreviewConfig, ProxyConfig, RobotsConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
 import type { Rule } from './config-rules'
-import { bag, bool, bytes, duration, either, fn, list, lit, map, num, obj, oneOf, str, typedKeys } from './config-rules'
+import { bag, bool, bytes, duration, either, fn, isRecord, list, lit, map, num, numOrInfinity, obj, oneOf, str, typedKeys } from './config-rules'
 import { nearest } from './nearest'
 
 // Every key the config and its nested bags take, each with the check of its value, written as records so the compiler refuses a key added to a type and missing here, or listed here and gone from the type.
@@ -35,7 +35,7 @@ const FAVICON: Record<keyof FaviconConfig, Rule> = { image: str, svg: str }
 const MANIFEST: Record<keyof ManifestConfig, Rule> = { shortName: str, themeColor: str, backgroundColor: str, display: oneOf('fullscreen', 'standalone', 'minimal-ui', 'browser'), orientation: oneOf('any', 'natural', 'landscape', 'landscape-primary', 'landscape-secondary', 'portrait', 'portrait-primary', 'portrait-secondary'), startUrl: str, scope: str, maskable: str, shortcuts: list(obj) }
 const MARKDOWN: Record<keyof MarkdownConfig, Rule> = { highlight: fn, headingLinks: bool, readingSpeed: num, imageSizes: str }
 const CARD: Record<keyof CardConfig, Rule> = { font: bag({ family: str, weight: num }), background: str, color: str, logo: str }
-const IMAGES: Record<keyof ImagesConfig, Rule> = { ttl: duration, dirs: map(str), remote: list(str), remoteMaxSize: bytes, remoteTimeout: duration, quality: num, webp: bag({ quality: num }), widths: list(num), avif: either(lit(false), bag({ quality: num })), maxDensity: num, placeholder: lit(false), aspects: list(str), card: bag(CARD), resolve: fn, guard: fn }
+const IMAGES: Record<keyof ImagesConfig, Rule> = { ttl: duration, dirs: map(str), remote: list(str), remoteMaxSize: bytes, remoteTimeout: duration, quality: num, webp: bag({ quality: num }), widths: list(num), avif: either(lit(false), bag({ quality: num })), maxDensity: numOrInfinity, placeholder: lit(false), aspects: list(str), card: bag(CARD), resolve: fn, guard: fn }
 const CORS = bag({ origins: either(oneOf('*'), list(str)), credentials: bool, expose: list(str), headers: list(str), maxAge: duration })
 const CONFIG: Record<keyof KayConfig, Rule> = {
   dirs: bag(DIRS),
@@ -173,7 +173,7 @@ export const GROUPED_KEYS = {
 
 export const CONFIG_GROUPS = ['dirs', 'limits', 'serve', 'observe', 'client'] as const
 
-export const isBag = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+export const isBag = isRecord
 
 // The config with each key of `GROUPED_KEYS` written in its bag, unless the bag sets it already, in which case the bag wins.
 export function groupedKeys<Config extends object>(config: Config): Config {

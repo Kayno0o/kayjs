@@ -862,7 +862,8 @@ export function knownAddress(request: Request, server: Server<unknown> | null | 
   const proxy = proxyOf(setting)
   const record = recordOf(request)
   const address = rewrittenAddress(request) ?? (server ?? record?.server)?.requestIP(request)?.address
-  const trusted = proxy ?? record?.proxy
+  // An explicit `proxy: false` for this call trusts no header, whatever the app's own setting or the inferred hop says.
+  const trusted = setting === false ? undefined : proxy ?? record?.proxy
   // Under `app.handle()`, as in a test, there is no socket: the request came from whatever the test says.
   const fromProxy = address === undefined || fromTrusted(address, trusted)
 
@@ -877,7 +878,7 @@ export function knownAddress(request: Request, server: Server<unknown> | null | 
     }
   }
 
-  if (!trusted && address !== undefined && fromProxy && record?.proxyOff !== true && request.headers.has('x-forwarded-for'))
+  if (!trusted && address !== undefined && fromProxy && setting !== false && record?.proxyOff !== true && request.headers.has('x-forwarded-for'))
     warnUnconfigured()
 
   if (trusted && trusted !== INFERRED_PROXY && !fromProxy && request.headers.has(trusted.header ?? 'x-forwarded-for'))
@@ -1016,7 +1017,7 @@ function noteInferred(): void {
     return
 
   notedInferred = true
-  kayLog('info', 'requests come through a proxy, as their X-Forwarded-For from a private address shows, and kay.config.ts sets no proxy, so kay counts one proxy in front and reads the visitor from the last entry; set proxy: true to say so, proxy: 2 or proxy: { header } for another setup, or proxy: false when none is in front')
+  kayLog('warn', 'a request carries X-Forwarded-For from a private address and kay.config.ts sets no proxy, so kay counts one proxy in front and reads the visitor from the last entry; a server reached directly through a private peer (a Docker bridge or userland proxy, an L4 balancer) lets a client pick its own address that way. Set proxy: 1 to confirm one proxy in front, proxy: 2 or proxy: { header } for another setup, or proxy: false when none is in front')
 }
 
 function warnUnconfigured(): void {

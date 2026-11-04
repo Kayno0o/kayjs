@@ -6,10 +6,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### Defaults that fit production
 
-- With no `proxy`, a production server counts one proxy in front for a request from a private address that carries `X-Forwarded-For`, as `proxy: true` does, and logs once that it does; before, every visitor behind a reverse proxy shared one rate-limit key. A server that faces visitors directly is unchanged, since a public address is counted by itself; set `proxy: false` for one reachable from a private network that is no proxy, `proxy: 2` for two proxies.
+- With no `proxy`, a production server counts one proxy in front for a request from a private address that carries `X-Forwarded-For`, as `proxy: true` does, and warns once that it does: set `proxy: 1` to confirm one proxy in front, since a server reached directly through a private peer (a Docker bridge, an L4 balancer) would let a client choose its own rate-limit key; before, every visitor behind a reverse proxy shared one rate-limit key. A server that faces visitors directly is unchanged, since a public address is counted by itself; set `proxy: false` for one reachable from a private network that is no proxy, `proxy: 2` for two proxies.
 - `session()` with no `store` and none in `store.sessions` keeps its sessions in `data/sessions.sqlite` (memory under `bun test`), revocable, where it kept them in the cookie: everyone signed in by cookie is signed out once. `session({ store: false })` keeps the old behaviour for a host with no disk of its own; a host with several servers gives the app a shared `store`. kayjs-auth is unchanged. Nothing warns about a missing store any more.
 - A `schedule` cron without `tz` is read in the `timeZone` of kay.config.ts when it sets one, the system's otherwise; name `tz` on a schedule that must keep the system's zone.
-- `kay new` with auth scaffolds `requireGuards: true`; `requireGuards` stays `false` by default for an existing app, since a public site would otherwise declare `guards: false` on every page.
+- A new app with auth (`kay new`, `kay add auth`'s scaffold) starts with `requireGuards: true` in its `kay.config.ts`, so a route added later is closed until a guard covers it; `requireGuards` stays `false` by default for an existing app, since a public site would otherwise declare `guards: false` on every page, and #3087 flips the default in 2.0.0.
 
 ### Config values are checked once, and library options too
 

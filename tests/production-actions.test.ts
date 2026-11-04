@@ -864,9 +864,60 @@ console.log(JSON.stringify(store.hit('ada@example.com', '60000ms').count))
       }
     }
 
-    it('counts one proxy in front in production for a request from a private address that carries X-Forwarded-For', async () => {
+    it('counts one proxy in front in production for a request from a private address that carries X-Forwarded-For, warning once that it guessed', async () => {
       expect(await seen(undefined, '10.0.0.2', forwarded)).toBe('198.51.100.1')
       expect(await seen(undefined, '127.0.0.1', forwarded)).toBe('198.51.100.1')
+    })
+
+    it('warns once, naming proxy: 1 and proxy: false, when it infers the proxy', async () => {
+      // A copy of the module, as the warning is kept once per process.
+      const fresh = await import(`../src/server/protection.ts?${'inferred-warning'}`) as typeof import('../src/server/protection')
+      const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+      const before = process.env.NODE_ENV
+
+      process.env.NODE_ENV = 'production'
+
+      try {
+        const app = new Elysia()
+
+        fresh.trustProxy(app, undefined)
+        app.get('/', ({ request }) => fresh.clientAddress(request, socket('10.0.0.2')))
+        await app.handle(forwarded)
+        await app.handle(forwarded)
+
+        const guessed = warn.mock.calls.map(([message]) => String(message)).filter(message => message.includes('proxy: 1 to confirm'))
+
+        expect(guessed).toHaveLength(1)
+        expect(guessed[0]).toContain('proxy: false')
+      }
+      finally {
+        warn.mockRestore()
+
+        if (before === undefined)
+          delete process.env.NODE_ENV
+        else
+          process.env.NODE_ENV = before
+      }
+    })
+
+    it('trusts no header for a call that says proxy: false, whatever the app infers', async () => {
+      const app = new Elysia()
+      const before = process.env.NODE_ENV
+
+      process.env.NODE_ENV = 'production'
+
+      try {
+        trustProxy(app, undefined)
+        app.get('/', ({ request }) => `${clientAddress(request, socket('10.0.0.2'))} ${clientAddress(request, socket('10.0.0.2'), false)}`)
+
+        expect(await (await app.handle(forwarded)).text()).toBe('198.51.100.1 10.0.0.2')
+      }
+      finally {
+        if (before === undefined)
+          delete process.env.NODE_ENV
+        else
+          process.env.NODE_ENV = before
+      }
     })
 
     it('counts a public peer, and a private one with no header, by their own address in production', async () => {

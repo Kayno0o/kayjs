@@ -861,9 +861,9 @@ describe('kay new', () => {
       expect(manifest.scripts).toMatchObject({ 'dev': 'kay dev', 'db:generate': 'pg-orm generate', 'db:migrate': 'pg-orm apply' })
       // Every env file but the example and the tests' own stays out of git, and all of them out of the image; the users are not in a file.
       expect((await Bun.file(join(dir, '.gitignore')).text()).split('\n')).toEqual(expect.arrayContaining(['.env', '.env.*', '!.env.example', '!.env.test']))
-      expect((await Bun.file(join(dir, '.gitignore')).text()).split('\n')).not.toContain('data')
+      expect((await Bun.file(join(dir, '.gitignore')).text()).split('\n')).toContain('data')
       expect((await Bun.file(join(dir, '.dockerignore')).text()).split('\n')).toEqual(expect.arrayContaining(['.git', '.env', '.env.*']))
-      expect(await Bun.file(join(dir, 'Dockerfile')).text()).not.toContain('mkdir data')
+      expect(await Bun.file(join(dir, 'Dockerfile')).text()).toContain('mkdir data')
 
       const compose = await Bun.file(join(dir, 'compose.prod.yaml')).text()
 
@@ -1022,11 +1022,11 @@ describe('kay new', () => {
           // kayjs-auth keeps its users in a SQLite file under `data` unless Postgres does.
           const file = !variant.has('postgres')
 
-          expect({ features, store: !contents['kay.config.ts']!.includes('pgStore'), ignored: contents['.gitignore']!.split('\n').includes('data') }).toEqual({ features, store: file, ignored: file })
+          expect({ features, store: !contents['kay.config.ts']!.includes('pgStore'), ignored: contents['.gitignore']!.split('\n').includes('data') }).toEqual({ features, store: file, ignored: true })
 
           // The file is written by the user the image runs as, in a folder a volume keeps across deploys.
           if (variant.has('docker')) {
-            expect({ features, dir: dockerfile?.includes('RUN mkdir data && chown nobody data\n'), ignored: contents['.dockerignore']!.split('\n').includes('data'), volume: compose?.includes('- data:/app/data') && compose.includes('\nvolumes:\n') && compose.includes('\n  data:') }).toEqual({ features, dir: file, ignored: file, volume: file })
+            expect({ features, dir: dockerfile?.includes('RUN mkdir data && chown nobody data\n'), ignored: contents['.dockerignore']!.split('\n').includes('data'), volume: compose?.includes('- data:/app/data') && compose.includes('\nvolumes:\n') && compose.includes('\n  data:') }).toEqual({ features, dir: true, ignored: true, volume: file })
           }
         }
 

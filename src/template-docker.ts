@@ -134,9 +134,6 @@ function databaseCompose(postgres: boolean): string {
 
 // The binary `kay build --compile` makes carries the pages, their assets and the browser build, so the image holds it alone.
 export function serverContainerFiles({ has }: Setup): Record<string, string> {
-  // kayjs-auth's SQLite file is written under `data`, which the image holds for the volume compose mounts there.
-  const data = has('auth') && !has('postgres')
-
   return {
     'Dockerfile': `FROM oven/bun:${Bun.version} AS build
 WORKDIR /app
@@ -149,13 +146,15 @@ FROM ${RUNTIME_IMAGE}
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/server ./server
-${data ? 'RUN mkdir data && chown nobody data\n' : ''}ENV NODE_ENV=production PORT=3000
+# Sessions are kept in data/sessions.sqlite unless a store is given, and kayjs-auth's SQLite file is written there too: a folder the unprivileged user can write, which the SQLite compose mounts a volume on.
+RUN mkdir data && chown nobody data
+ENV NODE_ENV=production PORT=3000
 EXPOSE 3000
 USER nobody
 HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]
 CMD ["./server"]
 `,
-    '.dockerignore': `node_modules\n.kay\nserver\n.git\n.env\n.env.*\n${data ? 'data\n' : ''}`,
+    '.dockerignore': `node_modules\n.kay\nserver\n.git\n.env\n.env.*\ndata\n`,
     'compose.prod.yaml': has('auth')
       ? databaseCompose(has('postgres'))
       : `services:

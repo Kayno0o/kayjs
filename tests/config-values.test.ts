@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { loadConfig } from '../src/config-loader'
+import { problem } from '../src/config-rules'
 import { invalidConfigValues, unknownConfigKeys } from '../src/config-shape'
 import { scratchDir } from './scratch'
 
@@ -18,6 +19,15 @@ async function load(config: string): Promise<unknown> {
 }
 
 describe('config values checked once at load', () => {
+  it('accepts Infinity where it is documented, reads it back in a message, and shortens or hides what it prints', () => {
+    expect(invalidConfigValues({ images: { maxDensity: Infinity } })).toEqual([])
+    expect(invalidConfigValues({ images: { maxDensity: NaN } })).toEqual(['`images.maxDensity` is NaN, expected a number'])
+    expect(invalidConfigValues({ images: { quality: Infinity } })).toEqual(['`images.quality` is Infinity, expected a number'])
+    expect(invalidConfigValues({ compress: 'x'.repeat(60) })[0]).toBe(`\`compress\` is "${'x'.repeat(40)}...", expected true or false`)
+    expect(problem('auth.sessionSecret', 'hunter2', 'a number')).toBe('`auth.sessionSecret` is a string, expected a number')
+    expect(problem('proxy.key', 'abc', 'a number')).toBe('`proxy.key` is a string, expected a number')
+  })
+
   it('names the key path, the allowed values and the nearest match for a value that is not one of them', () => {
     expect(invalidConfigValues({ trailingSlash: 'sometimes' })).toEqual(['`trailingSlash` is "sometimes", expected one of "never", "always" or "ignore"'])
     expect(invalidConfigValues({ trailingSlash: 'alway' })).toEqual(['`trailingSlash` is "alway", expected one of "never", "always" or "ignore"; did you mean "always"?'])
