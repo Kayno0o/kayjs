@@ -94,6 +94,7 @@ describe('component shell', () => {
 
     it('counts a namespace or default import of kay/i18n', () => {
       expect(islandOf('---\nimport * as i18n from \'kay/i18n\'\nconst x = i18n.formatDate\n---\np {x}')).toBe(true)
+      expect(islandOf('---\nimport i18n from \'kay/i18n\'\nconst x = i18n.formatDate\n---\np {x}')).toBe(true)
     })
 
     it('names the shared values the audit moved, ApiError and apiUrl among them', () => {
