@@ -395,7 +395,9 @@ onMount(() => drawMap(center))
 .map
 ```
 
-The server sends an empty slot for it, which shifts the layout when the map appears. Give it a fallback to show in the meantime: an `@fallback` block at the root of the component's template for every use, or one written under a use, `Map(center={center} hydrate="client")`, for that use alone. The browser replaces it when the island renders. A component's own fallback is static markup: it cannot read the script's values.
+The server sends an empty slot for it, which shifts the layout when the map appears. Give it a fallback to show in the meantime: an `@fallback` block at the root of the component's template for every use, or one written under a use, `Map(center={center} hydrate="client")`, for that use alone. The browser replaces it when the island renders.
+
+A component's own fallback is static markup: it cannot read the script's values, but it can use the script's imports, and `kay check` reports a value or prop it reads.
 
 ```kay
 --- client

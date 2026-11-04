@@ -39,7 +39,7 @@ export interface IslandBrand { readonly [ISLAND]: true }
 
 // What an interactive component's default export is; only islands take `hydrate`.
 // What a static parent passes an island besides its props: when it hydrates, and whether it lives on across navigations, `persist` keeping it by its component, `persist="key"` by a key of its own.
-// `fallback` is the markup a client-only use (`hydrate="client"`) shows on the server until the browser renders the island, written as an `@fallback` block.
+// `fallback` is the markup a client-only use shows on the server until the browser renders the island, written as an `@fallback` block: it reaches the island under a key of kay's own, so a component's `fallback` prop of another kind is its own.
 export interface IslandOptions {
   hydrate?: HydrateWhen | undefined
   persist?: boolean | string | undefined

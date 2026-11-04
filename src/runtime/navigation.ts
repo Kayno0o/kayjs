@@ -87,6 +87,8 @@ export const navigation: {
   loads: number
   // A response showed the server runs another build than this page's: the next link loads in full, as the new build's pages are not this page's to swap in.
   stale?: boolean
+  // The last click had a key held or a button other than the main one, so the browser does something else with it than follow or submit in place.
+  modified?: boolean
   // Set by `onBeforeNavigate` once an island uses it: asked before every leave, a `false` answer keeps the page.
   before?: ((to: URL) => boolean | Promise<boolean>) | undefined
   // Set by the `navigation` value once an island reads it: told each step of a swap, which `./page-swap` reports without importing the reactive code.

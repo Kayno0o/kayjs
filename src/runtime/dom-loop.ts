@@ -67,6 +67,8 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
   renderEffect(() => {
     const items = each()
     const list = items === false || items == null ? [] : listed(items)
+    // A Map's entries are fresh pairs on every run, so with no key written they are matched by their own key.
+    const keyed = items instanceof Map && key === rowKey ? (entry: T) => (entry as [unknown, unknown])[0] : key
 
     untrack(() => {
       const entering = empty.rendered
@@ -78,7 +80,7 @@ export function loop<T>(element: Node | null, start: Node | null, end: Node | nu
       }
 
       built.length = 0
-      rows = claiming() && !entering ? region.claim(() => list.map((item, index) => makeRow(item, index, key === false ? index : key(item)))) : reconcileRows(region, rows, list, key, makeRow)
+      rows = claiming() && !entering ? region.claim(() => list.map((item, index) => makeRow(item, index, keyed === false ? index : keyed(item)))) : reconcileRows(region, rows, list, keyed, makeRow)
 
       if (entering) {
         for (const row of built)

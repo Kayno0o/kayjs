@@ -31,7 +31,8 @@ const FILES: Record<string, string> = {
   'bad.kay': '---\nconst { unit } = props<{ unit: string }>()\nconst width = window.innerWidth\n---\np {width}{unit}\n',
   'plain.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(1)\n---\nb.plain {n()}\n',
   'skeleton.kay': '--- client\nconst { n } = props<{ n: number }>()\nconst width = window.innerWidth\n---\nb.real {n}:{width}\n@fallback\n  b.skeleton waiting\n',
-  'page.kay': '---\nimport Chart from \'./chart.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Skeleton from \'./skeleton.kay\'\nimport Width from \'./width.kay\'\n---\nmain\n  Chart(label="sales")\n  Panel\n  Width(unit="em")\n  Plain(hydrate="client")\n  Plain(hydrate="client")\n    @fallback\n      i.hold held\n  Skeleton(n={2})\n  Skeleton(n={3})\n    @fallback\n      i.own mine\n',
+  'avatar.kay': '--- client\nconst { fallback } = props<{ fallback: string }>()\nconst width = window.innerWidth\n---\nb.av {fallback}:{width}\n',
+  'page.kay': '---\nimport Avatar from \'./avatar.kay\'\nimport Chart from \'./chart.kay\'\nimport Panel from \'./panel.kay\'\nimport Plain from \'./plain.kay\'\nimport Skeleton from \'./skeleton.kay\'\nimport Width from \'./width.kay\'\n---\nmain\n  Chart(label="sales")\n  Panel\n  Width(unit="em")\n  Plain(hydrate="client")\n  Plain(hydrate="client")\n    @fallback\n      i.hold held\n  Skeleton(n={2})\n  Skeleton(n={3})\n    @fallback\n      i.own mine\n  Avatar(fallback="hi")\n',
 }
 
 let dir: string
@@ -41,7 +42,7 @@ let ids: Record<string, string>
 beforeAll(async () => {
   dir = await scratchDir('dom-')
   await Promise.all(Object.entries(FILES).map(async ([name, text]) => Bun.write(join(dir, name), text)))
-  ids = Object.fromEntries(['chart', 'panel', 'plain', 'skeleton', 'width'].map(name => [name, relative(process.cwd(), join(dir, `${name}.kay`))]))
+  ids = Object.fromEntries(['avatar', 'chart', 'panel', 'plain', 'skeleton', 'width'].map(name => [name, relative(process.cwd(), join(dir, `${name}.kay`))]))
 
   const { default: Page } = await import(join(dir, 'page.kay')) as { default: () => unknown }
 
@@ -70,6 +71,10 @@ describe('client-only islands', () => {
     expect(html).toContain(`<slot data-component="${ids.plain}" data-props="[{}]" data-client><i class="hold">held</i></slot>`)
     expect(html).toContain(`<slot data-component="${ids.skeleton}" data-props='[{"n":1},2]' data-client><b class="skeleton">waiting</b></slot>`)
     expect(html).toContain(`<slot data-component="${ids.skeleton}" data-props='[{"n":1},3]' data-client><i class="own">mine</i></slot>`)
+  })
+
+  it('keeps a client-only component\'s own `fallback` prop, which is not the block a use writes', () => {
+    expect(html).toContain(`<slot data-component="${ids.avatar}" data-props='[{"fallback":1},"hi"]' data-client></slot>`)
   })
 
   it('renders each one in the browser, the nested one where the server left its part, and hydrates the rest', async () => {
@@ -106,6 +111,7 @@ describe('client-only islands', () => {
       expect(document.querySelector('b.plain')!.textContent).toBe('1')
       expect([...document.querySelectorAll('b.real')].map(element => element.textContent)).toEqual([`2:${window.innerWidth}`, `3:${window.innerWidth}`])
       expect(document.querySelector('.skeleton, .own, .hold')).toBeNull()
+      expect(document.querySelector('b.av')!.textContent).toBe(`hi:${window.innerWidth}`)
     }
     finally {
       await GlobalRegistrator.unregister()
@@ -150,6 +156,38 @@ describe('client-only islands', () => {
 
     expect(await importsBrowserOnly(holding, analyzeScript(holding, parseKay(holding).script), join(dir, 'chart.kay'), cacheDir)).toBe(false)
     expect(performance.now() - started).toBeLessThan(5000)
+  })
+})
+
+describe('the fallback of a client-only component', () => {
+  const root = join(process.cwd(), 'tests/fixtures/static')
+  const compile = (source: string) => compileKay(source, join(root, 'src/widget.kay'), { output: 'html', component: true, root })
+
+  it('keeps its shorthand classes and the scope attribute of the component\'s styles', () => {
+    const compiled = compile('--- client\nconst w = window.innerWidth\n---\n--- style\n.map { color: red }\n---\np.real {w}\n@fallback\n  .map.animate-pulse\n')
+
+    expect(compiled.classes).toContain('animate-pulse')
+    expect(compiled.tsx).toContain('function KayFallback(')
+    expect(compiled.tsx).toMatch(/data-k-\w+ class=\\+"map animate-pulse\\+"/)
+  })
+
+  it('copies the imports it names, and reports a script value or prop it reads', () => {
+    const compiled = compile('--- client\nimport Icon from \'./icon.kay\'\nimport Other from \'./other.kay\'\nconst { n } = props<{ n: number }>()\nconst width = window.innerWidth\n---\np.real {n}\n@fallback\n  Icon\n  b {width}\n  i {n}\n  u {Math.max(1, 2)}\n')
+
+    expect(compiled.tsx).toContain('import Icon from')
+    expect(compiled.tsx).not.toContain('import Other from')
+    expect(compiled.tsx.indexOf('import Icon from')).toBeLessThan(compiled.tsx.indexOf('function KayFallback('))
+    expect(compiled.diagnostics.map(diagnostic => diagnostic.message)).toEqual([
+      '`@fallback` of a `--- client` component reads `width`, which the server does not have',
+      '`@fallback` of a `--- client` component reads `n`, which the server does not have',
+    ])
+  })
+
+  it('compiles an empty block', () => {
+    const compiled = compile('--- client\nconst w = window.innerWidth\n---\np.real {w}\n@fallback\n')
+
+    expect(compiled.diagnostics).toEqual([])
+    expect(compiled.tsx).toContain('function KayFallback(')
   })
 })
 

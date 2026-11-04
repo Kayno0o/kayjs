@@ -17,3 +17,5 @@ form(action={save})
   input(name="text")
   button.save Save
 div(style="height: 3000px")
+form.find(action="/second" method="get")
+  button.find Find

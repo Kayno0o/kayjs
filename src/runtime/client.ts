@@ -226,10 +226,14 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
 
   // A client-only island has no server markup to claim, only the fallback it renders over.
   if (element.dataset.client !== undefined) {
-    element.textContent = ''
+    const fallback = [...element.childNodes]
 
     try {
       disposers.set(element, noted(element, () => render(() => withIds(ids, () => component(props)), element)))
+
+      // Kept while the component throws, and gone once it has rendered beside it.
+      for (const node of fallback)
+        node.remove()
     }
     catch (error) {
       reportError(error, id)

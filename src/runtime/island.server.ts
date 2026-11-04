@@ -111,6 +111,9 @@ export function noteMessage(key: string): void {
   rendered?.messages.add(key)
 }
 
+// The prop a use's `@fallback` block arrives under besides `fallback`: a client-only island shows that block and does not send it as a prop, while a `fallback` attribute is the component's own and goes through.
+const USE_FALLBACK = 'kay:fallback'
+
 // On the server an interactive component renders inside a `<slot>` the browser hydrates, its props serialized for the client.
 // A client-only one, `client` or rendered with `hydrate="client"`, holds only its fallback in the slot, the use's `@fallback` block else the component's own, until the browser renders into it, and inside another island renders nothing.
 // Browsers lay a slot out as `display: contents`, so the island sits in a flex or grid parent as its own markup would, with no stylesheet to ship.
@@ -122,7 +125,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
     const kept = props.persist === false || props.persist === '' || props.persist === true ? undefined : props.persist
     const persist = props.persist === true ? id : kept
     const browserOnly = client || when === 'client'
-    const own = 'hydrate' in props || 'persist' in props || (browserOnly && 'fallback' in props) ? omit(props, 'hydrate', 'persist', ...browserOnly ? ['fallback'] : []) as P : props
+    const own = 'hydrate' in props || 'persist' in props || USE_FALLBACK in props ? omit(props, 'hydrate', 'persist', USE_FALLBACK, ...browserOnly && USE_FALLBACK in props ? ['fallback'] : []) as P : props
 
     // A key no catalog has is sent nothing: a library's `wording` falls back to its English.
     const state = localeState()
@@ -170,7 +173,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 
     try {
       // Detached, as in the browser, where an island reads nothing the page's components provide.
-      const { result: html, count } = browserOnly ? { result: placeholder(props.fallback, ownFallback), count: 0 } : withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(prefix, () => child(component!(given))), true)))
+      const { result: html, count } = browserOnly ? { result: placeholder((props as Record<string, unknown>)[USE_FALLBACK] as JSX.Element | undefined, ownFallback), count: 0 } : withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(prefix, () => child(component!(given))), true)))
       const shipped = slots.length === 0 ? '' : ` data-slots=${quotedAttribute(slotsValue(slots, html))}`
       // Marks an island whose title the page shows, so the browser leaves it alone while a later one has not hydrated.
       const titled = setsIslandTitle(mark) ? ` ${TITLED_ATTRIBUTE}` : ''

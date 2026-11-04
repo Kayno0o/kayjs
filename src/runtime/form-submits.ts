@@ -1,5 +1,6 @@
 import { withoutBase } from './base'
-import { navigation } from './navigation'
+import { followAsked } from './navigate'
+import { navigation, swappable } from './navigation'
 
 // Takes over the forms posting to an action, which `./navigate` loads once a page shows a form, one takes focus or is posted, so a page holding none never fetches it; the posting itself, in `./forms`, loads once one takes focus or is submitted.
 
@@ -53,10 +54,9 @@ async function loadForms(): Promise<typeof import('./forms')> {
   return formsModule ??= import('./forms')
 }
 
-// Where a form posts when the swap posts it: one of the app's actions, in this tab, with nothing opting it out.
-// An action the page cannot resolve is left to the browser, which posts it natively.
-export function swappedActionUrl(form: HTMLFormElement, submitter: HTMLElement | null): URL | undefined {
-  const method = (submitter?.getAttribute('formmethod') ?? form.getAttribute('method') ?? 'get').toLowerCase()
+// The method and address a submit sends to, when it stays in this tab and nothing opts it out: the submitter's attributes first, then the form's, a method the browser does not know being a GET as it is for the browser.
+function formRoute(form: HTMLFormElement, submitter: HTMLElement | null): { method: string, url: URL } | undefined {
+  const written = (submitter?.getAttribute('formmethod') ?? form.getAttribute('method') ?? 'get').toLowerCase()
   const target = submitter?.getAttribute('formtarget') ?? form.getAttribute('target') ?? ''
   let url: URL
 
@@ -67,10 +67,35 @@ export function swappedActionUrl(form: HTMLFormElement, submitter: HTMLElement |
     return undefined
   }
 
-  if (method !== 'post' || url.origin !== location.origin || (target !== '' && target !== '_self') || form.closest('[data-reload]') || submitter?.hasAttribute('data-reload'))
+  if (url.origin !== location.origin || (target !== '' && target !== '_self') || form.closest('[data-reload]') || submitter?.hasAttribute('data-reload'))
     return undefined
 
-  return ACTION_PATH.test(withoutBase(url.pathname)) ? url : undefined
+  return { method: written === 'post' || written === 'dialog' ? written : 'get', url }
+}
+
+// Where a form posts when the swap posts it: one of the app's actions, in this tab, with nothing opting it out.
+// An action the page cannot resolve is left to the browser, which posts it natively.
+export function swappedActionUrl(form: HTMLFormElement, submitter: HTMLElement | null): URL | undefined {
+  const route = formRoute(form, submitter)
+
+  return route?.method === 'post' && ACTION_PATH.test(withoutBase(route.url.pathname)) ? route.url : undefined
+}
+
+// Where a GET form of the app sends its fields, which replace the action's query as the browser would write it.
+function getFormUrl(form: HTMLFormElement, submitter: HTMLElement | null): URL | undefined {
+  const route = formRoute(form, submitter)
+
+  if (route?.method !== 'get' || !swappable(route.url))
+    return undefined
+
+  const query = new URLSearchParams()
+
+  for (const [name, value] of new FormData(form, submitter))
+    query.append(name, typeof value === 'string' ? value : value.name)
+
+  route.url.search = query.toString()
+
+  return route.url
 }
 
 // The browser posts the form, as it would have without the swap.
@@ -116,6 +141,16 @@ function onSubmit(event: SubmitEvent): void {
 
   if (event.defaultPrevented)
     return
+
+  const searched = navigation.modified && event.submitter ? undefined : getFormUrl(form, event.submitter)
+
+  // A GET form navigates in place as a link does, so a search or a filter keeps the page's islands, scroll and focus; the same path is a change of its query.
+  if (searched) {
+    event.preventDefault()
+    void followAsked(searched, searched.pathname === location.pathname ? { intent: 'query', link: form, focused: document.activeElement } : { intent: 'visit', link: form })
+
+    return
+  }
 
   const url = swappedActionUrl(form, event.submitter)
 

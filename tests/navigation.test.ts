@@ -2019,8 +2019,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     const submit = async (form: string, fill?: string, button?: string) => fresh.evaluate((formSelector, value, buttonSelector) => {
       const element = document.querySelector<HTMLFormElement>(formSelector)!
 
-      if (value !== undefined)
+      if (value !== undefined) {
         element.querySelector('input')!.value = value
+        element.querySelector('input')!.focus()
+      }
 
       element.requestSubmit(buttonSelector === undefined ? null : element.querySelector<HTMLButtonElement>(buttonSelector))
     }, form, fill, button)
@@ -2038,15 +2040,22 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         })
       })
 
+      await fresh.evaluate(() => {
+        document.querySelector('a.next')!.setAttribute('data-kept', '1')
+      })
       await submit('form.same', 'hello world', 'button.go')
       await fresh.waitUntil(() => location.search === '?q=hello+world&mode=all')
       await fresh.waitFor('p.found', { text: 'Found hello world' })
       expect(await sameDocument(fresh)).toBe(true)
+      // The same path is a change of the query: the field typed in keeps its focus.
+      expect(await fresh.evaluate(() => document.activeElement?.getAttribute('name'))).toBe('q')
 
       await submit('form.same', 'again', 'button.other')
       await fresh.waitUntil(() => location.pathname === '/query' && location.search === '?q=again&from=other')
       await fresh.waitFor('h1', { text: 'Query' })
       expect(await sameDocument(fresh)).toBe(true)
+      // A persisted island survives the visit.
+      expect(await fresh.evaluate(() => document.querySelector('a.next')?.getAttribute('data-kept'))).toBe('1')
 
       await fresh.back()
       await fresh.waitFor('p.found', { text: 'Found hello world' })
@@ -2054,13 +2063,66 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       await fresh.waitFor('p.found', { text: 'Found kept' })
       expect(await sameDocument(fresh)).toBe(true)
 
-      // A form opting out, and one to another origin, are the browser's.
+      // An empty method is a GET for the browser.
+      await submit('form.empty')
+      await fresh.waitFor('p.found', { text: 'Found empty' })
+
+      // A form opting out, one to another origin, a POST by the button, and one for another tab are the browser's.
       await submit('form.reload')
       await submit('form.away')
-      expect(await fresh.evaluate(() => (window as { kayPrevented?: boolean[] }).kayPrevented)).toEqual([true, true, true, false, false])
+      await submit('form.post', undefined, 'button.post-go')
+      await submit('form.blank')
+      expect(await fresh.evaluate(() => (window as { kayPrevented?: boolean[] }).kayPrevented)).toEqual([true, true, true, true, false, false, false, false])
       expect(fresh.errors).toEqual([])
     }
     finally {
+      fresh.close()
+    }
+  })
+
+  it('leaves a GET form submit with a key held to the browser, as a link click', async () => {
+    const fresh = await open('/get-form')
+
+    try {
+      await fresh.evaluate(() => {
+        const state = window as { kayPrevented?: boolean[] }
+
+        state.kayPrevented = []
+        window.addEventListener('submit', (event) => {
+          state.kayPrevented!.push(event.defaultPrevented)
+          event.preventDefault()
+        })
+        document.querySelector<HTMLButtonElement>('form.same button.go')!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }))
+        document.querySelector<HTMLButtonElement>('form.same button.go')!.click()
+      })
+      await fresh.waitUntil(() => location.search !== '')
+      expect(await fresh.evaluate(() => (window as { kayPrevented?: boolean[] }).kayPrevented)).toEqual([false, true])
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
+  it('asks the leave guards before a GET form navigates', async () => {
+    const asked: string[] = []
+    const fresh = await open('/guarded')
+
+    await fresh.onDialog((dialog) => {
+      asked.push(`${dialog.type} ${dialog.message}`)
+
+      return false
+    })
+
+    try {
+      await fresh.fill('.two input.draft', 'draft')
+      await fresh.click('form.find button.find')
+      await until(() => asked.length === 1)
+      await settled(fresh)
+      expect(await fresh.path()).toBe('/guarded')
+      expect(asked[0]).toBe('confirm This page has unsaved changes. Leave it anyway?')
+    }
+    finally {
+      await fresh.onDialog(() => false)
       fresh.close()
     }
   })

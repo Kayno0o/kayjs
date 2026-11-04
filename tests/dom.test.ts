@@ -668,6 +668,34 @@ describe('loops', () => {
     }
   })
 
+  const mountIterables = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst set = signal(new Set([\'a\', \'b\']))\nconst map = signal(new Map([[\'x\', 1], [\'y\', 2]]))\nconst count = signal(2)\nfunction* upto(n: number) {\n  for (let index = 0; index < n; index++)\n    yield index\n}\n;(globalThis as { setIterables?: (next: { set: string[], map: [string, number][], count: number }) => void }).setIterables = (next) => {\n  set.set(new Set(next.set))\n  map.set(new Map(next.map))\n  count.set(next.count)\n}\n---\nul.set\n  for item of set()\n    li {item}\nul.map\n  for [name, value] of map()\n    li {name}={value}\nul.gen\n  for n of upto(count())\n    li {n}\n',
+  })
+
+  it('renders a Set, a Map and a generator, read once for each run of the loop', async () => {
+    const { root, dispose } = await mountIterables()
+    const setIterables = (globalThis as unknown as { setIterables: (next: { set: string[], map: [string, number][], count: number }) => void }).setIterables
+    const texts = (selector: string) => [...root.querySelectorAll(`${selector} li`)].map(item => item.textContent)
+
+    try {
+      expect([texts('.set'), texts('.map'), texts('.gen')]).toEqual([['a', 'b'], ['x=1', 'y=2'], ['0', '1']])
+
+      const y = root.querySelectorAll('.map li')[1] ?? null
+
+      setIterables({ set: ['b', 'c', 'd'], map: [['y', 5]], count: 4 })
+      await settle()
+      expect([texts('.set'), texts('.map'), texts('.gen')]).toEqual([['b', 'c', 'd'], ['y=5'], ['0', '1', '2', '3']])
+      // A Map's rows are matched by entry key without a `key`, so the row kept its node.
+      expect(root.querySelector('.map li')).toBe(y)
+      setIterables({ set: [], map: [], count: 0 })
+      await settle()
+      expect([texts('.set'), texts('.map'), texts('.gen')]).toEqual([[], [], []])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
   const mount14 = site({
     'main.kay': '---\nimport { signal } from \'kay\'\n\nconst list = signal([{ id: 1, name: \'a\' }, { id: 2, name: \'b\' }])\n;(globalThis as { setItems?: (next: { id: number, name: string }[]) => void }).setItems = next => list.set(next)\n---\nul\n  for item of list()\n    li {item.name}\n',
   })

@@ -1,4 +1,4 @@
-import type { ClientConfig, DirsConfig, HealthConfig, I18nConfig, KayConfig, LimitsConfig, ObserveConfig, OfflineConfig, ProxyConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
+import type { ClientConfig, CookieDefaults, DirsConfig, HealthConfig, I18nConfig, KayConfig, LimitsConfig, ObserveConfig, OfflineConfig, ProxyConfig, SecurityConfig, SeoConfig, ServeConfig, SitemapConfig } from './config'
 import { nearest } from './nearest'
 
 // Every key the config and its nested bags take, written as records so the compiler refuses a key added to a type and missing here, or listed here and gone from the type.
@@ -121,6 +121,7 @@ export function mergeBags(base: object, over: object): Record<string, unknown> {
   return merged
 }
 
+const COOKIE_DEFAULTS: Record<keyof CookieDefaults, true> = { httpOnly: true, sameSite: true, secure: true, path: true }
 const BAGS: Record<string, Record<string, true>> = { dirs: DIRS, limits: LIMITS, serve: SERVE, observe: OBSERVE, client: CLIENT, security: SECURITY, i18n: I18N, seo: SEO, offline: OFFLINE, health: HEALTH, proxy: PROXY, sitemap: SITEMAP }
 
 // Each key of a config, or of one of its option bags, that no type of the config takes, as `` `trailingslash`, did you mean `trailingSlash`? ``; what an app mistyped would otherwise leave at kay's default with nothing said.
@@ -152,6 +153,11 @@ export function unknownConfigKeys(config: object): string[] {
     if (typeof bag === 'object' && bag !== null && !Array.isArray(bag))
       report(bag, known, `${name}.`)
   }
+
+  const cookies: unknown = (config as { security?: { cookies?: unknown } }).security?.cookies
+
+  if (typeof cookies === 'object' && cookies !== null)
+    report(cookies, COOKIE_DEFAULTS, 'security.cookies.')
 
   return problems
 }

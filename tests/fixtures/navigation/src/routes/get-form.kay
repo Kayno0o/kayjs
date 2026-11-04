@@ -21,3 +21,10 @@ form.away(action="https://example.com/search")
   input(name="q" aria-label="Away")
   button.away-go Away
 Linker(persist)
+form.empty(action="/get-form" method="")
+  input(name="q" value="empty" aria-label="Empty")
+  button.empty-go Empty
+form.post(action="/get-form")
+  button.post-go(formmethod="post") Post
+form.blank(action="/get-form" target="_blank")
+  button.blank-go Blank

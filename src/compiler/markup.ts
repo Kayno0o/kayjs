@@ -408,6 +408,13 @@ export abstract class TemplateWriter {
         b.add(`get ${JSON.stringify(this.source(slot.name))}() { return `)
         this.childrenValue(slot.children, this.lazySlots)
         b.add(' }')
+
+        // A client-only island shows the use's `@fallback` through a key of kay's own, so a component with a `fallback` prop keeps it.
+        if (!getters && this.source(slot.name) === 'fallback') {
+          b.add(', get "kay:fallback"() { return ')
+          this.childrenValue(slot.children, this.lazySlots)
+          b.add(' }')
+        }
       }
     }
 

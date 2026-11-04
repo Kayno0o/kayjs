@@ -67,7 +67,6 @@ export function startNavigation(given: NavigationHooks): void {
 
   history.scrollRestoration = 'manual'
   document.addEventListener('click', onClick)
-  document.addEventListener('submit', onGetSubmit)
   document.addEventListener('focusin', onFocus)
   window.addEventListener('popstate', onPopState)
   // `pagehide` saves the scroll for a full load only: back or forward between entries of this document fires `popstate` once the entry already changed, too late to save the one left, so the entry is kept up to date as the page scrolls.
@@ -222,7 +221,10 @@ export function plainClick(event: MouseEvent): boolean {
 }
 
 function onClick(event: MouseEvent): void {
-  if (!plainClick(event))
+  // Told to the forms' listener, which leaves a submit button pressed with a key held to the browser as a link is.
+  navigation.modified = !plainClick(event)
+
+  if (navigation.modified)
     return
 
   const link = linkOf(event)
@@ -233,44 +235,6 @@ function onClick(event: MouseEvent): void {
 
   event.preventDefault()
   void followAsked(url, { intent: 'visit', link })
-}
-
-// Where a form of the app sends its fields with GET, in this tab, with nothing opting it out: the fields replace the action's query, as the browser would write it.
-function getFormUrl(form: HTMLFormElement, submitter: HTMLElement | null): URL | undefined {
-  const method = submitter?.getAttribute('formmethod') ?? form.getAttribute('method') ?? 'get'
-  const target = submitter?.getAttribute('formtarget') ?? form.getAttribute('target') ?? ''
-  let url: URL
-
-  try {
-    url = new URL(submitter?.getAttribute('formaction') ?? form.getAttribute('action') ?? '', location.href)
-  }
-  catch {
-    return undefined
-  }
-
-  if (method.toLowerCase() !== 'get' || (target !== '' && target !== '_self') || form.closest('[data-reload]') || submitter?.hasAttribute('data-reload') || !swappable(url))
-    return undefined
-
-  const query = new URLSearchParams()
-
-  for (const [name, value] of new FormData(form, submitter))
-    query.append(name, typeof value === 'string' ? value : value.name)
-
-  url.search = query.toString()
-
-  return url
-}
-
-// A GET form navigates in place as a link does, so a search or a filter keeps the page's islands, scroll and focus; the same path is a change of its query.
-function onGetSubmit(event: SubmitEvent): void {
-  const form = event.target as HTMLFormElement
-  const url = event.defaultPrevented ? undefined : getFormUrl(form, event.submitter)
-
-  if (!url)
-    return
-
-  event.preventDefault()
-  void followAsked(url, url.pathname === location.pathname ? { intent: 'query', link: form, focused: document.activeElement } : { intent: 'visit', link: form })
 }
 
 export async function followAsked(url: URL, swap: Swap): Promise<void> {

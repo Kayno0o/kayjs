@@ -41,6 +41,24 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the URL 
   }, 180_000)
 })
 
+describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a GET form', () => {
+  it.each(SETTINGS)('swaps in place, asking onBeforeNavigate, under $name', async ({ options, start }) => {
+    const site = await testSite({ root: ROOT, browser: { path: chrome }, ...options })
+
+    sites.push(site)
+
+    await using page = await site.open(start)
+
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+    await page.click('button.search-go')
+    await page.waitUntil(() => location.search === '?q=x')
+    expect(await page.evaluate(() => (window as { kayAlive?: boolean }).kayAlive === true)).toBe(true)
+    expect(await page.evaluate(() => sessionStorage.getItem('asked'))).toBe(`${await page.evaluate(() => location.pathname)};`)
+  }, 180_000)
+})
+
 const I18N = { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') }
 // Where `navigate()` from a button goes, by the path it is given: the current locale's prefix is put on a path with none, and a prefixed one stays as written.
 const LOCALE_TARGETS = [

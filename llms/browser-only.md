@@ -34,9 +34,9 @@ onMount(() => drawMap(center))
 ### Fallback while the browser renders
 
 - A map or an editor that renders late shifts the layout and flashes. A fallback is the markup the server sends in the island's slot, which the browser replaces when the island renders.
-- A use writes it as an `@fallback` block: `Map(center={center} hydrate="client")` with an `@fallback` block under it holding the skeleton (`.map-skeleton` say). It reaches only that use, and is not a prop of the component.
+- A use writes it as an `@fallback` block: `Map(center={center} hydrate="client")` with an `@fallback` block under it holding the skeleton (`.map-skeleton` say). It reaches only that use, and is not a prop of the component: the `fallback` prop or slot a client-only component declares itself is untouched, but an `@fallback` block under such a use is the island's fallback and is not passed on to it.
 - A `--- client` component declares its own for every use with an `@fallback` block at the root of its template, beside the markup it renders. A use's block wins over it.
-- A component's own fallback renders on the server without the script, so it is static markup: it reads no prop, `const` or import of the script, and takes the place the island fills.
+- A component's own fallback renders on the server without the script, so it is static markup: it reads no prop or `const` of the script (`kay check` names one it reads), and takes the place the island fills. It may use the script's imports, a `Spinner` or an icon.
 - The fallback is for the first paint: give it the island's size, so nothing moves when the island replaces it. An island inside another one renders nothing on the server, as before.
 
 ### Browser globals on the server

@@ -9,7 +9,7 @@ import type { ImportedSignals, SignalKind } from './module-signals'
 import type { NameFindings } from './rewrite'
 import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
-import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
+import { drawIcons, elementsIn, nodeExpressions, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandCause, islandMessages, lineOf, promotionSite } from './codegen'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, openRedirects, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
@@ -23,8 +23,8 @@ import { signalKind } from './module-signals'
 import { SELF } from './names'
 import { findRewrites } from './rewrite'
 import { scopeAttribute } from './scoped-style'
-import { analyzeScript, analyzeServer } from './script'
-import { templateReads } from './template-reads'
+import { analyzeScript, analyzeServer, codeOf } from './script'
+import { bindingNames, templateReads } from './template-reads'
 import { ISLAND_TWIN } from './twin'
 import { validate } from './validate'
 
@@ -46,6 +46,8 @@ export interface CompileOptions {
   outerQueries?: string[] | undefined
   // The named slots the layouts above this page or layout declare, which its `@name` blocks fill: type checking reports a block naming none.
   outerSlots?: string[] | undefined
+  // The scope attribute of the component a nested compile belongs to, which its elements carry for that component's styles.
+  scope?: string | undefined
   // Output for type checking: adds the link, form field and island prop assertions.
   check?: boolean | undefined
   relocateImport?: ((specifier: string) => string | undefined) | undefined
@@ -242,15 +244,17 @@ export function compileKay(original: string, filename: string, options: CompileO
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, options.root), options.importedSignals)
 
-  if (file.style)
-    scopeElements(file, scopeAttribute(islandId(filename, options.root)))
+  const scope = file.style ? scopeAttribute(islandId(filename, options.root)) : options.scope
+
+  if (scope !== undefined)
+    scopeElements(file, scope)
 
   drawIcons(file, new Set([...script.imports, ...server?.imports ?? []].filter(binding => !binding.typeOnly && binding.imported === 'default' && ICON_IMPORT.test(binding.source)).map(binding => binding.local)))
 
   // Pages, layouts and special pages render on the server: a package they import never switches them.
   const routeFile = file.server !== undefined || ROUTE_FILES.has(basename(filename))
   const client = file.client !== undefined || (options.clientOnly === true && !routeFile)
-  const fallback = client ? takeFallback(file, filename, options) : undefined
+  const fallback = client ? takeFallback(file, filename, options, script, scope) : undefined
   const live = routeFile ? undefined : liveImport(script, options.importedSignals)
   const island = client || isInteractive(file, script) || live !== undefined ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
@@ -323,7 +327,7 @@ export function compileKay(original: string, filename: string, options: CompileO
 
   const shorthands = diagnostics.some(diagnostic => (diagnostic.fixes?.length ?? 0) > 0) ? [...elementsIn(file.template)].flatMap(element => element.attributes.filter((attribute): attribute is Shorthand => attribute.kind === 'expression' && attribute.shorthand !== undefined)) : []
   const facts = templateFacts(file)
-  const classes = [...facts.classes, ...expansion?.classes(file) ?? []]
+  const classes = [...facts.classes, ...expansion?.classes(file) ?? [], ...fallback?.classes ?? []]
   const spelled = (options.check ? applyLints(diagnostics, source, options.lints) : diagnostics).map(diagnostic => spelledOut(diagnostic, shorthands, source))
   const reported = (expansion ? [...spelled.map(diagnostic => expansion.diagnostic(diagnostic)), ...coded(problems, 'template-syntax')] : spelled).sort((a, b) => a.start - b.start)
 
@@ -376,11 +380,11 @@ function spelledOut(diagnostic: Diagnostic, shorthands: Shorthand[], source: str
   return { ...diagnostic, fixes }
 }
 
-// A compile error names the group of messages it belongs to, for `kay explain` to look up; a lint keeps its own name.
 const FALLBACK_COMPONENT = /^export default function \w+\(/m
 
 // The `@fallback` block at the root of a client-only component, which the server shows where the island will render: taken out of the template, and compiled alone, as the server never runs the script it would read.
-function takeFallback(file: KayFile, filename: string, options: CompileOptions): { code: string } | undefined {
+// It keeps the script's imports it names and the component's scope attribute, and reports a script value or prop it reads, which the server does not have.
+function takeFallback(file: KayFile, filename: string, options: CompileOptions, script: ScriptAnalysis, scope: string | undefined): { code: string, classes: string[] } | undefined {
   const index = file.template.findIndex(node => node.kind === 'slot' && file.source.slice(node.name.start, node.name.end) === 'fallback')
   const block = file.template[index]
 
@@ -390,15 +394,53 @@ function takeFallback(file: KayFile, filename: string, options: CompileOptions):
   file.template.splice(index, 1)
 
   const lines = file.source.slice(block.start, block.end).split('\n').slice(1).filter(line => line.trim() !== '')
-  const indent = Math.min(...lines.map(line => line.length - line.trimStart().length))
-  const compiled = compileKay(lines.map(line => line.slice(indent)).join('\n'), filename, { output: 'html', root: options.root, component: true })
+  const indent = lines.length === 0 ? 0 : Math.min(...lines.map(line => line.length - line.trimStart().length))
+  const body = lines.map(line => line.slice(indent)).join('\n')
+  const named = (name: string) => new RegExp(`(?<![\\w$])${name.replaceAll('$', '\\$')}(?![\\w$])`).test(body)
+  const imports = script.imports.filter(binding => !binding.typeOnly && named(binding.local)).map(binding => file.source.slice(binding.declaration.start, binding.declaration.end))
+  const header = imports.length === 0 ? '' : `---\n${[...new Set(imports)].join('\n')}\n---\n`
+  const compiled = compileKay(header + body, filename, { output: 'html', root: options.root, component: true, scope })
+  const own = new Set(script.imports.map(binding => binding.local))
+  const declared = new Set([...script.props?.bindings.map(binding => file.source.slice(binding.local.start, binding.local.end)) ?? [], ...scriptNames(file.script ? file.source.slice(file.script.start, file.script.end) : '')])
+  const reads = expressionNames(parseExpanded(header + body).file).filter(name => declared.has(name) && !own.has(name))
 
   for (const diagnostic of compiled.diagnostics)
     file.diagnostics.push({ ...diagnostic, start: block.name.start, end: block.name.end })
 
-  return { code: compiled.tsx.replace(FALLBACK_COMPONENT, 'function KayFallback(') }
+  for (const name of reads) {
+    const at = file.source.slice(block.start, block.end).search(new RegExp(`(?<![\\w$])${name.replaceAll('$', '\\$')}(?![\\w$])`, 'g'))
+    const start = at < 0 ? block.name.start : block.start + at
+
+    file.diagnostics.push({ start, end: at < 0 ? block.name.end : start + name.length, code: 'template-invalid', message: `\`@fallback\` of a \`--- client\` component reads \`${name}\`, which the server does not have`, note: 'the server renders it without running the script', help: 'write static markup, or import what it needs' })
+  }
+
+  return { code: compiled.tsx.replace(FALLBACK_COMPONENT, 'function KayFallback('), classes: compiled.classes }
 }
 
+const EXPRESSION_NAME = /(?<![\w$.])[A-Z_$][\w$]*/gi
+
+// Every name the template's expressions read, as written: the ones a nested block takes from a script it has not.
+function expressionNames(file: KayFile): string[] {
+  const names = new Set<string>()
+
+  visitNodes(file.template, (node) => {
+    for (const span of nodeExpressions(node)) {
+      for (const name of codeOf(file.source.slice(span.start, span.end)).match(EXPRESSION_NAME) ?? [])
+        names.add(name)
+    }
+  })
+
+  return [...names]
+}
+
+const SCRIPT_DECLARATION = /\b(?:const|let|var)\s+([\w$]+|[{[][^=]*?[}\]])\s*[=:;]|\b(?:function|class)\s+([\w$]+)/g
+
+// The top-level names a script declares, by a pattern search: enough to tell a fallback reading one.
+function scriptNames(script: string): string[] {
+  return [...script.matchAll(SCRIPT_DECLARATION)].flatMap(match => match[2] === undefined ? bindingNames(match[1]!) : [match[2]])
+}
+
+// A compile error names the group of messages it belongs to, for `kay explain` to look up; a lint keeps its own name.
 function coded(diagnostics: Diagnostic[], code: ErrorName): Diagnostic[] {
   return diagnostics.map(diagnostic => diagnostic.code === undefined ? { ...diagnostic, code } : diagnostic)
 }

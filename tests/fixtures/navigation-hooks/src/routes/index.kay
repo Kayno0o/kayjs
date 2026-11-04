@@ -6,3 +6,6 @@ head
 h1 Start
 Watcher
 a.second(href="/second") Second
+form.search(method="get")
+  input(name="q" value="x" aria-label="Search")
+  button.search-go Search

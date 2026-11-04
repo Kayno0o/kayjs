@@ -84,8 +84,11 @@ class DefaultedCookies extends Bun.CookieMap {
 
   override delete(name: string): void
   override delete(options: CookieStoreDeleteOptions): void
+  // Written as an expired cookie with the attributes a set would carry, as a `__Host-` or `__Secure-` cookie, or a `Secure` one, is only cleared by a header that is `Secure` too.
   override delete(first: string | CookieStoreDeleteOptions): void {
-    super.delete(typeof first === 'string' ? { name: first, path: this.#defaults.path } : { ...first, path: first.path ?? this.#defaults.path })
+    const { name, domain, path } = typeof first === 'string' ? { name: first, domain: undefined, path: undefined } : first
+
+    super.set(this.#given({ name, value: '', expires: new Date(0), ...domain == null ? {} : { domain }, ...path === undefined ? {} : { path } }) as CookieInit & { name: string, value: string })
   }
 }
 
