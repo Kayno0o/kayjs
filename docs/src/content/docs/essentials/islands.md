@@ -3,7 +3,6 @@ title: Islands
 order: 6
 description: Interactive components render on the server and hydrate in the browser, everything else ships no JavaScript bundle.
 ---
-
 An island is an interactive component. kay renders it on the server, then hydrates it in the browser. Every other component ships no JavaScript.
 
 ```kay
@@ -13,7 +12,7 @@ const count = signal(0)
 button(onClick={() => count++}) Clicked {count()} times
 ```
 
-A component is an island when it has an `on*` handler, a `bind:` or a `ref`, or when its script uses a value from `kay`, such as `signal`. The helpers that compute the same on both sides do not count: `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `ctx`, `defer`, `defineUi`, `describeField`, `durationMs`, `localPath`, `publicEnv`, `recipe`, `refusalMessage`, `route`, `s`, `sanitizeHtml`, `trustHtml`, `uid`, `withBase` and `withQuery` keep a component static.
+A component is an island when it has an `on*` handler, a `bind:` or a `ref`, or when its script uses a value from `kay`, such as `signal`. The helpers that compute the same on both sides do not count: `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `ctx`, `defer`, `defineUi`, `describeField`, `durationMs`, `localPath`, `publicEnv`, `recipe`, `refusalMessage`, `route`, `s`, `sanitizeHtml`, `trustHtml`, `uid`, `withBase` and `withQuery` keep a component static. A namespace or default import of `kay` or `kay/i18n` (`import * as i18n from 'kay/i18n'`) always makes an island, so import the names you use instead.
 
 An island is for what reacts to the user in the browser. A greeting or a stock count that only differs per request needs no JavaScript. Make it a [server island](/essentials/routing#server-islands) instead.
 
