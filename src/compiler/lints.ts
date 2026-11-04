@@ -741,6 +741,14 @@ export const LINTS = {
     wrong: '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n---\nTimeline(label="Day" entries={entries} selected={picked()} onSelect={picked.set})',
     right: '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n---\nTimeline(label="Day" entries={entries} selected={picked()} onSelectedChange={picked.set})',
   },
+  'deprecated-ui-props': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.88',
+    summary: 'A kayjs-ui prop under its name before 1.88: `isDisabled` on a DateInput or DateRangeInput, the per-day predicate, is `disabledDay` now, so `disabled` alone is the boolean every other control takes. The old name works until 1.91. The fix renames the attribute.',
+    wrong: '---\nimport DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\n---\nDateInput(aria-label="Day" isDisabled={iso => iso.endsWith("-25")})',
+    right: '---\nimport DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\n---\nDateInput(aria-label="Day" disabledDay={iso => iso.endsWith("-25")})',
+  },
   'deprecated-hook-names': {
     level: 'warn',
     group: 'deprecated',

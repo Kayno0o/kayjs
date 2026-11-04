@@ -27,7 +27,7 @@ const look = recipe({
   },
 })
 
-const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Choose a date'), previousLabel = wording('ui.dateInput.previous', 'Previous month'), nextLabel = wording('ui.dateInput.next', 'Next month'), todayLabel = wording('ui.dateInput.today', 'Today'), unavailableLabel = wording('ui.dateInput.unavailable', 'This date is not available'), isDisabled, day, open, onOpenChange, onMonthChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'value' | 'type' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
+const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Choose a date'), previousLabel = wording('ui.dateInput.previous', 'Previous month'), nextLabel = wording('ui.dateInput.next', 'Next month'), todayLabel = wording('ui.dateInput.today', 'Today'), unavailableLabel = wording('ui.dateInput.unavailable', 'This date is not available'), disabledDay, isDisabled, day, open, onOpenChange, onMonthChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'value' | 'type' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
   // The box's size: `md` by default, `sm` and `lg` change its padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
@@ -44,9 +44,11 @@ const { value, min, max, firstDay, openLabel = wording('ui.dateInput.open', 'Cho
   previousLabel?: string | undefined
   nextLabel?: string | undefined
   todayLabel?: string | undefined
-  // What a typed date `isDisabled` refuses says to the browser's validation, which holds a form back from posting it.
+  // What a typed date `disabledDay` refuses says to the browser's validation, which holds a form back from posting it.
   unavailableLabel?: string | undefined
   // Whether a single day cannot be chosen, such as a closed day or a booked one: its button is disabled, the arrow keys skip it, a click cannot pick it, and a typed date it refuses is flagged as invalid and not reported to `onChange`, as one outside `min` and `max` is flagged. The earliest and latest date stay `min` and `max`.
+  disabledDay?: ((iso: string) => boolean) | undefined
+  // The name `disabledDay` replaced in 1.88, which `kay upgrade` renames; it works until 1.91.
   isDisabled?: ((iso: string) => boolean) | undefined
   // Draws the inside of a day's button in place of its number, which the block writes itself (`{Number(iso.slice(8))}`), for a price or a dot under it; the button, its `aria-label` and the selection stay.
   day?: Snippet<[iso: string, state: { selected: boolean, today: boolean, outside: boolean, disabled: boolean }]> | undefined
@@ -83,11 +85,12 @@ const names = memo(() => weekdays(pageLocale(), first()))
 const ref = startRef<HTMLInputElement>(element => box = element, rest.ref)
 
 // Whether a day cannot be chosen, outside the bounds or refused by the app.
-const blocked = (iso: string) => !withinBounds(iso, min, max) || isDisabled?.(iso) === true
+const refusedDay = (iso: string) => (disabledDay ?? isDisabled)?.(iso) === true
+const blocked = (iso: string) => !withinBounds(iso, min, max) || refusedDay(iso)
 
 // A typed date the app refuses stays out of the value and holds the form back, as one outside the bounds does through the browser's own validation.
 function flag(next: string): boolean {
-  const refused = isDate(next) && isDisabled?.(next) === true
+  const refused = isDate(next) && refusedDay(next)
 
   box?.setCustomValidity(refused ? unavailableLabel : '')
 

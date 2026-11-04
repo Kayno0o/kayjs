@@ -16,6 +16,8 @@ const MUTED = /(^\s*|[[,?:]\s*)(['"])muted\2(?=\s*([\]),:}]|$))/g
 const MUTED_TONE = /(\btone['"]?\s*:\s*)(['"])muted\2/g
 // The kayjs-ui tags whose `selected` prop reports through `onSelectedChange` since 1.87, the callback named `onSelect` before.
 const SELECTED_TAGS = new Set(['table', 'tree-view', 'timeline'])
+// The kayjs-ui tags whose per-day predicate `isDisabled` is `disabledDay` since 1.88.
+const DATE_TAGS = new Set(['date-input', 'date-range-input'])
 // The kayjs-ui field tags that took the native `size` before 1.87, when `size` became `sm`, `md` or `lg`.
 const FIELD_TAGS = new Set(['text-input', 'select', 'combobox', 'date-input', 'time-input', 'date-time-input'])
 const NUMBER = /^\s*\d+\s*$/
@@ -859,6 +861,14 @@ class Validator {
         const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'onSelectedChange={onSelect}' } : { start: attribute.name.start, end: attribute.name.end, text: 'onSelectedChange' }
 
         this.lint(attribute.name, 'deprecated-ui-callbacks', `\`onSelect\` on \`${element.name}\` is \`onSelectedChange\` since kayjs-ui 1.87, beside the \`selected\` it reports`, { help: 'Write `onSelectedChange`', fixes: [{ title: 'Write `onSelectedChange`', edits: [edit], safe: true }] })
+
+        continue
+      }
+
+      if (DATE_TAGS.has(file) && name === 'isDisabled') {
+        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'disabledDay={isDisabled}' } : { start: attribute.name.start, end: attribute.name.end, text: 'disabledDay' }
+
+        this.lint(attribute.name, 'deprecated-ui-props', `\`isDisabled\` on \`${element.name}\` is \`disabledDay\` since kayjs-ui 1.88, so \`disabled\` alone is the boolean`, { help: 'Write `disabledDay`', fixes: [{ title: 'Write `disabledDay`', edits: [edit], safe: true }] })
 
         continue
       }

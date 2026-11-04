@@ -24,7 +24,7 @@ The button, month and Today labels read the `ui.dateInput.*` messages, or `openL
 
 ## Closed days and a day cell
 
-`isDisabled(iso)` closes single days, such as weekends or booked ones: the day is a disabled button, the arrow keys skip it (a week at a time for up and down), and a typed date it refuses is flagged invalid with `unavailableLabel` and not reported to `onChange`, as a date outside `min` and `max` is flagged by the browser. `min` and `max` still bound the calendar.
+`disabledDay(iso)` closes single days, such as weekends or booked ones: the day is a disabled button, the arrow keys skip it (a week at a time for up and down), and a typed date it refuses is flagged invalid with `unavailableLabel` and not reported to `onChange`, as a date outside `min` and `max` is flagged by the browser. `min` and `max` still bound the calendar.
 
 The `day(iso, state)` block draws the inside of a day's button in place of its number, for a price or a dot under it. Write the number in it yourself; the button, its `aria-label` and the selection stay, and `state` says whether the day is `selected`, `today`, `outside` the month or `disabled`.
 
@@ -35,7 +35,7 @@ import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
 const closed = new Set(['2026-12-24', '2026-12-25'])
 const prices: Record<string, number> = { '2026-12-23': 90 }
 ---
-DateInput(aria-label="Arrival" name="arrival" isDisabled={iso => closed.has(iso)} onMonthChange={month => console.log(month)})
+DateInput(aria-label="Arrival" name="arrival" disabledDay={iso => closed.has(iso)} onMonthChange={month => console.log(month)})
   @day(iso, state)
     span {Number(iso.slice(8))}
     if !state.disabled

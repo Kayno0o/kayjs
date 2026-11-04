@@ -10,5 +10,5 @@ snippet price(iso: string, state: { selected: boolean, disabled: boolean })
   if !state.disabled
     small.price(data-selected={state.selected ? '' : undefined}) 50
 form
-  DateInput#date(aria-label="Day" name="day" value="2026-10-21" isDisabled={iso => closed.has(iso)} day={price} onMonthChange={month => months.push(month)} onChange={onDate})
-  DateRangeInput#range(label="Stay" fromName="from" toName="to" isDisabled={iso => closed.has(iso)} onMonthChange={(month, box) => months.push(`${box}:${month}`)})
+  DateInput#date(aria-label="Day" name="day" value="2026-10-21" disabledDay={iso => closed.has(iso)} day={price} onMonthChange={month => months.push(month)} onChange={onDate})
+  DateRangeInput#range(label="Stay" fromName="from" toName="to" disabledDay={iso => closed.has(iso)} onMonthChange={(month, box) => months.push(`${box}:${month}`)})

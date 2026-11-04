@@ -1159,6 +1159,30 @@ describe('deprecated-ui-callbacks', () => {
   })
 })
 
+describe('deprecated-ui-props', () => {
+  const imports = 'import DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\nimport DateRangeInput from \'@kaynooo/kayjs-ui/date-range-input.kay\'\nimport Other from \'./other.kay\'\n'
+  const found = (template: string) => {
+    const source = `---\n${imports}---\n${template}\n`
+    const result = compileKay(source, 'props.kay', { check: true })
+
+    return result.diagnostics.filter(d => d.code === 'deprecated-ui-props').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
+  }
+
+  it('renames isDisabled on both date inputs', () => {
+    expect(found('DateInput(aria-label="x" isDisabled={closed})')).toEqual([{ at: 'isDisabled', fix: ['isDisabled->disabledDay'] }])
+    expect(found('DateRangeInput(label="x" isDisabled={closed})')).toHaveLength(1)
+  })
+
+  it('writes the shorthand as disabledDay={isDisabled}', () => {
+    expect(found('DateInput(aria-label="x" {isDisabled})')).toEqual([{ at: 'isDisabled', fix: ['{isDisabled}->disabledDay={isDisabled}'] }])
+  })
+
+  it('leaves the new name, the boolean and other tags alone', () => {
+    expect(found('DateInput(aria-label="x" disabledDay={closed} disabled)')).toEqual([])
+    expect(found('Other(isDisabled={closed})')).toEqual([])
+  })
+})
+
 describe('deprecated-lifetimes on the Chat of kayjs-ai', () => {
   const found = (template: string) => {
     const source = `---\nimport Chat from '@kaynooo/kayjs-ai/chat.kay'\nimport Launcher from '@kaynooo/kayjs-ai/chat-launcher.kay'\nimport Other from './other.kay'\n---\n${template}\n`

@@ -78,6 +78,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - kayjs-auth's mail `maxAge` is `{ link: '24h', code: '10m' }`: `lifetime(value, locale)` and `durationWords(value, locale)` take both until 1.91, and `kay upgrade` writes a number literal as `'86400s'` (`deprecated-duration-seconds`). OAuth `expiresAt` (`OAuthTokens`, `StoredCredential`, the `exchange` result) is a `Date`: a custom provider returns `new Date(...)`.
 - kayjs-ai's provider `embed`, `speak` and `transcribe` get `timeout` as a `Duration`, not milliseconds.
 
+### kayjs-ui: DateInput and DateRangeInput `isDisabled` is `disabledDay`
+
+- The per-day predicate keeps the bare-adjective `disabled` for the boolean that disables the whole input. `isDisabled={iso => closed.has(iso)}` is `disabledDay={iso => closed.has(iso)}`; the old name works until 1.91 and `kay check` flags it as `deprecated-ui-props`, with a safe fix that `kay upgrade` applies.
+
 ## 1.87.0
 
 ### `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `publicEnv` and `defineUi` no longer make a component an island
