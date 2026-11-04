@@ -363,6 +363,11 @@ export function sqliteJobs(path: string): JobStore {
 interface JobRow { id: string, queue: string, payload: string, attempts: number, run_at: number, error: string | null, job_key: string | null, progress: string | null }
 type StateRow = JobRow & { failed: number, held_until: number | null }
 
+// What a run that outlasted `lostAfter` fails with, in milliseconds below a second.
+function lostAfterText(milliseconds: number): string {
+  return `it ran past lostAfter, ${milliseconds < 1000 ? `${Math.round(milliseconds)} ms` : `${Math.round(milliseconds / 1000)} s`}`
+}
+
 function statusOf(failed: boolean, heldUntil: number, now: number): StoredJobState['status'] {
   if (failed)
     return 'failed'
@@ -742,7 +747,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
           arm()
 
         timer = setTimeout(() => {
-          const error = new Error(`it ran past lostAfter, ${lostAfter < 1000 ? `${Math.round(lostAfter)} ms` : `${Math.round(lostAfter / 1000)} s`}`)
+          const error = new Error(lostAfterText(lostAfter))
 
           ended.abort(error)
           reject(error)
