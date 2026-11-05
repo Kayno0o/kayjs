@@ -3,7 +3,7 @@ import { ISLAND } from './markers'
 import { moves, place } from './move'
 import { navigation } from './navigation'
 import { runnable, scriptMarkup } from './swap-head'
-import { KEPT, MISSING, morphChildren, UNIT } from './swap-morph'
+import { KEPT, MISSING, morphChildren, scoped, UNIT } from './swap-morph'
 import { decodeServerValue } from './wire'
 
 const PERSISTENT = 'slot[data-persist]'
@@ -50,14 +50,15 @@ export function heldLate(): void {
 const LIVE = 'script[data-kay-live]'
 
 // Throws `MISSING` before anything of the page changed when the next page, a refresh of some of its loads, cannot be put in place: an element it leaves to the page is gone, or it renders live values again, which would replace the connection of those the elements kept hold.
-export function checkKept(next: Document): void {
+// Returns the live element each placeholder stands for, found by their shared id.
+export function checkKept(next: Document): Map<Element, Element> | undefined {
   if (next.body.querySelector(`[${KEPT}]`) === null)
-    return
+    return undefined
 
   if (next.querySelector(LIVE) !== null)
     throw MISSING
 
-  keptUnits(document.body, next.body)
+  return keptUnits(document.body, next.body)
 }
 
 // The live element each placeholder of the next page stands for, found by the id they share.
@@ -78,14 +79,13 @@ function keptUnits(old: Element, body: Element): Map<Element, Element> {
 }
 
 // The next page's body morphed into this one: what it renders again stays the same element, so a layout's sidebar keeps its scroll, and the islands that live on are moved over before anything is taken away, so a playing video or an open socket never notices.
-export function swapBody(next: Document, policy: Policy, held: Held | undefined): void {
+export function swapBody(next: Document, policy: Policy, held: Held | undefined, left: Map<Element, Element> | undefined): void {
   const body = document.adoptNode(next.body)
   const old = document.body
   const focused = heldFocus()
 
   const kept = new Set<Element>()
-  // What the server left to the page as it is, found by its id before anything moves.
-  const left = body.querySelector(`[${KEPT}]`) ? keptUnits(old, body) : undefined
+  // What the server left to the page as it is, found by its id by the caller before anything moved.
   const lives = left ? [...left.values()] : []
 
   // The scroll of each element an island kept holds, which a move resets in a browser without `moveBefore`, and Chrome's swap loses with it too (a bare pair of moves keeps it, the swap's does not), so a restore puts back the ones the swap kept either way.
@@ -185,6 +185,7 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined)
 
   // The server writes `<body>` bare, so every attribute it holds is a script's.
   try {
+    scoped.on = left !== undefined
     morphChildren(old, body, new Set(old.querySelectorAll(LASTING)))
 
     for (const [standIn, live] of standIns) {
@@ -195,6 +196,7 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined)
     }
   }
   finally {
+    scoped.on = false
     parking?.remove()
   }
 

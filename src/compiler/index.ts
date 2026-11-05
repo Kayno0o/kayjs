@@ -63,7 +63,7 @@ export interface CompileOptions {
   output?: 'html' | 'dom' | undefined
   // Server output of a build that hydrates: islands carry markers, and a static component renders through its hydratable `?island` twin inside one.
   hydratable?: boolean | undefined
-  // The project refreshes page loads by name, so a page marks the elements a refresh may keep and leaves out the loads it does not need.
+  // The project refreshes page loads by name, so a page marks the elements a refresh may leave to the page as they are.
   namedRefresh?: boolean | undefined
   // Server output of a static component's `?island` twin, which carries markers like an island.
   twinBuild?: boolean | undefined

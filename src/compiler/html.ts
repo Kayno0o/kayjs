@@ -58,7 +58,7 @@ export interface HtmlOptions {
   errors?: ErrorMessages | undefined
   // Development: the source position each element carries for `kay dev`'s inspector.
   located?: ((element: ElementNode) => string | undefined) | undefined
-  // A refresh asking for some of the page's loads leaves an element reading none of them to the page as it is: the table of the loads, and the group of each such element by where it starts.
+  // A refresh naming some of the page's loads leaves an element reading none of them to the page as it is: the group of each such element by where it starts, with the id it carries.
   kept?: { groups: ReadonlyMap<number, { group: number, id: string }> } | undefined
 }
 
@@ -476,7 +476,7 @@ export class HtmlTemplate extends TemplateWriter {
     markup.dynamic(() => {
       const shown = new Markup(b)
 
-      b.add(`(${PROPS}.${LOAD_KEY}?.kept(${unit.group}) ? ${JSON.stringify(`<${element.name} data-kay-kept data-kay-u="${unit.id}">${VOID_ELEMENTS.has(element.name) ? '' : `</${element.name}>`}`)} : `)
+      b.add(`(${PROPS}[${LOAD_KEY}]?.(${unit.group}) ? ${JSON.stringify(`<${element.name} data-kay-kept data-kay-u="${unit.id}">${VOID_ELEMENTS.has(element.name) ? '' : `</${element.name}>`}`)} : `)
       this.written(element, shown)
       shown.end()
       b.add(')')

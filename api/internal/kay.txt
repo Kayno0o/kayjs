@@ -515,7 +515,7 @@ function leadingNewline(markup: string): string
 function linkHref(href: unknown, localize: boolean, ownRel: boolean): string
 
 [./html] loadScope
-function loadScope(request: Request | undefined, table: LoadTable): LoadRun
+function loadScope(request: Request | undefined, table: LoadTable): LoadKept
 
 [./html] localHref
 function localHref(href: unknown): unknown

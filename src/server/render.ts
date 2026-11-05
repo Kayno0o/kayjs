@@ -473,7 +473,7 @@ async function loadChainAsync(route: ServedRoute, files: string[], rendering: Re
           continue
 
         warnedLoads.add(`${route.file} ${name}`)
-        kayLog('warn', `a refresh asked for the load \`${name}\`, which no page or layout of this route declares as a top-level \`const ${name} = await ...\` in its server fence: nothing was refreshed for it`)
+        kayLog('warn', `a refresh asked for the load \`${name}\`, which no load the build read in this route's page or layouts answers to (the binding of a top-level \`const ${name} = await ...\` in a server fence): nothing was refreshed for it`)
       }
     }
 

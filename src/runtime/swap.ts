@@ -8,7 +8,7 @@ export const NAVIGATE_HEADER = 'x-kay-navigate'
 export const FAILURE_HEADER = 'x-kay-failure'
 // Names the page an action is called, or a form posted, from, which its params, its locale and where a form post goes back to are read off: a `Referer` the app's `referrer-policy` may cut.
 export const PAGE_HEADER = 'x-kay-page'
-// Names the page loads a refresh asks the server to run again, by the bindings of the page's fence, comma separated; the others are left as the page shows them. Without it the page renders whole.
+// Names the page loads a refresh asks the server to send again, by the bindings of the page's fence, comma separated; the server runs every load all the same and leaves the elements reading none of them as placeholders. Without it the page renders whole.
 export const LOADS_HEADER = 'x-kay-loads'
 // What a load name is: the binding of a top-level `const name = await ...`.
 export const LOAD_NAME = /^[\w$]{1,64}$/

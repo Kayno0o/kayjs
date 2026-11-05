@@ -7,9 +7,7 @@ export interface LoadTable {
 }
 
 // What a file's load hands to its markup: whether an element is left to the page as it is, given its group.
-export interface LoadRun {
-  kept: (group: number) => boolean
-}
+export type LoadKept = (group: number) => boolean
 
 const MAX_NAMES = 32
 
@@ -20,7 +18,7 @@ const requested = new WeakMap<Request, ReadonlySet<string> | undefined>()
 // The names a request asked for that a load of the chain answers to.
 const answered = new WeakMap<Request, Set<string>>()
 
-const none: LoadRun = { kept: () => false }
+const none: LoadKept = () => false
 
 // The names in the header of a request, at most `MAX_NAMES` of the form of a binding; anything else is dropped.
 export function requestedLoads(request: Request): ReadonlySet<string> | undefined {
@@ -47,7 +45,7 @@ export function requestedLoads(request: Request): ReadonlySet<string> | undefine
 }
 
 // Called first in a load: tells which elements stay as they are. Every statement and every load runs either way, so a refusal or an error ends a refresh as it ends the whole page; a request asking for the whole page leaves nothing out.
-export function loadScope(request: Request | undefined, table: LoadTable): LoadRun {
+export function loadScope(request: Request | undefined, table: LoadTable): LoadKept {
   const names = request === undefined ? undefined : requestedLoads(request)
 
   if (request === undefined || names === undefined)
@@ -68,7 +66,7 @@ export function loadScope(request: Request | undefined, table: LoadTable): LoadR
       asked.add(id)
   }
 
-  return { kept: group => !table.groups[group]!.some(id => asked.has(id)) }
+  return group => !table.groups[group]!.some(id => asked.has(id))
 }
 
 // The names a request asked for that no load of the page or its layouts answers to, for development to say so.

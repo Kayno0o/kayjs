@@ -1,6 +1,7 @@
 import type { FetchedPage, Swap } from './navigation'
 import type { Policy } from './swap-flight'
 import { reviveActionsOf } from './action-revive'
+import { TITLED } from './markers'
 import { historyState, leave, leaving, navigation, pageKey, restoreScroll, saveScroll } from './navigation'
 import { NAVIGATION_ENTRY } from './navigation-entry'
 import { forgetPageData } from './page-data'
@@ -67,7 +68,8 @@ export async function go(url: URL, swap: Swap): Promise<void> {
   }
 }
 
-function joinedLoads(running: readonly string[] | undefined, asked: readonly string[] | undefined): readonly string[] | undefined {
+// The loads a refresh and the one it cancels ask for together; asking for the whole page, as either does, is asking for all of it.
+export function joinedLoads(running: readonly string[] | undefined, asked: readonly string[] | undefined): readonly string[] | undefined {
   return running && asked ? [...new Set([...running, ...asked])] : undefined
 }
 
@@ -105,11 +107,15 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
     running?.controller.abort()
 
   const controller = reused?.controller ?? new AbortController()
-  // The refresh that this one cancels asked for its loads too, which this page then shows as well; one asking for the whole page makes the whole page.
+  // The refresh that this one cancels asked for its loads too, which this page then shows as well, whether its fetch or only its swap was under way; one asking for the whole page makes the whole page.
   let loads = swap.intent === 'refresh' ? swap.loads : undefined
 
-  if (swap.intent === 'refresh' && running?.intent === 'refresh' && running.key === key && !reused)
-    loads = joinedLoads(running.loads, swap.loads)
+  if (swap.intent === 'refresh') {
+    if (inFlight.owed?.key === key && !reused)
+      loads = joinedLoads(inFlight.owed.loads, swap.loads)
+
+    inFlight.owed = { key, loads }
+  }
 
   const pending = reused?.page ?? pageFor(url, controller.signal, loads)
   const flight = { controller, key, page: pending, href: url.href, intent: swap.intent, loads, replace: swap.replace, scroll: swap.scroll, transition: swap.transition }
@@ -184,6 +190,9 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
 
     try {
       await show(page, url.hash, swap, isCurrent)
+
+      if (isCurrent())
+        inFlight.owed = undefined
     }
     catch (error) {
       // The loads asked for left parts of the page to itself that it no longer has: nothing changed yet, so the whole page is asked for.
@@ -303,9 +312,19 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
   if (!isCurrent())
     return
 
+  // Found once, as late as can be and before anything of the page changes, so a placeholder without its element ends in the whole page being asked for rather than half a swap.
+  const left = checkKept(next)
+
   const commit = () => {
     if (!isCurrent())
       return
+
+    // An element the page kept went away while the swap waited for a view transition: only a full load shows the page right.
+    if (left !== undefined && [...left.values()].some(live => !live.isConnected)) {
+      leave(target, replaces)
+
+      return
+    }
 
     if (navigation.shown === '' || new URL(navigation.shown).pathname !== target.pathname) {
       navigation.arrivals = (navigation.arrivals ?? 0) + 1
@@ -314,13 +333,16 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
         close()
     }
 
-    document.title = next.title
+    // A titled island left to the page keeps the title it set: the server did not render it for this answer, whose title is the page's own.
+    if (left === undefined || ![...left.values()].some(live => live.matches(TITLED) || live.querySelector(TITLED) !== null))
+      document.title = next.title
+
     root()
     head.commit()
     inFlight.typing = process.env.NODE_ENV !== 'production' && navigation.typed === true
 
     try {
-      swapBody(next, policy, held)
+      swapBody(next, policy, held, left)
     }
     finally {
       inFlight.typing = false

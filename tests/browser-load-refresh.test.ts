@@ -78,6 +78,20 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('an actio
     expect(page.errors).toEqual([])
   }, 30_000)
 
+  it('keeps the loads of a refresh superseded after its page arrived, while its swap waits', async () => {
+    await using page = await site.open('/overlap')
+
+    await page.waitFor('button.bump')
+    await page.click('section.cart button.bump')
+    // The answer arrived and the swap waits for the stylesheet it brought; the next refresh starts then.
+    await Bun.sleep(600)
+    await page.click('section.wishlist button.bump')
+    await page.waitFor('p.wish', { text: '3' })
+
+    expect(await page.text('p.cart')).toBe('3')
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
   it('asks the whole page for loads the page no longer has', async () => {
     await using page = await site.open('/island')
 

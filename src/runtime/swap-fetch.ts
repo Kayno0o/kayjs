@@ -50,13 +50,13 @@ async function forgetFailed(key: string, page: Promise<FetchedPage>): Promise<vo
   }
 }
 
-async function fetchPage(url: URL, signal?: AbortSignal, loads?: readonly string[]): Promise<FetchedPage> {
+export async function fetchPage(url: URL, signal?: AbortSignal, loads?: readonly string[]): Promise<FetchedPage> {
   // The page asked for some of its loads is not the page: the browser's cache neither serves nor keeps it.
   const response = await fetch(pageKey(url), { headers: { accept: 'text/html', [NAVIGATE_HEADER]: '1', ...loads && { [LOADS_HEADER]: loads.join(',') } }, signal: signal ?? null, ...loads && { cache: 'no-store' } })
   const type = response.headers.get('content-type') ?? ''
 
   // A page that answers some of its loads is the same page still: a redirect, or another status, is for the whole page to show, since the placeholders it may hold stand for elements of the page asked.
-  if (loads && (!response.ok || response.redirected || pageKey(new URL(response.url)) !== pageKey(url))) {
+  if (loads && (!response.ok || response.redirected || (response.url !== '' && pageKey(new URL(response.url)) !== pageKey(url)))) {
     void response.body?.cancel()
 
     return fetchPage(url, signal)

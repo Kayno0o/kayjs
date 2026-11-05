@@ -20,11 +20,11 @@ export const PROBE = '(KayTarget, KayKey) => { KayTarget[KayKey] = undefined as 
 export const SUBJECT = 'KaySubject'
 // The server fence's function, which hands its data to the template.
 export const LOAD = 'load'
-// The table of a page's loads a refresh can run alone, and the function of `load` telling whether a statement of the fence runs.
+// The table of a page's loads a refresh can name, and the function of `load` telling which elements a refresh leaves to the page.
 export const LOAD_TABLE = 'KayLoadTable'
-export const LOAD_RUN = 'KayRun'
-// The key a page's data carries the scope of its request under, which its markup asks which elements to leave to the page.
-export const LOAD_KEY = '__kayRun'
+export const LOAD_RUN = 'KayKept'
+// The symbol key a page's data carries that function under, which its markup asks; a symbol keeps it out of the app's own names.
+export const LOAD_KEY = 'Symbol.for(\'kay.kept\')'
 // The component function's name in the analysis pass, which no read in the source can resolve to: the real one is chosen once the reads are known.
 export const SELF = 'KaySelf'
 

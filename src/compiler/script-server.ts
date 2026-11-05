@@ -63,7 +63,8 @@ export interface ServerAnalysis {
   // Statements that run per request, inside `load(ctx)`.
   body: Span[]
   // What a refresh of some of the page's loads needs to know of each statement of `body`.
-  facts: Map<Span, BodyFact>
+  // Read only for a page whose project refreshes loads by name, so no other compile pays for them.
+  facts: Map<Span, () => BodyFact>
   // What the fence reads of kay's values without declaring or importing it.
   implicit: string[]
   // Names declared at the top of the fence: `load` returns them and the template reads them.
@@ -138,7 +139,9 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
       }
       else {
         analysis.body.push(...gap, span)
-        analysis.facts.set(span, bodyFact(statement, shift, range => source.slice(range.start, range.end)))
+        let fact: BodyFact | undefined
+
+        analysis.facts.set(span, () => fact ??= bodyFact(statement, shift, range => source.slice(range.start, range.end)))
       }
 
       analysis.plain.push(...plainNames(statement))

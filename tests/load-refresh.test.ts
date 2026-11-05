@@ -7,12 +7,13 @@ const routesDir = 'tests/fixtures/load-refresh/src/routes'
 const site = await testSite({ routesDir, islands: false })
 const based = await testSite({ routesDir, islands: false, base: '/shop', trailingSlash: 'always' })
 const developing = await testSite({ routesDir, islands: false, dev: true })
+const localized = await testSite({ routesDir, islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' } })
 const { counts, reset } = await import(join(import.meta.dir, 'fixtures/load-refresh/src/calls.ts')) as typeof import('./fixtures/load-refresh/src/calls')
 
 const LOADS = 'x-kay-loads'
 
 afterAll(async () => {
-  await Promise.all([site.close(), based.close(), developing.close()])
+  await Promise.all([site.close(), based.close(), developing.close(), localized.close()])
 })
 
 beforeEach(reset)
@@ -270,6 +271,27 @@ describe('a refresh asking for some of the page loads', () => {
 
     expect(logged.filter(message => message.includes('`nothing`'))).toHaveLength(1)
     expect(logged.some(message => message.includes('`cart`'))).toBe(false)
+  })
+
+  it('answers a prefixed locale the same way, keeping its lang and placeholders', async () => {
+    const { html, response } = await asked('/en', 'cart', localized)
+
+    expect(response.status).toBe(200)
+    expect(html).toContain('lang="en"')
+    expect(placeholders(html)).toEqual(['h1', 'section'])
+    expect(response.headers.get('vary')).toContain(LOADS)
+
+    const other = await asked('/', 'cart', localized)
+
+    expect(other.html).toContain('lang="fr"')
+    expect(placeholders(other.html)).toEqual(['h1', 'section'])
+  })
+
+  it('answers a refresh whose names are all in the header the same whatever their order', async () => {
+    const first = await asked('/', 'cart,wishlist')
+    const second = await asked('/', 'wishlist,cart')
+
+    expect(placeholders(first.html)).toEqual(placeholders(second.html))
   })
 
   it('answers the same way under a base and with trailing slashes', async () => {

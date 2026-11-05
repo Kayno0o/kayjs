@@ -46,7 +46,7 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
   const declared = new Set<string>()
 
   for (const span of server.body) {
-    for (const name of server.facts.get(span)?.declared ?? [])
+    for (const name of server.facts.get(span)?.().declared ?? [])
       declared.add(name)
   }
 
@@ -66,10 +66,10 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
     edges.set(name, set)
   }
 
-  const statements: { words: string[], declares: boolean }[] = []
+  const statements: string[][] = []
 
   for (const span of server.body) {
-    const fact = server.facts.get(span)
+    const fact = server.facts.get(span)?.()
 
     if (fact === undefined)
       continue
@@ -84,7 +84,7 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
     for (const name of fact.declared)
       link(name, fact.words)
 
-    statements.push({ words: fact.words, declares: fact.declared.length > 0 })
+    statements.push([...fact.declared, ...fact.words])
   }
 
   if (count === 0)
@@ -110,11 +110,8 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
     return seen
   }
 
-  // A statement that declares nothing may change any value it mentions, or a value one of them is made of (an alias): they now depend on each other.
-  for (const { words, declares } of statements) {
-    if (declares)
-      continue
-
+  // A statement may change any value it mentions, or a value one of them is made of (an alias), and a call cannot be told from a read: the names it mentions now depend on each other.
+  for (const words of statements) {
     const group = new Set([...new Set(words)].filter(word => declared.has(word)).flatMap(word => [...reach(word)]))
 
     for (const name of group)

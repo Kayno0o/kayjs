@@ -79,11 +79,11 @@ export async function navigateTo(to: string | { query: QueryChanges }, options: 
 
 const warned = new Set<string>()
 
-// Development: warns of a name the server would drop and of an empty list, which both ask for the whole page.
-function checkedLoads(asked: readonly string[]): readonly string[] {
+// The names the server would keep: anything else, a control character that makes `fetch` throw included, is left out, and an empty list asks for the whole page. Development warns of both.
+export function checkedLoads(asked: readonly string[]): readonly string[] | undefined {
   const valid = asked.filter(name => LOAD_NAME.test(name))
 
-  if (asked.length === 0 || valid.length !== asked.length) {
+  if (process.env.NODE_ENV !== 'production' && (asked.length === 0 || valid.length !== asked.length)) {
     const message = asked.length === 0 ? 'kay: refresh() was given no load names, so it refreshes the whole page.' : `kay: refresh() was given load names that are not bindings (${asked.filter(name => !valid.includes(name)).map(name => JSON.stringify(name)).join(', ')}): they are left out.`
 
     // Once for each distinct mistake, as a call site repeats it on every click.
@@ -93,11 +93,11 @@ function checkedLoads(asked: readonly string[]): readonly string[] {
     }
   }
 
-  return valid
+  return valid.length === 0 ? undefined : valid
 }
 
 // Runs the page's loads again and shows what they return, keeping scroll, focus and every island whose props did not change.
-// Named loads, the bindings of `const cart = await ...` in the page's or a layout's fence, run alone: the rest of the page stays as it is, unless it shows them.
+// Named loads, the bindings of `const cart = await ...` in the page's or a layout's fence, are the ones sent and swapped: the server runs every load, and the rest of the page stays as it is, unless it shows them.
 // kept: free
 export async function refresh(loads?: string | readonly string[]): Promise<void> {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
@@ -112,5 +112,5 @@ export async function refresh(loads?: string | readonly string[]): Promise<void>
   prefetched.clear()
   const names = typeof loads === 'string' ? [loads] : loads
 
-  await follow(new URL(location.href), { intent: 'refresh', focused: document.activeElement, loads: process.env.NODE_ENV === 'production' || names === undefined ? names : checkedLoads(names) })
+  await follow(new URL(location.href), { intent: 'refresh', focused: document.activeElement, loads: names === undefined ? names : checkedLoads(names) })
 }

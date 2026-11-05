@@ -14,6 +14,9 @@ export const UNIT = 'data-kay-u'
 // Thrown before the page changed, when a placeholder has no element of the page to stand for.
 export const MISSING = Symbol('kept')
 
+// Whether the morph runs for a refresh that left elements to the page: only then do the ids the server gives its elements pair them, as the ids of two different pages say nothing of which element is which.
+export const scoped = { on: false }
+
 // Two nodes the morph makes one of: of one kind and tag, and for an element, the same id and class, or the same unit.
 function alike(live: Node, next: Node): boolean {
   if (live.nodeType !== next.nodeType || live.nodeName !== next.nodeName)
@@ -28,7 +31,7 @@ function alike(live: Node, next: Node): boolean {
   if (other.hasAttribute(KEPT))
     return false
 
-  if (live.hasAttribute(UNIT) || other.hasAttribute(UNIT))
+  if (scoped.on && (live.hasAttribute(UNIT) || other.hasAttribute(UNIT)))
     return live.getAttribute(UNIT) === other.getAttribute(UNIT)
 
   return live.id === other.id && live.getAttribute('class') === other.getAttribute('class') && (!OPAQUE_TAGS.has(live.localName) || (!live.matches(OPAQUE) && !other.matches(OPAQUE)))

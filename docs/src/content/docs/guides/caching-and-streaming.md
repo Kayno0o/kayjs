@@ -223,9 +223,11 @@ The name is the binding of the load, so there is nothing to declare. The server 
 
 Every load runs, because a skipped load cannot be told from a guard: `const owner = await mustOwn(id)` throws a 403 with nothing in it to say so. A page that refuses or fails does the same on a refresh. An element is sent when it reads a named load, a value made of one, or a value a statement changes with it. So is markup outside any element, such as the root of the page or `head`. Put the markup of a load in an element, and the page stays calm.
 
-An `if` or a `for` is part of the element around it, so that element is kept or rendered whole. A layout is never left alone around its page: the element holding the `slot` is rendered, and so are the loads it reads. When the browser cannot put the answer in place, because the page moved on, the answer is a redirect, or the rendered part reads a `live()` value, it asks for the whole page instead.
+An `if` or a `for` is part of the element around it, so that element is kept or rendered whole. A layout is never left alone around its page: the element holding the `slot` is sent whole. When the browser cannot put the answer in place, because the page moved on, the answer is a redirect, or the rendered part reads a `live()` value, it asks for the whole page instead.
 
 Only an element that stands on its own in the template is kept alone: never a component's children, a slot fill, an element with a spread or an element holding the `slot`, and never what is inside an `if` or a `for`.
+
+The build reads the project's sources for a name written as a string, such as `refresh: 'cart'` or `refresh('cart')`. A name held in a constant is not seen, and that project refreshes the whole page, which is correct but sends more. A kept element is not rendered by the server, so an error in its template shows when the whole page renders, and an island inside it that sets the page title keeps the title it set.
 
 The browser moves a kept element in the page. Where the browser has no `moveBefore`, an iframe or a video inside it starts again. A kept element stays as it was, so what it shows of the time or of `ctx` is stale until the next whole render.
 

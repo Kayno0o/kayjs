@@ -200,7 +200,7 @@ class ModuleShell {
   private readonly facts: TemplateFacts
   // Server values an `await` block renders by name: `load` defers each where it is declared, so the template changes how the server fence runs.
   private readonly deferred: Set<string>
-  // The loads of the fence a refresh may run alone, and the elements it may leave as the page shows them: server markup only.
+  // The loads of the fence a refresh may name, and the elements it may leave as the page shows them: server markup only.
   private readonly loadPlan: LoadPlan | undefined
   private jsxTemplate: JsxTemplate | undefined
   // Whether `src/ui.ts` sets variants for this component, which its parts read at runtime.
@@ -886,7 +886,7 @@ class ModuleShell {
 
       this.deferDeclared(server, span)
     }
-    const handOver = `return { ${[...server.data.map(data => this.deferred.has(data.name) ? `${data.name}: ${helperName('autoDefer')}(${data.name})` : data.name), ...this.loadPlan ? [`${LOAD_KEY}: ${LOAD_RUN}`] : []].join(', ')} }`
+    const handOver = `return { ${[...server.data.map(data => this.deferred.has(data.name) ? `${data.name}: ${helperName('autoDefer')}(${data.name})` : data.name), ...this.loadPlan ? [`[${LOAD_KEY}]: ${LOAD_RUN}`] : []].join(', ')} }`
 
     b.add('\n')
     this.sites.handOver = { start: b.code.length, end: b.code.length + handOver.length }
