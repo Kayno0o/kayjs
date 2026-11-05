@@ -28,7 +28,8 @@ release level:
 	  exit 1
 	fi
 	# A release refused before its push leaves the bump and its tag to us, so they go and a retry starts clean; once origin has the tag, they stay.
-	if ! ft release --tagged; then
+	# The suite takes about 16 minutes on CI, past ft's 15 minute default wait.
+	if ! ft release --tagged --timeout 40; then
 	  if [ -z "$(git ls-remote --tags origin "refs/tags/$tag")" ]; then
 	    git tag -d "$tag"
 	    git reset --keep HEAD~1
