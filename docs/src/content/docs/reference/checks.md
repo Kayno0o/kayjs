@@ -87,7 +87,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `external-redirect` | warn | security | A `redirect()` whose target is not written as a path of the site or wrapped in `localPath()`, and that the request can reach, which makes it an open redirect |
 | `async-reply` | warn | code | An `async` function returning kayjs-ai's `ask()`, which awaits the reply so nothing streams |
 | `unreturned-fail` | warn | code | A `ctx.fail(...)` in an action's handler that is not returned, so it does nothing |
-| `missing-captcha` | warn | forms | A kayjs-auth call that asks a CAPTCHA by default (`password.register`, `password.requestReset`, `magicLink.request`, `password.signIn`) written with no `captcha` option, unless a module's `createAuth` sets `captcha: false`, which silences it project-wide, in the editor too |
+| `missing-captcha` | warn | forms | A kayjs-auth call that asks a CAPTCHA by default (`password.register`, `password.requestReset`, `magicLink.request`, `password.signIn`) written with no `captcha` option, unless a module's `authCore` (`createAuth` before 1.91) sets `captcha: false`, which silences it project-wide, in the editor too |
 | `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
 | `brace-in-attribute` | warn | code | A quoted attribute value holding `{name}`, which ships as written: write `title={name}` or a template literal |
 | `over-budget` | warn | code | A page loading more JavaScript, CSS or weight than `budget` allows, or with a worse EcoIndex grade |

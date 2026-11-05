@@ -587,7 +587,9 @@ export const posts = collection(sqliteLoader({
 })
 ```
 
-The entries go in the SQLite file of your app's `store` (`sqliteData`), else `data/content.sqlite`; give `database` to name another. For Postgres, import `pgLoader` from `@kaynooo/kayjs-cms/pg`: it uses the pool of `store: pgData(url)` or `pgData(db)`, or `sql`, a connection URL or a Bun `SQL`. A pg-orm app passes its own connection, `sql: db.sql`, and adds the table to pg-orm's `ignoreTables` (`kay_content` unless you pass `table`), or pg-orm sees it as a table to drop.
+The entries go in the SQLite file of your app's `store` (`sqliteData`), else `data/content.sqlite`; give `database` to name another. For Postgres, import `pgLoader` from `@kaynooo/kayjs-cms/pg`: it uses the pool of `store: pgData(url)` or `pgData(db)`, or `source`, a connection URL, a Bun `SQL` or a pg-orm `Database` (`sql` is its deprecated name).
+
+A pg-orm app passes its own database, `source: db`, and adds the table to pg-orm's `ignoreTables` (`kay_content` unless you pass `table`), or pg-orm sees it as a table to drop.
 
 The `seed` is your initial content. It is written once per collection, so an entry an editor deletes stays deleted and a new seed never overwrites their work. Several collections can share the table, each keyed by its `name`. Pass `table` to name another.
 

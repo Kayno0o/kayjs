@@ -72,6 +72,30 @@ describe('deprecated-library-names', () => {
   })
 })
 
+describe('deprecated-library-names on re-exports and dynamic imports', () => {
+  it('keeps a re-export\'s public name, and renames the member of a dynamic import as the config templates write it', async () => {
+    const reexport = 'export { createAuth } from \'@kaynooo/kayjs-auth\'\n'
+    const template = 'export const store = async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgStore(1)\nexport const plain = import(\'@kaynooo/kayjs-cms\').then(cms => cms.createDrafts)\nexport const direct = (import(\'@kaynooo/kayjs-cms\') as never as { createDrafts: unknown }).createDrafts\n'
+    const fence = '--- server\nconst { pgStore } = await import(\'@kaynooo/kayjs-auth/pg\')\nexport const made = (await import(\'@kaynooo/kayjs-auth/pg\')).pgStore\n---\np x\n'
+    const other = 'export const store = async () => (await import(\'./mine\')).pgStore(1)\nexport const computed = async () => (await import(\'@kaynooo/kayjs-auth/pg\'))[\'pgStore\']\n'
+    const root = await project({ 'src/reexport.ts': reexport, 'src/template.ts': template, 'src/routes/fence.kay': fence, 'src/other.ts': other })
+
+    try {
+      const found = await libraryNames(root, {})
+
+      expect(names(root, found)).toEqual(['src/reexport.ts', 'src/routes/fence.kay', 'src/template.ts', 'src/template.ts'].sort())
+      await applySafeFixes(root, found)
+      expect(await read(root, 'src/reexport.ts')).toBe('export { authCore as createAuth } from \'@kaynooo/kayjs-auth\'\n')
+      expect(await read(root, 'src/template.ts')).toBe(template.replace('.pgStore(1)', '.pgAuth(1)').replace('.createDrafts)', '.createDrafts)').replace('}).createDrafts\n', '}).cmsDrafts\n'))
+      expect(await read(root, 'src/routes/fence.kay')).toBe(fence.replace('made = (await import(\'@kaynooo/kayjs-auth/pg\')).pgStore', 'made = (await import(\'@kaynooo/kayjs-auth/pg\')).pgAuth'))
+      expect(await read(root, 'src/other.ts')).toBe(other)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('deprecated-library-names on pgLoader', () => {
   it('renames the sql key, its shorthand and a namespace call, and leaves a source beside it, another loader and a spread', async () => {
     const keyed = 'import { pgLoader } from \'@kaynooo/kayjs-cms/pg\'\n\nexport const posts = pgLoader({ name: \'posts\', sql: process.env.DATABASE_URL })\n'
@@ -82,7 +106,8 @@ describe('deprecated-library-names on pgLoader', () => {
     const current = 'import { pgLoader } from \'@kaynooo/kayjs-cms/pg\'\n\nexport const posts = pgLoader({ name: \'posts\', source: \'a\' })\n'
     const other = 'import { pgLoader } from \'./mine\'\n\nexport const posts = pgLoader({ name: \'posts\', sql: \'a\' })\n'
     const spread = 'import { pgLoader } from \'@kaynooo/kayjs-cms/pg\'\n\nexport const posts = (options: object) => pgLoader({ ...options, name: \'posts\' })\n'
-    const root = await project({ 'src/keyed.ts': keyed, 'src/shorthand.ts': shorthand, 'src/namespaced.ts': namespaced, 'src/routes/fence.kay': fence, 'src/clash.ts': clash, 'src/current.ts': current, 'src/other.ts': other, 'src/spread.ts': spread })
+    const spreadSql = 'import { pgLoader } from \'@kaynooo/kayjs-cms/pg\'\n\nexport const posts = (options: object) => pgLoader({ ...options, sql: \'a\' })\n'
+    const root = await project({ 'src/keyed.ts': keyed, 'src/shorthand.ts': shorthand, 'src/namespaced.ts': namespaced, 'src/routes/fence.kay': fence, 'src/clash.ts': clash, 'src/current.ts': current, 'src/other.ts': other, 'src/spread.ts': spread, 'src/spread-sql.ts': spreadSql })
 
     try {
       const found = await pgLoaderSource(root, {})
@@ -93,6 +118,7 @@ describe('deprecated-library-names on pgLoader', () => {
         ['src/namespaced.ts', false],
         ['src/routes/fence.kay', false],
         ['src/shorthand.ts', false],
+        ['src/spread-sql.ts', true],
       ])
       await applySafeFixes(root, found)
       expect(await read(root, 'src/keyed.ts')).toBe(keyed.replace('sql:', 'source:'))
@@ -101,7 +127,8 @@ describe('deprecated-library-names on pgLoader', () => {
       expect(await read(root, 'src/routes/fence.kay')).toBe(fence.replace('sql:', 'source:'))
       expect(await read(root, 'src/clash.ts')).toBe(clash)
       expect(await read(root, 'src/other.ts')).toBe(other)
-      expect((await pgLoaderSource(root, {})).map(one => one.file.slice(root.length + 1))).toEqual(['src/clash.ts'])
+      expect(await read(root, 'src/spread-sql.ts')).toBe(spreadSql)
+      expect((await pgLoaderSource(root, {})).map(one => one.file.slice(root.length + 1))).toEqual(['src/clash.ts', 'src/spread-sql.ts'])
       expect(await pgLoaderSource(root, { lints: { 'deprecated-library-names': 'allow' } })).toEqual([])
     }
     finally {

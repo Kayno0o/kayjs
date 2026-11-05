@@ -30,7 +30,42 @@ function isPlain(property: ObjectExpression['properties'][number]): property is 
 
 // An export imported under the name it had before 1.91 (`LIBRARY_NAMES`): the fix renames the import and every use of it.
 export async function libraryNames(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-library-names', modules: LIBRARY_NAMES, needle: OLD_NAME, since: SINCE, until: UNTIL })
+  return [
+    ...await renamedTypes(root, options, { lint: 'deprecated-library-names', modules: LIBRARY_NAMES, needle: OLD_NAME, since: SINCE, until: UNTIL }),
+    ...await dynamicImports(root, options),
+  ]
+}
+
+// A member read straight off a dynamic import, `(await import('@kaynooo/kayjs-auth/pg')).pgStore`, which the config templates write: the fix renames the member.
+async function dynamicImports(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+  if (lintLevel('deprecated-library-names', options.lints) === 'allow')
+    return []
+
+  return scan(root, options, 'deprecated-library-names', OLD_NAME, ({ parsed, report }) => {
+    for (const { ast, base } of parsed) {
+      walk(ast, (node) => {
+        if (node.type !== 'MemberExpression' || node.computed || node.property.type !== 'Identifier')
+          return
+
+        const loaded = unwrapped(node.object)
+        const module = unwrapped(loaded.type === 'AwaitExpression' ? loaded.argument : loaded)
+        const specifier = module.type === 'ImportExpression' ? unwrapped(module.source) : undefined
+
+        if (specifier?.type !== 'Literal' || typeof specifier.value !== 'string' || !Object.hasOwn(LIBRARY_NAMES, specifier.value))
+          return
+
+        const names = LIBRARY_NAMES[specifier.value]!
+        const old = node.property.name
+
+        if (!Object.hasOwn(names, old))
+          return
+
+        const next = names[old]!
+
+        report(base + node.property.start, base + node.property.end, `\`${old}\` is renamed \`${next}\` since ${SINCE}, and the old name works until ${UNTIL}`, `rename it to \`${next}\``, [{ start: base + node.property.start, end: base + node.property.end, text: next }])
+      })
+    }
+  })
 }
 
 // The `sql` key of a `pgLoader({ ... })` literal, `source` since 1.91 as every Postgres store names its database: the fix renames the key, and a `source` set beside it is reported with no fix, as it wins.
@@ -61,11 +96,11 @@ export async function pgLoaderSource(root: string, options: CheckOptions): Promi
         if (!property)
           return
 
-        const clash = plain.some(one => keyName(one) === 'source')
+        const clash = plain.some(one => keyName(one) === 'source') || given.properties.some(one => one.type === 'SpreadElement')
         const { key } = property
         const edit = { start: base + key.start, end: base + (property.shorthand ? property.value.end : key.end), text: property.shorthand ? 'source: sql' : 'source' }
 
-        report(base + key.start, base + key.end, `\`sql\` of \`pgLoader()\` is \`source\` since ${SINCE}, as every Postgres store names its database; the old key works until ${UNTIL}`, clash ? '`source` is set beside it, which wins: drop `sql`' : 'write `source`', clash ? null : [edit])
+        report(base + key.start, base + key.end, `\`sql\` of \`pgLoader()\` is \`source\` since ${SINCE}, as every Postgres store names its database; the old key works until ${UNTIL}`, clash ? '`source` or a spread is set beside it, which may win: write `source` and drop `sql` by hand' : 'write `source`', clash ? null : [edit])
       })
     }
   })
