@@ -1,0 +1,340 @@
+[.] challengeOf
+function challengeOf(verifier: string): Promise<string>
+
+[.] createOAuthClient
+function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuthProvider<Raw, User>, config: OAuthClientConfig): {
+  authorizeUrl({
+    state, codeChallenge, nonce, extraParams
+  }?: AuthorizeUrlOptions): Promise<string>;
+  exchangeCode(code: string, opts?: {
+    codeVerifier?: string;
+  }): Promise<OAuthTokens>;
+  refreshTokens(refreshToken: string): Promise<OAuthTokens>;
+  revokeToken(token: string): Promise<boolean>;
+  fetchUser(accessToken: string): Promise<User>;
+  readUser(tokens: OAuthTokens, opts?: {
+    nonce?: string | undefined;
+    callback?: Record<string, string>;
+  }): Promise<User>;
+}
+
+[.] createOAuthTokenRefresher
+function createOAuthTokenRefresher<K, S>(deps: OAuthTokenRefresherDeps<K, S>): { getValidToken(subject: S): Promise<null | string>; }
+
+[.] createPkcePair
+function createPkcePair(): Promise<PkcePair>
+
+[.] createTokenRefresher
+function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>): { getValidToken(subject: S): Promise<null | string>; }
+
+[.] OAuthExchangeError
+class OAuthExchangeError
+  new (status: number, message: string): OAuthExchangeError
+  code: "oauth-exchange"
+  status: number
+
+[.] SIGNED_IN_HINT
+const SIGNED_IN_HINT: "kay_user"
+
+[./pages/confirm-email.kay] confirm
+function confirm(form: FormData, options?: CallOptions<never> | undefined): Promise<never>
+function confirm(input: { token: string; }, options?: CallOptions<never> | undefined): Promise<never>
+
+[./pages/confirm-email.kay] default
+component default
+
+[./pages/confirm-email.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{ token: string | undefined; error: any; landmark: boolean; }>
+
+[./pages/confirm-email.kay] page
+const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
+
+[./pages/invitation.kay] accept
+function accept(form: FormData, options?: CallOptions<never> | undefined): Promise<never>
+function accept(input: { id: string; }, options?: CallOptions<never> | undefined): Promise<never>
+
+[./pages/invitation.kay] default
+component default
+
+[./pages/invitation.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{
+  auth: any;
+  features: any;
+  prefix: any;
+  requested: string;
+  id: string;
+  invitation: any;
+  user: any;
+  signedIn: boolean;
+  mine: boolean;
+  unverified: boolean;
+  back: string;
+  refused: any;
+  landmark: boolean;
+}>
+
+[./pages/invitation.kay] page
+const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
+
+[./pages/invitation.kay] reject
+function reject(form: FormData, options?: CallOptions<never> | undefined): Promise<never>
+function reject(input: { id: string; }, options?: CallOptions<never> | undefined): Promise<never>
+
+[./pages/invitation.kay] switchAccount
+function switchAccount(form: FormData, options?: CallOptions<never> | undefined): Promise<never>
+function switchAccount(input: { id: string; }, options?: CallOptions<never> | undefined): Promise<never>
+
+[./pages/magic-link.kay] default
+component default
+
+[./pages/magic-link.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{ token: string | undefined; error: any; landmark: boolean; }>
+
+[./pages/magic-link.kay] page
+const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
+
+[./pages/magic-link.kay] spend
+function spend(form: FormData, options?: CallOptions<never> | undefined): Promise<never>
+function spend(input: { token: string; }, options?: CallOptions<never> | undefined): Promise<never>
+
+[./pages/register.kay] default
+component default
+
+[./pages/register.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{
+  auth: any;
+  features: any;
+  prefix: any;
+  redirect: string;
+  user: any;
+  askRemember: boolean;
+  providerLinks: {
+    name: string;
+    label: string;
+    href: string;
+  }[];
+  captcha: {
+    shown: boolean;
+    challenge: null | string;
+  };
+  refused: undefined | {
+    readonly error: any;
+    readonly fields?: never;
+  } | {
+    readonly fields: any;
+    readonly error?: never;
+  };
+  fields: any;
+  error: string | undefined;
+  verify: boolean;
+  landmark: boolean;
+}>
+
+[./pages/register.kay] page
+const page: { guards: false; }
+
+[./pages/register.kay] register
+function register(form: FormData, options?: CallOptions<"verify"> | undefined): Promise<"verify">
+function register(input: {
+  redirect?: string | undefined;
+  remember?: boolean | undefined;
+  username?: string | undefined;
+  'cf-turnstile-response'?: string | undefined;
+  'h-captcha-response'?: string | undefined;
+  'kayjs-captcha'?: string | undefined;
+  email: string;
+  password: string;
+}, options?: CallOptions<"verify"> | undefined): Promise<"verify">
+
+[./pages/reset-password.kay] default
+component default
+
+[./pages/reset-password.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{
+  auth: any;
+  features: any;
+  redirect: string;
+  token: string | undefined;
+  captcha: {
+    shown: boolean;
+    challenge: null | string;
+  };
+  requestError: string | undefined;
+  refused: undefined | {
+    readonly error: any;
+    readonly password?: never;
+  } | {
+    readonly password: any;
+    readonly error?: never;
+  };
+  sent: boolean;
+  landmark: boolean;
+}>
+
+[./pages/reset-password.kay] page
+const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
+
+[./pages/reset-password.kay] request
+function request(form: FormData, options?: CallOptions<"sent"> | undefined): Promise<"sent">
+function request(input: {
+  redirect?: string | undefined;
+  'cf-turnstile-response'?: string | undefined;
+  'h-captcha-response'?: string | undefined;
+  'kayjs-captcha'?: string | undefined;
+  email: string;
+}, options?: CallOptions<"sent"> | undefined): Promise<"sent">
+
+[./pages/reset-password.kay] reset
+function reset(form: FormData, options?: CallOptions<never> | undefined): Promise<never>
+function reset(input: { password: string; token: string; }, options?: CallOptions<never> | undefined): Promise<never>
+
+[./pages/sign-in.kay] default
+component default
+
+[./pages/sign-in.kay] emailCode
+function emailCode(form: FormData, options?: CallOptions<never> | undefined): Promise<never>
+function emailCode(input: { code: string; }, options?: CallOptions<never> | undefined): Promise<never>
+
+[./pages/sign-in.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{
+  auth: any;
+  features: any;
+  prefix: any;
+  redirect: string;
+  user: any;
+  captchaSignIn: {
+    shown: boolean;
+    challenge: null | string;
+  };
+  captchaMagic: {
+    shown: boolean;
+    challenge: null | string;
+  };
+  pending: any;
+  oauthError: string | undefined;
+  signInError: string | undefined;
+  mailError: string | undefined;
+  codeError: any;
+  mailedTo: string | undefined;
+  askRemember: boolean;
+  providerLinks: {
+    name: string;
+    label: string;
+    href: string;
+  }[];
+  codes: any;
+  landmark: boolean;
+}>
+
+[./pages/sign-in.kay] magicLink
+function magicLink(form: FormData, options?: CallOptions<string> | undefined): Promise<string>
+function magicLink(input: {
+  redirect?: string | undefined;
+  remember?: boolean | undefined;
+  'cf-turnstile-response'?: string | undefined;
+  'h-captcha-response'?: string | undefined;
+  'kayjs-captcha'?: string | undefined;
+  email: string;
+}, options?: CallOptions<string> | undefined): Promise<string>
+
+[./pages/sign-in.kay] page
+const page: { guards: false; }
+
+[./pages/sign-in.kay] passkey
+function passkey(form: FormData, options?: CallOptions<never> | undefined): Promise<never>
+function passkey(input: {
+  redirect?: string | undefined;
+  remember?: boolean | undefined;
+  response: AuthenticationResponseJSON;
+}, options?: CallOptions<never> | undefined): Promise<never>
+
+[./pages/sign-in.kay] passkeyOptions
+function passkeyOptions(form: FormData, options?: CallOptions<any> | undefined): Promise<any>
+function passkeyOptions(input: {}, options?: CallOptions<any> | undefined): Promise<any>
+function passkeyOptions(input?: undefined, options?: CallOptions<any> | undefined): Promise<any>
+
+[./pages/sign-in.kay] password
+function password(form: FormData, options?: CallOptions<never> | undefined): Promise<never>
+function password(input: {
+  redirect?: string | undefined;
+  remember?: boolean | undefined;
+  'cf-turnstile-response'?: string | undefined;
+  'h-captcha-response'?: string | undefined;
+  'kayjs-captcha'?: string | undefined;
+  password: string;
+  identifier: string;
+}, options?: CallOptions<never> | undefined): Promise<never>
+
+[./pages/two-factor.kay] default
+component default
+
+[./pages/two-factor.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{
+  auth: any;
+  features: any;
+  pending: any;
+  redirect: string;
+  error: any;
+  landmark: boolean;
+}>
+
+[./pages/two-factor.kay] page
+const page: { guards: false; }
+
+[./pages/two-factor.kay] passkey
+function passkey(form: FormData, options?: CallOptions<never> | undefined): Promise<never>
+function passkey(input: {
+  redirect?: string | undefined;
+  remember?: boolean | undefined;
+  response: AuthenticationResponseJSON;
+}, options?: CallOptions<never> | undefined): Promise<never>
+
+[./pages/two-factor.kay] passkeyOptions
+function passkeyOptions(form: FormData, options?: CallOptions<any> | undefined): Promise<any>
+function passkeyOptions(input: {}, options?: CallOptions<any> | undefined): Promise<any>
+function passkeyOptions(input?: undefined, options?: CallOptions<any> | undefined): Promise<any>
+
+[./pages/two-factor.kay] verify
+function verify(form: FormData, options?: CallOptions<never> | undefined): Promise<never>
+function verify(input: { code: string; }, options?: CallOptions<never> | undefined): Promise<never>
+
+[./pages/verify-email.kay] code
+function code(form: FormData, options?: CallOptions<never> | undefined): Promise<never>
+function code(input: { code: string; }, options?: CallOptions<never> | undefined): Promise<never>
+
+[./pages/verify-email.kay] default
+component default
+
+[./pages/verify-email.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>, object>): Promise<{
+  auth: any;
+  token: string | undefined;
+  user: any;
+  pending: any;
+  refused: any;
+  codeError: any;
+  resendError: any;
+  resent: boolean;
+  landmark: boolean;
+}>
+
+[./pages/verify-email.kay] page
+const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
+
+[./pages/verify-email.kay] resend
+function resend(form: FormData, options?: CallOptions<"sent"> | undefined): Promise<"sent">
+function resend(input: {}, options?: CallOptions<"sent"> | undefined): Promise<"sent">
+function resend(input?: undefined, options?: CallOptions<"sent"> | undefined): Promise<"sent">
+
+[./pages/verify-email.kay] verify
+function verify(form: FormData, options?: CallOptions<never> | undefined): Promise<never>
+function verify(input: { password?: string | undefined; token: string; }, options?: CallOptions<never> | undefined): Promise<never>
+
+[./rules] DEFAULT_RULES
+const DEFAULT_RULES: ResolvedRules
+
+[./rules] mixesConfusableScripts
+function mixesConfusableScripts(value: string): boolean
+
+[./rules] resolveRules
+function resolveRules(rules?: CredentialRules): ResolvedRules

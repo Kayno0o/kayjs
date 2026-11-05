@@ -91,6 +91,37 @@ type WidenedProps<Props, Added> = Props extends unknown ? Without<Props, keyof A
   [Name in Exclude<keyof Added, KnownKeys<Props>>]?: VariantValue<Record<Added[Name] & string, unknown>> | undefined
 } : never
 
+[./analytics] ANALYTICS_PATH
+const ANALYTICS_PATH: "/_kay/analytics"
+
+[./analytics] ANALYTICS_PROVIDERS
+const ANALYTICS_PROVIDERS: ReadonlySet<string>
+
+[./analytics] ANALYTICS_SCRIPT_PATH
+const ANALYTICS_SCRIPT_PATH: "/_kay/analytics.js"
+
+[./analytics] CUSTOM_COLLECT_PATH
+const CUSTOM_COLLECT_PATH: "/_kay/analytics/collect"
+
+[./analytics] CUSTOM_SCRIPT_PATH
+const CUSTOM_SCRIPT_PATH: "/_kay/analytics/script.js"
+
+[./analytics] INTEGRITY
+const INTEGRITY: RegExp
+
+[./analytics] isGated
+function isGated(options: AnalyticsOptions): boolean
+
+[./analytics] LazyGuard
+interface LazyGuard
+  load: () => Guard | Promise<Guard>
+
+[./analytics] NOTICE_SCRIPT_PATH
+const NOTICE_SCRIPT_PATH: "/_kay/analytics/notice.js"
+
+[./analytics] TRACKER_TAGS
+const TRACKER_TAGS: WeakSet<HeadTag>
+
 [./arrival] ARRIVAL_HIGHLIGHT
 const ARRIVAL_HIGHLIGHT: "kay-search"
 
@@ -148,6 +179,15 @@ function refreshForEdit(): Promise<void>
 
 [./client] startNavigation
 function startNavigation(given: NavigationHooks): void
+
+[./content] COLLECTION
+const COLLECTION: typeof COLLECTION
+
+[./content] contentKey
+function contentKey(name: string): string
+
+[./content] PUBLISH_TIMES
+const PUBLISH_TIMES: typeof PUBLISH_TIMES
 
 [./dom] animated
 function animated(unit: Unit | null): boolean
@@ -1537,3 +1577,6 @@ function pendingCall(block: Element, action: unknown): void
 
 [./pending] PendingSource
 type PendingSource = 'post' | 'hold' | 'call'
+
+[./server] editSessionOf
+function editSessionOf(request: Request): string | undefined

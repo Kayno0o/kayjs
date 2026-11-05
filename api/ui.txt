@@ -134,9 +134,6 @@ interface FilterField
 [.] formIssues
 const formIssues: Context<(() => Record<string, string>) | undefined>
 
-[.] holdToasts
-function holdToasts(hold: ToastHold, on: boolean): void
-
 [.] HoverCardPlacement
 type HoverCardPlacement = PopoverPlacement | 'top' | 'bottom' | 'left' | 'right'
 
@@ -480,9 +477,6 @@ function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string
 
 [.] Tone
 type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
-
-[.] TOOLBAR_ACTIONS
-const TOOLBAR_ACTIONS: readonly ["bold", "italic", "heading", "bulletList", "numberedList", "link", "image"]
 
 [.] ToolbarAction
 type ToolbarAction = typeof TOOLBAR_ACTIONS[number]

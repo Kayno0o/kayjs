@@ -1309,15 +1309,6 @@ function withQuery(changes: Readonly<Record<string, null | number | string | und
 [./analytics] analytics
 function analytics(options: AnalyticsOptions): KayExtension<AnyElysia>
 
-[./analytics] ANALYTICS_PATH
-const ANALYTICS_PATH: "/_kay/analytics"
-
-[./analytics] ANALYTICS_PROVIDERS
-const ANALYTICS_PROVIDERS: ReadonlySet<string>
-
-[./analytics] ANALYTICS_SCRIPT_PATH
-const ANALYTICS_SCRIPT_PATH: "/_kay/analytics.js"
-
 [./analytics] AnalyticsConsent
 interface AnalyticsConsent
   agree?: AnalyticsText | undefined
@@ -1356,12 +1347,6 @@ function consent(): Consent
 
 [./analytics] Consent
 type Consent = 'yes' | 'no' | ''
-
-[./analytics] CUSTOM_COLLECT_PATH
-const CUSTOM_COLLECT_PATH: "/_kay/analytics/collect"
-
-[./analytics] CUSTOM_SCRIPT_PATH
-const CUSTOM_SCRIPT_PATH: "/_kay/analytics/script.js"
 
 [./analytics] CustomOptions
 interface CustomOptions extends Common
@@ -1403,16 +1388,6 @@ interface Ga4Options extends Counted
   provider: "ga4"
   titles?: boolean | undefined
 
-[./analytics] INTEGRITY
-const INTEGRITY: RegExp
-
-[./analytics] isGated
-function isGated(options: AnalyticsOptions): boolean
-
-[./analytics] LazyGuard
-interface LazyGuard
-  load: () => Guard | Promise<Guard>
-
 [./analytics] MatomoOptions
 interface MatomoOptions extends Counted
   consent?: AnalyticsConsent | boolean | undefined
@@ -1425,9 +1400,6 @@ interface MatomoOptions extends Counted
   siteId: number | string
   titles?: boolean | undefined
   tokenAuth?: string | undefined
-
-[./analytics] NOTICE_SCRIPT_PATH
-const NOTICE_SCRIPT_PATH: "/_kay/analytics/notice.js"
 
 [./analytics] PlausibleOptions
 interface PlausibleOptions extends Counted
@@ -1459,9 +1431,6 @@ interface SimpleAnalyticsOptions extends Counted
   policyUrl?: string | undefined
   provider: "simpleanalytics"
   titles?: boolean | undefined
-
-[./analytics] TRACKER_TAGS
-const TRACKER_TAGS: WeakSet<HeadTag>
 
 [./analytics] UmamiOptions
 interface UmamiOptions extends Counted
@@ -1685,9 +1654,6 @@ interface Collection<Data, Components extends Record<string, Component<never>> =
   options: CollectionOptions<TSchema, boolean>
   translation: (entry: { slug: string; data: unknown; }, locale: string) => Promise<EntryOf<Data, Routed> | undefined>
 
-[./content] COLLECTION
-const COLLECTION: typeof COLLECTION
-
 [./content] collectionInfo
 function collectionInfo(name: string, { counts }?: { counts?: boolean | undefined; }): Promise<CollectionInfo | undefined>
 
@@ -1755,9 +1721,6 @@ class ContentChangedError
   new (message?: string | undefined, options?: ErrorOptions | undefined): ContentChangedError
   new (message?: string | undefined, options?: ErrorOptions | undefined): ContentChangedError
   name: string
-
-[./content] contentKey
-function contentKey(name: string): string
 
 [./content] ContentLoader
 interface ContentLoader<Data = unknown>
@@ -2011,9 +1974,6 @@ interface Paginated<Item>
   page: (param: number | string | undefined) => Promise<Page<Item> | undefined>
   pageCounts: (settings?: LocaleSettings | undefined) => Promise<Map<string | undefined, number>>
   pageSize: number
-
-[./content] PUBLISH_TIMES
-const PUBLISH_TIMES: typeof PUBLISH_TIMES
 
 [./content] reference
 function reference(collection: string, options?: ElysiaStringOptions | undefined): TString
@@ -2595,9 +2555,6 @@ function editedEntry(request: Request, collection: string, slug: string): boolea
 
 [./server] editRequested
 function editRequested(request: Request): boolean
-
-[./server] editSessionOf
-function editSessionOf(request: Request): string | undefined
 
 [./server] EnqueueOptions
 interface EnqueueOptions

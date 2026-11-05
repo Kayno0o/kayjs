@@ -121,6 +121,8 @@ export const db = new Database({ url: process.env.DATABASE_URL!, tables: [...aut
 // in createAuth: store: pgStore(db)
 ```
 
+Each table is exported on its own too, for a foreign key from a table of yours: `AuthUsers`, `AuthSessions`, `AuthIdentities`, `AuthPasskeys`, `AuthRecoveryCodes`, `AuthTokens`, `AuthAttempts`, `AuthAudit`, `AuthBearerTokens`, `AuthOrganizations`, `AuthMembers`, `AuthInvitations`, `AuthOAuthClients`, `AuthOAuthCodes`, `AuthOAuthGrants` and `AuthOAuthRefresh`.
+
 ## The signed-in user
 
 `user()` resolves to the user, or `null`.

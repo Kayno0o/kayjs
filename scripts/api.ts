@@ -48,12 +48,19 @@ export const INTERNAL: Record<string, InternalRules> = {
     // What compiled `.kay` files and kay's generated entries import (`llms/project.md`), and what kay's libraries share with it, released in lockstep.
     entries: [/^\.\/(?:html|dom|dom-[a-z]+|pending|i18n-links|island|await|client|arrival|jsx-runtime|internal(?:\/.+)?|library(?:\/.+)?)$/],
     // The compile-time machinery behind the generated shadow types, named by no doc.
-    names: { '.': ['BindableMark', 'IslandBrand', 'HandedPart', 'HandsPart', 'HandedSignal', 'UnresolvedParameter', 'WidenedProps', 'CheckedHref', 'CheckedHtml', 'BoundProp', 'BoundValue', 'PlainIslandProp', 'FunctionProp', 'Inferred', 'TemplateHelpers', 'TemplateValues', 'Truthy'] },
+    names: { '.': ['BindableMark', 'IslandBrand', 'HandedPart', 'HandsPart', 'HandedSignal', 'UnresolvedParameter', 'WidenedProps', 'CheckedHref', 'CheckedHtml', 'BoundProp', 'BoundValue', 'PlainIslandProp', 'FunctionProp', 'Inferred', 'TemplateHelpers', 'TemplateValues', 'Truthy'],
+      // Named by no doc: the analytics extension's paths and tracker tags, what kayjs-cms's loaders key a collection by, and the reader of a preview session.
+      './analytics': ['ANALYTICS_PATH', 'ANALYTICS_PROVIDERS', 'ANALYTICS_SCRIPT_PATH', 'CUSTOM_COLLECT_PATH', 'CUSTOM_SCRIPT_PATH', 'INTEGRITY', 'isGated', 'LazyGuard', 'NOTICE_SCRIPT_PATH', 'TRACKER_TAGS'], './content': ['COLLECTION', 'contentKey', 'PUBLISH_TIMES'], './server': ['editSessionOf'] },
   },
-  // `lib/` and `field-look` are what an ejected copy shares with the library ("for copies and not a stable API", `packages/ui/llms/setup.md`).
-  ui: { entries: [/^\.\/lib\//, /^\.\/field-look$/] },
+  // `lib/` and `field-look` are what an ejected copy shares with the library ("for copies and not a stable API", `packages/ui/llms/setup.md`), as are the toaster's hold and the markdown editor's action list.
+  ui: { entries: [/^\.\/lib\//, /^\.\/field-look$/], names: { '.': ['holdToasts', 'TOOLBAR_ACTIONS'] } },
+  // The OAuth plumbing `createAuth` builds its providers from, and the `load` and actions of the prebuilt pages, which only the routes the extension mounts call.
+  auth: {
+    entries: [/^\.\/pages\//],
+    names: { '.': ['challengeOf', 'createOAuthClient', 'createOAuthTokenRefresher', 'createPkcePair', 'createTokenRefresher', 'OAuthExchangeError', 'SIGNED_IN_HINT'], './rules': ['DEFAULT_RULES', 'mixesConfusableScripts', 'resolveRules'] },
+  },
   // The room the entry screen's parts watch through: `entryRoom` and `Member` are documented, the rest only the shipped parts use.
-  cms: { entries: [], names: { './room': ['editorsOf', 'hashOf', 'openRoom', 'watchRoom', 'WATCHED_ROWS'] } },
+  cms: { entries: [], names: { './form': ['createShown', 'formScope'], './room': ['editorsOf', 'hashOf', 'openRoom', 'watchRoom', 'WATCHED_ROWS'] } },
 }
 
 export function isInternal(name: string, specifier: string, exported: string): boolean {
@@ -497,7 +504,10 @@ if (import.meta.main) {
 
   const { record, refused, unknown } = recordBreaking(breaking, process.argv.includes('--breaking'), named)
 
-  if (report.length === 0 && stale.length === 0) {
+  // A name moved between a package's API file and its internal one reports nothing, and its files still change.
+  const rewritten = [...current].some(([path, text]) => (existsSync(join(root, path)) ? readFileSync(join(root, path), 'utf8') : '') !== text)
+
+  if (report.length === 0 && stale.length === 0 && !(update && rewritten)) {
     console.log('api: unchanged')
   }
   else if (!update) {

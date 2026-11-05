@@ -1,3 +1,9 @@
+[.] holdToasts
+function holdToasts(hold: ToastHold, on: boolean): void
+
+[.] TOOLBAR_ACTIONS
+const TOOLBAR_ACTIONS: readonly ["bold", "italic", "heading", "bulletList", "numberedList", "link", "image"]
+
 [./field-look] CHECKBOX
 const CHECKBOX: { root: string; input: string; label: string; hint: string; }
 

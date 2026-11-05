@@ -119,6 +119,41 @@ it('prints the members of a union in one order whichever way it was written', ()
   expect(sortUnions('{ "a | b": 1; c: (() => void) | null }')).toBe('{ "a | b": 1; c: (() => void) | null }')
 })
 
+const WORD = /[\w$]+/g
+const DOC_FILES = ['llms.txt', 'llms/**/*.md', 'packages/*/llms.txt', 'packages/*/llms/**/*.md', 'docs/src/content/docs/**/*.md']
+// What happened to a name is no documentation of it: the upgrade notes, the release notes and the table of deprecated lints name old forms.
+const HISTORY = /(?:^|\/)(?:upgrading|whats-new)(?:-archive)?\.md$|(?:^|\/)deprecated-lints\.md$|reference\/checks\.md$/
+const VALUE_BLOCK = /^(?:function|const|class) /
+
+// 2.0 freezes whatever the snapshot holds, so a value nothing tells an app to use is listed as internal (`INTERNAL` in scripts/api.ts) rather than left public by default.
+it('names every value export in the docs or lists it as internal', () => {
+  const documented = new Set<string>()
+
+  for (const pattern of DOC_FILES) {
+    for (const file of new Glob(pattern).scanSync()) {
+      if (!HISTORY.test(file)) {
+        for (const [word] of readFileSync(file, 'utf8').matchAll(WORD))
+          documented.add(word)
+      }
+    }
+  }
+
+  const missing: string[] = []
+
+  for (const name of readdirSync('api').filter(file => file.endsWith('.txt'))) {
+    const lines = readFileSync(`api/${name}`, 'utf8').split('\n')
+
+    for (const [index, line] of lines.entries()) {
+      const block = (/^\[([^\]]+)\] (\S+)$/).exec(line)
+
+      if (block !== null && block[2] !== 'default' && VALUE_BLOCK.test(lines[index + 1] ?? '') && !documented.has(block[2]!))
+        missing.push(`${name} [${block[1]}] ${block[2]}`)
+    }
+  }
+
+  expect(missing, 'no llms/, library llms/ or docs page names these values: document them, or add them to INTERNAL in scripts/api.ts and regenerate api/ with `--break="<key>"`').toEqual([])
+})
+
 const ANY = /(?<![\w$])any(?![\w$])/
 
 // A component's props are read from its shadow with kay's JSX options; a part class type resolving to `any` means a part's component was not resolved, so a wrong part name or class value would go unseen by `kay check`.
