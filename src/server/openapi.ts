@@ -325,9 +325,9 @@ function responses(response: unknown): Record<string, Schema> {
   return Object.fromEntries(Object.entries(byStatus).map(([status, schema]) => [status, { description: status.startsWith('2') ? 'OK' : 'Error', content: content(schema, 'application/json') }]))
 }
 
-// What a route answers when its `body`, `query`, `params` or `headers` refuse the input, as an action answers it, unless the route documents its own 422 or keeps Elysia's body.
+// What a route answers when its `body`, `query`, `params`, `headers` or `cookie` refuse the input, as an action answers it, unless the route documents its own 422 or keeps Elysia's body.
 const REFUSAL_SCHEMA = { type: 'object', required: ['errors', 'status'], properties: { errors: { type: 'object', additionalProperties: { type: 'string' } }, status: { const: 422, type: 'number' } } }
-const VALIDATED = ['body', 'query', 'params', 'headers'] as const
+const VALIDATED = ['body', 'query', 'params', 'headers', 'cookie'] as const
 
 function withRefusal(answers: Record<string, Schema>, hooks: Record<string, unknown>, instance: Elysia): Record<string, Schema> {
   if (answers[422] !== undefined || keepsElysiaShape(instance) || !VALIDATED.some(hook => hooks[hook] !== undefined))

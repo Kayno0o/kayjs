@@ -3,7 +3,9 @@ import { fieldOf } from './schema-check'
 import { invalidWord, schemaRefusal } from './words'
 
 const withoutFunctions = new WeakMap<object, unknown>()
-const withFunctions = new WeakMap<object, unknown>()
+
+// Where a stripped node keeps its `error` function, on the node itself: a schema Elysia merges or clones (a guard's with the route's) keeps own symbols, where a lookup by the identity of the whole schema would miss it.
+const STRIPPED_ERROR = Symbol.for('kay.strippedError')
 
 // The text an `error` option gives a field, a string or the string a function returns; a function that throws or returns anything else gives none, so the field keeps its default wording.
 // A function is called where the caller runs, which is inside the request's locale.
@@ -48,7 +50,9 @@ function stripped(node: unknown): unknown {
   const copy = Object.create(Object.getPrototypeOf(node) as object | null) as Record<string | symbol, unknown>
 
   for (const key of Reflect.ownKeys(node)) {
-    if (!(key === 'error' && typeof node[key] === 'function'))
+    if (key === 'error' && typeof node[key] === 'function')
+      copy[STRIPPED_ERROR] = node[key]
+    else
       copy[key] = stripped(node[key])
   }
 
@@ -64,15 +68,9 @@ export function validated(schema: TSchema): TSchema {
     const copy = stripped(schema)
 
     withoutFunctions.set(schema, copy)
-    withFunctions.set(copy as object, schema)
   }
 
   return withoutFunctions.get(schema) as TSchema
-}
-
-// The schema `validated` was given, for the `error` functions it dropped; any other schema is its own.
-export function withErrorFunctions(schema: unknown): unknown {
-  return typeof schema === 'object' && schema !== null && withFunctions.has(schema) ? withFunctions.get(schema) : schema
 }
 
 const segmentOf = (segment: string): string => segment.replaceAll('~1', '/').replaceAll('~0', '~')
@@ -84,7 +82,7 @@ function find(node: unknown, segments: string[]): string | undefined {
 
   const [head, ...rest] = segments
   const named = head !== undefined && isNode(node.properties) && Object.hasOwn(node.properties, head)
-  const found = head === undefined ? errorText(node.error) : find(named ? (node.properties as Record<string, unknown>)[head] : node.items, rest)
+  const found = head === undefined ? errorText(node.error ?? node[STRIPPED_ERROR]) : find(named ? (node.properties as Record<string, unknown>)[head] : node.items, rest)
 
   if (found !== undefined || !Array.isArray(node.anyOf))
     return found

@@ -29,7 +29,7 @@ describe('the OpenAPI document', () => {
 
     expect(document.info).toEqual({ title: 'Shop', version: '2.1.0' })
     expect(document.servers).toEqual([{ url: '/shop' }])
-    expect(Object.keys(document.paths).sort()).toEqual(['/api/files', '/api/files/any', '/api/files/bytes', '/api/files/raw/{wildcard}', '/api/files/size', '/api/files/{name}', '/api/items', '/api/items/photo', '/api/items/{id}', '/api/private', '/api/refusals-elysia', '/api/refusals/bare', '/api/refusals/own'])
+    expect(Object.keys(document.paths).sort()).toEqual(['/api/files', '/api/files/any', '/api/files/bytes', '/api/files/raw/{wildcard}', '/api/files/size', '/api/files/{name}', '/api/items', '/api/items/photo', '/api/items/{id}', '/api/private', '/api/refusals-elysia', '/api/refusals/bare', '/api/refusals/cookie', '/api/refusals/own'])
     expect(Object.keys(document.paths['/api/items/{id}']!)).toEqual(['get'])
   })
 
@@ -57,6 +57,7 @@ describe('the OpenAPI document', () => {
     expect(Object.keys(answers('/api/refusals/own', 'post'))).toEqual(['200', '422'])
     expect(answers('/api/refusals/own', 'post')[422]).toMatchObject({ content: { 'application/json': { schema: { properties: { mine: expect.anything() } } } } })
     expect(Object.keys(answers('/api/refusals/bare', 'get'))).toEqual(['200'])
+    expect(Object.keys(answers('/api/refusals/cookie', 'get'))).toEqual(['200', '422'])
     expect(Object.keys(answers('/api/refusals-elysia', 'post'))).toEqual(['200'])
   })
 

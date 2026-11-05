@@ -27,7 +27,7 @@ import { timeoutMs } from './config-limits'
 import { cookieJar } from './cookies'
 import { corsAdmits, corsResponse, corsRule, dropOwnGrant, grantedByKay, preflight, varyByOrigin, withCors, withoutOwnGrant } from './cors'
 import { streamReporters } from './event-stream'
-import { ERROR_SHAPE, keepsElysiaShape, refusedFields, validated, withErrorFunctions } from './field-errors'
+import { ERROR_SHAPE, keepsElysiaShape, refusedFields, validated } from './field-errors'
 import { loadGuard, requiredGuards } from './guards'
 import { inRouteReads, LIVE_HEADER, routeProof } from './live'
 import { answeringRequest, statusOf } from './log'
@@ -57,7 +57,7 @@ const RATE_LIMIT = Symbol.for('kay.rateLimit')
 // Where `api({ timeout })` keeps the module's timeout.
 const TIMEOUT = Symbol.for('kay.timeout')
 // The inputs of a route Elysia validates, whose schemas are read for their `error` in the request's locale.
-const INPUTS = ['body', 'query', 'params', 'headers']
+const INPUTS = ['body', 'query', 'params', 'headers', 'cookie']
 const BODY_PREFIX = /^body\./
 
 // The requests the guards of their module let through, whose later errors are no refused input.
@@ -528,7 +528,7 @@ function refusedInput({ request, error, code, set }: { request: Request, error: 
     return undefined
 
   const { validator } = error as ValidationError
-  const schema = withErrorFunctions((validator as { schema?: unknown }).schema ?? validator)
+  const schema = (validator as { schema?: unknown }).schema ?? validator
   const errors = inApiLocale(request, options, () => refusedFields(schema, error as ValidationError))
 
   set.status = 422

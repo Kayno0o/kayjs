@@ -28,3 +28,9 @@ export default api()
   .post('/photo', () => ({ ok: true }), { body: s.Object({ photo: s.File({ type: 'image/png' }) }) })
   .post('/no-input', () => ({ ok: true }))
   .post('/own-422', () => ({ ok: true }), { body: s.Object({ a: s.String() }), response: { 200: s.Object({ ok: s.Boolean() }), 422: s.Object({ mine: s.Boolean() }) } })
+
+  // A guard's schema merged with the route's, which Elysia builds into a new object.
+  .guard({ body: s.Object({ guarded: s.String({ error: () => wording('words.refused', 'Refused') }) }) }, guarded => guarded
+    .post('/merged', () => ({ ok: true }), { body: s.Object({ own: s.String({ error: () => wording('words.refused', 'Refused') }) }) })
+    .post('/merged-guard-only', () => ({ ok: true })))
+  .get('/cookie', () => ({ ok: true }), { cookie: s.Cookie({ token: s.String({ error: () => wording('words.refused', 'Refused') }) }) })

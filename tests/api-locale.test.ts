@@ -214,3 +214,22 @@ describe('input an API route refuses, other validators and edge cases', () => {
     expect(await response.json()).toEqual({ status: 422, errors: { photo: 'Invalid file type' } })
   })
 })
+
+describe('input an API route refuses, merged schemas and cookies', () => {
+  const post = async (path: string, body: unknown, headers: Record<string, string> = {}) => sites.plain.fetch(path, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
+
+  it('keeps the error functions of a guard\'s schema merged with the route\'s', async () => {
+    const merged = await post('/api/refused-schemas/merged', {}, { 'accept-language': 'fr' })
+
+    expect(merged.status).toBe(422)
+    expect(await merged.json()).toEqual({ status: 422, errors: { guarded: 'Refusé', own: 'Refusé' } })
+    expect(await (await post('/api/refused-schemas/merged-guard-only', {}, { 'accept-language': 'fr' })).json()).toEqual({ status: 422, errors: { guarded: 'Refusé' } })
+  })
+
+  it('answers a refused cookie as { errors, status } with the schema\'s own error', async () => {
+    const response = await sites.plain.fetch('/api/refused-schemas/cookie', { headers: { 'accept-language': 'fr' } })
+
+    expect(response.status).toBe(422)
+    expect(await response.json()).toEqual({ status: 422, errors: { token: 'Refusé' } })
+  })
+})
