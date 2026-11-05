@@ -1,5 +1,5 @@
 --- server
-export const page = { revalidate: '1m' }
+export const page = { ttl: '1m' }
 ---
 section
   slot
