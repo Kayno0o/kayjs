@@ -43,12 +43,6 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - Table with neither `@empty` nor `@noMatch` draws a `No rows.` row, and LineChart, ContributionGraph, Sparkline, StatusStrip, Timeline, DescriptionList, TreeView, Carousel and VirtualList draw their `ui.<component>.empty` text where they drew nothing. `emptyLabel=""` draws nothing again, and an `@empty` block replaces the text.
 
-## 1.90.0
-
-### kayjs-ui: empty components draw a default text
-
-- Table with neither `@empty` nor `@noMatch` draws a `No rows.` row, and LineChart, ContributionGraph, Sparkline, StatusStrip, Timeline, DescriptionList, TreeView, Carousel and VirtualList draw their `ui.<component>.empty` text where they drew nothing. `emptyLabel=""` draws nothing again, and an `@empty` block replaces the text.
-
 ## 1.89.0
 
 ### Defaults that fit production
