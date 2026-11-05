@@ -54,7 +54,7 @@ export const INTERNAL: Record<string, InternalRules> = {
   },
   // `lib/` and `field-look` are what an ejected copy shares with the library ("for copies and not a stable API", `packages/ui/llms/setup.md`), as are the toaster's hold and the markdown editor's action list.
   ui: { entries: [/^\.\/lib\//, /^\.\/field-look$/], names: { '.': ['holdToasts', 'TOOLBAR_ACTIONS'] } },
-  // The OAuth plumbing `createAuth` builds its providers from, and the `load` and actions of the prebuilt pages, which only the routes the extension mounts call.
+  // The OAuth plumbing `authCore` builds its providers from, and the `load` and actions of the prebuilt pages, which only the routes the extension mounts call.
   auth: {
     entries: [/^\.\/pages\//],
     names: { '.': ['challengeOf', 'createOAuthClient', 'createOAuthTokenRefresher', 'createPkcePair', 'createTokenRefresher', 'OAuthExchangeError', 'SIGNED_IN_HINT'], './rules': ['DEFAULT_RULES', 'mixesConfusableScripts', 'resolveRules'] },

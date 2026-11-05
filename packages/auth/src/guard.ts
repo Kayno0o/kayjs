@@ -9,7 +9,7 @@ export interface GuardOptions {
   twoFactor?: true | undefined
 }
 
-// The `auth.guard()` of the app's `auth()`, for a `_guard.ts` with no module to import it from: `export default authGuard()`. It asks the `auth` of the request, so it works with a `createAuth` of the app's own too.
+// The `auth.guard()` of the app's `auth()`, for a `_guard.ts` with no module to import it from: `export default authGuard()`. It asks the `auth` of the request, so it works with a `authCore` of the app's own too.
 export function authGuard(options: GuardOptions = {}) {
   return kayGuard<{ auth: Auth }>(async (ctx) => {
     const { auth } = ctx.locals

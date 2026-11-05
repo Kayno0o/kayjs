@@ -105,10 +105,10 @@ interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, T
   view?: ((props: ContactMailProps) => Element) | undefined
 
 [.] createMailListTables
-function createMailListTables(source: PgJobsSource): Promise<void>
+function createMailListTables(source: PgSource): Promise<void>
 
 [.] createMailSuppressionTable
-function createMailSuppressionTable(source: PgJobsSource): Promise<void>
+function createMailSuppressionTable(source: PgSource): Promise<void>
 
 [.] cssColors
 function cssColors(stylesheet: URL | string, name?: string): (property: string) => string
@@ -379,10 +379,10 @@ interface Palette
   text: string
 
 [.] pgLists
-function pgLists(source: PgJobsSource): ListStore & { close: () => Promise<void>; }
+function pgLists(source: PgSource): ListStore & { close: () => Promise<void>; }
 
 [.] pgSuppressions
-function pgSuppressions(source: PgJobsSource): SuppressionStore & { close: () => Promise<void>; }
+function pgSuppressions(source: PgSource): SuppressionStore & { close: () => Promise<void>; }
 
 [.] registeredMailer
 function registeredMailer(): Promise<Mailer | undefined>
@@ -591,19 +591,25 @@ component default
   muted?: boolean | undefined
 
 [./pg] createMailListTables
-function createMailListTables(source: PgJobsSource): Promise<void>
+function createMailListTables(source: PgSource): Promise<void>
 
 [./pg] createMailSuppressionTable
-function createMailSuppressionTable(source: PgJobsSource): Promise<void>
+function createMailSuppressionTable(source: PgSource): Promise<void>
+
+[./pg] createMailSuppressionTables
+function createMailSuppressionTables(source: PgSource): Promise<void>
+
+[./pg] mailListTableNames
+const mailListTableNames: readonly ["kay_mail_subscribers", "kay_mail_broadcasts", "kay_mail_deliveries", "kay_mail_suppressions"]
 
 [./pg] mailListTables
 const mailListTables: readonly ["kay_mail_subscribers", "kay_mail_broadcasts", "kay_mail_deliveries", "kay_mail_suppressions"]
 
 [./pg] pgLists
-function pgLists(source: PgJobsSource): ListStore & { close: () => Promise<void>; }
+function pgLists(source: PgSource): ListStore & { close: () => Promise<void>; }
 
 [./pg] pgSuppressions
-function pgSuppressions(source: PgJobsSource): SuppressionStore & { close: () => Promise<void>; }
+function pgSuppressions(source: PgSource): SuppressionStore & { close: () => Promise<void>; }
 
 [./quote.kay] default
 component default

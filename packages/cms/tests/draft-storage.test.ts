@@ -1,7 +1,7 @@
 import type { CmsDraftEntry } from '../src/kay/contract'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { browserKeeper, KEEP_FOR } from '../src/draft-storage'
-import { createDrafts } from '../src/drafts'
+import { cmsDrafts } from '../src/drafts'
 import { BODY } from '../src/markers'
 import { until } from './until'
 
@@ -21,7 +21,7 @@ function memoryStorage(): Storage {
 }
 
 function pageOf(storage: Storage, now = () => Date.now()) {
-  return createDrafts({ show: async () => ({}), delay: '1ms', keep: browserKeeper(() => storage, now) })
+  return cmsDrafts({ show: async () => ({}), delay: '1ms', keep: browserKeeper(() => storage, now) })
 }
 
 describe('drafts kept in the browser', () => {
@@ -169,7 +169,7 @@ describe('drafts kept in the browser', () => {
     } } as Storage
 
     for (const get of [() => undefined, () => throwing]) {
-      const drafts = createDrafts({ show: async () => ({}), keep: browserKeeper(get) })
+      const drafts = cmsDrafts({ show: async () => ({}), keep: browserKeeper(get) })
 
       drafts.open(post, 'v1')
       drafts.set(post, 'title', 'Mine')
@@ -270,7 +270,7 @@ describe('writing the kept draft', () => {
   it('writes once per pause rather than on every keystroke', async () => {
     const storage = memoryStorage()
     const writes = spyOn(storage, 'setItem')
-    const drafts = createDrafts({ show: async () => ({}), delay: '10ms', keep: browserKeeper(() => storage) })
+    const drafts = cmsDrafts({ show: async () => ({}), delay: '10ms', keep: browserKeeper(() => storage) })
 
     drafts.open(post, 'v1')
 

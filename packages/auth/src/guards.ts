@@ -5,7 +5,7 @@ import type { AuthRequirement } from './request'
 import type { PolicyContext, Predicate } from './types'
 import { READ_METHODS } from 'kay/library'
 import { guardPageOf, isNavigation, withBack } from './core'
-import { createGate, scopeAllows } from './gate'
+import { authGate, scopeAllows } from './gate'
 import { load } from './load'
 import { authOf, STATE } from './request'
 import { lacksTwoFactor, sendToEnrolment } from './requiredTwoFactor'
@@ -51,7 +51,7 @@ export function guardOf<Role extends string, Scope extends string>(core: Core, o
 
 // The gate of `auth.gate()`, before the plugin is used on the instance it closes.
 export function gateOf<Role extends string, Scope extends string>(core: Core, options: { require?: AuthRequirement<Role>, scope?: ScopeRequirement<Scope> }) {
-  return createGate<BareUser, Role, Scope>({
+  return authGate<BareUser, Role, Scope>({
     principal: async ctx => authOf(ctx).bareUser(),
     authorize: core.access.authorize,
     // A user lacking the two-factor the app asks of them is denied like one missing a role, bar the library's own enrolment pages.

@@ -10,7 +10,7 @@ The methods no feature owns stay on `auth` itself: the user (`user()`, `bareUser
 
 ### Move off the flat names
 
-The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassword(input)`) are gone since 1.86, and those before 1.87 (`auth.deleteAccount(proof)`, `auth.createUser(input)`) since 1.91, along with their lints: call the grouped method the tables give, `auth.admin.createUser(input)` on the `createAuth` result. An app still on them runs `kay upgrade` on 1.85 or 1.90 first, which renames the calls.
+The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassword(input)`) are gone since 1.86, and those before 1.87 (`auth.deleteAccount(proof)`, `auth.createUser(input)`) since 1.91, along with their lints: call the grouped method the tables give, `auth.admin.createUser(input)` on the `authCore` result. An app still on them runs `kay upgrade` on 1.85 or 1.90 first, which renames the calls.
 
 ## Reference
 
@@ -103,4 +103,4 @@ The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassw
 | `oauth` | `identities` | `listIdentities` |
 | `oauth` | `providerToken` | `providerToken` |
 | `audit` | `list` | `listAuditLog` |
-| `admin` (on the `createAuth` result) | `createUser` | `createUser` |
+| `admin` (on the `authCore` result) | `createUser` | `createUser` |

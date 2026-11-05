@@ -24,6 +24,44 @@ interface CmsDraftEntry extends EntryRef
   body?: string | undefined
   data: Record<string, unknown>
 
+[.] cmsDrafts
+function cmsDrafts({
+  show, delay, keep
+}: DraftsOptions): {
+  open(entry: CmsDraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): CmsDraftEntry | undefined;
+  kept(ref: EntryRef): boolean;
+  version(ref: EntryRef): string | undefined;
+  value(ref: EntryRef, path: FieldPath): unknown;
+  set(ref: EntryRef, path: FieldPath, value: unknown): void;
+  changed(ref: EntryRef): boolean;
+  reset(ref: EntryRef): void;
+  markSaved(ref: EntryRef, sent: CmsDraftEntry, version?: string | undefined): void;
+  refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
+  refusal(ref: EntryRef): Refusal | undefined;
+  keepEdits(ref: EntryRef): void;
+  adopt(ref: EntryRef, entry: CmsDraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: CmsDraftEntry): FieldPath[];
+  anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
+  flush: () => void;
+  discardAll(): void;
+  recovery(ref: EntryRef): Recovery | undefined;
+  recreating(ref: EntryRef): boolean;
+  reapply(): void;
+  stale(): EntryRef[];
+  report(refusals: readonly Issue[], ref?: EntryRef | undefined): void;
+  dismissWhere(ref: EntryRef, match: (issue: Issue) => boolean): void;
+  block(ref: EntryRef, path: string, message: string | undefined): void;
+  blocked(ref: EntryRef, path?: string | undefined): {
+    path: string;
+    message: string;
+  }[];
+  issues(ref: EntryRef, path?: FieldPath | undefined): Issue[];
+  failure: () => string | undefined;
+  rendering: () => boolean;
+  pending: () => boolean;
+}
+
 [.] CmsOptions
 interface CmsOptions
   author?: ((ctx: GuardContext) => Identity | Promise<Identity | undefined> | undefined) | undefined
@@ -131,7 +169,7 @@ interface DraftResult
   issues?: Issue[] | undefined
 
 [.] Drafts
-type Drafts = ReturnType<typeof createDrafts>
+type Drafts = ReturnType<typeof cmsDrafts>
 
 [.] DraftsOptions
 interface DraftsOptions
@@ -576,6 +614,20 @@ component default
   upload?: UploadHints
   value: string
 
+[./form] cmsEntryForm
+function cmsEntryForm({
+  prefix, collection, entry, locale, copy, source, denied, review: reviewed
+}: {
+  review?: ReviewView | undefined;
+  denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>> | undefined;
+  prefix: string;
+  collection: ScreenCollection;
+  entry?: (() => StoredEntry | undefined) | StoredEntry | undefined;
+  locale?: string | undefined;
+  copy?: PairedEntry | undefined;
+  source?: PairedEntry | undefined;
+}): EntryForm
+
 [./form] createEntryForm
 function createEntryForm({
   prefix, collection, entry, locale, copy, source, denied, review: reviewed
@@ -745,7 +797,8 @@ function pgLoader(options: PgLoaderOptions): ContentLoader<unknown>
 interface PgLoaderOptions extends LoaderOptions
   name: string
   seed?: (() => Promise<readonly CmsSeedEntry[]> | readonly CmsSeedEntry[]) | readonly CmsSeedEntry[] | undefined
-  sql?: SQL | string | undefined
+  source?: PgSource | undefined
+  sql?: PgSource | undefined
   table?: string | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined

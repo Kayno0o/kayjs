@@ -10,7 +10,7 @@ import type { PairedEntry } from './translations'
 import { effect, guardLeave, navigate, onCleanup, signal, untrack } from 'kay'
 import { wording } from 'kay/words'
 import { publishTime, unpublishTime, useGoesLive } from './datetime'
-import { createDrafts } from './drafts'
+import { cmsDrafts } from './drafts'
 import { savedHandler } from './editor/live'
 import { rebuildFinished } from './editor/rebuild'
 import { readReferrers } from './editor/referrers'
@@ -143,7 +143,7 @@ function slugLine(entry: StoredEntry): string {
 // An entry's form on its own screen, or a new entry's when `entry` is left out: the drafts, the save, publish and delete, and the guard against leaving with edits. Called in a component's script, it is what the default screen runs.
 // `entry` may be a function returning it, read each time the form needs it: for a screen that stays when the page refreshes in place (a `persist` island) and takes new props, `entry: () => all.entry`, so `stored`, `name` and `subtitle` follow the refreshed entry.
 // `copy` starts a new entry as a copy of a translation, `source` is the default locale's entry the form marks untranslated fields against.
-export function createEntryForm({ prefix, collection, entry, locale, copy, source, denied, review: reviewed }: { review?: ReviewView | undefined, denied?: Denials | undefined, prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined | (() => StoredEntry | undefined), locale?: string | undefined, copy?: PairedEntry | undefined, source?: PairedEntry | undefined }): EntryForm {
+export function cmsEntryForm({ prefix, collection, entry, locale, copy, source, denied, review: reviewed }: { review?: ReviewView | undefined, denied?: Denials | undefined, prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined | (() => StoredEntry | undefined), locale?: string | undefined, copy?: PairedEntry | undefined, source?: PairedEntry | undefined }): EntryForm {
   const read = typeof entry === 'function' ? entry : () => entry
   const first = read()
 
@@ -151,7 +151,7 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
   shipWords()
 
   // Nothing on this screen shows the entry rendered, so a change waits for no draft render.
-  const drafts = createDrafts({ show: async () => Promise.resolve({}) })
+  const drafts = cmsDrafts({ show: async () => Promise.resolve({}) })
   // A new entry's draft is kept under no slug until it is saved under the one typed.
   const ref: EntryRef = { collection: collection.name, slug: first?.slug ?? '', locale: first?.locale ?? locale }
   const slug = signal(first?.slug ?? copy?.slug ?? (collection.single ? SINGLE_SLUG : ''))
@@ -419,3 +419,6 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
     reset: () => drafts.reset(ref),
   }
 }
+
+/** @deprecated Renamed `cmsEntryForm` in 1.91, as a constructor is a noun; the old name works until 1.94. */
+export const createEntryForm = cmsEntryForm

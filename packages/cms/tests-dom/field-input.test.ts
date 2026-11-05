@@ -6,7 +6,7 @@ import process from 'node:process'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import { inputValue } from '../src/datetime'
-import { createDrafts } from '../src/drafts'
+import { cmsDrafts } from '../src/drafts'
 import FileField from '../tests/fixture/src/components/file-field.kay'
 import ListField from '../tests/fixture/src/components/list-field.kay'
 import ListState from '../tests/fixture/src/components/list-state.kay'
@@ -23,7 +23,7 @@ afterEach(() => {
 })
 
 async function open(items: string[]) {
-  const drafts = createDrafts({ show: async () => ({}) })
+  const drafts = cmsDrafts({ show: async () => ({}) })
 
   drafts.open({ ...ENTRY, data: { tags: items } })
   mounted = await mountComponent(ListField, { drafts, field: TAGS })
@@ -200,7 +200,7 @@ afterEach(() => {
 })
 
 async function openDate(stored: string | undefined) {
-  const drafts = createDrafts({ show: async () => ({}) })
+  const drafts = cmsDrafts({ show: async () => ({}) })
   const field: Field = { key: 'tags', label: 'Publish at', hint: undefined, required: false, kind: 'datetime' }
 
   drafts.open({ ...ENTRY, data: { tags: stored } })
@@ -373,7 +373,7 @@ const PHOTO = (hints: UploadHints = {}): Field => ({ key: 'tags', label: 'Photo'
 const sibling = (key: string): Field => ({ key, label: key, hint: undefined, required: false, kind: 'text' })
 
 async function openImage(data: Record<string, unknown>, hints: Parameters<typeof PHOTO>[0] = {}) {
-  const drafts = createDrafts({ show: async () => ({}) })
+  const drafts = cmsDrafts({ show: async () => ({}) })
 
   drafts.open({ ...ENTRY, data })
   mounted = await mountComponent(ListField, { drafts, field: PHOTO(hints) })
@@ -627,7 +627,7 @@ test('typing an address one character at a time never breaks the field, whatever
 })
 
 test('the zone of a list of images shows and applies the item field\'s own limits', async () => {
-  const drafts = createDrafts({ show: async () => ({}) })
+  const drafts = cmsDrafts({ show: async () => ({}) })
   const item: Field = { key: 0, label: 'Photo', hint: undefined, required: false, kind: 'image', upload: { accept: ['image/png'], maxSize: 1024 } }
 
   drafts.open({ ...ENTRY, data: { tags: [] } })
@@ -646,7 +646,7 @@ test('clearing an image takes its alt text with it', async () => {
 })
 
 test('an image field built without upload hints, as an app\'s own code may, works as it did', async () => {
-  const drafts = createDrafts({ show: async () => ({}) })
+  const drafts = cmsDrafts({ show: async () => ({}) })
 
   drafts.open({ ...ENTRY, data: { tags: UPLOADED } })
   mounted = await mountComponent(ListField, { drafts, field: { key: 'tags', label: 'Photo', hint: undefined, required: false, kind: 'image' } })
@@ -664,7 +664,7 @@ test('the refusal of an image\'s hidden width or height shows beside the image, 
 })
 
 test('the refusal of an image\'s width and height in the drafts reaches the field beside the image through FieldInput', async () => {
-  const drafts = createDrafts({ show: async () => ({}) })
+  const drafts = cmsDrafts({ show: async () => ({}) })
 
   drafts.open({ ...ENTRY, data: { tags: UPLOADED } })
   drafts.report([{ ...ENTRY, path: 'width', message: 'Width is required' }, { ...ENTRY, path: 'height', message: 'Height is required' }])

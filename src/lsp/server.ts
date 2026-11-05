@@ -45,6 +45,7 @@ const KAY_FILE = /^file:.*\.kay$/
 // The one TypeScript file the server completes besides the components: where an app restyles them.
 const UI_DOCUMENT = /^file:.*\/src\/ui\.ts$/
 const SCRIPT_FILE = /\.(?:[cm]?ts|tsx)$/
+const AUTH_CORE = /\b(?:authCore|createAuth)\b/
 const FULL_SYNC = 1
 const CREATED = 1
 const CHANGED = 2
@@ -211,7 +212,7 @@ export class KayLanguageServer implements LspHost {
       this.server.notify('workspace/didChangeWatchedFiles', { changes: others })
 
     // `kay.config.ts`, or a module it imported, changing makes every project read its config again.
-    // A module that holds `createAuth` may turn the CAPTCHA off, which `missing-captcha` reads project-wide.
+    // A module that holds `authCore` may turn the CAPTCHA off, which `missing-captcha` reads project-wide.
     const authChanged = await Promise.all(changed.filter(change => SCRIPT_FILE.test(change.path)).map(async change => change.type === DELETED || await createsAuth(change.path)))
 
     if (changed.some(change => basename(change.path) === CONFIG_FILE || realPath(change.path) in require.cache) || authChanged.includes(true)) {
@@ -526,10 +527,10 @@ export class KayLanguageServer implements LspHost {
   }
 }
 
-// Whether a module on disk holds `createAuth`, one that cannot be read holding none.
+// Whether a module on disk holds `authCore`, one that cannot be read holding none.
 async function createsAuth(path: string): Promise<boolean> {
   try {
-    return (await Bun.file(path).text()).includes('createAuth')
+    return AUTH_CORE.test(await Bun.file(path).text())
   }
   catch {
     return false

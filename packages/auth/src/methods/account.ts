@@ -48,7 +48,7 @@ export class AccountMethods {
     const profile = this.state.core.pages?.profile
 
     if (!profile)
-      throw new Error('kayjs-auth: account.saveProfile needs `pages.profile` in createAuth')
+      throw new Error('kayjs-auth: account.saveProfile needs `pages.profile` in authCore')
 
     const record = await this.state.current()
 

@@ -2482,10 +2482,10 @@ interface CoalesceOptions
 type CorsOptions = CorsCommon & ({ origins: '*', credentials?: false | undefined } | { origins: readonly string[], credentials?: boolean | undefined })
 
 [./server] createDataTables
-function createDataTables(source: PgJobsSource): Promise<void>
+function createDataTables(source: PgSource): Promise<void>
 
 [./server] createJobTables
-function createJobTables(source: PgJobsSource): Promise<void>
+function createJobTables(source: PgSource): Promise<void>
 
 [./server] crossOriginPaths
 function crossOriginPaths(plugin: object, paths: readonly string[], options: CorsOptions): void
@@ -3060,7 +3060,7 @@ interface PagesOptions extends KayConfig
   typography?: boolean | undefined
 
 [./server] pgData
-function pgData(source: PgJobsSource): {
+function pgData(source: PgSource): {
   sql: SQL;
   ping: () => Promise<void>;
   close: () => Promise<void>;
@@ -3079,10 +3079,13 @@ function pgData(source: PgJobsSource): {
 }
 
 [./server] pgJobs
-function pgJobs(source: PgJobsSource): JobStore
+function pgJobs(source: PgSource): JobStore
 
 [./server] PgJobsSource
-type PgJobsSource = SQL | { sql: SQL } | string
+type PgJobsSource = PgSource
+
+[./server] PgSource
+type PgSource = SQL | { sql: SQL } | string
 
 [./server] Prefetch
 type Prefetch = 'conservative' | 'moderate' | 'eager' | false

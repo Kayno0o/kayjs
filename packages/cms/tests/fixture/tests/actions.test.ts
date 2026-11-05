@@ -12,7 +12,7 @@ const { toasts } = await import(toastModule) as typeof import('../../../../ui/sr
 
 void mock.module('@kaynooo/kayjs-ui', async () => import(toastModule) as Promise<Record<string, unknown>>)
 
-const { createEntryForm } = await import('../../../src/form')
+const { cmsEntryForm } = await import('../../../src/form')
 const { deleteMessage } = await import('../../../src/listing')
 const { isSaveShortcut, saveShortcut } = await import('../../../src/editor/shortcut')
 
@@ -45,19 +45,19 @@ afterEach(() => {
 
 describe('Save', () => {
   test('waits for an edit on a saved entry, and a new entry can always be created', () => {
-    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk' }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk' }) })
 
     expect([form.dirty(), form.canSave()]).toEqual([false, false])
     form.drafts.set(form.entry, 'title', 'Other')
     expect([form.dirty(), form.canSave()]).toEqual([true, true])
     form.reset()
     expect([form.dirty(), form.canSave()]).toEqual([false, false])
-    expect(createEntryForm({ prefix: '/admin', collection: talks }).canSave()).toBe(true)
+    expect(cmsEntryForm({ prefix: '/admin', collection: talks }).canSave()).toBe(true)
   })
 
   test('creates a new entry under its slug cleaned of accents, spaces and case, or written from its title', async () => {
     const sent = server(() => ({ saved: true, version: 'v1' }))
-    const typed = createEntryForm({ prefix: '/admin', collection: talks })
+    const typed = cmsEntryForm({ prefix: '/admin', collection: talks })
 
     typed.drafts.set(typed.entry, 'title', 'Été à la ferme')
     await until(() => typed.slug() === 'ete-a-la-ferme')
@@ -69,7 +69,7 @@ describe('Save', () => {
 
   test('sends nothing when asked with nothing to save', async () => {
     const sent = server(() => ({ saved: true, version: 'v2' }))
-    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk' }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk' }) })
 
     await form.save()
     expect(sent).toHaveLength(0)
@@ -78,7 +78,7 @@ describe('Save', () => {
   test('is busy while the save is on its way, then says when it was saved and whether the site must rebuild', async () => {
     server(() => ({ saved: true, version: 'v2', commit: { sha: 'abc' } }))
 
-    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk' }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk' }) })
 
     form.drafts.set(form.entry, 'title', 'Other')
 
@@ -93,7 +93,7 @@ describe('Save', () => {
   test('says a save needing no rebuild is live', async () => {
     server(() => ({ saved: true, version: 'v2' }))
 
-    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk' }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk' }) })
 
     form.drafts.set(form.entry, 'title', 'Other')
     await form.save()
@@ -103,7 +103,7 @@ describe('Save', () => {
   test('keeps no saved time for a refused save', async () => {
     server(() => refused)
 
-    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk' }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk' }) })
 
     form.drafts.set(form.entry, 'title', 'Other')
     await form.save()
@@ -152,7 +152,7 @@ describe('the save shortcut', () => {
 describe('Publish', () => {
   test('saves the draft flag alone and shows the entry published', async () => {
     const sent = server(() => ({ saved: true, version: 'v2' }))
-    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', draft: true }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', draft: true }) })
 
     await form.publish()
     expect(sent.map(({ body }) => body.data)).toEqual([{ title: 'Talk', draft: false }])
@@ -161,7 +161,7 @@ describe('Publish', () => {
 
   test('refuses over edits not saved, sending nothing and keeping them', async () => {
     const sent = server(() => ({ saved: true, version: 'v2' }))
-    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', draft: true }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', draft: true }) })
 
     form.drafts.set(form.entry, 'title', 'Half typ')
     await form.publish()
@@ -173,7 +173,7 @@ describe('Publish', () => {
   test('puts the form back to a draft when the save is refused or fails', async () => {
     server(() => refused)
 
-    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', draft: true }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', draft: true }) })
 
     await form.publish()
     expect([form.isDraft(), form.dirty()]).toEqual([true, false])
@@ -186,8 +186,8 @@ describe('Publish', () => {
   test('does nothing for a collection with no draft field or a new entry', async () => {
     const sent = server(() => ({ saved: true }))
 
-    await createEntryForm({ prefix: '/admin', collection: { ...talks, draftField: undefined }, entry: talk({ title: 'Talk' }) }).publish()
-    await createEntryForm({ prefix: '/admin', collection: talks }).publish()
+    await cmsEntryForm({ prefix: '/admin', collection: { ...talks, draftField: undefined }, entry: talk({ title: 'Talk' }) }).publish()
+    await cmsEntryForm({ prefix: '/admin', collection: talks }).publish()
     expect(sent).toHaveLength(0)
   })
 })
@@ -195,7 +195,7 @@ describe('Publish', () => {
 describe('Unpublish', () => {
   test('turns a published entry back to a draft', async () => {
     const sent = server(() => ({ saved: true, version: 'v2' }))
-    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', draft: false }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', draft: false }) })
 
     await form.unpublish()
     expect(sent.map(({ body }) => body.data)).toEqual([{ title: 'Talk', draft: true }])
@@ -204,7 +204,7 @@ describe('Unpublish', () => {
 
   test('keeps it published when refused, and refuses over unsaved edits', async () => {
     const sent = server(() => refused)
-    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk' }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk' }) })
 
     await form.unpublish()
     expect([form.isDraft(), form.dirty()]).toEqual([false, false])
@@ -217,7 +217,7 @@ describe('Unpublish', () => {
 describe('a scheduled entry', () => {
   test('is published now by dating it now, and keeps its date when the save is refused', async () => {
     const sent = server(() => ({ saved: true, version: 'v2' }))
-    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', at: ahead }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', at: ahead }) })
 
     expect(form.scheduled()).toBeDefined()
     await form.publishNow()
@@ -226,7 +226,7 @@ describe('a scheduled entry', () => {
 
     server(() => refused)
 
-    const refusedForm = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', at: ahead }) })
+    const refusedForm = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', at: ahead }) })
 
     await refusedForm.publishNow()
     expect([refusedForm.drafts.value(refusedForm.entry, 'at'), refusedForm.dirty()]).toEqual([ahead, false])
@@ -234,7 +234,7 @@ describe('a scheduled entry', () => {
 
   test('is unscheduled by clearing its date', async () => {
     const sent = server(() => ({ saved: true, version: 'v2' }))
-    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', at: ahead }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', at: ahead }) })
 
     await form.unschedule()
     expect(sent[0]!.body.data).toEqual({ title: 'Talk' })
@@ -243,7 +243,7 @@ describe('a scheduled entry', () => {
 
   test('is left alone with unsaved edits', async () => {
     const sent = server(() => ({ saved: true }))
-    const form = createEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', at: ahead }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: talks, entry: talk({ title: 'Talk', at: ahead }) })
 
     form.drafts.set(form.entry, 'title', 'Edit')
     await form.unschedule()
@@ -257,7 +257,7 @@ describe('an ending entry', () => {
 
   test('keeps living by clearing its end date, and keeps it when the save is refused', async () => {
     const sent = server(() => ({ saved: true, version: 'v2' }))
-    const form = createEntryForm({ prefix: '/admin', collection: offers, entry: talk({ title: 'Offer', ends: ahead }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: offers, entry: talk({ title: 'Offer', ends: ahead }) })
 
     expect(form.ends()).toBeDefined()
     await form.clearEnd()
@@ -266,7 +266,7 @@ describe('an ending entry', () => {
 
     server(() => refused)
 
-    const refusedForm = createEntryForm({ prefix: '/admin', collection: offers, entry: talk({ title: 'Offer', ends: ahead }) })
+    const refusedForm = cmsEntryForm({ prefix: '/admin', collection: offers, entry: talk({ title: 'Offer', ends: ahead }) })
 
     await refusedForm.clearEnd()
     expect([refusedForm.drafts.value(refusedForm.entry, 'ends'), refusedForm.dirty()]).toEqual([ahead, false])
@@ -274,7 +274,7 @@ describe('an ending entry', () => {
 
   test('is left alone with unsaved edits', async () => {
     const sent = server(() => ({ saved: true }))
-    const form = createEntryForm({ prefix: '/admin', collection: offers, entry: talk({ title: 'Offer', ends: ahead }) })
+    const form = cmsEntryForm({ prefix: '/admin', collection: offers, entry: talk({ title: 'Offer', ends: ahead }) })
 
     form.drafts.set(form.entry, 'title', 'Edit')
     await form.clearEnd()

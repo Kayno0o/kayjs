@@ -8,7 +8,7 @@ function withoutBase(path: string, base: string): string {
   return base !== '' && (path === base || path.startsWith(`${base}/`)) ? path.slice(base.length) || '/' : path
 }
 
-// The mount point of the app: the path of the `site` kay.config.ts sets, else the one of `createAuth`, '' at the root.
+// The mount point of the app: the path of the `site` kay.config.ts sets, else the one of `authCore`, '' at the root.
 export function siteBase(core: Core): string {
   const fixed = configuredSite()?.origin ?? core.url
 

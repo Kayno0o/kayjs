@@ -34,14 +34,14 @@ export default defineConfig({
 })
 ```
 
-`auth()` takes the options of `createAuth` and finds the rest:
+`auth()` takes the options of `authCore` and finds the rest:
 
 - The session is kay's `session()`, on the app secret ([The app secret](/guides/sessions-and-guards#the-app-secret)).
 - The site's public origin, which OAuth callbacks, mailed links and passkeys are built on, is the `site` of `kay.config.ts` (or `SITE_URL`).
 - The store is the database of your app's `store` in kay.config.ts when it names one (`sqliteData(path)`, `pgData(url)`). kayjs-auth creates its `kay_*` tables there and leaves every other table alone, except under `bun test` and in a static export, where users stay in memory, and when `data/auth.db` already exists, which it keeps using.
 - Without one it is a SQLite file `data/auth.sqlite` (`data/auth.db` where an app already has it) kept through pg-orm, and in memory under `bun test`.
 - `AUTH_DATABASE_URL` names a Postgres or SQLite database of kayjs-auth's own and wins over the app's. A `pgData` given a connection rather than a URL names no database, so give `AUTH_DATABASE_URL` or `store` there.
-- To use your app's pg-orm database, give `store: async () => pgStore((await import('./src/db')).db)`; `store` also takes `{ url }` or a store.
+- To use your app's pg-orm database, give `store: async () => pgAuth((await import('./src/db')).db)`; `store` also takes `{ url }` or a store.
 - Mail goes through `mail.enqueue` of `src/mail.ts` when it exports `mail` (kayjs-mail, themed when `mail()` is in `kay.config.ts`). `email: false` sends none, and an `email` of your own replaces it.
 - `oauth: { github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from the environment, and `kay env` lists them. The presets are github, discord, google, microsoft and gitlab. An object adds `label`, `scopes` or `keepTokens`, and `clientId` and `clientSecret` skip the environment.
 - Hooks such as `onSignUp` and `onDelete` are options too, and win over the file. Hooks that need your database go in an optional `src/auth.ts` that exports `hooks` (`satisfies AuthHooks`), which kay finds by itself, or in `hooks: () => import('./src/auth')`. An executable from `kay build --compile` carries both files, and `kay dev` reloads them when you edit, add or remove one.
@@ -51,25 +51,25 @@ Every page, action and guard can now read `ctx.locals.auth`, typed. A file of yo
 
 `kay add auth` writes the one-line setup for a project with a server and Tailwind: `auth({ name })` in `kay.config.ts` with kayjs-ui's `ui()`, a `store` loading your pg-orm `Database` when the project has one (with `...authTables` added to its tables), a root `src/routes/_guard.ts` exporting `authGuard()`, and the session secret and `SITE_URL` in `.env.example` (`AUTH_DATABASE_URL` too without a project `Database`). There is no `src/auth.ts`.
 
-### The createAuth form
+### The authCore form
 
 An app that keeps session data of its own, or wires its store by hand, writes the auth object itself and loads it with `auth({ module })`.
 
-`src/auth.ts` creates the auth object. `memoryAuthStore()` keeps users in the process, for trying it out.
+`src/auth.ts` creates the auth object. `memoryAuth()` keeps users in the process, for trying it out.
 
 ```ts
 import type { AuthSessionData } from '@kaynooo/kayjs-auth'
-import { createAuth, memoryAuthStore } from '@kaynooo/kayjs-auth'
+import { authCore, memoryAuth } from '@kaynooo/kayjs-auth'
 import { session, sqliteSessions } from 'kay/server'
 
-export const auth = createAuth({
+export const auth = authCore({
   sessions: session<AuthSessionData>({ store: sqliteSessions('data/sessions.sqlite') }),
-  store: memoryAuthStore(),
+  store: memoryAuth(),
   pages: true,
 })
 ```
 
-The site's public origin, which OAuth callbacks, mailed links and passkeys are built on, is the `site` of `kay.config.ts` (or `SITE_URL`): `createAuth` reads it, so it is set once. `site: 'https://example.com'` in `createAuth` overrides it. `name: 'Example'` is the name mails and authenticator apps show, the origin's host by default.
+The site's public origin, which OAuth callbacks, mailed links and passkeys are built on, is the `site` of `kay.config.ts` (or `SITE_URL`): `authCore` reads it, so it is set once. `site: 'https://example.com'` in `authCore` overrides it. `name: 'Example'` is the name mails and authenticator apps show, the origin's host by default.
 
 The session takes kay's `KAY_SECRET`, and kayjs-auth takes its key from the session's secret, so one secret serves all three ([The app secret](/guides/sessions-and-guards#the-app-secret)).
 
@@ -88,7 +88,7 @@ export default defineConfig({
 })
 ```
 
-Every page, action and guard can now read `ctx.locals.auth`, typed. A `prefix` or `home` given to `auth({ module })` reaches `createAuth({ pages: true })` too, so give them once. A `prefix` that differs from the one in `createAuth({ pages })` stops the server at start, and a differing `home` logs a warning naming both, `createAuth`'s winning. `pages: true` serves the prebuilt pages under `/auth`, such as `/auth/sign-in`, `/auth/register` and `/auth/account`.
+Every page, action and guard can now read `ctx.locals.auth`, typed. A `prefix` or `home` given to `auth({ module })` reaches `authCore({ pages: true })` too, so give them once. A `prefix` that differs from the one in `authCore({ pages })` stops the server at start, and a differing `home` logs a warning naming both, `authCore`'s winning. `pages: true` serves the prebuilt pages under `/auth`, such as `/auth/sign-in`, `/auth/register` and `/auth/account`.
 
 A file of yours at the same path, such as `src/routes/auth/sign-in.kay`, replaces that page.
 
@@ -103,22 +103,22 @@ The sign-in and register pages show a "Keep me signed in" box. Unchecked, every 
 A magic link carries the choice of the browser that asked for it, so opened in another browser it signs in as chosen. The sign-out route and a provider link with no `redirect` go to `home` as written, not in the visitor's language.
 
 ```ts
-createAuth({ /* ... */ pages: { home: '/dashboard', remember: 'always' } })
+authCore({ /* ... */ pages: { home: '/dashboard', remember: 'always' } })
 ```
 
 To write every page yourself, leave out `pages` and set `signInPage` to your sign-in page, which `auth.guard()` and `requireUser()` then send visitors to, with `?redirect=` back. Give `auth({ module: './src/auth', pages: false })` in `kay.config.ts` to serve the plugin alone.
 
 ### Postgres
 
-`pgStore(db)` from `@kaynooo/kayjs-auth/pg` keeps users in Postgres. Its tables come from `authTables`. List them in your pg-orm `Database`, then migrate as for your own tables. They are named `kay_*`: a database from before 1.71 holds `auth_*` tables, which the migration renames with their rows on 1.71 to 1.73 and on 1.77 or later, not on 1.74 to 1.76 ([Upgrading](../../../../../llms/upgrading.md)).
+`pgAuth(db)` from `@kaynooo/kayjs-auth/pg` keeps users in Postgres. Its tables come from `authTables`. List them in your pg-orm `Database`, then migrate as for your own tables. They are named `kay_*`: a database from before 1.71 holds `auth_*` tables, which the migration renames with their rows on 1.71 to 1.73 and on 1.77 or later, not on 1.74 to 1.76 ([Upgrading](../../../../../llms/upgrading.md)).
 
 ```ts
-import { authTables, pgStore } from '@kaynooo/kayjs-auth/pg'
+import { authTables, pgAuth } from '@kaynooo/kayjs-auth/pg'
 import { Database } from '@kaynooo/pg-orm'
 
 export const db = new Database({ url: process.env.DATABASE_URL!, tables: [...authTables] })
 
-// in createAuth: store: pgStore(db)
+// in authCore: store: pgAuth(db)
 ```
 
 Each table is exported on its own too, for a foreign key from a table of yours: `AuthUsers`, `AuthSessions`, `AuthIdentities`, `AuthPasskeys`, `AuthRecoveryCodes`, `AuthTokens`, `AuthAttempts`, `AuthAudit`, `AuthBearerTokens`, `AuthOrganizations`, `AuthMembers`, `AuthInvitations`, `AuthOAuthClients`, `AuthOAuthCodes`, `AuthOAuthGrants` and `AuthOAuthRefresh`.
@@ -150,10 +150,10 @@ The methods of each feature are grouped under it: `auth.password`, `auth.email`,
 
 ### Your own data on the user
 
-Give `createAuth` a `user` schema to keep your own fields on the user, such as a provider's avatar. `profileFields` returns what to store on every provider sign-in, and `user().data` gives it back typed.
+Give `authCore` a `user` schema to keep your own fields on the user, such as a provider's avatar. `profileFields` returns what to store on every provider sign-in, and `user().data` gives it back typed.
 
 ```ts
-createAuth({
+authCore({
   // ...
   user: s.Object({ avatar: s.Optional(s.String()) }),
   profileFields: ({ user, profile }) => ({ avatar: profile.avatar ?? undefined }),
@@ -170,11 +170,11 @@ It is read for `user()` and `requireUser()` and for the hooks (`onSignUp`, `prof
 
 `user()` returns provider ids, so a route that sends `await auth.user()` whole to the client now sends them too: pick the fields to show.
 
-`pgStore` adds the `data` column when you run `db.sync()`, and older rows read as `{}`. A store of your own keeps `UserRecord.data` as JSON.
+`pgAuth` adds the `data` column when you run `db.sync()`, and older rows read as `{}`. A store of your own keeps `UserRecord.data` as JSON.
 
 With no prebuilt pages, `requireUser({ redirect: '/login' })` names your sign-in page. A bearer token limited to scopes is refused with a 403 unless `requireUser({ scope })` names one it holds. `requireUser({ require: 'editor' })` refuses with a 403 a user who does not meet it, through your `authorize` as `authGuard()` does. Add `bare: true` to get the user without `providers` and skip that read, when you only want the checks.
 
-Each prebuilt page writes its content in a `main`, so a screen reader can jump to it. If your layout already wraps pages in a `main`, set `pages: { main: false }` in `createAuth` (or `auth({ pages: { main: false } })`) and the pages write a `div` instead, so yours stays the one landmark.
+Each prebuilt page writes its content in a `main`, so a screen reader can jump to it. If your layout already wraps pages in a `main`, set `pages: { main: false }` in `authCore` (or `auth({ pages: { main: false } })`) and the pages write a `div` instead, so yours stays the one landmark.
 
 The prebuilt pages that open from a mailed link, to reset a password, verify an address, sign in by link or confirm a new address, send `Referrer-Policy: same-origin`. The token in the address never reaches another site through a link or an image on the page. An address with a comma, an angle bracket or a double quote in it is refused as an email.
 
@@ -242,7 +242,7 @@ A page whose imports reach one of the three, or any template reading `ctx`, thro
 Passwords are 10 to 128 characters and usernames 2 to 32. The `rules` option changes them, and adds a check of your own for the password:
 
 ```ts
-createAuth({
+authCore({
   // ...
   rules: {
     password: { min: 12, check: password => /\d/.test(password) ? undefined : 'Add a digit.' },
@@ -305,13 +305,13 @@ form(action={start})
   button Continue as a guest
 ```
 
-When the guest registers, the account keeps their id, so the app's data stays theirs. `user.guest` is `true` until then. A guest whose session ends is left in the store, and `admin.listUsers` shows them, until they are deleted: 30 days after they were made by default, or `guests: { maxAge: '7d' }` in `createAuth`. Only a guest with no session left goes, and `onDelete` is called as for any user.
+When the guest registers, the account keeps their id, so the app's data stays theirs. `user.guest` is `true` until then. A guest whose session ends is left in the store, and `admin.listUsers` shows them, until they are deleted: 30 days after they were made by default, or `guests: { maxAge: '7d' }` in `authCore`. Only a guest with no session left goes, and `onDelete` is called as for any user.
 
 An account registered and never verified goes the same way, 30 days after it was made, when `requireVerified` is on, as nobody can sign in to it. Set `email: { unverifiedMaxAge: '7d' }` to change that, or to turn it on without `requireVerified`, where an account never verified may be in use and goes once its session ends. An account with a session, a linked provider or a role beyond `defaultRoles` stays.
 
 A guest costs nothing to make, so kayjs-auth does not name it to other libraries: kayjs-ai's limits count a guest by address, and a signed-in user by id.
 
-`signUp: false` in `createAuth` closes self-service accounts. `password.register` and `signInAsGuest` answer `{ ok: false, error: 'off' }`, as any switched-off feature does. Make users yourself with `auth.admin.createUser({ email, password, roles })`, or the first one from the terminal:
+`signUp: false` in `authCore` closes self-service accounts. `password.register` and `signInAsGuest` answer `{ ok: false, error: 'off' }`, as any switched-off feature does. Make users yourself with `auth.admin.createUser({ email, password, roles })`, or the first one from the terminal:
 
 ```sh
 kay auth create-user ada@example.com --role admin
@@ -382,7 +382,7 @@ if (result.ok)
   console.log(result.token)
 ```
 
-`scopes` limits what the token reaches, from the `scopes` you declare in `createAuth`. A token without `scopes` reaches everything, so give a script or a device the scopes it needs. `maxAge` is a string such as `'30d'`; a token expires after 90 days without it, and `maxAge: null` makes one that never does. Tokens start with `kat_`, so a secret scanner can spot one that leaks. A token never makes another token.
+`scopes` limits what the token reaches, from the `scopes` you declare in `authCore`. A token without `scopes` reaches everything, so give a script or a device the scopes it needs. `maxAge` is a string such as `'30d'`; a token expires after 90 days without it, and `maxAge: null` makes one that never does. Tokens start with `kat_`, so a secret scanner can spot one that leaks. A token never makes another token.
 
 Control characters are removed from a token's label and from a passkey's name.
 
@@ -395,7 +395,7 @@ For a flow you gate yourself, such as pairing a device, `auth.issueToken(userId,
 A site that keeps data of its own on its users, such as a display name, keeps the prebuilt account pages. `pages.profile` adds those fields to the profile form.
 
 ```ts
-export const auth = createAuth({
+export const auth = authCore({
   // ...
   pages: {
     profile: {
@@ -417,7 +417,7 @@ A page of your own calls `auth.account.profile(locale)` and `auth.account.savePr
 
 ## Switching features off
 
-`auth({ password: false, passkeys: false, magicLink: false, twoFactor: false })` turns a feature off, and `createAuth` takes the same four keys. Each is on by default wherever it works today, so `false` is the only value to write, and `twoFactor` also takes `{ require }`. Writing `true` works until 1.93 and `kay upgrade` drops it. The same holds for `signUp`, and for `pages` of `auth()`.
+`auth({ password: false, passkeys: false, magicLink: false, twoFactor: false })` turns a feature off, and `authCore` takes the same four keys. Each is on by default wherever it works today, so `false` is the only value to write, and `twoFactor` also takes `{ require }`. Writing `true` works until 1.93 and `kay upgrade` drops it. The same holds for `signUp`, and for `pages` of `auth()`.
 
 A feature that is off is gone from the prebuilt pages: no password form, no mail form for sign-in links, no passkey button, no two-step section on the account page, and the register and password reset pages answer 404. Its methods answer `{ ok: false, error: 'off' }`, and `auth.features()` says `false` for it, so your own pages can follow.
 
@@ -435,9 +435,9 @@ A passkey sign-in counts as two factors, a password or OAuth session does not. A
 
 A way in that is switched off no longer counts as one when kayjs-auth checks that a user keeps another: with `password: false`, a user cannot unlink their last provider because they have a password.
 
-## Passkeys in `createAuth`
+## Passkeys in `authCore`
 
-`passkeys: { rpName, userVerification }` in `createAuth` sets the name the authenticator shows, `name` by default, and whether answering a second factor with a passkey requires a PIN or a biometric: `'required'`, `'preferred'` (the default) or `'discouraged'`. Adding a passkey, signing in with one and re-proving always require it.
+`passkeys: { rpName, userVerification }` in `authCore` sets the name the authenticator shows, `name` by default, and whether answering a second factor with a passkey requires a PIN or a biometric: `'required'`, `'preferred'` (the default) or `'discouraged'`. Adding a passkey, signing in with one and re-proving always require it.
 
 A passkey is added and used on the page's own origin only. One asked for in a frame of another origin is refused, as kay keeps other origins from framing its pages with `frame-ancestors 'self'`.
 
@@ -502,14 +502,14 @@ import { auth } from '../../auth'
 export default auth.guard({ require: 'editor' })
 ```
 
-The pieces behind `auth.hasRole` and `auth.gate()` are exported for an app that keeps its own users. `createRoleHierarchy(hierarchy, user => user.roles)` gives `isGranted` and `hasRole`. `createGate` is the Elysia plugin that closes every route after it. `scopeAllows(scopes, wanted)` says whether a bearer token's scopes meet what a route asks. A requirement is typed `Requirement`, and a custom check `Predicate`, which reads a `PolicyContext` of `params`, `body` and `query`.
+The pieces behind `auth.hasRole` and `auth.gate()` are exported for an app that keeps its own users. `roleHierarchy(hierarchy, user => user.roles)` gives `isGranted` and `hasRole`. `authGate` is the Elysia plugin that closes every route after it. `scopeAllows(scopes, wanted)` says whether a bearer token's scopes meet what a route asks. A requirement is typed `Requirement`, and a custom check `Predicate`, which reads a `PolicyContext` of `params`, `body` and `query`.
 
 ## Events and the audit log
 
 `onAuthEvent` hears what happens to an account, such as a sign-in, a failed sign-in, a role granted or a ban.
 
 ```ts
-createAuth({
+authCore({
   // ...
   audit: true,
   onAuthEvent: (info) => {
@@ -572,7 +572,7 @@ While an admin acts as a user, the admin pages answer 403 with the banner and th
 Organizations are teams or workspaces that users belong to, with roles of their own in each.
 
 ```ts
-createAuth({
+authCore({
   // ...
   organizations: {
     roles: { owner: ['admin'], admin: ['member'], member: [] },
@@ -632,9 +632,9 @@ The pages ask the same of the methods as your own would: a member without the ro
 Each entry of `oauth` adds `/auth/<name>` and `/auth/<name>/callback`. Register `site` plus the callback path at the provider.
 
 ```ts
-import { createAuth, discordProvider } from '@kaynooo/kayjs-auth'
+import { authCore, discordProvider } from '@kaynooo/kayjs-auth'
 
-createAuth({
+authCore({
   // ...
   oauth: {
     discord: {
@@ -683,7 +683,7 @@ The `examples/noticeboard` project in the kay repository runs kayjs-auth on Post
 `forwardAuth` turns the app into the sign-in of other sites behind a reverse proxy. The proxy asks the app before each request, lets it through with who the user is, or sends the visitor to sign in and back.
 
 ```ts
-createAuth({
+authCore({
   sessions: session<AuthSessionData>({ secret, cookie: 'login' }),
   forwardAuth: 'example.com',
   // ...
@@ -696,7 +696,7 @@ A host on none of them keeps a cookie of its own, and a `domain` given to `sessi
 
 Name your own domain: kay has no list of public suffixes, so `co.uk` or `github.io` are accepted and would open every site under them. A user without two-factor is sent to the account security page, passkey holders included, as a session does not record how it signed in.
 
-The sign-in page is sent by its full URL, so without `site` in `kay.config.ts` or in `createAuth` the app stops at startup in production.
+The sign-in page is sent by its full URL, so without `site` in `kay.config.ts` or in `authCore` the app stops at startup in production.
 
 The route is `/auth/forward`. For a person signed in with a session it answers 204 with `Remote-User`, `Remote-Name`, `Remote-Email` and `Remote-Groups` (the roles, comma-separated). A guest, a bearer token and a sign-in waiting for its second factor are not signed in. Otherwise it answers 401 with the sign-in page in `Location`, which brings the visitor back to the page they asked for. `/auth/forward?role=admin` also refuses a user without that role with a 403.
 
@@ -737,7 +737,7 @@ For Traefik, use `forwardAuth` with the address `http://auth:3000/auth/forward?r
 
 ## Letting an AI agent sign in
 
-An agent such as Claude Code or MCP Inspector can sign in to your app through [`/mcp`](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) with no code on your side. With `auth()` and a store that keeps OAuth data (`memoryAuthStore` and `pgStore` do), your app is its own OAuth authorization server.
+An agent such as Claude Code or MCP Inspector can sign in to your app through [`/mcp`](/guides/api-routes#letting-an-agent-call-the-app-over-mcp) with no code on your side. With `auth()` and a store that keeps OAuth data (`memoryAuth` and `pgAuth` do), your app is its own OAuth authorization server.
 
 The agent is pointed at `/mcp`, gets a 401, and reads where to sign in. It sends the user to a consent page of your app, which names the agent and lists what it asks for. Once the user allows it, the agent gets a token.
 
@@ -770,7 +770,7 @@ That holds with the built-in stores and any custom store that can read a refresh
 An approval given while your app declared no `scopes` asks the user again once it declares some.
 
 ```ts
-createAuth({
+authCore({
   // ...
   scopes: ['notes:read', 'notes:write'],
   // oauthServer: false turns it off.
@@ -779,20 +779,20 @@ createAuth({
 
 The agents can only ask for the scopes you declare. An agent that asks for none is given no scope, so its token reaches only routes marked `scope: false`. Name the scopes such an agent gets with `oauthServer: { defaultScopes: ['notes:read'] }`.
 
-In production, set `site` in `kay.config.ts` or in `createAuth`: the OAuth server names itself from it. Without one its documents and endpoints answer an error, and `/mcp` points at no authorization server, as a Host header could name it otherwise. Registrations are limited per address; `rateLimit: { oauthRegisterAll }` adds a ceiling on all addresses together.
+In production, set `site` in `kay.config.ts` or in `authCore`: the OAuth server names itself from it. Without one its documents and endpoints answer an error, and `/mcp` points at no authorization server, as a Host header could name it otherwise. Registrations are limited per address; `rateLimit: { oauthRegisterAll }` adds a ceiling on all addresses together.
 
 The new tables are created by `db.sync()` if you use Postgres or SQLite.
 
 ## Limits
 
-Attempts are counted where every process shares them: in the store (`memoryAuthStore` and `pgStore` keep them), else in the app's `store.rates` from `kay.config.ts`, else in the process's memory, where they also count while a store fails, so a sign-in still answers. They are counted per client address and per account, the address kept as a keyed digest. Creating organizations is limited too, to 10 a day for each account: past that, `organizations.create` answers `limited`.
+Attempts are counted where every process shares them: in the store (`memoryAuth` and `pgAuth` keep them), else in the app's `store.rates` from `kay.config.ts`, else in the process's memory, where they also count while a store fails, so a sign-in still answers. They are counted per client address and per account, the address kept as a keyed digest. Creating organizations is limited too, to 10 a day for each account: past that, `organizations.create` answers `limited`.
 
 Give the app `sqliteRates` or `pgRates` as `store.rates` rather than `memoryRates`, which drops open windows past 10,000, so a flood of typed addresses could lift a lockout.
 
 `rateLimit` overrides any of `DEFAULT_LIMITS`, each `{ max, window, store? }` with `window` a string such as `'1h'`, as the defaults are written, or a list of them: each is counted apart and any can refuse. `store` counts that one in a store of its own.
 
 ```ts
-createAuth({
+authCore({
   // ...
   rateLimit: { register: { max: 3, window: '1h' } },
 })
@@ -802,11 +802,11 @@ Wrong passwords are counted twice for an account. Six from one address stop that
 
 A right password clears the count of the address it came from, but not the wrong guesses of the others, so the owner signing in gives a stranger no fresh sixty. Set `rateLimit.signInAccount` and `rateLimit.signInAccountAll` to change them.
 
-Behind a proxy, kay reads the client address through `proxy` in `kay.config.ts`. A plain Elysia app passes `proxy: { hops: 1 }` to `createAuth` instead, or every client counts as the proxy.
+Behind a proxy, kay reads the client address through `proxy` in `kay.config.ts`. A plain Elysia app passes `proxy: { hops: 1 }` to `authCore` instead, or every client counts as the proxy.
 
 ## Stores
 
-`memoryAuthStore()` is for tests and trying things out. `pgStore(db)` keeps users in Postgres, or in a SQLite file when the `Database` opens a `sqlite://` URL.
+`memoryAuth()` is for tests and trying things out. `pgAuth(db)` keeps users in Postgres, or in a SQLite file when the `Database` opens a `sqlite://` URL.
 
 Any object with the `AuthStore` methods is a store. Each method is sync or async.
 
@@ -863,7 +863,7 @@ const cookie = await auth.sessionCookie(user.id)
 const response = await app.handle(new Request('http://localhost/account', { headers: { cookie } }))
 ```
 
-Each `testSite` keeps its own cookies. `memoryAuthStore()` keeps each test's users apart. A mailer that pushes into an array gives the test the links it would have mailed.
+Each `testSite` keeps its own cookies. `memoryAuth()` keeps each test's users apart. A mailer that pushes into an array gives the test the links it would have mailed.
 
 ## In the dev tool
 

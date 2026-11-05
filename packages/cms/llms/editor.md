@@ -33,10 +33,10 @@ html.kcms-editing .toolbar { right: var(--kcms-width, 0px) }
 
 ### Keep unsaved edits across a reload
 
-The on-page editor keeps its drafts in `localStorage` with `browserKeeper()`; a site building its own editor passes it to `createDrafts`.
+The on-page editor keeps its drafts in `localStorage` with `browserKeeper()`; a site building its own editor passes it to `cmsDrafts`.
 
 ```ts
-const drafts = createDrafts({ show, delay: '150ms', keep: browserKeeper() })
+const drafts = cmsDrafts({ show, delay: '150ms', keep: browserKeeper() })
 ```
 
 ## Reference

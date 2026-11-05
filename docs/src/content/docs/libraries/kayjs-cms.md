@@ -821,7 +821,7 @@ In the page, read what the screen reads with `entryScreen`, `listScreen` and `co
 
 ## Building an entry screen
 
-To arrange an entry screen in a way the layout cannot, build it from the parts the default one is made of. `createEntryForm` from `@kaynooo/kayjs-cms/form`, with the `EntryForm` and `FormScope` types, keeps the state: drafts, save, publish, delete, reset and the warning when you leave with edits. Each part takes that `form`.
+To arrange an entry screen in a way the layout cannot, build it from the parts the default one is made of. `cmsEntryForm` from `@kaynooo/kayjs-cms/form`, with the `EntryForm` and `FormScope` types, keeps the state: drafts, save, publish, delete, reset and the warning when you leave with edits. Each part takes that `form`.
 
 ```kay
 ---
@@ -831,11 +831,11 @@ import EntryField from '@kaynooo/kayjs-cms/entry-field.kay'
 import EntryHeader from '@kaynooo/kayjs-cms/entry-header.kay'
 import EntryIdentity from '@kaynooo/kayjs-cms/entry-identity.kay'
 import EntryNotices from '@kaynooo/kayjs-cms/entry-notices.kay'
-import { createEntryForm } from '@kaynooo/kayjs-cms/form'
+import { cmsEntryForm } from '@kaynooo/kayjs-cms/form'
 
 const { prefix, collection, entry } = props<{ prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined }>()
 
-const form = createEntryForm({ prefix, collection, entry })
+const form = cmsEntryForm({ prefix, collection, entry })
 ---
 form(novalidate onSubmit={event => { event.preventDefault(); void form.save() }})
   EntryHeader(prefix={prefix} collection={collection} title={form.name} subtitle={form.subtitle})

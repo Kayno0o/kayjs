@@ -138,17 +138,17 @@ See [Forms and actions](/essentials/forms-and-actions) and [Testing](/guides/tes
 
 ## Put a dashboard behind sign-in, with roles
 
-`createAuth` declares the roles, an admin meeting what an editor does, and `pages: true` serves the sign-in, register and account pages, `src/auth.ts`:
+`authCore` declares the roles, an admin meeting what an editor does, and `pages: true` serves the sign-in, register and account pages, `src/auth.ts`:
 
 ```ts
-import { createAuth } from '@kaynooo/kayjs-auth'
-import { pgStore } from '@kaynooo/kayjs-auth/pg'
+import { authCore } from '@kaynooo/kayjs-auth'
+import { pgAuth } from '@kaynooo/kayjs-auth/pg'
 import { db } from './db'
 import { sessions } from './session'
 
-export const auth = createAuth({
+export const auth = authCore({
   sessions,
-  store: pgStore(db),
+  store: pgAuth(db),
   name: 'Dashboard',
   pages: true,
   roles: { admin: ['editor'], editor: [] },

@@ -3,7 +3,7 @@ import type { Access } from './access'
 import type { BareUser } from './core'
 import type { Requirement } from './types'
 import { durationSeconds } from 'kay/library'
-import { createRoleHierarchy } from './roles'
+import { roleHierarchy } from './roles'
 
 const DEFAULT_INVITATION_MAX_AGE = '7d'
 
@@ -43,7 +43,7 @@ export interface OrganizationsCore {
 
 // `create` asks the app's `authorize`, through `access`.
 export function organizationsCore<OrgRole extends string, Role extends string>(options: OrganizationsOptions<OrgRole, Role>, access: Access<Role>): OrganizationsCore {
-  const { isGranted } = createRoleHierarchy<BareUser, OrgRole>(options.roles, user => user.roles as OrgRole[])
+  const { isGranted } = roleHierarchy<BareUser, OrgRole>(options.roles, user => user.roles as OrgRole[])
   const create = options.create
 
   return {

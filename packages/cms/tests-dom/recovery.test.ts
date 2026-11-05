@@ -2,7 +2,7 @@ import type { Mounted } from 'kay/test'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import { browserKeeper } from '../src/draft-storage'
-import { createDrafts } from '../src/drafts'
+import { cmsDrafts } from '../src/drafts'
 import Notices from '../tests/fixture/src/components/notices.kay'
 import { until } from '../tests/until'
 
@@ -29,7 +29,7 @@ function memoryStorage(): Storage {
   }
 }
 
-async function mountNotices(drafts: ReturnType<typeof createDrafts>) {
+async function mountNotices(drafts: ReturnType<typeof cmsDrafts>) {
   mounted = await mountComponent(Notices, { drafts })
   await settle()
 
@@ -38,19 +38,19 @@ async function mountNotices(drafts: ReturnType<typeof createDrafts>) {
 
 test('tells the editor their unsaved changes came back, or were left out for an entry saved since', async () => {
   const storage = memoryStorage()
-  const before = createDrafts({ show: async () => ({}), keep: browserKeeper(() => storage) })
+  const before = cmsDrafts({ show: async () => ({}), keep: browserKeeper(() => storage) })
 
   before.open({ ...ENTRY, data: { title: 'Hello' } }, 'v1')
   before.set(ENTRY, 'title', 'Mine')
   before.flush()
 
-  const same = createDrafts({ show: async () => ({}), keep: browserKeeper(() => storage) })
+  const same = cmsDrafts({ show: async () => ({}), keep: browserKeeper(() => storage) })
 
   same.open({ ...ENTRY, data: { title: 'Hello' } }, 'v1')
   expect((await mountNotices(same)).textContent).toContain('Your unsaved changes from')
   mounted?.unmount()
 
-  const newer = createDrafts({ show: async () => ({}), keep: browserKeeper(() => storage) })
+  const newer = cmsDrafts({ show: async () => ({}), keep: browserKeeper(() => storage) })
 
   before.set(ENTRY, 'title', 'Mine again')
   newer.open({ ...ENTRY, data: { title: 'Theirs' } }, 'v2')
@@ -60,7 +60,7 @@ test('tells the editor their unsaved changes came back, or were left out for an 
 test('a conflict names the fields both sides changed, and offers keeping mine or taking theirs', async () => {
   spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json({ collection: COLLECTION, entry: { ...ENTRY, data: { title: 'Theirs' }, version: 'v2' } })) as unknown as typeof fetch)
 
-  const drafts = createDrafts({ show: async () => ({}) })
+  const drafts = cmsDrafts({ show: async () => ({}) })
 
   drafts.open({ ...ENTRY, data: { title: 'Hello' } }, 'v1')
   drafts.set(ENTRY, 'title', 'Mine')
@@ -82,7 +82,7 @@ test('a conflict names the fields both sides changed, and offers keeping mine or
 })
 
 test('a conflict with a deleted file offers keeping the edits alone', async () => {
-  const drafts = createDrafts({ show: async () => ({}) })
+  const drafts = cmsDrafts({ show: async () => ({}) })
 
   drafts.open({ ...ENTRY, data: { title: 'Hello' } }, 'v1')
   drafts.set(ENTRY, 'title', 'Mine')

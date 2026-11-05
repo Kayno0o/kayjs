@@ -876,7 +876,7 @@ function configuredRedirects(): { from: string; to: string; status: RedirectStat
 function configuredSite(): undefined | { origin: string; slashed: boolean; }
 
 [./library] connectionOf
-function connectionOf(source: PgJobsSource): SQL
+function connectionOf(source: PgSource): SQL
 
 [./library] ContextDefinition
 interface ContextDefinition<Values extends object = object>
@@ -1192,7 +1192,10 @@ interface Parsed
 function parseEvents<End>(body: ReadableStream<Uint8Array<ArrayBufferLike>>, signal: AbortSignal, onEvent: (event: string, data: string) => End | undefined): Promise<End | undefined>
 
 [./library] PgJobsSource
-type PgJobsSource = SQL | { sql: SQL } | string
+type PgJobsSource = PgSource
+
+[./library] PgSource
+type PgSource = SQL | { sql: SQL } | string
 
 [./library] PresenceView
 type PresenceView = (request: Request | undefined, room: string, members: string[], member: string) => string[]

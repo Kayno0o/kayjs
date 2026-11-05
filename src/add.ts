@@ -373,7 +373,7 @@ async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
       // The config carries kayjs-auth's store line, which a project of the former form keeps in src/auth.ts and an edited config is not rewritten for: the note names that file, never a reason to refuse the rest.
       else if (path === 'kay.config.ts' && existsSync(join(dir, 'src/auth.ts'))) {
         if (core.includes('postgres'))
-          notes.push('src/auth.ts holds this app\'s kayjs-auth store: point its store at the new database, `pgStore(db)` from `@kaynooo/kayjs-auth/pg`')
+          notes.push('src/auth.ts holds this app\'s kayjs-auth store: point its store at the new database, `pgAuth(db)` from `@kaynooo/kayjs-auth/pg`')
       }
       else if (path === 'kay.config.ts') {
         notes.push(`${path} is not what \`kay new\` wrote, so apply this by hand:\n${handEdit(was, content)}`)

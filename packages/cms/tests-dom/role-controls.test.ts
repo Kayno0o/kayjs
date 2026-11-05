@@ -3,7 +3,7 @@ import type { Field } from '../src/fields'
 import type { ScreenCollection } from '../src/kay/contract'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
-import { createDrafts } from '../src/drafts'
+import { cmsDrafts } from '../src/drafts'
 import EntryBodyProbe from '../tests/fixture/src/components/entry-body-probe.kay'
 import EntryFieldProbe from '../tests/fixture/src/components/entry-field-probe.kay'
 import ListField from '../tests/fixture/src/components/list-field.kay'
@@ -103,7 +103,7 @@ async function withRole(denied: Record<string, string>, open: () => Promise<HTML
 const MARKDOWN: Field = { key: 'tags', label: 'Notes', hint: undefined, required: false, kind: 'markdown' }
 
 async function markdownField(): Promise<HTMLElement> {
-  const drafts = createDrafts({ show: async () => ({}) })
+  const drafts = cmsDrafts({ show: async () => ({}) })
 
   drafts.open({ collection: 'posts', slug: 'hello', data: { tags: '' } })
   mounted = await mountComponent(ListField, { drafts, field: MARKDOWN })

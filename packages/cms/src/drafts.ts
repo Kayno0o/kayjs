@@ -21,7 +21,7 @@ function fingerprint(entry: CmsDraftEntry): string {
   return hashOf(JSON.stringify([entry.data, entry.body ?? '']))
 }
 
-export type Drafts = ReturnType<typeof createDrafts>
+export type Drafts = ReturnType<typeof cmsDrafts>
 
 // Why the last save of an entry was refused as a whole, kept until it saves or its edits are dropped; `conflict` is the version another save left the file at.
 export interface Refusal {
@@ -36,7 +36,7 @@ export interface Recovery {
 }
 
 // The unsaved edits of the entries a page renders, rendering the page with them shortly after each change.
-export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
+export function cmsDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
   const wait = durationMs(delay)
   const saved = new Map<string, CmsDraftEntry>()
   // What `open` was last given for each entry, so being given it again changes nothing.
@@ -439,3 +439,6 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     pending: () => waiting(),
   }
 }
+
+/** @deprecated Renamed `cmsDrafts` in 1.91, as a constructor is a noun; the old name works until 1.94. */
+export const createDrafts = cmsDrafts

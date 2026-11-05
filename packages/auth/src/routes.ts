@@ -171,7 +171,7 @@ export function serveUntypedRoutes(plugin: Elysia, core: Core): void {
     return
 
   if (!rootUsable(core))
-    throw configError('forwardAuth sends visitors to the sign-in page by its full URL: set `site` in kay.config.ts, SITE_URL or in createAuth')
+    throw configError('forwardAuth sends visitors to the sign-in page by its full URL: set `site` in kay.config.ts, SITE_URL or in authCore')
 
   const forward = core.forward
   const route = `${core.prefix}/forward`

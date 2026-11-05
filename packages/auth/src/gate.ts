@@ -39,7 +39,7 @@ export function scopeAllows(scopes: readonly string[] | null, wanted: ScopeRequi
 
 // The macro only stamps the route's requirement; one local beforeHandle enforces it, so routes added through `group`, `guard`, `use`, `route`, `all` or `ws` fall back to `defaultRequirement` too.
 // Routes of the instance it is used on take `auth: <Requirement>` to override the default and `auth: false` to opt out, and `scope:` for what a scoped bearer token needs. Answers 401 to an anonymous caller and 403 to a signed-in one who is denied.
-export function createGate<P, G extends string, S extends string = string>(deps: GateDeps<P, G, S>) {
+export function authGate<P, G extends string, S extends string = string>(deps: GateDeps<P, G, S>) {
   // Generic over the app's own types, so what it holds already, such as `auth`, reaches the routes after it.
   return <Base extends string, Single extends SingletonBase, Defs extends DefinitionBase, Meta extends MetadataBase, Routes extends RouteBase, Eph extends EphemeralType, Vol extends EphemeralType>(app: Elysia<Base, Single, Defs, Meta, Routes, Eph, Vol>) => {
     // Elysia runs a route's `auth:` through the nearest gate's macro only, while every enclosing gate's hook runs: stamped under this gate's own symbols, the route's choice binds this gate alone, and the gates around it keep their own requirement.
@@ -102,3 +102,6 @@ export function createGate<P, G extends string, S extends string = string>(deps:
     return gated
   }
 }
+
+/** @deprecated Renamed `authGate` in 1.91, as a constructor is a noun (`create*` is for what writes schema); the old name works until 1.94. */
+export const createGate = authGate

@@ -12,9 +12,10 @@ const TRAILING_COMMA = /^\s*,/
 const TRAILING_COMMENT = /^[ \t]*(?:\/\/[^\n]*|\/\*[^\n]*?\*\/)/
 const INDENT = /^[ \t]*/
 
-// The features on by default that `true` only restates, by the function that takes them: `pages` is on by default for `auth()` alone, where `createAuth` serves none unless asked.
+// The features on by default that `true` only restates, by the function that takes them: `pages` is on by default for `auth()` alone, where `authCore` serves none unless asked.
 const SWITCHES: Record<string, readonly string[]> = {
   auth: ['password', 'magicLink', 'twoFactor', 'signUp', 'pages'],
+  authCore: ['password', 'magicLink', 'twoFactor', 'signUp'],
   createAuth: ['password', 'magicLink', 'twoFactor', 'signUp'],
 }
 
@@ -43,7 +44,7 @@ function removal(text: string, property: ObjectProperty): { start: number, end: 
   return { start: property.start, end: end + (comma ? INDENT.exec(text.slice(end))![0].length : 0) }
 }
 
-// A feature of kayjs-auth that is on by default written `feature: true`, in the options of `auth()` or `createAuth()` read from the library: a default-on feature is switched off with `false` or tuned with an object, and `true` says nothing, so leaving it out is the one way left. The old form works until 1.93; the fix drops the property.
+// A feature of kayjs-auth that is on by default written `feature: true`, in the options of `auth()` or `authCore()` read from the library: a default-on feature is switched off with `false` or tuned with an object, and `true` says nothing, so leaving it out is the one way left. The old form works until 1.93; the fix drops the property.
 export async function deprecatedAuthOptions(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   if (lintLevel('deprecated-auth-options', options.lints) === 'allow')
     return []

@@ -55,7 +55,7 @@ export function memoryAuthRates(): MemoryAuthRates {
 }
 
 // The limiter of a limit, counted in the store's own `rates`, else the app's `store.rates` from kay.config.ts, else this process's memory, its keys apart from kay's own limits and other libraries'.
-// The app's store is read on each count, as kay sets it up after `createAuth` may have run. A store that fails or hangs counts in memory meanwhile, as kay's own limits do.
+// The app's store is read on each count, as kay sets it up after `authCore` may have run. A store that fails or hangs counts in memory meanwhile, as kay's own limits do.
 export type AuthLimiters = (limit: AuthRateLimit) => Limiter
 
 export function authLimiters(store: AuthStore): AuthLimiters {

@@ -59,7 +59,7 @@ function authExample(ownDatabase: boolean): string[] {
 
 // The `auth()` of kay.config.ts: the name mails and authenticator apps show, and over the app's own database a store loading it as the server starts, so the config stays off the database.
 function authCall(name: string, ownDatabase: boolean): string {
-  const store = ownDatabase ? ', store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgStore((await import(\'./src/db\')).db)' : ''
+  const store = ownDatabase ? ', store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgAuth((await import(\'./src/db\')).db)' : ''
 
   return `auth({ name: '${name}'${store} })`
 }

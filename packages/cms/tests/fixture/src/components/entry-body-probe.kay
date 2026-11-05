@@ -2,7 +2,7 @@
 import EntryBody from '@kaynooo/kayjs-cms/entry-body.kay'
 import { resource } from 'kay'
 import editorApi from '../../../../src/api/editor'
-import { createDrafts } from '../../../../src/drafts'
+import { cmsDrafts } from '../../../../src/drafts'
 import { formScope } from '../../../../src/form'
 
 // The Markdown body of an entry on a form of its own, its denials read from the editor's `/can` as the on-page editor does, for a test of what its image drop does.
@@ -10,7 +10,7 @@ type Input = Parameters<typeof EntryBody>[0]
 
 const { collection } = props<{ collection: Parameters<typeof formScope>[2] }>()
 const entry = { collection: 'posts', slug: 'hello' }
-const drafts = createDrafts({ show: async () => ({}) })
+const drafts = cmsDrafts({ show: async () => ({}) })
 
 drafts.open({ ...entry, data: {}, body: '' })
 

@@ -199,7 +199,10 @@ type UserRow = InferEntity<typeof AuthUsers>
 const UNUSED_CLIENT_MS = 24 * 60 * 60 * 1000
 
 // kayjs-auth's data in the app's Postgres or SQLite database, through pg-orm: list `authTables` in the database's tables.
-export function pgStore(db: Database): AuthStore {
+export function pgAuth(db: Database): AuthStore {
+  if (typeof (db as Partial<Database> | null)?.repo !== 'function')
+    throw new TypeError('kayjs-auth: pgAuth takes a pg-orm `Database` listing `authTables`, not a connection URL or a Bun `SQL`: give `auth({ store: { url } })` for a URL')
+
   const users = db.repo(AuthUsers)
   const identities = db.repo(AuthIdentities)
   const tokens = db.repo(AuthTokens)
@@ -694,3 +697,6 @@ function isEmpty(row: object): boolean {
 function withoutUndefined<T extends object>(row: T): { [Key in keyof T]: Exclude<T[Key], undefined> } {
   return Object.fromEntries(Object.entries(row).filter(([, value]) => value !== undefined)) as { [Key in keyof T]: Exclude<T[Key], undefined> }
 }
+
+/** @deprecated Renamed `pgAuth` in 1.91, as a constructor is a noun (`create*` is for what writes schema); the old name works until 1.94. */
+export const pgStore = pgAuth

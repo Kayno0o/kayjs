@@ -11,7 +11,7 @@ export interface Ws extends WsSender {
 const VERIFIED_FRESH_MS = 30 * 1000
 
 /** Shared WS auth handshake: verifies the token, tracks the authed value per connection, replies `{type:'authed'}`; `verify` returns null to reject. `get` verifies the token again past 30 seconds, and closes the socket once it is refused. */
-export function createWsAuthStore<T>(verify: (token: string, ws: Ws) => Promise<T | null> | T | null) {
+export function wsAuthStore<T>(verify: (token: string, ws: Ws) => Promise<T | null> | T | null) {
   const authed = new Map<string, { token: string, value: T, at: number }>()
 
   return {
@@ -51,3 +51,6 @@ export function createWsAuthStore<T>(verify: (token: string, ws: Ws) => Promise<
     forget: (ws: Ws) => authed.delete(String(ws.id)),
   }
 }
+
+/** @deprecated Renamed `wsAuthStore` in 1.91, as a constructor is a noun (`create*` is for what writes schema); the old name works until 1.94. */
+export const createWsAuthStore = wsAuthStore

@@ -88,7 +88,7 @@ function auditMaxAge(audit: true | { maxAge?: Duration, ip?: 'full' | 'truncated
   return audit === true || audit.maxAge === undefined ? DEFAULT_AUDIT_MAX_AGE : wholeSeconds(audit.maxAge, 'audit.maxAge')
 }
 
-// Lets `auth()` hand a `createAuth({ pages: true })` its prefix and home, the paths derived from the prefix following, whichever of the two ran first.
+// Lets `auth()` hand a `authCore({ pages: true })` its prefix and home, the paths derived from the prefix following, whichever of the two ran first.
 export function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesConfig | undefined, signInPage?: string | undefined, twoFactorPage?: string | undefined, sessionsPage?: string | undefined, securityPage?: string | undefined, email?: { links?: Partial<Record<LinkType, string>> | undefined } | undefined }): PagesHandle {
   const own = typeof options.pages === 'object' ? options.pages : {}
 
@@ -100,12 +100,12 @@ export function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesCo
         return
 
       if (own.prefix !== undefined && own.prefix !== (given.prefix ?? DEFAULT_PAGES_PREFIX))
-        throw configError(`auth() serves the pages under '${given.prefix ?? DEFAULT_PAGES_PREFIX}' and createAuth({ pages: { prefix: '${own.prefix}' } }) sends users to '${own.prefix}'. Give auth({ prefix: '${own.prefix}' }), or drop the prefix of one of them`)
+        throw configError(`auth() serves the pages under '${given.prefix ?? DEFAULT_PAGES_PREFIX}' and authCore({ pages: { prefix: '${own.prefix}' } }) sends users to '${own.prefix}'. Give auth({ prefix: '${own.prefix}' }), or drop the prefix of one of them`)
 
       if (own.home === undefined && given.home !== undefined)
         pages.home = given.home
       else if (own.home !== undefined && given.home !== undefined && own.home !== given.home)
-        log.warn(`auth({ home: '${given.home}' }) and createAuth({ pages: { home: '${own.home}' } }) differ, and createAuth's wins: users go to '${own.home}'. Give home once, or the same in both`)
+        log.warn(`auth({ home: '${given.home}' }) and authCore({ pages: { home: '${own.home}' } }) differ, and authCore's wins: users go to '${own.home}'. Give home once, or the same in both`)
 
       if (own.prefix !== undefined || given.prefix === undefined || given.prefix === pages.prefix)
         return
@@ -179,7 +179,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     const url = given ?? configuredSite()?.origin.replace(TRAILING_SLASH, '')
 
     if (needsUrl && url === undefined)
-      throw configError('OAuth sign-in and mailed links need the site\'s public origin to build their URLs: set `site` in kay.config.ts or SITE_URL, or in createAuth')
+      throw configError('OAuth sign-in and mailed links need the site\'s public origin to build their URLs: set `site` in kay.config.ts or SITE_URL, or in authCore')
 
     if (url === undefined && waiting)
       return waiting
@@ -318,7 +318,7 @@ function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: strin
     return undefined
 
   if (!pages || !options.store.oauth)
-    throw configError('`oauthServer` needs the prebuilt `pages`, for its consent page, and a store with `oauth`, as `memoryAuthStore` and `pgStore` have')
+    throw configError('`oauthServer` needs the prebuilt `pages`, for its consent page, and a store with `oauth`, as `memoryAuth` and `pgAuth` have')
 
   const custom = typeof wanted === 'object' ? wanted.fetch : undefined
   const defaultScopes = typeof wanted === 'object' ? [...new Set(wanted.defaultScopes)] : []
@@ -328,7 +328,7 @@ function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: strin
 
   // Switched on by the app, not by the pages and the store alone, which every app with the prebuilt pages has.
   if (wanted !== undefined && (options.scopes?.length ?? 0) === 0)
-    log.warn('oauthServer is on but createAuth declares no `scopes`, so every OAuth token gets every scope: declare `scopes` and give routes a `scope:`')
+    log.warn('oauthServer is on but authCore declares no `scopes`, so every OAuth token gets every scope: declare `scopes` and give routes a `scope:`')
 
   return { fetchDocument: async url => (await import('./authorize/clients')).documentFetcher(custom)(url), documents: kv('auth:oauth-documents'), defaultScopes }
 }

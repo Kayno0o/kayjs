@@ -126,7 +126,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   breachedPasswords?: boolean | ((password: string) => boolean | Promise<boolean>) | undefined
   // The proxies in front, read as kay.config.ts's `proxy` is, for a plain Elysia app that kay's `pages()` does not serve; a kay app sets it in kay.config.ts instead.
   proxy?: KayConfig['proxy'] | undefined
-  // MCP clients sign in to the app by OAuth, on by default with `pages` and a store keeping it (`memoryAuthStore` and `pgStore` do): kayjs-auth serves the discovery documents, the authorization and token endpoints and the consent page, and the tokens it issues are bearer tokens. `false` turns it off; `fetch` reads the metadata document a client names by its URL, over the public internet only unless the app's own says otherwise.
+  // MCP clients sign in to the app by OAuth, on by default with `pages` and a store keeping it (`memoryAuth` and `pgAuth` do): kayjs-auth serves the discovery documents, the authorization and token endpoints and the consent page, and the tokens it issues are bearer tokens. `false` turns it off; `fetch` reads the metadata document a client names by its URL, over the public internet only unless the app's own says otherwise.
   oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined, defaultScopes?: readonly Scope[] | undefined } | undefined
   // A route for a reverse proxy to ask before it lets a request through to a site it guards (nginx `auth_request`, Traefik or Caddy forward auth): `${prefix}/forward` answers 204 with `Remote-User`, `Remote-Name`, `Remote-Email` and `Remote-Groups` for a signed-in person's session, or 401 with the sign-in page's URL as `Location`, which returns to the guarded site afterwards when it is on these domains or their subdomains. `requireTwoFactor` also refuses a user who has not set it up.
   forwardAuth?: ForwardDomains | ForwardAuthOptions | undefined
@@ -137,7 +137,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
 readRequestWith(requestOfContext)
 
 // Auth for a kay app or a plain Elysia one, on the app's kay session.
-export function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>) {
+export function authCore<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>) {
   const core = createCore(options)
   const access = core.access as unknown as Access<Role>
 
@@ -211,3 +211,6 @@ function withPluginOwner<Auth extends { plugin: object }>(auth: Auth): Auth {
 
   return auth
 }
+
+/** @deprecated Renamed `authCore` in 1.91, as a constructor is a noun (`create*` is for what writes schema); the old name works until 1.94. */
+export const createAuth = authCore

@@ -2,7 +2,7 @@ import type { Setup } from './template-shared'
 import { lines, quote } from './template-shared'
 
 // Over the app's own database, loaded as the server starts so the config stays off it.
-const POSTGRES_STORE = ', store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgStore((await import(\'./src/db\')).db)'
+const POSTGRES_STORE = ', store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgAuth((await import(\'./src/db\')).db)'
 
 export function config({ has, settings }: Setup): string {
   const server = has('server')

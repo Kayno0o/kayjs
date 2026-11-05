@@ -605,7 +605,7 @@ it('adds postgres to a kayjs-auth app of the former form, with a note naming src
     expect(written).toContain('compose.dev.yaml')
     expect(written).not.toContain('kay.config.ts')
     expect(notes).toEqual([expect.stringContaining('src/auth.ts holds this app')])
-    expect(notes.join('\n')).toContain('pgStore')
+    expect(notes.join('\n')).toContain('pgAuth')
   }
   finally {
     await rm(root, { recursive: true, force: true })
@@ -626,7 +626,7 @@ it('adds postgres to a kayjs-auth app whose config was edited, with the store li
     expect(written).toContain('compose.dev.yaml')
     expect(written).not.toContain('kay.config.ts')
     expect(notes.join('\n')).toContain('kay.config.ts is not what `kay new` wrote')
-    expect(notes.join('\n')).toContain('pgStore')
+    expect(notes.join('\n')).toContain('pgAuth')
   }
   finally {
     await rm(root, { recursive: true, force: true })
@@ -755,7 +755,7 @@ it('adds kayjs-auth over the project\'s pg-orm tables, the mailer being found by
 
     const config = await Bun.file(join(dir, 'kay.config.ts')).text()
 
-    expect(config).toContain('store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgStore((await import(\'./src/db\')).db)')
+    expect(config).toContain('store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgAuth((await import(\'./src/db\')).db)')
     expect(existsSync(join(dir, 'src/auth.ts'))).toBe(false)
     expect(await Bun.file(join(dir, '.env.example')).text()).not.toContain('AUTH_DATABASE_URL')
     expect((await addFeatures(dir, ['mail', 'auth'], { install: false })).written).toEqual([])
@@ -868,7 +868,7 @@ it('adds kayjs-auth over the Postgres database postgres sets up, with no second 
     const tables = await Bun.file(join(dir, 'src/db/tables.ts')).text()
 
     expect(tables).toContain('authTables')
-    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('pgStore((await import(\'./src/db\')).db)')
+    expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('pgAuth((await import(\'./src/db\')).db)')
     expect((await addFeatures(dir, ['auth', 'postgres'], { install: false })).written).toEqual([])
   }
   finally {

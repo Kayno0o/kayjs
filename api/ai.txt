@@ -1019,10 +1019,10 @@ component default
 const conversationTable: "kay_ai_conversations"
 
 [./pg] createConversationTable
-function createConversationTable(source: PgJobsSource): Promise<void>
+function createConversationTable(source: PgSource): Promise<void>
 
 [./pg] pgConversations
-function pgConversations(source: PgJobsSource): ConversationStore & { close: () => Promise<void>; }
+function pgConversations(source: PgSource): ConversationStore & { close: () => Promise<void>; }
 
 [./sqlite] sqliteConversations
 function sqliteConversations(path?: string): ConversationStore

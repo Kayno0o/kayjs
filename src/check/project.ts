@@ -123,7 +123,7 @@ export function lintConfigTypeError(root: string, lints: LintLevels = {}, diagno
   return levelEntries(lints).some(([name, level]) => !isLint(name) && !isLintGroup(name) ? diagnostic.message.includes(`'${name}'`) : !LEVELS.has(level) && diagnostic.message.includes(`"${level}"`))
 }
 
-// `missing-captcha` is moot in an app whose `createAuth` turns the CAPTCHA off, in whichever module it sits, unless the config sets the lint itself.
+// `missing-captcha` is moot in an app whose `authCore` turns the CAPTCHA off, in whichever module it sits, unless the config sets the lint itself.
 export async function withoutMissingCaptcha(root: string, options: CheckOptions): Promise<CheckOptions> {
   if (options.lints?.['missing-captcha'] !== undefined || options.lints?.forms !== undefined)
     return options

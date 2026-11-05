@@ -5,7 +5,7 @@ import { declareIsGranted } from '@kaynooo/utils'
 export type RoleHierarchy<R extends string> = Record<R, R[]>
 
 /** Role-hierarchy checker plus a `Requirement` bridge: `isGranted` walks the hierarchy, `hasRole` wraps it as a `Predicate` for `auth:`. `getRoles` projects a principal's roles. */
-export function createRoleHierarchy<P, R extends string>(
+export function roleHierarchy<P, R extends string>(
   hierarchy: RoleHierarchy<R>,
   getRoles: (principal: P) => R[],
 ) {
@@ -16,3 +16,6 @@ export function createRoleHierarchy<P, R extends string>(
 
   return { isGranted, hasRole }
 }
+
+/** @deprecated Renamed `roleHierarchy` in 1.91, as a constructor is a noun (`create*` is for what writes schema); the old name works until 1.94. */
+export const createRoleHierarchy = roleHierarchy

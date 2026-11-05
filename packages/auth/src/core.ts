@@ -116,7 +116,7 @@ export interface Core {
   // Where attempts are counted: the store's `rates`, else the app's `store.rates`, else this process's memory.
   rates: AuthLimiters
   keys: Keys
-  // The site's public origin: `site` of createAuth, else the site kay.config.ts or SITE_URL sets.
+  // The site's public origin: `site` of authCore, else the site kay.config.ts or SITE_URL sets.
   url?: string | undefined
   // Builds what depends on the site's origin, throwing while OAuth sign-in or mailed links lack one; a server asks as it boots and on each request until it has one.
   settle: () => void
@@ -169,7 +169,7 @@ export interface Core {
   admin?: ((user: User) => Promise<boolean>) | undefined
   // Whether a user meets a requirement, through the app's `authorize` when it has one, as `guard()` and `requireUser({ require })` ask.
   access: Access<string>
-  // `auth.guard()` of this `createAuth`, which the `guard()` of a module-less `auth()` asks for through the request's `auth`.
+  // `auth.guard()` of this `authCore`, which the `guard()` of a module-less `auth()` asks for through the request's `auth`.
   guard: (options: { redirect?: string | undefined, require?: Requirement<BareUser, string> | undefined, scope?: string | string[] | false | undefined, twoFactor?: true | undefined }) => Guard
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   // The data to keep on the user, laid over what they hold; nothing keeps it as is.

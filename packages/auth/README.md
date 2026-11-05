@@ -22,15 +22,15 @@ kay, Elysia and kayjs-ui (for the prebuilt pages) are peers, and `@kaynooo/pg-or
 ```ts
 // src/auth.ts
 import type { AuthSessionData } from '@kaynooo/kayjs-auth'
-import { createAuth, memoryAuthStore } from '@kaynooo/kayjs-auth'
+import { authCore, memoryAuth } from '@kaynooo/kayjs-auth'
 import { session } from 'kay/server'
 
-export const auth = createAuth({
+export const auth = authCore({
   sessions: session<AuthSessionData>(),
   // The session takes kay's KAY_SECRET, and kayjs-auth its key from the session's secret; pass `secret` (32+ characters) to keep a separate one.
   // OAuth callbacks and mailed links are built on kay's `site` (kay.config.ts or SITE_URL); `url` gives another.
-  // In the process, for trying it out; `pgStore(db)` from '@kaynooo/kayjs-auth/pg' keeps it in Postgres, or in SQLite on a pg-orm `Database` opened at a `sqlite://` URL, whose `tables` list `...authTables` and are migrated with the app's own.
-  store: memoryAuthStore(),
+  // In the process, for trying it out; `pgAuth(db)` from '@kaynooo/kayjs-auth/pg' keeps it in Postgres, or in SQLite on a pg-orm `Database` opened at a `sqlite://` URL, whose `tables` list `...authTables` and are migrated with the app's own.
+  store: memoryAuth(),
   signInPage: '/login',
 })
 ```
@@ -73,7 +73,7 @@ export default auth.guard({ redirect: '/login' })
 
 ## Prebuilt pages
 
-`auth()` in kay.config.ts serves them. With `pages: true` in `createAuth`, kayjs-auth sends users to `/auth/sign-in`, `/auth/account` and the rest. A file of the app's at one of those paths replaces that page, and a key under `auth` in its messages replaces that text.
+`auth()` in kay.config.ts serves them. With `pages: true` in `authCore`, kayjs-auth sends users to `/auth/sign-in`, `/auth/account` and the rest. A file of the app's at one of those paths replaces that page, and a key under `auth` in its messages replaces that text.
 
 ## Reference
 

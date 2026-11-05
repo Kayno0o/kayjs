@@ -6,7 +6,7 @@ import { memoryAuthRates } from './rates'
 const UNUSED_CLIENT_MS = 24 * 60 * 60 * 1000
 
 // Everything in this process's memory, gone on restart: for tests, and for trying kayjs-auth before a database is wired.
-export function memoryAuthStore(): AuthStore {
+export function memoryAuth(): AuthStore {
   const users = new Map<string, UserRecord>()
   const identities = new Map<string, IdentityRecord>()
   const tokens = new Map<string, TokenRecord>()
@@ -597,3 +597,6 @@ function oldestFirst<T extends { createdAt: Date }>(records: T[]): T[] {
 function clone<T extends object>(value: T | undefined): T | undefined {
   return value && { ...value }
 }
+
+/** @deprecated Renamed `memoryAuth` in 1.91, as a constructor is a noun (`create*` is for what writes schema); the old name works until 1.94. */
+export const memoryAuthStore = memoryAuth

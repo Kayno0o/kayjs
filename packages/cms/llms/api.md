@@ -24,10 +24,10 @@ humanize('seoURL') // 'Seo URL'
 
 ### Hold the unsaved edits of a page
 
-`createDrafts({ show, delay, keep })` holds the edits and renders the page with them once typing pauses.
+`cmsDrafts({ show, delay, keep })` holds the edits and renders the page with them once typing pauses.
 
 ```ts
-const drafts = createDrafts({ show, delay: '150ms', keep: browserKeeper() })
+const drafts = cmsDrafts({ show, delay: '150ms', keep: browserKeeper() })
 drafts.set(ref, 'title', 'New title')
 ```
 
@@ -39,5 +39,5 @@ drafts.set(ref, 'title', 'New title')
 - `emptyValue(field)`: what a new list item starts as.
 - `parseMarker(value, body?)`, `formatMarker(marker)`, `entryKey(ref)`: read and write kay's markers.
 - `fieldsAt(node)`: the fields rendered at a node, innermost first.
-- `createDrafts({ show, delay, keep })`: the unsaved edits of a page's entries; `keep` is a `DraftKeeper` (`browserKeeper()`) holding them across a reload, none by default. `anyChanged()`, `discardAll()`, `recovery(ref)`, `adopt(ref, entry, version)` and `differences(ref, other)` serve the leave guard, Stop editing and the conflict choice. `open(entry, version?)`, `version(ref)`, `value(ref, path)`, `set(ref, path, value)`, `changed(ref)`, `reset(ref)`, `markSaved(ref, sent, version?)` (what was sent becomes the saved state, an edit typed meanwhile staying unsaved), `refuse(ref, refusal)`, `refusal(ref)` and `keepEdits(ref)` (why a save was refused as a whole, kept until the entry saves or resets, and taking a conflict's version), `issues(ref, path?)`, `failure()`, `rendering()`, `stale()` (the changed entries the last render or save reported issues for, whose saved text the page shows) and `reapply()` (renders again with the edits, for a page that replaced the one they were shown on). Each change renders the page with every changed entry once typing pauses `delay` (a duration, `'150ms'`), keeping only the latest render's issues; `report(issues)` shows a refused save's, which a render scheduled before it leaves be until the next edit.
+- `cmsDrafts({ show, delay, keep })`: the unsaved edits of a page's entries; `keep` is a `DraftKeeper` (`browserKeeper()`) holding them across a reload, none by default. `anyChanged()`, `discardAll()`, `recovery(ref)`, `adopt(ref, entry, version)` and `differences(ref, other)` serve the leave guard, Stop editing and the conflict choice. `open(entry, version?)`, `version(ref)`, `value(ref, path)`, `set(ref, path, value)`, `changed(ref)`, `reset(ref)`, `markSaved(ref, sent, version?)` (what was sent becomes the saved state, an edit typed meanwhile staying unsaved), `refuse(ref, refusal)`, `refusal(ref)` and `keepEdits(ref)` (why a save was refused as a whole, kept until the entry saves or resets, and taking a conflict's version), `issues(ref, path?)`, `failure()`, `rendering()`, `stale()` (the changed entries the last render or save reported issues for, whose saved text the page shows) and `reapply()` (renders again with the edits, for a page that replaced the one they were shown on). Each change renders the page with every changed entry once typing pauses `delay` (a duration, `'150ms'`), keeping only the latest render's issues; `report(issues)` shows a refused save's, which a render scheduled before it leaves be until the next edit.
 - `valueAt(data, path)`, `withValueAt(data, path, value)`, `joinPath(parent, key)`: field paths.

@@ -40,7 +40,7 @@ export function emailProblem(email: string): EmailProblem | undefined {
   return isEmail(normalized) && !mixesConfusableScripts(normalized.slice(0, normalized.lastIndexOf('@'))) ? undefined : 'invalid'
 }
 
-// What an app sets over the defaults, in the `rules` option of `createAuth`, and the same object an island passes to `passwordProblem` and `usernameProblem`.
+// What an app sets over the defaults, in the `rules` option of `authCore`, and the same object an island passes to `passwordProblem` and `usernameProblem`.
 export interface CredentialRules {
   password?: {
     // 10 by default.
@@ -105,7 +105,7 @@ function resolved(rules: CredentialRules): ResolvedRules {
   return rules === DEFAULT_RULES || (typeof rules.password?.min === 'number' && typeof rules.password.max === 'number' && typeof rules.username?.min === 'number' && typeof rules.username.max === 'number') ? rules as ResolvedRules : resolveRules(rules)
 }
 
-// The rules an app set, over the defaults when none are given: an island passes `features().rules` it was handed, or the object the app gave `createAuth`.
+// The rules an app set, over the defaults when none are given: an island passes `features().rules` it was handed, or the object the app gave `authCore`.
 export function passwordProblem(password: string, rules: CredentialRules = DEFAULT_RULES): PasswordProblem | undefined {
   const { min, max, check } = resolved(rules).password
 

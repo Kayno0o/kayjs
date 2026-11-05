@@ -17,12 +17,12 @@ const impersonators = new WeakMap<Request, BareUser | null>()
 const banners = new WeakSet<Request>()
 let requestReader: (() => Request | undefined) | undefined
 
-// Given by the server code of `createAuth`, so this module imports nothing server-only and a component using it never drags kay's server into a browser build.
+// Given by the server code of `authCore`, so this module imports nothing server-only and a component using it never drags kay's server into a browser build.
 export function readRequestWith(read: () => Request | undefined): void {
   requestReader = read
 }
 
-// Called where `createAuth` first sees the request, so a component can read the signed-in user without a server fence.
+// Called where `authCore` first sees the request, so a component can read the signed-in user without a server fence.
 export function registerViewer(request: Request, viewer: Viewer): void {
   viewers.set(request, viewer)
 }

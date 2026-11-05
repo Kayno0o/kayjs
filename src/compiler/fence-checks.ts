@@ -757,7 +757,7 @@ const CAPTCHA_OFF = /\bcaptcha\s*:\s*false\b/
 
 // Whether a module creates an auth with its CAPTCHA off, which makes `missing-captcha` moot across the project.
 export function turnsCaptchaOff(source: string): boolean {
-  return source.includes('createAuth') && CAPTCHA_OFF.test(source)
+  return (source.includes('authCore') || source.includes('createAuth')) && CAPTCHA_OFF.test(source)
 }
 
 // The last name of a receiver, `auth` for `ctx.locals.auth`.
@@ -801,7 +801,7 @@ export function missingCaptchas(fence: ParsedFence): Diagnostic[] {
       code: 'missing-captcha',
       message: `\`${name}\` is called with no \`captcha\`, which kayjs-auth asks of it by default`,
       note: 'with the default proof of work, a call without the token answers `{ ok: false, error: \'captcha\' }`, and a form that does not post one fails with no message',
-      help: 'add `input(type="hidden" name="captcha" data-kay-work={await auth.captchaChallenge(action)})` to the form and pass `{ captcha: input.captcha }`, or set `captcha: false` on `createAuth`',
+      help: 'add `input(type="hidden" name="captcha" data-kay-work={await auth.captchaChallenge(action)})` to the form and pass `{ captcha: input.captcha }`, or set `captcha: false` on `authCore`',
     })
   })
 

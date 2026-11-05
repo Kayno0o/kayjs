@@ -10,7 +10,7 @@ import { mergedData } from './userData'
 // `held` with `data` laid over it as the `user` schema accepts it; throws for data it refuses, or when the app declared no schema.
 function signInAsData(core: Core, held: Record<string, unknown> | undefined, data: object): Record<string, unknown> {
   if (!core.userData)
-    throw new Error('kayjs-auth: signInAs was given `data`, and createAuth has no `user` schema')
+    throw new Error('kayjs-auth: signInAs was given `data`, and authCore has no `user` schema')
 
   const merged = mergedData(core.userData, held, data)
 

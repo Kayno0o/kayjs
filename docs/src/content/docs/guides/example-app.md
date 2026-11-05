@@ -7,7 +7,7 @@ description: A tour of the noticeboard example, which runs kay with kayjs-auth, 
 The tutorial builds an app from kay alone. [examples/noticeboard](https://github.com/Kayno0o/kayjs/tree/main/examples/noticeboard) is the next step: a club noticeboard running kay with the libraries a real site takes, each wired as its own reference says.
 
 - **Members** join and sign in through `@kaynooo/kayjs-auth`, with a password or a mailed link. They confirm their address from a mail. `/account` sits behind `auth.guard()`.
-- **Data** lives in Postgres through `@kaynooo/pg-orm`, with the auth tables beside the app's, through `pgStore`.
+- **Data** lives in Postgres through `@kaynooo/pg-orm`, with the auth tables beside the app's, through `pgAuth`.
 - **Mail** goes through `@kaynooo/kayjs-mail`. kayjs-auth's links are queued on it, and a notice's announcement is a `.kay` component built from its `Layout`, `Heading` and `Button`.
 - **A queue** of kay's, `announcements`, mails each new notice to the members with a confirmed address, after the post has answered.
 - **Rooms** of kay's carry the board's websocket: who is reading, and each notice as it is pinned. Every open board shows the new notice through `refresh()` with a toast.

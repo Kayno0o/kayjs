@@ -11,7 +11,7 @@ void mock.module('@kaynooo/kayjs-ui', async () => import(toastModule) as Promise
 
 const { default: entriesApi } = await import('../src/api/entries')
 const { default: filesApi } = await import('../src/api/files')
-const { createDrafts } = await import('../src/drafts')
+const { cmsDrafts } = await import('../src/drafts')
 const { deleteSaved, deleteUnusedUploadsInChunks, saveDraft } = await import('../src/editor/save')
 const { sessionEnded } = await import('../src/editor/session')
 const { uploadFile, uploading } = await import('../src/editor/upload')
@@ -41,7 +41,7 @@ function server(answer: (body: Sent['body'], count: number) => unknown, wait = 2
 }
 
 function opened() {
-  const drafts = createDrafts({ show: async () => ({}), delay: '1s' })
+  const drafts = cmsDrafts({ show: async () => ({}), delay: '1s' })
 
   drafts.open(post, 'v1')
 

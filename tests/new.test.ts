@@ -880,7 +880,7 @@ describe('kay new', () => {
       expect(await Bun.file(join(dir, 'pg-orm.config.ts')).text()).toContain('process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL')
       expect(await Bun.file(join(dir, 'src/db/tables.ts')).text()).toContain('export const tables = [...authTables]')
       expect(await Bun.file(join(dir, 'pg-orm.config.ts')).text()).toContain('import { tables } from \'./src/db/tables\'')
-      expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgStore((await import(\'./src/db\')).db)')
+      expect(await Bun.file(join(dir, 'kay.config.ts')).text()).toContain('store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgAuth((await import(\'./src/db\')).db)')
       // On the Bun that scaffolded it, rather than whatever is latest when it builds.
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toStartWith(`FROM oven/bun:${Bun.version} AS build\n`)
       expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain(`bun-version: ${Bun.version}\n`)
@@ -1022,7 +1022,7 @@ describe('kay new', () => {
           // kayjs-auth keeps its users in a SQLite file under `data` unless Postgres does.
           const file = !variant.has('postgres')
 
-          expect({ features, store: !contents['kay.config.ts']!.includes('pgStore'), ignored: contents['.gitignore']!.split('\n').includes('data') }).toEqual({ features, store: file, ignored: true })
+          expect({ features, store: !contents['kay.config.ts']!.includes('pgAuth'), ignored: contents['.gitignore']!.split('\n').includes('data') }).toEqual({ features, store: file, ignored: true })
 
           // The file is written by the user the image runs as, in a folder a volume keeps across deploys.
           if (variant.has('docker')) {

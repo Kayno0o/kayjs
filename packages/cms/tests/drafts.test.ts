@@ -1,7 +1,7 @@
 import type { Duration } from 'kay'
 import type { CmsDraftEntry, DraftResult } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
-import { createDrafts } from '../src/drafts'
+import { cmsDrafts } from '../src/drafts'
 import { BODY } from '../src/markers'
 import { until } from './until'
 
@@ -9,7 +9,7 @@ const post: CmsDraftEntry = { collection: 'posts', slug: 'hello', data: { title:
 
 function setup(answer: (entries: CmsDraftEntry[]) => Promise<DraftResult> = async () => ({}), delay: Duration = '5ms') {
   const calls: CmsDraftEntry[][] = []
-  const drafts = createDrafts({
+  const drafts = cmsDrafts({
     delay,
     show: async (entries) => {
       calls.push(entries)
@@ -49,7 +49,7 @@ describe('opening an entry again', () => {
 describe('opening from an effect, as the page editor does', () => {
   it('keeps a save and the edits typed after it when the effect runs again, and takes a copy it is offered anew', async () => {
     const { effect, root, signal, flush } = await import('kay')
-    const drafts = createDrafts({ show: async () => ({}) })
+    const drafts = cmsDrafts({ show: async () => ({}) })
     const source = signal({ entry: post, version: 'v1' })
 
     root(() => effect(() => {
@@ -75,7 +75,7 @@ describe('opening from an effect, as the page editor does', () => {
   })
 })
 
-describe('createDrafts', () => {
+describe('cmsDrafts', () => {
   it('reads the delay as a duration, and refuses a bare number', async () => {
     const { drafts, calls } = setup(undefined, '5ms')
 

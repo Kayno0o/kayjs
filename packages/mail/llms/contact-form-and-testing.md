@@ -85,11 +85,11 @@ export default { name: 'Ada', url: 'https://example.com/confirm' } satisfies Par
 
 ```ts
 // src/auth.ts
-import { createAuth } from '@kaynooo/kayjs-auth'
+import { authCore } from '@kaynooo/kayjs-auth'
 import { authMailer } from '@kaynooo/kayjs-mail'
 import { mail } from './mail'
 
-export const auth = createAuth({
+export const auth = authCore({
   // ...
   email: { mailer: authMailer(mail.enqueue), links: { /* ... */ } },
 })

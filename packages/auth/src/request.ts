@@ -38,7 +38,7 @@ import { featuresOf } from './pages'
 import { completeSignIn, provedLately, reprove } from './proof'
 import { pruneWhenDue } from './prune'
 import { sendToEnrolment } from './requiredTwoFactor'
-import { createRoleHierarchy } from './roles'
+import { roleHierarchy } from './roles'
 import { applyLifetime, chooseRemember, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { registerViewer } from './viewer'
 
@@ -331,7 +331,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return acting.error === 'two-factor-required' ? sendToEnrolment(this.core, this.request, stoppers(this.request)) : stoppers(this.request).deny(403)
   }
 
-  // The `guard()` of kayjs-auth, for a `_guard.ts` that cannot import the `createAuth` result: the guard of the one behind this request.
+  // The `guard()` of kayjs-auth, for a `_guard.ts` that cannot import the `authCore` result: the guard of the one behind this request.
   async guarded(ctx: GuardContext, options: Parameters<Core['guard']>[0]): Promise<void> {
     await this.core.guard(options)(ctx)
   }
@@ -520,7 +520,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (await this.record() === null)
       return []
 
-    const { isGranted } = createRoleHierarchy<string[], string>(this.core.hierarchy ?? {}, roles => roles)
+    const { isGranted } = roleHierarchy<string[], string>(this.core.hierarchy ?? {}, roles => roles)
     const found: string[] = []
 
     for (let offset = 0; offset < USER_SCAN_MAX; offset += USER_SCAN_PAGE) {

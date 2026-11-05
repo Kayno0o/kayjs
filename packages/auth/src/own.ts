@@ -1,6 +1,6 @@
 import type { AnyElysia } from 'elysia'
 import type { ExtensionApp } from 'kay/server'
-import type { AuthOptions, createAuth as CreateAuth } from './auth'
+import type { AuthOptions, authCore as CreateAuth } from './auth'
 import type { AuthSessionData, OAuthApp } from './core'
 import type { EmailOptions } from './email'
 import type { AuthMailer } from './mail'
@@ -15,7 +15,7 @@ import { s } from 'kay'
 import { appStore, configError } from 'kay/library'
 import { session } from 'kay/server'
 import { log } from './log'
-import { memoryAuthStore } from './memoryStore'
+import { memoryAuth } from './memoryStore'
 import { discordProvider, githubProvider, gitlabProvider, googleProvider, microsoftProvider } from './oauth/providers'
 
 /** What a provider preset takes beside its credentials, which the environment supplies when they are left out. */
@@ -49,7 +49,7 @@ type StoreOption = AuthStore | StoreUrl | (() => AuthStore | Promise<AuthStore>)
 
 type Inherited = 'sessions' | 'store' | 'oauth' | 'pages' | 'prefix' | 'email'
 
-/** The options of `auth()` with no module: `createAuth`'s own, with the session, the store, the mailer and the OAuth credentials found by convention. */
+/** The options of `auth()` with no module: `authCore`'s own, with the session, the store, the mailer and the OAuth credentials found by convention. */
 export interface OwnOptions<Role extends string = string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>> extends Omit<AuthOptions<AuthSessionData, Role, Prefix, Scope, OrgRole, UserData>, Inherited>, AuthPagesOptions {
   module?: undefined
   server?: undefined
@@ -180,7 +180,7 @@ async function storeOf(store: StoreOption | undefined, root: string, shared: str
 
   // Tests start from no users each run, as a file kept between them would not, and a static export reads none and creates or migrates no table.
   if (exporting || (given === undefined && process.env.NODE_ENV === 'test'))
-    return memoryAuthStore()
+    return memoryAuth()
 
   // The database of the app's own `store` when it names one, so `sqliteData` or `pgData(url)` in kay.config.ts is the only place to say where the data lives.
   // An app whose users are already in `data/auth.db` keeps them there, so an upgrade loses no one.
@@ -208,15 +208,15 @@ async function storeOf(store: StoreOption | undefined, root: string, shared: str
 
   await db.sync(!kept && url !== undefined && shared !== undefined && sameDatabase(url, shared, root) ? { ignoreTables: [foreignTables(pg.authTables.map(table => table.name))] } : undefined)
 
-  return pg.pgStore(db)
+  return pg.pgAuth(db)
 }
 
-// The hooks of `src/auth.ts`, which an app mounting its own `createAuth` result from there has not meant for this.
+// The hooks of `src/auth.ts`, which an app mounting its own `authCore` result from there has not meant for this.
 function conventionalHooks(loaded: Record<string, unknown> | undefined): AuthHooks | undefined {
   const own = loaded?.auth
 
   if (typeof own === 'object' && own !== null && 'plugin' in own)
-    throw configError('src/auth.ts exports `auth`, a createAuth result, while auth() builds its own: give `auth({ module: \'./src/auth\' })` for kay to mount it, or `auth({ plugin: false })` if you mount it by hand')
+    throw configError('src/auth.ts exports `auth`, a authCore result, while auth() builds its own: give `auth({ module: \'./src/auth\' })` for kay to mount it, or `auth({ plugin: false })` if you mount it by hand')
 
   return loaded?.hooks as AuthHooks | undefined
 }
@@ -288,9 +288,9 @@ export function builtOwn(site: { cookies: Bun.CookieMap }): OwnTest | undefined 
   return builtFor.get(site.cookies)
 }
 
-/** The `createAuth` an `auth()` with no module makes as the server starts: kay's session, the store, the mailer and the hooks found, the pages on. */
+/** The `authCore` an `auth()` with no module makes as the server starts: kay's session, the store, the mailer and the hooks found, the pages on. */
 export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<UserMaker & { plugin: AnyElysia }> {
-  const { createAuth } = await import('./auth')
+  const { authCore } = await import('./auth')
   const { hooks: loadHooks, store, oauth, email, pages, prefix, home, cookie, ...rest } = options
   const hooks = loadHooks ? (await loadHooks()).hooks : conventionalHooks(app.modules.hooks)
   const mailer = await emailOf(email, app)
@@ -300,10 +300,10 @@ export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<
 
     log.warn(appStore()?.sql === undefined
       ? `auth() keeps its users in ${file}, a SQLite file: set the app's \`store\` (\`sqliteData\` or \`pgData\`) in kay.config.ts, AUTH_DATABASE_URL, or auth's \`store\`, for a database that outlives a deploy`
-      : `auth() keeps its users in ${file}, a SQLite file, because pgData was given a connection and names no url: set AUTH_DATABASE_URL or pass auth({ store: pgStore(db) }) for a database that outlives a deploy`)
+      : `auth() keeps its users in ${file}, a SQLite file, because pgData was given a connection and names no url: set AUTH_DATABASE_URL or pass auth({ store: pgAuth(db) }) for a database that outlives a deploy`)
   }
 
-  const made = createAuth({
+  const made = authCore({
     ...hooks,
     ...rest,
     ...prefix !== undefined && { prefix },

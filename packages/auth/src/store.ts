@@ -385,7 +385,7 @@ export interface AuthStore {
     consume: (userId: string, digest: string) => MaybePromise<boolean>
     count: (userId: string) => MaybePromise<number>
   }
-  // Where the store counts attempts, shared by every process it is, as `memoryAuthStore` and `pgStore` do: kay's `RateStore`, whose `peek` and `reset` kay derives when it lacks them. Without it they count in the app's `store.rates`, else this process's memory.
+  // Where the store counts attempts, shared by every process it is, as `memoryAuth` and `pgAuth` do: kay's `RateStore`, whose `peek` and `reset` kay derives when it lacks them. Without it they count in the app's `store.rates`, else this process's memory.
   rates?: AuthRates | undefined
   // Deletes what outlived its use: expired links and codes and invitations, bearer tokens expired long ago, sessions past their lifetime unseen or the session plugin's `absoluteMaxAge` old, and attempt windows that ended. kayjs-auth calls it at most once an hour; a store without it keeps those rows until the app deletes them.
   prune?: (limits: PruneLimits) => MaybePromise<void>

@@ -7,7 +7,7 @@
 Teams or workspaces users belong to, with roles of their own in each:
 
 ```ts
-createAuth({
+authCore({
   // ...
   organizations: {
     roles: { owner: ['admin'], admin: ['member'], member: [] },

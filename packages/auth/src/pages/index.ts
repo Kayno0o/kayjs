@@ -13,7 +13,7 @@ import { pickLocale } from '../locale'
 import { buildOwn, MAIL_EXTENSION, ownEnv } from '../own'
 
 export interface AuthPagesOptions {
-  // Where the pages are served, `/auth` by default, beside kayjs-auth's own routes: `/auth/sign-in`. `createAuth` reads it when `auth()` loads it with `module`.
+  // Where the pages are served, `/auth` by default, beside kayjs-auth's own routes: `/auth/sign-in`. `authCore` reads it when `auth()` loads it with `module`.
   prefix?: string | undefined
   // Where a sign-in goes when nothing asked for another page, and a sign-out always: `/` by default.
   home?: string | undefined
@@ -55,7 +55,7 @@ export interface ProfileOptions<Field extends string = string> {
   save: (user: BareUser, values: Record<Field, string>) => void | { errors: Partial<Record<Field, string>> } | Promise<void | { errors: Partial<Record<Field, string>> }>
 }
 
-// What `createAuth`'s `pages` option takes: `auth()`'s own options and the profile data of the app.
+// What `authCore`'s `pages` option takes: `auth()`'s own options and the profile data of the app.
 export interface AuthPagesConfig extends AuthPagesOptions {
   // The "keep me signed in" choice of the sign-in and register pages: `'checkbox'` shows a box that decides (unchecked is the same short session by every way of signing in, OAuth and passkeys included), `'always'` hides it and keeps every sign-in `remember.maxAge`, `'never'` hides it and ends every session with the browser. `'checkbox'` by default.
   remember?: RememberMode | undefined
@@ -155,7 +155,7 @@ export function featuresOf(core: Core): AuthFeatures {
   }
 }
 
-// The pages `auth()` serves for `createAuth({ pages })` to send users to, each under the prefix.
+// The pages `auth()` serves for `authCore({ pages })` to send users to, each under the prefix.
 export function pagePaths(prefix: string) {
   return {
     signIn: `${prefix}/sign-in`,
@@ -171,27 +171,27 @@ export function pagePaths(prefix: string) {
   }
 }
 
-// The module `src/auth.ts` is: the `createAuth` result as its `auth` export or its default one.
+// The module `src/auth.ts` is: the `authCore` result as its `auth` export or its default one.
 export type AuthModule = { auth: { plugin: AnyElysia } } | { default: { plugin: AnyElysia } }
 
 // The plugin of an `AuthModule`, for `kay check` to type `ctx.locals.auth` off.
 export type PluginOf<Module> = Module extends { auth: { plugin: infer Plugin extends AnyElysia } } ? Plugin : Module extends { default: { plugin: infer Plugin extends AnyElysia } } ? Plugin : never
 
-// What `createAuth` hands `auth()` to settle the prefix and home between them, whichever of the two was made first.
+// What `authCore` hands `auth()` to settle the prefix and home between them, whichever of the two was made first.
 export const PAGES_OF = Symbol('kayjs-auth.pages')
 
 export interface PagesHandle {
-  // Takes the prefix and home `auth()` was given where `createAuth({ pages })` set none of its own, and throws when both name another prefix.
+  // Takes the prefix and home `auth()` was given where `authCore({ pages })` set none of its own, and throws when both name another prefix.
   adopt: (given: { prefix?: string | undefined, home?: string | undefined }) => void
 }
 
-// Set on the plugin of a `createAuth` result, so what has the plugin alone finds the `auth` it came from.
+// Set on the plugin of a `authCore` result, so what has the plugin alone finds the `auth` it came from.
 export const AUTH_OF = Symbol('kayjs-auth.auth')
 
 // Set on the extensions kayjs-auth gives, answering the app's `auth` for the commands, given the project root.
 export const LOAD_AUTH = Symbol('kayjs-auth.load')
 
-// Set on the `createAuth` result, answering what `createUser` would refuse a login for.
+// Set on the `authCore` result, answering what `createUser` would refuse a login for.
 export const CHECK_USER = Symbol('kayjs-auth.checkUser')
 
 // What `kay auth create-user` needs of the app's `auth`.
@@ -204,12 +204,12 @@ export interface UserMaker {
 // The commands both extensions add.
 const COMMANDS = { 'auth create-user': `${import.meta.dir}/../createUserCommand.ts` }
 
-// The `auth` of a module: the `createAuth` result as its `auth` export or its default one.
+// The `auth` of a module: the `authCore` result as its `auth` export or its default one.
 function authOfModule(module: Partial<Record<'auth' | 'default', { plugin: AnyElysia, [PAGES_OF]?: PagesHandle | undefined }>>) {
   const auth = module.auth ?? module.default
 
   if (!auth)
-    throw configError('the auth module exports no `auth`, the `createAuth` result')
+    throw configError('the auth module exports no `auth`, the `authCore` result')
 
   return auth
 }
@@ -220,7 +220,7 @@ async function authOfServer(server: (() => AnyElysia | Promise<AnyElysia>) | und
   const auth = plugin?.[AUTH_OF]
 
   if (!auth)
-    throw configError('the `server` of auth() is not the `plugin` of a `createAuth` result, so its commands cannot reach the app\'s auth; give `module: \'./src/auth\'` instead')
+    throw configError('the `server` of auth() is not the `plugin` of a `authCore` result, so its commands cannot reach the app\'s auth; give `module: \'./src/auth\'` instead')
 
   return auth
 }
@@ -234,9 +234,9 @@ function viewerExtension(viewer: boolean | undefined): { context: string, layout
 }
 
 export interface AuthExtensionOptions extends AuthPagesOptions {
-  // The file exporting the app's `auth`, the `createAuth` result, as a path from the project root: `'./src/auth'`. kay imports it as the server starts, never as the config is read, so the config stays off the app's database, and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes off it.
+  // The file exporting the app's `auth`, the `authCore` result, as a path from the project root: `'./src/auth'`. kay imports it as the server starts, never as the config is read, so the config stays off the app's database, and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes off it.
   module?: string | undefined
-  // Any other plugin carrying a `createAuth` result, as a function, in place of `module`.
+  // Any other plugin carrying a `authCore` result, as a function, in place of `module`.
   server?: (() => AnyElysia | Promise<AnyElysia>) | undefined
   // `false` leaves out the prebuilt pages and serves the plugin alone, for an app writing every page itself. `true` by default.
   pages?: boolean | undefined
@@ -249,14 +249,14 @@ export interface AuthExtensionOptions extends AuthPagesOptions {
 // The `auth` an app's module exports, for `prepare` to hand it the prefix and home `auth()` was given.
 function authOfExport(exported: unknown, module: string): { [PAGES_OF]?: PagesHandle | undefined } {
   if (typeof exported !== 'object' || exported === null || !('plugin' in exported))
-    throw new Error(`kayjs-auth: ${module} exports no \`auth\`: export the \`createAuth\` result as \`export const auth = createAuth(...)\``)
+    throw new Error(`kayjs-auth: ${module} exports no \`auth\`: export the \`authCore\` result as \`export const auth = authCore(...)\``)
 
   return exported as { [PAGES_OF]?: PagesHandle | undefined }
 }
 
 const KNOWN_OPTIONS: Record<keyof OwnOptions | keyof AuthExtensionOptions, true> = { module: true, server: true, plugin: true, prefix: true, pages: true, cookie: true, oauth: true, store: true, email: true, hooks: true, viewer: true, secret: true, site: true, name: true, signInPage: true, failurePage: true, twoFactorPage: true, allow: true, signUp: true, onSignUp: true, user: true, profileFields: true, onDelete: true, guests: true, exportData: true, onAuthEvent: true, audit: true, scopes: true, roles: true, organizations: true, admin: true, defaultRoles: true, remember: true, rules: true, sessionsPage: true, securityPage: true, locate: true, rateLimit: true, passkeys: true, password: true, magicLink: true, twoFactor: true, captcha: true, breachedPasswords: true, proxy: true, oauthServer: true, forwardAuth: true, authorize: true, home: true }
 
-// kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `auth({ module: './src/auth' })`, the module exporting the `auth` made with `createAuth`. Its plugin is used before the pages, so the app mounts nothing else and declares no `Register`, and `prefix` and `home` reach `createAuth({ pages: true })`; the prebuilt pages come with it unless `pages: false`.
+// kayjs-auth for `extensions` in kay.config.ts, as the whole declaration: `auth({ module: './src/auth' })`, the module exporting the `auth` made with `authCore`. Its plugin is used before the pages, so the app mounts nothing else and declares no `Register`, and `prefix` and `home` reach `authCore({ pages: true })`; the prebuilt pages come with it unless `pages: false`.
 export function auth<Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options?: OwnOptions<Role, Prefix, Scope, OrgRole, UserData>): AuthPages<OwnPlugin<Role, Prefix, Scope, OrgRole, UserData>>
 export function auth(options: AuthExtensionOptions): AuthPages
 export function auth(options: object = {}): AuthPages {
@@ -270,7 +270,7 @@ export function auth(options: object = {}): AuthPages {
   return moduleAuth(given)
 }
 
-// `auth()` with no module: kayjs-auth builds the whole `createAuth` as the server starts, so kay.config.ts declares everything and no file of the app is needed.
+// `auth()` with no module: kayjs-auth builds the whole `authCore` as the server starts, so kay.config.ts declares everything and no file of the app is needed.
 function ownAuth(options: OwnOptions): AuthPages {
   const prefix = options.prefix ?? DEFAULT_PREFIX
   // Built again only when the hooks, the mail module or kayjs-mail's registration are not the ones it was built from, so a reload under `kay dev` that left them alone keeps the store it opened; a test site always builds its own, so two sites of one project do not share a store.
@@ -326,7 +326,7 @@ function moduleAuth(options: AuthExtensionOptions): AuthPages {
   return Object.assign(extension, { [LOAD_AUTH]: load })
 }
 
-// The prefix and home `createAuth` reads off its `pages` option.
+// The prefix and home `authCore` reads off its `pages` option.
 export function pagesOf(pages: boolean | AuthPagesConfig | undefined): { prefix: string, home: string, remember: RememberMode, main: boolean, profile?: ProfileOptions } | undefined {
   if (pages == null || pages === false)
     return undefined
