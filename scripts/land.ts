@@ -226,8 +226,8 @@ async function verify(): Promise<string> {
   if (changed.length === 0)
     fail('nothing to land: the branch is main', EXIT.unlandable)
 
-  // A rebase resolved by hand can leave a conflict marker in a file no check reads.
-  const markers = addedMarkers(await $`git diff --unified=0 --no-color ${base} HEAD`.text())
+  // A rebase resolved by hand can leave a conflict marker in a file no check reads. `--no-ext-diff`, as a `diff.external` such as difftastic would print a diff this does not parse.
+  const markers = addedMarkers(await $`git diff --no-ext-diff --unified=0 --no-color ${base} HEAD`.text())
 
   if (markers.length > 0)
     fail(`the branch adds merge markers: ${markers.map(({ file, line, text }) => `${file}:${line} (${text})`).join(', ')}`, EXIT.unlandable)
