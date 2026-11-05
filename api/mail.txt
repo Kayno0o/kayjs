@@ -104,6 +104,12 @@ interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, T
   to?: Address | Address[] | undefined
   view?: ((props: ContactMailProps) => Element) | undefined
 
+[.] createMailListTables
+function createMailListTables(source: PgJobsSource): Promise<void>
+
+[.] createMailSuppressionTable
+function createMailSuppressionTable(source: PgJobsSource): Promise<void>
+
 [.] cssColors
 function cssColors(stylesheet: URL | string, name?: string): (property: string) => string
 
@@ -293,6 +299,9 @@ interface MailingList
   test: <P extends object>(message: ListMessage<P>, to: Address) => Promise<void>
   unsubscribe: (address: string) => Promise<boolean>
 
+[.] mailListTables
+const mailListTables: readonly ["kay_mail_subscribers", "kay_mail_broadcasts", "kay_mail_deliveries", "kay_mail_suppressions"]
+
 [.] MailMessage
 type MailMessage<P extends object = object> = Envelope & (ViewContent<P> | HtmlContent | TextContent)
 
@@ -369,6 +378,12 @@ interface Palette
   surface: string
   text: string
 
+[.] pgLists
+function pgLists(source: PgJobsSource): ListStore & { close: () => Promise<void>; }
+
+[.] pgSuppressions
+function pgSuppressions(source: PgJobsSource): SuppressionStore & { close: () => Promise<void>; }
+
 [.] registeredMailer
 function registeredMailer(): Promise<Mailer | undefined>
 
@@ -416,6 +431,9 @@ interface SmtpSettings
   secure?: boolean | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   user?: string | undefined
+
+[.] sqliteSuppressions
+function sqliteSuppressions(path: string): SuppressionStore
 
 [.] Subscriber
 interface Subscriber

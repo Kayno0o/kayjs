@@ -4,6 +4,8 @@ export { ask, replaces, resuming } from './ask'
 export { storedFile } from './attachments'
 export { chatMessages, lastChatMessage } from './chat-messages'
 export type { ChatMessagesOptions } from './chat-messages'
+// sqliteConversations moved to `@kaynooo/kayjs-ai/sqlite` in 1.88 (with `pgConversations` in `/pg`); the root keeps it until 1.91.
+export { sqliteConversations } from './conversation-store'
 export type { ConversationChange, ConversationKey, ConversationStore, StoredConversation, StoredTurn } from './conversation-store'
 export type { ConversationSummary } from './conversation-title'
 export type { Attachment, Message, Reply, ToolCall } from './deprecated'

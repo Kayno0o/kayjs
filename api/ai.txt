@@ -526,6 +526,9 @@ interface Spoken
   text: string
   voice: string | undefined
 
+[.] sqliteConversations
+function sqliteConversations(path?: string): ConversationStore
+
 [.] Step
 interface Step
   calls: AiToolCall[]
