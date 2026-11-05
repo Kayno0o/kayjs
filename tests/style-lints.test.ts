@@ -81,6 +81,12 @@ describe('unused-selector', () => {
     expect(unused('.title { x: y } .item { x: y } .x { x: y }', 'div hi', fences)).toEqual(['.title', '.item'])
   })
 
+  it('reads a class string after an apostrophe in a comment, and none inside a comment', () => {
+    const fences = '---\n// don\'t panic\nel.classList.add(\'open\') // \'shut\'\n---\n'
+
+    expect(unused('.open { x: y } .shut { x: y }', 'div hi', fences)).toEqual(['.shut'])
+  })
+
   it('reads every branch, loop and snippet of the template', () => {
     const template = 'if ok\n  p.yes hi\nelse\n  p.no hi\nfor n of [1]\n  li.row {n}\nsnippet item()\n  b.bold hi\nitem()'
     const fences = '---\nconst ok = true\n---\n'

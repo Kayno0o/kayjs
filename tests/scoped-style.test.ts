@@ -80,6 +80,10 @@ describe('scopeCss keyframes', () => {
     expect(scopeCss('@keyframes steps { to { x: y } } .a { animation: steps 1s steps(4, end) }', ATTR)).toBe(`@keyframes steps-k-x { to { x: y } } .a[${ATTR}] { animation: steps-k-x 1s steps(4, end) }`)
   })
 
+  it('leaves a function call whose name starts with a keyframes name', () => {
+    expect(scopeCss('@keyframes step { to { x: y } } .a { animation: step 1s steps(4, end) }', ATTR)).toBe(`@keyframes step-k-x { to { x: y } } .a[${ATTR}] { animation: step-k-x 1s steps(4, end) }`)
+  })
+
   it('unwraps :global(...) as the name, leaving its uses as written', () => {
     expect(scopeCss('@keyframes :global(spin) { to { x: y } } .a { animation: spin 1s }', ATTR)).toBe(`@keyframes spin { to { x: y } } .a[${ATTR}] { animation: spin 1s }`)
   })

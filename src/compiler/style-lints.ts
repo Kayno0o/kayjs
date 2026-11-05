@@ -3,7 +3,7 @@ import { elementsIn } from './ast'
 import { blankComments, pseudoElementAt, selectorList, selectorParts, styleRules } from './scoped-style'
 
 const WHITESPACE = /\s+/
-const STRING_LITERAL = /'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`/g
+const STRING_OR_COMMENT = /\/\/[^\n]*|\/\*[\s\S]*?\*\/|'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`/g
 const WORD = /[.*+?^${}()|[\]\\]/g
 const ROOT_PSEUDO = /(?<![\w-]):root(?![\w-])/
 const ROOT_ELEMENT = /^(?:html|body)(?![\w-])/i
@@ -129,7 +129,7 @@ export function styleLints(file: KayFile): Diagnostic[] {
 
   const { source } = file
   const css = blankComments(source.slice(file.style.start, file.style.end))
-  const code = [file.script, file.server, file.module].flatMap(span => span ? source.slice(span.start, span.end).match(STRING_LITERAL) ?? [] : []).join('\n')
+  const code = [file.script, file.server, file.module].flatMap(span => span ? (source.slice(span.start, span.end).match(STRING_OR_COMMENT) ?? []).filter(token => !token.startsWith('/')) : []).join('\n')
   const mentions = new Map<string, boolean>()
   const mentioned = (name: string) => {
     let found = mentions.get(name)
