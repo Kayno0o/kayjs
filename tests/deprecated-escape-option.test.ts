@@ -44,4 +44,41 @@ describe('deprecated-escape-option', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+  it('drops plugin beside a module, which server would be refused with, and gives no fix next to a spread', async () => {
+    const before = 'import { auth } from \'@kaynooo/kayjs-auth\'\n\nauth({ plugin: false, module: \'./src/auth\' })\n'
+    const after = 'import { auth } from \'@kaynooo/kayjs-auth\'\n\nauth({ module: \'./src/auth\', plugin: false })\n'
+    const spread = 'import { auth } from \'@kaynooo/kayjs-auth\'\n\nauth({ ...base, plugin: false })\n'
+    const root = await project({ 'src/before.ts': before, 'src/after.ts': after, 'src/spread.ts': spread })
+
+    try {
+      const found = await deprecatedEscapeOption(root, {})
+
+      expect(found.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.fixes === undefined]).sort()).toEqual([['src/after.ts', false], ['src/before.ts', false], ['src/spread.ts', true]])
+      await applySafeFixes(root, found)
+      expect(await Bun.file(join(root, 'src/before.ts')).text()).toBe('import { auth } from \'@kaynooo/kayjs-auth\'\n\nauth({ module: \'./src/auth\' })\n')
+      expect(await Bun.file(join(root, 'src/after.ts')).text()).toBe('import { auth } from \'@kaynooo/kayjs-auth\'\n\nauth({ module: \'./src/auth\' })\n')
+      expect(await Bun.file(join(root, 'src/spread.ts')).text()).toBe(spread)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('renames a quoted key, an aliased import and a call in a .kay fence', async () => {
+    const quoted = 'import { auth } from \'@kaynooo/kayjs-auth\'\n\nauth({ \'plugin\': false })\n'
+    const aliased = 'import { auth as a } from \'@kaynooo/kayjs-auth/pages\'\n\na({ plugin: false })\n'
+    const fence = '--- server\nimport { auth } from \'@kaynooo/kayjs-auth\'\nexport const x = auth({ plugin: false })\n---\np x\n'
+    const root = await project({ 'src/quoted.ts': quoted, 'src/aliased.ts': aliased, 'src/routes/fence.kay': fence })
+
+    try {
+      await applySafeFixes(root, await deprecatedEscapeOption(root, {}))
+      expect(await Bun.file(join(root, 'src/quoted.ts')).text()).toBe(quoted.replace('\'plugin\'', 'server'))
+      expect(await Bun.file(join(root, 'src/aliased.ts')).text()).toBe(aliased.replace('plugin', 'server'))
+      expect(await Bun.file(join(root, 'src/routes/fence.kay')).text()).toBe(fence.replace('plugin', 'server'))
+      expect(await deprecatedEscapeOption(root, {})).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })

@@ -410,6 +410,21 @@ export interface MailExtensionOptions extends MailerOptions {
 // The file `mail()` with no options loads by convention, exporting the app's mailer as `mail`.
 const APP_FILES = { mail: 'src/mail.ts' }
 
+// The `mail` a `src/mail.ts` exports, undefined when the app has no such file; a file whose export is no mailer stops the boot.
+function conventionalMailer(app: ExtensionApp | undefined): Mailer | undefined {
+  const loaded = app?.modules.mail
+
+  if (loaded === undefined)
+    return undefined
+
+  const exported = loaded.mail
+
+  if (typeof exported !== 'object' || exported === null || !('handle' in exported))
+    throw configError('src/mail.ts does not export a mailer as `mail`: write `export const mail = mailer({ ... })`, or give `mail({ ... })` its options in kay.config.ts and remove the file')
+
+  return exported as Mailer
+}
+
 // The mailers of the sites running in this process, the latest started last: what `send` and `enqueue` use. A site that is closed without stopping (kaynooo/kayjs#3053) leaves its entry until the next start.
 const running: Mailer[] = []
 
@@ -492,7 +507,7 @@ export function mail(options: MailExtensionOptions = {}): KayExtension<Mailer> {
 
   // Built at each start of a site, so two sites in one process hold a mailer each.
   const build = async (app?: ExtensionApp): Promise<Mailer> => {
-    const conventional = given || server !== undefined ? undefined : app?.modules.mail?.mail as Mailer | undefined
+    const conventional = given || server !== undefined ? undefined : conventionalMailer(app)
     const built = conventional ?? (server === undefined ? mailer(mailerOptions) : await server())
 
     register(built)

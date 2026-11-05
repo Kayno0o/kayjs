@@ -53,7 +53,7 @@ Every page, action and guard can now read `ctx.locals.auth`, typed. A file of yo
 
 ### The authCore form
 
-An app that keeps session data of its own, or wires its store by hand, writes the auth object itself and loads it with `auth({ module })`. An app that mounts the plugin by hand gives `auth({ server: false })`, the escape `mail({ server: false })` takes too (it was `plugin: false` until 1.94).
+An app that keeps session data of its own, or wires its store by hand, writes the auth object itself and loads it with `auth({ module })`. An app that mounts the plugin by hand gives `auth({ server: false })`, the escape `mail({ server: false })` takes too. `plugin: false` works until 1.94.
 
 `src/auth.ts` creates the auth object. `memoryAuth()` keeps users in the process, for trying it out.
 

@@ -64,6 +64,11 @@ describe('mail() by convention and by hand', () => {
     expect(outbox.last()?.subject).toBe('Bare')
   })
 
+  it('stops the boot naming src/mail.ts when it exports no mailer', async () => {
+    await expect(build(mail(), { mail: { mail: 'nope' } })).rejects.toThrow('src/mail.ts')
+    await expect(build(mail(), { mail: {} })).rejects.toThrow('src/mail.ts')
+  })
+
   it('keeps the inline options over the file', async () => {
     const own = mailer({ from: 'file@site.test' })
     const built = await build(mail({ from: 'inline@site.test' }), { mail: { mail: own } })
