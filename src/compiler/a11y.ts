@@ -398,7 +398,7 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
 
       const states = attribute.kind === 'static' ? ARIA_STATE_VALUES.get(name) : undefined
 
-      if (states && attribute.kind === 'static' && !states.has(attribute.text)) {
+      if (attribute.kind === 'static' && states && !states.has(attribute.text)) {
         const meant = closest(attribute.text, states)
         const values = [...states].map(value => `\`${value}\``).join(', ')
 

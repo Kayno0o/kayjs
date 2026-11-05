@@ -96,6 +96,15 @@ describe('hints for the first template mistakes', () => {
     expect(errors(found)).toEqual([])
   })
 
+  it('takes a bare crossorigin, a false, ol type A and a string-typed expression with a hint, and leaves component props alone', async () => {
+    const found = await report('---\nimport Note from "../note.kay"\nconst external = false\nconst kind: string = "x"\n---\nimg(src="https://x.test/a.png" alt="" width="1" height="1" crossorigin)\na(href="/" target={external && "_blank"}) go\nbutton(type={external && "submit"}) go\nol(type="A")\n  li a\nol(type={1})\n  li b\nbutton(type={kind}) go\nNote(level="warnlevel")\n', { 'src/note.kay': '---\nconst { level } = props<{ level: "info" | "warnLevel" | "danger" }>()\n---\np {level}\n' })
+
+    expect(errors(found).map(error => [error[0], error[3]])).toEqual([
+      [13, expect.stringContaining('type it as the union')],
+      [14, expect.not.stringContaining('takes')],
+    ])
+  })
+
   it('names the SVG attribute a typo or a React spelling stands for', async () => {
     const found = await report('---\n---\nsvg(viewbox="0 0 1 1" width="1")\n  path(d="M0 0" strokeWidth="2" stroke-linecap="round")\n  circle(cx="1" cy="1" r="1" fill="red" stroke-width="1" xlink:href="#a" data-x="1" aria-hidden="true")\n  rect(x="1" y="1" widht="2")\n')
 

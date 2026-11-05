@@ -36,7 +36,9 @@ const UNKNOWN_ELEMENT = /^Property '([\w$-]+)' does not exist on type 'JSX\.Intr
 const UNKNOWN_ATTRIBUTE = /Property '(\w+)' does not exist on type '(?:Html|Svg)Attributes</
 const UNKNOWN_SVG_ATTRIBUTE = /Property '([^']+)' does not exist on type 'SvgAttributes</
 const KEYWORD_MISMATCH = /^Type '"([^']*)"' is not assignable to type '(.+?)'\./
-const ARIA_STATE = /Types of property ''(aria-[\w-]+)'' are incompatible\.\s+Type '"([^']*)"' is not assignable to type '(.+?)'\.?$/
+const STRING_MISMATCH = /^Type 'string' is not assignable to type '(.+?)'\./
+const INTRINSIC_LINE = /^[ \t]*[a-z][\w-]*(?:[.#][\w-]+)*\(/
+const UPPERCASE_METHODS = new Set(['"GET"', '"POST"', '"DIALOG"'])
 const KEYWORD_ALIAS = /^\w+<(.*)>$/
 const NAME_AT = /^[\w:-]+(?==)/
 const TAG_NAME = /^[\w$.:-]+$/
@@ -303,32 +305,41 @@ const tooltipName: Row = (diagnostic, source, span) => {
 }
 
 // An attribute that takes a list of keywords, given another: the keywords it takes, from the type TypeScript names, and the one written.
-// Reported at the attribute for an HTML attribute (`loading="soon"`) and at the tag for an ARIA state, which is checked through its own type.
+// Only an element's own attribute: a component prop typed as a union is answered by its own message.
 const enumeratedValue: Row = (diagnostic, source, span) => {
   if (diagnostic.code !== ASSIGNABILITY && diagnostic.code !== DID_YOU_MEAN)
     return undefined
 
-  const aria = ARIA_STATE.exec(diagnostic.message)
-  const direct = aria === null ? KEYWORD_MISMATCH.exec(diagnostic.message) : null
-  const name = aria?.[1] ?? NAME_AT.exec(source.slice(span.start))?.[0]
-  const given = aria?.[2] ?? direct?.[1]
-  const allowed = aria?.[3] ?? direct?.[2]
+  const list = attributeList(source, span)
+  const lineStart = source.lastIndexOf('\n', list.start) + 1
+
+  if (!INTRINSIC_LINE.test(source.slice(lineStart, list.start)))
+    return undefined
+
+  const name = NAME_AT.exec(source.slice(span.start))?.[0]
+  const direct = KEYWORD_MISMATCH.exec(diagnostic.message)
+  const text = name !== undefined && direct === null ? STRING_MISMATCH.exec(diagnostic.message) : null
+
+  if (name !== undefined && text !== null && text[1]!.includes('"'))
+    return { span, help: `\`${name}\` takes keywords, and this value is a \`string\`: type it as the union (\`${text[1]!.split(' | ').filter(word => word.startsWith('"')).join(' | ')}\`)` }
+
+  const given = direct?.[1]
+  const allowed = direct?.[2]
 
   if (name === undefined || given === undefined || allowed === undefined)
     return undefined
 
   const listed = allowed.replace(KEYWORD_ALIAS, '$1')
-  const words = listed.includes('...') ? INPUT_TYPES.map(word => `"${word}"`) : listed.split(' | ').filter(word => word.startsWith('"') && word === word.toLowerCase())
+  const words = listed.includes('...') ? INPUT_TYPES.map(word => `"${word}"`) : listed.split(' | ').filter(word => word.startsWith('"') && !UPPERCASE_METHODS.has(word))
 
   if (words.length === 0)
     return undefined
 
   const near = words.length > 6 ? nearest(`"${given}"`, words) : undefined
 
-  const attribute = aria === null ? span : attributeNamed(source, attributeList(source, span), name)
-  const list = words.length === 1 ? `\`${words[0]}\`` : `${words.slice(0, -1).map(word => `\`${word}\``).join(', ')} or \`${words.at(-1)}\``
+  const phrase = words.length === 1 ? `\`${words[0]}\`` : `${words.slice(0, -1).map(word => `\`${word}\``).join(', ')} or \`${words.at(-1)}\``
 
-  return attribute && { span: attribute, help: near === undefined ? `\`${name}\` takes ${list}, not \`"${given}"\`` : `\`${name}\` does not take \`"${given}"\`: did you mean \`${near}\`?` }
+  return { span, help: near === undefined ? `\`${name}\` takes ${phrase}, not \`"${given}"\`` : `\`${name}\` does not take \`"${given}"\`: did you mean \`${near}\`?` }
 }
 
 // A name outside the SVG attributes: the nearest one, which also answers the React spelling (`strokeWidth`) and the lowercased one (`viewbox`).
@@ -339,7 +350,7 @@ const svgAttributeName: Row = (diagnostic, source, span) => {
     return undefined
 
   const attribute = attributeNamed(source, attributeList(source, span), name)
-  const near = nearest(name, SVG_ATTRIBUTE_NAMES)
+  const near = name.length > 2 ? nearest(name, SVG_ATTRIBUTE_NAMES) : undefined
 
   return attribute && { span: attribute, help: `\`${name}\` is no SVG attribute${near === undefined ? '' : `: did you mean \`${near}\`?`}` }
 }

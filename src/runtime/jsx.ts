@@ -12,11 +12,11 @@ type Value = string | number | bigint | boolean | null | undefined
 // What an attribute takes: a template writes them as text, so any value that renders as text goes.
 type AttributeValue = Value
 
-// An attribute HTML limits to a list of keywords, written lowercase as the specification does, or left out.
+// An attribute HTML limits to a list of keywords, written lowercase as the specification does, or left out; `false` leaves it out too, as `target={external && '_blank'}` does.
 // `OpenKeyword` lists the keywords of an attribute whose values HTML leaves open, so an editor still offers them.
-type Keyword<Words extends string> = Words | null | undefined
+type Keyword<Words extends string> = Words | false | null | undefined
 
-type OpenKeyword<Words extends string> = Words | (string & {}) | null | undefined
+type OpenKeyword<Words extends string> = Words | (string & {}) | false | null | undefined
 
 type ClassValue = Value | Record<string, unknown> | readonly ClassValue[]
 
@@ -173,7 +173,8 @@ type BrowsingContext = OpenKeyword<'_self' | '_blank' | '_parent' | '_top'>
 
 type ReferrerPolicy = Keyword<'' | 'no-referrer' | 'no-referrer-when-downgrade' | 'origin' | 'origin-when-cross-origin' | 'same-origin' | 'strict-origin' | 'strict-origin-when-cross-origin' | 'unsafe-url'>
 
-type CrossOrigin = Keyword<'' | 'anonymous' | 'use-credentials'>
+// A bare `crossorigin` is `true`, which renders as an empty value: anonymous.
+type CrossOrigin = Keyword<'' | 'anonymous' | 'use-credentials'> | true
 
 // HTML reads the method case-insensitively and templates habitually write it in capitals, so both spellings go.
 type FormMethod = Keyword<'get' | 'post' | 'dialog' | 'GET' | 'POST' | 'DIALOG'>
@@ -192,7 +193,7 @@ interface EnumeratedAttributes {
   img: { loading?: Keyword<'lazy' | 'eager'>, decoding?: Keyword<'sync' | 'async' | 'auto'>, crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
   input: { type?: Keyword<typeof INPUT_TYPES[number]>, formmethod?: FormMethod, formMethod?: FormMethod, formenctype?: FormEncoding, formEnctype?: FormEncoding, formtarget?: BrowsingContext, formTarget?: BrowsingContext }
   link: { crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
-  ol: { type?: Keyword<'1' | 'a' | 'A' | 'i' | 'I'> }
+  ol: { type?: Keyword<'1' | 'a' | 'A' | 'i' | 'I'> | 1 }
   script: { crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
   th: { scope?: Keyword<'row' | 'col' | 'rowgroup' | 'colgroup'> }
   video: { crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin }

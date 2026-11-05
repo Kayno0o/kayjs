@@ -56,7 +56,6 @@ export const ARIA_ATTRIBUTES: ReadonlySet<string> = new Set([
   'aria-valuetext',
 ])
 
-// The roles an element may take, those of the Digital Publishing and Graphics modules included.
 const TRUE_FALSE = ['true', 'false']
 
 // The keywords ARIA gives the states that take a list of them, for a value written as text: `kay check` holds a static `aria-expanded="yes"` to them.
@@ -83,6 +82,7 @@ export const ARIA_STATE_VALUES: ReadonlyMap<string, ReadonlySet<string>> = new M
   'aria-sort': ['none', 'ascending', 'descending', 'other'],
 }).map(([name, values]) => [name, new Set(values)]))
 
+// The roles an element may take, those of the Digital Publishing and Graphics modules included.
 export const ROLES: ReadonlySet<string> = new Set([
   'alert',
   'alertdialog',
