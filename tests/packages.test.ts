@@ -14,6 +14,7 @@ interface Manifest {
   engines?: { bun?: string }
 }
 
+const RELEASE_HEADING = /^## .+$/gm
 const root = await Bun.file('package.json').json() as Manifest
 const libraries = await Promise.all((await Array.fromAsync(new Glob('packages/*/package.json').scan())).sort().map(async path => ({ path, manifest: await Bun.file(path).json() as Manifest })))
 const names = new Set(libraries.map(({ manifest }) => manifest.name))
@@ -90,7 +91,7 @@ describe('kay\'s libraries', () => {
 describe('what\'s new', () => {
   it('names each release once on What\'s new and Upgrading', async () => {
     for (const page of ['llms/whats-new.md', 'llms/upgrading.md']) {
-      const headings = (await Bun.file(page).text()).match(/^## .+$/gm) ?? []
+      const headings = [...(await Bun.file(page).text()).matchAll(RELEASE_HEADING)].map(([heading]) => heading)
 
       expect({ page, twice: headings.filter((heading, at) => headings.indexOf(heading) !== at) }).toEqual({ page, twice: [] })
     }
