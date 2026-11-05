@@ -154,8 +154,8 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   retryLabel?: string | undefined
   // Called with the rows each time a `rows` function or promise answers.
   onLoad?: ((rows: Row[]) => unknown) | undefined
-  // Called with the error when a `rows` function or promise rejects.
-  onError?: ((error: unknown) => unknown) | undefined
+  // Called with `{ error }` when a `rows` function or promise rejects.
+  onError?: ((failure: { error: unknown }) => unknown) | undefined
   // Makes each row a link: the address of a row, or undefined for one that leads nowhere. The first cell holds an anchor stretched over the row, named `openRowLabel`, so a real link opens in a new tab and a click on the row follows it, while the checkbox, the toggle and the links and buttons of the cells stay clickable above it.
   rowHref?: ((row: Row) => string | undefined) | undefined
   // Makes each row a button, or hears the click of a link row (call `event.preventDefault()` to follow the link yourself).
@@ -168,7 +168,7 @@ if (expandable && virtual)
   throw new Error('kayjs-ui: a Table cannot be both expandable and virtual, a detail row breaks the single row height a virtual table measures by')
 
 const tableId = uid()
-const source = asyncRows<Row>(() => passed, { onLoad: loaded => onLoad?.(loaded), onError: error => onError?.(error) })
+const source = asyncRows<Row>(() => passed, { onLoad: loaded => onLoad?.(loaded), onError: failure => onError?.(failure) })
 const rows = () => list ? list.rows() : source.rows()
 const columns = memo(() => given.map(column => resolvedColumn(column, sortable)))
 const keptKey = sortParam === undefined ? undefined : persisted(sortParam, '', { storage: 'query' })

@@ -215,7 +215,7 @@ Breadcrumb#breadcrumb(label="Trail" items={[{ label: 'Home', href: '/' }, { labe
 RadioGroup#radios(label="Plan" value="a" options={[{ value: 'a', label: 'A', description: 'First' }, { value: 'b', label: 'B' }]})
 Toaster#toaster
 TooltipHost#tooltips
-FormDialog#form-dialog(open={true} title="Rename" action={fakeAction} submitLabel="Rename" failure="Could not rename" onOpenChange={() => undefined})
+FormDialog#form-dialog(open={true} title="Rename" action={fakeAction} submitLabel="Rename" failureLabel="Could not rename" onOpenChange={() => undefined})
   TextInput(name="name")
 ContactForm#contact(action={fakeAction})
 ContactForm(action={fakeAction} consent)

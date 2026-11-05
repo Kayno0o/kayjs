@@ -9,7 +9,7 @@ async function empty() {
 ---
 ConfirmDelete(
   message="Empty the trash?"
-  failure="Could not empty it"
+  failureLabel="Could not empty it"
   onConfirm={empty}
   trigger="button"
   label="Empty trash"

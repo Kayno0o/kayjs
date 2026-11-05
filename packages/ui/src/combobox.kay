@@ -64,8 +64,8 @@ const { size = 'md', invalid, id, options, value = '', valueLabel, label, name, 
   onInput?: ((text: string) => unknown) | undefined
   // Called with the options a function answered and the text it was asked for, for the latest question only: an answer that arrives after a newer key press is not reported.
   onLoad?: ((options: readonly ComboboxOption<Value>[], query: string) => unknown) | undefined
-  // Called with what a function rejected with and the text it was asked for, for the latest question only; `failureLabel` still shows.
-  onError?: ((error: unknown, query: string) => unknown) | undefined
+  // Called with `{ error, query }`, what a function rejected with and the text it was asked for, for the latest question only; `failureLabel` still shows.
+  onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // Draws each row in place of its label and description: `@option(option)`. The row stays named by the option's `label`, and the input shows the label once it is picked.
   option?: Snippet<[option: ComboboxOption<Value>]> | undefined
 }>()
@@ -200,7 +200,7 @@ async function load(query: string) {
       found = []
       answered = query
       failed = true
-      notify(() => onError?.(error, query))
+      notify(() => onError?.({ error, query }))
     }
   }
 }

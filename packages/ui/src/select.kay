@@ -41,7 +41,7 @@ const { size = 'md', invalid, value, options, onChange, param, paramDefault, nam
   failureLabel?: string | undefined
   // Called with the answer of a function `options`, and with what it rejected with.
   onLoad?: ((options: readonly SelectOption<Value>[]) => unknown) | undefined
-  onError?: ((error: unknown) => unknown) | undefined
+  onError?: ((failure: { error: unknown }) => unknown) | undefined
 }>()
 
 // A select with no callback is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
@@ -84,7 +84,7 @@ effect(() => {
         console.error('kayjs-ui: a Select could not load its options', error)
         failed = true
         asking = false
-        onError?.(error)
+        onError?.({ error })
       }
     }
   })()

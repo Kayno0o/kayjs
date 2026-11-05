@@ -46,7 +46,7 @@ const look = recipe({
   },
 })
 
-const { src, title, artist, artwork, chapters = [], cues = [], position, onPositionChange, onChapterChange, onPlay, onPause, onEnded, onError, preload = 'metadata', actions, playLabel = wording('ui.audioPlayer.play', 'Play'), pauseLabel = wording('ui.audioPlayer.pause', 'Pause'), previousLabel = wording('ui.audioPlayer.previous', 'Previous chapter'), nextLabel = wording('ui.audioPlayer.next', 'Next chapter'), seekLabel = wording('ui.audioPlayer.seek', 'Position'), chaptersLabel = wording('ui.audioPlayer.chapters', 'Chapters'), transcriptLabel = wording('ui.audioPlayer.transcript', 'Transcript'), linkLabel = wording('ui.audioPlayer.link', 'Open {title}'), failure = wording('ui.audioPlayer.failure', 'Could not play the audio.'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onPlay' | 'onPause' | 'onEnded' | 'onError'> & {
+const { src, title, artist, artwork, chapters = [], cues = [], position, onPositionChange, onChapterChange, onPlay, onPause, onEnded, onError, preload = 'metadata', actions, playLabel = wording('ui.audioPlayer.play', 'Play'), pauseLabel = wording('ui.audioPlayer.pause', 'Pause'), previousLabel = wording('ui.audioPlayer.previous', 'Previous chapter'), nextLabel = wording('ui.audioPlayer.next', 'Next chapter'), seekLabel = wording('ui.audioPlayer.seek', 'Position'), chaptersLabel = wording('ui.audioPlayer.chapters', 'Chapters'), transcriptLabel = wording('ui.audioPlayer.transcript', 'Transcript'), linkLabel = wording('ui.audioPlayer.link', 'Open {title}'), failureLabel, failure = wording('ui.audioPlayer.failure', 'Could not play the audio.'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onPlay' | 'onPause' | 'onEnded' | 'onError'> & {
   // The audio file or stream.
   src: string
   // Names the audio on the lock screen, with the chapter playing as the song when there are chapters.
@@ -69,8 +69,8 @@ const { src, title, artist, artwork, chapters = [], cues = [], position, onPosit
   onPause?: (() => unknown) | undefined
   // Called when it plays to its end.
   onEnded?: (() => unknown) | undefined
-  // Called with the `MediaError` when the file or stream fails to load, or the `DOMException` when the browser refuses to play, beside the `failure` toast of a refused play.
-  onError?: ((error: MediaError | DOMException | null) => unknown) | undefined
+  // Called with `{ error }` (and the `event` of the audio element), the `MediaError` when the file or stream fails to load or the `DOMException` when the browser refuses to play, beside the `failureLabel` toast of a refused play.
+  onError?: ((failure: { error: MediaError | DOMException | null, event?: Event }) => unknown) | undefined
   // What the browser loads before the first play; the audio's length is known with `metadata`, a stream's may not be.
   preload?: 'none' | 'metadata' | 'auto' | undefined
   // Fills a chapter's row after its link: `@actions(chapter, index)`.
@@ -87,6 +87,8 @@ const { src, title, artist, artwork, chapters = [], cues = [], position, onPosit
   // Names a chapter's link, `{title}` standing for the chapter's title.
   linkLabel?: string | undefined
   // The toast shown when the browser refuses to play.
+  failureLabel?: string | undefined
+  // Deprecated: `failureLabel`. Works until 1.93.
   failure?: string | undefined
 }>()
 
@@ -222,11 +224,11 @@ async function start(audio: HTMLAudioElement) {
     }
     catch (error) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) {
-        onError?.(error as DOMException)
+        onError?.({ error: error as DOMException })
         throw error
       }
     }
-  }, failure)
+  }, failureLabel ?? failure)
 }
 
 async function seek(seconds: number, play: boolean) {
@@ -338,7 +340,7 @@ onCleanup(() => {
 ---
 div(part="root" {...rest})
   // Without `controls`, so the element draws nothing and the bar below is the player.
-  audio(part="audio" ref={element => player = element} src={src} preload={preload} onTimeUpdate={event => report(event.currentTarget.currentTime)} onDurationChange={event => measure(event.currentTarget)} onLoadedMetadata={event => measure(event.currentTarget)} onPlay={() => { playing = true; claim(); onPlay?.() }} onPause={() => { playing = false; onPause?.() }} onEnded={() => { playing = false; onEnded?.() }} onError={event => onError?.(event.currentTarget.error)} onEmptied={event => emptied(event.currentTarget)})
+  audio(part="audio" ref={element => player = element} src={src} preload={preload} onTimeUpdate={event => report(event.currentTarget.currentTime)} onDurationChange={event => measure(event.currentTarget)} onLoadedMetadata={event => measure(event.currentTarget)} onPlay={() => { playing = true; claim(); onPlay?.() }} onPause={() => { playing = false; onPause?.() }} onEnded={() => { playing = false; onEnded?.() }} onError={event => onError?.({ error: event.currentTarget.error, event })} onEmptied={event => emptied(event.currentTarget)})
   div(part="bar")
     if chapters.length > 1
       IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={previous})

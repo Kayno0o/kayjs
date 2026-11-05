@@ -18,7 +18,7 @@ const cues = [
   { start: 95, end: 100, text: 'Bye.' },
 ]
 ---
-AudioPlayer#player(src="/episode.mp3" title="Episode" artist="Show" chapters={chapters} cues={cues} position={seconds()} onPositionChange={(value) => { seconds = value; onPosition(value) }} onChapterChange={onChapter} onPlay={() => events?.push('play')} onPause={() => events?.push('pause')} onEnded={() => events?.push('ended')} onError={error => events?.push(`error ${error instanceof DOMException ? error.name : 'media'}`)})
+AudioPlayer#player(src="/episode.mp3" title="Episode" artist="Show" chapters={chapters} cues={cues} position={seconds()} onPositionChange={(value) => { seconds = value; onPosition(value) }} onChapterChange={onChapter} onPlay={() => events?.push('play')} onPause={() => events?.push('pause')} onEnded={() => events?.push('ended')} onError={({ error }) => events?.push(`error ${error instanceof DOMException ? error.name : 'media'}`)})
   @actions(chapter, index)
     button.act(type="button") {`Like ${chapter.title} ${index}`}
 AudioPlayer#plain(src="/plain.mp3")

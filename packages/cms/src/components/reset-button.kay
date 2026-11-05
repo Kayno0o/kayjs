@@ -9,4 +9,4 @@ const { disabled = false, onReset } = props<{ disabled?: boolean, onReset: () =>
 if disabled
   Button(label={wording('cms.entry.reset', 'Reset')} disabled)
 else
-  ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.reset', 'Reset')} message={wording('cms.entry.resetMessage', 'Drop your unsaved changes? They cannot be brought back.')} failure={wording('cms.entry.resetFailure', 'Could not reset')} onConfirm={onReset})
+  ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.reset', 'Reset')} message={wording('cms.entry.resetMessage', 'Drop your unsaved changes? They cannot be brought back.')} failureLabel={wording('cms.entry.resetFailure', 'Could not reset')} onConfirm={onReset})

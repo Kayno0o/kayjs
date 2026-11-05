@@ -5,7 +5,7 @@ export type RowsSource<Row> = Row[] | (() => Row[] | Promise<Row[]>) | Promise<R
 
 export interface AsyncRowsHooks<Row> {
   onLoad?: ((rows: Row[]) => unknown) | undefined
-  onError?: ((error: unknown) => unknown) | undefined
+  onError?: ((failure: { error: unknown }) => unknown) | undefined
 }
 
 export interface AsyncRows<Row> {
@@ -127,7 +127,7 @@ export function asyncRows<Row>(given: () => RowsSource<Row> | undefined, hooks: 
       console.error('kayjs-ui: a rows source could not load', error)
       loading.set(false)
       failed.set(true)
-      notify(() => hooks.onError?.(error))
+      notify(() => hooks.onError?.({ error }))
     }
   }
 

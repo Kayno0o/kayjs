@@ -80,7 +80,7 @@ const { size = 'md', invalid, id, options, value = [], label, placeholder = word
   valueLabels?: Readonly<Record<string, string>> | undefined
   // Called with each answer of a function `options` and the text it was asked for, and with what it rejected with.
   onLoad?: ((options: readonly MultiSelectOption<Value>[], query: string) => unknown) | undefined
-  onError?: ((error: unknown, query: string) => unknown) | undefined
+  onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // What the trigger reads once several are picked, `3 selected` by default.
   selectedLabel?: string | ((count: number) => string) | undefined
   // Submits each picked value under this name, for a control inside a form.
@@ -201,7 +201,7 @@ async function load(text: string) {
       found = []
       answered = text
       failed = true
-      notify(() => onError?.(error, text))
+      notify(() => onError?.({ error, query: text }))
     }
   }
 }

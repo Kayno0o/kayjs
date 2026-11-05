@@ -51,7 +51,7 @@ describe('FormDialog', () => {
   test('onError hears a refusal and stays quiet for a save', async () => {
     const heard: unknown[] = []
 
-    mounted = await mountComponent(FormDialogComponent, { save: async () => ({ errors: { name: 'Taken' } }), plain: false, onSaved: (name: string) => saved.push(name), onError: (error: unknown) => heard.push(error) })
+    mounted = await mountComponent(FormDialogComponent, { save: async () => ({ errors: { name: 'Taken' } }), plain: false, onSaved: (name: string) => saved.push(name), onError: ({ error }: { error: unknown }) => heard.push(error) })
     submit(mounted.root)
     await settle()
 

@@ -18,7 +18,7 @@ import { rename } from '../routes/posts/[id].kay'
 
 const { post } = props<{ post: Post }>()
 ---
-SaveForm(action={rename} failure="Could not save" saved="Saved.")
+SaveForm(action={rename} failureLabel="Could not save" saved="Saved.")
   input(type="hidden" name="id" value={post.id})
   FormField(label="Title" name="title" required)
     input.kui-field-input(name="title" value={post.title})
@@ -34,7 +34,7 @@ A failure keeps the bar dirty. A refused field shows its message on its [FormFie
 
 A save toasts `saved` when given, calls `onSaved` with what the action returned and leaves the form clean.
 
-When a save is refused or fails, `onError` is called first with the error, before the toast. A refusal is an `ActionError` with its `errors` by field and its `data`, and any other failure is what the call threw. Use it to log the failure or scroll to the first bad field.
+When a save is refused or fails, `onError` is called first with `{ error }`, before the toast. A refusal is an `ActionError` with its `errors` by field and its `data`, and any other failure is what the call threw. Use it to log the failure or scroll to the first bad field.
 
 ## Editors driven by signals
 
@@ -45,7 +45,7 @@ SaveForm(dirty={isNew || changed()} onSave={() => save({ name: name(), config: c
   // the editor
 ```
 
-The bar, the leave guard, Save and Ctrl+S follow `dirty`, so a new item saves with no change. A rejection of `onSave` is handled as a refused action is, with its messages on their FormField and `failure` toasted, and a result of `false` is a refusal the page shows itself. Either leaves the bar unsaved. `onSaved` is for `action` only. The page clears `dirty` once it has saved, and `status` replaces the status line.
+The bar, the leave guard, Save and Ctrl+S follow `dirty`, so a new item saves with no change. A rejection of `onSave` is handled as a refused action is, with its messages on their FormField and `failureLabel` toasted, and a result of `false` is a refusal the page shows itself. Either leaves the bar unsaved. `onSaved` is for `action` only. The page clears `dirty` once it has saved, and `status` replaces the status line.
 
 ## Discarding
 

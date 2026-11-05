@@ -52,8 +52,8 @@ const { items: given, list: source, item, itemKey, estimate = 48, overscan = 4, 
   retryLabel?: string | undefined
   // Called with the items each time an `items` function or promise answers.
   onLoad?: ((items: Item[]) => unknown) | undefined
-  // Called with the error when an `items` function or promise rejects.
-  onError?: ((error: unknown) => unknown) | undefined
+  // Called with `{ error }` when an `items` function or promise rejects.
+  onError?: ((failure: { error: unknown }) => unknown) | undefined
   // Makes each item a link: its address, or undefined for one that leads nowhere. An anchor named `itemLabel` is stretched over the item, the links and buttons the item draws staying clickable above it.
   itemHref?: ((item: Item, index: number) => string | undefined) | undefined
   // Makes each item a button, or hears the click of a link item (call `event.preventDefault()` to follow the link yourself).
@@ -65,7 +65,7 @@ const { items: given, list: source, item, itemKey, estimate = 48, overscan = 4, 
   empty?: Snippet | undefined
 } & ({ items: RowsSource<Item>, list?: undefined } | { items?: undefined, list: InfiniteList<Item> })>()
 
-const loaded = asyncRows<Item>(() => given, { onLoad: answer => onLoad?.(answer), onError: error => onError?.(error) })
+const loaded = asyncRows<Item>(() => given, { onLoad: answer => onLoad?.(answer), onError: failure => onError?.(failure) })
 const items = () => source ? source.rows() : loaded.rows()
 const waiting = () => busy || (source ? source.pending() && !source.failed() : loaded.loading())
 const skeleton = () => waiting() && items().length === 0

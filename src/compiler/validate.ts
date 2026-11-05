@@ -22,6 +22,18 @@ const TOGGLE_TAGS = new Set(['table', 'tree-view'])
 const DATE_TAGS = new Set(['date-input', 'date-range-input'])
 // Widget's `isEmpty` is `empty` and its `@empty` block `@emptyState` since 1.89.
 const WIDGET_TAG = 'widget'
+// The kayjs-ui props renamed in 1.90 so a failure is named the same everywhere: a message is `failureLabel`, a failed copy `onError`. `onFail` takes its error bare and `onError` an object, so it is reported with no fix.
+const FAILURE_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  'copy-button': { failure: 'failureLabel', onFail: 'onError' },
+  'confirm-delete': { failure: 'failureLabel' },
+  'form-dialog': { failure: 'failureLabel' },
+  'record-button': { failure: 'failureLabel' },
+  'save-form': { failure: 'failureLabel' },
+  'audio-player': { failure: 'failureLabel' },
+  'icon-picker': { errorLabel: 'failureLabel' },
+  'image-cropper': { errorLabel: 'failureLabel' },
+  'ai-chat': { errorMessage: 'failureLabel' },
+}
 // The kayjs-ui field tags that took the native `size` before 1.87, when `size` became `sm`, `md` or `lg`.
 const FIELD_TAGS = new Set(['text-input', 'select', 'combobox', 'date-input', 'time-input', 'date-time-input'])
 const NUMBER = /^\s*\d+\s*$/
@@ -903,6 +915,18 @@ class Validator {
         const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'disabledDay={isDisabled}' } : { start: attribute.name.start, end: attribute.name.end, text: 'disabledDay' }
 
         this.lint(attribute.name, 'deprecated-ui-props', `\`isDisabled\` on \`${element.name}\` is \`disabledDay\` since kayjs-ui 1.89, so \`disabled\` alone is the boolean`, { help: 'Write `disabledDay`', fixes: [{ title: 'Write `disabledDay`', edits: [edit], safe: true }] })
+
+        continue
+      }
+
+      const renamed = FAILURE_RENAMES[file]?.[name]
+
+      if (renamed !== undefined) {
+        const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === renamed)
+        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: `${renamed}={${name}}` } : { start: attribute.name.start, end: attribute.name.end, text: renamed }
+        const reshaped = name === 'onFail'
+
+        this.lint(attribute.name, 'deprecated-ui-failures', `\`${name}\` on \`${element.name}\` is \`${renamed}\` since kayjs-ui 1.90${reshaped ? ', and `onError` takes `{ error }` where `onFail` took the error' : ''}`, named || reshaped ? { help: reshaped ? 'Write `onError` and read `error` from its argument' : `Drop \`${name}\`, \`${renamed}\` is there` } : { help: `Write \`${renamed}\``, fixes: [{ title: `Write \`${renamed}\``, edits: [edit], safe: true }] })
 
         continue
       }

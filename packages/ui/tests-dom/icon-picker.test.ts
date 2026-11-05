@@ -47,7 +47,7 @@ async function picker(options: { value?: string, hold?: (query: string) => boole
   mounted = await mountComponent(IconPicker, {
     value: options.value,
     onSearch: (query: string) => searched.push(query),
-    onError: (error: Error) => errors.push(error.message),
+    onError: ({ error }: { error: unknown }) => errors.push((error as Error).message),
     onChange: (name: string) => changes.push(name),
     search: async (query: string, limit: number, offset: number) => {
       searches.push([query, limit, offset])

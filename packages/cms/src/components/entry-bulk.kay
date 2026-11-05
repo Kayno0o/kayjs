@@ -68,8 +68,8 @@ if actions.has('publish') && drafts() && fitting('publish').length > 0
 if actions.has('unpublish') && drafts() && fitting('unpublish').length > 0 && denied.publish !== undefined
   Refused(label={wording('cms.entry.unpublish', 'Unpublish')} reason={denied.publish})
 else if actions.has('unpublish') && drafts() && fitting('unpublish').length > 0
-  ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.bulk.unpublishMessage', fitting('unpublish').length === 1 ? 'Unpublish 1 entry? Visitors stop seeing it until you publish it again.' : 'Unpublish {count} entries? Visitors stop seeing them until you publish them again.', { count: fitting('unpublish').length })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => run('unpublish')})
+  ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.bulk.unpublishMessage', fitting('unpublish').length === 1 ? 'Unpublish 1 entry? Visitors stop seeing it until you publish it again.' : 'Unpublish {count} entries? Visitors stop seeing them until you publish them again.', { count: fitting('unpublish').length })} failureLabel={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => run('unpublish')})
 if actions.has('delete') && denied.delete !== undefined
   Refused(label={wording('cms.bulk.delete', 'Delete')} reason={denied.delete} tone="danger")
 else if actions.has('delete')
-  ConfirmDelete(trigger="button" label={wording('cms.bulk.delete', 'Delete')} message={bulkDeleteMessage(rows.length, referrers())} onOpenChange={open => open && askReferrers()} failure={wording('cms.save.deleteFailure', 'Could not delete')} onConfirm={() => run('delete')})
+  ConfirmDelete(trigger="button" label={wording('cms.bulk.delete', 'Delete')} message={bulkDeleteMessage(rows.length, referrers())} onOpenChange={open => open && askReferrers()} failureLabel={wording('cms.save.deleteFailure', 'Could not delete')} onConfirm={() => run('delete')})

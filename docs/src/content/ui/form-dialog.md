@@ -44,7 +44,7 @@ FormDialog(
   title="Rename"
   action={rename}
   submitLabel="Rename"
-  failure="Could not rename"
+  failureLabel="Could not rename"
   onSaved={saved => title = saved.title}
   onOpenChange={() => editing = false}
 )
@@ -57,11 +57,11 @@ The dialog calls `action` with the form's data. Give each control the `name` of 
 
 ## Failures
 
-When the action is refused or fails, `onError` is called with the error before the toast, and the dialog stays open. A refusal is an `ActionError` with its `errors` by field and its `data`, and any other failure is what the call threw.
+When the action is refused or fails, `onError` is called with `{ error }` before the toast, and the dialog stays open. A refusal is an `ActionError` with its `errors` by field and its `data`, and any other failure is what the call threw.
 
 ## Refusals of the handler
 
-A handler refusing with `ctx.fail(400, { error: 'Slug taken' })` reaches the dialog through `refused`, which answers a message per field, or one message that is toasted. Without it, `failure` is toasted.
+A handler refusing with `ctx.fail(400, { error: 'Slug taken' })` reaches the dialog through `refused`, which answers a message per field, or one message that is toasted. Without it, `failureLabel` is toasted. It defaults to `Could not save.`.
 
 ```kay
 FormDialog(
@@ -69,7 +69,7 @@ FormDialog(
   title="Rename"
   action={rename}
   submitLabel="Rename"
-  failure="Could not rename"
+  failureLabel="Could not rename"
   refused={data => ({ slug: data.error })}
   onOpenChange={() => editing = false}
 )
@@ -103,7 +103,7 @@ FormDialog(
   title={friend.row() ? 'Edit friend' : 'Add friend'}
   action={save}
   submitLabel="Save"
-  failure="Could not save"
+  failureLabel="Could not save"
   onOpenChange={friend.close}
 )
   input(type="hidden" name="id" value={friend.row()?.id ?? ''})

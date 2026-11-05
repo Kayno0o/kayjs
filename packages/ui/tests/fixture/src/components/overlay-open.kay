@@ -53,7 +53,7 @@ SidePanel#plazy(open={shown().plazy === true} title="Lazy" onOpenChange={shut('p
 SidePanel#kept(open={shown().kept === true} title="Kept" onOpenChange={shut('kept')})
   input#kept-input
 CommandPalette#palette(entries={[]} size="sm")
-FormDialog#form(open={shown().form === true} title="Form" action={save} submitLabel="Save" failure="Failed" size="lg" closeLabel="Shut" level={3} onOpenChange={shut('form')})
+FormDialog#form(open={shown().form === true} title="Form" action={save} submitLabel="Save" failureLabel="Failed" size="lg" closeLabel="Shut" level={3} onOpenChange={shut('form')})
   @actions
     button#form-actions Extra
   input(name="name")

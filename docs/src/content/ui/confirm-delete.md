@@ -16,7 +16,7 @@ Pass `disabled` while something else is busy, such as a save running. It disable
 
 ## When it fails
 
-If `onConfirm` throws, the dialog stays open and `failure` is toasted.
+If `onConfirm` throws, the dialog stays open and `failureLabel` is toasted.
 
 `success` is toasted once `onConfirm` went through.
 
@@ -36,7 +36,7 @@ If `onConfirm` throws, the dialog stays open and `failure` is toasted.
 
 ## Refusals of the handler
 
-A handler refusing with `ctx.fail(400, { error: 'Still in use' })` is a failure of `onConfirm`. Give `refused` a function from that data to a message, and it is toasted in place of `failure`. `failure` stays for an answer of `undefined` and for any other error.
+A handler refusing with `ctx.fail(400, { error: 'Still in use' })` is a failure of `onConfirm`. Give `refused` a function from that data to a message, and it is toasted in place of `failureLabel`. `failureLabel` stays for an answer of `undefined` and for any other error.
 
 ## Refusals of an API route
 
@@ -56,7 +56,7 @@ A deletion made with `call()` throws an `ApiError` when the route refuses. It is
 
 ```kay
 Menu(label="Row" icon="menu" items={[{ label: 'Delete', tone: 'danger', onSelect: () => asking = true }]})
-ConfirmDelete(trigger="none" open={asking()} onOpenChange={open => asking = open} message="Delete this row?" failure="Could not delete" onConfirm={remove})
+ConfirmDelete(trigger="none" open={asking()} onOpenChange={open => asking = open} message="Delete this row?" failureLabel="Could not delete" onConfirm={remove})
 ```
 
 ## Attributes

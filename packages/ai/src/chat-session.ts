@@ -614,7 +614,7 @@ export function createChatSession(options: ChatSessionOptions) {
         const refusal = error instanceof ActionError && error.status < 500 ? error.errors[''] : undefined
 
         failure.set(refusal !== undefined && refusal !== '' ? refusal : options.errorMessage)
-        notify(options.onError, { message: failure() ?? options.errorMessage, status: error instanceof ActionError ? error.status : undefined })
+        notify(options.onError, { message: failure() ?? options.errorMessage, status: error instanceof ActionError ? error.status : undefined, error })
       }
     }
     finally {

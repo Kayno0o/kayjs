@@ -19,19 +19,19 @@ SidePanel#panel-heading(open={true} modal={false} closeHref="/list" title="Detai
     em Venus
   p Body
 #form-heading
-  FormDialog(open={true} title="Edit moon" action={save} submitLabel="Save" failure="Failed" onOpenChange={() => undefined})
+  FormDialog(open={true} title="Edit moon" action={save} submitLabel="Save" failureLabel="Failed" onOpenChange={() => undefined})
     @heading
       em Phobos
     p Body
 #confirm-details
-  ConfirmDelete(open={true} message="Delete 2 moons?" failure="Failed" onConfirm={() => undefined})
+  ConfirmDelete(open={true} message="Delete 2 moons?" failureLabel="Failed" onConfirm={() => undefined})
     @details
       ul
         li Phobos
         li Deimos
 #confirm-plain
-  ConfirmDelete(open={true} message="Delete the moon?" failure="Failed" onConfirm={() => undefined})
+  ConfirmDelete(open={true} message="Delete the moon?" failureLabel="Failed" onConfirm={() => undefined})
 #confirm-inline
-  ConfirmDelete(open={true} ask="inline" message="Delete 2 moons?" failure="Failed" onConfirm={() => undefined})
+  ConfirmDelete(open={true} ask="inline" message="Delete 2 moons?" failureLabel="Failed" onConfirm={() => undefined})
     @details
       p Phobos

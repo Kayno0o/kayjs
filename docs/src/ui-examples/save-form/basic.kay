@@ -21,7 +21,7 @@ const rename = Object.assign(async (form: FormData) => {
 }, { pending, url: '' }) as unknown as Action<{ title: string }, string | Failure<never>>
 ---
 .max-w-md
-  SaveForm(action={rename} failure="Could not save" saved="Saved.")
+  SaveForm(action={rename} failureLabel="Could not save" saved="Saved.")
     FormField(label="Title" name="title" required)
       input.kui-field-input(name="title" value="Notes from the road")
     FormField(label="Summary" name="summary")

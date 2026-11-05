@@ -42,5 +42,5 @@ AppSwitcher(id="switcher" apps={apps} open={switcher()} onOpenChange={shown => {
 
 HoverCard#card(anchor={anchor()} onOpenChange={shown => calls.push(`card ${shown}`)}) Detail
 Menu(id="menu" label="Actions" icon="plus" items={[{ label: 'One' }]} data-testid="menu" style="color: blue")
-ConfirmDelete(message="Sure?" failure="No" onConfirm={() => undefined} data-testid="confirm")
+ConfirmDelete(message="Sure?" failureLabel="No" onConfirm={() => undefined} data-testid="confirm")
 Toaster(data-testid="toaster")

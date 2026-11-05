@@ -32,8 +32,8 @@ Once the audio has played, the lock screen and the headset buttons show the chap
 
 ## Labels
 
-`playLabel`, `pauseLabel`, `previousLabel`, `nextLabel`, `seekLabel`, `chaptersLabel` and `transcriptLabel` name the controls and `linkLabel` a chapter's link, `{title}` standing for the chapter's title. `failure` is the message shown when the browser refuses to play. `preload` is `metadata` by default, which gives the slider its length.
+`playLabel`, `pauseLabel`, `previousLabel`, `nextLabel`, `seekLabel`, `chaptersLabel` and `transcriptLabel` name the controls and `linkLabel` a chapter's link, `{title}` standing for the chapter's title. `failureLabel` is the message shown when the browser refuses to play. `preload` is `metadata` by default, which gives the slider its length.
 
 ## Play, pause, end and error
 
-`onPlay`, `onPause` and `onEnded` are called as the audio moves through them. `onError` gets the `MediaError` when the file or stream fails to load, or the `DOMException` when the browser refuses to play, which the `failure` toast also reports.
+`onPlay`, `onPause` and `onEnded` are called as the audio moves through them. `onError` gets `{ error, event }`, the error being the `MediaError` when the file or stream fails to load, or the `DOMException` when the browser refuses to play, which the `failureLabel` toast also reports.

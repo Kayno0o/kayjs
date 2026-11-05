@@ -55,7 +55,7 @@
   - An entry with `href` (`{ label: 'Open', href: '/x' }`, `onSelect` then optional) is an `a role="menuitem"`: middle-click, Ctrl+click, "copy link" and the status bar work, Enter and Space follow it, and the menu closes as it is followed (`onSelect`, when given, runs then). An absolute address (`https://...`) opens in a new tab with `rel="noopener noreferrer"`; a `disabled` entry stays a disabled button.
   - An entry's `onSelect` runs once the menu has closed and focus is back on the trigger, so a dialog it opens takes focus from there.
 - `IconPicker(search={findIcons} value={post.icon} name="icon" onChange={icon.set})`:
-  - A search that rejects is logged and shown as `errorLabel` (`ui.iconPicker.error`), the last grid kept. `onSearch(query)` and `onError(error)` hear the searches.
+  - A search that rejects is logged and shown as `failureLabel` (`ui.iconPicker.error`), the last grid kept. `onSearch(query)` and `onError({ error })` hear the searches.
   - A search box over a grid of the icons `search(query, limit, offset)` returns, from the `offset`th on, as `IconChoice`s, `{ name, icon }` with `icon` the IconProps to draw: typically an action, since a whole icon set is too large to ship, as `search={(query, limit, offset) => findIcons({ query, limit, offset })}`. The app's action builds them on the server with kay's `iconNames` and `iconProps` over the set's JSON, so the set never ships to the browser:
 
     ```ts

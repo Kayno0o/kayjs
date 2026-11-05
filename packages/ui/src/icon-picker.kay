@@ -14,7 +14,7 @@ const DEBOUNCE_MS = 200
 
 const look = recipe({ parts: { root: 'kui-icon-picker', search: '', grid: 'kui-icon-grid', option: 'kui-icon-grid-option', empty: 'kui-icon-grid-empty', bar: 'kui-icon-grid-bar', selection: 'kui-icon-grid-selection', clear: 'kui-icon-grid-clear', error: 'kui-icon-grid-error', more: 'kui-icon-grid-more' } })
 
-const { search, icons: given, value = '', name, invalid, disabled = false, onChange, onSearch, onError, searchLabel = wording('ui.iconPicker.search', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.grid', 'Icons'), searchingLabel = wording('ui.iconPicker.searching', 'Searching…'), emptyLabel = wording('ui.iconPicker.empty', 'No icons found.'), empty, errorLabel = wording('ui.iconPicker.error', 'The icons could not be loaded.'), clearLabel = wording('ui.iconPicker.clear', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.more', 'Show more'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onError'> & {
+const { search, icons: given, value = '', name, invalid, disabled = false, onChange, onSearch, onError, searchLabel = wording('ui.iconPicker.search', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.grid', 'Icons'), searchingLabel = wording('ui.iconPicker.searching', 'Searching…'), emptyLabel = wording('ui.iconPicker.empty', 'No icons found.'), empty, failureLabel, errorLabel, clearLabel = wording('ui.iconPicker.clear', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.more', 'Show more'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onError'> & {
   // The icons matching `query` from the `offset`th on, at most `limit` of them: typically an action, since a whole icon set is too large to ship. A page of fewer than `limit` is the last. A rejection is logged and leaves the last grid on screen under `errorLabel`.
   search?: ((query: string, limit: number, offset: number) => Promise<IconChoice[]>) | undefined
   // A fixed set of icons instead of `search`, filtered by the text typed and paged like its answers: no action is needed for a small set. Give one of the two.
@@ -31,8 +31,8 @@ const { search, icons: given, value = '', name, invalid, disabled = false, onCha
   onChange?: ((name: string) => unknown) | undefined
   // Called with the query each time a new search starts, the first one included, not for a page added by Show more.
   onSearch?: ((query: string) => unknown) | undefined
-  // Called with what `search` rejected with, for the latest search or page only; the grid keeps its icons under `errorLabel`.
-  onError?: ((error: unknown) => unknown) | undefined
+  // Called with `{ error }`, what `search` rejected with, for the latest search or page only; the grid keeps its icons under `failureLabel`.
+  onError?: ((failure: { error: unknown }) => unknown) | undefined
   // What the picker says: the search box's name and placeholder, the grid's name, its states, and its two buttons.
   searchLabel?: string | undefined
   placeholder?: string | undefined
@@ -41,6 +41,8 @@ const { search, icons: given, value = '', name, invalid, disabled = false, onCha
   emptyLabel?: string | undefined
   // Replaces the empty text with the app's own markup, such as a link to add the missing one: an `@empty` block.
   empty?: Snippet | undefined
+  failureLabel?: string | undefined
+  // Deprecated: `failureLabel`. Works until 1.93.
   errorLabel?: string | undefined
   clearLabel?: string | undefined
   moreLabel?: string | undefined
@@ -64,6 +66,7 @@ const more = signal(false)
 const pending = signal(true)
 // Whether the last search was rejected.
 const failed = signal(false)
+const failureText = () => failureLabel ?? errorLabel ?? wording('ui.iconPicker.error', 'The icons could not be loaded.')
 // The last pick, whose icon the selection keeps drawing once a new search no longer finds it.
 const last = signal<IconChoice>()
 let hidden: HTMLInputElement | undefined
@@ -127,7 +130,7 @@ async function load(needle: string, offset: number) {
     if (mine === request) {
       console.error('kayjs-ui: an IconPicker\'s search failed', error)
       failed = true
-      onError?.(error)
+      onError?.({ error })
     }
   }
   finally {
@@ -198,7 +201,7 @@ div(part="root" {...rest} ref={ref})
         if empty && !pending() && !failed()
           | {empty}
         else
-          | {pending() ? searchingLabel : failed() ? errorLabel : emptyLabel}
+          | {pending() ? searchingLabel : failed() ? failureText() : emptyLabel}
   div(part="bar")
     if picked()
       span(part="selection" aria-live="polite")
@@ -207,6 +210,6 @@ div(part="root" {...rest} ref={ref})
         | {nameOf(picked())}
         IconButton(icon="close" label={clearLabel} size="xs" variant="inline" part="clear" disabled={disabled} onClick={() => pick('')})
     if failed() && icons().length > 0
-      span(part="error" role="alert") {errorLabel}
+      span(part="error" role="alert") {failureText()}
     if more()
       button(part="more" type="button" disabled={disabled} onClick={showMore}) {moreLabel}

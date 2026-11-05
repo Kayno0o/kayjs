@@ -154,7 +154,7 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
         if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined && denied.publish !== undefined
           Refused(label={wording('cms.entry.unpublish', 'Unpublish')} reason={denied.publish})
         else if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined
-          ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: row.title })} failure={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => unpublish(row)})
+          ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: row.title })} failureLabel={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => unpublish(row)})
         if actions.has('duplicate') && !collection.single && row.problem === undefined
           Button(label={wording('cms.table.duplicate', 'Duplicate')} aria-label={wording('cms.table.duplicateAria', 'Duplicate {title}', { title: row.title })} onClick={() => copy(row)})
         if actions.has('rename') && !collection.single && row.problem === undefined
@@ -165,7 +165,7 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
         if actions.has('delete') && denied.delete !== undefined
           Refused(icon="delete" label={wording('cms.table.delete', 'Delete {title}', { title: row.title })} reason={denied.delete} size="sm" variant="ghost")
         else if actions.has('delete')
-          ConfirmDelete(message={deleteMessage(row.title, row.url, 'table', referrers()[row.slug])} onOpenChange={open => open && askReferrers(row)} label={wording('cms.table.delete', 'Delete {title}', { title: row.title })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
+          ConfirmDelete(message={deleteMessage(row.title, row.url, 'table', referrers()[row.slug])} onOpenChange={open => open && askReferrers(row)} label={wording('cms.table.delete', 'Delete {title}', { title: row.title })} failureLabel={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
   @empty
     if searched
       EmptyState(title={wording('cms.table.noMatch', 'No match')} description={wording('cms.table.noMatchHint', 'No entry matches the search and the filter.')})

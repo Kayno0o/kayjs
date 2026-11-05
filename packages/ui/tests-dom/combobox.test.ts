@@ -226,7 +226,7 @@ test('reports the typed text, each latest answer and the latest failure, never a
       throw new Error('down')
 
     return new Promise(resolve => answers.set(q, resolve))
-  }, 1, false, { onInput: (text: string) => typed.push(text), onLoad: (options: { label: string }[], query: string) => loaded.push([options.map(option => option.label), query]), onError: (error: Error, query: string) => failed.push([error.message, query]) })
+  }, 1, false, { onInput: (text: string) => typed.push(text), onLoad: (options: { label: string }[], query: string) => loaded.push([options.map(option => option.label), query]), onError: ({ error, query }: { error: Error, query: string }) => failed.push([error.message, query]) })
 
   clock.start()
   type(input, 'm')

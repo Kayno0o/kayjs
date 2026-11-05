@@ -69,7 +69,7 @@ describe('Table rows from a source', () => {
       return PLANETS
     }
 
-    mounted = await mountComponent(Table, { columns: COLUMNS, rows, rowKey: 'id', onError: (error: unknown) => errors.push(error) })
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows, rowKey: 'id', onError: ({ error }: { error: unknown }) => errors.push(error) })
     await settle()
 
     const { root } = mounted

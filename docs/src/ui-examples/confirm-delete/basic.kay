@@ -9,6 +9,6 @@ async function remove() {
 ---
 ConfirmDelete(
   message="Delete this post?"
-  failure="Could not delete"
+  failureLabel="Could not delete"
   onConfirm={remove}
 )

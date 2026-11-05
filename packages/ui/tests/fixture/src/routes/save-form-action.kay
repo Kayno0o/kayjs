@@ -8,5 +8,5 @@ import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 ---
 Toaster
-SaveForm(action={draft} failure="Could not save" saved="Saved.")
+SaveForm(action={draft} failureLabel="Could not save" saved="Saved.")
   input#name(name="name" value="Ada")

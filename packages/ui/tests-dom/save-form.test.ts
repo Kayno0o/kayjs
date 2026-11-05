@@ -174,7 +174,7 @@ describe('SaveForm', () => {
         throw answer
 
       return answer
-    }, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++, onError: (error: unknown) => heard.push(error) })
+    }, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++, onError: ({ error }: { error: unknown }) => heard.push(error) })
 
     const root = mounted.root
 

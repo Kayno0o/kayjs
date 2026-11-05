@@ -27,7 +27,7 @@ const { src, name, size = 'md', label, href, fallback, onLoad, onError, ...rest 
   // Called when the picture loads.
   onLoad?: ((event: Event) => unknown) | undefined
   // Called when the picture fails to load, as the fallback takes its place.
-  onError?: ((event: Event) => unknown) | undefined
+  onError?: ((failure: { event: Event }) => unknown) | undefined
   // Makes the avatar a link, to the person's page: the `label`, else the name, names it.
   href?: string | undefined
 }>()
@@ -45,7 +45,7 @@ const ground = () => stringToHexColor(name)
 snippet face()
   if src && !failed()
     // kay-allow unsized-image
-    img(part="image" src={src} alt="" onLoad={event => onLoad?.(event)} onError={event => { failed = true; onError?.(event) }})
+    img(part="image" src={src} alt="" onLoad={event => onLoad?.(event)} onError={event => { failed = true; onError?.({ event }) }})
   else if fallback
     | {fallback}
   else

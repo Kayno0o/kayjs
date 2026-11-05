@@ -63,7 +63,7 @@ Each is called once per transition, with a throw or a rejected promise logged an
 1. `onSuggestion(text)` when a suggestion is pressed, `onRegenerate()` when Regenerate is, `onEdit(text)` when an edit is saved (the new text).
 2. `onSend({ messages })` with the messages posted. Try again calls it again; a reply asked for again after a reload does not.
 3. `onToolCall(call)` each time a tool call starts and each time it ends (`reply.progress()` actions), with the `AiToolCall`.
-4. One of `onReply(turn)` with the finished `ChatTurnView`, `onStop()` as the visitor presses Stop (called then, whatever has arrived), or `onError({ message, status })` for a refused call (its HTTP status) or a stream that broke off (no status), `message` being what the chat shows.
+4. One of `onReply(turn)` with the finished `ChatTurnView`, `onStop()` as the visitor presses Stop (called then, whatever has arrived), or `onError({ message, status, error })` for a refused call (its HTTP status and what it threw) or a stream that broke off (neither), `message` being what the chat shows.
 
 A reply that ends because the chat left its conversation (a new conversation, another one loaded) calls none of the last. `ChatLauncher` takes them all, and `suggestions`, and passes them on.
 

@@ -9,14 +9,16 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-save-form', grid: 'kui-form-grid', bar: 'kui-save-bar', status: 'kui-save-bar-status', actions: 'kui-save-bar-actions', confirm: '' } })
 
-const { action, refused, saved, onSaved, onError, onDiscard, dirty, onSave, status, failure = wording('ui.saveForm.failure', 'Could not save.'), dirtyLabel = wording('ui.saveForm.dirty', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.clean', 'No unsaved change.'), savingLabel = wording('ui.saveForm.saving', 'Saving…'), saveLabel = wording('ui.saveForm.save', 'Save'), discardLabel = wording('ui.saveForm.discard', 'Discard'), cancelLabel = wording('ui.saveForm.cancel', 'Cancel'), cancelHref, confirm, confirmLabel, saveDisabled, shortcut: saveKeys = 'mod+s', ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'children' | 'onSubmit' | 'onInput' | 'onChange' | 'onError'> & {
+const { action, refused, saved, onSaved, onError, onDiscard, dirty, onSave, status, failureLabel, failure, dirtyLabel = wording('ui.saveForm.dirty', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.clean', 'No unsaved change.'), savingLabel = wording('ui.saveForm.saving', 'Saving…'), saveLabel = wording('ui.saveForm.save', 'Save'), discardLabel = wording('ui.saveForm.discard', 'Discard'), cancelLabel = wording('ui.saveForm.cancel', 'Cancel'), cancelHref, confirm, confirmLabel, saveDisabled, shortcut: saveKeys = 'mod+s', ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'children' | 'onSubmit' | 'onInput' | 'onChange' | 'onError'> & {
   // The page's action the form calls with its fields, as FormDialog does. An editor whose state is signals gives `dirty` and `onSave` instead.
   action?: Action<never, Output> | undefined
   // Toasted when the call fails other than on a field, or when `onSave` rejects.
+  failureLabel?: string | undefined
+  // Deprecated: `failureLabel`. Works until 1.93.
   failure?: string | undefined
   // Whether the editor holds unsaved changes, when its state is the app's own signals rather than named fields: the bar, the leave guard and Save follow it instead of the fields, so `dirty={isNew || changed()}` lets a new item save with no change.
   dirty?: boolean | undefined
-  // Called by Save, the shortcut included, instead of `action`: answer the call's promise. A rejection is handled as an action's refusal is (`refused`, the messages on their FormField, `failure`); `false` is a refusal the app shows itself, and either leaves the bar unsaved. `onSaved` is for `action` only. The app clears `dirty` once it has saved.
+  // Called by Save, the shortcut included, instead of `action`: answer the call's promise. A rejection is handled as an action's refusal is (`refused`, the messages on their FormField, `failureLabel`); `false` is a refusal the app shows itself, and either leaves the bar unsaved. `onSaved` is for `action` only. The app clears `dirty` once it has saved.
   onSave?: (() => Promise<unknown>) | undefined
   // Replaces the status line, whatever the form's state.
   status?: string | undefined
@@ -26,8 +28,8 @@ const { action, refused, saved, onSaved, onError, onDiscard, dirty, onSave, stat
   saved?: string | undefined
   // What the action returned, for the page to patch into what it shows. The form is clean again once it has run.
   onSaved?: ((result: Answer<Success<Output>>) => unknown) | undefined
-  // Called with what a save was refused or failed with, before the toast: the `ActionError` of a refusal (its `errors` by field, its `data`), or whatever the call threw. For logging, or to scroll to the first bad field.
-  onError?: ((error: unknown) => unknown) | undefined
+  // Called with `{ error }` before the toast: the `ActionError` of a refusal (its `errors` by field, its `data`), or whatever the call threw. For logging, or to scroll to the first bad field.
+  onError?: ((failure: { error: unknown }) => unknown) | undefined
   // Called after Discard has put the controls back to their initial values, for state the page keeps beyond them: the library's controls and their `onChange` need nothing from it.
   onDiscard?: (() => unknown) | undefined
   // The bar's texts: unsaved changes, nothing to save, the save under way, and the two buttons.
@@ -53,6 +55,7 @@ const changed = signal(false)
 const saving = signal(false)
 const asking = signal(false)
 // The dialog of `confirm`, a chunk of its own fetched once there is a question to ask, held in a list of at most one component.
+const failureText = () => failureLabel ?? failure ?? wording('ui.saveForm.failure', 'Could not save.')
 const confirmView = signal<(typeof import('./internal/save-confirm.kay'))['default'][]>([])
 // The fetch of that chunk, under way or done; unset again when it failed.
 let confirmLoad: Promise<void> | undefined
@@ -81,7 +84,7 @@ async function loadConfirm() {
     // A preload fails quietly: only a Save waiting on the question says it cannot be asked.
     if (asking()) {
       asking = false
-      toast.error(failure)
+      toast.error(failureText())
     }
   }
 }
@@ -209,7 +212,7 @@ async function submit(event: SubmitEvent) {
     saving = true
 
     try {
-      done = await callAction(form, (() => run()) as unknown as Action<never, Output>, issues, failure, refused, onError)
+      done = await callAction(form, (() => run()) as unknown as Action<never, Output>, issues, failureText(), refused, onError)
     }
     finally {
       saving = false
@@ -220,7 +223,7 @@ async function submit(event: SubmitEvent) {
       return
   }
   else {
-    done = await callAction(form, action!, issues, failure, refused, onError)
+    done = await callAction(form, action!, issues, failureText(), refused, onError)
   }
 
   if (!done)
@@ -234,7 +237,7 @@ async function submit(event: SubmitEvent) {
   if (saved)
     toast.success(saved)
 
-  if (!onSave)
+  if (!run)
     onSaved?.(done.result as Answer<Success<Output>>)
 }
 

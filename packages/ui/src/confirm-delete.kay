@@ -22,7 +22,7 @@ const frame = recipe({
   },
 })
 
-const { message, details, onConfirm, open, onOpenChange, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancel', 'Cancel'), size, variant, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children' | 'title' | 'onClick' | 'disabled' | 'hidden'> & {
+const { message, details, onConfirm, open, onOpenChange, failureLabel, failure, success, refused, tone = 'danger', trigger = 'icon', ask = 'dialog', disabled = false, label, title, confirmLabel, pendingLabel, cancelLabel = wording('ui.confirmDelete.cancel', 'Cancel'), size, variant, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'type' | 'class' | 'children' | 'title' | 'onClick' | 'disabled' | 'hidden'> & {
   // The dialog's question; asked inline, the armed pair's name for screen readers and the confirm button's tooltip.
   message: string
   // Markup under the message in the dialog, such as a count, the names of what goes or a consequence; the message stays the name asked inline, where there is no room for it.
@@ -34,10 +34,12 @@ const { message, details, onConfirm, open, onOpenChange, failure, success, refus
   // Called with `true` when the trigger is pressed, for a message that is read then rather than at render, and with `false` once the dialog or the armed pair goes, as the `onOpenChange` of Dialog.
   onOpenChange?: ((open: boolean) => unknown) | undefined
   // Toasted when `onConfirm` throws, which leaves the dialog open, unless the call carries a message of its own: see `attempt`.
-  failure: string
+  failureLabel?: string | undefined
+  // Deprecated: `failureLabel`. Works until 1.93.
+  failure?: string | undefined
   // Toasted once `onConfirm` went through.
   success?: string | undefined
-  // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: toasted in place of `failure`, which stays for an answer of undefined or another error.
+  // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: toasted in place of `failureLabel`, which stays for an answer of undefined or another error.
   refused?: ((data: Data) => string | undefined) | undefined
   // `neutral` for a confirm that is not a deletion, such as a save with a consequence: accent buttons, a check icon, and every word taken from `label` unless given.
   tone?: Tone | undefined
@@ -111,7 +113,7 @@ function close() {
 async function confirm() {
   pending = true
 
-  const done = await attempt(async () => onConfirm(), { failure, success, refused })
+  const done = await attempt(async () => onConfirm(), { failure: failureLabel ?? failure ?? wording('ui.confirmDelete.failure', 'Could not delete.'), success, refused })
 
   pending = false
 

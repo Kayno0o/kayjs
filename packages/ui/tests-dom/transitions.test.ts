@@ -83,7 +83,7 @@ describe('CopyButton', () => {
     }
   })
 
-  test('tells onFail when the text cannot be built or the browser refuses it, and never onCopy', async () => {
+  test('tells onError when the text cannot be built or the browser refuses it, and never onCopy', async () => {
     clipboardWith(true)
 
     const refused = await mount()
@@ -100,7 +100,7 @@ describe('CopyButton', () => {
     expect(broken.calls).toEqual(['failed'])
   })
 
-  test('writes nothing and tells onFail for a text that resolves to nothing', async () => {
+  test('writes nothing and tells onError for a text that resolves to nothing', async () => {
     const written = clipboardWith()
     const { root, calls } = await mount('empty')
 

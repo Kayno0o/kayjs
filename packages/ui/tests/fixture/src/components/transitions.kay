@@ -22,4 +22,4 @@ SiteFavicon#favicon(src="/favicon.png" name="Site" onLoad={() => calls.push('fav
 SiteFavicon#globe(src="/favicon.png" name="Site")
   @fallback
     b.fallback ?
-CopyButton#copy(text={sources[source]} label="Copy" onCopy={copied => calls.push(`copied ${copied}`)} onFail={() => calls.push('failed')})
+CopyButton#copy(text={sources[source]} label="Copy" onCopy={copied => calls.push(`copied ${copied}`)} onError={() => calls.push('failed')})

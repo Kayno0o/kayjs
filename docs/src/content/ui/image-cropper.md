@@ -20,6 +20,6 @@ description: A crop of a fixed ratio over an image, moved and resized by pointer
 
 ## Source and labels
 
-`src` is the image and `alt` its text, empty by default. `onLoad` hears the image's natural size once it has decoded. When the image does not load, `onError` is called and the stage shows `errorLabel`, or the `@fallback` block, until `src` changes.
+`src` is the image and `alt` its text, empty by default. `onLoad` hears the image's natural size once it has decoded. When the image does not load, `onError` is called with `{ event }` (or `{ error }` when decoding rejected) and the stage shows `failureLabel`, or the `@fallback` block, until `src` changes.
 
 `cropLabel` names the crop area for screen readers, with the keys that move it. `cropText` reads the crop out as it changes, `{w}`, `{h}`, `{x}` and `{y}` standing for its size and place in natural pixels, `{w} by {h} pixels at {x}, {y}` by default.

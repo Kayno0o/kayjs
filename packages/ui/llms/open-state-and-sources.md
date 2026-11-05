@@ -28,9 +28,10 @@
 
 ### Avatar, SiteFavicon, CopyButton, AudioPlayer
 
-- `Avatar` and `SiteFavicon` take `onLoad(event)`, `onError(event)` and `@fallback`, drawn in place of the initial or the globe when there is no picture or it fails.
-- `CopyButton(text={() => signedLink()} onCopy={copied => ...} onFail={error => ...})`: `text` is a string, a function returning one or a promise of one, copied inside the click so Safari accepts it. `onCopy(text)` follows a successful copy, `onFail(error)` a text that could not be built or a refused copy, beside the `failure` toast.
-- `AudioPlayer` takes `onPlay`, `onPause`, `onEnded` and `onError(error)`, the `MediaError` of a file that fails to load or the `DOMException` of a refused play.
+- `Avatar` and `SiteFavicon` take `onLoad(event)`, `onError({ event })` and `@fallback`, drawn in place of the initial or the globe when there is no picture or it fails.
+- `CopyButton(text={() => signedLink()} onCopy={copied => ...} onError={({ error }) => ...})`: `text` is a string, a function returning one or a promise of one, copied inside the click so Safari accepts it. `onCopy(text)` follows a successful copy, `onError({ error })` a text that could not be built or a refused copy, beside the `failureLabel` toast.
+- `AudioPlayer` takes `onPlay`, `onPause`, `onEnded` and `onError({ error, event })`, the `MediaError` of a file that fails to load or the `DOMException` of a refused play, and `failureLabel` for the refused play's toast.
+- A failure is named the same on every component: `onError` receives one object, `{ error }` for what was thrown or rejected (`{ error, query }` on a Combobox or MultiSelect, `{ problem, error? }` on a RecordButton) and `{ event }` for what the DOM raised (Avatar, SiteFavicon, an ImageCropper's image), so a field is added without breaking a caller; the message shown is `failureLabel`, beside `loadingLabel`, `emptyLabel` and `retryLabel`.
 
 ### Pagination
 

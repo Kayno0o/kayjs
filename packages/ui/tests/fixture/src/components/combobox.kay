@@ -4,7 +4,7 @@ import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 
 // What the test reads back: each value picked and each text created, with the options it hands over, a list or a loader. `field` puts it in a FormField, which then names it, `wrap` in a group FormField (`group`) or a bare label (`label`), and `value` with `valueLabel` start it on a pick.
-const { options, onChange, onCreate, onInput, onLoad, onError, minLength, create = true, createLabel, field = false, wrap = '', value = '', valueLabel } = props<{ options: ComboboxOptions, create?: boolean, createLabel?: string | ((text: string) => string), field?: boolean, wrap?: string, value?: string, valueLabel?: string, onChange?: (value: string, option: ComboboxOption | undefined) => void, onCreate?: (text: string) => void, onInput?: (text: string) => void, onLoad?: (options: readonly ComboboxOption[], query: string) => void, onError?: (error: unknown, query: string) => void, minLength?: number }>()
+const { options, onChange, onCreate, onInput, onLoad, onError, minLength, create = true, createLabel, field = false, wrap = '', value = '', valueLabel } = props<{ options: ComboboxOptions, create?: boolean, createLabel?: string | ((text: string) => string), field?: boolean, wrap?: string, value?: string, valueLabel?: string, onChange?: (value: string, option: ComboboxOption | undefined) => void, onCreate?: (text: string) => void, onInput?: (text: string) => void, onLoad?: (options: readonly ComboboxOption[], query: string) => void, onError?: (failure: { error: unknown, query: string }) => void, minLength?: number }>()
 ---
 form#form
   if wrap === 'group'

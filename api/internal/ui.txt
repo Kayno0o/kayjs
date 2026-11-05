@@ -1047,7 +1047,9 @@ function resetWhenIdle(busy: () => boolean, restore: () => void): { reset: () =>
 function startRef<Target extends Element>(first: (element: Target) => void, app?: unknown): (element: Target) => void
 
 [./lib/forms] callAction
-function callAction<Output>(form: HTMLFormElement, action: Action<never, Output, never>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined, onError?: ((error: unknown) => unknown) | undefined): Promise<undefined | {
+function callAction<Output>(form: HTMLFormElement, action: Action<never, Output, never>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined, onError?: ((failure: {
+  error: unknown;
+}) => unknown) | undefined): Promise<undefined | {
   result: Answer<Success<Output>>;
 }>
 
@@ -2156,12 +2158,15 @@ interface RecorderOptions
   maxMs: number
   onAudio: (audio: File) => unknown
   onCancel?: (() => unknown) | undefined
-  onError?: ((problem: "send" | RecordProblem, cause?: unknown) => unknown) | undefined
+  onError?: ((failure: RecordFailure) => unknown) | undefined
   onRecordingChange?: ((recording: boolean) => unknown) | undefined
   onStart?: (() => unknown) | undefined
   onStop?: ((reason: RecordStop) => unknown) | undefined
   sending?: string | undefined
   words: RecordWords
+
+[./lib/record] RecordFailure
+type RecordFailure = { problem: RecordProblem, error?: undefined } | { problem: 'send', error: unknown }
 
 [./lib/record] RecordProblem
 type RecordProblem = 'insecure' | 'unsupported' | 'denied' | 'missing' | 'taken' | 'failed' | 'lost' | 'empty'
@@ -2213,7 +2218,7 @@ interface AsyncRows<Row>
 
 [./lib/source] AsyncRowsHooks
 interface AsyncRowsHooks<Row>
-  onError?: ((error: unknown) => unknown) | undefined
+  onError?: ((failure: { error: unknown; }) => unknown) | undefined
   onLoad?: ((rows: Row[]) => unknown) | undefined
 
 [./lib/source] RowsSource

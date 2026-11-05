@@ -1559,3 +1559,31 @@ describe('once-read-prop', () => {
     expect(lints(island(`const last = items.length - 1${used}`), { lints: { 'once-read-prop': 'allow' } }).filter(d => d.code === 'once-read-prop')).toEqual([])
   })
 })
+
+describe('deprecated-ui-failures', () => {
+  const imports = 'import CopyButton from \'@kaynooo/kayjs-ui/copy-button.kay\'\nimport SaveForm from \'@kaynooo/kayjs-ui/save-form.kay\'\nimport IconPicker from \'@kaynooo/kayjs-ui/icon-picker.kay\'\nimport Other from \'./other.kay\'\n'
+  const found = (template: string) => {
+    const source = `---\n${imports}---\n${template}\n`
+    const result = compileKay(source, 'failures.kay', { check: true })
+
+    return result.diagnostics.filter(d => d.code === 'deprecated-ui-failures').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
+  }
+
+  it('renames the message props to failureLabel', () => {
+    expect(found('CopyButton(text="x" failure="No")')).toEqual([{ at: 'failure', fix: ['failure->failureLabel'] }])
+    expect(found('IconPicker(search={find} errorLabel="No")')).toEqual([{ at: 'errorLabel', fix: ['errorLabel->failureLabel'] }])
+    expect(found('CopyButton(text="x" {failure})')).toEqual([{ at: 'failure', fix: ['{failure}->failureLabel={failure}'] }])
+  })
+
+
+  it('reports onFail alone, as onError takes an object', () => {
+    expect(found('CopyButton(text="x" onFail={log})')).toEqual([{ at: 'onFail', fix: undefined }])
+  })
+
+  it('leaves the new names, a rename already written and other tags alone', () => {
+    expect(found('CopyButton(text="x" failureLabel="No" onError={log})')).toEqual([])
+    expect(found('CopyButton(text="x" failure="No" failureLabel="No")')).toEqual([{ at: 'failure', fix: undefined }])
+    expect(found('Other(failure="No")')).toEqual([])
+    expect(found('SaveForm(onSave={run})')).toEqual([])
+  })
+})

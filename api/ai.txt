@@ -154,6 +154,7 @@ interface Calls
 
 [.] ChatFailure
 interface ChatFailure
+  error?: unknown
   message: string
   status: number | undefined
 
@@ -721,6 +722,7 @@ component default
   expandIcon?: Element
   expandLabel?: string | undefined
   failedLabel?: string | undefined
+  failureLabel?: string | undefined
   fill?: boolean | undefined
   footer?: Element
   greeting?: string | undefined
@@ -936,6 +938,7 @@ component default
   empty?: ((chat: { send: (text: string) => void; }) => Element) | undefined
   errorMessage?: string | undefined
   failedLabel?: string | undefined
+  failureLabel?: string | undefined
   fill?: boolean | undefined
   footer?: Element
   greeting?: string | undefined

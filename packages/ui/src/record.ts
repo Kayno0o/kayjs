@@ -5,6 +5,9 @@ import { wording } from 'kay/words'
 
 export type { RecordProblem } from './recording'
 
+/** What a recording's `onError` receives: the microphone's `problem`, or `send` with the rejection of `onAudio` as `error`. */
+export type RecordFailure = { problem: RecordProblem, error?: undefined } | { problem: 'send', error: unknown }
+
 // How long a recording runs by default before it is handed over as if pressed, so one left running stays within an action's `maxSize`.
 export const RECORD_LIMIT: Duration = '5m'
 
@@ -42,8 +45,8 @@ export interface RecorderOptions {
   onStop?: ((reason: RecordStop) => unknown) | undefined
   // Called when the recording under way is dropped (Escape).
   onCancel?: (() => unknown) | undefined
-  // Called with why nothing was recorded (the microphone's problem), or `send` and the rejection when `onAudio` rejected.
-  onError?: ((problem: RecordProblem | 'send', cause?: unknown) => unknown) | undefined
+  // Called with `{ problem }`, why nothing was recorded (the microphone's problem), or `send` with the rejection as `error` when `onAudio` rejected.
+  onError?: ((failure: RecordFailure) => unknown) | undefined
   // Called with `true` when a press (or `start`) begins asking for the microphone, and with `false` once the recording is over however it ended: stopped, cancelled, out of time, refused or lost. Once per change.
   onRecordingChange?: ((recording: boolean) => unknown) | undefined
 }
@@ -136,7 +139,7 @@ export function recorder(options: RecorderOptions): Recorder {
       state.set('idle')
       said.set('')
       problem.set(words[result])
-      options.onError?.(result)
+      options.onError?.({ problem: result })
 
       return
     }
@@ -151,7 +154,7 @@ export function recorder(options: RecorderOptions): Recorder {
     catch (error) {
       console.error('kayjs-ui: a recording\'s onRecord failed', error)
       problem.set(options.failure)
-      options.onError?.('send', error)
+      options.onError?.({ problem: 'send', error })
     }
     finally {
       said.set('')
@@ -193,7 +196,7 @@ export function recorder(options: RecorderOptions): Recorder {
       state.set('idle')
       problem.set(words[started])
       report(false)
-      options.onError?.(started)
+      options.onError?.({ problem: started })
 
       return
     }

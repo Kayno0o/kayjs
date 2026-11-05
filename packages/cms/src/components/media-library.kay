@@ -117,7 +117,7 @@ Table.kcms-media(columns={columns} rows={uploads} rowKey={upload => upload.key})
       if denied.delete !== undefined
         Refused(icon="delete" label={wording('cms.uploads.delete', 'Delete {key}', { key: row.name })} reason={denied.delete} size="sm" variant="ghost")
       else if row.deletable
-        ConfirmDelete(message={wording('cms.media.deleteOne', 'Delete {name}? Check that no page or unsaved form uses it: this cannot be undone.', { name: row.name })} label={wording('cms.uploads.delete', 'Delete {key}', { key: row.name })} failure={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={async () => { await remove(row) }})
+        ConfirmDelete(message={wording('cms.media.deleteOne', 'Delete {name}? Check that no page or unsaved form uses it: this cannot be undone.', { name: row.name })} label={wording('cms.uploads.delete', 'Delete {key}', { key: row.name })} failureLabel={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={async () => { await remove(row) }})
       else
         Refused(icon="delete" label={wording('cms.uploads.delete', 'Delete {key}', { key: row.name })} reason={reasonOf(row)} size="sm" variant="ghost")
   @empty

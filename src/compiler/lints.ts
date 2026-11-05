@@ -819,6 +819,14 @@ export const LINTS = {
     wrong: '---\nimport Table from \'@kaynooo/kayjs-ui/table.kay\'\n---\nTable(columns={[]} rows={[]} rowKey="id" expandable onToggle={(key, open) => keep(key, open)})',
     right: '---\nimport Table from \'@kaynooo/kayjs-ui/table.kay\'\n---\nTable(columns={[]} rows={[]} rowKey="id" expandable onOpenChange={(key, open) => keep(key, open)})',
   },
+  'deprecated-ui-failures': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.90',
+    summary: 'A kayjs-ui failure prop under its name before 1.90: a message is `failureLabel` (`failure` on a CopyButton, ConfirmDelete, FormDialog, RecordButton, SaveForm or AudioPlayer, `errorLabel` on an IconPicker or ImageCropper, `errorMessage` on a kayjs-ai Chat), and a CopyButton\'s `onFail` is `onError`, which takes `{ error }`. The old names work until 1.93. The fix renames the attribute, except `onFail`, whose argument changes shape and is reported alone.',
+    wrong: '---\nimport CopyButton from \'@kaynooo/kayjs-ui/copy-button.kay\'\n---\nCopyButton(text="x" failure="Could not copy")',
+    right: '---\nimport CopyButton from \'@kaynooo/kayjs-ui/copy-button.kay\'\n---\nCopyButton(text="x" failureLabel="Could not copy")',
+  },
   'deprecated-hook-names': {
     level: 'warn',
     group: 'deprecated',

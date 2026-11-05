@@ -28,7 +28,7 @@ const levels = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] as const
 const planets = [{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]
 const choices = [{ value: 'x', label: 'X' }, { value: 'y', label: 'Y' }, { value: 'z', label: 'Z' }] as const
 ---
-SaveForm(action={save} failure="Could not save")
+SaveForm(action={save} failureLabel="Could not save")
   Checkbox(name="agree" label="Agree" checked={agree()} onChange={agree.set})
   Toggle(name="power" label="Power" checked={power()} onChange={power.set})
   ChipGroup(label="Decks" name="decks" options={options} value={decks()} onChange={decks.set})

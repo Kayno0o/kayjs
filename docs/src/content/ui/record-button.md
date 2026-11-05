@@ -6,13 +6,13 @@ description: A microphone button that records the visitor's voice and hands the 
 
 `onRecord` takes what was said as a `File`, `recording.webm` in Chrome and Firefox and `recording.m4a` in Safari, which an action's `s.File()` field takes as it is: `RecordButton(onRecord={audio => transcribe({ audio })})`. `label` names the button, `Record` by default.
 
-A press asks the browser for the microphone, which prompts the visitor the first time, and starts recording. The button is then pressed, draws a stop icon and shows the time beside it. The next press stops and hands the recording over. While the promise `onRecord` returns is pending the button is busy, and a rejection says `failure`. `maxDuration`, `5m` by default and a duration with its unit, stops a recording left running as if pressed, so it stays within the action's `maxSize`.
+A press asks the browser for the microphone, which prompts the visitor the first time, and starts recording. The button is then pressed, draws a stop icon and shows the time beside it. The next press stops and hands the recording over. While the promise `onRecord` returns is pending the button is busy, and a rejection says `failureLabel`. `maxDuration`, `5m` by default and a duration with its unit, stops a recording left running as if pressed, so it stays within the action's `maxSize`.
 
 ## Callbacks
 
 `onStart` is called once the microphone is open and the recording runs, to dim the page or stop a player. `onStop` is called when a recording ends and is handed over, before `onRecord`, with `press` when the visitor stopped it and `limit` when `maxDuration` ran out. `onCancel` is called when Escape drops it.
 
-`onError` is called with why nothing was recorded, the code of the notice shown (`denied`, `missing`, `taken`, `insecure`, `unsupported`, `failed`, `lost` or `empty`), or with `send` and the rejection when `onRecord` rejected. The notice still shows.
+`onError` is called with `{ problem }`, why nothing was recorded, the code of the notice shown (`denied`, `missing`, `taken`, `insecure`, `unsupported`, `failed`, `lost` or `empty`), or with `send` and the rejection as `error` when `onRecord` rejected. The notice still shows.
 
 ## What it handles
 

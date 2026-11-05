@@ -24,7 +24,7 @@ Find-in-page only sees the rows drawn, and a focused control in a row that scrol
 
 `items` also takes a function returning the items or a promise of them. An array is drawn by the server; a function is called in the browser only and a promise's answer lands there, the server drawing `skeletonItems` (5) skeletons for both. A rejection keeps the items shown beside a `failureLabel` with a retry.
 
-`onLoad` and `onError` hear each answer, `busy` shows the skeleton for items the page loads itself. `itemHref(item, index)` and `onItemClick(item, index, event)` make each item a link or a button, a stretched anchor named by `itemLabel` over it with the item's own links and buttons above. The link covers the item, so its text cannot be selected with the mouse and a `tooltip` on the item's own content does not show; put them on a control.
+`onLoad` and `onError({ error })` hear each answer, `busy` shows the skeleton for items the page loads itself. `itemHref(item, index)` and `onItemClick(item, index, event)` make each item a link or a button, a stretched anchor named by `itemLabel` over it with the item's own links and buttons above. The link covers the item, so its text cannot be selected with the mouse and a `tooltip` on the item's own content does not show; put them on a control.
 
 ## Loaded page by page
 

@@ -10,7 +10,7 @@ ConfirmDelete(
   trigger="button"
   label="Publish"
   message="Publishing sends the post to every subscriber."
-  failure="Could not publish"
+  failureLabel="Could not publish"
   success="Published"
   onConfirm={publish}
 )

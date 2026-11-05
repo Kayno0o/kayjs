@@ -288,7 +288,7 @@ test('reports the start, how a recording stopped before onRecord, a cancel and e
       onStart: hear('start'),
       onStop: hear('stop'),
       onCancel: hear('cancel'),
-      onError: (problem: string, cause?: Error) => events.push(['error', problem, cause?.message]),
+      onError: ({ problem, error }: { problem: string, error?: Error }) => events.push(['error', problem, error?.message]),
     })
 
     microphone(async () => Promise.reject(new DOMException('no', 'NotAllowedError')))
