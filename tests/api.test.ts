@@ -121,8 +121,8 @@ it('prints the members of a union in one order whichever way it was written', ()
 
 const WORD = /[\w$]+/g
 const DOC_FILES = ['llms.txt', 'llms/**/*.md', 'packages/*/llms.txt', 'packages/*/llms/**/*.md', 'docs/src/content/docs/**/*.md']
-// What happened to a name is no documentation of it: the upgrade notes, the release notes and the table of deprecated lints name old forms.
-const HISTORY = /(?:^|\/)(?:upgrading|whats-new)(?:-archive)?\.md$|(?:^|\/)deprecated-lints\.md$|reference\/checks\.md$/
+// What happened to a name is no documentation of it: the upgrade and release notes name old forms. The table of deprecated lints does count, as an old name still exported is an alias its row documents.
+const HISTORY = /(?:^|\/)(?:upgrading|whats-new)(?:-archive)?\.md$/
 const VALUE_BLOCK = /^(?:function|const|let|var|class|enum) /
 
 // 2.0 freezes whatever the snapshot holds, so a value nothing tells an app to use is listed as internal (`INTERNAL` in scripts/api.ts) rather than left public by default.

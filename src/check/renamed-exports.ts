@@ -219,14 +219,16 @@ async function renamedTypes(root: string, options: CheckOptions, config: Renamed
     for (const { ast, base } of parsed) {
       for (const statement of ast.body) {
         // A re-export keeps its public name: `export { context } from 'kay'` becomes `export { createContext as context } from 'kay'`.
-        if (statement.type === 'ExportNamedDeclaration' && statement.source?.value === config.module) {
+        if (statement.type === 'ExportNamedDeclaration' && statement.source !== null && statement.source !== undefined && Object.hasOwn(config.modules, statement.source.value)) {
+          const names = config.modules[statement.source.value]!
+
           for (const specifier of statement.specifiers) {
             const old = specifier.local.type === 'Identifier' ? specifier.local.name : specifier.local.value
 
-            if (!Object.hasOwn(config.names, old))
+            if (!Object.hasOwn(names, old))
               continue
 
-            const next = config.names[old]!
+            const next = names[old]!
             const plain = specifier.exported.start === specifier.local.start
 
             report(base + specifier.local.start, base + specifier.local.end, `\`${old}\` is renamed \`${next}\` since ${config.since}, and the old name works until ${config.until}`, `rename it to \`${next}\``, [{ start: base + specifier.local.start, end: base + specifier.local.end, text: plain ? `${next} as ${old}` : next }], config.safe(old))
@@ -302,5 +304,5 @@ const OLD_CONTEXT = /\bcontext\b/
 
 // `context` imported from `kay`: the `createContext` it was renamed to in 1.90, so it does not read as `ctx` or `defineContext`.
 export async function contextName(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-context-name', module: 'kay', names: { context: 'createContext' }, needle: OLD_CONTEXT, since: '1.90', until: '1.93', safe: () => true })
+  return renamedTypes(root, options, { lint: 'deprecated-context-name', modules: { kay: { context: 'createContext' } }, needle: OLD_CONTEXT, since: '1.90', until: '1.93', safe: () => true })
 }
