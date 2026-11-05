@@ -110,7 +110,6 @@ const CONFIG: Record<keyof KayConfig, Rule> = {
   lints: true,
   secret: either(str, list(str)),
   preview: either(lit(false), bag(PREVIEW)),
-  fileStore: true,
   store: true,
   onError: fn,
   env: true,
@@ -118,8 +117,8 @@ const CONFIG: Record<keyof KayConfig, Rule> = {
   extensions: list(obj),
 }
 
-// The names a config key had before 1.88 and no longer has, each with where it lives now: one is reported as an unknown key naming its replacement.
-export const REMOVED_KEYS: Record<string, string> = { routes: 'dirs.routes', api: 'dirs.api', content: 'contentConfig', storage: 'store.files', maxSizes: 'limits.byPath', settings: 'librarySettings' }
+// The names a config key had before 1.88 (`fileStore` before 1.87) and no longer has, each with where it lives now: one is reported as an unknown key naming its replacement.
+export const REMOVED_KEYS: Record<string, string> = { routes: 'dirs.routes', api: 'dirs.api', content: 'contentConfig', storage: 'store.files', maxSizes: 'limits.byPath', settings: 'librarySettings', fileStore: 'store.files' }
 
 // The flat keys 1.88 grouped by concern, each with the bag that holds it now and its name there: still read until 1.91, and reported by `deprecated-config-groups`.
 export const GROUPED_KEYS = {

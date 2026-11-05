@@ -125,7 +125,7 @@ describe('erasing a user', () => {
     const { user } = await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
-    expect(await ada.post('/call/deleteAccount', [{ password: PASSWORD }])).not.toEqual({ ok: true })
+    expect(await ada.post('/call/account.delete', [{ password: PASSWORD }])).not.toEqual({ ok: true })
     expect(await store.users.get(user.id)).toBeDefined()
     logged.mockRestore()
   })
@@ -302,7 +302,7 @@ describe('erasing a user, the entry recording it', () => {
     const ada = browser()
     const { user } = await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    expect(await ada.post('/call/deleteAccount', [{ password: PASSWORD }])).not.toEqual({ ok: true })
+    expect(await ada.post('/call/account.delete', [{ password: PASSWORD }])).not.toEqual({ ok: true })
     expect(calls).toBe(2)
     expect(await store.users.get(user.id)).toBeUndefined()
   })

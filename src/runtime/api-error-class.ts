@@ -12,9 +12,4 @@ export class ApiError<Data = unknown> extends Error implements ErrorShape<Data> 
     super(message, options)
     this.data = data
   }
-
-  /** @deprecated Renamed `data` in 1.87; the old name works until 1.90, and `kay upgrade` renames it where it can tell the receiver is an `ApiError`. */
-  get answer(): unknown {
-    return this.data
-  }
 }

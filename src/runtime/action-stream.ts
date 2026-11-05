@@ -1,6 +1,6 @@
 import type { ActionStream, SETTLED, Settles } from './action'
 import type { ApiError } from './api-error'
-import type { StreamStatus } from './live'
+import type { ConnectionStatus } from './live'
 import { ownSignal } from './reactive'
 import { decodeServerValue } from './wire'
 
@@ -13,24 +13,24 @@ const LINE_BREAK = /\r?\n/
 // kay's own answer holds one line per value, so it is read here rather than by live.ts's reader: what this module imports of the runtime loads up front on every page, so it takes `settled` from its caller too.
 // Values arriving before the first `on()`, until the task the call resolved in ends, go to it when it comes. `failure` is what `ended()` rejects with for a stream that failed, an `ActionError` its caller makes.
 export function actionStream<T>(response: Response, settled: typeof SETTLED, failure: () => Error): ActionStream<T> & Settles {
-  const [status, setStatus] = ownSignal<StreamStatus>('open')
+  const [status, setStatus] = ownSignal<ConnectionStatus>('open')
   const [last, setLast] = ownSignal<T | undefined>(undefined, { equals: false })
   const listeners = new Set<(value: T) => void>()
   const reader = response.body!.getReader()
   let early: T[] | undefined = []
-  let ended: StreamStatus | undefined
+  let ended: ConnectionStatus | undefined
   let latest: T | undefined
   let failed: Error | undefined
-  const waiting: ((status: StreamStatus) => void)[] = []
+  const waiting: ((status: ConnectionStatus) => void)[] = []
 
-  const onEnd = (then: (status: StreamStatus) => void) => {
+  const onEnd = (then: (status: ConnectionStatus) => void) => {
     if (ended)
       then(ended)
     else
       waiting.push(then)
   }
 
-  const end = (final: StreamStatus) => {
+  const end = (final: ConnectionStatus) => {
     if (ended)
       return
 
@@ -96,7 +96,7 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
 }
 
 // A body running out before its end event, failing to read or sending a value that does not decode ends the stream as failed and stops it on the server; one already closed stays closed.
-async function read<T>(reader: ReadableStreamDefaultReader<Uint8Array>, receive: (value: T) => void, end: (final: StreamStatus) => void): Promise<void> {
+async function read<T>(reader: ReadableStreamDefaultReader<Uint8Array>, receive: (value: T) => void, end: (final: ConnectionStatus) => void): Promise<void> {
   const decoder = new TextDecoder()
   let buffer = ''
 

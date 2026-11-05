@@ -63,7 +63,6 @@ export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
   recipe: 'shared',
   reducedMotion: 'browser',
   refresh: 'browser',
-  refusalMessage: 'shared',
   refuse: 'browser',
   resource: 'browser',
   root: 'browser',

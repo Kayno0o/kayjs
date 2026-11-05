@@ -42,10 +42,10 @@ describe('textOf and the failure factory', () => {
 })
 
 describe('ApiError', () => {
-  it('carries errors and data, with answer as the old name of data', () => {
+  it('carries errors and data', () => {
     const error = new ApiError(409, 'Taken', { reason: 'locked' }, { id: 'Taken' })
 
-    expect([error.status, error.message, error.errors, error.data, error.answer]).toEqual([409, 'Taken', { id: 'Taken' }, { reason: 'locked' }, { reason: 'locked' }])
+    expect([error.status, error.message, error.errors, error.data]).toEqual([409, 'Taken', { id: 'Taken' }, { reason: 'locked' }])
   })
 
   it('is what an action throws too, its message read by the same rule', () => {

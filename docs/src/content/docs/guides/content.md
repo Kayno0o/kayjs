@@ -271,7 +271,7 @@ A localized entry's `url` has its own slug, so `(await posts.translation(post, '
 
 A dotted slug such as `v1.2` is a page, not a file; a link ending in a file's extension, such as `/blog/cover.png`, stays a file unless an entry has that slug, as `release.html` in a localized site, whose entries are read at startup and again when the collection is invalidated. A slug the route cannot write leaves its entry out, logged. The CMS reads the route before `url`.
 
-The route has one param, the slug, and `kay check` reports a route no page matches, such as one with `src/routes/blog/[slug].kay` missing, a page listing the collection in `prerender` while another page serves the route, and two collections sharing one route. A collection with no `route` has no `url`. A `url` function and a feed item's `path` next to a `route` are the old way, reported by the `deprecated-collection-links` lint, which `kay upgrade` fixes.
+The route has one param, the slug, and `kay check` reports a route no page matches, such as one with `src/routes/blog/[slug].kay` missing, a page listing the collection in `prerender` while another page serves the route, and two collections sharing one route. A collection with no `route` has no `url`.
 
 ## Feeds
 

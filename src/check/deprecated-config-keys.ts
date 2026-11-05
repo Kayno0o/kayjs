@@ -11,7 +11,7 @@ import { GROUPED_KEYS } from '../config-shape'
 import { importsOf, walk } from './ast'
 
 const SOURCE_FILE = /(?<!\.d)\.tsx?$/
-const OLD_KEY = new RegExp(`\\b(?:${[...Object.keys(GROUPED_KEYS), 'fileStore'].join('|')})\\b`)
+const OLD_KEY = new RegExp(`\\b(?:${Object.keys(GROUPED_KEYS).join('|')})\\b`)
 // The options of `pages()` and `testSite()` are the config's own, so they carry the same keys, as the `config` of an extension does.
 // A file that can hold options of the config or an extension's: it imports kay or one of its libraries.
 const CONFIG_HOLDER = /\bfrom\s+['"](?:kay|kayjs-[\w-]+)(?:\/[^'"]*)?['"]/
@@ -148,9 +148,8 @@ function groupEdits(source: string, properties: ObjectProperty[], moved: Set<Obj
 }
 
 // A key of the config written flat that 1.88 grouped, in `kay.config.ts` or in the options handed to `pages()` and `testSite()`: the fix writes it in its bag.
-// `fileStore`, which 1.87 moved under `store` as `files`, is reported as `deprecated-file-store` by the same walk: the fix writes `store: { files: <value> }`, unless the object has a `store` of its own to merge into.
 export async function deprecatedConfigKeys(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  if (lintLevel('deprecated-file-store', options.lints) === 'allow' && lintLevel('deprecated-config-groups', options.lints) === 'allow')
+  if (lintLevel('deprecated-config-groups', options.lints) === 'allow')
     return []
 
   const found: CheckDiagnostic[] = []
@@ -199,8 +198,7 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
 
     for (const object of objects) {
       const names = new Set(object.properties.flatMap(property => isPlain(property) ? [keyName(property)] : []))
-      // A spread or a computed key may carry a `store`, which a `store` written beside it would shadow or be shadowed by.
-      const mayHoldStore = names.has('store') || object.properties.some(property => !isPlain(property))
+
       const movedProperties = object.properties.filter(isPlain).filter(property => grouped(keyName(property) ?? '') !== undefined)
       const groupLevel = movedProperties[0] === undefined ? 'allow' : levelAt('deprecated-config-groups', movedProperties[0].key.start)
 
@@ -239,30 +237,6 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
           code: 'deprecated-config-groups',
           severity: groupLevel === 'warn' ? 'warning' : 'error',
           ...!holdsBag && !twice && allWritten && { fixes: [{ title: 'Move the keys into their groups', edits: groupEdits(source, object.properties.filter(isPlain), new Set(movedProperties), bags), safe: true }] },
-        })
-      }
-
-      for (const property of object.properties) {
-        if (!isPlain(property) || keyName(property) !== 'fileStore')
-          continue
-
-        const level = levelAt('deprecated-file-store', property.key.start)
-
-        if (level === 'allow')
-          continue
-
-        const start = property.key.start
-        const end = property.value.end
-
-        found.push({
-          file,
-          ...positionAt(source, start),
-          end: property.key.end,
-          message: '`fileStore` is `store.files` in the config since 1.87, so every kind of store is named in one place; the old key works until 1.90',
-          help: names.has('store') ? 'move it into the `files` of the `store` beside it' : 'write `store: { files: ... }`, in the `store` a spread or computed key may give this object if it has one',
-          code: 'deprecated-file-store',
-          severity: level === 'warn' ? 'warning' : 'error',
-          ...!mayHoldStore && { fixes: [{ title: 'Move fileStore under store.files', edits: [{ start, end, text: `store: { files: ${property.shorthand ? 'fileStore' : source.slice(property.value.start, property.value.end)} }` }], safe: true }] },
         })
       }
     }

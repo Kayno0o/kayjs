@@ -61,7 +61,7 @@ export function notes({ beforeSave, onSave }: NotesOptions) {
 
 ### What ships
 
-This release ships the helpers (`notify()`, `decide()`, `hookContext()`, `HookContext`, `Hook`, `BeforeHook`), `refuse()` and `ErrorShape` (from `kay` too), and `source` on `observe.onError` of `kay.config.ts`. The hooks that exist today keep their names (`onAuthEvent`, kayjs-ai's `onRequest` and `onFinish`, kayjs-ui's `onSaved`); queues, workflows and schedules already follow the rule (`onStart`, `onSuccess`, `onRetry`, `onError`, with the queue's `onFailed` deprecated for `onError`). Later releases rename them to the rule and list each rename in [Upgrading](upgrading.md) with a `kay upgrade` fix. New hooks follow the rule from the start.\n
+This release ships the helpers (`notify()`, `decide()`, `hookContext()`, `HookContext`, `Hook`, `BeforeHook`), `refuse()` and `ErrorShape` (from `kay` too), and `source` on `observe.onError` of `kay.config.ts`. The hooks that exist today keep their names (`onAuthEvent`, kayjs-ai's `onRequest` and `onFinish`, kayjs-ui's `onSaved`); queues, workflows and schedules already follow the rule (`onStart`, `onSuccess`, `onRetry`, `onError`). Later releases rename them to the rule and list each rename in [Upgrading](upgrading.md) with a `kay upgrade` fix. New hooks follow the rule from the start.\n
 ### The rule
 
 - `onX` runs after X happened and only observes: what it returns is ignored. X is the verb of the transition in its base form, as the DOM names events: `onSave`, `onSend`, `onDelete`, `onSubscribe`. Never a participle (`onSaved`, `onSent`, `onFailed`).

@@ -1299,7 +1299,7 @@ describe('queue', () => {
     }
   })
 
-  it('retries a failing job after a doubling wait, logging each retry, then keeps it as failed and hands it to onFailed', async () => {
+  it('retries a failing job after a doubling wait, logging each retry, then keeps it as failed and hands it to onError', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
     const tries: number[] = []
@@ -1309,7 +1309,7 @@ describe('queue', () => {
       tries.push(n)
 
       throw new Error('mail server down')
-    }, { store: memoryJobs(), attempts: 3, backoff: '10s', onFailed: ({ payload: n, error }) => void gaveUp.push([n, (error as Error).message]) })
+    }, { store: memoryJobs(), attempts: 3, backoff: '10s', onError: ({ payload: n, error }) => void gaveUp.push([n, (error as Error).message]) })
 
     useAppOnError(({ error, request }) => void tracked.push([(error as Error).message, request]))
 
@@ -1356,7 +1356,7 @@ describe('queue', () => {
 
       return queue('failing', () => {
         throw new Error('no such mailbox')
-      }, { store, attempts: 1, failedTtl, onFailed: () => undefined })
+      }, { store, attempts: 1, failedTtl, onError: () => undefined })
     }
     const kept = await failing()
     const forever = await failing(false)
@@ -1392,12 +1392,12 @@ describe('queue', () => {
     const seen: unknown[] = []
     const redacting = queue<{ to: string, body: string }>('redacted', () => {
       throw new Error('no such mailbox')
-    }, { store, attempts: 1, redact: ({ to }) => ({ to, body: '' }), onFailed: ({ payload }) => void seen.push(payload) })
+    }, { store, attempts: 1, redact: ({ to }) => ({ to, body: '' }), onError: ({ payload }) => void seen.push(payload) })
     const throwing = queue<{ to: string, body: string }>('throwing', () => {
       throw new Error('no such mailbox')
     }, { store, attempts: 1, redact: () => {
       throw new Error('redact bug')
-    }, onFailed: () => undefined })
+    }, onError: () => undefined })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -1407,7 +1407,7 @@ describe('queue', () => {
       await throwing.drain()
       expect((await redacting.failed()).map(job => job.payload)).toEqual(kind === 'without payload' ? [{ to: 'ada@example.com', body: 'https://example.com/reset?token=secret' }] : [{ to: 'ada@example.com', body: '' }])
       expect((await throwing.failed()).map(job => job.payload)).toEqual([{ to: 'grace@example.com', body: 'whole' }])
-      // The app's own onFailed still gets the payload as it was.
+      // The app's own onError still gets the payload as it was.
       expect(seen).toEqual([{ to: 'ada@example.com', body: 'https://example.com/reset?token=secret' }])
     }
     finally {
@@ -1419,7 +1419,7 @@ describe('queue', () => {
     const store = kind === 'sqlite' ? sqliteJobs(await jobsPath()) : memoryJobs()
     const make = (name: string) => queue(name, () => {
       throw new Error('down')
-    }, { store, attempts: 1, keepFailed: '1d', onFailed: () => undefined })
+    }, { store, attempts: 1, failedTtl: '1d', onError: () => undefined })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -1453,7 +1453,7 @@ describe('queue', () => {
   it('keeps the redacted payload of a job given up without running, after its process died each time', async () => {
     const store = memoryJobs()
     const ran = jest.fn()
-    const dead = queue<{ to: string, body: string }>('dead', ran, { store, attempts: 1, redact: ({ to }) => ({ to, body: '' }), onFailed: () => undefined })
+    const dead = queue<{ to: string, body: string }>('dead', ran, { store, attempts: 1, redact: ({ to }) => ({ to, body: '' }), onError: () => undefined })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -1496,7 +1496,7 @@ describe('queue', () => {
     const mail = queue('erase', (to: string) => {
       if (to === 'bounce@example.com')
         throw new Error('no such mailbox')
-    }, { store: kind === 'memory' ? memoryJobs() : sqliteJobs(await jobsPath()), attempts: 1, onFailed: () => undefined })
+    }, { store: kind === 'memory' ? memoryJobs() : sqliteJobs(await jobsPath()), attempts: 1, onError: () => undefined })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
@@ -1578,7 +1578,7 @@ describe('queue', () => {
     const store = memoryJobs()
     const runs: string[] = []
     const gaveUp: string[] = []
-    const crashing = queue('crashing', (name: string) => void runs.push(name), { store, attempts: 2, lostAfter: '1m', onFailed: ({ payload: name, error }) => void gaveUp.push(`${name}: ${(error as Error).message}`) })
+    const crashing = queue('crashing', (name: string) => void runs.push(name), { store, attempts: 2, lostAfter: '1m', onError: ({ payload: name, error }) => void gaveUp.push(`${name}: ${(error as Error).message}`) })
 
     try {
       await crashing.enqueue('huge import')
@@ -1803,7 +1803,7 @@ describe('queue', () => {
 
         if (outcome === 'throws')
           throw new Error('late')
-      }, { store, attempts: 2, backoff: '1m', onFailed: failed })
+      }, { store, attempts: 2, backoff: '1m', onError: failed })
 
       try {
         await late.enqueue('x', { key: 'k' })

@@ -10,7 +10,7 @@ import { kay } from '../src/build/plugin'
 import { check } from '../src/check'
 import { flush, root, signal } from '../src/runtime'
 import { ActionError, ActionRedirectError } from '../src/runtime/action'
-import { ApiError, call, dispatch, openSocket, readEvents, refusalMessage, resource, routeUrl, socket, stream } from '../src/runtime/live'
+import { ApiError, call, dispatch, openSocket, readEvents, resource, routeUrl, socket, stream } from '../src/runtime/live'
 import { encodeValue } from '../src/runtime/wire'
 import { apiStubs, scanApi } from '../src/server/api-modules'
 import { rooms, sqliteRooms } from '../src/server/rooms'
@@ -934,17 +934,6 @@ describe('call()', () => {
     expect(await shown(call(notes, '/'))).toBe('The server could not be reached')
   })
 
-  it('keeps the deprecated refusalMessage and the answer alias working', () => {
-    expect(refusalMessage(new Error('boom'), 'Try again')).toBe('Try again')
-    expect(refusalMessage(undefined, 'Try again')).toBe('Try again')
-    expect(refusalMessage(new ApiError(503, 'HTTP 503'), 'Try again')).toBe('HTTP 503')
-    expect(refusalMessage(new ApiError(0, 'The server could not be reached'), 'Try again')).toBe('Try again')
-    expect(refusalMessage(new ActionError(409, 'x', { '': 'Taken' }), 'Try again')).toBe('Taken')
-    expect(refusalMessage(new ActionRedirectError(302, '/'), 'Try again')).toBe('Try again')
-    expect(new ApiError(409, 'Taken', { reason: 'locked' }).answer).toEqual({ reason: 'locked' })
-    expect(new ActionError(422, 'raw body', {}, { reason: 'x' }).answer).toBe('raw body')
-  })
-
   it('words an ActionError with what a visitor can read, not the serialized body', () => {
     const body = '[{"errors":1,"data":2},{"":2},"whisper answered 500"]'
 
@@ -1017,7 +1006,7 @@ describe('call()', () => {
     answer(cut, { headers: { 'content-type': 'application/json' } })
     await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 0, message: 'The server could not be reached', cause: expect.objectContaining({ message: 'ECONNRESET' }) })
     answer('{oops', { status: 500, headers: { 'content-type': 'application/json' } })
-    await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 500, message: '{oops', answer: '{oops' })
+    await expect(call(notes, '/')).rejects.toMatchObject({ name: 'ApiError', status: 500, message: '{oops', data: '{oops' })
     answer('<p>Down</p>', { status: 502, headers: { 'content-type': 'text/html' } })
     await expect(call(notes, '/')).rejects.toMatchObject({ status: 502, message: '<p>Down</p>' })
     answer(null, { status: 503 })

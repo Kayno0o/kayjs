@@ -168,13 +168,6 @@ describe('input an API route refuses', () => {
   it('leaves the module\'s onError to answer it', async () => {
     expect(await (await post(sites.plain, '/api/refused-own', {})).json()).toEqual({ mine: true })
   })
-
-  it('keeps Elysia\'s body behind errorShape: \'elysia\'', async () => {
-    const answer = await (await post(sites.plain, '/api/refused-elysia', {})).json() as { type?: string, errors?: unknown }
-
-    expect(answer.type).toBe('validation')
-    expect(Array.isArray(answer.errors)).toBe(true)
-  })
 })
 
 describe('input an API route refuses, other validators and edge cases', () => {

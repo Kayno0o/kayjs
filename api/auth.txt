@@ -170,14 +170,10 @@ class Auth
   bareUser: () => Promise<BareUser<UserData> | null>
   captchaChallenge: (action: CaptchaAction) => Promise<null | string>
   captchaRequired: (action: CaptchaAction) => Promise<boolean>
-  changeUsername: (username: string) => Promise<ChangeUsernameResult>
   cookies: string[]
   core: Core
-  deleteAccount: (proof: Proof) => Promise<DeleteAccountResult>
-  deletionImpact: () => Promise<DeletionImpact>
   email: EmailMethods
   establish: (record: UserRecord, method: string) => Promise<void>
-  exportData: () => Promise<ExportResult>
   features: () => AuthFeatures
   genuine: (signedIn: SignedIn) => Promise<boolean>
   groups: Partial<Groups<Scope, Role, OrgRole>>
@@ -191,10 +187,7 @@ class Auth
   impersonator: () => Promise<User<Record<string, unknown>> | null>
   known?: undefined | { record: Promise<UserRecord | null>; at: number; }
   leave: () => Promise<void>
-  linkProvider: (provider: string, proof: Proof, options?: undefined | { redirect?: string; }) => Promise<LinkProviderResult>
   linked: WeakMap<UserRecord, Promise<Record<string, { id: string; }>>>
-  listAuditLog: (options?: undefined | { before?: AuditCursorInput; limit?: number; }) => Promise<AuditEntry[]>
-  listIdentities: () => Promise<string[]>
   live: (signedIn: SignedIn, record: UserRecord, stored: SessionRecord | undefined) => Promise<boolean>
   magicLink: MagicLinkMethods
   markBrowser: (signedIn: boolean, maxAge?: number | undefined) => void
@@ -206,9 +199,7 @@ class Auth
   organizations: OrganizationMethods<OrgRole>
   passkeys: PasskeyMethods
   password: PasswordMethods
-  profile: (locale?: string | undefined) => Promise<ProfileFieldView[] | null>
   provedLately: () => Promise<boolean>
-  providerToken: (provider: string) => Promise<null | string>
   providersOf: (record: UserRecord) => Promise<Record<string, { id: string; }>>
   record: () => Promise<UserRecord | null>
   reprove: (proof: Proof) => Promise<ReproveResult>
@@ -224,7 +215,6 @@ class Auth
 }
   resolve: () => Promise<UserRecord | null>
   resolving: Promise<UserRecord | null> | undefined
-  saveProfile: (values: Record<string, unknown>) => Promise<SaveProfileResult>
   scopes: () => Promise<null | string[]>
   session: Session<AuthSessionData>
   sessions: SessionMethods
@@ -238,8 +228,6 @@ class Auth
   tokenScopes: null | string[]
   tokens: TokenMethods<Scope>
   twoFactor: TwoFactorMethods
-  unlink: (provider: string, proof: Proof) => Promise<UnlinkResult>
-  updateLocale: (locale: string) => Promise<UpdateLocaleResult>
   user: () => Promise<User<UserData> | null>
   userIdsHolding: (role: string) => Promise<string[]>
   via: () => Promise<"bearer" | "session" | null>
@@ -688,9 +676,6 @@ function createAuth<Data extends AuthSessionData, Role extends string = string, 
       roles?: Role[] | undefined;
     }): Promise<CreateUserResult>;
   };
-  createUser(input: Omit<CreateUserInput, "roles"> & {
-    roles?: Role[] | undefined;
-  }): Promise<CreateUserResult>;
   issueToken(userId: string, label: string, tokenOptions?: TokenOptions<Scope> & {
     token?: string | undefined;
   }): Promise<IssueTokenResult>;
@@ -762,7 +747,10 @@ function createAuth<Data extends AuthSessionData, Role extends string = string, 
       };
     };
     parser: (Meta & {
-      schema: {}; ...#5fcbd34a (3890 lines)
+      schema: {};
+      standaloneSchema: {};
+      macro: {};
+      macroFn: {}; ...#3b849fac (3887 lines)
   guard: (guardOptions?: RouteGuardOptions<Role, Scope>) => Guard;
   test: (site: OAuthSite) => { ...#d43a5614 (9 lines)
   sessionCookie(userId: string, cookieOptions?: { ...#73ac2c57 (3 lines)

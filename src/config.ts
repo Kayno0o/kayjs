@@ -22,7 +22,6 @@ import type { PageHook } from './server/page-hook'
 import type { Redirects } from './server/redirects'
 import type { Rewrite } from './server/rewrite'
 import type { Prefetch } from './server/speculation'
-import type { FileStore } from './server/storage'
 import type { TraceExtractor, Tracer } from './server/trace'
 
 // What `kay.config.ts` exports by default; `pages()`, `kay build`, `kay dev` and `kay check` all read it.
@@ -119,8 +118,6 @@ export interface KayConfig extends AppHooks {
   secret?: string | string[] | undefined
   // Lets an editor see drafts on the live site, `false` for none: a visitor in preview mode sees every draft, and pages render for them alone, past prerendered and cached copies.
   preview?: PreviewConfig | false | undefined
-  /** @deprecated Moved under `store` in 1.87 as `store: { files }`; the old key works until 1.90, and `kay upgrade` moves it. */
-  fileStore?: FileStore | undefined
 
   // Where the app keeps what outlives one process, for every feature naming no store of its own: `session()`'s data, `cached` values, `live()` values, queued jobs and schedule locks, rate limit counts, the tabs a page's `presence()` lists and the Web Vitals `vitals()` counts and the notifications `notify()` stores, the push subscriptions, the small keyed values libraries keep with an end (`kv`), and the files `files` from `kay/server` keeps in `files`, which only the app writes: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`. `sqliteData('data/app.sqlite')` keeps all but the files in one file; `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications, push, kv, files }` takes stores of your own, each optional, Redis say, and each may have `ping` for `health` and `close` for a stop. Without it sessions stay in `data/sessions.sqlite` (`session({ store: false })` keeps them in their cookie), jobs in `data/jobs.sqlite` and the others in memory.
   store?: AppStore | undefined

@@ -9,7 +9,7 @@ import { NON_ROOT_TRAILING_SLASH } from '../runtime/base'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
 import { API_PREFIX, KAY_PREFIX, openApiPaths } from './api-modules'
-import { keepsElysiaShape } from './field-errors'
+
 import { sharedContext } from './render'
 import { apiRoutePath } from './routes'
 import { markPrivate } from './scope'
@@ -205,7 +205,7 @@ export function openApiDocument(modules: MountedApi[], options: { title: string,
           ...hooks.detail?.deprecated === true && { deprecated: true },
           ...parameters(path, hooks),
           ...hooks.body !== undefined && { requestBody: { required: true, content: content(hooks.body, holdsFile(hooks.body) ? 'multipart/form-data' : 'application/json') } },
-          responses: withRefusal(responses(hooks.response), hooks, module.instance),
+          responses: withRefusal(responses(hooks.response), hooks),
           ...module.guards.length > 0 && { 'x-kay-guarded': true },
           ...tool && { 'x-kay-tool': tool },
         }
@@ -325,12 +325,12 @@ function responses(response: unknown): Record<string, Schema> {
   return Object.fromEntries(Object.entries(byStatus).map(([status, schema]) => [status, { description: status.startsWith('2') ? 'OK' : 'Error', content: content(schema, 'application/json') }]))
 }
 
-// What a route answers when its `body`, `query`, `params`, `headers` or `cookie` refuse the input, as an action answers it, unless the route documents its own 422 or keeps Elysia's body.
+// What a route answers when its `body`, `query`, `params`, `headers` or `cookie` refuse the input, as an action answers it, unless the route documents its own 422.
 const REFUSAL_SCHEMA = { type: 'object', required: ['errors', 'status'], properties: { errors: { type: 'object', additionalProperties: { type: 'string' } }, status: { const: 422, type: 'number' } } }
 const VALIDATED = ['body', 'query', 'params', 'headers', 'cookie'] as const
 
-function withRefusal(answers: Record<string, Schema>, hooks: Record<string, unknown>, instance: Elysia): Record<string, Schema> {
-  if (answers[422] !== undefined || keepsElysiaShape(instance) || !VALIDATED.some(hook => hooks[hook] !== undefined))
+function withRefusal(answers: Record<string, Schema>, hooks: Record<string, unknown>): Record<string, Schema> {
+  if (answers[422] !== undefined || !VALIDATED.some(hook => hooks[hook] !== undefined))
     return answers
 
   return { ...answers, 422: { description: 'Error', content: { 'application/json': { schema: REFUSAL_SCHEMA } } } }

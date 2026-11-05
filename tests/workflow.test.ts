@@ -381,7 +381,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const failures: string[] = []
     const after = workflow<undefined>(name, async ({ step }) => {
       await step.run('renamed', () => undefined)
-    }, { store, onFailed: ({ error }) => void failures.push((error as Error).message) })
+    }, { store, onError: ({ error }) => void failures.push((error as Error).message) })
 
     later(2 * MINUTE * 60)
     expect(await after.drain()).toBe(1)
@@ -419,7 +419,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
         await step.run('fn', () => () => 1)
       else
         await Promise.all([step.run('a', () => 1), step.run('b', () => 2)])
-    }, { store, attempts: 1, onFailed: ({ error }) => void failures.push((error as Error).message) })
+    }, { store, attempts: 1, onError: ({ error }) => void failures.push((error as Error).message) })
 
     await flow.start(1)
     await flow.start(2)

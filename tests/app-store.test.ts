@@ -225,13 +225,10 @@ describe('the store contract', () => {
     }
   })
 
-  it('reads the fileStore of before 1.87 first, then store.files, so no store factory moves files', () => {
+  it('reads store.files, so no store factory moves files', () => {
     const files = { write: async () => undefined, read: async () => undefined, delete: async () => false }
-    const old = { ...files }
 
-    expect(configuredFiles({ store: { files }, fileStore: old })).toBe(old)
     expect(configuredFiles({ store: { files } })).toBe(files)
-    expect(configuredFiles({ store: sqliteData(':memory:'), fileStore: old })).toBe(old)
     expect(configuredFiles({ store: sqliteData(':memory:') })).toBeUndefined()
     expect(configuredFiles({})).toBeUndefined()
   })

@@ -103,7 +103,7 @@ const READING: Record<string, string> = {
   'src/routes/closure.kay': '---\nimport { tick } from \'../ticking\'\n---\np {tick()}\n',
   'src/routes/through-component.kay': '---\nimport Clock from \'../clock.kay\'\n---\nClock\n',
   'src/routes/opted-out.kay': '--- server\nexport const page = { prerender: false }\n---\np Opted out\n',
-  'src/routes/revalidated.kay': '--- server\nexport const page = { revalidate: \'1h\' }\n---\np Revalidated\n',
+  'src/routes/revalidated.kay': '--- server\nexport const page = { ttl: \'1h\' }\n---\np Revalidated\n',
   'src/routes/[name].kay': 'p Params\n',
   'src/routes/barrel.kay': '---\nimport { now } from \'../lib\'\n---\np {now()}\n',
   'src/routes/relative.kay': '--- server\nimport { formatRelativeTime } from \'kay/i18n\'\n---\np {formatRelativeTime(1_700_000_000_000)}\n',
@@ -485,7 +485,7 @@ describe('a kept page and the state a script declares', () => {
 
   it('tells a page setting from another export in a server fence', async () => {
     const root = await scratch({
-      'src/routes/settings.kay': '--- server\nlet title = \'Home\'\n\nexport const page = { prerender: true, revalidate: \'1h\' }\n---\nh1 {title}\n',
+      'src/routes/settings.kay': '--- server\nlet title = \'Home\'\n\nexport const page = { prerender: true, ttl: \'1h\' }\n---\nh1 {title}\n',
       'src/routes/typed.kay': '--- server\nlet title = \'Home\'\n\nexport type Row = { id: number }\n---\nh1 {title}\n',
       'src/routes/named.kay': '--- server\nconst seen = []\n\nexport const pageSize = seen.length\n---\np {pageSize}\n',
       'src/routes/function.kay': '--- server\nlet count = 0\n\nexport async function bump(): Promise<void> {\n  count++\n}\n---\np {count}\n',
@@ -502,7 +502,7 @@ describe('a kept page and the state a script declares', () => {
   it('judges a server fence the compiler cannot place, but that parses, by its first export besides a type or a page setting', async () => {
     const root = await scratch({
       'src/routes/function.kay': '--- server\nlet count = 0\nconst pending\n\nexport async function bump(): Promise<void> {\n  count++\n}\n---\np {count}\n',
-      'src/routes/settings.kay': '--- server\nlet title = \'Home\'\nconst pending\n\nexport const page = { prerender: true, revalidate: \'1h\' }\n---\nh1 {title}\n',
+      'src/routes/settings.kay': '--- server\nlet title = \'Home\'\nconst pending\n\nexport const page = { prerender: true, ttl: \'1h\' }\n---\nh1 {title}\n',
       'src/routes/typed.kay': '--- server\nlet title = \'Home\'\nlet title = \'Again\'\n\nexport type Row = { id: number }\n---\nh1 {title}\n',
     })
 

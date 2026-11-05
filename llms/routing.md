@@ -228,7 +228,7 @@ export default (value: string) =>
 | --- | --- | --- |
 | `prerender` | `true`, `false`, a list of params, a function returning one, a content collection or `paginate()` | [Prerendering](prerendering.md#prerendering) |
 | `keep` | `true` to say the build is to keep the page prerendered on its own, `unkept-page` naming what stops it | [Prerendering](prerendering.md#prerendering) |
-| `ttl` | a `Duration`, how old a prerendered page gets before it is rendered again, and how long a CDN keeps it (`revalidate` is its name before 1.87) | [Prerendering](prerendering.md#prerendering) |
+| `ttl` | a `Duration`, how old a prerendered page gets before it is rendered again, and how long a CDN keeps it (`revalidate` was its name before 1.87, gone since 1.91) | [Prerendering](prerendering.md#prerendering) |
 | `cacheControl` | the `cache-control` text a prerendered page sends everyone, `false` for the default | [Prerendering](prerendering.md#prerendering) |
 | `layouts` | `false` only, to drop the layouts above | this section |
 | `query` | a schema `ctx.query` is read against | `ctx.query`, below |

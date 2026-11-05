@@ -526,7 +526,7 @@ describe('kay build --static', () => {
 
     try {
       await Bun.write(join(fixture, 'src/routes/news.kay'), '--- server\nexport const page = { prerender: true, ttl: \'1h\' }\n---\nh1 News\n')
-      await Bun.write(join(fixture, 'src/routes/legacy.kay'), '--- server\nexport const page = { prerender: true, revalidate: \'2m\' }\n---\nh1 Legacy\n')
+
       await Bun.write(join(fixture, 'src/routes/plain.kay'), '--- server\nexport const page = { prerender: true, ttl: \'1h\', cacheControl: false }\n---\nh1 Plain\n')
       await Bun.write(join(fixture, 'src/routes/long.kay'), '--- server\nexport const page = { prerender: true, cacheControl: \'public, max-age=300\' }\n---\nh1 Long\n')
 
@@ -538,7 +538,7 @@ describe('kay build --static', () => {
       const headers = await Bun.file(join(elsewhere, '_headers')).text()
 
       expect(headers).toContain('\n/repo/news\n  Cache-Control: public, max-age=0, s-maxage=3600, stale-while-revalidate=3600\n\n/repo/news/\n  Cache-Control: public, max-age=0, s-maxage=3600, stale-while-revalidate=3600\n')
-      expect(headers).toContain('\n/repo/legacy\n  Cache-Control: public, max-age=0, s-maxage=120, stale-while-revalidate=120\n')
+
       expect(headers).toContain('\n/repo/long\n  Cache-Control: public, max-age=300\n')
       expect(headers).not.toContain('/repo/plain')
       expect(headers).not.toContain('/repo/about')

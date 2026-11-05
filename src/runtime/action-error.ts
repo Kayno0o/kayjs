@@ -11,11 +11,6 @@ export class ActionError<Data = unknown> extends ApiError<Data> {
   constructor(status: number, readonly body: string, errors: Record<string, string> = {}, data?: Data, message = messageOf({ status, errors, data }, actionFailed(status))) {
     super(status, message, data, errors)
   }
-
-  /** @deprecated Renamed `body` in 1.87 for an `ActionError`, whose `data` is what `ctx.fail` passed; the old name works until 1.90, and `kay upgrade` renames it where an `instanceof ActionError` narrows the receiver. */
-  override get answer(): unknown {
-    return this.body
-  }
 }
 
 // Thrown by a call whose action redirected, where there is no browser to send: a test, a script.

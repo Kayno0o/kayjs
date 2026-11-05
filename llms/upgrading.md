@@ -8,6 +8,20 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 `pgLists`, `createMailListTables`, `mailListTables`, `pgSuppressions`, `createMailSuppressionTable` and `sqliteSuppressions` are imported from `@kaynooo/kayjs-mail/pg` and `@kaynooo/kayjs-mail/sqlite`, and `sqliteConversations` from `@kaynooo/kayjs-ai/sqlite` (`pgConversations` is in `/pg`). `kay check` cannot tell an import it should move, so no lint ships: change the import path.
 
+### The forms 1.87 deprecated are gone
+
+Their `deprecated-*` lints go with them: run `kay upgrade` on 1.90 first and it rewrites every one that has a fix. On 1.91 each is a type error or an error at start-up, not a silent change.
+
+- `fileStore` in the config is `store: { files }`; the config refuses the old key, naming the new one.
+- kayjs-auth's flat account, provider and audit methods (`auth.deleteAccount`, `auth.changeUsername`, `auth.listIdentities`, `auth.listAuditLog` and the rest) are `auth.account.*`, `auth.oauth.*` and `auth.audit.*`, and `createUser` on the `createAuth` result is `auth.admin.createUser`.
+- A page's `revalidate` is `ttl`, `notify(user, { keep })` is `ttl`, a `queue()` or `workflow()` `keepFailed` is `failedTtl`, and kayjs-ai's `Chat` `keep` is `history`.
+- `onFailed` of `queue()`, `workflow()` and `mailer({ queue })` is `onError`, which also gets `id` and `attempts`.
+- The `onSelect` of a Table, TreeView or Timeline is `onSelectedChange`, and is no longer called.
+- `.answer` of an `ApiError` is `.data`, and of an `ActionError` `.body`.
+- `refusalMessage(error, fallback)` is `error instanceof ApiError ? error.message : fallback`.
+- The types StreamStatus, ResourceStatus and ResourceFailure from `kay` are `ConnectionStatus`, `LoadStatus` and `ApiError`.
+- `api({ errorShape })` is gone: a refused input always answers `{ errors, status }`, and `'elysia'` no longer keeps Elysia's own body.
+
 ## 1.90.0
 
 ### FileDrop is a form control

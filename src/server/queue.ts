@@ -106,8 +106,7 @@ export interface QueueOptions<Payload> {
   idlePoll?: Duration | undefined
   // How long a failed job is kept, its payload included, from when its last attempt was due: 30 days by default, `false` until removed.
   failedTtl?: Duration | false | undefined
-  /** @deprecated The name of `failedTtl` before 1.87, read until 1.90; `kay upgrade` renames it. */
-  keepFailed?: Duration | false | undefined
+
   // What a failed job keeps in place of its payload, such as a mail without its body: applied once it is given up, so a failed job holds no more than the app needs to see what went wrong. The payload is kept whole when it throws.
   redact?: ((payload: Payload) => Payload) | undefined
   // Told before each run of a job, once its worker has taken it: `attempts` counts this run.
@@ -118,9 +117,7 @@ export interface QueueOptions<Payload> {
   onRetry?: Hook<{ id: string, payload: Payload, attempts: number, error: unknown, wait: number }> | undefined
   // Told when the last attempt failed, once the job is kept as failed.
   onError?: Hook<{ id: string, payload: Payload, attempts: number, error: unknown }> | undefined
-  // Gets a job that failed its last attempt, once it is kept as failed.
-  // @deprecated `onError`, which gets the job's `id` and `attempts` too and is told in order with the other hooks; kept until 1.90.
-  onFailed?: ((event: { payload: Payload, error: unknown }) => unknown) | undefined
+
   // Starts no worker with the server: the first `activate()` or `enqueue` does, so a queue an app may never use costs it no idle poll. A job already stored waits until then.
   lazy?: boolean | undefined
   // Shows the queue's waiting and running jobs to islands, which read them with `jobs(name)` from `kay` and follow them as they change, in every process: `true` sends each job whole, its key, payload, progress and last error; a function sends each job's id, status, attempts and due time, and as its payload what the function gives of the payload and of `{ key, error, progress }`, so nothing else leaves the server. Whoever may render a page reading them may follow them.
@@ -596,8 +593,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
   const lostAfter = durationSeconds(options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s lostAfter`) * 1000
   const concurrency = options.concurrency ?? 1
   const idlePoll = durationSeconds(options.idlePoll ?? DEFAULT_IDLE_POLL, `queue('${name}')'s idlePoll`) * 1000
-  const failedTtl = options.failedTtl ?? options.keepFailed
-  const keepFailed = failedTtl === false ? undefined : durationSeconds(failedTtl ?? DEFAULT_KEEP_FAILED, `queue('${name}')'s failedTtl`) * 1000
+  const keepFailed = options.failedTtl === false ? undefined : durationSeconds(options.failedTtl ?? DEFAULT_KEEP_FAILED, `queue('${name}')'s failedTtl`) * 1000
 
   if (!Number.isInteger(attempts) || attempts < 1)
     throw new KayError('config-invalid', `kay: queue('${name}')'s attempts is ${attempts}; it takes a whole number of at least 1`)
@@ -614,7 +610,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
   const store = shown === undefined ? ownStore : tellingStore(ownStore, shown.changed)
 
   // The job's payload for a hook, undefined when no hook is set to read it or the stored text cannot be read: a job never fails for its hooks.
-  const anyHook = [options.onStart, options.onSuccess, options.onRetry, options.onError, options.onFailed].some(hook => hook !== undefined)
+  const anyHook = [options.onStart, options.onSuccess, options.onRetry, options.onError].some(hook => hook !== undefined)
   const parsed = new WeakMap<StoredJob, { payload: Payload } | null>()
 
   // Read once per claimed job, and only when a hook is set to want it.
@@ -648,7 +644,6 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
       return
 
     await notify(`${kind}.onError`, [options.onError], { id: job.id, payload: read.payload, attempts, error })
-    await notify(`${kind}.onFailed`, [options.onFailed], { payload: read.payload, error })
   }
 
   // The payload a failed job keeps, undefined to keep it whole.

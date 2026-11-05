@@ -41,11 +41,11 @@ test('every on<Prop>Change callback sits beside the prop it reports', async () =
   expect(broken).toEqual([])
 })
 
-test('onSelect is the press of an item: beside a selected prop it is only the pre-1.87 fallback of onSelectedChange', async () => {
+test('onSelect is the press of an item: a component with a selected prop reports through onSelectedChange', async () => {
   const broken: string[] = []
 
   for (const [file, { callbacks, props }] of await declared()) {
-    if (callbacks.includes('onSelect') && props.has('selected') && !callbacks.includes('onSelectedChange'))
+    if (callbacks.includes('onSelect') && props.has('selected'))
       broken.push(`${file}: onSelect beside \`selected\` is onSelectedChange`)
   }
 

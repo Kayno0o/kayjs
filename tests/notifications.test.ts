@@ -74,7 +74,6 @@ describe('the title of a notification', () => {
 
   it('names the lifetime key it was given when the duration is wrong', async () => {
     await expect(notify('ada', { title: 'x', ttl: 'soon' as never })).rejects.toThrow('notify\'s ttl')
-    await expect(notify('ada', { title: 'x', keep: 'soon' as never })).rejects.toThrow('notify\'s keep')
   })
 
   it('needs a user id', async () => {
@@ -148,7 +147,7 @@ function storeCases(name: string, make: () => Promise<NotificationStore>): void 
       expect(await store.list('grace', 5, now + 2000)).toHaveLength(1)
     })
 
-    it('takes the time a notification is kept from the ttl option, or from keep, the name it had before 1.87', async () => {
+    it('takes the time a notification is kept from the ttl option', async () => {
       const store = await make()
       const now = Date.now()
 
@@ -156,8 +155,6 @@ function storeCases(name: string, make: () => Promise<NotificationStore>): void 
       await notify('ada', { title: 'an hour', ttl: '1h' })
       expect(await store.list('ada', 5, now + 3_000_000)).toHaveLength(1)
       expect(await store.list('ada', 5, now + 3_700_000)).toHaveLength(0)
-      await notify('bob', { title: 'an hour', keep: '1h' })
-      expect(await store.list('bob', 5, now + 3_700_000)).toHaveLength(0)
     })
 
     it('keeps 90 days by default', async () => {

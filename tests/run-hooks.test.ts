@@ -228,29 +228,6 @@ describe('a queue\'s run hooks', () => {
     }
   }, 15_000)
 
-  it('still reads onFailed, after onError, with the same payload and error', async () => {
-    const [logged] = quiet()
-    const seen: unknown[] = []
-    const jobs = queue<number>(named('queue'), () => {
-      throw new Error('gone')
-    }, {
-      store: memoryJobs(),
-      attempts: 1,
-      onError: ({ payload }) => void seen.push(['error', payload]),
-      onFailed: ({ payload, error }) => void seen.push(['failed', payload, (error as Error).message]),
-    })
-
-    try {
-      await jobs.enqueue(5)
-      await jobs.drain()
-      expect(seen).toEqual([['error', 5], ['failed', 5, 'gone']])
-    }
-    finally {
-      forgetQueue(jobs)
-      logged.mockRestore()
-    }
-  })
-
   it('counts a run kept as failed once it was taken too often without ending, and tells onError', async () => {
     const [logged] = quiet()
     const seen: unknown[] = []
@@ -404,7 +381,7 @@ describe('a workflow\'s run hooks', () => {
     }
   })
 
-  it('tells onRetry for a failed attempt and onError with the run id and input once the last one fails, onFailed still read', async () => {
+  it('tells onRetry for a failed attempt and onError with the run id and input once the last one fails', async () => {
     const [logged, warned] = quiet()
     const seen: unknown[] = []
     const flow = workflow<number>(named('flow'), () => {
@@ -415,7 +392,6 @@ describe('a workflow\'s run hooks', () => {
       backoff: '10s',
       onRetry: ({ input, attempts }) => void seen.push(['retry', input, attempts]),
       onError: ({ id, input, attempts, error }) => void seen.push(['error', typeof id, input, attempts, (error as Error).message]),
-      onFailed: ({ input }) => void seen.push(['failed', input]),
     })
 
     try {
@@ -423,7 +399,7 @@ describe('a workflow\'s run hooks', () => {
       await flow.drain()
       setSystemTime(Date.now() + 11_000)
       await flow.drain()
-      expect(seen).toEqual([['retry', 3, 1], ['error', 'string', 3, 2, 'flow down'], ['failed', 3]])
+      expect(seen).toEqual([['retry', 3, 1], ['error', 'string', 3, 2, 'flow down']])
     }
     finally {
       forgetQueue(flow)

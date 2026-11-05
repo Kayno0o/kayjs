@@ -17,7 +17,6 @@ import { bearerRequest, bearerToken } from './bearerHeader'
 import { admit, captchaChallenge, captchaRequired } from './captcha'
 import { banned, guardPageOf, isNavigation, linkedProviders, linkedUser, newUserRecord, publicUser, unlinked, withBack } from './core'
 import { report } from './events'
-import { FlatMethods } from './flatMethods'
 import { scopeAllows } from './gate'
 import { load } from './load'
 import { acceptedLocales } from './locale'
@@ -108,7 +107,7 @@ interface Groups<Scope extends string, Role extends string, OrgRole extends stri
 }
 
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.
-export class Auth<Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>> extends FlatMethods {
+export class Auth<Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>> {
   readonly [STATE]: RequestState
   readonly [REQUIRES] = true
   private known?: { record: Promise<UserRecord | null>, at: number } | undefined
@@ -123,8 +122,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   private readonly cookies: string[] = []
 
   constructor(session: Session<AuthSessionData>, private readonly core: Core, private readonly request: Request, client: string, address: string) {
-    super()
-
     const bearer = bearerRequest(request)
     const crossSite = () => !bearer && crossSiteRefused(request, core.url)
 

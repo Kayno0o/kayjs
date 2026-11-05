@@ -220,7 +220,7 @@ describe('values of kay a template reads', () => {
   })
 
   it('keeps a component static for a script reading only helpers that read nothing reactive', () => {
-    for (const body of ['route(\'/x\')', 'localPath(\'/x\')', 'withBase(\'/x\')', 's.String()', 'durationMs(5)', 'refusalMessage(undefined)'])
+    for (const body of ['route(\'/x\')', 'localPath(\'/x\')', 'withBase(\'/x\')', 's.String()', 'durationMs(5)', 'sanitizeHtml(\'x\')'])
       expect(island(`---\nconst x = ${body}\n---\np {String(x)}`)).toBe(false)
   })
 

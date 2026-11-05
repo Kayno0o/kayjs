@@ -138,7 +138,7 @@ interface Owner {
   deliver: (mail: Mail, signal?: AbortSignal) => Promise<Delivery>
   run: (run: ListRun, signal: AbortSignal) => Promise<void>
   redact: (mail: Queued) => Queued
-  failed: (mail: Mail, error: unknown) => Promise<void>
+  failed: (mail: Mail, error: unknown) => void
   // The queue's run hooks, for the mailer that queued the mail, its payload without the internal `via`.
   told: (hook: 'onStart' | 'onSuccess' | 'onRetry' | 'onError', event: QueueEvent) => Promise<void>
 }
@@ -656,23 +656,20 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   suppressions.lists = lists
 
-  const { name = 'mail', onFailed, onStart, onSuccess, onRetry, onError, ...queueOptions } = options.queue ?? {}
+  const { name = 'mail', onStart, onSuccess, onRetry, onError, ...queueOptions } = options.queue ?? {}
   const via = crypto.randomUUID()
   const redact = queueOptions.redact ?? withoutBody
   const owner: Owner = {
     deliver,
     run: async (run, signal) => lists.run(run, signal),
     redact,
-    failed: async (mail, error) => {
+    failed: (mail, error) => {
       log.error(`${described(mail)} to ${whom(recipientsOf(mail))} is given up after its last attempt`, error)
-
-      if (onFailed)
-        await onFailed({ payload: mail, error })
     },
     told: async (hook, event) => notify(`mail.${hook}`, [({ onStart, onSuccess, onRetry, onError } as Record<typeof hook, Hook<QueueEvent> | undefined>)[hook]], event),
   }
 
-  agreeOnQueue(name, queueOptions.store, { attempts: queueOptions.attempts, backoff: queueOptions.backoff, failedTtl: queueOptions.failedTtl ?? queueOptions.keepFailed, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll, concurrency: queueOptions.concurrency }, owner)
+  agreeOnQueue(name, queueOptions.store, { attempts: queueOptions.attempts, backoff: queueOptions.backoff, failedTtl: queueOptions.failedTtl, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll, concurrency: queueOptions.concurrency }, owner)
   MAILERS.set(via, new WeakRef(owner))
   FORGOTTEN.register(owner, via)
 
@@ -683,14 +680,18 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const deliverQueued = async ({ via: queuedBy, ...mail }: Queued, signal: AbortSignal): Promise<Delivery> => ownerOf(queuedBy).deliver(mail, signal)
   const jobs = queue<Queued>(name, deliverQueued, {
     ...queueOptions,
-    failedTtl: queueOptions.failedTtl ?? queueOptions.keepFailed ?? FAILED_KEPT,
+    failedTtl: queueOptions.failedTtl ?? FAILED_KEPT,
     redact: queued => ownerOf(queued.via).redact(queued),
     // Always set: any mailer of the queue may claim a mail, and its owner is the one to hear of it.
     onStart: told('onStart'),
     onSuccess: told('onSuccess'),
     onRetry: told('onRetry'),
-    onError: told('onError'),
-    onFailed: async ({ payload: { via: queuedBy, ...mail }, error }) => ownerOf(queuedBy).failed(mail, error),
+    onError: async (event) => {
+      const { via: queuedBy, ...mail } = event.payload
+
+      ownerOf(queuedBy).failed(mail, event.error)
+      await told('onError')(event)
+    },
   })
   // The mails of a list are sent by a job of their own, a batch at a time, so a broadcast to a long list resumes after a restart where it stopped. Its worker starts with the first `mail.list()`, so a mailer with no list runs no more queue than before lists.
   const listJobs = queue<QueuedRun>(`${name}-list`, async ({ via: queuedBy, ...run }, signal) => ownerOf(queuedBy).run(run, signal), defined({ lazy: true, store: queueOptions.store, attempts: queueOptions.attempts, backoff: queueOptions.backoff, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll }))

@@ -48,7 +48,6 @@ interface ActionDone extends ActionRun
 [.] ActionError
 class ActionError
   new <Data = unknown>(status: number, body: string, errors?: Record<string, string>, data?: Data | undefined, message?: string): ActionError<Data>
-  answer: unknown
   body: string
   data: Data | undefined
   errors: Record<string, string>
@@ -111,7 +110,6 @@ interface ActionRateLimit extends RateLimit
 [.] ActionRedirectError
 class ActionRedirectError
   new (status: number, location: string): ActionRedirectError
-  answer: unknown
   body: string
   data: unknown
   errors: Record<string, string>
@@ -161,7 +159,6 @@ type ApiCallOptions<Module, Path, M> = ApiRequest<Module, Path, M> & {
 [.] ApiError
 class ApiError
   new <Data = unknown>(status: number, message: string, data?: Data | undefined, errors?: Record<string, string>, options?: ErrorOptions | undefined): ApiError<Data>
-  answer: unknown
   data: Data | undefined
   errors: Record<string, string>
   name: string
@@ -723,7 +720,6 @@ interface PageSettings
   prerender?: boolean | object
   query?: TSchema
   reload?: true
-  revalidate?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
   search?: ((params: Record<string, string>) => PageSearch | Promise<PageSearch | undefined> | undefined) | PageSearch
   security?: PageSecurity
   sitemap?: boolean | object
@@ -927,9 +923,6 @@ function refresh(loads?: readonly string[] | string | undefined): Promise<void>
 interface Refreshable
   refresh: () => unknown
 
-[.] refusalMessage
-function refusalMessage(error: unknown, fallback: string): string
-
 [.] refuse
 function refuse(message?: string, { status, errors, data }?: RefuseOptions): never
 
@@ -978,16 +971,13 @@ function resource<Module, const Path extends ResourcePath<Module>>(module: Modul
 function resource<T>(load: (signal: AbortSignal) => PromiseLike<T> | T): Resource<Awaited<T>>
 
 [.] Resource
-interface Resource<T> extends Source<ResourceStatus>
+interface Resource<T> extends Source<Exclude<LoadStatus, 'idle'>>
   error: () => ApiError<unknown> | undefined
   pending: () => boolean
   refresh: () => void
   retry: () => void
-  status: () => ResourceStatus
+  status: () => "failed" | "loading" | "ready"
   value: () => T | undefined
-
-[.] ResourceFailure
-type ResourceFailure = ApiError
 
 [.] ResourcePath
 type ResourcePath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends {
@@ -999,9 +989,6 @@ type ResourcePath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found 
     200: infer Value
   }
 } ? Readable<Value> extends true ? Path : never : Path : never : never
-
-[.] ResourceStatus
-type ResourceStatus = Exclude<LoadStatus, 'idle'>
 
 [.] RetryOptions
 interface RetryOptions
@@ -1232,9 +1219,6 @@ interface StreamRun<T, Options> extends EventReader<T>
 
 [.] StreamStartOptions
 type StreamStartOptions<Module, Path, M> = UrlOptions<MethodRoute<Module, Path, Chosen<M>>> & CallBody<MethodRoute<Module, Path, Chosen<M>>>
-
-[.] StreamStatus
-type StreamStatus = ConnectionStatus
 
 [.] Success
 type Success<Output> = Exclude<Output, Failure<unknown>>
@@ -2399,7 +2383,6 @@ interface ApiModule
 [./server] ApiOptions
 interface ApiOptions
   cors?: CorsOptions | false | undefined
-  errorShape?: "elysia" | "kay" | undefined
   guards?: false | undefined
   maxSize?: (() => ByteSize) | ByteSize | undefined
   rateLimit?: RateLimit | RateLimit[] | undefined
@@ -2729,7 +2712,6 @@ interface KayConfig extends AppHooks
   env?: false | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: FaviconConfig | false | string | undefined
-  fileStore?: FileStore | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   head?: HeadTag[] | undefined
   health?: HealthConfig | false | undefined
@@ -2951,11 +2933,10 @@ interface NotificationStore extends StoreBase
   unread: (user: string, now: number) => MaybePromise<number>
 
 [./server] notify
-function notify(user: string, { title, url, ttl, keep, push }: NotifyOptions): Promise<Notification>
+function notify(user: string, { title, url, ttl, push }: NotifyOptions): Promise<Notification>
 
 [./server] NotifyOptions
 interface NotifyOptions
-  keep?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   push?: boolean | undefined
   title: string
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
@@ -3014,7 +2995,6 @@ interface PagesOptions extends KayConfig
   env?: false | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: FaviconConfig | false | string | undefined
-  fileStore?: FileStore | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   head?: HeadTag[] | undefined
   health?: HealthConfig | false | undefined
@@ -3210,12 +3190,10 @@ interface QueueOptions<Payload>
   concurrency?: number | undefined
   failedTtl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   idlePoll?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-  keepFailed?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   lazy?: boolean | undefined
   live?: ((payload: Payload, job: LiveJob) => unknown) | boolean | undefined
   lostAfter?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   onError?: Hook<{ id: string; payload: Payload; attempts: number; error: unknown; }> | undefined
-  onFailed?: ((event: { payload: Payload; error: unknown; }) => unknown) | undefined
   onRetry?: Hook<{ id: string; payload: Payload; attempts: number; error: unknown; wait: number; }> | undefined
   onStart?: Hook<{ id: string; payload: Payload; attempts: number; }> | undefined
   onSuccess?: Hook<{ id: string; payload: Payload; attempts: number; }> | undefined
@@ -3728,16 +3706,14 @@ type Workflow<Input, Known extends Events> = Elysia & {
   // Starts a run, which the server's workers carry out, surviving restarts; resolves with its id once stored. start: (...args: undefined extends Input ? [input?: Input, options?: StartOptions] : [input: Input, options?: StartOptions]) => Promise<string> // Hands the event to the run, waking it now when it waits for it, else keeping it for the wait that names it; resolves with whether the run took it. An event sent while a step runs, or once a worker took the run after its timeout, is dropped. send: <Event extends keyof Known & string>(id: string, event: Event, ...data: undefined extends Known[Event] ? [data?: Known[Event]] : [data: Known[Event]]) => Promise<boolean> // Where the run stands; undefined once it completed, was cancelled or never started. status: (id: string) => Promise<WorkflowStatus | undefined> // Ends a run: one not running goes at once, one running stops at its next step. Resolves with whether there was one. cancel: (id: string) => Promise<boolean> // Runs every run whose time has come, here and now, as `drain` of a queue does. drain: () => Promise<number> }
 
 [./server] WorkflowOptions
-interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'lostAfter' | 'idlePoll' | 'failedTtl' | 'keepFailed'>
+interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'lostAfter' | 'idlePoll' | 'failedTtl'>
   attempts?: number | undefined
   backoff?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   concurrency?: number | undefined
   failedTtl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   idlePoll?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-  keepFailed?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   lostAfter?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   onError?: Hook<{ id: string; input: Input; attempts: number; error: unknown; }> | undefined
-  onFailed?: ((event: { id: string; input: Input; error: unknown; }) => unknown) | undefined
   onRetry?: Hook<{ id: string; input: Input; attempts: number; error: unknown; wait: number; }> | undefined
   onStart?: Hook<{ id: string; input: Input; }> | undefined
   onSuccess?: Hook<{ id: string; input: Input; }> | undefined
@@ -4024,7 +4000,6 @@ interface TestOptions extends PagesOptions
   env?: false | undefined | { compose?: string | string[] | undefined; example?: string | undefined; }
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: FaviconConfig | false | string | undefined
-  fileStore?: FileStore | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   head?: HeadTag[] | undefined
   headers?: Record<string, string> | undefined

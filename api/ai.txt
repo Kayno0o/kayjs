@@ -744,7 +744,6 @@ component default
   icons?: (Partial<Record<ChatIconName, ChatIconValue>> & Partial<Record<"close" | "collapse" | "expand" | "open", ChatIconValue>>) | undefined
   images?: string | string[] | undefined
   initial?: ChatTurn[] | undefined
-  keep?: number | undefined
   keepOnServer?: boolean | undefined
   label?: string | undefined
   loadFailedLabel?: string | undefined
@@ -959,7 +958,6 @@ component default
   icons?: Partial<Record<ChatIconName, ChatIconValue>> | undefined
   images?: string | string[] | undefined
   initial?: ChatTurn[] | undefined
-  keep?: number | undefined
   keepOnServer?: boolean | undefined
   label?: string | undefined
   links?: "apart" | "here" | undefined

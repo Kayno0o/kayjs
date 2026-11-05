@@ -1,5 +1,5 @@
 import type { ActionStream } from './action-shared'
-import type { StreamStatus } from './live'
+import type { ConnectionStatus } from './live'
 import type { Owner } from './reactive'
 import { leaving, navigation } from './navigation'
 import { liveOwner, onCleanupOf } from './reactive'
@@ -14,7 +14,7 @@ export interface Caller {
 export const SETTLED = Symbol.for('kay.settled')
 
 export interface Settles {
-  [SETTLED]: (then: (status: StreamStatus) => void) => void
+  [SETTLED]: (then: (status: ConnectionStatus) => void) => void
 }
 
 // A stream ends with the block or island that started it, or the nearest one around it still alive when its answer arrives (a persist island's living on across pages), and one whose block goes in that same task, the call's own result removing it, passes to the block around it. One started under no owner, after an `await` in a handler say, ends once a path other than the call's is shown.
@@ -82,7 +82,7 @@ export function closeWithCaller(stream: ActionStream<unknown> & Settles, caller:
 }
 
 // Hands `then` how a stream ended, once it ended, failed or was closed; false when `data` is no stream.
-export function onStreamEnd(data: unknown, then: (status: StreamStatus) => void): boolean {
+export function onStreamEnd(data: unknown, then: (status: ConnectionStatus) => void): boolean {
   const settles = (data as Partial<Settles> | null | undefined)?.[SETTLED]
 
   settles?.(then)

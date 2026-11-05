@@ -217,9 +217,9 @@ export function defaultFileStore(): FileStore {
   return defaultStore ??= process.env.NODE_ENV === 'test' ? memoryFiles() : diskFiles()
 }
 
-// The file store a config names: the `fileStore` of before 1.87, else `store.files`, which only an app writing it has: no store factory fills it, so what an app already keeps never moves.
-export function configuredFiles(config: { store?: AppStore | undefined, fileStore?: FileStore | undefined } | undefined): FileStore | undefined {
-  return config?.fileStore ?? config?.store?.files
+// The file store a config names: `store.files`, which only an app writing it has: no store factory fills it, so what an app already keeps never moves.
+export function configuredFiles(config: { store?: AppStore | undefined } | undefined): FileStore | undefined {
+  return config?.store?.files
 }
 
 // `store.files` from kay.config.ts, which the server's `files` reads, and the directory where the image route copies a file from a store not on this disk.

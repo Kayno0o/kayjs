@@ -31,7 +31,7 @@ describe('unreadSettings', () => {
   it.each([
     ['literals', 'export const page = { guards: false, layouts: true }\n', undefined],
     ['a literal followed by a comment', 'export const page = { guards: false, // why\n layouts: true /* x */ }\n', undefined],
-    ['other keys holding anything', 'export const page = { noindex: flag, revalidate: compute() }\n', undefined],
+    ['other keys holding anything', 'export const page = { noindex: flag, ttl: compute() }\n', undefined],
     ['a nested key of the same name', 'export const page = { sitemap: { guards: flag } }\n', undefined],
     ['an object that is not the page', 'const other = { guards: flag }\n', undefined],
     ['a page written in a comment', '// export const page = { guards: flag }\n', undefined],

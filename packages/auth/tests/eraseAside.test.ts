@@ -111,7 +111,7 @@ describe('erasing a user takes their notifications and mailing list rows', () =>
       erase(address)
     }
 
-    expect((await ada.fetch('/call/deleteAccount', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }]) })).status).toBe(500)
+    expect((await ada.fetch('/call/account.delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }]) })).status).toBe(500)
     expect(await store.users.findByEmail('ada@example.com')).toBeDefined()
     fail = false
     expect(await ada.call('account.delete', { password: PASSWORD })).toEqual({ ok: true })

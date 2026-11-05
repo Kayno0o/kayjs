@@ -31,18 +31,18 @@ import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
-import { authMethods } from './auth-methods'
+
 import { deprecatedAuthOptions } from './deprecated-auth-options'
-import { deprecatedCollectionLinks } from './deprecated-collection-links'
+
 import { deprecatedConfigKeys } from './deprecated-config-keys'
-import { deprecatedLifetimes } from './deprecated-lifetimes'
+
 import { ownFile } from './diagnose'
 import { durationSeconds } from './duration-seconds'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
-import { apiErrorAnswers, refusalMessages } from './error-shape'
+
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
-import { hookNames } from './hook-names'
+
 import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
 import { mcpRoutes } from './mcp-routes'
@@ -50,7 +50,7 @@ import { movedImports } from './moved-imports'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
-import { contextName, exportNames, roomTypes, sourceTypes } from './renamed-exports'
+import { contextName, exportNames, roomTypes } from './renamed-exports'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { sizeLimits } from './size-limits'
 import { untypedSockets } from './socket-routes'
@@ -145,17 +145,13 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => removedUiTokens(root, options),
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
-  async ({ root, options }) => authMethods(root, options),
-  async ({ root, options }) => sourceTypes(root, options),
+
   async ({ root, options }) => roomTypes(root, options),
   async ({ root, options }) => exportNames(root, options),
   async ({ root, options }) => durationSeconds(root, options),
-  async ({ root, options }) => apiErrorAnswers(root, options),
-  async ({ root, options }) => refusalMessages(root, options),
+
   async ({ root, options }) => deprecatedConfigKeys(root, options),
-  async ({ root, options }) => deprecatedCollectionLinks(root, options),
-  async ({ root, options }) => hookNames(root, options),
-  async ({ root, options }) => deprecatedLifetimes(root, options),
+
   async ({ root, options }) => contextName(root, options),
   async ({ root, options }) => movedImports(root, options),
   async ({ root, options }) => deprecatedAuthOptions(root, options),

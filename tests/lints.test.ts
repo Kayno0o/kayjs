@@ -448,8 +448,8 @@ describe('the checks that read a module', () => {
 describe('page settings', () => {
   it('refuses a setting exported under its own name, its fix moving every one into page at once, a value over several lines one level deeper', () => {
     const one = '--- server\nexport const prerender = true\n---\np x'
-    const several = '--- server\nimport { s } from \'kay\'\n\n// The search\nexport const query = s.Object({\n  page: s.Integer(),\n})\nexport const revalidate = \'1h\'\n---\np x'
-    const moved = '--- server\nimport { s } from \'kay\'\n\nexport const page = {\n  query: s.Object({\n    page: s.Integer(),\n  }),\n  revalidate: \'1h\',\n}\n---\np x'
+    const several = '--- server\nimport { s } from \'kay\'\n\n// The search\nexport const query = s.Object({\n  page: s.Integer(),\n})\nexport const ttl = \'1h\'\n---\np x'
+    const moved = '--- server\nimport { s } from \'kay\'\n\nexport const page = {\n  query: s.Object({\n    page: s.Integer(),\n  }),\n  ttl: \'1h\',\n}\n---\np x'
 
     expect(lints(one)).toEqual([{ code: 'page-settings-invalid', severity: undefined, at: 'prerender' }])
     expect(compileKay(one, 'list.kay').diagnostics.map(d => d.message)).toEqual(['`prerender` is a setting of `page`, not an export of its own'])
@@ -483,7 +483,7 @@ describe('page settings', () => {
 
   it.each([
     ['a setting the fence reads', '--- server\nexport const prerender = true\nconst again = prerender\n---\np {again}'],
-    ['one with a type of its own', '--- server\nexport const revalidate: number = 60\n---\np x'],
+    ['one with a type of its own', '--- server\nexport const ttl: number = 60\n---\np x'],
   ])('leaves %s for the author to move', (_name, source) => {
     expect(fixed(source)).toEqual([])
   })
@@ -1146,48 +1146,6 @@ describe('an extension satisfying missing-alt', () => {
   })
 })
 
-describe('deprecated-ui-tone', () => {
-  const imports = 'import Sparkline from \'@kaynooo/kayjs-ui/sparkline.kay\'\nimport StatusStrip from \'@kaynooo/kayjs-ui/status-strip.kay\'\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\nimport TextInput from \'@kaynooo/kayjs-ui/text-input.kay\'\nimport Select from \'@kaynooo/kayjs-ui/select.kay\'\n'
-  const found = (template: string) => {
-    const source = `---\n${imports}---\n${template}\n`
-    const result = compileKay(source, 'tone.kay', { check: true })
-
-    return result.diagnostics.filter(d => d.code === 'deprecated-ui-tone').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
-  }
-
-  it('fixes a muted tone written as a literal', () => {
-    expect(found('Sparkline(label="x" values={[1]} tone="muted")')).toEqual([{ at: 'muted', fix: ['muted->neutral'] }])
-    expect(found('Sparkline(label="x" values={[1]} tones={[\'muted\', \'danger\']})')).toEqual([{ at: '\'muted\'', fix: ['\'muted\'->\'neutral\''] }])
-    expect(found('StatusStrip(label="x" cells={[\'success\', \'muted\', undefined]})')).toEqual([{ at: '\'muted\'', fix: ['\'muted\'->\'neutral\''] }])
-    expect(found('Timeline(label="x" entries={[{ key: \'a\', time: \'1\', text: \'a\', tone: \'muted\' }]})')).toEqual([{ at: 'tone: \'muted\'', fix: ['tone: \'muted\'->tone: \'neutral\''] }])
-  })
-
-  it('reports a native size on a field with no fix', () => {
-    expect(found('TextInput(size={20})')).toEqual([{ at: 'size', fix: undefined }])
-    expect(found('Select(size="4" options={[]} value="")')).toEqual([{ at: 'size', fix: undefined }])
-  })
-
-  it('leaves the new forms and other tags alone', () => {
-    expect(found('TextInput(size="lg")')).toEqual([])
-    expect(found('Sparkline(label="x" values={[1]} tone="neutral")')).toEqual([])
-    expect(found('Sparkline(label="x" values={[1]} tone={kind})')).toEqual([])
-    expect(found('input(size={20})')).toEqual([])
-    expect(found('Other(tone="muted")')).toEqual([])
-  })
-
-  it('fixes a muted value but never a comparison or a longer string', () => {
-    expect(found('StatusStrip(label="x" cells={rows.filter(row => row.kind === \'muted\')})')).toEqual([])
-    expect(found('Sparkline(label="x" values={[1]} tones={[\'say "muted"\']})')).toEqual([])
-    expect(found('Sparkline(label="x" values={[1]} tones={pick(row, \'muted\')})')).toEqual([])
-    expect(found('Sparkline(label="x" values={[1]} tones={xs.map(x => x === \'muted\' ? \'danger\' : \'muted\')})')).toEqual([{ at: '\'muted\'', fix: ['\'muted\'->\'neutral\''] }])
-    expect(found('Sparkline(label="x" values={[1]} tones={[\'muted\', \'muted\']})')).toHaveLength(2)
-  })
-
-  it('is silenced by kay-allow', () => {
-    expect(found('// kay-allow deprecated-ui-tone\nSparkline(label="x" values={[1]} tone="muted")')).toEqual([])
-  })
-})
-
 describe('deprecated-open-change', () => {
   const imports = 'import Table from \'@kaynooo/kayjs-ui/table.kay\'\nimport TreeView from \'@kaynooo/kayjs-ui/tree-view.kay\'\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n'
   const found = (template: string) => {
@@ -1203,32 +1161,6 @@ describe('deprecated-open-change', () => {
     expect(found('Table(columns={[]} rows={[]} rowKey="id" expandable onToggle={a} onOpenChange={b})')).toEqual([{ at: 'onToggle', fix: undefined }])
     expect(found('Timeline(label="x" entries={[]} onToggle={b})')).toEqual([])
     expect(found('TreeView(nodes={[]} label="x" onOpenChange={b})')).toEqual([])
-  })
-})
-
-describe('deprecated-ui-callbacks', () => {
-  const imports = 'import Table from \'@kaynooo/kayjs-ui/table.kay\'\nimport TreeView from \'@kaynooo/kayjs-ui/tree-view.kay\'\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\nimport BarList from \'@kaynooo/kayjs-ui/bar-list.kay\'\n'
-  const found = (template: string) => {
-    const source = `---\n${imports}---\n${template}\n`
-    const result = compileKay(source, 'callbacks.kay', { check: true })
-
-    return result.diagnostics.filter(d => d.code === 'deprecated-ui-callbacks').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
-  }
-
-  it('renames onSelect on the components with a selected prop', () => {
-    expect(found('Table(columns={[]} rows={[]} rowKey="id" selectable onSelect={pick})')).toEqual([{ at: 'onSelect', fix: ['onSelect->onSelectedChange'] }])
-    expect(found('TreeView(nodes={[]} label="x" selected={a} onSelect={b})')).toHaveLength(1)
-    expect(found('Timeline(label="x" entries={[]} onSelect={b})')).toHaveLength(1)
-  })
-
-  it('writes the shorthand as onSelectedChange={onSelect}', () => {
-    expect(found('Table(columns={[]} rows={[]} rowKey="id" {onSelect})')).toEqual([{ at: 'onSelect', fix: ['{onSelect}->onSelectedChange={onSelect}'] }])
-  })
-
-  it('leaves a press, the new name and other tags alone', () => {
-    expect(found('BarList(rows={[]} onSelect={pick})')).toEqual([])
-    expect(found('Timeline(label="x" entries={[]} onSelectedChange={b})')).toEqual([])
-    expect(found('Other(onSelect={b})')).toEqual([])
   })
 })
 
@@ -1284,30 +1216,6 @@ describe('deprecated-ui-props', () => {
   it('leaves the new name, the boolean and other tags alone', () => {
     expect(found('DateInput(aria-label="x" disabledDay={closed} disabled)')).toEqual([])
     expect(found('Other(isDisabled={closed})')).toEqual([])
-  })
-})
-
-describe('deprecated-lifetimes on the Chat of kayjs-ai', () => {
-  const found = (template: string) => {
-    const source = `---\nimport Chat from '@kaynooo/kayjs-ai/chat.kay'\nimport Launcher from '@kaynooo/kayjs-ai/chat-launcher.kay'\nimport Other from './other.kay'\n---\n${template}\n`
-    const result = compileKay(source, 'chat.kay', { check: true })
-
-    return result.diagnostics.filter(d => d.code === 'deprecated-lifetimes').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
-  }
-
-  it('renames keep to history, however the value is written', () => {
-    expect(found('Chat(action={reply} label="x" keep={2})')).toEqual([{ at: 'keep', fix: ['keep->history'] }])
-    expect(found('Chat(action={reply} label="x" keep="2")')).toEqual([{ at: 'keep', fix: ['keep->history'] }])
-  })
-
-  it('renames the keep of a ChatLauncher too', () => {
-    expect(found('Launcher(action={reply} label="x" keep={2})')).toEqual([{ at: 'keep', fix: ['keep->history'] }])
-  })
-
-  it('leaves history, other components and keepOnServer alone', () => {
-    expect(found('Chat(action={reply} label="x" history={2} keepOnServer)')).toEqual([])
-    expect(found('Other(keep={2})')).toEqual([])
-    expect(found('// kay-allow deprecated-lifetimes\nChat(action={reply} label="x" keep={2})')).toEqual([])
   })
 })
 

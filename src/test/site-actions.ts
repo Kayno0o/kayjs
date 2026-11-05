@@ -1,6 +1,6 @@
 import type { Action, ActionError, FailuresOf, ResolvedProtection, ResultOf, Settles } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
-import type { EventReader, StreamStatus } from '../runtime/live'
+import type { ConnectionStatus, EventReader } from '../runtime/live'
 import type { PageReading } from './page'
 import type { SiteScope } from './site-scope'
 import type { CallArguments, FormValue, SubmitInit, Tested, TestSite } from './site-types'
@@ -57,7 +57,7 @@ async function streamedValues(stream: EventReader<unknown> & Settles, url: strin
 
   stream.on(value => void values.push(value))
 
-  const status = await new Promise<StreamStatus>(resolve => stream[SETTLED](resolve))
+  const status = await new Promise<ConnectionStatus>(resolve => stream[SETTLED](resolve))
 
   if (status !== 'done')
     throw new Error(`kay: the stream ${url} answered ${status} after ${values.length} values`)

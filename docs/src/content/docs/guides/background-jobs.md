@@ -91,9 +91,9 @@ The server runs it with `.use(welcomeMails)`. An action calls `await welcomeMail
 
 A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onError` as `{ id, payload, attempts, error }`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
 
-`onStart`, `onSuccess` and `onRetry` tell the other moments of a run, and a schedule takes `onStart`, `onSuccess` and `onError` too. A hook that throws is logged and reported, and never fails the job. `onFailed` is the old name of `onError` and works until 1.90. Queue and workflow runs are counted in `kay_queue_runs_total`.
+`onStart`, `onSuccess` and `onRetry` tell the other moments of a run, and a schedule takes `onStart`, `onSuccess` and `onError` too. A hook that throws is logged and reported, and never fails the job. Queue and workflow runs are counted in `kay_queue_runs_total`.
 
-A queue's hooks are waited for, up to 10 seconds each, before the worker takes its next job. With `concurrency` above 1, a retry's `onStart` may run before the previous `onRetry` has finished. If you set both `onError` and `onFailed`, both are told until 1.90.
+A queue's hooks are waited for, up to 10 seconds each, before the worker takes its next job. With `concurrency` above 1, a retry's `onStart` may run before the previous `onRetry` has finished.
 
 Under `kay dev`, the dev tool's Jobs tab lists every queue's jobs and retries or deletes a failed one ([the dev tool](/guides/performance/#jobs)).
 

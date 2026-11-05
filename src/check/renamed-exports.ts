@@ -187,11 +187,6 @@ function isName(parent: Node, key: string): boolean {
   return parent.type === 'TSQualifiedName' && key === 'right'
 }
 
-// The types of `kay` renamed when every source an island reads came to share one vocabulary, and the name each has now.
-export const SOURCE_TYPES: Readonly<Record<string, string>> = { StreamStatus: 'ConnectionStatus', ResourceStatus: 'LoadStatus', ResourceFailure: 'ApiError' }
-
-const OLD_TYPE = /StreamStatus|ResourceStatus|ResourceFailure/
-
 // The types of `kay/server` renamed in 1.88, when the rooms stores became async only, and the name each has now.
 export const ROOM_TYPES: Readonly<Record<string, string>> = { AsyncRoomStore: 'RoomStore', AsyncRooms: 'Rooms', StoreRooms: 'Rooms' }
 
@@ -298,12 +293,6 @@ async function renamedTypes(root: string, options: CheckOptions, config: Renamed
       }
     }
   })
-}
-
-// `StreamStatus`, `ResourceStatus` and `ResourceFailure` imported from `kay`.
-// `LoadStatus` also has `idle` and `ApiError` is a class with more members, so those two renames can need a code change.
-export async function sourceTypes(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-source-types', modules: { kay: SOURCE_TYPES }, needle: OLD_TYPE, since: '1.87', until: '1.90', safe: old => old === 'StreamStatus' })
 }
 
 // `AsyncRoomStore`, `AsyncRooms` and `StoreRooms` imported from `kay/server`: the same types under the names every store kind shares.

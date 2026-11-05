@@ -10,9 +10,7 @@ The methods no feature owns stay on `auth` itself: the user (`user()`, `bareUser
 
 ### Move off the flat names
 
-Since 1.87 the account, provider and audit methods are grouped too (table below), and the flat names `auth.deleteAccount(proof)` and `auth.createUser(input)` keep working until 1.90: `kay upgrade` renames the calls (`deprecated-auth-account-methods`). `createUser` belongs to the `createAuth` result, so it is `auth.admin.createUser(input)` there.
-
-The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassword(input)`) are gone since 1.86, along with the `deprecated-auth-methods` lint: call the grouped method the table gives. An app still on them runs `kay upgrade` on 1.85 first, which renames the calls.
+The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassword(input)`) are gone since 1.86, and those before 1.87 (`auth.deleteAccount(proof)`, `auth.createUser(input)`) since 1.91, along with their lints: call the grouped method the tables give, `auth.admin.createUser(input)` on the `createAuth` result. An app still on them runs `kay upgrade` on 1.85 or 1.90 first, which renames the calls.
 
 ## Reference
 
@@ -91,7 +89,7 @@ The flat names `auth` had before 1.82 (`auth.listUsers()`, `auth.signInWithPassw
 
 ### The groups added in 1.87
 
-| Group | Method | Flat name (works until 1.90) |
+| Group | Method | Flat name (gone in 1.91) |
 | --- | --- | --- |
 | `account` | `changeUsername` | `changeUsername` |
 | `account` | `updateLocale` | `updateLocale` |

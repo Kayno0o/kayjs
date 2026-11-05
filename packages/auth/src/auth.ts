@@ -183,11 +183,6 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       },
     },
 
-    /** @deprecated since 1.87: `auth.admin.createUser` */
-    async createUser(input: Omit<CreateUserInput, 'roles'> & { roles?: Role[] | undefined }): Promise<CreateUserResult> {
-      return (await load.password()).createUser(core, input)
-    },
-
     // A bearer token for `userId` taking no proof and sending no mail, for a flow the app gates itself, such as pairing a device, or a script. `token` adopts one the app handed out before, so its devices keep working through a migration.
     async issueToken(userId: string, label: string, tokenOptions: TokenOptions<Scope> & { token?: string | undefined } = {}): Promise<IssueTokenResult> {
       return (await load.bearer()).issueToken(core, userId, label, tokenOptions)

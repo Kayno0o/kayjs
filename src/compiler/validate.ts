@@ -11,11 +11,6 @@ const UI_SOURCE = /^@kaynooo\/kayjs-ui\/([\w-]+)\.kay$/
 const AI_CHAT_SOURCES = new Set(['@kaynooo/kayjs-ai/chat.kay', '@kaynooo/kayjs-ai/chat-launcher.kay'])
 // The `file` key `uiComponents` holds for kayjs-ai's Chat.
 const AI_CHAT = 'ai-chat'
-// A `muted` string standing as a value, alone or as an array element or ternary branch: never one compared against, passed to a call or inside a longer string.
-const MUTED = /(^\s*|[[,?:]\s*)(['"])muted\2(?=\s*([\]),:}]|$))/g
-const MUTED_TONE = /(\btone['"]?\s*:\s*)(['"])muted\2/g
-// The kayjs-ui tags whose `selected` prop reports through `onSelectedChange` since 1.87, the callback named `onSelect` before.
-const SELECTED_TAGS = new Set(['table', 'tree-view', 'timeline'])
 // The kayjs-ui tags whose `onToggle` is `onOpenChange` since 1.90, as every show and hide state reports.
 const TOGGLE_TAGS = new Set(['table', 'tree-view'])
 // The kayjs-ui tags whose per-day predicate `isDisabled` is `disabledDay` since 1.89.
@@ -45,9 +40,6 @@ const ACTIONS_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>
 }
 // kayjs-ai's Chat and ChatLauncher drew each round button's icon from a block of its own before 1.90; `icons` names them all.
 const CHAT_ICON_BLOCKS: Readonly<Record<string, string>> = { sendIcon: 'send', stopIcon: 'stop', newIcon: 'new', attachIcon: 'attach', regenerateIcon: 'regenerate', editIcon: 'edit', recordIcon: 'record', icon: 'open', closeIcon: 'close', expandIcon: 'expand', collapseIcon: 'collapse' }
-// The kayjs-ui field tags that took the native `size` before 1.87, when `size` became `sm`, `md` or `lg`.
-const FIELD_TAGS = new Set(['text-input', 'select', 'combobox', 'date-input', 'time-input', 'date-time-input'])
-const NUMBER = /^\s*\d+\s*$/
 
 type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile' | 'layoutFile' | 'outerSlots' | 'component'>
 
@@ -496,7 +488,7 @@ class Validator {
       this.accessibility(element)
 
     if (this.options.check && element.component) {
-      this.deprecatedUiTone(element)
+      this.deprecatedUiNames(element)
     }
 
     if (foreign && !element.component && RAW_TEXT.has(element.name) && this.dynamicContent(element))
@@ -871,8 +863,8 @@ class Validator {
     return type?.kind === 'static' ? type.text : undefined
   }
 
-  // Type checking only. kayjs-ui 1.87 named the quiet grey `neutral` and made `size` a field size: `muted` is fixed where it is written as a literal, a native `size` is reported alone.
-  private deprecatedUiTone(element: ElementNode): void {
+  // Type checking only: the kayjs-ui and kayjs-ai props and blocks an app still writes under a name they had before their renames.
+  private deprecatedUiNames(element: ElementNode): void {
     const file = this.uiComponents.get(element.name)
 
     if (file === undefined)
@@ -941,14 +933,6 @@ class Validator {
         continue
       }
 
-      if (SELECTED_TAGS.has(file) && name === 'onSelect') {
-        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'onSelectedChange={onSelect}' } : { start: attribute.name.start, end: attribute.name.end, text: 'onSelectedChange' }
-
-        this.lint(attribute.name, 'deprecated-ui-callbacks', `\`onSelect\` on \`${element.name}\` is \`onSelectedChange\` since kayjs-ui 1.87, beside the \`selected\` it reports`, { help: 'Write `onSelectedChange`', fixes: [{ title: 'Write `onSelectedChange`', edits: [edit], safe: true }] })
-
-        continue
-      }
-
       if (TOGGLE_TAGS.has(file) && name === 'onToggle') {
         const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'onOpenChange={onToggle}' } : { start: attribute.name.start, end: attribute.name.end, text: 'onOpenChange' }
 
@@ -979,47 +963,13 @@ class Validator {
         continue
       }
 
-      // kayjs-ai's Chat counted the messages each send posts as `keep`, a word the config keeps for a boolean; it is `history` since 1.87.
-      if (file === AI_CHAT) {
-        if (name === 'maxFileSize') {
-          const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'maxSize')
-          const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'maxSize={maxFileSize}' } : { start: attribute.name.start, end: attribute.name.end, text: 'maxSize' }
+      // kayjs-ai's Chat took its upload limit as `maxFileSize` before 1.90.
+      if (file === AI_CHAT && name === 'maxFileSize') {
+        const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'maxSize')
+        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'maxSize={maxFileSize}' } : { start: attribute.name.start, end: attribute.name.end, text: 'maxSize' }
 
-          this.lint(attribute.name, 'deprecated-size-limits', '`maxFileSize` of `Chat` is `maxSize` since 1.90, as every size limit is', named ? { help: 'Drop `maxFileSize`, `maxSize` is there' } : { help: 'Write `maxSize`', fixes: [{ title: 'Write `maxSize`', edits: [edit], safe: true }] })
-
-          continue
-        }
-
-        if (name === 'keep')
-          this.lint(attribute.name, 'deprecated-lifetimes', '`keep` of `Chat` is `history` since 1.87: the number of messages each send posts', { help: 'Write `history`', fixes: [{ title: 'Write `history`', edits: [{ start: attribute.name.start, end: attribute.name.end, text: 'history' }], safe: true }] })
-
-        continue
+        this.lint(attribute.name, 'deprecated-size-limits', '`maxFileSize` of `Chat` is `maxSize` since 1.90, as every size limit is', named ? { help: 'Drop `maxFileSize`, `maxSize` is there' } : { help: 'Write `maxSize`', fixes: [{ title: 'Write `maxSize`', edits: [edit], safe: true }] })
       }
-
-      if (attribute.kind === 'boolean')
-        continue
-
-      if (FIELD_TAGS.has(file) && name === 'size') {
-        const value = attribute.kind === 'static' ? attribute.text : this.text(attribute.expression)
-
-        if (NUMBER.test(value))
-          this.lint(attribute.name, 'deprecated-ui-tone', `\`size\` on \`${element.name}\` is a field size since kayjs-ui 1.87, \`sm\`, \`md\` or \`lg\`, not the native character width`, { help: 'width the field with a class, such as `w-[20ch]`' })
-
-        continue
-      }
-
-      const span = attribute.kind === 'static' ? attribute.value : attribute.expression
-      const wanted = (file === 'sparkline' && (name === 'tone' || name === 'tones')) || (file === 'status-strip' && name === 'cells') || (file === 'timeline' && name === 'entries')
-
-      if (!wanted)
-        continue
-
-      const text = this.text(span)
-      const staticFound = text === 'muted' ? [{ start: span.start, end: span.end, text: 'neutral' }] : []
-      const found = attribute.kind === 'static' ? staticFound : [...text.matchAll(file === 'timeline' ? MUTED_TONE : MUTED)].filter(match => file === 'timeline' || !(match[1]!.trim() === ',' && match[3] === ')')).map(match => ({ start: span.start + match.index + (file === 'timeline' ? 0 : match[1]!.length), end: span.start + match.index + match[0].length, text: file === 'timeline' ? `${match[1]}${match[2]}neutral${match[2]}` : `${match[2]}neutral${match[2]}` }))
-
-      for (const edit of found)
-        this.lint(edit, 'deprecated-ui-tone', `the \`muted\` tone of \`${element.name}\` is \`neutral\` since kayjs-ui 1.87`, { help: 'Write `neutral`', fixes: [{ title: 'Write `neutral`', edits: [edit], safe: true }] })
     }
   }
 

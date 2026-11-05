@@ -32,7 +32,7 @@ export interface WorkflowRun<Input, Known extends Events> {
   step: WorkflowStep<Known>
 }
 
-export interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'lostAfter' | 'idlePoll' | 'failedTtl' | 'keepFailed'> {
+export interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'lostAfter' | 'idlePoll' | 'failedTtl'> {
   // Told once, when a worker first takes the run: not for the runs after a sleep, a wait or a retry.
   onStart?: Hook<{ id: string, input: Input }> | undefined
   // Told once the flow function ended, after its last step.
@@ -41,9 +41,7 @@ export interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store
   onRetry?: Hook<{ id: string, input: Input, attempts: number, error: unknown, wait: number }> | undefined
   // Told when the last attempt failed, once the run is kept as failed.
   onError?: Hook<{ id: string, input: Input, attempts: number, error: unknown }> | undefined
-  // Gets a run that failed its last attempt, once it is kept as failed.
-  // @deprecated `onError`, which also gets `attempts` and is told in order with the other hooks; kept until 1.90.
-  onFailed?: ((event: { id: string, input: Input, error: unknown }) => unknown) | undefined
+
 }
 
 export interface StartOptions {
@@ -167,7 +165,7 @@ function needs(store: JobStore, name: string): { [Method in 'update' | 'release'
 // The function runs again from its top each time the run is taken, and each finished step gives its kept result back, so what lies between steps must give the same answer every time. The run is one job of the queue `workflow:<name>` kept under its id, and its results are kept in that job after each step.
 export function workflow<Input = undefined, Known extends Events = Events>(name: string, flow: (run: WorkflowRun<Input, Known>) => unknown, options: WorkflowOptions<Input> = {}): Workflow<Input, Known> {
   const queueName = `${WORKFLOW_PREFIX}${name}`
-  const { onStart, onSuccess, onRetry, onError, onFailed, store: own, ...rest } = options
+  const { onStart, onSuccess, onRetry, onError, store: own, ...rest } = options
   const storeOf = () => own ?? defaultJobStore()
 
   const handler = async (payload: Payload<Input>, signal: AbortSignal, job: JobContext<unknown>, hold: RunHold) => {
@@ -340,9 +338,6 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
     },
     ...onError && {
       onError: ({ payload, attempts, error, context }) => onError({ id: payload.run, input: payload.input, attempts, error, context }),
-    },
-    ...onFailed && {
-      onFailed: ({ payload, error }) => onFailed({ id: payload.run, input: payload.input, error }),
     },
   }, 'workflow')
 

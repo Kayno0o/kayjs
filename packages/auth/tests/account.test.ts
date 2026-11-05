@@ -189,7 +189,7 @@ describe('the profile without pages.profile', () => {
   test('saveProfile throws, as the app asked for a form it did not declare', async () => {
     const { ada } = await registered()
 
-    expect((await ada.fetch('/call/saveProfile', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ bio: 'x' }]) })).status).toBe(500)
+    expect((await ada.fetch('/call/account.saveProfile', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ bio: 'x' }]) })).status).toBe(500)
   })
 })
 
@@ -234,7 +234,7 @@ describe('changing the username', () => {
       throw new Error('connection lost')
     }
 
-    expect((await ada.fetch('/call/changeUsername', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(['carol']) })).status).toBe(500)
+    expect((await ada.fetch('/call/account.changeUsername', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(['carol']) })).status).toBe(500)
   })
 
   test('refuses a device\'s bearer token, which is no session', async () => {
@@ -242,7 +242,7 @@ describe('changing the username', () => {
     const { token } = await ada.callOk('tokens.create', { password: PASSWORD }, 'Phone')
     const device = browser()
 
-    expect(await device.json('/call/changeUsername', { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(['carol']) })).toEqual({ ok: false, error: 'signed-out' })
+    expect(await device.json('/call/account.changeUsername', { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(['carol']) })).toEqual({ ok: false, error: 'signed-out' })
   })
 
   test('shows the new name to the rest of the same request', async () => {
@@ -316,7 +316,7 @@ describe('deleting the account', () => {
       browsers.push(browser)
     }
 
-    expect((await browsers[0]!.fetch('/call/deleteAccount', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }]) })).status).toBe(500)
+    expect((await browsers[0]!.fetch('/call/account.delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }]) })).status).toBe(500)
     expect((await app.store.users.get(ids[0]!))?.roles).toEqual(['admin'])
   })
 
@@ -329,7 +329,7 @@ describe('deleting the account', () => {
       },
     })
 
-    expect((await ada.fetch('/call/deleteAccount', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }]) })).status).toBe(500)
+    expect((await ada.fetch('/call/account.delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }]) })).status).toBe(500)
     expect(await store.users.findByEmail('ada@example.com')).toBeDefined()
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
 

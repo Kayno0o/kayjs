@@ -85,7 +85,7 @@ export interface PrerenderedPage {
   etag: string
   // When `kay build` rendered it, in ms since the epoch.
   renderedAt: number
-  // Seconds after which the server renders it again in the background, from the page's `revalidate` export.
+  // Seconds after which the server renders it again in the background, from the page's `ttl` export.
   revalidate?: number | undefined
   // The `cache-control` it answers everyone with, from the page's `ttl` or `cacheControl`; absent for the default, which has a shared cache ask again each time.
   cacheControl?: string | undefined

@@ -4875,15 +4875,32 @@ describe.concurrent('kay check, s.Public fields', () => {
   })
 })
 
-describe('kay check, deprecated-api-error-answer and deprecated-refusal-message', () => {
-  it('reports .answer of an ApiError with a fix, and refusalMessage with a fix that is not safe', async () => {
-    const root = await scratchProject({ 'src/errors.ts': 'import { ApiError, refusalMessage } from \'kay\'\n\nexport const a = (error: unknown) => error instanceof ApiError ? error.answer : refusalMessage(error, \'No\')\n' })
+describe('kay check, the forms 1.87 deprecated and 1.91 dropped', () => {
+  it('reports each as a type error, not a silent change', async () => {
+    const root = await scratchProject({
+      'src/old.ts': [
+        'import type { ResourceFailure, ResourceStatus, StreamStatus } from \'kay\'',
+        'import { ApiError, refusalMessage } from \'kay\'',
+        'import { notify, queue, workflow } from \'kay/server\'',
+        '',
+        'export const a = queue(\'a\', () => undefined, { onFailed: () => undefined })',
+        'export const e = queue(\'e\', () => undefined, { keepFailed: \'1d\' })',
+        'export const b = workflow(\'b\', () => undefined, { onFailed: () => undefined })',
+        'export const c = notify(\'ada\', { title: \'x\', keep: \'1h\' })',
+        'export const d = (error: ApiError, types: [ResourceFailure, ResourceStatus, StreamStatus]) => [error.answer, refusalMessage(error, \'x\'), types]',
+        '',
+      ].join('\n'),
+      'src/routes/index.kay': '--- server\nexport const page = { prerender: true, revalidate: \'1h\' }\n---\nh1 Home\n',
+    })
 
     try {
-      const found = await check(root)
+      const messages = (await check(root)).map(found => found.message)
 
-      expect(found.filter(d => d.code === 'deprecated-api-error-answer').map(d => [d.fixes?.[0]?.title, d.fixes?.[0]?.safe])).toEqual([['Read `data`', false]])
-      expect(found.filter(d => d.code === 'deprecated-refusal-message').map(d => d.fixes?.[0]?.safe)).toEqual([false])
+      for (const name of ['revalidate', 'onFailed', 'keepFailed', 'keep', 'answer'])
+        expect(messages.some(message => message.includes(`'${name}' does not exist`))).toBe(true)
+
+      for (const name of ['ResourceFailure', 'ResourceStatus', 'StreamStatus', 'refusalMessage'])
+        expect(messages.some(message => message.includes(`'${name}'`))).toBe(true)
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -4942,38 +4959,6 @@ describe('kay check --watch, stopped by a signal', () => {
     }
     finally {
       await watch.stop()
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-})
-
-describe('kay check, deprecated-ui-tone', () => {
-  it('reports a muted tone and --fix writes neutral', async () => {
-    const head = '---\nimport StatusStrip from \'@kaynooo/kayjs-ui/status-strip.kay\'\n---\n'
-    const root = await scratchProject({ 'src/a.kay': `${head}StatusStrip(label="Up" cells={['success', 'muted']})\n` })
-
-    try {
-      expect((await runCheck(root)).output.match(/deprecated-ui-tone/g)).toHaveLength(1)
-      await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/a.kay')).text()).toBe(`${head}StatusStrip(label="Up" cells={['success', 'neutral']})\n`)
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-})
-
-describe('kay check, deprecated-ui-callbacks', () => {
-  it('reports onSelect on a Timeline and --fix writes onSelectedChange', async () => {
-    const head = '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\nlet picked: string | undefined\n---\n'
-    const root = await scratchProject({ 'src/a.kay': `${head}Timeline(label="Day" entries={[]} selected={picked} onSelect={key => picked = key})\n` })
-
-    try {
-      expect((await runCheck(root)).output.match(/deprecated-ui-callbacks/g)).toHaveLength(1)
-      await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/a.kay')).text()).toBe(`${head}Timeline(label="Day" entries={[]} selected={picked} onSelectedChange={key => picked = key})\n`)
-    }
-    finally {
       await rm(root, { recursive: true, force: true })
     }
   })

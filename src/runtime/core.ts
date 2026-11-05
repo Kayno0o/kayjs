@@ -389,7 +389,7 @@ export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
   return promise
 }
 
-// `export const page = { ... }` in a page's server fence; a layout takes `query` as well as `layouts`, `security`, `reload`, `noindex`, `revalidate` and `search`, which apply to the pages under it, and `guards`, which opens its own actions.
+// `export const page = { ... }` in a page's server fence; a layout takes `query` as well as `layouts`, `security`, `reload`, `noindex`, `ttl` and `search`, which apply to the pages under it, and `guards`, which opens its own actions.
 export interface PageSettings {
   // `kay build` renders the page once: `true` for a route without params, else the params of each page to render, as a list, a function returning one, a content collection or a `paginate()` list.
   prerender?: boolean | object
@@ -399,8 +399,7 @@ export interface PageSettings {
   ttl?: Duration
   // What the prerendered page sends as `cache-control` to everyone, in place of the one `ttl` derives or `public, max-age=0, must-revalidate`; `false` sends the default whatever the `ttl`. A page behind a guard, or rendered for one visitor, is `private` whatever this says.
   cacheControl?: string | false
-  // The name `ttl` had before 1.87, still read; `kay upgrade` renames it.
-  revalidate?: Duration
+
   // `false` renders the page, or the layouts below this one, without the layouts above.
   layouts?: false
   // `false` runs none of the `_guard.ts` files above the page, nor above its actions or a layout's: a sign-in page under a guard asking for a session.

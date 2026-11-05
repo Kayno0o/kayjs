@@ -113,9 +113,6 @@ export interface Socket<Send, Receive> extends Source<SocketStatus> {
   close: () => void
 }
 
-/** @deprecated Renamed `ConnectionStatus` in 1.87; the old name works until 1.90, and `kay upgrade` renames it. */
-export type StreamStatus = ConnectionStatus
-
 export interface EventReader<T> extends Source<ConnectionStatus> {
   // The last value received, read reactively; undefined before the first.
   last: () => T | undefined
@@ -264,7 +261,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
 
   const link = connection<T>(() => void read(run!), reconnect, idle)
 
-  const onEvent = (event: string, data: string): StreamStatus | undefined => {
+  const onEvent = (event: string, data: string): ConnectionStatus | undefined => {
     if (event === END_EVENT)
       return 'done'
 
@@ -294,7 +291,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
   }
 
   async function read(controller: AbortController) {
-    let ended: StreamStatus | undefined
+    let ended: ConnectionStatus | undefined
     let failure: ApiError | undefined
 
     try {
@@ -583,17 +580,11 @@ export function stream(module: unknown, path?: string, options?: UrlInput & { me
   return run
 }
 
-/** @deprecated Renamed `LoadStatus` in 1.87; the old name works until 1.90, and `kay upgrade` renames it. */
-export type ResourceStatus = Exclude<LoadStatus, 'idle'>
-
-/** @deprecated Every failure is an `ApiError` since 1.87; the old name works until 1.90, and `kay upgrade` renames it. */
-export type ResourceFailure = ApiError
-
-export interface Resource<T> extends Source<ResourceStatus> {
+export interface Resource<T> extends Source<Exclude<LoadStatus, 'idle'>> {
   // What the route last answered, kept while it is asked again; undefined before the first answer.
   value: () => T | undefined
   // `loading` until the route answers, and again each time it is asked anew; `pending()` also reads a quiet reload that keeps `ready`.
-  status: () => ResourceStatus
+  status: () => Exclude<LoadStatus, 'idle'>
   // Why the last request failed as an `ApiError`, kept while the route is asked again until it answers. `retry()` asks again after a failure only.
   error: () => ApiError | undefined
   // Asks the route again with the same options, until the component that read it is gone, even when it is ready.
@@ -653,7 +644,7 @@ export function resource<Module, const Path extends ResourcePath<Module>>(module
 export function resource<T>(load: (signal: AbortSignal) => T | PromiseLike<T>): Resource<Awaited<T>>
 export function resource(module: unknown, path?: string, options?: UrlInput | (() => UrlInput)): Resource<unknown> {
   const [value, setValue] = ownSignal<unknown>(undefined, { equals: false })
-  const [status, setStatus] = ownSignal<ResourceStatus>('loading')
+  const [status, setStatus] = ownSignal<Exclude<LoadStatus, 'idle'>>('loading')
   const [error, setError] = ownSignal<ApiError | undefined>(undefined)
   const [busy, setBusy] = ownSignal(true)
   let current: AbortController | undefined
@@ -766,15 +757,6 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
 }
 
 export { ApiError }
-
-/** @deprecated Every `ApiError` has a `message` safe to show since 1.87: write `error instanceof ApiError ? error.message : fallback`. The old name works until 1.90. */
-// kept: free
-export function refusalMessage(error: unknown, fallback: string): string {
-  if (!(error instanceof ApiError) || error.status === 0)
-    return fallback
-
-  return 'body' in error ? error.errors[''] ?? fallback : error.message
-}
 
 // The methods a node answers over HTTP, a websocket's left out.
 export type CallMethod<Node> = Exclude<RouteKey<Node>, 'subscribe'>

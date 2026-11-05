@@ -134,11 +134,3 @@ export function refusedFields(schema: unknown, error: Readonly<ValidationError>)
 
   return errors
 }
-
-// Where `api({ errorShape })` keeps the module's choice.
-export const ERROR_SHAPE = Symbol.for('kay.errorShape')
-
-// Whether a module keeps Elysia's own body for refused input.
-export function keepsElysiaShape(instance: object): boolean {
-  return (instance as { [ERROR_SHAPE]?: string })[ERROR_SHAPE] === 'elysia'
-}

@@ -26,7 +26,7 @@ import { timeoutMs } from './config-limits'
 import { cookieJar } from './cookies'
 import { corsAdmits, corsResponse, corsRule, dropOwnGrant, grantedByKay, preflight, varyByOrigin, withCors, withoutOwnGrant } from './cors'
 import { streamReporters } from './event-stream'
-import { ERROR_SHAPE, keepsElysiaShape, refusedFields, validated } from './field-errors'
+import { refusedFields, validated } from './field-errors'
 import { loadGuard, requiredGuards } from './guards'
 import { inRouteReads, LIVE_HEADER, routeProof } from './live'
 import { answeringRequest, statusOf } from './log'
@@ -301,9 +301,8 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
         // After the module's own `onError`, which may answer the error itself.
         .onError(({ request, error, code, set }) => {
           const refused = { request, error, code, set }
-          const shaped = keepsElysiaShape(instance) ? undefined : refusedInput(refused, options)
 
-          return shaped ?? reportThrown(refused, options)
+          return refusedInput(refused, options) ?? reportThrown(refused, options)
         })
 
       letGoOfParent(instance, app)
@@ -739,8 +738,6 @@ export interface ApiOptions {
   rateLimit?: RateLimit | RateLimit[] | undefined
   // Runs none of the guards above the module, as a page's `guards: false` does; read from the `api({ guards: false })` call as written.
   guards?: false | undefined
-  // The body of a 422 for refused input: `'kay'` (the default) answers `{ errors, status }` as an action does, a message per field in the request's locale; `'elysia'` keeps Elysia's own body for clients still parsing it, and goes in 1.90.
-  errorShape?: 'kay' | 'elysia' | undefined
 }
 
 // What a route of an `api()` module reads besides the app's locals: the values the `_guard.ts` files above it handed on, and `ctx.once`.
@@ -767,9 +764,6 @@ export function api<Guarded extends object = object>(options: ApiOptions = {}): 
 
   if (options.rateLimit !== undefined)
     Object.defineProperty(instance, RATE_LIMIT, { value: options.rateLimit })
-
-  if (options.errorShape !== undefined)
-    Object.defineProperty(instance, ERROR_SHAPE, { value: options.errorShape })
 
   const socketRoute = instance.ws.bind(instance) as (path: string, options: SocketOptions) => unknown
 

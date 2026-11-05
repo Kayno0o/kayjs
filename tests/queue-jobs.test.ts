@@ -164,7 +164,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
       }
       const failed: unknown[] = []
       let runs = 0
-      const jobs = queue<number>(named(), () => void runs++, { store, attempts: 3, onFailed: ({ error }) => void failed.push(error) })
+      const jobs = queue<number>(named(), () => void runs++, { store, attempts: 3, onError: ({ error }) => void failed.push(error) })
 
       await jobs.enqueue(1)
       await jobs.drain()
@@ -192,7 +192,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
       const jobs = queue<number>(named(), () => {
         if (++runs <= 10)
           throw retryLater('30s')
-      }, { store: await open(), attempts: 3, onFailed: ({ error }) => void failed.push(error) })
+      }, { store: await open(), attempts: 3, onError: ({ error }) => void failed.push(error) })
       const id = await jobs.enqueue(1, { key: 'k' })
 
       for (let round = 1; round <= 10; round++) {
