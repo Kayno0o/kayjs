@@ -1,4 +1,5 @@
 import type { Diagnostic, KayFile } from './ast'
+import type { Segment } from './browser'
 import type { Node, NodeOfType } from './estree'
 import type { Path } from './scope'
 import { buildProgram, templateExpressions } from './browser'
@@ -57,7 +58,7 @@ export function unownedEffects(file: KayFile, serverNames: string[]): Diagnostic
     const fn = fnPath?.node
     const cause = fnPath && owning(fnPath) ? undefined : fnPath && handlerOf(fnPath, program.segments)
     const afterAwait = awaits.some(found => found.fn === fn && found.at < path.node.start && !elsewhere(found.path, path))
-    const reason = cause ?? (afterAwait ? 'after an `await`, when the component\'s owner is gone' : undefined)
+    const reason = cause?.reason ?? (afterAwait ? 'after an `await`, when the component\'s owner is gone' : undefined)
 
     if (reason === undefined)
       continue
@@ -69,15 +70,16 @@ export function unownedEffects(file: KayFile, serverNames: string[]): Diagnostic
     if (start === undefined || end === undefined)
       continue
 
-    const result = name === 'onCleanup' ? 'its function is dropped and never runs' : 'nothing stops it, so each call adds one that lives until the page goes'
+    const ownerless = name === 'onCleanup' ? 'its function is dropped and never runs' : 'nothing stops it, so each call adds one that lives until the page goes'
+    const result = cause?.perEvent ? 'each event adds one, stopped only when the component goes' : ownerless
 
-    diagnostics.push({ start, end, code: 'unowned-effect', checkOnly: true, message: `\`${name}\` called ${reason}: ${result}`, note: 'only a component\'s script, an effect or a `root` gives what is created in it an owner to stop it', help: 'call it in the component\'s script, or inside `root()` and call the `dispose` it hands over when done' })
+    diagnostics.push({ start, end, code: 'unowned-effect', checkOnly: true, message: `\`${name}\` called ${reason}: ${result}`, note: cause?.perEvent ? 'a handler runs under the component\'s owner, once per event' : 'only a component\'s script, an effect or a `root` gives what is created in it an owner to stop it', help: 'call it in the component\'s script, or inside `root()` and call the `dispose` it hands over when done' })
   }
 
   return diagnostics
 }
 
-function toSource(segments: { generated: number, source: number, length: number }[], generated: number): number | undefined {
+function toSource(segments: Segment[], generated: number): number | undefined {
   const segment = segments.find(candidate => generated >= candidate.generated && generated <= candidate.generated + candidate.length)
 
   return segment && segment.source + generated - segment.generated
@@ -91,9 +93,9 @@ function owning(fn: Path): boolean {
 }
 
 // What the function is when it runs outside its component's setup: an event handler, the handler of a `listen`, a timer or a promise callback.
-function handlerOf(fn: Path, segments: { generated: number, deferred?: boolean | undefined }[]): string | undefined {
-  if (segments.some(segment => segment.deferred && segment.generated === fn.node.start))
-    return 'in an event handler'
+function handlerOf(fn: Path, segments: Segment[]): { reason: string, perEvent: boolean } | undefined {
+  if (segments.some(segment => segment.handler && segment.generated === fn.node.start))
+    return { reason: 'in an event handler', perEvent: true }
 
   const call = fn.parentPath?.node
 
@@ -104,12 +106,12 @@ function handlerOf(fn: Path, segments: { generated: number, deferred?: boolean |
 
   if (callee.type === 'Identifier') {
     if (LATER_CALLS.has(callee.name) && call.arguments[0] === fn.node)
-      return 'in a timer'
+      return { reason: 'in a timer', perEvent: false }
 
-    return importedFromKay(fn.scope, callee) === 'listen' && call.arguments[2] === fn.node ? 'in a `listen` handler, which runs on every event' : undefined
+    return importedFromKay(fn.scope, callee) === 'listen' && call.arguments[2] === fn.node ? { reason: 'in a `listen` handler', perEvent: true } : undefined
   }
 
-  return callee.type === 'MemberExpression' && callee.property.type === 'Identifier' && PROMISE_METHODS.has(callee.property.name) ? 'in a promise callback' : undefined
+  return callee.type === 'MemberExpression' && callee.property.type === 'Identifier' && PROMISE_METHODS.has(callee.property.name) ? { reason: 'in a promise callback', perEvent: false } : undefined
 }
 
 // An `await` in a branch the call is not in, such as the other side of an `if`: it does not come before the call.

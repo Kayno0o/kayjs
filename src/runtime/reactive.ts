@@ -528,12 +528,12 @@ export function memo<T>(fn: () => T, options?: SignalOptions<T>): () => T {
 // Runs `fn` once the current render is done, then again whenever what it read changes; never on the server.
 // kept: free
 // A function `fn` returns runs as its cleanup, as one passed to `onCleanup` does.
-export function effect(fn: () => void | (() => void)): void {
+export function effect(fn: () => void): void {
   createEffect(fn, 'effect')
 }
 
 // `effect` for `api`, which a development warning names, with the start of `named`, when it runs with no owner.
-export function createEffect(fn: () => void | (() => void), api: string, named: (...args: never[]) => unknown = fn): void {
+export function createEffect(fn: () => void, api: string, named: (...args: never[]) => unknown = fn): void {
   if (typeof KAY_BROWSER === 'undefined' && serverRendering > 0)
     return
 
@@ -555,8 +555,8 @@ export function renderEffect(fn: () => void): void {
 
 // Runs once, after the component's markup is in place.
 // kept: free
-export function onMount(fn: () => void | (() => void)): void {
-  effect(() => untrack(fn))
+export function onMount(fn: () => void): void {
+  createEffect(() => untrack(fn), 'onMount', fn)
 }
 
 // Runs when the computation or root it is registered in runs again or goes away.

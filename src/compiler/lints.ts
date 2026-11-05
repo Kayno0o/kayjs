@@ -444,7 +444,7 @@ export const LINTS = {
   'unowned-effect': {
     level: 'warn',
     group: 'islands',
-    summary: '`effect`, `watch`, `every`, `listen`, `debounced`, `onMount` or `onCleanup` called in an event handler, a `listen` handler, a timer or promise callback, or after an `await`: the component\'s owner is not there to stop them, so each call adds an effect that lives until the page goes, and `onCleanup` drops its function. Call them in the component\'s script, or inside `root()`, which hands over the `dispose` to call when done.',
+    summary: '`effect`, `watch`, `every`, `listen`, `debounced`, `onMount` or `onCleanup` called in a timer or promise callback, or after an `await`, where the component\'s owner is gone: nothing stops them, so each call adds an effect that lives until the page goes, and `onCleanup` drops its function. In an inline event handler or a `listen` handler the owner is the component\'s, so each event adds one that is stopped only when the component goes. Call them in the component\'s script, or inside `root()`, which hands over the `dispose` to call when done. Only inline handlers are seen: a named handler, a conditional handler and an `await` inside a loop are not.',
     wrong: '---\nimport { effect, signal } from \'kay\'\n\nconst open = signal(false)\n---\nbutton(onClick={() => effect(() => console.log(open()))}) Log',
     right: '---\nimport { effect, signal } from \'kay\'\n\nconst open = signal(false)\n\neffect(() => console.log(open()))\n---\nbutton(onClick={() => open.set(true)}) Log',
   },

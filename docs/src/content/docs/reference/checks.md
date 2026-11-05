@@ -101,7 +101,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `island-marker` | deny | islands | A `// kay-island` or `// kay-static` comment the component contradicts |
 | `promoted-island` | warn | islands | A static component that renders as an island for the function it passes one, unless `// kay-island` says it is meant |
 | `hydration-mismatch` | deny | islands | An island reading the clock, `Math.random()` or a locale-less `Intl` or `toLocale*String` while it renders, which the server and the browser compute apart; allow a deliberate read with `// kay-allow hydration-mismatch` |
-| `unowned-effect` | warn | islands | `effect`, `watch`, `every`, `listen`, `debounced`, `onMount` or `onCleanup` called in a handler, a timer, a promise callback or after an `await`, where nothing stops them; call them in the component script or inside `root()` |
+| `unowned-effect` | warn | islands | `effect`, `watch`, `every`, `listen`, `debounced`, `onMount` or `onCleanup` called in a timer, a promise callback or after an `await` (nothing stops them), or in an inline handler (each event adds one); call them in the component script or inside `root()`; a named or conditional handler is not seen |
 | `secret-prop` | warn | security | A value handed to an island with a field named like a secret, such as `passwordHash` or `token`, which lands in the page source |
 | `draft-message` | warn | i18n | A message marked `// draft`, which no one has checked yet |
 | `draft-entry` | warn | i18n | An entry marked `# draft`, which no one has checked yet |

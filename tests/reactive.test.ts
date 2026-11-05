@@ -2084,3 +2084,44 @@ describe('a function an effect returns', () => {
     reported.mockRestore()
   })
 })
+
+describe('effect and onMount types', () => {
+  it('still take a callback returning a value or a promise', () => {
+    // Compiled by the type check: a callback returning anything fits `() => void`.
+    const forms = () => {
+      const items: number[] = []
+      let n = 0
+
+      effect(() => items.push(1))
+      effect(() => n += 1)
+      // eslint-disable-next-line ts/no-misused-promises
+      effect(async () => undefined)
+      // eslint-disable-next-line ts/no-misused-promises
+      onMount(async () => undefined)
+      onMount(() => n = 3)
+    }
+
+    expect(forms).toBeTypeOf('function')
+  })
+
+  it('names onMount in the no-owner warning, for each call site', () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    const seen: string[] = []
+
+    onMount(() => void seen.push('firstMount'))
+    onMount(() => void seen.push('secondMount'))
+    expect(warn).toHaveBeenCalledTimes(2)
+    expect(String(warn.mock.calls[0]![0])).toContain('onMount()')
+    expect(String(warn.mock.calls[1]![0])).toContain('secondMount')
+    warn.mockRestore()
+  })
+
+  it('leaves the warnings out of a production bundle of the runtime', async () => {
+    const built = await Bun.build({ entrypoints: [new URL('../src/runtime/reactive.ts', import.meta.url).pathname], minify: true, define: { 'process.env.NODE_ENV': '"production"' }, target: 'browser' })
+    const text = (await Promise.all(built.outputs.map(async output => output.text()))).join('')
+
+    expect(built.success).toBe(true)
+    expect(text).not.toContain('no owner')
+  })
+})

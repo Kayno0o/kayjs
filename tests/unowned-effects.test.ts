@@ -40,6 +40,23 @@ describe('unowned-effect', () => {
     expect(lints('---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst effect = (fn: () => void) => fn()\n---\nbutton(onClick={() => effect(() => count())}) go\n')).toEqual([])
   })
 
+  it('says an event handler adds one per event, where a timer has no owner at all', () => {
+    const messages = (source: string) => compileKay(source, join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.filter(diagnostic => diagnostic.code === 'unowned-effect').map(diagnostic => diagnostic.message)
+
+    expect(messages(page('', 'button(onClick={() => effect(() => count())}) go'))[0]).toContain('each event adds one')
+    expect(messages(page('listen(window, \'keydown\', () => effect(() => count()))'))[0]).toContain('each event adds one')
+    expect(messages(page('setTimeout(() => effect(() => count()), 10)'))[0]).toContain('lives until the page goes')
+  })
+
+  it('leaves alone a ref, which runs once under the component\'s owner', () => {
+    expect(lints(page('', 'div(ref={el => onCleanup(() => el.remove())})'))).toEqual([])
+    expect(lints(page('', 'div(ref={el => effect(() => el.title = String(count()))})'))).toEqual([])
+  })
+
+  it('reaches a `--- client` component too', () => {
+    expect(lints(page('', 'button(onClick={() => effect(() => count())}) go').replace('---\nimport', '--- client\nimport'))).toEqual([['unowned-effect', 'effect']])
+  })
+
   it('is a lint a kay-allow comment and the lint level reach', () => {
     const handler = page('', 'button(onClick={() => effect(() => count())}) go')
 
