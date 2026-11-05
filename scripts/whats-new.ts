@@ -240,7 +240,8 @@ export async function releasePages(read: (path: string) => string, version: stri
     pages.set(archive, trimArchive(capped.archive))
     index = indexArchive(index, archive, trimArchive(capped.archive))
 
-    const texts = new Map(linking.map(path => [path, pages.get(path) ?? read(path)] as const))
+    // The pages an earlier archive already rewrote are relinked too, as the release notes link the upgrading sections this move takes.
+    const texts = new Map([...pages, ...linking.map(path => [path, pages.get(path) ?? read(path)] as const)])
 
     texts.set(page, capped.page)
     texts.set(archive, pages.get(archive)!)
