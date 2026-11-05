@@ -29,7 +29,7 @@ export interface RegisterErrors {
   username?: UsernameProblem | 'taken' | undefined
 }
 
-// `signedIn` is false, with no user, when the app wants the address verified first: the same answer whether the address was free or held, its holder mailed instead. `closed` with `signUp: false`.
+// `signedIn` is false, with no user, when the app wants the address verified first: the same answer whether the address was free or held, its holder mailed instead. `off` with `signUp: false`.
 export type RegisterResult = { ok: true, user: BareUser, signedIn: true } | { ok: true, signedIn: false } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' | 'captcha' | 'off' }
 
 export interface CreateUserInput {

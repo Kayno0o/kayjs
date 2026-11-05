@@ -38,7 +38,27 @@ describe('deprecated-auth-options', () => {
       expect(await Bun.file(join(root, 'kay.config.ts')).text()).toBe('import { auth } from \'@kaynooo/kayjs-auth/pages\'\n\nauth({\n  // kept\n  twoFactor: { require: \'admin\' },\n  magicLink: false,\n})\nauth({ oauthServer: true })\n')
       expect(await Bun.file(join(root, 'src/plain.ts')).text()).toBe('import { createAuth } from \'@kaynooo/kayjs-auth\'\n\nexport const a = createAuth({ store, sessions, pages: true })\nexport const b = createAuth({ store })\n')
       expect(await Bun.file(join(root, 'src/own.ts')).text()).toBe(own)
-      expect(await Bun.file(join(root, 'src/routes/fence.kay')).text()).toBe('--- server\nimport { auth } from \'@kaynooo/kayjs-auth/pages\'\nexport const a = auth({  })\n---\np x\n')
+      expect(await Bun.file(join(root, 'src/routes/fence.kay')).text()).toBe('--- server\nimport { auth } from \'@kaynooo/kayjs-auth/pages\'\nexport const a = auth()\n---\np x\n')
+      expect(await deprecatedAuthOptions(root, {})).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves clean commas on one line, under an alias and through a namespace', async () => {
+    const files: Record<string, [string, string]> = {
+      'src/a.ts': ['import { auth as kayAuth } from \'@kaynooo/kayjs-auth/pages\'\n\nkayAuth({ password: true })\nkayAuth({ password: true, twoFactor: true, signUp: false })\nkayAuth({ signUp: false, password: true, magicLink: true })\nkayAuth({ signUp: false, password: true, magicLink: true, oauthServer: true })\n', 'import { auth as kayAuth } from \'@kaynooo/kayjs-auth/pages\'\n\nkayAuth()\nkayAuth({ signUp: false })\nkayAuth({ signUp: false })\nkayAuth({ signUp: false, oauthServer: true })\n'],
+      'src/b.ts': ['import * as lib from \'@kaynooo/kayjs-auth\'\n\nexport const a = lib.createAuth({ store, signUp: true })\nexport const b = lib.createAuth({ signUp: true, store, password: true })\n', 'import * as lib from \'@kaynooo/kayjs-auth\'\n\nexport const a = lib.createAuth({ store })\nexport const b = lib.createAuth({ store })\n'],
+    }
+    const root = await project(Object.fromEntries(Object.entries(files).map(([path, [before]]) => [path, before])))
+
+    try {
+      await applySafeFixes(root, await deprecatedAuthOptions(root, {}))
+
+      for (const [path, [, after]] of Object.entries(files))
+        expect(await Bun.file(join(root, path)).text()).toBe(after)
+
       expect(await deprecatedAuthOptions(root, {})).toEqual([])
     }
     finally {

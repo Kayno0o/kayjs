@@ -65,16 +65,47 @@ export async function deprecatedAuthOptions(root: string, options: CheckOptions)
           if (given?.type !== 'ObjectExpression')
             continue
 
-          for (const property of given.properties.filter(isPlain)) {
+          const properties = given.properties
+          const isOld = (property: ObjectExpression['properties'][number]) => {
+            if (!isPlain(property))
+              return false
+
             const key = keyName(property)
             const value = unwrapped(property.value)
 
-            if (key === undefined || !keys.includes(key) || value.type !== 'Literal' || value.value !== true)
-              continue
+            return key !== undefined && keys.includes(key) && value.type === 'Literal' && value.value === true
+          }
+          const old = properties.filter(isOld) as ObjectProperty[]
+          const everything = old.length === properties.length && node.arguments.length === 1
+          const aloneOnLine = (property: ObjectProperty) => removal(text, property).start === text.lastIndexOf('\n', property.start - 1) + 1
 
-            const { start, end } = removal(text, property)
+          for (const property of old) {
+            let edit: { start: number, end: number } | null
 
-            report(base + property.start, base + property.end, `\`${key}: true\` restates what kayjs-auth does by default, so a feature on by default is switched off with \`false\` or tuned with an object, and \`true\` is left out; the old form works until 1.93`, `drop \`${key}: true\``, [{ start: base + start, end: base + end, text: '' }])
+            if (everything) {
+              edit = property === old[0] ? { start: node.arguments[0]!.start, end: node.arguments[0]!.end } : null
+            }
+            else if (aloneOnLine(property)) {
+              edit = removal(text, property)
+            }
+            else {
+              const index = properties.indexOf(property)
+              const run = properties.slice(0, index).reverse().findIndex(before => !isOld(before) || aloneOnLine(before as ObjectProperty))
+              const first = index - (run === -1 ? index : run)
+              const next = properties[index + 1]
+
+              // A run of dropped properties on one line goes at its last member, with the comma that joined it to what stays.
+              if (next !== undefined && isOld(next) && !aloneOnLine(next as ObjectProperty))
+                edit = null
+              else if (next !== undefined)
+                edit = { start: properties[first]!.start, end: next.start }
+              else
+                edit = first > 0 ? { start: properties[first - 1]!.end, end: property.end } : removal(text, property)
+            }
+
+            const key = keyName(property)
+
+            report(base + property.start, base + property.end, `\`${key}: true\` restates what kayjs-auth does by default, so a feature on by default is switched off with \`false\` or tuned with an object, and \`true\` is left out; the old form works until 1.93`, `drop \`${key}: true\``, edit && [{ start: base + edit.start, end: base + edit.end, text: '' }])
           }
         }
       })
