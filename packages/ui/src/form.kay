@@ -1,19 +1,22 @@
 --- <Output>
 import type { Action, Answer, FailureData, JSX, Success } from 'kay'
 import { recipe, signal } from 'kay'
-import { callAction, formIssues, showIssues } from './forms'
+import type { FormValidation } from './forms'
+import { callAction, checkSchema, formIssues, leftField, showIssues } from './forms'
 import { toast } from './toast'
 import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-form-grid' } })
 
-const { action, refused, saved, onSaved, onError, failureLabel, ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'onSubmit' | 'onError'> & {
+const { action, refused, saved, onSaved, onError, failureLabel, validate = false, ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'onSubmit' | 'onFocusOut' | 'onError'> & {
   // The page's action the form calls with its fields, which posts it as a plain form without JavaScript: the messages it refuses a field with show on the FormField of that `name`, and the first invalid field takes the focus.
   action: Action<never, Output>
   // Toasted when the call fails other than on a field.
   failureLabel?: string | undefined
   // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: a message per field, each shown on its FormField, or one message, toasted. Without it, or when it answers undefined or an empty message, `failureLabel` is toasted.
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
+  // Checks the fields against the action's schema in the browser, as the server would, with the same messages shown on their FormField: `'submit'` when the form is sent, with nothing called while a field is refused, `'blur'` also each field as it loses focus; `false` (the default) leaves it to the server. Files and missing required fields are the server's.
+  validate?: FormValidation
   // Toasted as a success once the action has run.
   saved?: string | undefined
   // What the action returned, for the page to patch into what it shows.
@@ -34,7 +37,12 @@ async function submit(event: SubmitEvent) {
   if (action.pending() || !form)
     return
 
-  const done = await callAction(form, action, issues, failureLabel ?? wording('ui.form.failure', 'Could not save.'), refused, onError)
+  const failure = failureLabel ?? wording('ui.form.failure', 'Could not save.')
+
+  if (validate !== false && !(await checkSchema(form, action, issues, failure)))
+    return
+
+  const done = await callAction(form, action, issues, failure, refused, onError)
 
   if (!done)
     return
@@ -47,6 +55,13 @@ async function submit(event: SubmitEvent) {
 
   onSaved?.(done.result)
 }
+
+async function leave(event: FocusEvent) {
+  const field = leftField(event)
+
+  if (validate === 'blur' && form && field !== undefined)
+    await checkSchema(form, action, issues, '', field)
+}
 ---
-form(part="root" {...rest} action={action} ref={element => form = element} onSubmit={submit})
+form(part="root" {...rest} action={action} ref={element => form = element} onSubmit={submit} onFocusOut={leave})
   slot

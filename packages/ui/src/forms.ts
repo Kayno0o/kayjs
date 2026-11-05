@@ -1,5 +1,5 @@
 import type { Action, Answer, FailureData, Signal, Success } from 'kay'
-import { ActionError, createContext, describeField, effect, focusInvalid, formErrors, markInvalid, uid } from 'kay'
+import { ActionError, createContext, describeField, effect, focusInvalid, formErrors, markInvalid, uid, untrack } from 'kay'
 import { liveElements } from './field-look'
 import { answerMessage } from './internal/answer-message'
 import { toast } from './toast'
@@ -182,21 +182,65 @@ export async function callAction<Output>(form: HTMLFormElement, action: Action<n
     const read = error instanceof ActionError && error.data !== undefined ? refused?.(error.data as FailureData<Output>) : undefined
     // As in `attempt`, a `refused` saying nothing leaves the words of the data itself.
     const said = read === undefined || read === '' ? answerMessage(error instanceof ActionError ? error.data : undefined) : read
-    const byField = { ...error instanceof ActionError ? error.errors : {}, ...messagesOf(said) }
-    const messages = Object.entries(byField)
-    const shown = (name: string) => [...form.querySelectorAll('[data-field]')].some(field => field.getAttribute('data-field') === name)
 
-    issues.set(byField)
-    await showIssues(form, byField)
-
-    // A message no FormField shows, such as a limit or a refusal of the whole form under the empty name, is toasted rather than lost; a failure carrying none toasts the page's own message.
-    for (const message of messages.length === 0 ? [failure] : messages.filter(([name]) => !shown(name)).map(([, message]) => message))
-      toast.error(message)
-
-    // Each FormField marks its control invalid as its message renders; the first one takes the focus, so the message is read with it.
-    await focusInvalid(form)
+    await refuse(form, { ...error instanceof ActionError ? error.errors : {}, ...messagesOf(said) }, issues, failure)
 
     return undefined
+  }
+}
+
+// Shows a refusal: the messages go to the FormFields, a message no FormField shows (a limit, or a refusal of the whole form under the empty name) is toasted rather than lost, a refusal carrying none toasts `failure`, and the first invalid field takes the focus.
+async function refuse(form: HTMLFormElement, byField: Record<string, string>, issues: Signal<Record<string, string>>, failure: string): Promise<void> {
+  const messages = Object.entries(byField)
+  const shown = (name: string) => [...form.querySelectorAll('[data-field]')].some(field => field.getAttribute('data-field') === name)
+
+  issues.set(byField)
+  await showIssues(form, byField)
+
+  for (const message of messages.length === 0 ? [failure] : messages.filter(([name]) => !shown(name)).map(([, message]) => message))
+    toast.error(message)
+
+  // Each FormField marks its control invalid as its message renders; the first one takes the focus, so the message is read with it.
+  await focusInvalid(form)
+}
+
+// What `checkSchema` asks of an action: `validate` and the errors of `failed()`.
+interface Validating {
+  validate: (form: HTMLFormElement, field?: string) => Promise<boolean>
+  failed: () => { errors: object } | undefined
+}
+
+// What a form's `validate` is: `'submit'` checks the fields against the action's schema when the form is sent, `'blur'` also each field as it loses focus, `false` leaves it to the server.
+export type FormValidation = 'blur' | 'submit' | false | undefined
+
+// The name of the field a focus left, none for a button or a control without one.
+export function leftField(event: FocusEvent): string | undefined {
+  const control = event.target
+
+  return (control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement) && control.name !== '' ? control.name : undefined
+}
+
+// Checks the form against the action's schema in the browser, as the server would, and puts the messages where a refusal's go. Sent, a refusal shows as a call's does and nothing is called; with a `field`, the one that lost focus, only its message changes and the focus stays. True when what was checked is accepted.
+export async function checkSchema(form: HTMLFormElement, action: Validating, issues: Signal<Record<string, string>>, failure: string, field?: string): Promise<boolean> {
+  try {
+    const accepted = await action.validate(form, field)
+    const errors = { ...untrack(action.failed)?.errors } as Record<string, string>
+
+    if (field === undefined && !accepted) {
+      await refuse(form, errors, issues, failure)
+    }
+    else {
+      issues.set(errors)
+      await showIssues(form, errors)
+    }
+
+    return accepted
+  }
+  catch (error) {
+    // A check that cannot run leaves the form to the server.
+    console.error('kayjs-ui: the form could not be checked', error)
+
+    return true
   }
 }
 

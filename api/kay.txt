@@ -17,6 +17,7 @@ interface Action<Input, Output, Honeypot extends string = never>
   succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
   track: (options?: undefined | { queue?: CallQueue | undefined; }) => TrackedCall<Input, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
   url: string
+  validate: (form: HTMLFormElement, field?: Extract<keyof Input, string> | undefined) => Promise<boolean>
   with: (fields: Partial<Input>) => Action<Input, Output, Honeypot>
 
 [.] ActionContext
@@ -1122,6 +1123,7 @@ interface ServerAction<Schema extends TSchema, Output, Honeypot extends string =
   params: [];
 })["static"]>, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
   url: string
+  validate: (form: HTMLFormElement, field?: Extract<keyof Sendable<(Schema & { params: []; })["static"]>, string> | undefined) => Promise<boolean>
   with: (fields: Partial<Sendable<(Schema & { params: []; })["static"]>>) => Action<Sendable<(Schema & { params: []; })["static"]>, Output, Honeypot>
 
 [.] ServerOfModule

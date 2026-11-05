@@ -1,0 +1,34 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const claim = action(t.Object({
+  handle: t.String({ minLength: 3, maxLength: 40, error: 'Three letters at least' }),
+  nick: t.String({ minLength: 3, maxLength: 40, error: '<img src=x onerror=alert(1)>' }),
+}), () => 'ok')
+---
+---
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Form from '@kaynooo/kayjs-ui/form.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+---
+main
+  Form(action={claim} id="blur" validate="blur" saved="Added.")
+    FormField(label="Handle" name="handle")
+      input#blur-handle(name="handle" value="abc")
+    FormField(label="Nick" name="nick")
+      input#blur-nick(name="nick" value="abc")
+    button#blur-submit Claim
+  Form(action={claim} id="submit" validate="submit" saved="Added.")
+    FormField(label="Handle" name="handle")
+      input#submit-handle(name="handle" value="abc")
+    FormField(label="Nick" name="nick")
+      input#submit-nick(name="nick" value="abc")
+    button#submit-submit Claim
+  Form(action={claim} id="off" saved="Added.")
+    FormField(label="Handle" name="handle")
+      input#off-handle(name="handle" value="abc")
+    FormField(label="Nick" name="nick")
+      input#off-nick(name="nick" value="abc")
+    button#off-submit Claim
+  Toaster

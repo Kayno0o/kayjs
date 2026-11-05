@@ -378,6 +378,9 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   // The message a refused post got for one field, or for the whole form under ''; a method, so any action still passes where `Action<never, unknown>` is expected.
   // eslint-disable-next-line ts/method-signature-style
   error(field?: Extract<keyof Input, string> | Honeypot | ''): string | undefined
+  // Checks a form in the browser against this action's schema, as the server would, writing what it refuses into `error(field)` (and `failed()`) in place of the last outcome: every field, or `field` alone, the other fields' messages kept. Resolves whether the checked fields are accepted. Nothing is posted and no bubble shows; a page whose forms hold no schema for the action accepts all.
+  // eslint-disable-next-line ts/method-signature-style
+  validate(form: HTMLFormElement, field?: Extract<keyof Input, string>): Promise<boolean>
   // Whether `error` is a call to this action the server refused, its `data` typed as the handler passes it to `ctx.fail`.
   // eslint-disable-next-line ts/method-signature-style
   refused(error: unknown): error is ActionError<FailureData<Output>>

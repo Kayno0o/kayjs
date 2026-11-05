@@ -46,28 +46,9 @@ export function checkForm(form: HTMLFormElement, action: string): boolean {
   if (!rules)
     return true
 
-  const data = new FormData(form)
-  const body: Record<string, unknown> = {}
-
-  for (const name of new Set(data.keys())) {
-    const values = data.getAll(name)
-
-    body[name] = values.length === 1 ? values[0] : values
-  }
-
-  const fields = formInput(rules as unknown as TSchema, body) as Record<string, unknown>
   let valid = true
 
-  for (const [name, field] of Object.entries(rules.properties)) {
-    const control = controlOf(form, name)
-
-    // A file is checked by its bytes, and a hidden field's message would show nowhere: both are the server's.
-    if (!control || (control instanceof HTMLInputElement && (control.type === 'file' || control.type === 'hidden')))
-      continue
-
-    const value = fields[name]
-    const message = value === undefined ? undefined : fieldMessage(name, field, value)
-
+  for (const { control, message } of checked(form, rules)) {
     control.setCustomValidity(message ?? '')
 
     if (message !== undefined) {
@@ -80,6 +61,52 @@ export function checkForm(form: HTMLFormElement, action: string): boolean {
     HTMLFormElement.prototype.reportValidity.call(form)
 
   return valid
+}
+
+// The messages the schema of the action at `action` refuses the fields of a form with, by field name, none for a field it accepts: all the fields, or `only` alone. Undefined when the page holds no schema for the action. Nothing is reported on the form, for a page to show the messages itself.
+export function fieldMessages(form: HTMLFormElement, action: string, only?: string): Record<string, string> | undefined {
+  const rules = formRules(action)
+
+  if (!rules)
+    return undefined
+
+  const messages: Record<string, string> = {}
+
+  for (const { name, message } of checked(form, rules, only)) {
+    if (message !== undefined)
+      messages[name] = message
+  }
+
+  return messages
+}
+
+// Each field of the form the check reaches, with the control the message is shown on and the message it is refused with, undefined for a field it accepts.
+function checked(form: HTMLFormElement, rules: FormRules, only?: string): { name: string, control: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, message: string | undefined }[] {
+  const data = new FormData(form)
+  const body: Record<string, unknown> = {}
+
+  for (const name of new Set(data.keys())) {
+    const values = data.getAll(name)
+
+    body[name] = values.length === 1 ? values[0] : values
+  }
+
+  const fields = formInput(rules as unknown as TSchema, body) as Record<string, unknown>
+  const found = []
+
+  for (const [name, field] of Object.entries(rules.properties)) {
+    const control = controlOf(form, name)
+
+    // A file is checked by its bytes, and a hidden field's message would show nowhere: both are the server's.
+    if ((only !== undefined && only !== name) || !control || (control instanceof HTMLInputElement && (control.type === 'file' || control.type === 'hidden')))
+      continue
+
+    const value = fields[name]
+
+    found.push({ name, control, message: value === undefined ? undefined : fieldMessage(name, field, value) })
+  }
+
+  return found
 }
 
 function formRules(action: string): FormRules | undefined {

@@ -1916,3 +1916,93 @@ inBrowser('the FormFields a static page gives a Form, SaveForm or FormDialog as 
     expect(page.errors).toEqual([])
   }, 120_000)
 })
+
+inBrowser('a Form checking its fields against the action\'s schema', () => {
+  const calls = async (page: { route: (match: (url: URL) => boolean, handler: (request: { continue: () => Promise<void> }) => Promise<void>) => Promise<void> }) => {
+    const seen = { count: 0 }
+
+    await page.route(url => url.pathname.includes('/_kay/action/'), async (request) => {
+      seen.count++
+      await request.continue()
+    })
+
+    return seen
+  }
+  const message = (page: { evaluate: <T, Args extends unknown[]>(run: (...args: Args) => T, ...args: Args) => Promise<T> }, form: string, name: string) => page.evaluate((within: string, field: string) => [...document.querySelectorAll(`#${within} [data-field="${field}"] > *`)].map(found => found.textContent), form, name)
+
+  test('with validate="blur" shows a field\'s message as it loses focus and takes it away once fixed, calling nothing', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/form-validate')
+    const seen = await calls(page)
+
+    await page.fill('#blur-handle', 'ab')
+    await page.press('Tab')
+    await page.waitFor('#blur [data-field="handle"] [data-part="issue"]', { text: 'Three letters at least' })
+    expect(await page.evaluate(() => [document.getElementById('blur-handle')!.getAttribute('aria-invalid'), document.getElementById('blur-nick')!.getAttribute('aria-invalid')])).toEqual(['true', null])
+
+    await page.fill('#blur-handle', 'abc')
+    await page.press('Tab')
+    await page.waitUntil(() => document.querySelectorAll('#blur [data-part="issue"]').length === 0)
+    expect(await page.evaluate(() => document.getElementById('blur-handle')!.getAttribute('aria-invalid'))).toBeNull()
+    expect([seen.count, page.errors]).toEqual([0, []])
+  }, 120_000)
+
+  test('with validate="submit" refuses a send without calling the action, shows every message as text and focuses the first field', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/form-validate')
+    const seen = await calls(page)
+
+    await page.fill('#submit-handle', 'ab')
+    await page.fill('#submit-nick', 'cd')
+    await page.click('#submit-submit')
+    await page.waitFor('#submit [data-field="nick"] [data-part="issue"]')
+    expect([await message(page, 'submit', 'handle'), await message(page, 'submit', 'nick')]).toEqual([['Three letters at least'], ['<img src=x onerror=alert(1)>']])
+    expect(await page.evaluate(() => [document.activeElement?.id, document.querySelectorAll('#submit img').length])).toEqual(['submit-handle', 0])
+    expect(seen.count).toBe(0)
+
+    await page.fill('#submit-handle', 'abc')
+    await page.fill('#submit-nick', 'cde')
+    await page.click('#submit-submit')
+    await page.waitFor('.kui-toast [data-part=message]', { text: 'Added.' })
+    expect([seen.count, await message(page, 'submit', 'handle'), page.errors]).toEqual([1, [], []])
+  }, 120_000)
+
+  test('by default calls the action and leaves the check to the server', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/form-validate')
+    const seen = await calls(page)
+
+    await page.fill('#off-handle', 'ab')
+    await page.click('#off-submit')
+    await page.waitFor('#off [data-field="handle"] [data-part="issue"]', { text: 'Three letters at least' })
+    expect([seen.count, page.errors]).toEqual([1, []])
+  }, 120_000)
+
+  test('a FormDialog checks before it calls the action', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/form-validate-dialog')
+    const seen = await calls(page)
+
+    await page.click('#open')
+    await page.waitFor('#handle')
+    await page.click('button[type="submit"]')
+    await page.waitFor('[data-field="handle"] [data-part="issue"]', { text: 'Three letters at least' })
+    expect([seen.count, await page.evaluate(() => document.querySelector('dialog[open]') !== null), page.errors]).toEqual([0, true, []])
+  }, 120_000)
+
+  test('a SaveForm checks before it asks its question', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/form-validate-save')
+    const seen = await calls(page)
+
+    await page.fill('#handle', 'ab')
+    await page.click('button[type="submit"]')
+    await page.waitFor('[data-field="handle"] [data-part="issue"]', { text: 'Three letters at least' })
+    expect([await page.evaluate(() => document.querySelector('dialog[open]')), seen.count, page.errors]).toEqual([null, 0, []])
+  }, 120_000)
+})

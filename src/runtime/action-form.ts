@@ -97,6 +97,10 @@ export function formScope<Result>(target: unknown, render: () => Result, only = 
   if (only && !isAction(target))
     return render()
 
+  // A component given the action, such as a SaveForm that calls it, has the page carry its schema too, for `action.validate`.
+  if (only && isAction(target))
+    renderedForms?.add(target)
+
   enclosing.push(target)
 
   try {

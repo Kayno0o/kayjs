@@ -1445,6 +1445,7 @@ component default
   size?: OverlaySize | undefined
   submitLabel: string
   title: string
+  validate?: FormValidation
 
 [./form-field.kay] default
 component default
@@ -1480,6 +1481,7 @@ component default
   onSaved?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   saved?: string | undefined
+  validate?: FormValidation
 
 [./hover-card.kay] default
 component default
@@ -2147,6 +2149,7 @@ component default
   savingLabel?: string | undefined
   shortcut?: false | string | undefined
   status?: string | undefined
+  validate?: FormValidation
 
 [./scatter-chart.kay] default
 component default

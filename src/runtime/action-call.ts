@@ -7,7 +7,7 @@ import { withFields } from './action-form'
 import { closeWithCaller, onStreamEnd, SETTLED } from './action-owner'
 import { ACTION } from './action-shared'
 import { actionFailed, apiErrorOf, messageOf } from './api-error'
-import { withBase } from './base'
+import { withBase, withoutBase } from './base'
 import { skew } from './build'
 import { trackCalls, whenIdle } from './call-result'
 import { durationSeconds, isZeroDuration } from './duration'
@@ -400,6 +400,20 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
         return found?.succeeded ? { data: found.data } : undefined
       }),
       error: read((field = '') => failed()?.errors[field]),
+      validate: read(async (form: HTMLFormElement, field?: string) => {
+        const { fieldMessages } = await import('./validate')
+        const found = fieldMessages(form, withoutBase(url()), field)
+
+        if (found === undefined)
+          return true
+
+        // One field checked replaces that field's message and leaves the others.
+        const errors = field === undefined ? found : { ...Object.fromEntries(Object.entries(untrack(failed)?.errors ?? {}).filter(([name]) => name !== field)), ...found }
+
+        called(navigation.page, Object.keys(errors).length === 0 ? null : { action: url(), status: 422, values: {}, errors, data: undefined })
+
+        return field === undefined ? Object.keys(found).length === 0 : found[field] === undefined
+      }),
       refused: read((error: unknown) => error instanceof ActionError && refusedAt.get(error) === url()),
       track: read((handle?: { queue?: CallQueue }) => {
         const lane: Lane = { tail: Promise.resolve(), queue: handle?.queue }

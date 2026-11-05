@@ -3,14 +3,15 @@ import type { Action, Answer, FailureData, JSX, Snippet, Success } from 'kay'
 import { effect, recipe, signal, uid } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
-import { callAction, formIssues, showIssues } from './forms'
+import type { FormValidation } from './forms'
+import { callAction, checkSchema, formIssues, leftField, showIssues } from './forms'
 import type { OverlaySize } from './overlay'
 import { wording } from 'kay/words'
 
 
 const look = recipe({ parts: { root: '', footer: 'flex w-full flex-wrap items-center gap-2', actions: 'ml-auto flex flex-wrap justify-end gap-2', form: 'kui-form-grid' } })
 
-const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failureLabel, failure, refused, onSaved, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'id' | 'onClose' | 'onInput' | 'onError' | 'closedby' | 'closedBy' | 'children'> & {
+const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failureLabel, failure, validate = false, refused, onSaved, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'id' | 'onClose' | 'onInput' | 'onError' | 'closedby' | 'closedBy' | 'children'> & {
   // Shows the dialog; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -26,6 +27,8 @@ const { open, title, heading, action, submitLabel, savingLabel = wording('ui.for
   failureLabel?: string | undefined
   // Deprecated: `failureLabel`. Works until 1.93.
   failure?: string | undefined
+  // Checks the fields against the action's schema in the browser, as the server would, with the same messages shown on their FormField: `'submit'` when the form is sent, with nothing called while a field is refused, `'blur'` also each field as it loses focus; `false` (the default) leaves it to the server.
+  validate?: FormValidation
   // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: a message per field, each shown on its FormField, or one message, toasted. Without it, or when it answers undefined or an empty message, `failureLabel` is toasted.
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   // What the action returned, for the page to patch into what it shows. The dialog closes once it has run.
@@ -75,7 +78,12 @@ async function submit(event: SubmitEvent) {
   if (action.pending() || !form)
     return
 
-  const done = await callAction(form, action, issues, failureLabel ?? failure ?? wording('ui.formDialog.failure', 'Could not save.'), refused, onError)
+  const failureText = failureLabel ?? failure ?? wording('ui.formDialog.failure', 'Could not save.')
+
+  if (validate !== false && !(await checkSchema(form, action, issues, failureText)))
+    return
+
+  const done = await callAction(form, action, issues, failureText, refused, onError)
 
   if (!done)
     return
@@ -83,6 +91,13 @@ async function submit(event: SubmitEvent) {
   // Outside the call's `try`, so a page failing to patch the saved result in surfaces as the bug it is rather than as a refused save.
   onSaved?.(done.result)
   onOpenChange(false)
+}
+
+async function leave(event: FocusEvent) {
+  const field = leftField(event)
+
+  if (validate === 'blur' && form && field !== undefined)
+    await checkSchema(form, action, issues, '', field)
 }
 
 // Enter in a single-line field submits on its own; a textarea keeps Enter for new lines and takes Ctrl+Enter. The method is called through the prototype, as a control named `requestSubmit` takes its place on the form.
@@ -102,5 +117,5 @@ Dialog({...rest} open={open} title={title} heading={heading} size={size} level={
       div(part="actions")
         Button(label={cancelLabel} disabled={action.pending()} onClick={() => onOpenChange(false)})
         Button(label={action.pending() ? savingLabel : submitLabel} type="submit" form={formId} tone="accent" busy={action.pending()} disabled={action.pending()})
-  form(part="form" id={formId} ref={element => form = element} onSubmit={submit} onKeyDown={submitOnCtrlEnter})
+  form(part="form" id={formId} ref={element => form = element} onSubmit={submit} onFocusOut={leave} onKeyDown={submitOnCtrlEnter})
     slot

@@ -23,6 +23,10 @@ Form(action={add} saved="Added.")
 
 Without JavaScript the form posts to the action as any `form(action={add})` does, and the page comes back with the messages in place. With JavaScript it calls the action, so the page does not reload. The fields can be the page's own markup: after a call made with JavaScript the form writes each message into the FormField of that `name`, links it to the control, marks the control invalid and focuses the first one, with no island of yours.
 
+## Checking as you type
+
+`validate="submit"` checks the fields against the action's schema when the form is sent: a refused field shows its message with the same words the server would give, the first one takes the focus and the action is not called. `validate="blur"` also checks each field as it loses focus, and the message goes once the value is fixed. By default the check is the server's. Files and missing fields are always the server's.
+
 ## Saving
 
 A refused field shows its message on its FormField and takes the focus. Any other message is toasted, and `refused` words a handler's refusals, as in a [FormDialog](/ui/form-dialog). A failure carrying no message toasts `failureLabel`.

@@ -1059,6 +1059,9 @@ function callAction<Output>(form: HTMLFormElement, action: Action<never, Output,
   result: Answer<Success<Output>>;
 }>
 
+[./lib/forms] checkSchema
+function checkSchema(form: HTMLFormElement, action: Validating, issues: Signal<Record<string, string>>, failure: string, field?: string | undefined): Promise<boolean>
+
 [./lib/forms] CONTROL
 const CONTROL: "input:not([type=\"hidden\"]), select, textarea, button, [contenteditable], [tabindex]"
 
@@ -1083,6 +1086,12 @@ function fieldsOf(frame: string): HTMLElement[]
 
 [./lib/forms] formIssues
 const formIssues: Context<(() => Record<string, string>) | undefined>
+
+[./lib/forms] FormValidation
+type FormValidation = 'blur' | 'submit' | false | undefined
+
+[./lib/forms] leftField
+function leftField(event: FocusEvent): string | undefined
 
 [./lib/forms] showIssues
 function showIssues(form: HTMLFormElement, byField: Record<string, string>): Promise<void>
