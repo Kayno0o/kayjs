@@ -1,3 +1,5 @@
+import type { NewTab } from './outside'
+
 // One row of a BarList.
 export interface BarListRow {
   key: string | number
@@ -7,6 +9,8 @@ export interface BarListRow {
   display?: string
   // Makes the label a link to it, which a row's `onSelect` then leaves alone.
   href?: string
+  // Opens the link in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
+  newTab?: NewTab | undefined
 }
 
 // One dot of a `ScatterChart`.

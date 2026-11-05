@@ -1,6 +1,7 @@
 --- <Key extends string | number>
 import type { JSX } from 'kay'
 import type { TimelineEntry } from './timeline'
+import { tabOf } from './outside'
 import { effect, recipe, signal } from 'kay'
 import Icon from './icon.kay'
 
@@ -48,7 +49,7 @@ ol(part="root" {...rest} aria-label={label})
   for entry of entries key={entry.key}
     li(part="item" data-tone={entry.tone})
       if entry.href !== undefined
-        a(part="entry" href={entry.href} aria-current={picked() === entry.key ? 'true' : undefined})
+        a(part="entry" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={picked() === entry.key ? 'true' : undefined})
           span(part="time") {entry.time}
           if entry.icon
             Icon(icon={entry.icon} part="icon")

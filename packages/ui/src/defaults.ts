@@ -1,4 +1,5 @@
 import type { IconProps } from 'kay/icons'
+import type { NewTab } from './outside'
 import alert from '~icons/tabler/alert-triangle'
 import back from '~icons/tabler/arrow-left'
 import send from '~icons/tabler/arrow-up'
@@ -33,6 +34,8 @@ export interface NavLink {
   label: string
   icon?: IconSlot | IconProps | undefined
   children?: readonly NavLink[] | undefined
+  // Opens the link in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
+  newTab?: NewTab | undefined
 }
 
 // The slots added since apps first wrote icon maps of their own: optional, so such a map still type-checks, each drawing its default when left out.

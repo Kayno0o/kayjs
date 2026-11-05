@@ -20,6 +20,7 @@ interface AttemptOptions<Data = unknown>
 
 [.] AudioChapter
 interface AudioChapter
+  newTab?: NewTab | undefined
   start: number
   title: string
   url?: string | undefined
@@ -44,6 +45,7 @@ interface BarListRow
   href?: string
   key: number | string
   label: string
+  newTab?: NewTab | undefined
   value: number
 
 [.] BarSeries
@@ -171,6 +173,9 @@ type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = I
 [.] InfinitePage
 type InfinitePage<Row> = Row[] | undefined
 
+[.] isExternal
+function isExternal(href: string): boolean
+
 [.] ListFilter
 interface ListFilter
   fields: Record<string, string>
@@ -208,6 +213,7 @@ interface MenuAction
   href?: string | undefined
   icon?: IconProps | IconSlot
   label: string
+  newTab?: NewTab | undefined
   onSelect?: (() => unknown) | undefined
   tone?: Tone | undefined
 
@@ -233,6 +239,10 @@ interface NavLink
   href: string
   icon?: IconProps | IconSlot | undefined
   label: string
+  newTab?: NewTab | undefined
+
+[.] NewTab
+type NewTab = boolean | 'auto'
 
 [.] OverlaySize
 type OverlaySize = 'sm' | 'md' | 'lg' | 'full'
@@ -274,6 +284,7 @@ interface PaletteLink extends PaletteBase
   icon?: IconProps | IconSlot | undefined
   keywords?: string | undefined
   label: string
+  newTab?: NewTab | undefined
 
 [.] Plate
 interface Plate
@@ -411,7 +422,7 @@ interface SwitcherApp
   icon?: IconProps | IconSlot | undefined
   id: string
   label: string
-  newTab?: boolean | undefined
+  newTab?: NewTab | undefined
   rel?: string | undefined
 
 [.] TimelineEntry
@@ -419,6 +430,7 @@ interface TimelineEntry<Key extends string | number = string>
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   key: Key
+  newTab?: NewTab | undefined
   pickable?: boolean | undefined
   text: string
   time: string
@@ -498,6 +510,7 @@ interface TreeNode<Id extends TreeId = string>
   id: Id
   label: string
   menu?: readonly MenuEntry[] | undefined
+  newTab?: NewTab | undefined
 
 [.] uiDefaults
 const uiDefaults: UiSettings
@@ -590,7 +603,7 @@ component default
   icon?: IconProps | IconSlot | undefined
   id?: string | undefined
   label?: string | undefined
-  newTab?: boolean | undefined
+  newTab?: NewTab | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
   placement?: PopoverPlacement | undefined
@@ -786,8 +799,8 @@ component default
   link?: string | undefined;
   text?: string | undefined;
 }
-  item?: ((item: Pick<NavItem, "icon" | "label"> & { href?: string | undefined; }) => Element) | undefined
-  items: readonly (Pick<NavItem, "icon" | "label"> & { href?: string | undefined; })[]
+  item?: ((item: Pick<NavItem, "icon" | "label"> & { href?: string | undefined; newTab?: NewTab | undefined; }) => Element) | undefined
+  items: readonly (Pick<NavItem, "icon" | "label"> & { href?: string | undefined; newTab?: NewTab | undefined; })[]
   label: string
   structured?: boolean | undefined
 
@@ -1527,6 +1540,7 @@ component default
 }
   formatLabel?: ((label: string, context: LabelContext) => string) | undefined
   formatValue?: ((value: number) => string) | undefined
+  href?: ((mark: ChartMark) => string | undefined) | undefined
   label: string
   labels: string[]
   legend?: boolean | undefined

@@ -1,6 +1,7 @@
 import type { SearchHit } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
+import type { NewTab } from './outside'
 
 interface PaletteBase {
   label: string
@@ -11,9 +12,11 @@ interface PaletteBase {
   keywords?: string | undefined
 }
 
-// A place to go: followed in the same tab, or a new one with Ctrl or Cmd held, or always when `external`.
+// A place to go: followed in the same tab, or a new one with Ctrl or Cmd held, or always when `newTab` is `true`, or when the address leaves the site with `newTab` left to `'auto'`.
 export interface PaletteLink extends PaletteBase {
   href: string
+  newTab?: NewTab | undefined
+  /** @deprecated Use `newTab: true`, which wins when both are given. Removed in 2.0.0. */
   external?: boolean | undefined
 }
 

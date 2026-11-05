@@ -1,6 +1,7 @@
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import type { MenuEntry } from './menu'
+import type { NewTab } from './outside'
 import { currentTab } from './tab-nav'
 
 // A path of the site: one slash, not two, which would name another host.
@@ -17,6 +18,8 @@ export interface TreeNode<Id extends TreeId = string> {
   children?: TreeChildren<Id> | undefined
   // A site path or URL: the row is then a real link to it, and the node is the selected one while the page is on that address.
   href?: string | undefined
+  // Opens the link in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
+  newTab?: NewTab | undefined
   // The row's context menu, opened by a right click, Shift+F10 or the Menu key on the focused row.
   menu?: readonly MenuEntry[] | undefined
 }

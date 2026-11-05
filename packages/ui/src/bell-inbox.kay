@@ -9,7 +9,7 @@ import inboxApi from './api/inbox'
 import IconButton from './icon-button.kay'
 import { withPopup } from './menu'
 import { MENU_FOOTER, MENU_ITEM, MENU_LIST } from './menu-look'
-import { OUTSIDE } from './outside'
+import { tabOf } from './outside'
 import Popover from './popover.kay'
 
 const look = recipe({
@@ -50,7 +50,7 @@ const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-e
 
 // The routes answer a path of the site or an http(s) URL only; checked again here, as the link is drawn.
 const LINKED = /^(?:\/(?![/\\])|https?:\/\/)/
-const WEB = /^https?:\/\//
+
 const custom = source !== undefined
 const inbox = custom ? undefined : resource(inboxApi, '/')
 // A function source is asked once the Bell is in the page, again when a signal it reads changes and after a read.
@@ -74,7 +74,6 @@ function named(attributes: PopoverTriggerProps): BellTriggerProps {
   return Object.defineProperty(withPopup(attributes, 'true'), 'aria-label', { get: name, enumerable: true }) as BellTriggerProps
 }
 
-const external = (url: string | undefined) => url !== undefined && WEB.test(url)
 
 // A live region naming a notification that arrives while the page is open; the first load announces nothing.
 const announced = signal('')
@@ -126,7 +125,7 @@ span(part="root" {...rest})
         p(part="empty") {wording('ui.bell.empty', 'No notifications')}
       for note of items() key={note.id}
         if linked(note.url) as url
-          a(part="item" href={url} {...external(url) ? OUTSIDE : {}} onClick={() => send(note.id)})
+          a(part="item" href={url} {...tabOf(url, note.newTab)} onClick={() => send(note.id)})
             if drawRow
               | {drawRow(note as Item)}
             else

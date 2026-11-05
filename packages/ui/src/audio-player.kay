@@ -5,7 +5,7 @@ import { effect, memo, onCleanup, onMount, recipe, signal } from 'kay'
 import { chapterAt, clock, cueAt, cuesByChapter, lockScreen, previousStart } from './audio'
 import CollapsibleSection from './collapsible-section.kay'
 import IconButton from './icon-button.kay'
-import { OUTSIDE } from './outside'
+import { tabOf } from './outside'
 import { rangeTrack } from './range-track'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
@@ -16,7 +16,7 @@ const ECHO_MS = 1000
 // How long a hand scroll or a key between cues holds the transcript where the reader left it: a cue changing inside it does not recentre, the first one after it does.
 const HAND_MS = 4000
 const CUE_KEYS = new Set(['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'Home', 'End'])
-const WEB = /^https?:\/\//
+
 
 // 'kui-audio-player' stays as the component's name for an app's CSS. The chapter playing and the cue playing are marked by aria-current.
 const look = recipe({
@@ -363,7 +363,7 @@ div(part="root" {...rest})
             span(part="start") {clock(chapter.start)}
             span(part="title") {chapter.title}
           if chapter.url
-            IconButton(href={chapter.url} {...WEB.test(chapter.url) ? OUTSIDE : {}} icon="external" label={linkLabel.replaceAll('{title}', chapter.title)} variant="ghost" size="sm")
+            IconButton(href={chapter.url} {...tabOf(chapter.url, chapter.newTab)} icon="external" label={linkLabel.replaceAll('{title}', chapter.title)} variant="ghost" size="sm")
           if actions
             span(part="actions")
               | {actions(chapter, index)}

@@ -5,6 +5,8 @@ import type { Snippet } from 'kay'
 import type { MenuTriggerProps } from './menu'
 import type { SwitcherApp } from './app-switcher'
 import type { IconSlot } from './defaults'
+import { isExternal } from './outside'
+import type { NewTab } from './outside'
 import type { PopoverPlacement } from './popover'
 import { recipe } from 'kay'
 import { wording } from 'kay/words'
@@ -54,8 +56,8 @@ const { id, apps, current, label = wording('ui.appSwitcher.label', 'Apps'), icon
   // Shows the panel when the page sets it; the trigger, a click outside and Escape open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
-  // Opens the tiles in a new tab; they stay in the same one by default, as the apps are one place to the visitor. An app's own `newTab` wins.
-  newTab?: boolean | undefined
+  // Opens the tiles in a new tab, or only those leaving the site with `'auto'`. They stay in the same tab by default, unlike the other components with link entries, as the apps are one place to the visitor. An app's own `newTab` wins.
+  newTab?: NewTab | undefined
   // Replaces the text under a tile's icon: `@tile(app)`.
   tile?: Snippet<[app: SwitcherApp]> | undefined
   // Replaces the icon button that opens the panel, as a Menu's does: `@trigger(attributes)`, then `button({...attributes})`; `icon` then has nothing to draw.
@@ -94,10 +96,14 @@ function keyDown(event: KeyboardEvent) {
   all[move(Math.max(all.indexOf(document.activeElement as HTMLAnchorElement), 0), all.length)]?.focus()
 }
 
-const opensNew = (app: SwitcherApp) => app.newTab ?? newTab
+const opensNew = (app: SwitcherApp) => {
+  const choice = app.newTab ?? newTab
+
+  return choice === 'auto' ? isExternal(app.href) : choice
+}
 
 // `_self` is written out so kay's own new tab for a link to another origin does not apply; one in a new tab carries the mark the page's screen reader rule reads.
-const tabOf = (app: SwitcherApp) => opensNew(app) ? { 'target': '_blank', 'rel': app.rel ?? 'noopener', 'data-new-tab': '' } : { target: '_self', rel: app.rel }
+const attributesOf = (app: SwitcherApp) => opensNew(app) ? { 'target': '_blank', 'rel': app.rel ?? 'noopener', 'data-new-tab': '' } : { target: '_self', rel: app.rel }
 ---
 Popover(id={id} placement={placement} open={open} part="menu" onOpenChange={opened})
   @trigger(attributes)
@@ -107,7 +113,7 @@ Popover(id={id} placement={placement} open={open} part="menu" onOpenChange={open
       IconButton({...rest} {...attributes} style={[attributes.style, style].filter(Boolean).join('; ')} icon={icon} label={label} variant="ghost" aria-haspopup="true" part="root")
   div(part="grid" ref={element => grid = element} role="group" aria-label={label} onKeyDown={keyDown})
     for app of apps key={app.id}
-      a(part="tile" href={app.href} {...tabOf(app)} aria-current={app.id === current ? 'true' : undefined} data-tooltip={app.description})
+      a(part="tile" href={app.href} {...attributesOf(app)} aria-current={app.id === current ? 'true' : undefined} data-tooltip={app.description})
         if app.icon
           Icon(icon={app.icon} part="icon")
         else

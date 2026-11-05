@@ -1,9 +1,13 @@
+import type { NewTab } from './outside'
+
 export interface AudioChapter {
   title: string
   // Seconds into the audio. Chapters are in time order, as the player never sorts them.
   start: number
   // A page about the chapter, opened beside it.
   url?: string | undefined
+  // Opens the page in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
+  newTab?: NewTab | undefined
 }
 
 export interface AudioCue {

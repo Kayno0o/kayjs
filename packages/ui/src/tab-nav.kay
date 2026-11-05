@@ -4,6 +4,7 @@ import type { NavItem } from './nav-item'
 import type { TabEntry, TabLink } from './tab-nav'
 import { onMount, recipe, withQuery } from 'kay'
 import Icon from './icon.kay'
+import { tabOf } from './outside'
 import { currentTab, keptHref } from './tab-nav'
 
 // 'kui-tab-nav' stays as the component's name for an app's CSS.
@@ -47,7 +48,7 @@ const { links, current, keep = [], tabs, param, paramDefault, label, tab, ...res
 let nav: HTMLElement | undefined
 
 // A tab of `tabs` links to the page with its value set, and is current when that link is the address itself, else when it is the default one.
-const items = (): { key: string, to: string, entry: TabEntry, on: boolean, scrolls: boolean }[] => {
+const items = (): { key: string, to: string, entry: TabEntry & Pick<TabLink, 'newTab'>, on: boolean, scrolls: boolean }[] => {
   if (tabs === undefined || param === undefined) {
     const marked = currentTab(links ?? [], current ?? '')
 
@@ -92,5 +93,5 @@ nav(part="root" {...rest} ref={element => nav = element} aria-label={label})
       span(part="link" aria-disabled="true")
         | {inside(item)}
     else
-      a(part="link" data-keep-scroll={item.scrolls ? undefined : ''} href={item.to} aria-current={item.on ? 'page' : undefined})
+      a(part="link" data-keep-scroll={item.scrolls ? undefined : ''} href={item.to} {...tabOf(item.to, item.entry.newTab)} aria-current={item.on ? 'page' : undefined})
         | {inside(item)}

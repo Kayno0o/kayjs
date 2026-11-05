@@ -59,11 +59,12 @@ interface SwitcherApp
   icon?: IconProps | IconSlot | undefined
   id: string
   label: string
-  newTab?: boolean | undefined
+  newTab?: NewTab | undefined
   rel?: string | undefined
 
 [./lib/audio] AudioChapter
 interface AudioChapter
+  newTab?: NewTab | undefined
   start: number
   title: string
   url?: string | undefined
@@ -98,6 +99,7 @@ const RESTART_CHAPTER_SECONDS: 3
 [./lib/bell] BellItem
 interface BellItem
   id: string
+  newTab?: NewTab | undefined
   read?: boolean | undefined
   title: string
   url?: string | undefined
@@ -769,6 +771,7 @@ interface NavLink
   href: string
   icon?: IconProps | IconSlot | undefined
   label: string
+  newTab?: NewTab | undefined
 
 [./lib/defaults] UiSettings
 interface UiSettings
@@ -1090,6 +1093,7 @@ interface AttemptOptions<Data = unknown>
 
 [./lib/index] AudioChapter
 interface AudioChapter
+  newTab?: NewTab | undefined
   start: number
   title: string
   url?: string | undefined
@@ -1114,6 +1118,7 @@ interface BarListRow
   href?: string
   key: number | string
   label: string
+  newTab?: NewTab | undefined
   value: number
 
 [./lib/index] BarSeries
@@ -1241,6 +1246,9 @@ type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = I
 [./lib/index] InfinitePage
 type InfinitePage<Row> = Row[] | undefined
 
+[./lib/index] isExternal
+function isExternal(href: string): boolean
+
 [./lib/index] ListFilter
 interface ListFilter
   fields: Record<string, string>
@@ -1278,6 +1286,7 @@ interface MenuAction
   href?: string | undefined
   icon?: IconProps | IconSlot
   label: string
+  newTab?: NewTab | undefined
   onSelect?: (() => unknown) | undefined
   tone?: Tone | undefined
 
@@ -1303,6 +1312,10 @@ interface NavLink
   href: string
   icon?: IconProps | IconSlot | undefined
   label: string
+  newTab?: NewTab | undefined
+
+[./lib/index] NewTab
+type NewTab = boolean | 'auto'
 
 [./lib/index] OverlaySize
 type OverlaySize = 'sm' | 'md' | 'lg' | 'full'
@@ -1344,6 +1357,7 @@ interface PaletteLink extends PaletteBase
   icon?: IconProps | IconSlot | undefined
   keywords?: string | undefined
   label: string
+  newTab?: NewTab | undefined
 
 [./lib/index] Plate
 interface Plate
@@ -1481,7 +1495,7 @@ interface SwitcherApp
   icon?: IconProps | IconSlot | undefined
   id: string
   label: string
-  newTab?: boolean | undefined
+  newTab?: NewTab | undefined
   rel?: string | undefined
 
 [./lib/index] TimelineEntry
@@ -1489,6 +1503,7 @@ interface TimelineEntry<Key extends string | number = string>
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   key: Key
+  newTab?: NewTab | undefined
   pickable?: boolean | undefined
   text: string
   time: string
@@ -1568,6 +1583,7 @@ interface TreeNode<Id extends TreeId = string>
   id: Id
   label: string
   menu?: readonly MenuEntry[] | undefined
+  newTab?: NewTab | undefined
 
 [./lib/index] uiDefaults
 const uiDefaults: UiSettings
@@ -1808,6 +1824,7 @@ interface MenuAction
   href?: string | undefined
   icon?: IconProps | IconSlot
   label: string
+  newTab?: NewTab | undefined
   onSelect?: (() => unknown) | undefined
   tone?: Tone | undefined
 
@@ -1816,9 +1833,6 @@ type MenuEntry = MenuAction | 'separator'
 
 [./lib/menu] MenuTriggerProps
 type MenuTriggerProps = PopoverTriggerProps & { 'aria-haspopup': 'menu' | 'true' }
-
-[./lib/menu] opensOutside
-function opensOutside(href: string): boolean
 
 [./lib/menu] withPopup
 function withPopup(attributes: PopoverTriggerProps, popup: "menu" | "true"): MenuTriggerProps
@@ -1865,8 +1879,21 @@ type NullOption<Value, Held> = null extends Value ? null extends Held ? '' exten
   'a null option needs a value typed to allow null': never
 } : unknown
 
+[./lib/outside] isExternal
+function isExternal(href: string): boolean
+
+[./lib/outside] NewTab
+type NewTab = boolean | 'auto'
+
 [./lib/outside] OUTSIDE
 const OUTSIDE: { readonly target: "_blank"; readonly rel: "noopener noreferrer"; readonly 'data-new-tab': ""; }
+
+[./lib/outside] tabOf
+function tabOf(href: string | undefined, newTab?: NewTab | undefined): Record<never, never> | {
+  readonly target: "_blank";
+  readonly rel: "noopener noreferrer";
+  readonly 'data-new-tab': "";
+}
 
 [./lib/overlay] closeWatcher
 function closeWatcher({ modal, docked, dirty, edited, footer }: CloseWatcherState): "any" | "closerequest" | "none"
@@ -1964,6 +1991,7 @@ interface PaletteLink extends PaletteBase
   icon?: IconProps | IconSlot | undefined
   keywords?: string | undefined
   label: string
+  newTab?: NewTab | undefined
 
 [./lib/palette] paletteMatches
 function paletteMatches(entries: PaletteEntry[], query: string, groups?: string[]): PaletteEntry[]
@@ -2011,6 +2039,7 @@ interface BarListRow
   href?: string
   key: number | string
   label: string
+  newTab?: NewTab | undefined
   value: number
 
 [./lib/plot] barRatios
@@ -2263,6 +2292,7 @@ interface TabEntry extends NavItem
 interface TabLink
   also?: readonly string[] | undefined
   href: string
+  newTab?: NewTab | undefined
   prefix?: boolean | undefined
 
 [./lib/table] cellText
@@ -2345,6 +2375,7 @@ interface TimelineEntry<Key extends string | number = string>
   href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   key: Key
+  newTab?: NewTab | undefined
   pickable?: boolean | undefined
   text: string
   time: string
@@ -2441,6 +2472,7 @@ interface TreeNode<Id extends TreeId = string>
   id: Id
   label: string
   menu?: readonly MenuEntry[] | undefined
+  newTab?: NewTab | undefined
 
 [./lib/tree] treePath
 function treePath<Id extends TreeId>(nodes: readonly TreeNode<Id>[], id: TreeId): Id[] | undefined

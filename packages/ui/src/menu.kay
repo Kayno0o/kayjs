@@ -11,8 +11,8 @@ import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { MENU_ITEM, MENU_LIST } from './menu-look'
-import { opensOutside, withPopup } from './menu'
-import { OUTSIDE } from './outside'
+import { withPopup } from './menu'
+import { tabOf } from './outside'
 import Popover from './popover.kay'
 import type { Tone } from './tone'
 
@@ -176,7 +176,7 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
         hr(part="separator")
       else
         if entry.href !== undefined && !entry.disabled
-          a(part="item" href={entry.href} {...opensOutside(entry.href) ? OUTSIDE : {}} role="menuitem" tabindex="-1" data-danger={isDanger(entry) || undefined} data-tone={toneOf(entry)} onClick={() => select(entry)})
+          a(part="item" href={entry.href} {...tabOf(entry.href, entry.newTab)} role="menuitem" tabindex="-1" data-danger={isDanger(entry) || undefined} data-tone={toneOf(entry)} onClick={() => select(entry)})
             if item
               | {item(entry)}
             else

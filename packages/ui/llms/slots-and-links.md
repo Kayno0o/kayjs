@@ -15,6 +15,8 @@
 - `Card(href)` needs a `title`, which is the link's text, and `CardRow(href)` links its body. The link covers the whole card or row, and every button, input and link inside it, `actions` and `head` included, is lifted above the link and stays clickable; the card or row has `data-linked`.
 - A `Timeline` entry with an `href` is no button: `onSelectedChange` is not called, and the entry whose key is `selected` gets `aria-current="true"` in place of `aria-pressed`.
 - A `Carousel` slide with `href` draws its picture inside a link; with a `@slide` block the block draws the whole content, link included.
+- Every entry with an address takes `newTab: true | false | 'auto'`, `'auto'` by default: an `https://` or `//host` address opens in a new tab with `rel="noopener noreferrer"`, a path stays in the same one. It is on `MenuAction`, `BellItem`, `AudioChapter`, `PaletteLink` (its `external: true` is `newTab: true`), `NavLink` (`SiteNav`, `AppHeader`), `Breadcrumb` items, `TabNav` links, `Timeline` entries, `TreeView` nodes, `BarList` rows and `Carousel` slides; `AppSwitcher` keeps `false` as its default (switcher and app both take `'auto'`). `isExternal(href)` is the test they share, exported by kayjs-ui.
+- `LineChart(href={mark => ...})` makes a point a link, like the other charts: a click without a drag or Enter on it follows the address (a new tab when it leaves the site), unless `onSelect` is given, which hears it instead.
 
 ### Icon, badge, disabled and nesting in navigation
 

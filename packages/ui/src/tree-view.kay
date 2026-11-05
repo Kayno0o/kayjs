@@ -1,6 +1,7 @@
 --- <Id extends TreeId>
 import type { JSX, Snippet } from 'kay'
 import type { MenuEntry } from './menu'
+import { tabOf } from './outside'
 import type { TreeId, TreeNode, TreeRow } from './tree'
 import { effect, memo, recipe, signal, untrack, withQuery } from 'kay'
 import Icon from './icon.kay'
@@ -284,7 +285,7 @@ ul(part="root" {...rest} ref={element => list = element} role="tree" aria-label=
       if row.node.icon
         Icon(icon={row.node.icon} part="icon")
       if row.node.href !== undefined
-        a(part="link" href={row.node.href} tabindex="-1" aria-current={row.node.id === current() ? 'page' : undefined}) {row.node.label}
+        a(part="link" href={row.node.href} {...tabOf(row.node.href, row.node.newTab)} tabindex="-1" aria-current={row.node.id === current() ? 'page' : undefined}) {row.node.label}
       else
         span(part="label") {row.node.label}
       if failed().has(row.node.id)

@@ -5,7 +5,7 @@ import { effect, memo, onCleanup, recipe, searchResults, shortcut, signal, uid }
 import { stepIndex } from './cycle'
 import { startRef } from './form-reset'
 import Icon from './icon.kay'
-import { OUTSIDE } from './outside'
+import { tabOf } from './outside'
 import { isPaletteLink, paletteHits, paletteMatches, paletteSections, splitMatches, withRecent } from './palette'
 import { wording } from 'kay/words'
 import { labelText } from './label-text'
@@ -286,7 +286,7 @@ dialog({...rest} part="root" data-size={size === 'md' ? undefined : size} ref={r
             div.kui-heading-section(part="heading" id={`${id}-group-${sectionIndex}`}) {section.group}
           for row of section.rows key={row.index}
             if linkOf(row.entry) as link
-              a(part="option" data-snippet={row.snippet ? '' : undefined} href={link.href} {...link.external ? OUTSIDE : {}} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected = row.index} onClick={() => followed(link, row.snippet !== undefined || row.remote === true)})
+              a(part="option" data-snippet={row.snippet ? '' : undefined} href={link.href} {...tabOf(link.href, link.newTab ?? (link.external ? true : undefined))} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected = row.index} onClick={() => followed(link, row.snippet !== undefined || row.remote === true)})
                 if link.icon as icon
                   Icon(icon={icon} part="icon")
                 if row.snippet as snippet

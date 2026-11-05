@@ -1,7 +1,9 @@
---- <Slide extends { src: string, alt: string, href?: string | undefined }>
+--- <Slide extends { src: string, alt: string, href?: string | undefined, newTab?: NewTab | undefined }>
 import type { Duration, JSX, Snippet } from 'kay'
 import { durationMs, effect, every, onCleanup, recipe, reducedMotion, signal, untrack } from 'kay'
 import IconButton from './icon-button.kay'
+import { tabOf } from './outside'
+import type { NewTab } from './outside'
 import { startRef } from './form-reset'
 import type { InfiniteList } from './infinite-list'
 import LoadMore from './load-more.kay'
@@ -121,7 +123,7 @@ section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-lab
         if slide
           slot slide(entry, position)
         else if entry.href !== undefined
-          a(part="link" href={entry.href})
+          a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)})
             // kay-allow unsized-image
             img(part="image" src={entry.src} alt={entry.alt} loading={position === 0 ? 'eager' : 'lazy'})
         else

@@ -1,4 +1,5 @@
 import type { NavItem } from './nav-item'
+import type { NewTab } from './outside'
 import { withBase } from 'kay'
 import { localize } from 'kay/i18n'
 
@@ -30,6 +31,8 @@ export function addressHref(href: string): string {
 // A tab bar link, with the sub-pages that also mark it current.
 export interface TabLink {
   href: string
+  // Opens the link in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
+  newTab?: NewTab | undefined
   // Marks the link current on every page under its path, so `/traffic` stays current on `/traffic/requests/12`.
   prefix?: boolean | undefined
   // Paths whose pages, and the pages under them, also mark the link current.

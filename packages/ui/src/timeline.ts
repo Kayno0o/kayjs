@@ -1,5 +1,6 @@
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
+import type { NewTab } from './outside'
 import type { Tone } from './tone'
 
 export interface TimelineEntry<Key extends string | number = string> {
@@ -15,4 +16,6 @@ export interface TimelineEntry<Key extends string | number = string> {
   pickable?: boolean | undefined
   // Makes the entry a link, to the page it stands for. It is no button then: `onSelectedChange` is not called, and `selected` marks it `aria-current` in place of `aria-pressed`.
   href?: string | undefined
+  // Opens the link in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
+  newTab?: NewTab | undefined
 }

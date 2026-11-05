@@ -3,10 +3,11 @@ import type { AxisFactory, ChartPlugin, DomRenderOutput, Layer, LineChartPresetO
 import type { JSX } from 'kay'
 import type { ChartMark } from './chart-marks'
 import type { ChartSeries } from './plot'
-import { effect, memo, onCleanup, onMount, recipe, signal, uid, untrack } from 'kay'
+import { effect, memo, navigate, onCleanup, onMount, recipe, signal, uid, untrack } from 'kay'
 import type { LabelContext } from './chart-axis'
 import { loaders } from './chartist'
 import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, totalAt, xAxisOptions } from './chart-axis'
+import { isExternal } from './outside'
 import { dashSample, PALETTE, SERIES_DASHES, steppedPoint } from './plot'
 import { wording } from 'kay/words'
 
@@ -44,7 +45,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, onSelect, onActive, active, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, onSelect, href, onActive, active, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.
@@ -69,6 +70,8 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   onRange?: ((from: number, to: number) => unknown) | undefined
   // Hears the point a click without a drag lands on, or Enter with no span being picked, as `{ index, label, values }`.
   onSelect?: ((mark: ChartMark) => unknown) | undefined
+  // The address a point goes to, or `undefined` for none: a click without a drag on a point that has one, or Enter on it, follows it (an address leaving the site in a new tab) unless the app gave `onSelect`, which hears it instead, as for the other charts.
+  href?: ((mark: ChartMark) => string | undefined) | undefined
   // Hears the index of the point the pointer or the keyboard is on, `null` when it leaves.
   onActive?: ((index: number | null) => unknown) | undefined
   // The point whose cursor and dots are drawn, `null` for none; the app controls them when it gives it, the tooltip following the pointer and keyboard alone.
@@ -192,6 +195,27 @@ const watchTip = (element: HTMLElement) => {
 const lit = () => active === undefined ? hovered() : active === null || labels.length === 0 ? null : { index: Math.min(Math.max(Math.round(active), 0), labels.length - 1) }
 
 const mark = (index: number): ChartMark => ({ index, label: labels[index] ?? '', values: series.map(item => item.values[index] ?? null) })
+
+// What a click or Enter on a point does: `onSelect` hears it, else its `href` is followed.
+function choose(index: number) {
+  const picked = mark(index)
+
+  if (onSelect) {
+    void onSelect(picked)
+
+    return
+  }
+
+  const to = href?.(picked)
+
+  if (to === undefined || to === '')
+    return
+
+  if (isExternal(to))
+    window.open(to, '_blank', 'noopener,noreferrer')
+  else
+    void navigate(to)
+}
 
 let lastActive: number | null = null
 
@@ -503,7 +527,7 @@ function finishSpan() {
   if (span && span.from !== span.to)
     void onRange?.(Math.min(span.from, span.to), Math.max(span.from, span.to))
   else if (pressed !== null && (hovered() === null || hovered()!.index === pressed))
-    void onSelect?.(mark(pressed))
+    choose(pressed)
 }
 
 // Shows the cursor, dots and tooltip at a point the keyboard reached, the tooltip over the plot's top at that point.
@@ -534,9 +558,9 @@ function keyDown(event: KeyboardEvent) {
     return
   }
 
-  if (event.key === 'Enter' && onSelect && labels.length > 0) {
+  if (event.key === 'Enter' && (onSelect || href) && labels.length > 0) {
     event.preventDefault()
-    void onSelect(mark(current()))
+    choose(current())
 
     return
   }

@@ -2,6 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import { recipe, uid } from 'kay'
 import type { NavLink } from './defaults'
+import { tabOf } from './outside'
 import Icon from './icon.kay'
 import SiteNavState from './internal/site-nav-state.kay'
 import { addressHref } from './tab-nav'
@@ -70,7 +71,7 @@ function marked(href: string) {
 ---
 // One link of the list or of a group under one: its icon, then the app's block or the label.
 snippet destination(entry: NavLink)
-  a(part="link" href={entry.href} aria-current={marked(entry.href)})
+  a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={marked(entry.href)})
     if entry.icon
       Icon(icon={entry.icon} part="icon")
     if link

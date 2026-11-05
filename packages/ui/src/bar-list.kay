@@ -1,6 +1,7 @@
 --- <Row extends BarListRow>
 import type { JSX } from 'kay'
 import type { BarListRow } from './plot'
+import { tabOf } from './outside'
 import { memo, recipe } from 'kay'
 import { wording } from 'kay/words'
 
@@ -47,7 +48,7 @@ else
         else
           div(part="row")
             if row.href
-              a(part="label" href={row.href}) {row.label}
+              a(part="label" href={row.href} {...tabOf(row.href, row.newTab)}) {row.label}
             else
               span(part="label") {row.label}
             span(part="value") {row.display ?? row.value}
