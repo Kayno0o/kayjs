@@ -26,6 +26,12 @@ div#virtual
 div#field
   FormField(label="Pick" group={later()})
     input(name="one")
+div#toGroup
+  FormField(label="Pick" hint="Help" group={later()})
+    input(name="two")
+div#toSingle
+  FormField(label="Pick" required={!later()} group={!later()})
+    input(name="three")
 div#consent
   ContactForm(action={plain} consent={later()})
 div#swapped

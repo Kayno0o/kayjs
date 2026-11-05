@@ -65,6 +65,31 @@ test('FormField becomes a group', async () => {
   expect(root.querySelector('#field input')!.getAttribute('aria-required')).toBeNull()
 })
 
+test('FormField dropping its group role leaves no aria-required it set', async () => {
+  const root = await mount()
+  const input = () => root.querySelector('#toSingle input')!
+
+  expect(root.querySelector('#toSingle fieldset')).not.toBeNull()
+  expect(input().getAttribute('aria-required')).toBe('true')
+
+  await flip(root)
+
+  expect(root.querySelector('#toSingle fieldset')).toBeNull()
+  expect(input().getAttribute('aria-required')).toBeNull()
+})
+
+test('FormField becoming a group leaves its hint out of the field description', async () => {
+  const root = await mount()
+  const input = () => root.querySelector('#toGroup input')!
+
+  expect(input().getAttribute('aria-describedby')).not.toBeNull()
+
+  await flip(root)
+
+  expect(root.querySelector('#toGroup fieldset')).not.toBeNull()
+  expect(input().getAttribute('aria-describedby')).toBeNull()
+})
+
 test('ContactForm draws the consent box once consent is asked, by prop or by its action', async () => {
   const root = await mount()
 

@@ -15,6 +15,9 @@ const CONTROL = 'input:not([type="hidden"]), select, textarea, button, [contente
 const FIELDS = 'input:not([type="hidden"]), select, textarea'
 const SPACES = /\s+/
 
+// The fields whose `aria-required` was set here, not by the page.
+const requiredByUs = new WeakSet<HTMLElement>()
+
 export interface FieldLinks {
   // Marks the field's frame, for the link to find its control: a `ref` would make the component an island.
   frame: string
@@ -39,17 +42,26 @@ export function fieldLinks(group: () => boolean, hint: () => boolean, messages: 
   }
 
   const marked = new Set<HTMLElement>()
+  let grouped = false
 
   effect(() => {
     if (group()) {
+      grouped = true
       markGroup(links, messages().length > 0, marked, required())
 
       return
     }
 
-    // A group that became a single field leaves nothing marked behind.
-    if (marked.size > 0)
+    // A group that became a single field leaves nothing marked behind, nor the `aria-required` it set.
+    if (grouped) {
+      grouped = false
       markGroup(links, false, marked, false)
+
+      for (const field of fieldsOf(links)) {
+        if (requiredByUs.delete(field))
+          field.removeAttribute('aria-required')
+      }
+    }
 
     const ours = links.described()
     const invalid = messages().length > 0
@@ -84,15 +96,29 @@ function fieldsOf(links: FieldLinks): HTMLElement[] {
 const UNREQUIRABLE = new Set(['radio', 'range', 'file', 'color'])
 
 function requireField(field: HTMLElement): void {
-  if (!field.hasAttribute('aria-required') && !(field instanceof HTMLInputElement && UNREQUIRABLE.has(field.type)))
+  if (!field.hasAttribute('aria-required') && !(field instanceof HTMLInputElement && UNREQUIRABLE.has(field.type))) {
     field.setAttribute('aria-required', 'true')
+    requiredByUs.add(field)
+  }
 }
 
 // The fields the group marked, which it clears once its message does; `markInvalid` leaves one the page or a refused post still marks.
 function markGroup(links: FieldLinks, shown: boolean, marked: Set<HTMLElement>, required: boolean): void {
-  if (required) {
-    for (const field of fieldsOf(links))
+  for (const field of fieldsOf(links)) {
+    if (required)
       requireField(field)
+
+    // A field that was a single control still names the hint, which the group's own element carries now.
+    const described = (field.getAttribute('aria-describedby') ?? '').split(SPACES)
+
+    if (described.includes(links.hint)) {
+      const rest = described.filter(id => id !== '' && id !== links.hint)
+
+      if (rest.length > 0)
+        field.setAttribute('aria-describedby', rest.join(' '))
+      else
+        field.removeAttribute('aria-describedby')
+    }
   }
 
   const fields = shown ? fieldsOf(links) : [...marked]
