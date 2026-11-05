@@ -96,3 +96,13 @@ Each `testSite` keeps its own cookies, one browser each. `memoryAuth()` keeps ea
 ### Dev tool
 
 - Under `kay dev`, the dev tool every dev page carries has an Auth tab, brought by `auth()` with nothing to add in the app: the session's user (id, email, roles, how they signed in, password, two-factor) with a Sign out button that posts to the pages' `/auth/sign-out`. It reads `/_kay/auth`, a route mounted under `kay dev` alone.
+
+### Errors
+
+Each class extends `KayError` (from `kay/library`): `code` is the name `kay explain <code>` documents, `kind` tells apart what a code covers, `status` is the HTTP status it stands for, and `cause` the error underneath. A message opens with `kayjs-auth: `, or `kay: ` for an option the config refuses at boot.
+
+| Class | `code` | `kind` | Thrown for |
+| --- | --- | --- | --- |
+| `OAuthExchangeError` | `oauth-exchange` | `oauth-exchange` | The provider rejected the token exchange, the ID token or the user fetch, or was down. `status` is the provider's, or 400 for a bad code and 502 for an outage, so an action can answer a client's bad code with a 4xx. |
+
+What a visitor did wrong is a result, `{ ok: false, error }` or `{ ok: false, errors }` by field; a wrong setup (a missing `auth` in the context, an option the config refuses) throws an error opening with `kayjs-auth: ` or `kay: `.

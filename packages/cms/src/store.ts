@@ -1,7 +1,7 @@
 import type { Commit, FileChange, FileMove, Identity } from './files'
 import type { CmsDraftEntry, CollectionInfo, EntryRef, Issue, JsonSchema, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { SaveEvent } from './settings'
-import { redirectMovedPage, RedirectRefusedError } from 'kay/library'
+import { KayError, redirectMovedPage, RedirectRefusedError } from 'kay/library'
 import { previewUrl } from 'kay/server'
 import { wording } from 'kay/words'
 import { recordActivity } from './activity'
@@ -32,9 +32,13 @@ export interface VersionRule {
   required?: boolean | undefined
 }
 
-export class UnknownCollectionError extends Error {
+export class UnknownCollectionError extends KayError {
   override readonly name = 'UnknownCollectionError'
-  readonly code = 'unknown-collection'
+  declare readonly code: 'unknown-collection'
+
+  constructor(message = 'unknown collection', options?: ErrorOptions) {
+    super('unknown-collection', message, { ...options, status: 404 })
+  }
 }
 
 // The collection as the screens read it, with the layout `cms({ collections })` gave it.

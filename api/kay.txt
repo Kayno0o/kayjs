@@ -1939,7 +1939,10 @@ interface LoadedEntry
 class MarkdownError
   new (message: string, line: number): MarkdownError
   code: "markdown-invalid"
+  kind: string
   line: number
+  name: string
+  status: number | undefined
 
 [./content] markdownField
 function markdownField(options?: ElysiaStringOptions | undefined): TString

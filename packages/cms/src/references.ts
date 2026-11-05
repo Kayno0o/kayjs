@@ -1,5 +1,6 @@
 import type { Field } from './fields'
 import type { CmsDraftEntry, CollectionInfo, Issue, SourceEntry } from './kay/contract'
+import { KayError } from 'kay/library'
 import { wording } from 'kay/words'
 import { fieldsOf, itemFields, itemOf } from './fields'
 import { collections, entries } from './kay/content'
@@ -55,12 +56,12 @@ export async function referrersOf(target: string, slugs: Iterable<string>): Prom
 }
 
 // A collection that could hold references to the target failed to read, so the entries naming it are not all known. `names` is empty when the list of collections itself failed.
-export class UnreadReferrersError extends Error {
+export class UnreadReferrersError extends KayError {
   override readonly name = 'UnreadReferrersError'
-  readonly code = 'unread-referrers'
+  declare readonly code: 'unread-referrers'
 
   constructor(readonly names: string[]) {
-    super(`${names.join(', ')} failed to read for the references to be found`)
+    super('unread-referrers', `kayjs-cms: ${names.join(', ')} failed to read for the references to be found`)
   }
 }
 

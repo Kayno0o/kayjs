@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite'
+import type { KayErrorOptions } from '../compiler/errors'
 import type { Duration } from '../runtime/duration'
 import type { MaybePromise, StoreBase } from '../runtime/store-base'
 import type { Hook } from './hooks'
@@ -186,7 +187,13 @@ const DEFAULT_IDLE_POLL = '10s'
 const DEFAULT_PATH = 'data/jobs.sqlite'
 
 // Thrown from a handler for a failure no retry can mend: the job is kept as failed at once, whatever attempts are left.
-export class GiveUpError extends Error {}
+export class GiveUpError extends KayError {
+  override readonly name = 'GiveUpError'
+
+  constructor(message: string, options?: KayErrorOptions) {
+    super('job-give-up', message, options)
+  }
+}
 
 class RetryLater extends Error {
   readonly waitMs: number

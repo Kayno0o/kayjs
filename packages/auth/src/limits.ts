@@ -1,7 +1,7 @@
 import type { RateLimit, RateWindow } from 'kay'
 import type { Core } from './core'
 import type { AuthLimiters } from './rates'
-import { durationSeconds } from 'kay/library'
+import { configError, durationSeconds } from 'kay/library'
 
 // `max` attempts every `window`, a string such as '15m', as in kay's own `rateLimit`, counted in `store` when given. kayjs-auth counts under keys of its own, so it takes no `key`.
 export type AuthRateLimit = Omit<RateLimit, 'key'>
@@ -74,7 +74,7 @@ export function resolveLimits(given: LimitsOption | undefined): ResolvedLimits {
     const list = [option].flat()
 
     if (list.length === 0)
-      throw new Error(`kay: rateLimit.${name} is an empty list; give it a limit or leave it out`)
+      throw configError(`rateLimit.${name} is an empty list; give it a limit or leave it out`)
 
     for (const [index, limit] of list.entries()) {
       const place = list.length === 1 ? `rateLimit.${name}` : `rateLimit.${name}[${index}]`
@@ -82,7 +82,7 @@ export function resolveLimits(given: LimitsOption | undefined): ResolvedLimits {
       durationSeconds(limit.window, `${place}.window`)
 
       if (limit.store !== undefined && typeof limit.store?.hit !== 'function')
-        throw new Error(`kay: ${place}.store has no hit(key, window) method; give it a RateStore`)
+        throw configError(`${place}.store has no hit(key, window) method; give it a RateStore`)
     }
 
     limits[name] = list.map(({ max, window, store }) => ({ max, window, store })) as LimitSet

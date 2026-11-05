@@ -50,7 +50,7 @@ it('reads the pronunciation pass', async () => {
 
 ### Errors
 
-`AiError` has a `kind` (also its `code`), a `status` when the provider answered, `retryAfter` (seconds) on a rate limit, `partial` (the text received) on a failure mid-reply and `fields` on a `schema` one:
+`AiError` extends `KayError` (from `kay/library`): `kind` says which failure it is, `code` is `ai-error` for `kay explain`, `cause` is the error underneath, `name` is `AiError`, and the message opens with `kayjs-ai: `. It has a `status` when the provider answered, `retryAfter` (seconds) on a rate limit, `partial` (the text received) on a failure mid-reply and `fields` on a `schema` one:
 
 | kind | when |
 | --- | --- |

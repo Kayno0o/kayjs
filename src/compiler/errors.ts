@@ -7,6 +7,8 @@ export const ERROR_GROUPS = {
   build: 'What stops `kay build`: the browser bundle, workers, icons, libraries, the executable and the config.',
   content: 'A collection that does not load: its entries, its Markdown, its loader and what the editor and the helpers are asked.',
   export: 'A page, endpoint or API module a static export cannot hold, and the directory it writes to.',
+  runtime: 'What kay refuses while the server runs: an address that is not public, a redirect an editor may not add, a job given up on, a database call that took too long.',
+  library: 'What a library (kayjs-auth, kayjs-cms, kayjs-mail, kayjs-ai, kayjs-ui) throws for the app to catch, with the kinds it tells apart in the library\'s own error table.',
 } as const
 
 export type ErrorGroup = keyof typeof ERROR_GROUPS
@@ -289,6 +291,66 @@ export const ERRORS = {
     summary: 'Prerendering run with no client build to add its pages to.',
     fix: { file: 'llms/project.md', heading: 'Commands' },
   },
+  'private-address': {
+    group: 'runtime',
+    summary: 'A host that answered with an address that is not public, which a download of kay refuses to fetch.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'redirect-refused': {
+    group: 'runtime',
+    summary: 'A runtime redirect an editor asked for that kay refuses, worded for the editor.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'job-give-up': {
+    group: 'runtime',
+    summary: 'A job handler that threw `GiveUpError`: the job is kept as failed at once, whatever attempts are left.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'poll-timeout': {
+    group: 'runtime',
+    summary: 'A database call a store gave up on after its time limit.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'ai-error': {
+    group: 'library',
+    summary: 'A kayjs-ai call that failed: `kind` says why (auth, rate-limited, unavailable, invalid, network, timeout, cut, protocol, limited, too-long, schema, unsupported, conflict).',
+    fix: { file: 'packages/ai/llms/testing-and-errors.md', heading: 'Errors' },
+  },
+  'oauth-exchange': {
+    group: 'library',
+    summary: 'A provider that rejected the OAuth token exchange or the user fetch: a bad or expired code, or the provider being down. `status` is the provider\'s.',
+    fix: { file: 'packages/auth/llms/hardening-and-testing.md', heading: 'Errors' },
+  },
+  'save-conflict': {
+    group: 'library',
+    summary: 'A kayjs-cms save made from a version of the file that another save has replaced, or a new file where one exists.',
+    fix: { file: 'packages/cms/llms/options.md', heading: 'Errors' },
+  },
+  'forge-refused': {
+    group: 'library',
+    summary: 'A Forgejo server that refused a kayjs-cms request, with its `status`.',
+    fix: { file: 'packages/cms/llms/options.md', heading: 'Errors' },
+  },
+  'unknown-collection': {
+    group: 'library',
+    summary: 'A kayjs-cms call naming a collection the site does not have.',
+    fix: { file: 'packages/cms/llms/options.md', heading: 'Errors' },
+  },
+  'unread-referrers': {
+    group: 'library',
+    summary: 'A kayjs-cms reference lookup where a collection failed to read, so the entries naming the target are not all known.',
+    fix: { file: 'packages/cms/llms/options.md', heading: 'Errors' },
+  },
+  'mail-not-configured': {
+    group: 'library',
+    summary: 'A send by an `optional` kayjs-mail mailer whose environment lacks what it needs.',
+    fix: { file: 'packages/mail/llms/contact-form-and-testing.md', heading: 'Errors' },
+  },
+  'upstream-invalid': {
+    group: 'library',
+    summary: 'A record under `.upstream/` that the kayjs-ui commands cannot use.',
+    fix: { file: 'packages/ui/llms/setup.md', heading: 'Errors' },
+  },
 } as const satisfies Record<string, ErrorCode>
 
 export type ErrorName = keyof typeof ERRORS
@@ -315,11 +377,21 @@ export function raisedMark(): number {
 const MATCH_MIN = 16
 
 // An error kay raised itself, its code the one `kay explain` documents.
+// `kind` tells apart what one code covers (an `AiError`'s `auth` from its `schema`) and is the code when a code covers one cause, `status` is the HTTP status the error stands for, and `cause` is the error underneath.
+export interface KayErrorOptions extends ErrorOptions {
+  kind?: string | undefined
+  status?: number | undefined
+}
+
 export class KayError extends Error {
   override name = 'KayError'
+  readonly kind: string
+  readonly status: number | undefined
 
-  constructor(readonly code: ErrorName, message: string, options?: ErrorOptions) {
+  constructor(readonly code: ErrorName, message: string, { kind, status, ...options }: KayErrorOptions = {}) {
     super(message, options)
+    this.kind = kind ?? code
+    this.status = status
     raised.push({ error: this, order: ++raisedCount })
 
     if (raised.length > RAISED_KEPT)

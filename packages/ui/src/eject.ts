@@ -2,7 +2,7 @@
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, sep } from 'node:path'
-import { uiConfigEntries } from 'kay/library'
+import { KayError, uiConfigEntries } from 'kay/library'
 
 const PACKAGE = '@kaynooo/kayjs-ui'
 
@@ -357,7 +357,14 @@ export async function writeAll(writes: Map<string, string>): Promise<void> {
 }
 
 // A record under `.upstream/` the commands cannot use: its message names the file and what to do.
-export class UpstreamError extends Error {}
+export class UpstreamError extends KayError {
+  override readonly name = 'UpstreamError'
+  declare readonly code: 'upstream-invalid'
+
+  constructor(message: string, options?: ErrorOptions) {
+    super('upstream-invalid', `kayjs-ui: ${message}`, options)
+  }
+}
 
 function recorded(root: string, path: string): string {
   return relative(root, upstreamPath(root, path))

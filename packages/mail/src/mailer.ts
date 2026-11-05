@@ -13,7 +13,7 @@ import process from 'node:process'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
 import { direction } from 'kay/i18n'
-import { checkOptionKeys, configError, escapeHtml as escape, inFlightWork, normalizeAddress, notify, underKayDev } from 'kay/library'
+import { checkOptionKeys, configError, escapeHtml as escape, inFlightWork, KayError, normalizeAddress, notify, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
@@ -90,12 +90,12 @@ export interface MailerOptions {
 }
 
 // Thrown by an `optional` mailer while the environment lacks what it needs to send, so a form can tell the visitor another way to reach the site.
-export class MailNotConfiguredError extends Error {
+export class MailNotConfiguredError extends KayError {
   override readonly name = 'MailNotConfiguredError'
-  readonly code = 'mail-not-configured'
+  declare readonly code: 'mail-not-configured'
 
   constructor(readonly missing: string[]) {
-    super(`${missing.length > 1 ? `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}` : missing[0]} must be set to send mail`)
+    super('mail-not-configured', `kayjs-mail: ${missing.length > 1 ? `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}` : missing[0]} must be set to send mail`)
   }
 }
 

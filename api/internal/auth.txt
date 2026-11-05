@@ -29,8 +29,9 @@ function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>): { getValidT
 
 [.] OAuthExchangeError
 class OAuthExchangeError
-  new (status: number, message: string): OAuthExchangeError
+  new (status: number, message: string, options?: ErrorOptions | undefined): OAuthExchangeError
   code: "oauth-exchange"
+  name: "OAuthExchangeError"
   status: number
 
 [.] SIGNED_IN_HINT

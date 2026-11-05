@@ -1,6 +1,6 @@
 import type { JWTVerifyGetKey } from 'jose'
 import type { OAuthClientConfig, OAuthEndpoints, OAuthProvider, OAuthTokens, OpenIdCheck } from './types'
-import { configError } from 'kay/library'
+import { configError, KayError } from 'kay/library'
 import { PROVIDER_TIMEOUT_MS } from './timeout'
 
 // How far apart the provider's clock and this one may be when an ID token's times are read.
@@ -24,12 +24,13 @@ function redactBody(text: string): string {
 }
 
 /** Thrown when the provider rejects the token exchange or user fetch, a bad or expired authorization code or the provider being down. `status` is the upstream HTTP status, so a caller can answer a client's bad code with a 4xx and a provider outage with a 502. */
-export class OAuthExchangeError extends Error {
-  readonly code = 'oauth-exchange'
+export class OAuthExchangeError extends KayError {
+  override readonly name = 'OAuthExchangeError'
+  declare readonly code: 'oauth-exchange'
+  declare readonly status: number
 
-  constructor(readonly status: number, message: string) {
-    super(message)
-    this.name = 'OAuthExchangeError'
+  constructor(status: number, message: string, options?: ErrorOptions) {
+    super('oauth-exchange', `kayjs-auth: ${message}`, { ...options, status })
   }
 }
 

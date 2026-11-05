@@ -1,7 +1,9 @@
 import type { Database } from 'bun:sqlite'
+import type { KayErrorOptions } from '../compiler/errors'
 import type { RedirectStatus } from './redirects'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
+import { KayError } from '../compiler/errors'
 import { leavesSite } from '../runtime/base'
 import { fillTarget, readRedirects, redirectLocation, redirectProblems } from './redirects'
 import { withoutSlash } from './routes'
@@ -19,7 +21,13 @@ const PARAM_SEGMENT = /:[A-Z_$][\w$]*/gi
 const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 
 // Why a redirect was not added, worded for the editor who asked: any other error is the store's, which they are not told.
-export class RedirectRefusedError extends Error {}
+export class RedirectRefusedError extends KayError {
+  override readonly name = 'RedirectRefusedError'
+
+  constructor(message: string, options?: KayErrorOptions) {
+    super('redirect-refused', message, options)
+  }
+}
 
 // What a runtime row answers: a redirect's status, or 410 for a path that is gone for good, which has no target.
 export type RuntimeStatus = RedirectStatus | 410

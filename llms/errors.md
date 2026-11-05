@@ -16,10 +16,12 @@ kay explain template-syntax
 
 - A compile, build, content or export error that is no lint carries a code too, printed in brackets, `error[template-syntax]`, or after the failure, `kay explain <code> says where the fix is written`.
 - `kay check --format json`, `kay build --format json` and `kay explain --format json` carry it as `code`, which is `null` for what kay did not raise at compile, build, content or export time, such as a type error TypeScript names by number.
-- `kay explain <code>` prints what raises it and the section that covers the fix; `kay explain compile`, `command`, `build`, `content` or `export` lists a group's.
+- `kay explain <code>` prints what raises it and the section that covers the fix; `kay explain compile`, `command`, `build`, `content`, `export`, `runtime` or `library` lists a group's.
 - The codes are stable names, one for a group of messages with one cause.
 - No level applies to them, and no `// kay-allow` comment reaches them.
-- Errors kay raises while serving a request, and the app's own code, carry none.
+- Errors kay raises while serving a request, other than the classes of the `runtime` group below, and the app's own code, carry none.
+- Every error kay and its libraries throw for an app to catch extends `KayError` (from `kay/library`): `code` is the registered name, `kind` tells apart what one code covers (the code itself when it covers one cause), `status` is the HTTP status it stands for (`undefined` when none), `cause` the error underneath, and `name` the class's, so `instanceof` of each class still works.
+- A message opens with `kay: ` when it names a setting (a `configError`, which every library throws for an option it refuses at boot), with `kayjs-<library>: ` when a library refuses a call of the developer's, and with nothing when the app shows it to a visitor or an editor (a `SaveConflictError`, a `RedirectRefusedError`).
 - Every error class kay exports ends in `Error`, as a library's does (`HydrationMismatchError` of `kay/dom`, `ActionRedirectError` from `kay`, `CspViolationError` from `kay/server`, `RedirectRefusedError` of `kay/library`, their `name` too).
 
 | Error | Group | Raised for | Fix |
@@ -78,3 +80,29 @@ kay explain template-syntax
 | `export-path-clash` | export | Two pages that would be prerendered to the same file. | [Prerendering](prerendering.md#prerendering) |
 | `export-api-module` | export | An API module, which answers requests only a server does. | [API modules](api-routes.md#api-modules) |
 | `export-no-client-build` | export | Prerendering run with no client build to add its pages to. | [Commands](project.md#commands) |
+| `private-address` | runtime | A host that answered with an address that is not public, which a download of kay refuses to fetch. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `redirect-refused` | runtime | A runtime redirect an editor asked for that kay refuses, worded for the editor. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `job-give-up` | runtime | A job handler that threw `GiveUpError`: the job is kept as failed at once, whatever attempts are left. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `poll-timeout` | runtime | A database call a store gave up on after its time limit. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `ai-error` | library | A kayjs-ai call that failed: `kind` says why (auth, rate-limited, unavailable, invalid, network, timeout, cut, protocol, limited, too-long, schema, unsupported, conflict). | [Errors](../packages/ai/llms/testing-and-errors.md#errors) |
+| `oauth-exchange` | library | A provider that rejected the OAuth token exchange or the user fetch: a bad or expired code, or the provider being down. `status` is the provider's. | [Errors](../packages/auth/llms/hardening-and-testing.md#errors) |
+| `save-conflict` | library | A kayjs-cms save made from a version of the file that another save has replaced, or a new file where one exists. | [Errors](../packages/cms/llms/options.md#errors) |
+| `forge-refused` | library | A Forgejo server that refused a kayjs-cms request, with its `status`. | [Errors](../packages/cms/llms/options.md#errors) |
+| `unknown-collection` | library | A kayjs-cms call naming a collection the site does not have. | [Errors](../packages/cms/llms/options.md#errors) |
+| `unread-referrers` | library | A kayjs-cms reference lookup where a collection failed to read, so the entries naming the target are not all known. | [Errors](../packages/cms/llms/options.md#errors) |
+| `mail-not-configured` | library | A send by an `optional` kayjs-mail mailer whose environment lacks what it needs. | [Errors](../packages/mail/llms/contact-form-and-testing.md#errors) |
+| `upstream-invalid` | library | A record under `.upstream/` that the kayjs-ui commands cannot use. | [Errors](../packages/ui/llms/setup.md#errors) |
+
+### Errors raised while running
+
+Each extends `KayError`, so its `code`, `kind`, `status` and `name` are set and `error instanceof KayError` holds.
+
+| Class | `code` | Thrown for |
+| --- | --- | --- |
+| `PrivateAddressError` | `private-address` | A host that answers with an address that is not public, which a download of kay refuses. |
+| `RedirectRefusedError` (`kay/library`) | `redirect-refused` | A runtime redirect an editor asked for that kay refuses, its message worded for the editor. |
+| `GiveUpError` | `job-give-up` | Thrown by a job handler for a failure no retry can mend: the job is kept as failed at once. |
+| `TimeoutError` | `poll-timeout` | A database call a store gave up on after its time limit. |
+| `MarkdownError` | `markdown-invalid` | Markdown an entry holds that kay cannot read, with the `line`. |
+
+The libraries list their own classes in an `Errors` table of their `llms/`: [kayjs-ai](../packages/ai/llms/testing-and-errors.md#errors), [kayjs-auth](../packages/auth/llms/hardening-and-testing.md#errors), [kayjs-cms](../packages/cms/llms/options.md#errors), [kayjs-mail](../packages/mail/llms/contact-form-and-testing.md#errors) and [kayjs-ui](../packages/ui/llms/setup.md#errors).

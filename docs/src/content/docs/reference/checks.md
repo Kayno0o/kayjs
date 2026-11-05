@@ -152,9 +152,11 @@ A template that does not compile, a build that stops, a collection that does not
 
 In `--format json` the code is the `code` field. It is `null` for what kay did not raise, such as a type error TypeScript names by number.
 
-`kay explain <code>` prints what raises it and the section that covers the fix, and `kay explain compile`, `command`, `build`, `content` or `export` lists a group's. The codes are stable names, one for a group of messages with one cause.
+`kay explain <code>` prints what raises it and the section that covers the fix, and `kay explain compile`, `command`, `build`, `content`, `export`, `runtime` or `library` lists a group's. The codes are stable names, one for a group of messages with one cause.
 
-No level applies to an error and no `// kay-allow` comment reaches it. Errors kay raises while serving a request, and the app's own code, carry no code.
+No level applies to an error and no `// kay-allow` comment reaches it. The classes kay and its libraries throw for an app to catch (`AiError`, `SaveConflictError`, `GiveUpError` and the rest) extend `KayError` and carry a code of the `runtime` and `library` groups. Their `kind` tells apart what one code covers, their `status` is the HTTP status they stand for, and `instanceof` of each class still works. Other errors kay raises while serving a request, and the app's own code, carry no code.
+
+A message opens with `kay: ` when it names a setting, with `kayjs-<library>: ` when a library refuses a call, and with nothing when the app shows it to a visitor.
 
 | Error | Group | Raised for | Fix |
 | --- | --- | --- | --- |
@@ -212,6 +214,18 @@ No level applies to an error and no `// kay-allow` comment reaches it. Errors ka
 | `export-path-clash` | export | Two pages that would be prerendered to the same file. | [Prerendering](/essentials/routing) |
 | `export-api-module` | export | An API module, which answers requests only a server does. | [API modules](/guides/api-routes) |
 | `export-no-client-build` | export | Prerendering run with no client build to add its pages to. | [Commands](/reference/cli) |
+| `private-address` | runtime | A host that answered with an address that is not public, which a download of kay refuses to fetch. | [Errors](/reference/checks) |
+| `redirect-refused` | runtime | A runtime redirect an editor asked for that kay refuses, worded for the editor. | [Errors](/reference/checks) |
+| `job-give-up` | runtime | A job handler that threw `GiveUpError`: the job is kept as failed at once, whatever attempts are left. | [Errors](/reference/checks) |
+| `poll-timeout` | runtime | A database call a store gave up on after its time limit. | [Errors](/reference/checks) |
+| `ai-error` | library | A kayjs-ai call that failed: `kind` says why (auth, rate-limited, unavailable, invalid, network, timeout, cut, protocol, limited, too-long, schema, unsupported, conflict). | [Errors](/libraries/kayjs-ai) |
+| `oauth-exchange` | library | A provider that rejected the OAuth token exchange or the user fetch: a bad or expired code, or the provider being down. `status` is the provider's. | [Errors](/libraries/kayjs-auth) |
+| `save-conflict` | library | A kayjs-cms save made from a version of the file that another save has replaced, or a new file where one exists. | [Errors](/libraries/kayjs-cms) |
+| `forge-refused` | library | A Forgejo server that refused a kayjs-cms request, with its `status`. | [Errors](/libraries/kayjs-cms) |
+| `unknown-collection` | library | A kayjs-cms call naming a collection the site does not have. | [Errors](/libraries/kayjs-cms) |
+| `unread-referrers` | library | A kayjs-cms reference lookup where a collection failed to read, so the entries naming the target are not all known. | [Errors](/libraries/kayjs-cms) |
+| `mail-not-configured` | library | A send by an `optional` kayjs-mail mailer whose environment lacks what it needs. | [Errors](/libraries/kayjs-mail) |
+| `upstream-invalid` | library | A record under `.upstream/` that the kayjs-ui commands cannot use. | [Errors](/libraries/kayjs-ui) |
 
 ## Fixing
 

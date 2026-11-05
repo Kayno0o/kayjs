@@ -141,3 +141,11 @@ AuthLink(mail={mail} lead={t('resetLead', { name: mail.name })})
 ## Reference
 
 - In development (`NODE_ENV=development`) and under `bun test` (`NODE_ENV=test`) no mail leaves the process: they go to the outbox, which `kay dev` lists at `/_kay/mail` and a test reads through `outbox`; a server started with `NODE_ENV=development` outside `kay dev` serves no such page. Only another `NODE_ENV`, production, sends over SMTP.
+
+### Errors
+
+`MailNotConfiguredError` extends `KayError` (from `kay/library`): `code` and `kind` are `mail-not-configured`, `missing` lists what the environment lacks, and the message opens with `kayjs-mail: `. An `optional` mailer throws it from each send while it lacks its settings. A `list.confirm` answers `{ kind }` for what a subscriber did (a result, not a throw); everything else a send reports it throws as a plain error opening with `kayjs-mail: `, or `kay: ` for an option refused at boot.
+
+| Class | `code` | `kind` | Thrown for |
+| --- | --- | --- | --- |
+| `MailNotConfiguredError` | `mail-not-configured` | `mail-not-configured` | A send by an `optional` mailer lacking `MAIL_URL` or a sender. |

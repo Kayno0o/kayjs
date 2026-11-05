@@ -1,3 +1,6 @@
+import type { KayErrorOptions } from '../compiler/errors'
+import { KayError } from '../compiler/errors'
+
 const ZONE = /%.*$/
 const DOTTED_TAIL = /(\d+\.\d+\.\d+\.\d+)$/
 
@@ -5,7 +8,13 @@ const DOTTED_TAIL = /(\d+\.\d+\.\d+\.\d+)$/
 export type Resolver = (host: string) => Promise<{ address: string, family: number }[]>
 
 // Thrown when a host answers with an address that is not public, so a download can tell it from a failing host.
-export class PrivateAddressError extends Error {}
+export class PrivateAddressError extends KayError {
+  override readonly name = 'PrivateAddressError'
+
+  constructor(message: string, options?: KayErrorOptions) {
+    super('private-address', message, options)
+  }
+}
 
 // Loaded when a name is first resolved, so an executable that fetches no remote image never loads it.
 export const resolveHost: Resolver = async (host) => {

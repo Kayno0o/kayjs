@@ -973,9 +973,9 @@ function upstreamBase(root: string, path: string): Promise<string>
 
 [./lib/eject] UpstreamError
 class UpstreamError
-  new (message?: string | undefined): UpstreamError
-  new (message?: string | undefined, options?: ErrorOptions | undefined): UpstreamError
-  new (message?: string | undefined, options?: ErrorOptions | undefined): UpstreamError
+  new (message: string, options?: ErrorOptions | undefined): UpstreamError
+  code: "upstream-invalid"
+  name: "UpstreamError"
 
 [./lib/eject] upstreamPath
 function upstreamPath(root: string, path: string): string

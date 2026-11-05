@@ -37,6 +37,10 @@ Their `deprecated-*` lints go with them: run `kay upgrade` on 1.90 first and it 
 - `PgJobsSource` is `PgSource` (`kay/server`, `kay/library`), which every Postgres store and table helper takes; kayjs-mail's `createMailSuppressionTable` from `@kaynooo/kayjs-mail/pg` is `createMailSuppressionTables` and its `mailListTables` is `mailListTableNames`, as `jobTableNames` lists names and `createXTables` creates.
 - The `sql` key of `pgLoader({ ... })` in kayjs-cms is `source`, which also takes a pg-orm `Database`.
 - The old names work until 1.94, and `kay check` flags an import of each, and the `sql` key, as `deprecated-library-names`, with a safe fix that `kay upgrade` applies.
+### `AiError.code` is `ai-error`, and the library error messages open with one prefix
+
+- `AiError` extends `KayError`: read `error.kind` for what the failure is (`'auth'`, `'rate-limited'`, `'schema'`), which `error.code` held until now. `kay check` cannot see a read of `.code`, so no lint reports it. `error.code` is `'ai-error'` and `kay explain ai-error` lists the kinds.
+- A message opens with `kay: ` for a setting, `kayjs-<library>: ` for a refused call and nothing for text shown to a visitor: `OAuthExchangeError`, `MailNotConfiguredError`, `UnreadReferrersError` and `UpstreamError` gained their library prefix. An app matching on the start of one of those messages updates the match.
 
 ## 1.90.0
 

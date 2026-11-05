@@ -1,6 +1,7 @@
 // Markdown entries compiled once into what renders them: the HTML around the kay components they use, plus their headings.
 import type { SafeHtml } from '../runtime/checks'
 import type { SanitizeOptions } from '../runtime/sanitize'
+import { KayError } from '../compiler/errors'
 import { escape, escapeAttribute } from '../runtime/escape'
 import { outsideLinks } from '../runtime/html'
 import { MARKDOWN_KEPT, MARKDOWN_OPTIONS, sanitizedMarkdown } from '../runtime/markdown'
@@ -96,11 +97,12 @@ const LINE_BREAK = /\n/g
 let words: Intl.Segmenter | undefined
 
 // kept: free
-export class MarkdownError extends Error {
-  readonly code = 'markdown-invalid'
+export class MarkdownError extends KayError {
+  declare readonly code: 'markdown-invalid'
 
   constructor(message: string, readonly line: number) {
-    super(message)
+    super('markdown-invalid', message)
+    this.name = 'MarkdownError'
   }
 }
 

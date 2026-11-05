@@ -1,7 +1,7 @@
 import type { Duration } from 'kay'
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { configError, optionMs } from 'kay/library'
+import { configError, KayError, optionMs } from 'kay/library'
 import { wording } from 'kay/words'
 import { log } from './log'
 
@@ -54,12 +54,12 @@ export interface FileSaver {
 // A save made from a version of the file another save has replaced since, or a new file where one already is.
 // `current` is the version the file is at, null once deleted, undefined when the saver could not tell.
 // `at` is the repository path of the file refused, when a move refuses one that is not the one moved.
-export class SaveConflictError extends Error {
+export class SaveConflictError extends KayError {
   override readonly name = 'SaveConflictError'
-  readonly code = 'save-conflict'
+  declare readonly code: 'save-conflict'
 
   constructor(readonly current?: string | null, readonly creating = false, readonly at?: string) {
-    super(creating ? wording('cms.store.exists', 'An entry with this slug already exists: pick another slug') : wording('cms.store.conflict', 'This entry was saved since you opened it, by another save or by yours before the site rebuilt from it'))
+    super('save-conflict', creating ? wording('cms.store.exists', 'An entry with this slug already exists: pick another slug') : wording('cms.store.conflict', 'This entry was saved since you opened it, by another save or by yours before the site rebuilt from it'), { kind: creating ? 'exists' : 'conflict', status: 409 })
   }
 }
 
@@ -183,12 +183,13 @@ export interface ForgejoOptions extends ForgejoSettings {
   baseUrl: string
 }
 
-export class ForgeError extends Error {
+export class ForgeError extends KayError {
   override readonly name = 'ForgeError'
-  readonly code = 'forge-refused'
+  declare readonly code: 'forge-refused'
+  declare readonly status: number
 
-  constructor(readonly status: number, message: string, options?: ErrorOptions) {
-    super(message, options)
+  constructor(status: number, message: string, options?: ErrorOptions) {
+    super('forge-refused', message, { ...options, status })
   }
 }
 

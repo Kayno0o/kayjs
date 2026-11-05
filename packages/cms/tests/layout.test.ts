@@ -3,7 +3,8 @@ import type { CollectionInfo, ScreenCollection, ToolbarAction } from '../src/kay
 import { describe, expect, test } from 'bun:test'
 import { TOOLBAR_ACTIONS } from '../../ui/src/markdown-edit'
 import { fieldsOf } from '../src/fields'
-import { bodylessLayout, cellText, checkLayouts, formRows, layoutProblems, listColumns, rowActions, TOOLBAR_BUTTONS, whenProblems } from '../src/layout'
+import { bodylessLayout, cellText, formRows, layoutProblems, listColumns, rowActions, TOOLBAR_BUTTONS, whenProblems } from '../src/layout'
+import { checkLayouts } from '../src/layout-check'
 import { rowsOf } from '../src/listing'
 import { configure, settings } from '../src/settings'
 

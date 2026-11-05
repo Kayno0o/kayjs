@@ -28,7 +28,7 @@ async function kay(args: string[]) {
 
 // The source the codes are raised in, without the registry itself.
 async function sources(): Promise<string> {
-  const files = [...new Glob('src/**/*.ts').scanSync({ cwd: root })].filter(file => file !== 'src/compiler/errors.ts' && !file.includes('/codec/'))
+  const files = ['src/**/*.ts', 'packages/*/src/**/*.ts'].flatMap(pattern => [...new Glob(pattern).scanSync({ cwd: root })]).filter(file => file !== 'src/compiler/errors.ts' && !file.includes('/codec/'))
 
   return (await Promise.all(files.map(async file => Bun.file(join(root, file)).text()))).join('\n')
 }
@@ -89,7 +89,7 @@ describe('error codes', () => {
     for (const error of Object.values(ERRORS)) {
       const anchor = error.fix.heading.toLowerCase().replaceAll('`', '').replace(SLUG_PUNCTUATION, '').trim().replaceAll(' ', '-')
 
-      expect(llms).toContain(`[${error.fix.heading}](${error.fix.file.replace('llms/', '')}#${anchor})`)
+      expect(llms).toContain(`[${error.fix.heading}](${error.fix.file.startsWith('packages/') ? `../${error.fix.file}` : error.fix.file.replace('llms/', '')}#${anchor})`)
     }
   })
 

@@ -1,5 +1,7 @@
 import type { SQL } from 'bun'
+import type { KayErrorOptions } from '../compiler/errors'
 import type { PgHandle } from './pg-data'
+import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { delayAfter, pollClock } from '../runtime/poll-backoff'
 import { outsideRequest } from './clean-context'
@@ -23,7 +25,13 @@ export function closeWith(pg: PgHandle, dispose: () => unknown): void {
 }
 
 // What a call given up on by `timeLimited` fails with.
-export class TimeoutError extends Error {}
+export class TimeoutError extends KayError {
+  override readonly name = 'TimeoutError'
+
+  constructor(message: string, options?: KayErrorOptions) {
+    super('poll-timeout', message, options)
+  }
+}
 
 // Gives up on `work` after `ms`, cancelling the statements it started that are still in flight so they free their connection; what else it does keeps running, its result ignored.
 export async function timeLimited<Result>(work: () => Promise<Result>, ms: number, what: string): Promise<Result> {

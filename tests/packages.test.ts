@@ -465,10 +465,20 @@ describe('the naming conventions', () => {
     expect(found).toEqual([])
   })
 
-  it('give the error class a library exports a code, as kay\'s KayError carries one', () => {
-    const find = (_: string, __: string, text: string): string[] => [...text.matchAll(/export (?:abstract )?class (\w+) extends \w*Error \{\n([\s\S]*?)\n\}/g)].filter(([, , body]) => !(/\bcode\b/).test(body!)).map(([, name]) => name!)
+  it('extend KayError in the error class a library exports, with its own name and a code of the registry', () => {
+    const find = (_: string, __: string, text: string): string[] => [...text.matchAll(/export (?:abstract )?class (\w+) extends (\w*Error) \{\n([\s\S]*?)\n\}/g)]
+      .filter(([, name, base, body]) => base !== 'KayError' || !body!.includes(`name = '${name}'`) || !(/super\('[a-z-]+'/).test(body!))
+      .map(([, name]) => name!)
 
     expect(drift(find, [])).toEqual([])
+  })
+
+  it('throw a configuration problem through configError, never as a raw error opening with `kay: `', () => {
+    // These run in the browser, where configError would bring kay/library into the island.
+    const browser = new Set(['packages/ai/src/chat-attachments.ts', 'packages/ui/src/file-drop.kay', 'packages/ui/src/steps.ts'])
+    const found = sources.flatMap(({ files }) => files.filter(({ file, text }) => !browser.has(file) && (/new Error\((?:`|')kay: /).test(text)).map(({ file }) => file))
+
+    expect(found).toEqual([])
   })
 })
 

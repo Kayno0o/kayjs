@@ -1,3 +1,5 @@
+import { configError } from 'kay/library'
+
 // What a role may do beyond editing an entry, which anyone the guard admits can.
 export const ACTIONS = ['publish', 'review', 'delete', 'upload', 'redirects'] as const
 
@@ -9,18 +11,18 @@ export function checkRoles(roles: Record<string, readonly CmsAction[]> | undefin
     return undefined
 
   if (!guarded)
-    throw new Error('kay: `cms({ roles })` needs a `guard`, which says who the signed-in person is')
+    throw configError('`cms({ roles })` needs a `guard`, which says who the signed-in person is')
 
   const checked = new Map<string, ReadonlySet<CmsAction>>()
 
   for (const [role, actions] of Object.entries(roles)) {
     if (!Array.isArray(actions))
-      throw new Error(`kay: \`cms({ roles })\` gives ${JSON.stringify(role)} ${JSON.stringify(actions)}; it takes a list of ${ACTIONS.map(action => `'${action}'`).join(', ')}`)
+      throw configError(`\`cms({ roles })\` gives ${JSON.stringify(role)} ${JSON.stringify(actions)}; it takes a list of ${ACTIONS.map(action => `'${action}'`).join(', ')}`)
 
     const unknown = (actions as readonly unknown[]).find(action => !ACTIONS.includes(action as CmsAction))
 
     if (unknown !== undefined)
-      throw new Error(`kay: \`cms({ roles })\` gives ${JSON.stringify(role)} the action ${JSON.stringify(unknown)}; the actions are ${ACTIONS.join(', ')}`)
+      throw configError(`\`cms({ roles })\` gives ${JSON.stringify(role)} the action ${JSON.stringify(unknown)}; the actions are ${ACTIONS.join(', ')}`)
 
     checked.set(role, new Set(actions))
   }

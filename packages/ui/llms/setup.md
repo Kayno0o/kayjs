@@ -114,3 +114,11 @@ A page that uses the components renders them in `testSite()` like the app's own.
 
 Components write no Tailwind utility, only the classes of `theme.css`, every one prefixed `kui-`, so a site's own `btn` or `card` never meets them, while the theme's tokens carry the app's own names (`--color-accent`, `--color-background`), so one theme feeds the app and the library. A rule of the app's on one of those classes restyles every instance, and `--border-width` sets the keyline of every framed box; utilities passed through a component's `class` prop restyle one, and `src/ui.ts` restyles the parts of a component with some, see [Restyle a component](#restyle-a-component).
 - `toast` only shows in the browser, called from an island. The server's toast list, shared by every request, stays empty. `ui()` in kay.config.ts (`kay add ui`) mounts one `Toaster`, one `TooltipHost` and the theme on every page. An extension may render its own: while one is mounted, a second renders nothing until the first unmounts.
+
+### Errors
+
+`UpstreamError` extends `KayError` (from `kay/library`): `code` and `kind` are `upstream-invalid`, and the message opens with `kayjs-ui: `. It is thrown by `kay ui` commands for a record under `.upstream/` they cannot use, and names the file and what to do. A component given a prop it refuses throws an error opening with `kay: ` (a setting) or `kayjs-ui: ` (a call).
+
+| Class | `code` | `kind` | Thrown for |
+| --- | --- | --- | --- |
+| `UpstreamError` | `upstream-invalid` | `upstream-invalid` | A record under `.upstream/` the commands cannot use. |

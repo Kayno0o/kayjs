@@ -1,5 +1,6 @@
 ai [./chat-launcher.kay] default
 ai [./chat.kay] default
+ai [.] AiError
 auth [.] Auth
 auth [.] createAuth
 kay [./server] ApiOptions

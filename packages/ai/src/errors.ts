@@ -1,3 +1,5 @@
+import { KayError } from 'kay/library'
+
 export type AiErrorKind
   // The provider refused the key (401, 403).
   = | 'auth'
@@ -47,12 +49,11 @@ export interface AiErrorDetails {
   cause?: unknown
 }
 
-export class AiError extends Error {
+// Its `code` is `ai-error` for `kay explain`, and `kind` says which of the failures it is.
+export class AiError extends KayError {
   override readonly name = 'AiError'
-  // The same as `code`, the name every error of kay and its libraries carries it under.
-  readonly kind: AiErrorKind
-  readonly code: AiErrorKind
-  readonly status: number | undefined
+  override readonly kind: AiErrorKind
+  declare readonly code: 'ai-error'
   readonly retryAfter: number | undefined
   // Which limit refused the ask, for a `limited` error.
   readonly limit: AiLimit | undefined
@@ -63,10 +64,8 @@ export class AiError extends Error {
   declare readonly [REFUSED]?: { status: number, retryAfter: number | undefined, message: string }
 
   constructor(kind: AiErrorKind, message: string, { status, retryAfter, partial, limit, fields, cause }: AiErrorDetails = {}) {
-    super(`kayjs-ai: ${message}`, { cause })
+    super('ai-error', `kayjs-ai: ${message}`, { cause, kind, status })
     this.kind = kind
-    this.code = kind
-    this.status = status
     this.retryAfter = retryAfter
     this.partial = partial
     this.limit = limit

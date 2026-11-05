@@ -7,14 +7,13 @@ type AiAttachment = Blob | Uint8Array | ArrayBuffer | StoredFile
 [.] AiError
 class AiError
   new (kind: AiErrorKind, message: string, { status, retryAfter, partial, limit, fields, cause }?: AiErrorDetails): AiError
-  code: AiErrorKind
+  code: "ai-error"
   fields: string[] | undefined
   kind: AiErrorKind
   limit: AiLimit | undefined
   name: "AiError"
   partial: string | undefined
   retryAfter: number | undefined
-  status: number | undefined
 
 [.] AiErrorKind
 type AiErrorKind = | 'auth' // Too many requests (429): `retryAfter` is the seconds the provider asked to wait, when it said. | 'rate-limited' // The provider is down or overloaded (5xx, or an error event in the stream). | 'unavailable' // The provider refused the request (another 4xx): a model it does not know, a message it cannot take. | 'invalid' // The provider could not be reached. | 'network' // The provider took longer than the `timeout` of `ask` to answer, or to send the next event: `partial` holds what came. | 'timeout' // The stream ended before the provider said the reply was done: `partial` holds what came. | 'cut' // The provider sent something that is no server-sent event of its API. | 'protocol' // The visitor or the chat is over a limit or budget set in `ai()`: `retryAfter` is the seconds until its window closes, `limit` which one. | 'limited' // The messages, with their attachments counted, are longer than the `maxInputChars` of `ask`, or an attachment is over `maxSize`: nothing was sent to the provider. | 'too-long' // The model's answer does not fit the `schema` of `ask`: it is no JSON object, was cut by `maxTokens` or refused, or breaks the schema. `fields` names the fields it refuses and `partial` holds the text. | 'schema' // An attachment is none of the kinds a model is shown (a PNG, JPEG, GIF or WebP image, a PDF), or the provider does not take its kind: nothing was sent. | 'unsupported' // A `Chat` with `keepOnServer` posted to its conversation as it stood before another tab wrote to it: nothing was sent, and the Chat reloads the conversation. | 'conflict'
