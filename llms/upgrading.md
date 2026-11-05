@@ -12,6 +12,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.89.0
 
+### The email format is one strict check
+
+- `s.String({ format: 'email' })`, the browser check and kayjs-auth's sign-up now refuse what kayjs-mail refuses as a recipient: a trailing dot, an IP domain, a quoted or commented local part, a name with angle brackets and anything past 254 characters. An address the old loose pattern took and a mailer could not deliver to is now refused at the form. `kay check` cannot recognise it, so there is no lint; nothing changes unless an app signs up such addresses.
+
 ### Defaults that fit production
 
 - With no `proxy`, a production server counts one proxy in front for a request from a private address that carries `X-Forwarded-For`, as `proxy: true` does, and warns once that it does: set `proxy: 1` to confirm one proxy in front, since a server reached directly through a private peer (a Docker bridge, an L4 balancer) would let a client choose its own rate-limit key; before, every visitor behind a reverse proxy shared one rate-limit key. A server that faces visitors directly is unchanged, since a public address is counted by itself; set `proxy: false` for one reachable from a private network that is no proxy, `proxy: 2` for two proxies.

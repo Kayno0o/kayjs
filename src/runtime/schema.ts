@@ -1,9 +1,14 @@
 import type { TSchema } from 'elysia'
 import type { ByteSize } from './byte-size'
 import { t as schema } from 'elysia'
+import { FormatRegistry } from 'elysia/type-system'
 import { byteSize } from './byte-size'
+import { isEmail } from './email'
 
 type Builder = typeof schema
+
+// The `email` format is kay's own check, the one the browser, auth and mail share, in place of Elysia's.
+FormatRegistry.Set('email', isEmail)
 
 // A string of at least 32 characters that production must set, and development and tests derive from the project path, so a secret needs no placeholder in the app: read it with `defineEnv`.
 function Secret(options: Parameters<Builder['String']>[0] = {}): ReturnType<Builder['String']> {

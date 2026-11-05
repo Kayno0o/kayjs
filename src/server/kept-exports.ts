@@ -30,6 +30,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   guard: 'request',
   guardLeave: 'free',
   installPrompt: 'free',
+  isEmail: 'free',
   jobs: 'request',
   linked: 'free',
   listen: 'free',

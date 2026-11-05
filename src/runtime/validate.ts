@@ -1,5 +1,6 @@
 import type { TSchema } from 'elysia'
 import type { InvalidWord } from '../server/words'
+import { isEmail } from './email'
 import { formInput, NUMERIC_FORMATS } from './form'
 import { controlsOf } from './form-controls'
 import { wording } from './words.client'
@@ -31,8 +32,8 @@ export interface FormRules {
 // The schemas of the actions a page's forms post to, by action path, in one JSON script of the page's head, and one more after each streamed block bringing forms the page lacked.
 export const FORMS_SCRIPT = 'script[data-kay-forms]'
 // Elysia's own checks of the formats the browser checks too; any other format is left to the server.
-const FORMATS: Record<string, RegExp> = {
-  email: /^[\w!#$%&'*+/=?^`{|}~-]+(?:\.[\w!#$%&'*+/=?^`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i,
+const FORMATS: Record<string, RegExp | ((value: string) => boolean)> = {
+  email: isEmail,
   uuid: /^(?:urn:uuid:)?[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i,
 }
 
@@ -104,6 +105,13 @@ function controlOf(form: HTMLFormElement, name: string): HTMLInputElement | HTML
 }
 
 // The schema's own `error` for a refused field, else the `kay.invalid.*` text of the keyword it fails, which the server words the same way; a site without the key reads Elysia's English.
+function formatFails(format: RegExp | ((value: string) => boolean) | undefined, value: string): boolean {
+  if (format === undefined)
+    return false
+
+  return typeof format === 'function' ? !format(value) : !format.test(value)
+}
+
 function fieldMessage(name: string, field: FieldRules, value: unknown): string | undefined {
   const message = refusal(name, field, value)
 
@@ -156,7 +164,7 @@ function refusal(name: string, field: FieldRules, value: unknown): Refusal | und
       if (field.pattern !== undefined && !new RegExp(field.pattern).test(value))
         return { kind: 'kay.invalid.pattern', english: `Expected string to match '${field.pattern}'` }
 
-      return field.format !== undefined && FORMATS[field.format]?.test(value) === false ? { kind: 'kay.invalid.format', english: `Property '${name}' should be ${field.format}`, params: { format: field.format } } : undefined
+      return field.format !== undefined && formatFails(FORMATS[field.format], value) ? { kind: 'kay.invalid.format', english: `Property '${name}' should be ${field.format}`, params: { format: field.format } } : undefined
     case 'number':
     case 'integer':
       if (typeof value !== 'number' || Number.isNaN(value))

@@ -61,6 +61,8 @@ form(action={contact})
 
 Adding a key to the record adds the option and the accepted value together. A record with no key is refused when the server starts.
 
+A string with `format: 'email'` takes one plain address and nothing else, the same check in the browser, on the server, in kayjs-auth and in kayjs-mail: no quotes, comments, IP domain, trailing dot, name with angle brackets, list, line break or space around it, and at most 254 characters. Letters of any script and an internationalised domain are fine. `isEmail(value)` from `kay` runs that check.
+
 A string field with no `maxLength` is refused past 10,000 characters, with the same error as a declared one, and the bound reaches the form's `maxlength` attribute and the tool's schema. Give a name, an email or a title a tighter one, which `kay check` warns of, and a field that takes more text a longer one.
 
 ## An action with no input

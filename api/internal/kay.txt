@@ -933,6 +933,9 @@ function inFlightWork<T>(work: () => Promise<T>): Promise<T>
 [./library] invalidateLocally
 function invalidateLocally(key: string): void
 
+[./library] isEmail
+function isEmail(input: unknown): input is string
+
 [./library] isUrlAttribute
 function isUrlAttribute(name: string): boolean
 
@@ -1104,6 +1107,9 @@ interface MissingTranslations
 
 [./library] nameUser
 function nameUser(request: Request, name: Namer): void
+
+[./library] normalizeAddress
+function normalizeAddress(input: unknown): string | undefined
 
 [./library] notify
 function notify<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E, { detached, context }?: NotifyOptions): Promise<void>

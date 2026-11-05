@@ -4,10 +4,10 @@ import type { Address, Delivery, Mail, MailAttachment, MailMessage, ViewContent 
 import { join } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
-import { escapeHtml as escape, RESTART_RELOAD, sourceHash } from 'kay/library'
+import { escapeHtml as escape, isEmail, RESTART_RELOAD, sourceHash } from 'kay/library'
 import { authMailerOptions, authMessage } from './auth'
 import { AUTH_SAMPLES, authSample } from './auth-samples'
-import { attempt, deliveryAddress, devServer, messageOf, ONE_ADDRESS, setDeliveryAddress } from './delivery'
+import { attempt, deliveryAddress, devServer, messageOf, setDeliveryAddress } from './delivery'
 import { outbox, PREVIEW_PATH } from './outbox'
 import { nodemailerMessage } from './smtp'
 
@@ -141,7 +141,7 @@ function sendForm(relay: Relay, action: string, outcome: Outcome | undefined): s
   const offered = outcome?.to ?? relay.to() ?? ''
   const result = outcome === undefined ? '' : outcomeNote(outcome, server)
 
-  return `<h2>Send for real</h2>${result}<form class="bar" method="post" action="${action}"><label>Over ${server} to <input type="email" name="to" required value="${escape(ONE_ADDRESS.test(offered) ? offered : '')}"></label><button type="submit">Send</button></form>`
+  return `<h2>Send for real</h2>${result}<form class="bar" method="post" action="${action}"><label>Over ${server} to <input type="email" name="to" required value="${escape(isEmail(offered) ? offered : '')}"></label><button type="submit">Send</button></form>`
 }
 
 function outcomeNote(outcome: Outcome, server: string): string {
@@ -155,7 +155,7 @@ function outcomeNote(outcome: Outcome, server: string): string {
 function postedAddress(body: unknown): string | undefined {
   const to = typeof body === 'object' && body !== null && 'to' in body && typeof body.to === 'string' ? body.to.trim() : undefined
 
-  return to !== undefined && ONE_ADDRESS.test(to) ? to : undefined
+  return isEmail(to) ? to : undefined
 }
 
 // Only from the development pages themselves, so another site the developer visits cannot act through them.
@@ -309,7 +309,7 @@ async function deliveryState(relay: Relay): Promise<Response> {
       const offered = relay.to()
 
       state.server = relay.server()
-      state.offered = offered !== undefined && ONE_ADDRESS.test(offered) ? offered : undefined
+      state.offered = isEmail(offered) ? offered : undefined
       state.on = to !== undefined
       state.to = to
     }

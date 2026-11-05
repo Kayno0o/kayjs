@@ -464,6 +464,9 @@ type InstallOutcome = 'accepted' | 'dismissed' | 'unavailable'
 [.] installPrompt
 const installPrompt: { available: () => boolean; show(): Promise<InstallOutcome>; }
 
+[.] isEmail
+function isEmail(input: unknown): input is string
+
 [.] IslandComponent
 type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Element) & IslandBrand
 

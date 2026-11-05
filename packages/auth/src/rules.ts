@@ -1,14 +1,13 @@
 // The credential rules, stated once so a form and the server agree. Browser-safe: an island imports them from `@kaynooo/kayjs-auth/rules` to refuse before posting, and the server checks every one again.
 
+import { isEmail } from 'kay'
+
 export const PASSWORD_MIN_LENGTH = 10
 // Argon2id has no ceiling of its own, and an unbounded field is free CPU for whoever posts it.
 export const PASSWORD_MAX_LENGTH = 128
 export const USERNAME_MIN_LENGTH = 2
 export const USERNAME_MAX_LENGTH = 32
-const EMAIL_MAX_LENGTH = 254
 
-// Loose on purpose, but a comma, an angle bracket or a quote never belongs to an address a mailer is handed: an address delivers or it does not, and a strict pattern refuses real addresses far more often than it catches a typo.
-const EMAIL = /^[^\s@,<>"]+@[^\s@,<>"][^\s.@,<>"]*\.[^\s@,<>"]+$/
 // Letters and digits in any script, with spaces, dots, hyphens and underscores inside only.
 const USERNAME = /^[\p{L}\p{N}](?:[\p{L}\p{N} ._-]*[\p{L}\p{N}])?$/u
 const WHITESPACE = /\s+/g
@@ -38,7 +37,7 @@ export function mixesConfusableScripts(value: string): boolean {
 export function emailProblem(email: string): EmailProblem | undefined {
   const normalized = normalizeEmail(email)
 
-  return EMAIL.test(normalized) && normalized.length <= EMAIL_MAX_LENGTH && !mixesConfusableScripts(normalized.slice(0, normalized.lastIndexOf('@'))) ? undefined : 'invalid'
+  return isEmail(normalized) && !mixesConfusableScripts(normalized.slice(0, normalized.lastIndexOf('@'))) ? undefined : 'invalid'
 }
 
 // What an app sets over the defaults, in the `rules` option of `createAuth`, and the same object an island passes to `passwordProblem` and `usernameProblem`.

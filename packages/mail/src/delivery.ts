@@ -3,10 +3,7 @@ import type { Mail } from './types'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { KAY_DIR, underKayDev } from 'kay/library'
-
-// One address, as the send form takes: a comma or a name would add a recipient.
-export const ONE_ADDRESS = /^[^\s<>@,]+@[^\s<>@,]+$/
+import { isEmail, KAY_DIR, underKayDev } from 'kay/library'
 
 // The "Send for real" switch, kept so the server restarting keeps it.
 const SWITCH_FILE = 'mail-delivery.json'
@@ -29,7 +26,7 @@ export async function deliveryAddress(): Promise<string | undefined> {
   try {
     const { to } = await Bun.file(switchPath()).json() as { to?: unknown }
 
-    return typeof to === 'string' && ONE_ADDRESS.test(to) ? to : undefined
+    return isEmail(to) ? to : undefined
   }
   catch {
     return undefined

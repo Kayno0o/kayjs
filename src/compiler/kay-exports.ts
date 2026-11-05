@@ -29,6 +29,7 @@ export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
   followLog: 'browser',
   guard: 'browser',
   guardLeave: 'browser',
+  isEmail: 'shared',
   installPrompt: 'browser',
   jobs: 'browser',
   linked: 'browser',
