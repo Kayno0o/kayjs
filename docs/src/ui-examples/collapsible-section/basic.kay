@@ -1,5 +1,5 @@
 ---
 import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
 ---
-CollapsibleSection(title="Active")
+CollapsibleSection(title="Active" open)
   p Io, Europa and Ganymede.

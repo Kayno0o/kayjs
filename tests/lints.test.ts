@@ -1202,6 +1202,14 @@ describe('deprecated-ui-callbacks', () => {
     expect(found('Table(columns={[]} rows={[]} rowKey="id" {onSelect})')).toEqual([{ at: 'onSelect', fix: ['{onSelect}->onSelectedChange={onSelect}'] }])
   })
 
+  it('renames onToggle on a Table and a TreeView, unless onOpenChange is written', () => {
+    expect(found('Table(columns={[]} rows={[]} rowKey="id" expandable onToggle={open})')).toEqual([{ at: 'onToggle', fix: ['onToggle->onOpenChange'] }])
+    expect(found('TreeView(nodes={[]} label="x" {onToggle})')).toEqual([{ at: 'onToggle', fix: ['{onToggle}->onOpenChange={onToggle}'] }])
+    expect(found('Table(columns={[]} rows={[]} rowKey="id" expandable onToggle={a} onOpenChange={b})')).toEqual([{ at: 'onToggle', fix: undefined }])
+    expect(found('Timeline(label="x" entries={[]} onToggle={b})')).toEqual([])
+    expect(found('TreeView(nodes={[]} label="x" onOpenChange={b})')).toEqual([])
+  })
+
   it('leaves a press, the new name and other tags alone', () => {
     expect(found('BarList(rows={[]} onSelect={pick})')).toEqual([])
     expect(found('Timeline(label="x" entries={[]} onSelectedChange={b})')).toEqual([])

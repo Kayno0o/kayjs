@@ -2,6 +2,11 @@
 
 ## Common tasks
 
+### One name for show and hide
+
+- A component that shows and hides something takes `open` and reports through `onOpenChange(open, ...context)`, the context being what the component knows (a MediaGallery's index, a DateRangeInput's box); a Table and a TreeView open many rows, so theirs lead with the row key or node id, `onOpenChange(key, open)` and `onOpenChange(id, open, node)`. A list of things open stays `expanded` or `value` (Table and TreeView `expanded`, Accordion `value`), and a component with two such regions names each: SplitLayout `sidebarOpen` with `onSidebarOpenChange` and `detailOpen` with `onDetailOpenChange`. `open` defaults to `false` everywhere, and `boxed` to `false` on CollapsibleSection and Accordion. `onToggle` on Table and TreeView, before 1.89 the callback, works until 1.92 (`deprecated-ui-callbacks`).
+- Not disclosures, so named for what they are: Notice `open` is whether it shows, adding a close button as `dismissible` does, with `onDismiss` for the press; MarkdownEditor `previewing` and RecordButton `recording` are modes of a control (edit or preview, idle or recording) with `onPreviewChange` and `onRecordingChange`.
+
 ### CollapsibleSection, Accordion
 
 - `CollapsibleSection(title open={open()} onOpenChange={now => ...})`: `open` follows the page when it changes, `onOpenChange(open)` is called on every fold and unfold, however it came about. Passing it makes the section an island; without it the section stays static. `disabled` keeps it as it is, `title` takes a string or a block.
@@ -19,7 +24,7 @@
 ### TreeView
 
 - `TreeNode.children` may be `() => TreeNode[] | Promise<TreeNode[]>`, called once the first time the branch opens, the nodes kept; the row is `aria-busy` with a spinner meanwhile, and a throw or rejection shows `failureLabel` (`ui.treeView.failure`) beside a `retryLabel` button (`ui.treeView.retry`), opening the branch again also retrying. A tree with such a branch is an island.
-- `onToggle(id, open, node)` runs for each click or key opening or closing a branch. `expanded` is followed when the parent passes a new list, the selected node's branches staying open. Parts `spinner`, `failed`, `retry`.
+- `onOpenChange(id, open, node)` runs for each click or key opening or closing a branch. `expanded` is followed when the parent passes a new list, the selected node's branches staying open. Parts `spinner`, `failed`, `retry`.
 
 ### Avatar, SiteFavicon, CopyButton, AudioPlayer
 

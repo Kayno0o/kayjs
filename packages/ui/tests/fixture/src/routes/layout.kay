@@ -27,7 +27,7 @@ main
         a(href="/table") New
       p Phobos
   article#collapsed
-    CollapsibleSection(title="Older" open={false} boxed)
+    CollapsibleSection(title="Older" boxed)
       @meta
         Badge(label={2})
       p Deimos

@@ -12,7 +12,7 @@ description: A group of collapsible sections where opening one closes the others
 
 <Demo name="accordion/multiple" />
 
-`boxed` is on by default and draws each section as a card, with neighbours sharing their border. `boxed={false}` draws plain headings.
+`boxed` draws each section as a card, with neighbours sharing their border, as CollapsibleSection does; sections are plain headings otherwise.
 
 ## Keeping which sections are open
 

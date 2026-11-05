@@ -13,7 +13,7 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
 
 const look = recipe({ parts: { root: 'kui-accordion' } })
 
-const { items, level, multiple = false, boxed = true, value, onChange, panel, title, meta, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onChange'> & {
+const { items, level, multiple = false, boxed = false, value, onChange, panel, title, meta, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onChange'> & {
   // `open` starts a section unfolded; with one open at a time, the first one flagged wins. `disabled` keeps a section as it is, and `meta` draws a count or a state in its band, as CollapsibleSection's does.
   items: readonly { value: string, title: string, open?: boolean | undefined, disabled?: boolean | undefined, meta?: string | undefined }[]
   // The values open, which the accordion follows when the app passes a new one: a string, or an array with `multiple`. Left out, the reader alone decides after the first draw.

@@ -449,6 +449,11 @@ describe('SplitLayout', () => {
     await settle()
 
     expect(split.hasAttribute('data-sidebar-open')).toBe(false)
+
+    click(split.querySelector('.kui-split-layout-detail-back .kui-icon-btn'))
+    await settle()
+
+    expect(split.hasAttribute('data-detail-open')).toBe(false)
   })
 
   test('resizes the list with the arrow keys within its bounds, and keeps the width for the next visit', async () => {
@@ -576,9 +581,9 @@ describe('SplitLayout on a phone', () => {
       toggle.focus()
       click(toggle)
       await settle()
-      await untilHolds(() => document.activeElement === root.querySelector('#edit'))
+      await untilHolds(() => document.activeElement === root.querySelector('.kui-split-layout-detail-back .kui-icon-btn'))
 
-      expect(document.activeElement).toBe(root.querySelector('#edit'))
+      expect(document.activeElement).toBe(root.querySelector('.kui-split-layout-detail-back .kui-icon-btn'))
 
       click(toggle)
       await settle()

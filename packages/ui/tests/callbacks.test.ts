@@ -3,8 +3,8 @@ import { expect, test } from 'bun:test'
 
 const CALLBACK = /^ {2}(on[A-Z]\w*)\??:/gm
 const CHANGE = /^on([A-Z]\w*)Change$/
-// Change callbacks that only observe state the component owns, with no prop to hold it.
-const OBSERVE_ONLY = new Set(['audio-player.kay:onChapterChange', 'date-input.kay:onMonthChange', 'date-range-input.kay:onMonthChange', 'hover-card.kay:onOpenChange'])
+// Change callbacks that only observe state the component owns, with no prop to hold it, or that hold it as a list (`expanded`) of the things they report one at a time.
+const OBSERVE_ONLY = new Set(['audio-player.kay:onChapterChange', 'date-input.kay:onMonthChange', 'date-range-input.kay:onMonthChange', 'hover-card.kay:onOpenChange', 'table.kay:onOpenChange', 'tree-view.kay:onOpenChange'])
 const SOURCES = [...new Glob('*.kay').scanSync('src')].toSorted()
 
 async function declared() {

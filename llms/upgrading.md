@@ -48,6 +48,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `empty` is the bare-adjective boolean and the block is named apart, so a block present never reads as "always empty". `Widget(isEmpty)` with `@empty` is `Widget(empty)` with `@emptyState`; the old names work until 1.92 and `kay check` flags them as `deprecated-ui-props`, with a safe fix that `kay upgrade` applies.
 
+### kayjs-ui: show and hide state is `open`, `onOpenChange` and `false`
+
+- A Table's and a TreeView's `onToggle(key, open)` and `onToggle(id, open, node)` are `onOpenChange` with the same arguments; the old name works until 1.92 and `kay check` flags it as `deprecated-ui-callbacks`, with a safe fix that `kay upgrade` applies.
+- `CollapsibleSection` starts folded and `Accordion` draws plain headings, as every `open` and `boxed` defaults to `false`: `kay check` cannot see a default, so write `CollapsibleSection(title="Active" open)` where the section starts unfolded, and `Accordion(items boxed)` where the cards are wanted.
+
 ## 1.88.0
 
 ### The names of 1.84 are gone

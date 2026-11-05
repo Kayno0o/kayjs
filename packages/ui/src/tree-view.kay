@@ -12,7 +12,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-tree-view', item: 'kui-tree-view-item', toggle: 'kui-tree-view-toggle', spinner: 'kui-tree-view-spinner animate-spin motion-reduce:animate-none', icon: 'kui-tree-view-icon', label: 'kui-tree-view-label', link: 'kui-tree-view-link', failed: 'kui-tree-view-failed', retry: 'kui-tree-view-retry', trailing: 'kui-tree-view-trailing' } })
 
-const { nodes, label, selected, expanded = [], onSelectedChange, onSelect, onToggle, trailing, failureLabel = wording('ui.treeView.failure', 'Could not load.'), retryLabel = wording('ui.treeView.retry', 'Try again'), ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect' | 'onToggle'> & {
+const { nodes, label, selected, expanded = [], onSelectedChange, onSelect, onOpenChange, onToggle, trailing, failureLabel = wording('ui.treeView.failure', 'Could not load.'), retryLabel = wording('ui.treeView.retry', 'Try again'), ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect' | 'onToggle'> & {
   nodes: readonly TreeNode<Id>[]
   // Names the tree for screen readers.
   label: string
@@ -21,6 +21,8 @@ const { nodes, label, selected, expanded = [], onSelectedChange, onSelect, onTog
   // The branches open; a tree whose parent passes another list follows it, and the reader opens and closes branches from then on.
   expanded?: readonly Id[] | undefined
   // Called with the branch's id, whether it is now open and the node, whenever the reader opens or closes a branch, by a click or a key.
+  onOpenChange?: ((id: Id, open: boolean, node: TreeNode<Id>) => unknown) | undefined
+  // Before 1.89 `onOpenChange` was called `onToggle`; both work until 1.92 (`deprecated-ui-callbacks`).
   onToggle?: ((id: Id, open: boolean, node: TreeNode<Id>) => unknown) | undefined
   // What a branch whose children failed to load says, beside a button that tries again.
   failureLabel?: string | undefined
@@ -152,7 +154,7 @@ function toggle(id: TreeId) {
     failed.set(shown => without(shown, id))
 
   if (node)
-    onToggle?.(id as Id, opening, node)
+    onOpenChange ? onOpenChange(id as Id, opening, node) : onToggle?.(id as Id, opening, node)
 }
 
 function pick(row: TreeRow<Id>) {

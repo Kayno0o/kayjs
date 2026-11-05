@@ -1243,6 +1243,10 @@
     @apply flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 md:hidden;
   }
 
+  .kui-split-layout-detail-back {
+    @apply flex shrink-0 items-center border-b border-border px-3 py-2 md:hidden;
+  }
+
   .kui-split-layout-sidebar-title {
     @apply truncate text-sm;
   }

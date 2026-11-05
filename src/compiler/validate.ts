@@ -16,6 +16,8 @@ const MUTED = /(^\s*|[[,?:]\s*)(['"])muted\2(?=\s*([\]),:}]|$))/g
 const MUTED_TONE = /(\btone['"]?\s*:\s*)(['"])muted\2/g
 // The kayjs-ui tags whose `selected` prop reports through `onSelectedChange` since 1.87, the callback named `onSelect` before.
 const SELECTED_TAGS = new Set(['table', 'tree-view', 'timeline'])
+// The kayjs-ui tags whose `onToggle` is `onOpenChange` since 1.89, as every show and hide state reports.
+const TOGGLE_TAGS = new Set(['table', 'tree-view'])
 // The kayjs-ui tags whose per-day predicate `isDisabled` is `disabledDay` since 1.89.
 const DATE_TAGS = new Set(['date-input', 'date-range-input'])
 // Widget's `isEmpty` is `empty` and its `@empty` block `@emptyState` since 1.89.
@@ -883,6 +885,16 @@ class Validator {
         const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'onSelectedChange={onSelect}' } : { start: attribute.name.start, end: attribute.name.end, text: 'onSelectedChange' }
 
         this.lint(attribute.name, 'deprecated-ui-callbacks', `\`onSelect\` on \`${element.name}\` is \`onSelectedChange\` since kayjs-ui 1.87, beside the \`selected\` it reports`, { help: 'Write `onSelectedChange`', fixes: [{ title: 'Write `onSelectedChange`', edits: [edit], safe: true }] })
+
+        continue
+      }
+
+      if (TOGGLE_TAGS.has(file) && name === 'onToggle') {
+        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'onOpenChange={onToggle}' } : { start: attribute.name.start, end: attribute.name.end, text: 'onOpenChange' }
+
+        const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'onOpenChange')
+
+        this.lint(attribute.name, 'deprecated-ui-callbacks', `\`onToggle\` on \`${element.name}\` is \`onOpenChange\` since kayjs-ui 1.89, as every show and hide state reports`, named ? { help: 'Drop `onToggle`, `onOpenChange` is there' } : { help: 'Write `onOpenChange`', fixes: [{ title: 'Write `onOpenChange`', edits: [edit], safe: true }] })
 
         continue
       }

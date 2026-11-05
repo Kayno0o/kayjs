@@ -16,6 +16,6 @@ const { rows, expanded, onToggle, narrow } = props<{
 
 const columns: Column<Moon>[] = [{ key: 'name', header: 'Name' }]
 ---
-Table(columns={columns} rows={rows} rowKey="id" expandable expanded={expanded} onToggle={onToggle} narrow={narrow})
+Table(columns={columns} rows={rows} rowKey="id" expandable expanded={expanded} onOpenChange={onToggle} narrow={narrow})
   @detail(moon)
     p.more Orbit of {moon.name}

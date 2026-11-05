@@ -34,7 +34,7 @@ SidePanel#beside(open={beside()} modal={false} closeHref="/list" title="Venus" o
   p#beside-body Second planet
 SidePanel#linked(open={linked()} modal={false} closeHref="/list" title="Earth")
   p#linked-body Third planet
-SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={() => sidebarOpen = false} sidebarTitle="Planets" resizableList listWidthKey={listWidthKey} detailOpen={detailOpen()})
+SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={() => sidebarOpen = false} sidebarTitle="Planets" resizableList listWidthKey={listWidthKey} detailOpen={detailOpen()} onDetailOpenChange={() => detailOpen = false})
   @sidebar
     nav Inner, outer
   @list

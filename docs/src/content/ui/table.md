@@ -32,7 +32,7 @@ The `@bulk(keys, clear)` block draws the page's bulk actions beside the count wh
 
 `expandable` puts a toggle on each row that opens the `@detail(row)` block in a full-width row under it, or under its card when the rows are stacked. Rows start closed. The toggle carries `aria-expanded` and `aria-controls`, and is named `Details of <first column's text>`; `expandLabel(row)` replaces the words.
 
-`expanded` gives the keys of the rows to start open (a new list from the parent is followed) and `onToggle(key, open)` hears each toggle. A table cannot be both `expandable` and `virtual`.
+`expanded` gives the keys of the rows to start open (a new list from the parent is followed) and `onOpenChange(key, open)` hears each toggle. A table cannot be both `expandable` and `virtual`.
 
 <Demo name="table/expandable" />
 

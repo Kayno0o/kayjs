@@ -24,4 +24,4 @@ const nodes = [
 button#release(type="button" onClick={() => waiting.shift()?.()}) Release
 button#heal(type="button" onClick={() => healed = true}) Heal
 button#expand(type="button" onClick={() => expanded = ['plain']}) Expand
-TreeView#tree(nodes={nodes} label="Files" expanded={expanded()} onToggle={(id, open) => calls.push(`${id} ${open}`)})
+TreeView#tree(nodes={nodes} label="Files" expanded={expanded()} onOpenChange={(id, open) => calls.push(`${id} ${open}`)})

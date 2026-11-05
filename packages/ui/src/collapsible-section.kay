@@ -6,7 +6,7 @@ import ToggleWatch from './internal/toggle-watch.kay'
 
 const look = recipe({ parts: { root: 'kui-collapsible-section', summary: 'kui-collapsible-section-summary', title: 'kui-collapsible-section-title', meta: 'kui-collapsible-section-meta', chevron: 'kui-collapsible-section-chevron', body: 'kui-collapsible-section-body' } })
 
-const { title, level, open = true, boxed = false, disabled = false, meta, onOpenChange, ...rest } = props<Omit<JSX.IntrinsicElements['details'], 'class' | 'title' | 'open' | 'children'> & {
+const { title, level, open = false, boxed = false, disabled = false, meta, onOpenChange, ...rest } = props<Omit<JSX.IntrinsicElements['details'], 'class' | 'title' | 'open' | 'children'> & {
   // The heading: a string, or a block to draw it, as `meta` is.
   title: string | Snippet
   // Makes the title a heading of that level, inside the summary, so the section shows in a screen reader's outline; without it, the title is a plain span.
