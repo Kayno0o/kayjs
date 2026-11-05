@@ -1,0 +1,14 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const claim = action(t.Object({ handle: t.String({ minLength: 3, maxLength: 40, error: '<img src=x onerror=alert(1)>' }) }), () => undefined)
+---
+---
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+---
+main
+  form#claim(action={claim})
+    FormField(label="Handle" name="handle")
+      input(name="handle")
+    button(formnovalidate) Claim

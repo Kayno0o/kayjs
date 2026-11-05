@@ -1449,6 +1449,15 @@ describe('FormField in a form calling an action', () => {
     expect(refused.html).toMatch(/<input name="handle"[^>]*aria-describedby="[\w-]+"/)
   })
 
+  test('shows a refusal message that is markup as text in a plain form(action)', async () => {
+    const { claim } = await import('../src/routes/form-hostile.kay')
+
+    const refused = await site.submit(claim, { handle: 'ab' }, { from: '/form-hostile' })
+
+    expect(refused.html).toContain('&lt;img src=x onerror=alert(1)')
+    expect(refused.html).not.toContain('<img src=x')
+  })
+
   test('puts the posted value back and marks a raw input invalid inside Form', async () => {
     const { claim } = await import('../src/routes/form-component.kay')
 

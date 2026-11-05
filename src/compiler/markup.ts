@@ -408,7 +408,8 @@ export abstract class TemplateWriter {
       b.add(`${helperName('merge')}(`)
 
     const props = this.sources(element, getters, true)
-    const scope = componentAction(element, this.src) !== undefined
+    // Read through the props, or from its own expression when a spread merges them and `this` is no longer the props.
+    const scope = componentAction(element, this.src)?.expression
 
     for (const slot of element.children.filter((child): child is SlotNode => child.kind === 'slot' && child !== except)) {
       props.separate()
@@ -419,7 +420,7 @@ export abstract class TemplateWriter {
       }
       else {
         b.add(`get ${JSON.stringify(this.source(slot.name))}() { return `)
-        this.childrenValue(slot.children, this.lazySlots, scope)
+        this.childrenValue(slot.children, this.lazySlots, scope, spreads)
         b.add(' }')
 
         // A client-only island shows the use's `@fallback` through a key of kay's own, so a component with a `fallback` prop keeps it.
@@ -436,7 +437,7 @@ export abstract class TemplateWriter {
     if (children.length > 0) {
       props.separate()
       b.add('get children() { return ')
-      this.childrenValue(children, this.lazySlots, scope)
+      this.childrenValue(children, this.lazySlots, scope, spreads)
       b.add(' }')
     }
 
@@ -813,7 +814,7 @@ export abstract class TemplateWriter {
   // What a component receives as `children` or a slot: a lone line of text as its string or values, as JSX passes it, anything else rendered.
   // With `lazy`, rendered children are a function building them, which `eachChild` calls where they are put.
   // With `scope`, the component is given an `action` and the content renders as that action's form's does, once it is read as the action the component got.
-  protected childrenValue(nodes: Node[], lazy = false, scope = false): void {
+  protected childrenValue(nodes: Node[], lazy = false, scope?: Extract<Attribute, { kind: 'expression' }>['expression'], fromSource = false): void {
     const { b } = this
     const lone = nodes.length === 1 && nodes[0]!.kind === 'text' ? nodes[0] : undefined
 
@@ -821,8 +822,14 @@ export abstract class TemplateWriter {
       if (lazy)
         b.add('() => (')
 
-      if (scope)
-        b.add(`${helperName(this.scoping)}(this.action, () => (`)
+      if (scope) {
+        b.add(`${helperName(this.scoping)}(`)
+
+        if (fromSource)
+          b.addSource(scope).add(', () => (')
+        else
+          b.add('this.action, () => (')
+      }
 
       this.rendered(nodes)
 

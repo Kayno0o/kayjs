@@ -747,7 +747,7 @@ export class JsxTemplate {
       return false
 
     const name = this.text(attribute.name)
-    // The names written in a component's content are not checked against its action's input.
+    // The names written in a component's content are not checked against its action's input, while `field` keeps the target: it takes the constraints of the action's schema, which a component's own action carries too.
     const target = name === 'name' && this.facts.loose.has(element) ? undefined : this.facts.forms.get(element)
 
     if (name === FIELD_ATTRIBUTE ? !FIELD_ELEMENTS.has(element.name) : name !== 'name' || !FORM_FIELDS.has(element.name))
