@@ -1941,7 +1941,7 @@ class MarkdownError
   code: "markdown-invalid"
   kind: string
   line: number
-  name: string
+  name: "MarkdownError"
   status: number | undefined
 
 [./content] markdownField
@@ -2503,11 +2503,14 @@ function crossSiteResponse(request: Request, what: "action" | "request", site?: 
 class CspViolationError
   new (directive: string, blocked: string, url: string, disposition: "enforce" | "report", source?: string | undefined, sample?: string | undefined): CspViolationError
   blocked: string
+  code: "csp-violation"
   directive: string
   disposition: "enforce" | "report"
-  name: string
+  kind: string
+  name: "CspViolationError"
   sample?: string | undefined
   source?: string | undefined
+  status: number | undefined
   url: string
 
 [./server] dataTableNames
@@ -3262,7 +3265,11 @@ function requestId(request: Request): string
 [./server] RequestTimeoutError
 class RequestTimeoutError
   new (ms: number): RequestTimeoutError
+  code: "request-timeout"
+  kind: string
   ms: number
+  name: "RequestTimeoutError"
+  status: number | undefined
 
 [./server] retryLater
 function retryLater(wait: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, reason?: string): Error

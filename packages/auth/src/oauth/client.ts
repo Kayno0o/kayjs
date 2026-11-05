@@ -71,7 +71,7 @@ export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuth
     catch (error) {
       discovered = undefined
 
-      throw new OAuthExchangeError(502, `OAuth discovery failed (${provider.name}): ${error instanceof Error ? error.message : String(error)}`)
+      throw new OAuthExchangeError(502, `OAuth discovery failed (${provider.name}): ${error instanceof Error ? error.message : String(error)}`, { cause: error })
     }
   }
 
@@ -136,7 +136,7 @@ export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuth
       // A key set out of reach is the provider down; any other failure, a token not to trust.
       const refused = error instanceof errors.JOSEError && error.code !== 'ERR_JOSE_GENERIC' && !(error instanceof errors.JWKSTimeout)
 
-      throw new OAuthExchangeError(refused ? 400 : 502, `OAuth ID token refused (${provider.name}): ${error instanceof Error ? error.message : String(error)}`)
+      throw new OAuthExchangeError(refused ? 400 : 502, `OAuth ID token refused (${provider.name}): ${error instanceof Error ? error.message : String(error)}`, { cause: error })
     }
 
     const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud]
@@ -259,7 +259,7 @@ async function askProvider(name: string, what: string, url: string, init: Reques
     return { res, text: await res.text() }
   }
   catch (error) {
-    throw new OAuthExchangeError(502, `OAuth ${what} failed (${name}): ${error instanceof Error ? error.message : String(error)}`)
+    throw new OAuthExchangeError(502, `OAuth ${what} failed (${name}): ${error instanceof Error ? error.message : String(error)}`, { cause: error })
   }
 }
 
@@ -282,7 +282,7 @@ function tokensFrom<Raw, User>(provider: OAuthProvider<Raw, User>, raw: unknown)
     if (error instanceof OAuthExchangeError)
       throw error
 
-    throw new OAuthExchangeError(502, `OAuth token request failed (${provider.name}): ${error instanceof Error ? error.message : String(error)}`)
+    throw new OAuthExchangeError(502, `OAuth token request failed (${provider.name}): ${error instanceof Error ? error.message : String(error)}`, { cause: error })
   }
 }
 

@@ -144,7 +144,7 @@ AuthLink(mail={mail} lead={t('resetLead', { name: mail.name })})
 
 ### Errors
 
-`MailNotConfiguredError` extends `KayError` (from `kay/library`): `code` and `kind` are `mail-not-configured`, `missing` lists what the environment lacks, and the message opens with `kayjs-mail: `. An `optional` mailer throws it from each send while it lacks its settings. A `list.confirm` answers `{ kind }` for what a subscriber did (a result, not a throw); everything else a send reports it throws as a plain error opening with `kayjs-mail: `, or `kay: ` for an option refused at boot.
+`MailNotConfiguredError` extends `KayError` (from `kay/library`): `code` and `kind` are `mail-not-configured`, `missing` lists what the environment lacks, and the message opens with `kayjs-mail: `. An `optional` mailer throws it from each send while it lacks its settings. A `list.confirm` answers `{ kind }` for what a subscriber did (a result, not a throw); the plain errors of the other calls mostly open with `kayjs-mail: `, and an option refused at boot with `kay: `.
 
 | Class | `code` | `kind` | Thrown for |
 | --- | --- | --- | --- |

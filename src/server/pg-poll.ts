@@ -27,6 +27,7 @@ export function closeWith(pg: PgHandle, dispose: () => unknown): void {
 // What a call given up on by `timeLimited` fails with.
 export class TimeoutError extends KayError {
   override readonly name = 'TimeoutError'
+  declare readonly code: 'poll-timeout'
 
   constructor(message: string, options?: KayErrorOptions) {
     super('poll-timeout', message, options)

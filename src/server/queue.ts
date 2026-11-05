@@ -189,6 +189,7 @@ const DEFAULT_PATH = 'data/jobs.sqlite'
 // Thrown from a handler for a failure no retry can mend: the job is kept as failed at once, whatever attempts are left.
 export class GiveUpError extends KayError {
   override readonly name = 'GiveUpError'
+  declare readonly code: 'job-give-up'
 
   constructor(message: string, options?: KayErrorOptions) {
     super('job-give-up', message, options)

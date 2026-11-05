@@ -303,12 +303,42 @@ export const ERRORS = {
   },
   'job-give-up': {
     group: 'runtime',
-    summary: 'A job handler that threw `GiveUpError`: the job is kept as failed at once, whatever attempts are left.',
+    summary: 'A workflow run whose steps changed under it, which gives up at once instead of retrying.',
     fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
   },
   'poll-timeout': {
     group: 'runtime',
     summary: 'A database call a store gave up on after its time limit.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'request-timeout': {
+    group: 'runtime',
+    summary: 'A request that ran past its `timeout`: a page answers 504 through the nearest `_error.kay`.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'island-props-invalid': {
+    group: 'runtime',
+    summary: 'An island given a prop that cannot reach the browser: a function, rendered markup or a value the wire format refuses.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'stream-refused': {
+    group: 'runtime',
+    summary: 'A stream source that cannot serve after all, which closes the stream so the browser opens it again after its backoff.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'csp-violation': {
+    group: 'runtime',
+    summary: 'A violation of the site\'s content security policy as a browser reported it to kay\'s report route.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'config-refused': {
+    group: 'runtime',
+    summary: 'A `kay.config.ts` that does not load, the process that found out having printed why.',
+    fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
+  },
+  'database-owned': {
+    group: 'runtime',
+    summary: 'A boot on a database that belongs to another app.',
     fix: { file: 'llms/errors.md', heading: 'Errors raised while running' },
   },
   'ai-error': {
@@ -437,13 +467,13 @@ export function errorList(group?: ErrorGroup): string {
 }
 
 // What `kay explain <code>` prints: what raises it and where the fix is written.
-export function explainError(name: ErrorName): string {
+export function explainError(name: ErrorName, where: (file: string) => string = file => file): string {
   const error: ErrorCode = ERRORS[name]
 
   return [
     `${name}: an error of ${error.group}`,
     error.summary,
-    `The fix is written in ${error.fix.file}, in the section "${error.fix.heading}".`,
+    `The fix is written in ${where(error.fix.file)}, in the section "${error.fix.heading}".`,
   ].join('\n\n')
 }
 

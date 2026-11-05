@@ -10,6 +10,7 @@ export type Resolver = (host: string) => Promise<{ address: string, family: numb
 // Thrown when a host answers with an address that is not public, so a download can tell it from a failing host.
 export class PrivateAddressError extends KayError {
   override readonly name = 'PrivateAddressError'
+  declare readonly code: 'private-address'
 
   constructor(message: string, options?: KayErrorOptions) {
     super('private-address', message, options)

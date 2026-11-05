@@ -1,7 +1,6 @@
 // The credential rules, stated once so a form and the server agree. Browser-safe: an island imports them from `@kaynooo/kayjs-auth/rules` to refuse before posting, and the server checks every one again.
 
 import { isEmail } from 'kay'
-import { configError } from 'kay/library'
 
 export const PASSWORD_MIN_LENGTH = 10
 // Argon2id has no ceiling of its own, and an unbounded field is free CPU for whoever posts it.
@@ -67,43 +66,14 @@ export interface ResolvedRules {
 
 export const DEFAULT_RULES: ResolvedRules = { password: { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH }, username: { min: USERNAME_MIN_LENGTH, max: USERNAME_MAX_LENGTH } }
 
-// What the prebuilt pages' forms take at most, so a ceiling above never meets a refusal from the form first.
-const FORM_PASSWORD_MAX = 1024
-const FORM_USERNAME_MAX = 128
-
-function limit(value: number | undefined, fallback: number, name: string): number {
-  if (value === undefined)
-    return fallback
-
-  if (!Number.isInteger(value) || value < 1)
-    throw configError(`rules.${name} is ${value}, a whole number of at least 1`)
-
-  return value
-}
-
-// The rules with the defaults filled in, refusing a range that no value fits.
-export function resolveRules(rules: CredentialRules = {}): ResolvedRules {
-  const password = { min: limit(rules.password?.min, PASSWORD_MIN_LENGTH, 'password.min'), max: limit(rules.password?.max, PASSWORD_MAX_LENGTH, 'password.max'), check: rules.password?.check }
-  const username = { min: limit(rules.username?.min, USERNAME_MIN_LENGTH, 'username.min'), max: limit(rules.username?.max, USERNAME_MAX_LENGTH, 'username.max') }
-
-  if (password.max > FORM_PASSWORD_MAX)
-    throw configError(`rules.password.max is ${password.max}, over the ${FORM_PASSWORD_MAX} the prebuilt pages post`)
-
-  if (username.max > FORM_USERNAME_MAX)
-    throw configError(`rules.username.max is ${username.max}, over the ${FORM_USERNAME_MAX} the prebuilt pages post`)
-
-  if (password.min > password.max)
-    throw configError(`rules.password.min is ${password.min}, over rules.password.max ${password.max}`)
-
-  if (username.min > username.max)
-    throw configError(`rules.username.min is ${username.min}, over rules.username.max ${username.max}`)
-
-  return { password, username }
+// The rules with the defaults filled in, no range checked: `resolveRules` of the server refuses one that no value fits.
+function filled(rules: CredentialRules): ResolvedRules {
+  return { password: { min: rules.password?.min ?? PASSWORD_MIN_LENGTH, max: rules.password?.max ?? PASSWORD_MAX_LENGTH, check: rules.password?.check }, username: { min: rules.username?.min ?? USERNAME_MIN_LENGTH, max: rules.username?.max ?? USERNAME_MAX_LENGTH } }
 }
 
 // An already resolved set, such as the core's, is used as it is.
 function resolved(rules: CredentialRules): ResolvedRules {
-  return rules === DEFAULT_RULES || (typeof rules.password?.min === 'number' && typeof rules.password.max === 'number' && typeof rules.username?.min === 'number' && typeof rules.username.max === 'number') ? rules as ResolvedRules : resolveRules(rules)
+  return rules === DEFAULT_RULES || (typeof rules.password?.min === 'number' && typeof rules.password.max === 'number' && typeof rules.username?.min === 'number' && typeof rules.username.max === 'number') ? rules as ResolvedRules : filled(rules)
 }
 
 // The rules an app set, over the defaults when none are given: an island passes `features().rules` it was handed, or the object the app gave `authCore`.

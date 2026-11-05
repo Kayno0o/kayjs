@@ -336,6 +336,3 @@ const DEFAULT_RULES: ResolvedRules
 
 [./rules] mixesConfusableScripts
 function mixesConfusableScripts(value: string): boolean
-
-[./rules] resolveRules
-function resolveRules(rules?: CredentialRules): ResolvedRules

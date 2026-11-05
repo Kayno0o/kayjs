@@ -95,7 +95,7 @@ cms({ guard, files, onSave: async ({ collection, slug }) => { await purgeCdn(`/$
 
 ### Errors
 
-Each class extends `KayError` (from `kay/library`): `code` is the name `kay explain <code>` documents, `kind` tells apart what a code covers, `status` is the HTTP status it stands for, and `cause` the error underneath. A message opens with `kayjs-cms: `, or `kay: ` for an option the config refuses at boot; those worded for an editor carry no prefix.
+Each class extends `KayError` (from `kay/library`): `code` is the name `kay explain <code>` documents, `kind` tells apart what a code covers, `status` is the HTTP status it stands for, and `cause` the error underneath. The classes below carry no prefix when their message is worded for an editor (`SaveConflictError`, `UnknownCollectionError`), `UnreadReferrersError` opens with `kayjs-cms: `, and an option the config refuses at boot opens with `kay: `.
 
 | Class | `code` | `kind` | `status` | Thrown for |
 | --- | --- | --- | --- | --- |

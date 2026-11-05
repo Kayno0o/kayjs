@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { ObserveConfig } from '../config'
+import { KayError } from '../compiler/errors'
 import { readCapped } from './errors'
 import { clientAddress, overLimit } from './protection'
 import { reportServerError } from './report'
@@ -23,8 +24,9 @@ const CONTROL_CHARACTERS = /[\p{Cc}\p{Zl}\p{Zp}]+/gu
 const QUERY_OR_HASH = /[?#].*$/
 
 // A violation of the site's policy as a browser reported it: what `onError` gets from kay's report route.
-export class CspViolationError extends Error {
-  override name = 'CspViolationError'
+export class CspViolationError extends KayError {
+  override readonly name = 'CspViolationError'
+  declare readonly code: 'csp-violation'
 
   constructor(
     // The directive that blocked it, such as `script-src-elem`.
@@ -40,7 +42,7 @@ export class CspViolationError extends Error {
     // The first characters of a blocked inline script or style, when the directive asks for them with `'report-sample'`.
     readonly sample?: string,
   ) {
-    super(`${directive} blocked ${blocked} on ${url}${disposition === 'report' ? ' (report only)' : ''}`)
+    super('csp-violation', `${directive} blocked ${blocked} on ${url}${disposition === 'report' ? ' (report only)' : ''}`)
     this.stack = source === undefined ? `${this.name}: ${this.message}` : `${this.name}: ${this.message}\n    at ${source}`
   }
 }

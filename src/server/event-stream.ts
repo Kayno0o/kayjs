@@ -1,4 +1,6 @@
+import type { KayErrorOptions } from '../compiler/errors'
 import type { EventStream } from '../runtime/live'
+import { KayError } from '../compiler/errors'
 import { END_EVENT, ERROR_EVENT } from '../runtime/live'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
@@ -30,8 +32,13 @@ export function endEventStreams(): void {
 export const streamReporters = new WeakMap<Response, { report: (error: unknown) => void }>()
 
 // Thrown by a source that cannot serve its stream after all: the stream closes with no end or error event, which a browser takes as a drop and opens again after its backoff.
-export class StreamRefusedError extends Error {
-  override name = 'StreamRefusedError'
+export class StreamRefusedError extends KayError {
+  override readonly name = 'StreamRefusedError'
+  declare readonly code: 'stream-refused'
+
+  constructor(message: string, options?: KayErrorOptions) {
+    super('stream-refused', message, options)
+  }
 }
 
 // What a stream reads: an iterable, or a function making one from a signal aborted when the browser goes away, which a source blocked on a quiet feed passes to what it waits on.

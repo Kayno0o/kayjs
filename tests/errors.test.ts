@@ -93,6 +93,14 @@ describe('error codes', () => {
     }
   })
 
+  it('explain a library code from the command line', async () => {
+    const { stdout, code } = await kay(['explain', 'ai-error'])
+
+    expect(code).toBe(0)
+    expect(stdout).toContain('ai-error')
+    expect(stdout).toContain('testing-and-errors.md')
+  })
+
   it('are read off what was thrown, only when kay raised it', () => {
     expect(errorCodeOf(new KayError('content-invalid', 'x'))).toBe('content-invalid')
     expect(errorCodeOf(Object.assign(new Error('x'), { code: 'ENOENT' }))).toBeUndefined()

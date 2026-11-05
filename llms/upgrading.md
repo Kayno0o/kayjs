@@ -67,7 +67,7 @@ Their `deprecated-*` lints go with them: run `kay upgrade` on 1.90 first and it 
 
 ### The root of kayjs-auth and kayjs-cms stops repeating their browser entries
 
-- `normalizeEmail`, `normalizeUsername`, `emailProblem`, `usernameProblem`, `passwordProblem`, `resolveRules`, `DEFAULT_RULES`, `mixesConfusableScripts`, the length constants and their types are imported from `@kaynooo/kayjs-auth/rules`, no longer from `@kaynooo/kayjs-auth`; `EntryForm` and `FormScope` from `@kaynooo/kayjs-cms/form`, no longer from `@kaynooo/kayjs-cms`. `deprecated-import-path` rewrites the import, and a re-export from the root. A namespace import (`import * as auth from '@kaynooo/kayjs-auth'`) or a dynamic `import()` of a moved name is left to the type check.
+- `normalizeEmail`, `normalizeUsername`, `emailProblem`, `usernameProblem`, `passwordProblem`, `DEFAULT_RULES`, `mixesConfusableScripts`, the length constants and their types are imported from `@kaynooo/kayjs-auth/rules`, no longer from `@kaynooo/kayjs-auth`; `EntryForm` and `FormScope` from `@kaynooo/kayjs-cms/form`, no longer from `@kaynooo/kayjs-cms`. `deprecated-import-path` rewrites the import, and a re-export from the root. A namespace import (`import * as auth from '@kaynooo/kayjs-auth'`) or a dynamic `import()` of a moved name is left to the type check.
 ### kayjs-ui: show and hide state is `open`, `onOpenChange` and `false`
 
 - A Table's and a TreeView's `onToggle(key, open)` and `onToggle(id, open, node)` are `onOpenChange` with the same arguments; the old name works until 1.93 and `kay check` flags it as `deprecated-open-change`, with a safe fix that `kay upgrade` applies.

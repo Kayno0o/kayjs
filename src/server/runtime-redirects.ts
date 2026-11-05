@@ -23,6 +23,7 @@ const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 // Why a redirect was not added, worded for the editor who asked: any other error is the store's, which they are not told.
 export class RedirectRefusedError extends KayError {
   override readonly name = 'RedirectRefusedError'
+  declare readonly code: 'redirect-refused'
 
   constructor(message: string, options?: KayErrorOptions) {
     super('redirect-refused', message, options)

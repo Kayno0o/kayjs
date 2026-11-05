@@ -1,6 +1,8 @@
+import type { KayErrorOptions } from '../compiler/errors'
 import type { IslandComponent, IslandOptions } from './checks'
 import type { JSX } from './jsx'
 import type { Html } from './rendered'
+import { KayError } from '../compiler/errors'
 import { isAction } from './action'
 import { issueScope } from './action-form'
 import { escapeAttribute, quotedAttribute } from './escape'
@@ -103,8 +105,13 @@ export function insideIsland(): boolean {
   return depth > 0
 }
 
-export class IslandPropsError extends Error {
-  override name = 'IslandPropsError'
+export class IslandPropsError extends KayError {
+  override readonly name = 'IslandPropsError'
+  declare readonly code: 'island-props-invalid'
+
+  constructor(message: string, options?: KayErrorOptions) {
+    super('island-props-invalid', message, options)
+  }
 }
 
 // A message an island looked up while rendering, so the browser gets it too.

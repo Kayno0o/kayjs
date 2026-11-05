@@ -4,6 +4,11 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- Every error kay and its libraries throw for an app to catch extends `KayError` (from `kay/library`) with `code`, `kind`, `status`, `cause` and `name`, its old class kept for `instanceof`, and `kay explain <code>` documents them in the new `runtime` and `library` groups: [Errors](errors.md). An uncaught `SaveConflictError` now answers 409 and an `UnknownCollectionError` 404, where both answered 500.
+- A library's config-time problems (a `cms({ collections })` layout, `roles`, `rules`, a rate limit) throw through `configError`, and each library's `llms/` lists its errors in one `Errors` table.
+
+## 1.90.0
+
 - A constructor is a noun across the libraries (`authCore`, `authGate`, `memoryAuth`, `pgAuth`, `cmsDrafts`, `cmsEntryForm`), every Postgres store and table helper takes one `PgSource` (a Bun `SQL`, a pg-orm `Database` or a URL; `pgLoader` takes it as `source`), `createXTables` creates, `xTableNames` lists names: see [Component libraries: conventions](component-library-conventions.md#conventions); `deprecated-library-names` renames the old names.
 - Each library runs with no argument and takes the same three forms: `mail()` uses a `src/mail.ts` exporting `mail` as `auth()` uses `src/auth.ts` and `src/mail.ts`, `mail({ from })` and `auth({ store })` take their options inline, `module` names a file of the app, and `server: false` is the one escape for an app mounting the plugin by hand (`auth({ plugin: false })` is renamed by `deprecated-escape-option`): [kayjs-mail](../packages/mail/llms/writing-and-sending.md), [kayjs-auth](../packages/auth/llms/setup.md).
 - `mail()` with no argument uses the `mail` a `src/mail.ts` exports, as `auth()` already reads that file: an app with `mail()` and a `src/mail.ts` now sends through that file's mailer, where `mail()` built its own from the environment (options given to `mail({ ... })` still win, and a file exporting no mailer stops the boot). `server: false` is the one escape for an app mounting a plugin by hand, on `auth()` and `mail()`; `auth({ plugin: false })` is renamed by `deprecated-escape-option`: [kayjs-mail](../packages/mail/llms/writing-and-sending.md), [kayjs-auth](../packages/auth/llms/setup.md).

@@ -1,5 +1,6 @@
 import type { Subprocess } from 'bun'
 import type { Readable } from 'node:stream'
+import type { KayErrorOptions } from '../compiler/errors'
 import type { KayConfig } from '../config'
 import type { TypeProblem } from './refuse'
 import type { DevPorts, Phase } from './session/ports'
@@ -8,6 +9,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { KAY_DIR, testWorker } from '../build/assets'
+import { KayError } from '../compiler/errors'
 import { CONFIG_FILE } from '../config'
 import { projectPaths } from '../project'
 import { removeDevAddress } from './address'
@@ -54,7 +56,14 @@ export interface DevOptions {
 }
 
 // kay.config.ts does not load; the process that found out has printed why.
-export class ConfigRefusedError extends Error {}
+export class ConfigRefusedError extends KayError {
+  override readonly name = 'ConfigRefusedError'
+  declare readonly code: 'config-refused'
+
+  constructor(message = 'kay.config.ts does not load', options?: KayErrorOptions) {
+    super('config-refused', message, options)
+  }
+}
 
 export type { DevPorts, TypesWorker } from './session/ports'
 

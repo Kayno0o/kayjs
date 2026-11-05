@@ -8,6 +8,7 @@ import { explainLint, isLint } from '../compiler/lints'
 import { componentPlace, componentProps } from '../docs-props'
 import { docFiles, excerpt, findLabel, isLabel, labelPath, looksLikeLabel, searchDocs } from '../docs-search'
 import { formatOption, printDocument, printFailure } from './command'
+import { fixPath } from './fix-path'
 
 // The other matches a search lists after the one it prints.
 const OTHERS = 5
@@ -68,7 +69,7 @@ export const docs: Command = {
 
     // A lint or an error code is explained as `kay explain` does, the sections naming it listed after.
     if (positionals.length === 1 && (isLint(first) || isErrorCode(first))) {
-      printShown({ label: `kay explain ${first}`, heading: first, text: isLint(first) ? explainLint(first) : explainError(first) }, matches.slice(0, OTHERS), format, root)
+      printShown({ label: `kay explain ${first}`, heading: first, text: isLint(first) ? explainLint(first) : explainError(first, fixPath) }, matches.slice(0, OTHERS), format, root)
 
       return 0
     }

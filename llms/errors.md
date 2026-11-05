@@ -82,8 +82,14 @@ kay explain template-syntax
 | `export-no-client-build` | export | Prerendering run with no client build to add its pages to. | [Commands](project.md#commands) |
 | `private-address` | runtime | A host that answered with an address that is not public, which a download of kay refuses to fetch. | [Errors raised while running](errors.md#errors-raised-while-running) |
 | `redirect-refused` | runtime | A runtime redirect an editor asked for that kay refuses, worded for the editor. | [Errors raised while running](errors.md#errors-raised-while-running) |
-| `job-give-up` | runtime | A job handler that threw `GiveUpError`: the job is kept as failed at once, whatever attempts are left. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `job-give-up` | runtime | A workflow run whose steps changed under it, which gives up at once instead of retrying. | [Errors raised while running](errors.md#errors-raised-while-running) |
 | `poll-timeout` | runtime | A database call a store gave up on after its time limit. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `request-timeout` | runtime | A request that ran past its `timeout`: a page answers 504 through the nearest `_error.kay`. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `island-props-invalid` | runtime | An island given a prop that cannot reach the browser: a function, rendered markup or a value the wire format refuses. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `stream-refused` | runtime | A stream source that cannot serve after all, which closes the stream so the browser opens it again after its backoff. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `csp-violation` | runtime | A violation of the site's content security policy as a browser reported it to kay's report route. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `config-refused` | runtime | A `kay.config.ts` that does not load, the process that found out having printed why. | [Errors raised while running](errors.md#errors-raised-while-running) |
+| `database-owned` | runtime | A boot on a database that belongs to another app. | [Errors raised while running](errors.md#errors-raised-while-running) |
 | `ai-error` | library | A kayjs-ai call that failed: `kind` says why (auth, rate-limited, unavailable, invalid, network, timeout, cut, protocol, limited, too-long, schema, unsupported, conflict). | [Errors](../packages/ai/llms/testing-and-errors.md#errors) |
 | `oauth-exchange` | library | A provider that rejected the OAuth token exchange or the user fetch: a bad or expired code, or the provider being down. `status` is the provider's. | [Errors](../packages/auth/llms/hardening-and-testing.md#errors) |
 | `save-conflict` | library | A kayjs-cms save made from a version of the file that another save has replaced, or a new file where one exists. | [Errors](../packages/cms/llms/options.md#errors) |
@@ -101,7 +107,13 @@ Each extends `KayError`, so its `code`, `kind`, `status` and `name` are set and 
 | --- | --- | --- |
 | `PrivateAddressError` | `private-address` | A host that answers with an address that is not public, which a download of kay refuses. |
 | `RedirectRefusedError` (`kay/library`) | `redirect-refused` | A runtime redirect an editor asked for that kay refuses, its message worded for the editor. |
-| `GiveUpError` | `job-give-up` | Thrown by a job handler for a failure no retry can mend: the job is kept as failed at once. |
+| `GiveUpError` | `job-give-up` | A workflow run whose steps changed under it: the job is kept as failed at once, with no retry. |
+| `RequestTimeoutError` | `request-timeout` | A request past its `timeout`, `status` 504. |
+| `IslandPropsError` | `island-props-invalid` | An island given a prop that cannot reach the browser. |
+| `StreamRefusedError` | `stream-refused` | A stream source that cannot serve after all. |
+| `CspViolationError` | `csp-violation` | A violation a browser reported to kay's report route. |
+| `ConfigRefusedError` | `config-refused` | A `kay.config.ts` that does not load under `kay dev`. |
+| `DatabaseOwnedError` | `database-owned` | A boot on a database that belongs to another app. |
 | `TimeoutError` | `poll-timeout` | A database call a store gave up on after its time limit. |
 | `MarkdownError` | `markdown-invalid` | Markdown an entry holds that kay cannot read, with the `line`. |
 

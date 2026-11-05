@@ -22,6 +22,8 @@ export const judgingReads = new WeakSet<object>()
 // What a page read of its request while it was rendered at build time, where only a request holds it.
 // `file` and `line` are where the read is written: a page, a layout, a component or a module, off the stack of the read.
 export class RequestReadError extends KayError {
+  override readonly name = 'RequestReadError'
+  declare readonly code: 'export-server-render'
   readonly file: string | undefined
   readonly line: number | undefined
 

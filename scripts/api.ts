@@ -57,7 +57,7 @@ export const INTERNAL: Record<string, InternalRules> = {
   // The OAuth plumbing `authCore` builds its providers from, and the `load` and actions of the prebuilt pages, which only the routes the extension mounts call.
   auth: {
     entries: [/^\.\/pages\//],
-    names: { '.': ['challengeOf', 'createOAuthClient', 'createOAuthTokenRefresher', 'createPkcePair', 'createTokenRefresher', 'OAuthExchangeError', 'SIGNED_IN_HINT'], './rules': ['DEFAULT_RULES', 'mixesConfusableScripts', 'resolveRules'] },
+    names: { '.': ['challengeOf', 'createOAuthClient', 'createOAuthTokenRefresher', 'createPkcePair', 'createTokenRefresher', 'OAuthExchangeError', 'SIGNED_IN_HINT'], './rules': ['DEFAULT_RULES', 'mixesConfusableScripts'] },
   },
   // The room the entry screen's parts watch through: `entryRoom` and `Member` are documented, the rest only the shipped parts use.
   cms: { entries: [], names: { './form': ['createShown', 'formScope'], './room': ['editorsOf', 'hashOf', 'openRoom', 'watchRoom', 'WATCHED_ROWS'] } },

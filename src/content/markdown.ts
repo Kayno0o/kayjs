@@ -98,11 +98,11 @@ let words: Intl.Segmenter | undefined
 
 // kept: free
 export class MarkdownError extends KayError {
+  override readonly name = 'MarkdownError'
   declare readonly code: 'markdown-invalid'
 
   constructor(message: string, readonly line: number) {
     super('markdown-invalid', message)
-    this.name = 'MarkdownError'
   }
 }
 

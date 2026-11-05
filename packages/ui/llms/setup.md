@@ -117,7 +117,7 @@ Components write no Tailwind utility, only the classes of `theme.css`, every one
 
 ### Errors
 
-`UpstreamError` extends `KayError` (from `kay/library`): `code` and `kind` are `upstream-invalid`, and the message opens with `kayjs-ui: `. It is thrown by `kay ui` commands for a record under `.upstream/` they cannot use, and names the file and what to do. A component given a prop it refuses throws an error opening with `kay: ` (a setting) or `kayjs-ui: ` (a call).
+`UpstreamError` extends `KayError` (from `kay/library`): `code` and `kind` are `upstream-invalid`, and the message opens with `kayjs-ui: `. It is thrown by `kay ui` commands for a record under `.upstream/` they cannot use, and names the file and what to do.
 
 | Class | `code` | `kind` | Thrown for |
 | --- | --- | --- | --- |

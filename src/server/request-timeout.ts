@@ -1,12 +1,15 @@
 import type { Duration } from '../runtime/duration'
+import { KayError } from '../compiler/errors'
 import { timeoutMs } from './config-limits'
 import { recordOf, requestRecord } from './request-record'
 
 // What a request that ran past its `timeout` ends with, answered 504 through the nearest `_error.kay` for a page; logged and handed to `onError` as any server error is.
-export class RequestTimeoutError extends Error {
+export class RequestTimeoutError extends KayError {
+  override readonly name = 'RequestTimeoutError'
+  declare readonly code: 'request-timeout'
+
   constructor(readonly ms: number) {
-    super(`the request took longer than ${ms} ms`)
-    this.name = 'RequestTimeoutError'
+    super('request-timeout', `the request took longer than ${ms} ms`, { status: 504 })
   }
 }
 

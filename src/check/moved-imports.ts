@@ -5,7 +5,7 @@ import { scan } from './renamed-exports'
 
 // The names a package stopped exporting from its root in 1.90 because an entry of its own holds them for the browser, and the entry to import them from.
 export const MOVED_IMPORTS: readonly { from: string, to: string, names: readonly string[] }[] = [
-  { from: '@kaynooo/kayjs-auth', to: '@kaynooo/kayjs-auth/rules', names: ['CredentialRules', 'DEFAULT_RULES', 'emailProblem', 'EmailProblem', 'mixesConfusableScripts', 'normalizeEmail', 'normalizeUsername', 'PASSWORD_MAX_LENGTH', 'PASSWORD_MIN_LENGTH', 'passwordProblem', 'PasswordProblem', 'PROFILE_MAX_LENGTH', 'ResolvedRules', 'resolveRules', 'USERNAME_MAX_LENGTH', 'USERNAME_MIN_LENGTH', 'usernameProblem', 'UsernameProblem'] },
+  { from: '@kaynooo/kayjs-auth', to: '@kaynooo/kayjs-auth/rules', names: ['CredentialRules', 'DEFAULT_RULES', 'emailProblem', 'EmailProblem', 'mixesConfusableScripts', 'normalizeEmail', 'normalizeUsername', 'PASSWORD_MAX_LENGTH', 'PASSWORD_MIN_LENGTH', 'passwordProblem', 'PasswordProblem', 'PROFILE_MAX_LENGTH', 'ResolvedRules', 'USERNAME_MAX_LENGTH', 'USERNAME_MIN_LENGTH', 'usernameProblem', 'UsernameProblem'] },
   { from: '@kaynooo/kayjs-cms', to: '@kaynooo/kayjs-cms/form', names: ['EntryForm', 'FormScope'] },
 ]
 

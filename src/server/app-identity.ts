@@ -1,7 +1,9 @@
 import type { SQL } from 'bun'
+import type { KayErrorOptions } from '../compiler/errors'
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
+import { KayError } from '../compiler/errors'
 import { bundled } from './bundle'
 import { query } from './pg-sql'
 
@@ -34,7 +36,14 @@ export function appName(): string | undefined {
 }
 
 // What a boot refuses with when the database belongs to another app.
-export class DatabaseOwnedError extends Error {}
+export class DatabaseOwnedError extends KayError {
+  override readonly name = 'DatabaseOwnedError'
+  declare readonly code: 'database-owned'
+
+  constructor(message: string, options?: KayErrorOptions) {
+    super('database-owned', message, options)
+  }
+}
 
 // Records `name` in `kay_meta` as the app owning the database, the first app to boot claiming one that has none. Another app's boot throws, unless `KAY_ADOPT_DATABASE` names the owner it takes over from: the one-off way a renamed app keeps its data.
 export async function claimDatabase(db: SQL, name: string | undefined): Promise<void> {

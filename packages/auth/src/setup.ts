@@ -20,7 +20,7 @@ import { createOAuthTokenRefresher } from './oauth/refresher'
 import { organizationsCore } from './organizationsCore'
 import { DEFAULT_PREFIX as DEFAULT_PAGES_PREFIX, pagePaths, pagesOf } from './pages'
 import { authLimiters } from './rates'
-import { resolveRules } from './rules'
+import { resolveRules } from './rules-check'
 import { userDataRules } from './userData'
 
 const TRAILING_SLASH = /\/$/

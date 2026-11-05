@@ -7,6 +7,7 @@ import { explainLint, isLint, isLintGroup, LINT_GROUPS, lintList, LINTS } from '
 import { docFiles, searchDocs } from '../docs-search'
 import { formatOption, printDocument, printFailure } from './command'
 import { explainIsland } from './explain-island'
+import { fixPath } from './fix-path'
 
 // Lists the lints and the errors, or a group's, or explains the lint or error named; `island [file]` says whether a component is an island and why, or lists every island.
 export const explain: Command = {
@@ -43,7 +44,7 @@ export const explain: Command = {
       if (format === 'json')
         printDocument({ name, ...ERRORS[name] as ErrorCode })
       else
-        console.log(explainError(name))
+        console.log(explainError(name, fixPath))
 
       return 0
     }

@@ -473,6 +473,27 @@ describe('the naming conventions', () => {
     expect(drift(find, [])).toEqual([])
   })
 
+  it('give the error class kay exports the same shape: KayError, its own name, a declared code and a registry code', async () => {
+    const found: string[] = []
+
+    for (const file of await Array.fromAsync(new Glob('src/**/*.ts').scan())) {
+      for (const [, name, body] of (await Bun.file(file).text()).matchAll(/export class (\w+) extends KayError \{\n([\s\S]*?)\n\}/g)) {
+        if (name !== 'KayError' && (!body!.includes(`name = '${name}'`) || !body!.includes('declare readonly code:') || !(/super\('[a-z-]+'/).test(body!)))
+          found.push(`${file}: ${name}`)
+      }
+    }
+
+    expect(found).toEqual([])
+  })
+
+  it('bundle the entries documented as browser-safe for a browser', async () => {
+    const entries = ['packages/auth/src/rules.ts', 'packages/auth/src/browser.ts']
+    const built = await Bun.build({ entrypoints: entries, target: 'browser', write: false } as Parameters<typeof Bun.build>[0])
+
+    expect(built.logs.filter(log => log.level === 'error').map(String)).toEqual([])
+    expect(built.success).toBe(true)
+  })
+
   it('throw a configuration problem through configError, never as a raw error opening with `kay: `', () => {
     // These run in the browser, where configError would bring kay/library into the island.
     const browser = new Set(['packages/ai/src/chat-attachments.ts', 'packages/ui/src/file-drop.kay', 'packages/ui/src/steps.ts'])

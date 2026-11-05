@@ -99,7 +99,7 @@ Each `testSite` keeps its own cookies, one browser each. `memoryAuth()` keeps ea
 
 ### Errors
 
-Each class extends `KayError` (from `kay/library`): `code` is the name `kay explain <code>` documents, `kind` tells apart what a code covers, `status` is the HTTP status it stands for, and `cause` the error underneath. A message opens with `kayjs-auth: `, or `kay: ` for an option the config refuses at boot.
+Each class extends `KayError` (from `kay/library`): `code` is the name `kay explain <code>` documents, `kind` tells apart what a code covers, `status` is the HTTP status it stands for, and `cause` the error underneath. The message of the class below opens with `kayjs-auth: `, and an option the config refuses at boot opens with `kay: `.
 
 | Class | `code` | `kind` | Thrown for |
 | --- | --- | --- | --- |
