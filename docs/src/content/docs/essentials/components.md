@@ -180,7 +180,7 @@ A field of `this`, a write beside another write, a `let` written with an `await`
 
 ## Derived and selected state
 
-`linked(() => source)` is a signal an island can edit, that takes the source's value again whenever the source changes. It suits a prop you edit locally. The edit is dropped once a refresh or the next page brings a new value.
+`linked(() => source)` is a writable signal that follows its source: an island can edit it, and it takes the source's value again whenever the source changes. It suits a prop you edit locally. The edit is dropped once a refresh or the next page brings a new value.
 
 ```kay
 ---

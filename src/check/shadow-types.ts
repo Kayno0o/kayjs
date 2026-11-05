@@ -48,7 +48,8 @@ import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
-import { exportNames, roomTypes, sourceTypes } from './renamed-exports'
+
+import { exportNames, contextName, roomTypes, sourceTypes } from './renamed-exports'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { unknownToolLabels } from './tool-labels'
@@ -153,6 +154,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => deprecatedCollectionLinks(root, options),
   async ({ root, options }) => hookNames(root, options),
   async ({ root, options }) => deprecatedLifetimes(root, options),
+  async ({ root, options }) => contextName(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

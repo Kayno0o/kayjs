@@ -13,6 +13,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### The email format is one strict check
 
 - `s.String({ format: 'email' })`, the browser check and kayjs-auth's sign-up now share one check, the one kayjs-mail delivers to: one plain address, a local part up to 64 characters and a label up to 63 (both were unbounded in auth's pattern), at most 254 characters in all, and a host typed as the URL parser keeps it (no soft hyphen, zero-width space, fullwidth letter or ideographic full stop). A quoted or commented local part, a name with angle brackets, a list and a line break are refused. `user@192.168.0.1` passed the schema before and is refused now; use a domain name. Non-ASCII local parts and internationalised domains now pass `format: 'email'` for every field of an app, which Elysia's ASCII pattern refused; only kayjs-auth also refuses a name mixing Latin with Cyrillic or Greek. `kay check` cannot recognise any of it, so there is no lint.
+### `context` is `createContext`
+
+- `context(default)` from `kay` is `createContext(default)`, as `context` read as `ctx` and `defineContext`, which are other things. The old name works until 1.93; `deprecated-context-name` renames the import and its uses.
 
 ## 1.89.0
 

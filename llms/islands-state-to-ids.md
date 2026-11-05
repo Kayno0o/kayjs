@@ -79,7 +79,7 @@
 
 ### Context
 
-- `context(defaultValue)` from `kay` makes a value a component hands everything it renders, however deep, without passing it through each one's props.
+- `createContext(defaultValue)` from `kay` makes a value a component hands everything it renders, however deep, without passing it through each one's props.
 - A component's script calls `Theme.provide('dark')`, and any component it renders, its children and their blocks included, reads `Theme.use()`.
 - A component beside the provider, or above it, reads the nearest value provided above itself, else the default.
 - Provide a signal to share a value that changes.

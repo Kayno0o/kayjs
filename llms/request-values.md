@@ -68,4 +68,5 @@ a(href="/cart") Cart ({ctx.cartCount})
 - A template using `ctx` any other way than `ctx.name`, passed whole, spread or indexed, loads every key, as does an error page or a 404, which may show keys the failed page did not. A key is read off `ctx` in a template or its script, not in a `--- server` fence, whose `ctx` is the request.
 - Values hold no prototype: `ctx.hasOwnProperty` is undefined and `String(ctx)` throws.
 - A function `defineContext(load)` still loads all its keys at once.
+- `TemplateContext` from `kay` is the type of `ctx`: the values of every extension giving a context, `object` until one does. A helper taking it annotates `(ctx: TemplateContext)`, and it is not the request `ctx` of a fence (`PageContext`, `ActionContext`).
 - The pages that load them are found as `layout: { file, reaching }` finds them ([Component libraries](component-libraries.md#extensions)).

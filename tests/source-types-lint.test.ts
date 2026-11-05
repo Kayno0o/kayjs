@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { durationSeconds } from '../src/check/duration-seconds'
 import { applySafeFixes } from '../src/check/fixes'
-import { exportNames, roomTypes, sourceTypes } from '../src/check/renamed-exports'
+import { exportNames, contextName, roomTypes, sourceTypes } from '../src/check/renamed-exports'
 import { scratchDir } from './scratch'
 
 async function project(files: Record<string, string>): Promise<string> {
@@ -108,6 +108,26 @@ describe('deprecated-room-types', () => {
       expect(found).toHaveLength(1)
       expect(found[0]?.fixes).toBeUndefined()
       expect(await roomTypes(root, { lints: { 'deprecated-room-types': 'allow' } })).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('deprecated-context-name', () => {
+  it('renames the import and its calls, and leaves a context of another module or a local one', async () => {
+    const source = 'import { context } from \'kay\'\n\nexport const Theme = context<\'light\' | \'dark\'>(\'light\')\n'
+    const root = await project({ 'src/a.ts': source, 'src/b.ts': 'import { context } from \'./mine\'\n\nexport const B = context(1)\n', 'src/c.ts': 'import { context } from \'kay\'\n\nexport function c() {\n  const context = 1\n\n  return context\n}\n' })
+
+    try {
+      const found = await contextName(root, {})
+
+      expect(found.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.fixes?.[0]?.safe])).toEqual([['src/a.ts', true], ['src/c.ts', undefined]])
+      await applySafeFixes(root, found)
+      expect(await read(root, 'src/a.ts')).toBe('import { createContext } from \'kay\'\n\nexport const Theme = createContext<\'light\' | \'dark\'>(\'light\')\n')
+      expect(await read(root, 'src/b.ts')).toContain('context(1)')
+      expect(await contextName(root, { lints: { 'deprecated-context-name': 'allow' } })).toEqual([])
     }
     finally {
       await rm(root, { recursive: true, force: true })

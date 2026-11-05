@@ -210,13 +210,13 @@ Visitors who ask for reduced motion see no animation. The server leaves the attr
 
 ## Hand a value down without props
 
-`context(default)` from `kay` makes a value that a component gives to everything it renders, however deep.
+`createContext(default)` from `kay` makes a value that a component gives to everything it renders, however deep.
 
 ```ts
 // src/theme.ts
-import { context } from 'kay'
+import { createContext } from 'kay'
 
-export const Theme = context<'light' | 'dark'>('light')
+export const Theme = createContext<'light' | 'dark'>('light')
 ```
 
 A component provides it in its script.

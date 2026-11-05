@@ -816,6 +816,15 @@ export const LINTS = {
     wrong: '--- server\nimport { cssColours } from \'@kaynooo/kayjs-mail\'\n\nexport const colour = cssColours(\'a { --brand: #0047ff }\')\n---\np x',
     right: '--- server\nimport { cssColors } from \'@kaynooo/kayjs-mail\'\n\nexport const colour = cssColors(\'a { --brand: #0047ff }\')\n---\np x',
   },
+  'deprecated-context-name': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.90',
+    site: true,
+    summary: 'An import of `context` from `kay`, `createContext` since 1.90: the old name read as `ctx` and `defineContext`, which are other things. The old name works until 1.93. Found in the TypeScript files and `.kay` fences of the project; the fix renames the import and every use of it. An aliased import is renamed without its uses, and a file where the new name is already taken, or the old one is declared again, exported or read in a template, is reported with no fix.',
+    wrong: '--- server\nimport { context } from \'kay\'\n\nexport const Theme = context(\'light\')\n---\np x',
+    right: '--- server\nimport { createContext } from \'kay\'\n\nexport const Theme = createContext(\'light\')\n---\np x',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

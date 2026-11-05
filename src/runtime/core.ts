@@ -161,7 +161,7 @@ export function listen<T extends EventTarget, K extends keyof EventMapOf<T> & st
   }, 'listen', handler)
 }
 
-// A signal an island edits locally that takes `source`'s value again whenever it changes: `const tiers = linked(() => board.tiers)` follows the prop once the page brings a new board.
+// A writable signal that follows `source`: an island edits it locally, and it takes `source`'s value again whenever that changes: `const tiers = linked(() => board.tiers)` follows the prop once the page brings a new board.
 // kept: free
 export function linked<T>(source: () => T): Signal<T> {
   const from = memo(source)
@@ -192,7 +192,7 @@ export interface Context<T> {
 
 // A value a component hands what it renders, however deep, without passing it through each one's props: `Theme.provide('dark')` in one, `Theme.use()` below it.
 // kept: free
-export function context<T>(fallback: T): Context<T> {
+export function createContext<T>(fallback: T): Context<T> {
   const key = Symbol('kay.context')
 
   return {
@@ -204,6 +204,10 @@ export function context<T>(fallback: T): Context<T> {
     },
   }
 }
+
+/** @deprecated Renamed `createContext` in 1.90, so it does not read as `ctx` or `defineContext`; the old name works until 1.93, and `kay upgrade` renames it. */
+// kept: free
+export const context = createContext
 
 export interface Selection<Key> {
   (): Key | undefined

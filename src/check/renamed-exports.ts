@@ -280,3 +280,10 @@ const OLD_EXPORT = new RegExp(`\\b(?:${[...new Set(Object.values(EXPORT_NAMES).f
 export async function exportNames(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   return renamedTypes(root, options, { lint: 'deprecated-export-names', modules: EXPORT_NAMES, needle: OLD_EXPORT, since: '1.90', until: '1.93', safe: () => true })
 }
+
+const OLD_CONTEXT = /\bcontext\b/
+
+// `context` imported from `kay`: the `createContext` it was renamed to in 1.90, so it does not read as `ctx` or `defineContext`.
+export async function contextName(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+  return renamedTypes(root, options, { lint: 'deprecated-context-name', module: 'kay', names: { context: 'createContext' }, needle: OLD_CONTEXT, since: '1.90', until: '1.93', safe: () => true })
+}

@@ -1,3 +1,3 @@
-import { context } from 'kay'
+import { createContext } from 'kay'
 
-export const Theme = context<'light' | 'dark'>('light')
+export const Theme = createContext<'light' | 'dark'>('light')

@@ -254,7 +254,7 @@ p {game.miners[0].ore}
 
 - A derived value is a `memo`, or a plain function the template calls: `const shown = () => todos.filter(t => !t.done)`, read as `shown()`.
 - `memo(fn)` caches a derived value until what it read changes.
-- `linked(() => board.tiers)` from `kay` is a signal an island edits locally that takes its source's value again whenever that changes: `tiers = moved` shows the edit, and once a refresh or the next page gives a new `board`, `tiers()` reads its tiers.
+- `linked(() => board.tiers)` from `kay` is a writable signal that follows its source: an island edits it locally, and it takes its source's value again whenever that changes: `tiers = moved` shows the edit, and once a refresh or the next page gives a new `board`, `tiers()` reads its tiers.
 - A `linked` signal drops its edit when its source changes, even when the source comes back to the value it was edited over.
 - `linked` reads a prop of a component inside an island, or of an island marked `persist`, the ones whose props change in place, a prop given unchanged keeping its edit.
 - A top-level island whose props changed on a refresh renders afresh from them, its dialogs and focus lost: one whose state should outlive a refresh, such as an editor, is marked `persist`, so it stays and takes the new props.

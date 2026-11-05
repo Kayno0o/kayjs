@@ -46,9 +46,6 @@ interface IslandBrand
 [.] PlainIslandProp
 type PlainIslandProp<Component, Value> = Component extends IslandBrand ? SecretProp<Value> : unknown
 
-[.] TemplateContext
-type TemplateContext = TemplateValues extends { values: infer Values extends object } ? Values : object
-
 [.] TemplateHelpers
 interface TemplateHelpers
   Await: <T>(props: { value: T; pending?: Element; ready?: Element; failed?: Element; }) => Element

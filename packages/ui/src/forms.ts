@@ -1,13 +1,13 @@
 import type { Action, Answer, FailureData, Signal, Success } from 'kay'
-import { ActionError, context, describeField, effect, focusInvalid, markInvalid, uid } from 'kay'
+import { ActionError, createContext, describeField, effect, focusInvalid, markInvalid, uid } from 'kay'
 import { answerMessage } from './internal/answer-message'
 import { toast } from './toast'
 
 // The name of the FormField around a control, which shows that field's messages: a Checkbox or Toggle of the same name leaves them to it.
-export const fieldNamed = context<(() => string | undefined) | undefined>(undefined)
+export const fieldNamed = createContext<(() => string | undefined) | undefined>(undefined)
 
 // The messages a FormDialog's last call was refused with, by field name, which each FormField inside it reads for its own `name`.
-export const formIssues = context<(() => Record<string, string>) | undefined>(undefined)
+export const formIssues = createContext<(() => Record<string, string>) | undefined>(undefined)
 
 // What a FormField's label names in its slot: the first control taking focus.
 const CONTROL = 'input:not([type="hidden"]), select, textarea, button, [contenteditable], [tabindex]'

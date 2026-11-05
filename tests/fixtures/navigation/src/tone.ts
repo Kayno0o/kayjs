@@ -1,4 +1,4 @@
-import { context } from 'kay'
+import { createContext } from 'kay'
 
 // Provided by a component for the ones it renders.
-export const Tone = context('plain')
+export const Tone = createContext('plain')
