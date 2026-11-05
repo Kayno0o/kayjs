@@ -185,19 +185,12 @@ ul
 - `--- client` in place of `---` makes the component render in the browser only, generic ones written `--- client <T>`; see [Islands](islands.md#islands).
 - `--- module` holds module-level code, run once per bundle rather than per render: `export const visits = signal(0)` or `export function label(n: number)` there are values other files import from the `.kay` file, typed as written (`import { label } from './counter.kay'`). It takes no props and no default export, and a `--- client` component has none. Module state is per bundle: the server's copy and the browser's are not shared. A signal exported from it is read by an importer as `visits()` and written as `visits = 1`, as one a `.ts` module exports.
 - `--- style` holds CSS scoped to the component: kay adds a `data-k-<id>` attribute to every element the template writes and ends each selector on it (before a pseudo-element, which keeps its place), so `.card { color: red }` reaches this file's `.card` alone, and the rule weighs one attribute more. `:global(.x)` is the escape, `:global(body) .card` scoping `.card`, and `@media`, `@supports`, `@layer` and `@container` bodies are scoped alike; a rule nested inside another is scoped on its own selector, and a `@keyframes` name is scoped to the component with the `animation` and `animation-name` values that use it (`@keyframes :global(spin)` keeps `spin` for other components to use). A component called from the template keeps its root unscoped, reached through `class` and parts, and slotted content carries its writer's attribute. The CSS joins the page stylesheet as an imported one does (Tailwind's `@apply` works, unused classes are cut).
-- `kay check` reads the style fence for the two lints below.
+- `kay check` reads the style fence for `unused-selector` (warn: a rule no element of the template can match) and `unreachable-selector` (error, fixed to `:global(...)`: a rule ending on `:root`, `html` or `body`).
 - A fence ends on a `---` line, or on a `--- server`, `--- client`, `--- script`, `--- module` or `--- style` line, which opens the next fence.
 - `--- script` is `---` spelled out, for a script that follows another fence.
 - Imports, `type` and `interface` declarations are module level, except a type taking the `typeof` a name the script declares, which stays inside the component.
 - Both fences may import the same name; the server fence's copy is dropped.
 - A fence holds TypeScript only: markup goes in the template, and JSX in a fence is reported.
-
-### Style fence lints
-
-| Lint | Level | Group | Reports |
-| --- | --- | --- | --- |
-| `unused-selector` | warn | code | A rule whose last compound no element of the template can have; a spread, a `class` expression, a `part` or a class the code names counts as a possible match. |
-| `unreachable-selector` | deny | code | A rule ending on `:root`, `html` or `body`, which carry no scope attribute; `kay check --fix` writes `:global(...)`. |
 
 ### Imports kay adds
 

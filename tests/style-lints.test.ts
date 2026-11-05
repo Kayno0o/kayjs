@@ -75,6 +75,12 @@ describe('unused-selector', () => {
     expect(unused('.open { x: y } .shut { x: y }', 'div(ref={el}) hi', fences)).toEqual(['.shut'])
   })
 
+  it('does not count a name the code uses outside a string', () => {
+    const fences = '---\nlet title = \'x\'\nconst item = title\n---\n'
+
+    expect(unused('.title { x: y } .item { x: y } .x { x: y }', 'div hi', fences)).toEqual(['.title', '.item'])
+  })
+
   it('reads every branch, loop and snippet of the template', () => {
     const template = 'if ok\n  p.yes hi\nelse\n  p.no hi\nfor n of [1]\n  li.row {n}\nsnippet item()\n  b.bold hi\nitem()'
     const fences = '---\nconst ok = true\n---\n'

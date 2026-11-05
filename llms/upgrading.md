@@ -26,7 +26,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - `CollapsibleSection` starts folded and `Accordion` draws plain headings, as every `open` and `boxed` defaults to `false`: `kay check` cannot see a default, so write `CollapsibleSection(title="Active" open)` where the section starts unfolded, and `Accordion(items boxed)` where the cards are wanted.
 ### A `@keyframes` name in a `--- style` fence is scoped
 
-- The name is scoped to its component, with the `animation` and `animation-name` values in the same fence that use it, so two components defining `@keyframes spin` no longer collide. A keyframes name an app uses from elsewhere (another stylesheet, `animate-[spin_1s]`, a class set in a script) stops matching: write `@keyframes :global(spin)` in the fence to keep the name as written, or move the keyframes to a stylesheet the page imports: [components](components.md#file-layout).
+- The name is scoped to its component, with the `animation` and `animation-name` values in the same fence that use it, so two components defining `@keyframes spin` no longer collide. A keyframes name an app uses from elsewhere (another stylesheet, `animate-[spin_1s]`, a class set in a script) stops matching: write `@keyframes :global(spin)` in the fence to keep the name as written, or move the keyframes to a stylesheet the page imports. A name held in a custom property (`--anim: spin` read through `var(--anim)`) is not rewritten: write it through `:global` or set the property to the scoped name: [components](components.md#file-layout).
 
 ## 1.89.0
 
