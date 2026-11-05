@@ -231,7 +231,7 @@ export default {
 }
 ```
 
-Write each path without the `base` and the locale. kay lists it for every locale of the site, under the mount point, and a site with a domain per locale lists it on each host. A pattern starting with `*`, such as `*.pdf$`, is written as it is. `robots: false` serves no robots file.
+Write each path without the `base` and the locale. kay lists it for every locale of the site, under the mount point, and a site with a domain per locale lists it on each host. A pattern starting with `*`, such as `*.pdf$`, is written as it is. `robots: false` serves no robots file, and `sitemap: false` serves no sitemap and leaves its line out of the robots file.
 
 A file of the same name in `public/` replaces either generated file.
 

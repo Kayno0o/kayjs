@@ -57,6 +57,8 @@ export interface SitemapOptions {
   trailingSlash?: TrailingSlash | undefined
   locales?: LocaleSettings | undefined
   robots?: RobotsConfig | false | undefined
+  // `false` serves no sitemap, and `robots.txt` names none.
+  sitemap?: boolean | undefined
   // The mount point, which the paths of `robots` go under.
   base?: string | undefined
   // `sitemap.ttl`: how long a built sitemap is served, an hour when left out.
@@ -163,7 +165,7 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
     }
   }
 
-  if (served.offer({ path: SITEMAP, owner: 'the sitemap', kind: 'kay', exported: true })) {
+  if (options.sitemap !== false && served.offer({ path: SITEMAP, owner: 'the sitemap', kind: 'kay', exported: true })) {
     app.get(SITEMAP, async ({ request }) => answer(request, 0))
 
     // The parts of a sitemap past its limits, each a path of its own so no route of the app with a param is shadowed; a static export writes the ones that exist.
@@ -185,7 +187,7 @@ export function serveSitemap(app: Elysia, served: ServedPaths, routes: ServedRou
         let body = written.get(locale)
 
         if (body === undefined)
-          written.set(locale, body = robotsTxt(rules, settings?.hosts ? `https://${settings.hosts[locale!]}${options.base ?? ''}` : origin, settings, locale, options.base))
+          written.set(locale, body = robotsTxt(rules, settings?.hosts ? `https://${settings.hosts[locale!]}${options.base ?? ''}` : origin, settings, locale, options.base, options.sitemap !== false))
 
         return new Response(body, { headers: { 'content-type': 'text/plain; charset=utf-8' } })
       })
@@ -211,7 +213,7 @@ function robotsRules(config: RobotsConfig = {}): Rules {
 }
 
 // Every rule stands for the copy of its path in each locale the host serves, under the mount point.
-function robotsTxt(rules: Rules, origin: string, settings: LocaleSettings | undefined, locale: string | undefined, base = ''): string {
+function robotsTxt(rules: Rules, origin: string, settings: LocaleSettings | undefined, locale: string | undefined, base = '', sitemap = true): string {
   // A pattern starting with `*` matches wherever it falls, so it stays as it is.
   const lines = (name: string, paths: string[]) => paths.flatMap(path => path.startsWith('*') ? [`${name}: ${path}`] : [...new Set(localeCopies(settings, path).filter(copy => settings?.hosts === undefined || copy.locale === locale).map(copy => `${name}: ${base}${copy.path}`))])
 
@@ -219,7 +221,7 @@ function robotsTxt(rules: Rules, origin: string, settings: LocaleSettings | unde
   // `Allow: /` against `Disallow: /` is a tie that crawlers settle for Allow, so blocking the whole site drops it.
   const everything = disallowed.includes('Disallow: /') ? '' : 'Allow: /\n'
 
-  return `User-agent: *\n${everything}${[...lines('Allow', rules.allow), ...disallowed].map(line => `${line}\n`).join('')}\nSitemap: ${origin}${SITEMAP}\n`
+  return `User-agent: *\n${everything}${[...lines('Allow', rules.allow), ...disallowed].map(line => `${line}\n`).join('')}${sitemap ? `\nSitemap: ${origin}${SITEMAP}\n` : ''}`
 }
 
 // The `modified` time of each entry of a collection by slug, the latest of its locales' for a localized one.

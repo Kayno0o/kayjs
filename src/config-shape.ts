@@ -60,7 +60,7 @@ const CONFIG: Record<keyof KayConfig, Rule> = {
   site: str,
   seo: bag(SEO),
   robots: either(lit(false), bag(ROBOTS)),
-  sitemap: bag(SITEMAP),
+  sitemap: either(lit(false), bag(SITEMAP)),
   head: list(obj),
   images: bag(IMAGES),
   budget: bag(BUDGET),

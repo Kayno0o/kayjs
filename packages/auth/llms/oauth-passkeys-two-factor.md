@@ -71,6 +71,15 @@ catch (caught) {
 ### Switching features off
 
 - `auth({ password: false, passkeys: false, magicLink: false, twoFactor: false })`, and the same keys of `createAuth`, switch a feature off; each is on by default where it works. A method of a feature that is off answers `{ ok: false, error: 'off' }`: `password.register`, `password.signIn`, `password.requestReset`, `password.reset` and `password.change` for `password`; `magicLink.request`, `magicLink.signIn` and `magicLink.signInWithCode` for `magicLink`; the passkey sign-in, adding and proof methods for `passkeys`; `twoFactor.setUp` and `twoFactor.enable` for `twoFactor`. `passkeys.signInOptions` throws.
+- A default-on feature is `false | Config` and a default-off one `true | Config`, so `password: true`, `magicLink: true`, `twoFactor: true`, `signUp: true` and `pages: true` of `auth()` only restate the default: they work until 1.93 and `kay check` drops them (`deprecated-auth-options`). `oauthServer` and `breachedPasswords` keep `true`, which demands them where they would not be on by themselves.
+- The word an `{ ok: false, error }` result carries for a feature that does not run:
+
+  | Word | Means | Seen from |
+  | --- | --- | --- |
+  | `'off'` | the app switched the feature off or never set it up | `password.*`, `magicLink.*`, `twoFactor.setUp`, `passkeys.*`, `password.register` and `signInAsGuest` with `signUp: false` |
+  | `'unavailable'` | the feature is on but lacks what it needs, such as mail, an invitation page or a reachable provider | `email.*`, `magicLink.request`, `organizations.invite`, OAuth link and sign-in |
+  | `'not-enabled'` | the user has not turned two-factor on | `twoFactor.regenerateRecoveryCodes` |
+
 - `features()` has `password`, `magicLink` and `twoFactor` besides `passkeys`, false for a feature off (`magicLink` also without mail), and the prebuilt pages show none of it: no password form, mail form, passkey button or account section, and the register and reset pages answer 404.
 - `twoFactor: { require: ['admin'] }` (a role, a predicate or a list, as a guard's `require`) makes it a must for those users. A user it names who lacks it is sent by `authGuard()` and `requireAdmin()` to the security page (`securityPage`, the prebuilt account security page by default) with `?redirect=` back, when opening a page, and gets a 403 on any other request; `auth.gate()` only answers 403, and `requireUser()` does not check it. Every `auth.admin` method answers `{ ok: false, error: 'two-factor-required' }` and OAuth consent answers `access_denied`.
 - The check never applies to the security page, the `twoFactorPage` and the sign-out route, whatever guard or gate runs, so a user can always turn it on; the prebuilt security page sends them back through `?redirect=` once it is on and the recovery codes were seen. An endpoint outside those, such as the app's own enrolment API, takes `auth: false` on its gate and `requireUser()`. `authGuard({ twoFactor: true })` asks every user the guard lets through.

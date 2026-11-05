@@ -1075,7 +1075,7 @@ interface GuardOptions
   twoFactor?: true | undefined
 
 [.] GuestSignInResult
-type GuestSignInResult = { ok: true, user: BareUser } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' | 'closed' }
+type GuestSignInResult = { ok: true, user: BareUser } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' | 'off' }
 
 [.] hcaptcha
 function hcaptcha(secret: string): (token: string, action: CaptchaAction, context?: CaptchaContext | undefined) => Promise<boolean> | boolean
@@ -1632,7 +1632,7 @@ interface PruneLimits
 function pwnedPassword(password: string): Promise<boolean>
 
 [.] RecoveryCodesResult
-type RecoveryCodesResult = { ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'disabled' }
+type RecoveryCodesResult = { ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'not-enabled' }
 
 [.] RefreshableOAuthClient
 interface RefreshableOAuthClient
@@ -1665,7 +1665,7 @@ type RegisterResult = {
 } | {
   ok: false, errors: RegisterErrors
 } | {
-  ok: false, error: 'limited' | 'captcha' | 'closed'
+  ok: false, error: 'limited' | 'captcha' | 'off'
 }
 
 [.] RejectInvitationResult

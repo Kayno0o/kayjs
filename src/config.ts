@@ -49,8 +49,8 @@ export interface KayConfig extends AppHooks {
   seo?: SeoConfig | undefined
   // What `/robots.txt` says besides pointing at the sitemap, or `false` to serve none: `{ disallow: ['/admin'] }`. Needs `site`, as the sitemap does.
   robots?: RobotsConfig | false | undefined
-  // How `/sitemap.xml` is kept.
-  sitemap?: SitemapConfig | undefined
+  // How `/sitemap.xml` is kept, or `false` to serve none (and name none in `/robots.txt`).
+  sitemap?: SitemapConfig | false | undefined
   // Tags every page's head carries, written as a `head` block compiles them: `[{ tag: 'script', props: { src: '/stats.js', defer: true } }]`, a tag's text as `children`. A layout or the page setting a tag of the same identity wins, and the content security policy lets their inline scripts and styles through.
   head?: HeadTag[] | undefined
   images?: ImagesConfig | undefined

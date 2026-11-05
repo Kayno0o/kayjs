@@ -56,7 +56,7 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
   plugin?: undefined
   // Where the OAuth and page routes live, `/auth` by default.
   prefix?: Prefix | undefined
-  // The prebuilt pages are served by default; `false` leaves them out, an object tunes them (`remember`, `profile`).
+  // The prebuilt pages are served by default; `false` leaves them out, an object tunes them (`remember`, `profile`). `true` works until 1.93, leave it out.
   pages?: boolean | Pick<AuthPagesConfig, 'profile' | 'remember' | 'main'> | undefined
   // The session cookie's name, `kay_session` by default; kay names it `__Host-` first over https unless `forwardAuth` shares it under a domain.
   cookie?: string | undefined

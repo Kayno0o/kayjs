@@ -30,7 +30,7 @@ export interface RegisterErrors {
 }
 
 // `signedIn` is false, with no user, when the app wants the address verified first: the same answer whether the address was free or held, its holder mailed instead. `closed` with `signUp: false`.
-export type RegisterResult = { ok: true, user: BareUser, signedIn: true } | { ok: true, signedIn: false } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' | 'captcha' | 'closed' }
+export type RegisterResult = { ok: true, user: BareUser, signedIn: true } | { ok: true, signedIn: false } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' | 'captcha' | 'off' }
 
 export interface CreateUserInput {
   // At least one of the two, the user signing in with either.
@@ -62,7 +62,7 @@ export async function register(state: RequestState, input: RegisterInput, option
   const { store } = state.core
 
   if (!state.core.signUp)
-    return { ok: false, error: 'closed' }
+    return { ok: false, error: 'off' }
 
   const refused = await admit(state, 'register', options.captcha)
 

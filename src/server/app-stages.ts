@@ -713,7 +713,7 @@ export async function siteFiles(boot: Boot) {
   const { app, env, options, served, routes, log, dictionaryUsed, project: { root, paths, mode }, setup: { source, client, site, i18n, locales, collections, appManifest } } = boot
 
   if (site !== undefined)
-    serveSitemap(app, served, routes, site, { dev: env.dev, onError: options.observe?.onError, trailingSlash: env.trailingSlash, locales: i18n?.settings, robots: options.robots, base: env.base, ttl: options.sitemap?.ttl })
+    serveSitemap(app, served, routes, site, { dev: env.dev, onError: options.observe?.onError, trailingSlash: env.trailingSlash, locales: i18n?.settings, robots: options.robots, base: env.base, sitemap: options.sitemap !== false, ttl: options.sitemap === false ? undefined : options.sitemap?.ttl })
 
   const favicon = faviconSource(root, options.favicon, options.manifest)
 

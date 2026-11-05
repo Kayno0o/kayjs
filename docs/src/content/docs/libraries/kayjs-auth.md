@@ -311,7 +311,7 @@ An account registered and never verified goes the same way, 30 days after it was
 
 A guest costs nothing to make, so kayjs-auth does not name it to other libraries: kayjs-ai's limits count a guest by address, and a signed-in user by id.
 
-`signUp: false` in `createAuth` closes self-service accounts. `password.register` and `signInAsGuest` answer `'closed'`. Make users yourself with `auth.admin.createUser({ email, password, roles })`, or the first one from the terminal:
+`signUp: false` in `createAuth` closes self-service accounts. `password.register` and `signInAsGuest` answer `{ ok: false, error: 'off' }`, as any switched-off feature does. Make users yourself with `auth.admin.createUser({ email, password, roles })`, or the first one from the terminal:
 
 ```sh
 kay auth create-user ada@example.com --role admin
@@ -417,9 +417,11 @@ A page of your own calls `auth.account.profile(locale)` and `auth.account.savePr
 
 ## Switching features off
 
-`auth({ password: false, passkeys: false, magicLink: false, twoFactor: false })` turns a feature off, and `createAuth` takes the same four keys. Each is on by default wherever it works today.
+`auth({ password: false, passkeys: false, magicLink: false, twoFactor: false })` turns a feature off, and `createAuth` takes the same four keys. Each is on by default wherever it works today, so `false` is the only value to write, and `twoFactor` also takes `{ require }`. Writing `true` works until 1.93 and `kay upgrade` drops it. The same holds for `signUp`, and for `pages` of `auth()`.
 
 A feature that is off is gone from the prebuilt pages: no password form, no mail form for sign-in links, no passkey button, no two-step section on the account page, and the register and password reset pages answer 404. Its methods answer `{ ok: false, error: 'off' }`, and `auth.features()` says `false` for it, so your own pages can follow.
+
+`'off'` is the word for any feature the app switched off. `'unavailable'` is for a feature that is on but lacks what it needs, such as mail, and `'not-enabled'` for a user who has not turned two-factor on.
 
 Turning `twoFactor` off only stops new users from setting it up. A user who already turned it on is still asked for the code when they sign in, and can renew their recovery codes or turn it off, so switching it off never weakens an account. The `forwardAuth` option `requireTwoFactor` needs it on.
 

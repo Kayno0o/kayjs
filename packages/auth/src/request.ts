@@ -443,7 +443,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
       return current.guest ? { ok: true, user: publicUser(current) } : { ok: false, error: 'signed-in' }
 
     if (!this.core.signUp)
-      return { ok: false, error: 'closed' }
+      return { ok: false, error: 'off' }
 
     const refused = await admit(this[STATE], 'guest', options.captcha)
 

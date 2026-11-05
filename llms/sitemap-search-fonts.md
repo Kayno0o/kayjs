@@ -102,7 +102,7 @@ In production the sitemap is built on the first request and kept for an hour (`s
 
 Past 50,000 URLs or 50 MB (the protocol's limits) `/sitemap.xml` is a sitemap index and the URLs go into `/sitemap-1.xml`, `/sitemap-2.xml` and so on, each within both limits, named in the index with the site's public origin and the `base` (each host's own with locales by domain). `robots.txt` still points at `/sitemap.xml`, and a static export writes every part. Under the limits `/sitemap.xml` is the one file, as before.
 
-`robots: { disallow: ['/admin'], allow: ['/admin/login'] }` in `kay.config.ts` adds `Disallow` and `Allow` lines below the default `Allow: /`, the `Sitemap:` line staying (each host's own with locales by domain); `robots: false` serves no `robots.txt`. A path starts with `/` and is written without the `base` and the locale, which kay adds: a site served by path lists `/admin` and `/en/admin`, a site by domain lists the asking host's. A pattern starting with `*`, such as `*.pdf$`, is written as it is.
+`robots: { disallow: ['/admin'], allow: ['/admin/login'] }` in `kay.config.ts` adds `Disallow` and `Allow` lines below the default `Allow: /`, the `Sitemap:` line staying (each host's own with locales by domain); `sitemap: false` serves no sitemap and leaves the `Sitemap:` line out of `robots.txt`; `robots: false` serves no `robots.txt`. A path starts with `/` and is written without the `base` and the locale, which kay adds: a site served by path lists `/admin` and `/en/admin`, a site by domain lists the asking host's. A pattern starting with `*`, such as `*.pdf$`, is written as it is.
 
 ### Favicon and web manifest
 

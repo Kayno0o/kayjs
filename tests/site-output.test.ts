@@ -131,6 +131,13 @@ describe('robots', () => {
     expect((await fetchFrom(app, '/sitemap.xml')).status).toBe(200)
   })
 
+  it('serves no sitemap with sitemap: false, and names none in robots.txt', async () => {
+    const app = await appWith({ site, sitemap: false })
+
+    expect((await fetchFrom(app, '/sitemap.xml')).status).toBe(404)
+    expect(await text(app)).toBe('User-agent: *\nAllow: /\n')
+  })
+
   it('puts the paths under the mount point', async () => {
     const app = await appWith({ site, base: '/docs', robots: { disallow: ['/private'] } })
 

@@ -2779,7 +2779,7 @@ interface KayConfig extends AppHooks
   serverTiming?: boolean | undefined
   shutdownTimeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   site?: string | undefined
-  sitemap?: SitemapConfig | undefined
+  sitemap?: SitemapConfig | false | undefined
   store?: AppStore | undefined
   timeZone?: string | undefined
   tracer?: Tracer | undefined
@@ -3065,7 +3065,7 @@ interface PagesOptions extends KayConfig
   serverTiming?: boolean | undefined
   shutdownTimeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   site?: string | undefined
-  sitemap?: SitemapConfig | undefined
+  sitemap?: SitemapConfig | false | undefined
   store?: AppStore | undefined
   timeZone?: string | undefined
   tracer?: Tracer | undefined
@@ -4073,7 +4073,7 @@ interface TestOptions extends PagesOptions
   serverTiming?: boolean | undefined
   shutdownTimeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   site?: string | undefined
-  sitemap?: SitemapConfig | undefined
+  sitemap?: SitemapConfig | false | undefined
   store?: AppStore | undefined
   styles?: boolean | undefined
   timeZone?: string | undefined

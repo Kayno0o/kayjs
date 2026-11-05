@@ -149,7 +149,7 @@ export async function disableTwoFactor(state: RequestState, proof: Proof): Promi
   return { ok: true }
 }
 
-export type RecoveryCodesResult = { ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'disabled' }
+export type RecoveryCodesResult = { ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'not-enabled' }
 
 // A new set of recovery codes, the old ones void.
 export async function regenerateRecoveryCodes(state: RequestState, proof: Proof): Promise<RecoveryCodesResult> {
@@ -159,7 +159,7 @@ export async function regenerateRecoveryCodes(state: RequestState, proof: Proof)
     return proved
 
   if (proved.record.totpEnabledAt === null)
-    return { ok: false, error: 'disabled' }
+    return { ok: false, error: 'not-enabled' }
 
   const recoveryCodes = await issueRecoveryCodes(state.core, proved.record.id)
 

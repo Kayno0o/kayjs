@@ -12,7 +12,7 @@ const USER_AGENT_MAX_LENGTH = 512
 
 export type RevokeSessionResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
 
-export type GuestSignInResult = { ok: true, user: BareUser } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' | 'closed' }
+export type GuestSignInResult = { ok: true, user: BareUser } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' | 'off' }
 
 // Where the user is signed in, as the app lists it.
 export interface UserSession {

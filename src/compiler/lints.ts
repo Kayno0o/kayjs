@@ -744,6 +744,15 @@ export const LINTS = {
     wrong: '--- server\nexport const page = { prerender: true, revalidate: \'1h\' }\n---\nh1 Blog',
     right: '--- server\nexport const page = { prerender: true, ttl: \'1h\' }\n---\nh1 Blog',
   },
+  'deprecated-auth-options': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.90',
+    site: true,
+    summary: 'A kayjs-auth feature that is on by default, written `feature: true`: `password`, `magicLink`, `twoFactor` and `signUp` of `auth()` or `createAuth()`, and `pages` of `auth()`. A default-on feature is switched off with `false` or tuned with an object, so `true` is left out. The old form works until 1.93. Found in the options object written out at a call of `auth` or `createAuth` read from `@kaynooo/kayjs-auth`; the fix drops the property.',
+    wrong: 'auth({ password: true, twoFactor: true, signUp: false })',
+    right: 'auth({ signUp: false })',
+  },
   'deprecated-ui-tone': {
     level: 'warn',
     group: 'deprecated',

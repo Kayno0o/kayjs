@@ -22,8 +22,8 @@ describe('signUp: false', () => {
     const { browser, signUps, store } = setup({ signUp: false })
     const visitor = browser()
 
-    expect(await visitor.post('/register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'closed' })
-    expect(await visitor.call('signInAsGuest')).toEqual({ ok: false, error: 'closed' })
+    expect(await visitor.post('/register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'off' })
+    expect(await visitor.call('signInAsGuest')).toEqual({ ok: false, error: 'off' })
     expect(await visitor.call('features')).toMatchObject({ signUp: false })
     expect((await store.users.list({ offset: 0, limit: 10 })).total).toBe(0)
     expect(signUps).toEqual([])

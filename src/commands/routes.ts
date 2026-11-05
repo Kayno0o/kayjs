@@ -221,7 +221,7 @@ function kayRoutes(root: string, config: LoadedConfig): Listed[] {
     ...config.preview !== undefined && config.preview !== false ? [kay(PREVIEW_ROUTE, 'preview mode')] : [],
     ...mcpAt === undefined ? [] : [kay(mcpAt, 'MCP endpoint', 'POST'), kay(RESOURCE_METADATA, 'MCP sign-in metadata'), kay(`${RESOURCE_METADATA}${mcpAt}`, 'MCP sign-in metadata')],
     ...openapi !== undefined && openapi.dev !== true ? [kay(documented.document, 'OpenAPI document'), ...openapi.reference === true ? [kay(documented.reference, 'API reference')] : []] : [],
-    ...config.site === undefined ? [] : [kay(SITEMAP, 'sitemap, unless the app serves it'), kay(ROBOTS, 'robots.txt, unless the app serves it')],
+    ...config.site === undefined ? [] : [...config.sitemap === false ? [] : [kay(SITEMAP, 'sitemap, unless the app serves it')], kay(ROBOTS, 'robots.txt, unless the app serves it')],
     ...favicon ? FAVICON_PATHS.filter(path => (path !== SVG_ICON || favicon.svg !== undefined) && (!MASKABLE_ICON.test(path) || favicon.maskable !== undefined)).map(path => kay(path, 'favicon, unless the app serves it')) : [],
     ...favicon ? localeManifests({ name: config.seo?.name, description: config.seo?.description }, config.i18n).map(({ path }) => kay(path, 'favicon, unless the app serves it')) : [],
     kay(SERVICE_WORKER, 'service worker'),
