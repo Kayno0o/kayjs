@@ -25,7 +25,7 @@ import { s } from 'kay'
 const bill = s.Object({ supplier: s.String(), total: s.Number(), due: s.Optional(s.String()) })
 
 export const read = action(s.Object({ scan: s.File({ type: 'application/pdf' }) }), async ({ scan }) => {
-  return await ask([{ role: 'user', content: 'Read this bill', attachments: [scan] }], { schema: bill, maxAttachmentBytes: 5_000_000 })
+  return await ask([{ role: 'user', content: 'Read this bill', attachments: [scan] }], { schema: bill, maxSize: '5mb' })
 }, { maxSize: '6mb' })
 ---
 ```
@@ -56,7 +56,7 @@ export const read = action(s.Object({ scan: s.File({ type: 'application/pdf' }) 
 
 - `attachments` is on a `user` message only (an `assistant` one fails with `unsupported`): a `Blob` or `File`, a `Uint8Array`, an `ArrayBuffer`, or `storedFile(key)` for a file `files.put` stored (never a key a visitor chose; a plain `{ file: key }` is refused).
 - What a file is comes from its bytes, never its name or declared type, with kay's own check (`holdsType`): PNG, JPEG, GIF or WebP images and PDFs. Any other file, AVIF and SVG included, fails the reply with an `AiError` of kind `unsupported` naming the attachment (`attachment 2 of message 1`), before the provider is called; an action letting it out answers 415. A stored key with no file fails the same way.
-- An attachment past `maxAttachmentBytes` (10 MB by default, a number of bytes) fails with `too-long` before the provider is called.
+- An attachment past `maxSize` (10 MB by default, bytes or a size such as `'5mb'`; `maxAttachmentBytes` works until 1.93) fails with `too-long` before the provider is called.
 - They are read when the reply is first read, once however many steps a tool loop takes, so `ask()` itself stays synchronous and a bad file fails the reply like any error of it.
 
 ### Providers

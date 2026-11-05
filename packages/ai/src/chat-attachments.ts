@@ -1,11 +1,31 @@
+import type { ByteSize } from 'kay/library'
 import { signal } from 'kay'
+
+const DEFAULT_MAX_SIZE = 5 * 1024 * 1024
+const SIZE_TEXT = /^(\d+(?:\.\d+)?)(b|kb|mb)$/i
+const UNIT_BYTES = { b: 1, kb: 1024, mb: 1024 * 1024 }
+
+// The bytes a `maxSize` stands for, 5 MB when none is given: bytes or `'2mb'`, parsed here as the browser cannot load kay's own parser.
+export function fileSizeLimit(size: ByteSize | undefined): number {
+  if (size === undefined)
+    return DEFAULT_MAX_SIZE
+
+  const text = typeof size === 'string' ? SIZE_TEXT.exec(size) : null
+  const fromText = text ? Number(text[1]) * UNIT_BYTES[text[2]!.toLowerCase() as keyof typeof UNIT_BYTES] : Number.NaN
+  const bytes = typeof size === 'number' ? size : fromText
+
+  if (!Number.isFinite(bytes) || bytes <= 0)
+    throw new Error(`kay: the maxSize of Chat is ${JSON.stringify(size)}; it takes a positive size, bytes or a string such as '2mb'`)
+
+  return bytes
+}
 
 // What the files of one message may be, read live as the props they come from, and what a refused file says.
 export interface AttachmentLimits {
   // Whether a file is of a type `accept` names: given by the Chat, so kayjs-ui stays an optional peer that only the chat components import.
   readonly accepts: (file: File) => boolean
   readonly maxFiles: number
-  readonly maxFileSize: number
+  readonly maxSize: ByteSize | undefined
   readonly tooBigLabel: string
   readonly fullLabel: string
   readonly refusedLabel: string
@@ -21,14 +41,15 @@ export function createAttachments(limits: AttachmentLimits) {
   const problem = signal<string | undefined>(undefined)
   const { accepts } = limits
 
-  // Files the picker, a drop or a paste gave, that fit the message: a file past `maxFileSize` or beyond `maxFiles` is left out and says so, and one already attached is not added twice.
+  // Files the picker, a drop or a paste gave, that fit the message: a file past `maxSize` or beyond `maxFiles` is left out and says so, and one already attached is not added twice.
   function add(chosen: File[]) {
-    const sized = chosen.filter(file => file.size <= limits.maxFileSize && !attached().some(known => sameFile(known, file)))
+    const largest = fileSizeLimit(limits.maxSize)
+    const sized = chosen.filter(file => file.size <= largest && !attached().some(known => sameFile(known, file)))
     const taken = sized.slice(0, Math.max(0, limits.maxFiles - attached().length))
 
     attached.set([...attached(), ...taken])
 
-    if (sized.length < chosen.length && chosen.some(file => file.size > limits.maxFileSize))
+    if (sized.length < chosen.length && chosen.some(file => file.size > largest))
       problem.set(limits.tooBigLabel)
     else if (taken.length < sized.length)
       problem.set(limits.fullLabel)

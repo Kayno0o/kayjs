@@ -52,6 +52,7 @@ import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
 import { exportNames, contextName, roomTypes, sourceTypes } from './renamed-exports'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
+import { sizeLimits } from './size-limits'
 import { untypedSockets } from './socket-routes'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
@@ -158,6 +159,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => contextName(root, options),
   async ({ root, options }) => movedImports(root, options),
   async ({ root, options }) => deprecatedAuthOptions(root, options),
+  async ({ root, options }) => sizeLimits(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

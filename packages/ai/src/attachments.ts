@@ -96,7 +96,7 @@ function kindOf(bytes: Uint8Array): { type: string, kind: Media['kind'] } | unde
 }
 
 function tooBig(place: string, size: number, max: number): AiError {
-  return new AiError('too-long', `attachment ${place} holds ${size} bytes, past the ${max} that maxAttachmentBytes allows`)
+  return new AiError('too-long', `attachment ${place} holds ${size} bytes, past the ${max} that maxSize allows`)
 }
 
 // The stored file, or nothing for a key the store does not hold or refuses.

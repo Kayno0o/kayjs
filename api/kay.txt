@@ -2800,6 +2800,7 @@ interface KayExtension<Server extends AnyElysia = AnyElysia>
   env?: EnvSchema | undefined
   layout?: string | undefined | { file: string; reaching: string[]; }
   maxSize?: Record<string, ByteSize> | undefined
+  maxSizeByPath?: Record<string, ByteSize> | undefined
   messages?: string | undefined
   name: string
   needsServer?: boolean | undefined

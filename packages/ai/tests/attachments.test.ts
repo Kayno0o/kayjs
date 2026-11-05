@@ -81,14 +81,17 @@ describe('attachments to the fake', () => {
     expect(fakeAi.asked).toHaveLength(0)
   })
 
-  it('refuses an attachment past maxAttachmentBytes, 10 MB by default', async () => {
+  it('refuses an attachment past maxSize, 10 MB by default, and past the maxAttachmentBytes it was called', async () => {
     const big = new Uint8Array(1000)
 
     big.set(PNG)
 
-    const error = await failure(ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxAttachmentBytes: 999 }))
+    const error = await failure(ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxSize: 999 }))
 
     expect(error.kind).toBe('too-long')
+    expect((await failure(ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxSize: '999b' }))).kind).toBe('too-long')
+    expect((await failure(ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxAttachmentBytes: 999 }))).kind).toBe('too-long')
+    expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxSize: '1kb', maxAttachmentBytes: 10 })).toBe('Fake reply to: x')
     expect(error.status).toBeUndefined()
     expect(fakeAi.asked).toHaveLength(0)
     expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi })).toBe('Fake reply to: x')
@@ -129,7 +132,7 @@ describe('attachments to the fake', () => {
     await expect(readAttachments([{ role: 'user', content: 'x', attachments: [PNG] }], 1024, controller.signal)).rejects.toThrow()
   })
 
-  it('refuses files past the 24 MiB an ask takes together, though each is under maxAttachmentBytes', async () => {
+  it('refuses files past the 24 MiB an ask takes together, though each is under maxSize', async () => {
     const MiB = 1024 * 1024
     const image = (mebibytes: number) => {
       const bytes = new Uint8Array(mebibytes * MiB)
@@ -170,7 +173,8 @@ describe('attachments to the fake', () => {
     expect(() => ask([{ role: 'user', content: 'x' }, { role: 'assistant', content: 'y', attachments: [PNG] }], { provider: fakeAi })).toThrow('only a user message')
     expect(() => ask([{ role: 'user', content: 'x', attachments: ['/etc/passwd' as never] }], { provider: fakeAi })).toThrow('an attachment is')
     expect(() => ask([{ role: 'user', content: 'x', attachments: 'nope' as never }], { provider: fakeAi })).toThrow('attachments are a list')
-    expect(() => ask([{ role: 'user', content: 'x' }], { provider: fakeAi, maxAttachmentBytes: 0 })).toThrow('maxAttachmentBytes')
+    expect(() => ask([{ role: 'user', content: 'x' }], { provider: fakeAi, maxSize: 0 })).toThrow('maxSize')
+    expect(() => ask([{ role: 'user', content: 'x' }], { provider: fakeAi, maxSize: '5gb' as never })).toThrow('maxSize')
   })
 
   it('reads an object out of a scan with a schema', async () => {

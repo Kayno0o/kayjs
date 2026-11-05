@@ -1306,6 +1306,27 @@ describe('deprecated-lifetimes on the Chat of kayjs-ai', () => {
   })
 })
 
+describe('deprecated-size-limits on the Chat of kayjs-ai', () => {
+  const found = (template: string) => {
+    const source = `---\nimport Chat from '@kaynooo/kayjs-ai/chat.kay'\nimport Other from './other.kay'\n---\n${template}\n`
+    const result = compileKay(source, 'chat.kay', { check: true })
+
+    return result.diagnostics.filter(d => d.code === 'deprecated-size-limits').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
+  }
+
+  it('renames maxFileSize to maxSize, however the value is written', () => {
+    expect(found('Chat(action={reply} label="x" attach maxFileSize={1000})')).toEqual([{ at: 'maxFileSize', fix: ['maxFileSize->maxSize'] }])
+    expect(found('Chat(action={reply} label="x" attach maxFileSize={limit})')).toEqual([{ at: 'maxFileSize', fix: ['maxFileSize->maxSize'] }])
+  })
+
+  it('reports maxFileSize beside maxSize with no fix, and leaves maxSize and other components alone', () => {
+    expect(found('Chat(action={reply} label="x" attach maxFileSize={1} maxSize="2mb")')).toEqual([{ at: 'maxFileSize', fix: undefined }])
+    expect(found('Chat(action={reply} label="x" attach maxSize="2mb")')).toEqual([])
+    expect(found('Other(maxFileSize={2})')).toEqual([])
+    expect(found('// kay-allow deprecated-size-limits\nChat(action={reply} label="x" attach maxFileSize={1})')).toEqual([])
+  })
+})
+
 describe('unreturned-fail', () => {
   const server = (body: string) => `--- server\nimport { action, s } from 'kay'\n\n${body}\n---\np x`
   const found = (body: string) => lints(server(body)).filter(d => d.code === 'unreturned-fail')

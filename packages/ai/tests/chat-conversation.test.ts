@@ -105,7 +105,7 @@ function chat(reads: ConversationAnswer[], replies: (() => Promise<ActionStream<
     return next()
   }) as unknown as ChatAction
 
-  const attachments = createAttachments({ accepts: () => true, maxFiles: 2, maxFileSize: 100, tooBigLabel: '', fullLabel: '', refusedLabel: '' })
+  const attachments = createAttachments({ accepts: () => true, maxFiles: 2, maxSize: 100, tooBigLabel: '', fullLabel: '', refusedLabel: '' })
   const session = root(() => createChatSession({ action, initial: [], keep: 20, maxChars: 40_000, remember: undefined, errorMessage: 'The reply failed.', attachments, say: call => call.name, focus: () => undefined, follow: () => undefined, conversation, listed: false, conflictMessage: 'Changed elsewhere.', loadFailedMessage: 'Could not load.', ...options }))
 
   flush()

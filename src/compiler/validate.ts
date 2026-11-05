@@ -909,6 +909,15 @@ class Validator {
 
       // kayjs-ai's Chat counted the messages each send posts as `keep`, a word the config keeps for a boolean; it is `history` since 1.87.
       if (file === AI_CHAT) {
+        if (name === 'maxFileSize') {
+          const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'maxSize')
+          const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'maxSize={maxFileSize}' } : { start: attribute.name.start, end: attribute.name.end, text: 'maxSize' }
+
+          this.lint(attribute.name, 'deprecated-size-limits', '`maxFileSize` of `Chat` is `maxSize` since 1.90, as every size limit is', named ? { help: 'Drop `maxFileSize`, `maxSize` is there' } : { help: 'Write `maxSize`', fixes: [{ title: 'Write `maxSize`', edits: [edit], safe: true }] })
+
+          continue
+        }
+
         if (name === 'keep')
           this.lint(attribute.name, 'deprecated-lifetimes', '`keep` of `Chat` is `history` since 1.87: the number of messages each send posts', { help: 'Write `history`', fixes: [{ title: 'Write `history`', edits: [{ start: attribute.name.start, end: attribute.name.end, text: 'history' }], safe: true }] })
 

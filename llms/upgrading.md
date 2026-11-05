@@ -31,6 +31,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `password.register` and `signInAsGuest` with `signUp: false` answer `{ ok: false, error: 'off' }` where they answered `'closed'`, as every other switched-off feature does, and `twoFactor.regenerateRecoveryCodes` for a user without two-factor answers `'not-enabled'` where it answered `'disabled'`. An app that compares `error === 'closed'` or `'disabled'` (or maps them to its own text) changes the word; `kay check` cannot see a comparison made on a value read at run time, so search for both. `RegisterResult`, `GuestSignInResult` and `RecoveryCodesResult` carry the new words, which a typed `switch` shows as errors. The prebuilt pages' `closed` text is gone, `off` saying the feature is switched off; `unavailable` stays for a feature that is on but lacks what it needs (mail, a page).
 - `password`, `magicLink`, `twoFactor` and `signUp` of `auth()` and `createAuth()`, and `pages` of `auth()`, are on by default, so they take `false` (or an object) and `password: true` says nothing: the old form works until 1.93 and `kay check` flags it as `deprecated-auth-options`, with a safe fix that `kay upgrade` applies by dropping the property. `oauthServer` and `breachedPasswords` keep `true`, which demands them where they are not on by themselves. The words of a result that does not run are listed in one table in kayjs-auth's `llms` (Switching features off).
+### One name for a size limit
+
+- A size limit is `maxSize`, bytes or a size such as `'5mb'`, and a map of limits by path is `maxSizeByPath`. kayjs-ai's `ask({ maxAttachmentBytes })` is `maxSize` and its `Chat` prop `maxFileSize` is `maxSize` (a number of bytes is a size, so the value stays as it is). An extension's `maxSize: { '/auth/upload': '8mb' }` is `maxSizeByPath`, as the config's `limits.byPath` is. The old names work until 1.93, `deprecated-size-limits` flags them and `kay upgrade` renames each.
 
 ## 1.89.0
 

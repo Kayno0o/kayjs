@@ -110,7 +110,7 @@ An extension may set these fields. Only `name` is required.
 - `transformPage`: rewrites each prerendered page before it is written.
 - `transformServedPage`: rewrites each page the server renders for a request, in `kay dev` too. It buffers the page, so keep it quick.
 - `needsServer`: set it when the extension does nothing without a running server, as a tracker posting to a route of its own. `kay build --static` warns about it.
-- `maxSize`: the most a request to a route of the extension may send, by path, for a route that takes more than the app's `maxSize`, such as an upload.
+- `maxSizeByPath`: the most a request to a route of the extension may send, by path, for a route that takes more than the app's `maxSize`, such as an upload.
 - `staticFiles`: files a static export writes into the site, by path, for what the extension's server would otherwise serve, such as a script every page loads.
 - `layout`: one `.kay` layout, alone in its directory, wrapping every page outside the app's layouts. It renders its `slot` and then what the library mounts on every page, such as a toaster; its stylesheet comes before the app's, and a page setting `layouts: false` starts afresh without it. `layout: { file, reaching }` wraps only the pages whose imports reach one of the `reaching` files, found as islands are: aliases, literal `import()` and `import.meta.glob` are followed.
 - `context`: a module default-exporting `defineContext(load)` from `kay/library`. `load(request)` runs at most once per request, for a page reaching a template that reads `ctx`, and the keys it returns are `ctx.<key>` in any page, layout or component, with no fence, typed in `kay check`. That page is the visitor's own, so no cache shares it, and an island cannot read `ctx`, it renders in the browser too. kayjs-auth gives `ctx.user`, `ctx.can(role)` and `ctx.impersonator`.
@@ -176,7 +176,7 @@ kay and its libraries name the same idea the same way. A new option, export or f
 - `site` is the public address of the site, and it defaults to kay's own `site`. `name` is a display name.
 - A duration is a string with its unit, such as `'5m'` or `'250ms'`. Every option, store argument and test helper takes the same type, and `kay check --fix` rewrites an old bare number.
 - `maxAge` is how long something stays valid. `timeout` is how long to wait. `expires` is a date.
-- `maxSize` is a size limit. It takes bytes or a string such as `'2mb'`.
+- `maxSize` is one size limit and takes bytes or a string such as `'2mb'`; a map of limits by path is `maxSizeByPath`, as the extension's and the config's `limits.byPath` are.
 - `rateLimit` sets a rate limit with `max` and `window`. `key` says who is counted. A library with several limits nests them under `rateLimit`.
 - A list by page uses `page` and `pageSize`. A window onto a list uses `limit` and `offset`.
 - Look goes in the library's settings module. Behaviour goes in the call.

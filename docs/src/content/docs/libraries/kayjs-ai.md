@@ -358,7 +358,7 @@ export const read = action(s.Object({ scan: s.File({ type: 'application/pdf' }) 
 ---
 ```
 
-kay reads what each file is from its bytes, never from its name. PNG, JPEG, GIF and WebP images work, and so do PDFs. Anything else fails with an `AiError` of kind `unsupported` before the provider is called, and an action that lets it out answers 415. A file over `maxAttachmentBytes` (10 MB by default) fails with `too-long`.
+kay reads what each file is from its bytes, never from its name. PNG, JPEG, GIF and WebP images work, and so do PDFs. Anything else fails with an `AiError` of kind `unsupported` before the provider is called, and an action that lets it out answers 415. A file over `maxSize` (10 MB by default) fails with `too-long`.
 
 Anthropic takes both kinds. An OpenAI-compatible server takes images, and PDFs too at OpenAI and Mistral. Any other server fails a PDF with `unsupported`. If your proxy does take PDFs, `openai({ pdf: 'file' })` says how.
 

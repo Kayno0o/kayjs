@@ -866,6 +866,15 @@ export const LINTS = {
     wrong: '--- server\nimport { normalizeEmail } from \'@kaynooo/kayjs-auth\'\n\nexport const email = (value: string) => normalizeEmail(value)\n---\np x',
     right: '--- server\nimport { normalizeEmail } from \'@kaynooo/kayjs-auth/rules\'\n\nexport const email = (value: string) => normalizeEmail(value)\n---\np x',
   },
+  'deprecated-size-limits': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.90',
+    site: true,
+    summary: 'A size limit under the name it had before 1.90, when every size limit came to be `maxSize`, one size in bytes or a string such as `\'5mb\'`, and a map of limits by path `maxSizeByPath`: `maxAttachmentBytes` of kayjs-ai\'s `ask` is `maxSize`, `maxFileSize` of its `Chat` is `maxSize`, and the `maxSize` map of an extension is `maxSizeByPath`. The old names work until 1.93, a number of bytes being a size, so the fix only renames the key. Found in the TypeScript files and `.kay` fences calling `ask` from `@kaynooo/kayjs-ai`, in the templates calling `Chat` and in an extension written out in a file importing kay; a key written beside its new name is reported with no fix.',
+    wrong: '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\n\nexport const read = (scan: File) => ask([{ role: \'user\', content: \'Read this\', attachments: [scan] }], { maxAttachmentBytes: 5_000_000 })\n---\np x',
+    right: '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\n\nexport const read = (scan: File) => ask([{ role: \'user\', content: \'Read this\', attachments: [scan] }], { maxSize: \'5mb\' })\n---\np x',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

@@ -3,7 +3,7 @@ import type { ChatAction, ChatSessionOptions, TranscribeAction } from '../src/ch
 import type { ChatMessage, ChatTurn, Progress } from '../src/types'
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { ActionError, flush, root, signal } from 'kay'
-import { createAttachments } from '../src/chat-attachments'
+import { createAttachments, fileSizeLimit } from '../src/chat-attachments'
 import { createChatSession } from '../src/chat-session'
 import { REPLACES_HEADER, REPLY_HEADER } from '../src/resume'
 
@@ -93,7 +93,7 @@ function chat(answers: Answer[], options: Partial<ChatSessionOptions> & { initia
     return next(call.signal!)
   }) as unknown as ChatAction
 
-  const attachments = createAttachments({ accepts: file => file.type === 'image/png', maxFiles: 2, maxFileSize: 100, tooBigLabel: 'too big', fullLabel: 'full', refusedLabel: 'refused' })
+  const attachments = createAttachments({ accepts: file => file.type === 'image/png', maxFiles: 2, maxSize: 100, tooBigLabel: 'too big', fullLabel: 'full', refusedLabel: 'refused' })
   const session = root(() => createChatSession({ action, initial: [], keep: 20, maxChars: 40_000, remember: undefined, errorMessage: 'The reply failed.', attachments, say: call => `${call.name}: ${call.status}`, focus: () => focused++, follow: () => followed++, ...options }))
 
   flush()
@@ -600,4 +600,22 @@ test('prefill puts text in front of what the visitor typed', () => {
   session.draft.set('mine')
   session.prefill('Ask')
   expect(session.draft()).toBe('Ask\nmine')
+})
+
+test('a file size limit is bytes or a size with its unit, 5 MB by default', () => {
+  expect(fileSizeLimit(undefined)).toBe(5 * 1024 * 1024)
+  expect(fileSizeLimit(100)).toBe(100)
+  expect(fileSizeLimit('2kb')).toBe(2048)
+  expect(fileSizeLimit('1.5MB')).toBe(1.5 * 1024 * 1024)
+  expect(() => fileSizeLimit('5gb' as never)).toThrow('maxSize')
+  expect(() => fileSizeLimit(0)).toThrow('maxSize')
+})
+
+test('files past a maxSize written with a unit are left out', () => {
+  const attachments = createAttachments({ accepts: () => true, maxFiles: 2, maxSize: '1kb', tooBigLabel: 'too big', fullLabel: 'full', refusedLabel: 'refused' })
+  const big = new File([new Uint8Array(2000)], 'big.png', { type: 'image/png' })
+
+  attachments.add([big])
+  expect(attachments.attached()).toEqual([])
+  expect(attachments.problem()).toBe('too big')
 })

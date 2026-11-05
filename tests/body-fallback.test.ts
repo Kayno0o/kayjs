@@ -150,7 +150,7 @@ describe('the app\'s own limits by path', () => {
   })
 
   it('lowers it, wins over an extension for one path, and stops the boot for a bad entry', async () => {
-    const site = await app({ maxSizeByPath: { '/auth/token': 100, '/auth/upload': '1kb' }, extension: { maxSize: { '/auth/upload': '8mb' } } })
+    const site = await app({ maxSizeByPath: { '/auth/token': 100, '/auth/upload': '1kb' }, extension: { maxSizeByPath: { '/auth/upload': '8mb' } } })
 
     expect((await post(site, '/auth/token', 'x'.repeat(101))).status).toBe(413)
     expect((await post(site, '/auth/upload', 'x'.repeat(2000))).status).toBe(413)
@@ -161,7 +161,7 @@ describe('the app\'s own limits by path', () => {
 
 describe('an extension\'s own limit', () => {
   it('raises the limit for its route and what is under it, the rest keeping the app\'s', async () => {
-    const site = await app({ extension: { maxSize: { '/auth/upload': '8mb' } } })
+    const site = await app({ extension: { maxSizeByPath: { '/auth/upload': '8mb' } } })
 
     expect((await post(site, '/auth/upload', big)).status).toBe(200)
     expect((await post(site, '/auth/upload', 'x'.repeat(9 * MB))).status).toBe(413)
@@ -169,27 +169,38 @@ describe('an extension\'s own limit', () => {
     expect((await stream(site, '/auth/upload', 2 * MB)).status).toBe(200)
   })
 
+  it('still reads the map under its name before 1.90, maxSize, and prefers maxSizeByPath beside it', async () => {
+    const old = await app({ extension: { maxSize: { '/auth/upload': '8mb' } } })
+
+    expect((await post(old, '/auth/upload', big)).status).toBe(200)
+
+    const both = await app({ extension: { maxSize: { '/auth/upload': '8mb' }, maxSizeByPath: { '/auth/token': '8mb' } } })
+
+    expect((await post(both, '/auth/token', big)).status).toBe(200)
+    expect((await post(both, '/auth/upload', big)).status).toBe(413)
+  })
+
   it('can lower it, under a base too', async () => {
-    const site = await app({ base: '/blog', extension: { maxSize: { '/auth/token': 100 } } })
+    const site = await app({ base: '/blog', extension: { maxSizeByPath: { '/auth/token': 100 } } })
 
     expect((await post(site, '/auth/token', 'x'.repeat(101))).status).toBe(413)
     expect((await post(site, '/auth/token', 'x'.repeat(100))).status).toBe(200)
   })
 
   it('stops the boot for a limit that is no size', async () => {
-    await expect(app({ extension: { maxSize: { '/auth/token': 0 } } })).rejects.toThrow('maxSize')
-    await expect(app({ extension: { maxSize: { 'auth/token': '1mb' } } })).rejects.toThrow('does not start with a slash')
+    await expect(app({ extension: { maxSizeByPath: { '/auth/token': 0 } } })).rejects.toThrow('maxSize')
+    await expect(app({ extension: { maxSizeByPath: { 'auth/token': '1mb' } } })).rejects.toThrow('does not start with a slash')
   })
 })
 
 describe('a cross-origin route of an extension', () => {
   const ORIGIN = 'https://client.example'
-  const crossOrigin = (maxSize?: KayExtension['maxSize']) => {
+  const crossOrigin = (maxSize?: KayExtension['maxSizeByPath']) => {
     const server = plugin()
 
     crossOriginPaths(server, ['/auth'], { origins: '*' })
 
-    return { server, ...maxSize && { maxSize } }
+    return { server, ...maxSize && { maxSizeByPath: maxSize } }
   }
 
   const tooBig = async (site: Awaited<ReturnType<typeof app>>, path: string) => site.handle(new Request(`http://localhost${path}`, { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'origin': ORIGIN }, body: big }))

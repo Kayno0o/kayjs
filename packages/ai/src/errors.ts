@@ -17,7 +17,7 @@ export type AiErrorKind
     | 'protocol'
   // The visitor or the chat is over a limit or budget set in `ai()`: `retryAfter` is the seconds until its window closes, `limit` which one.
     | 'limited'
-  // The messages, with their attachments counted, are longer than the `maxInputChars` of `ask`, or an attachment is over `maxAttachmentBytes`: nothing was sent to the provider.
+  // The messages, with their attachments counted, are longer than the `maxInputChars` of `ask`, or an attachment is over `maxSize`: nothing was sent to the provider.
     | 'too-long'
   // The model's answer does not fit the `schema` of `ask`: it is no JSON object, was cut by `maxTokens` or refused, or breaks the schema. `fields` names the fields it refuses and `partial` holds the text.
     | 'schema'

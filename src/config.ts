@@ -550,6 +550,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   // Set when the extension counts visitors only after their yes on the `kay_analytics` cookie, so another extension measuring visitors, such as `vitals()`, waits for the same yes.
   asksConsent?: boolean | undefined
   // The most a request to the extension's routes may send, by path: the route itself and what is under it, bytes or a size such as '8mb', in place of the app's `limits.body` that every other route with a body has.
+  maxSizeByPath?: Record<string, ByteSize> | undefined
+  /** @deprecated Named `maxSizeByPath` since 1.90, so `maxSize` is only ever one size; the old key works until 1.93, and `kay upgrade` renames it. */
   maxSize?: Record<string, ByteSize> | undefined
   // Files a static export writes into the site, by their path, for what the extension's server would otherwise serve as a constant, such as a script every page loads: `kay build --static` runs no server plugin.
   staticFiles?: Record<string, string> | undefined

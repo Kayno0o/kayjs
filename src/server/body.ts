@@ -99,9 +99,10 @@ export function mountLimits(modules: Map<string, BodyLimit>, extensions: KayExte
       limits.set(withoutSlash(path), { refuse: request => corsResponse(rule, request, refusePlainly()) })
   }
 
-  for (const { name, maxSize } of extensions ?? []) {
-    for (const [path, bytes] of Object.entries(maxSize ?? {})) {
-      const key = slashed(path, `the maxSize of the extension ${name}`)
+  for (const { name, maxSizeByPath, maxSize } of extensions ?? []) {
+    // `maxSize` is the name before 1.90; one written beside `maxSizeByPath` is ignored.
+    for (const [path, bytes] of Object.entries(maxSizeByPath ?? maxSize ?? {})) {
+      const key = slashed(path, `the maxSizeByPath of the extension ${name}`)
 
       limits.set(key, { ...limits.get(key), bytes })
     }

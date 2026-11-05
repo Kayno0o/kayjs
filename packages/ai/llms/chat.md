@@ -40,7 +40,7 @@ export const reply = action(s.Object({ messages: chatMessages({ attachments: { t
 Chat(action={reply} attach)
 ```
 
-The attach button, the upload's checks (`accept`, `maxFiles`, `maxFileSize`), their words and what each send posts again: [Let a chat visitor attach a file](attachments.md#let-a-chat-visitor-attach-a-file).
+The attach button, the upload's checks (`accept`, `maxFiles`, `maxSize`), their words and what each send posts again: [Let a chat visitor attach a file](attachments.md#let-a-chat-visitor-attach-a-file).
 
 ### Speaking a message
 

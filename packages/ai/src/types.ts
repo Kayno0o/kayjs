@@ -1,5 +1,5 @@
 import type { Action, Duration, Static } from 'kay'
-import type { TSchema } from 'kay/library'
+import type { ByteSize, TSchema } from 'kay/library'
 import type { StoredFile } from './attachments'
 
 // A file the model is shown: bytes or a `Blob` (a `File` from an `s.File()` field is one), or a file kay stored (`storedFile(key)`, never a key a visitor chose). What it is comes from its bytes, not its name or declared type: a PNG, JPEG, GIF or WebP image, or a PDF.
@@ -35,7 +35,7 @@ export interface AiMessage {
   content: string
   // What an assistant message cites, for a `Chat`'s `initial` to show again; `ask` leaves it out of the request.
   sources?: readonly Source[] | undefined
-  // Images and PDFs shown to the model beside the text, on a user message; they count toward `maxInputChars` as `ask` estimates and each is under `maxAttachmentBytes`.
+  // Images and PDFs shown to the model beside the text, on a user message; they count toward `maxInputChars` as `ask` estimates and each is under `maxSize`.
   attachments?: readonly AiAttachment[] | undefined
 }
 
@@ -296,7 +296,9 @@ export interface AskOptions extends AskHooks {
   confirm?: Confirm | false | undefined
   // The most characters the messages may hold together, 50,000 by default (the system prompt is not counted); a conversation past it fails the reply with a `too-long` error, 413 in an action, before the provider is called. `Infinity` lifts it.
   maxInputChars?: number | undefined
-  // The most bytes one attachment may hold, 10 MB (10,485,760) by default; a larger one fails the reply with a `too-long` error before the provider is called.
+  // The most bytes one attachment may hold, bytes or a size such as `'5mb'`, 10 MB by default; a larger one fails the reply with a `too-long` error before the provider is called.
+  maxSize?: ByteSize | undefined
+  /** @deprecated Named `maxSize` since 1.90, as every size limit is; the old key works until 1.93, and `kay upgrade` renames it. */
   maxAttachmentBytes?: number | undefined
   // Asks this provider instead of the one the environment names, such as `openai({ baseUrl })`; under `bun test` the fake answers in its place.
   provider?: Provider | undefined

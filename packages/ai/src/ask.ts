@@ -3,7 +3,7 @@ import type { HeldCall } from './conversation'
 import type { Offered } from './loop'
 import type { Replaces } from './resume'
 import type { AiMessage, AiReply, AskOptions, FunctionTool, Piece, Provider, ProviderMessage, ProviderRequest, ReplyOf, StructuredAskOptions, Timeouts, ToolAction } from './types'
-import { actionTool, configError, currentRequest, durationSeconds, jsonSchemaOf, refundRateLimit } from 'kay/library'
+import { actionTool, byteSize, configError, currentRequest, durationSeconds, jsonSchemaOf, refundRateLimit } from 'kay/library'
 import { attachmentsOf, checkAccepted, DEFAULT_MAX_ATTACHMENT_BYTES, estimatedChars, mediaChars, readAttachments, toolChars } from './attachments'
 import { choose, given } from './config'
 import { conversationReply, heldCall, heldReply } from './conversation'
@@ -294,13 +294,11 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchem
   const described = answer === undefined ? undefined : answerSchema(answer)
   const schema = described?.plain
   const maxInputChars = options.maxInputChars ?? DEFAULT_MAX_INPUT_CHARS
-  const maxAttachmentBytes = options.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES
+  // `maxAttachmentBytes` is the name before 1.90.
+  const maxAttachmentBytes = byteSize(options.maxSize ?? options.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES, 'the maxSize of ask')
 
   if (typeof maxInputChars !== 'number' || !(maxInputChars >= 1))
     throw configError('maxInputChars is a number of characters of 1 or more')
-
-  if (typeof maxAttachmentBytes !== 'number' || !(maxAttachmentBytes >= 1))
-    throw configError('maxAttachmentBytes is a number of bytes of 1 or more')
 
   const outlive = options.outlive === true
   const kept = call?.key
