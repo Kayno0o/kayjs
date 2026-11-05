@@ -99,8 +99,13 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   const token = ++navigation.current
   const key = pageKey(url)
   const running = inFlight.fetch
+
   // A traversal takes the page already being fetched; any other swap cancels it and fetches its own, a refresh to get a fresh page.
   // A fetch asking for some of the page's loads answers with placeholders, which only a refresh can show.
+  // A refresh owed to another page is no one's now.
+  if (inFlight.owed && inFlight.owed.key !== key)
+    inFlight.owed = undefined
+
   const reused = swap.intent === 'traverse' && running?.key === key && running.loads === undefined ? running : undefined
 
   if (!reused)
@@ -190,9 +195,6 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
 
     try {
       await show(page, url.hash, swap, isCurrent)
-
-      if (isCurrent())
-        inFlight.owed = undefined
     }
     catch (error) {
       // The loads asked for left parts of the page to itself that it no longer has: nothing changed yet, so the whole page is asked for.
@@ -217,6 +219,8 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   finally {
     if (isCurrent()) {
       document.documentElement.removeAttribute('aria-busy')
+      // The swap is over, shown or given up: nothing is owed.
+      inFlight.owed = undefined
 
       if (navigating)
         navigation.phase?.('idle')

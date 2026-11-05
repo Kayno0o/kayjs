@@ -1,9 +1,11 @@
-import { readFileSync } from 'node:fs'
-import { basename, dirname, join, relative, sep } from 'node:path'
+import { readdirSync, readFileSync } from 'node:fs'
+import { basename, dirname, join, relative } from 'node:path'
 
 // A `refresh: 'name'`, `refresh: ['name', ...]` or `refresh('name')` in a source: the project names page loads to refresh. A name held in a constant or built elsewhere goes unseen, and its refresh asks for the whole page, as it always did.
-const NAMED = /\brefresh\s*[:(]\s*(?:\[[^\]]*?['"`]|['"`])/
+const NAMED = /\brefresh\s*[:(]\s*(?:\[[^'"`;{}]{0,200}['"`]|['"`])/
 const SOURCES = new Bun.Glob('**/*.{kay,ts,tsx}')
+const SOURCE = /\.(?:kay|ts|tsx)$/
+const SKIPPED = new Set(['node_modules'])
 const found = new Map<string, boolean>()
 
 // The folder to read the sources of: the nearest `src` between the file and the project root, else the project root itself (a routes directory outside `src`). Never above the root, and nothing for a file outside it.
@@ -35,10 +37,7 @@ export function namedRefresh(file: string, root: string): boolean {
 
   let named = false
 
-  for (const path of SOURCES.scanSync({ cwd: source, onlyFiles: true })) {
-    if (path.split(sep).includes('node_modules') || path.startsWith('.'))
-      continue
-
+  for (const path of sourcePaths(source)) {
     if (NAMED.test(readFileSync(join(source, path), 'utf8'))) {
       named = true
 
@@ -49,6 +48,22 @@ export function namedRefresh(file: string, root: string): boolean {
   found.set(source, named)
 
   return named
+}
+
+// The source files under the folder, walking none of node_modules or a dot folder.
+function* sourcePaths(source: string): Generator<string> {
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    if (entry.name.startsWith('.') || SKIPPED.has(entry.name))
+      continue
+
+    if (entry.isDirectory()) {
+      for (const path of SOURCES.scanSync({ cwd: join(source, entry.name), onlyFiles: true }))
+        yield join(entry.name, path)
+    }
+    else if (SOURCE.test(entry.name)) {
+      yield entry.name
+    }
+  }
 }
 
 // For tests: the scans read so far are forgotten.

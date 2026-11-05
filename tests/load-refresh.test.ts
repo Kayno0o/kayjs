@@ -273,6 +273,26 @@ describe('a refresh asking for some of the page loads', () => {
     expect(logged.some(message => message.includes('`cart`'))).toBe(false)
   })
 
+  it('sends what a statement ties to the named load, a call changing another value included', async () => {
+    const x = await asked('/tie', 'x')
+
+    expect(placeholders(x.html)).toEqual(['p'])
+    expect(x.html).toMatch(/class="len"[^>]*>1</)
+
+    const y = await asked('/tie', 'y')
+
+    expect(placeholders(y.html)).toEqual(['p', 'p'])
+  })
+
+  it('does not render an element left to the page, so its template error shows on a whole render only', async () => {
+    const whole = await site.fetch('/broken-unit')
+    const scoped = await asked('/broken-unit', 'cart')
+
+    expect(whole.status).toBe(500)
+    expect(scoped.response.status).toBe(200)
+    expect(placeholders(scoped.html)).toEqual(['p'])
+  })
+
   it('answers a prefixed locale the same way, keeping its lang and placeholders', async () => {
     const { html, response } = await asked('/en', 'cart', localized)
 

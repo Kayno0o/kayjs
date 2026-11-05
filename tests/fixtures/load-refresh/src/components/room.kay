@@ -1,0 +1,6 @@
+---
+const name = signal('Room')
+---
+head
+  title {name()}
+span.room {name()}

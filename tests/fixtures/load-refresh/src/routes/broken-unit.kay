@@ -1,0 +1,9 @@
+--- server
+import { run } from '../calls'
+
+const cart = await run('cart', n => ({ n }))
+const wishlist = await run('wishlist', n => ({ n, items: undefined as unknown as string[] }))
+---
+main
+  p.cart {cart.n}
+  p.wish {wishlist.items.length}

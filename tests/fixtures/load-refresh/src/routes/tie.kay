@@ -1,0 +1,12 @@
+--- server
+import { run } from '../calls'
+
+const x = await run('x', n => ({ n, first: n }))
+const y = await run('y', n => ({ n }))
+const list: number[] = []
+const pushed = list.push(x.first)
+---
+main
+  p.len {list.length}
+  p.pushed {pushed}
+  p.y {y.n}

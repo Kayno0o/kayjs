@@ -92,6 +92,18 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('an actio
     expect(page.errors).toEqual([])
   }, 30_000)
 
+  it('leaves the title a kept island set as it is', async () => {
+    await using page = await site.open('/titled')
+
+    await page.waitFor('button.bump')
+    expect(await page.evaluate(() => document.title)).toBe('Room')
+    await page.click('button.bump')
+    await page.waitFor('p.cart', { text: '2' })
+
+    expect(await page.evaluate(() => document.title)).toBe('Room')
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
   it('asks the whole page for loads the page no longer has', async () => {
     await using page = await site.open('/island')
 

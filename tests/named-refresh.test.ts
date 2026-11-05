@@ -35,7 +35,7 @@ afterAll(async () => {
 
 describe('the scan for refreshes by name', () => {
   it('finds a name given to a call, a list of names and a refresh() call', async () => {
-    for (const source of ['await add({}, { refresh: \'cart\' })', 'await add({}, { refresh: [\n  \'cart\',\n] })', 'await add({}, { refresh: [list, \'cart\'] })', 'refresh("cart")']) {
+    for (const source of ['await add({}, { refresh: \'cart\' })', 'await add({}, { refresh: [\n  \'cart\',\n] })', 'await add({}, { refresh: [list, \'cart\'] })', 'refresh("cart")', 'await add({}, { refresh: [names[0], \'cart\'] })']) {
       forgetNamedRefresh()
 
       const { page, root } = await project('src/routes', { 'src/components/button.ts': source })
