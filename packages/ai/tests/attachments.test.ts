@@ -95,6 +95,8 @@ describe('attachments to the fake', () => {
     expect(fakeAi.asked).toHaveLength(0)
     expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi })).toBe('Fake reply to: x')
     expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxSize: '1kb', maxAttachmentBytes: 10 })).toBe('Fake reply to: x')
+    expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxAttachmentBytes: Infinity })).toBe('Fake reply to: x')
+    expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxSize: Infinity })).toBe('Fake reply to: x')
   })
 
   it('counts an image and a PDF against maxInputChars', async () => {
@@ -174,6 +176,7 @@ describe('attachments to the fake', () => {
     expect(() => ask([{ role: 'user', content: 'x', attachments: ['/etc/passwd' as never] }], { provider: fakeAi })).toThrow('an attachment is')
     expect(() => ask([{ role: 'user', content: 'x', attachments: 'nope' as never }], { provider: fakeAi })).toThrow('attachments are a list')
     expect(() => ask([{ role: 'user', content: 'x' }], { provider: fakeAi, maxSize: 0 })).toThrow('maxSize')
+    expect(() => ask([{ role: 'user', content: 'x' }], { provider: fakeAi, maxAttachmentBytes: 0 })).toThrow('maxAttachmentBytes')
     expect(() => ask([{ role: 'user', content: 'x' }], { provider: fakeAi, maxSize: '5gb' as never })).toThrow('maxSize')
   })
 

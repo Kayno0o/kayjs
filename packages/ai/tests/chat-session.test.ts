@@ -3,6 +3,7 @@ import type { ChatAction, ChatSessionOptions, TranscribeAction } from '../src/ch
 import type { ChatMessage, ChatTurn, Progress } from '../src/types'
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { ActionError, flush, root, signal } from 'kay'
+import { byteSize } from 'kay/library'
 import { createAttachments, fileSizeLimit } from '../src/chat-attachments'
 import { createChatSession } from '../src/chat-session'
 import { REPLACES_HEADER, REPLY_HEADER } from '../src/resume'
@@ -618,4 +619,30 @@ test('files past a maxSize written with a unit are left out', () => {
   attachments.add([big])
   expect(attachments.attached()).toEqual([])
   expect(attachments.problem()).toBe('too big')
+})
+
+test('the chat reads a size as kay does', () => {
+  const table: unknown[] = [1, 100, 0.5, '800b', '20kb', '1.5mb', '2MB', 0, -1, '0kb', '5gb', '2 mb', '', 'mb', 'Infinity', Number.NaN, Infinity, 1e21, '1e3kb', null]
+
+  for (const input of table) {
+    const kay = (() => {
+      try {
+        return byteSize(input, 'x')
+      }
+      catch {
+        return 'throws'
+      }
+    })()
+
+    const chat = (() => {
+      try {
+        return fileSizeLimit(input as never)
+      }
+      catch {
+        return 'throws'
+      }
+    })()
+
+    expect([input, chat]).toEqual([input, kay])
+  }
 })

@@ -17,7 +17,7 @@ import { approvalMessage, ticketsIn, withoutApproval } from './approval-marker'
 import { MARK, MARKED, withoutMarker } from './marker'
 import { citedAsWritten, linkAsWritten, linkSources, opensApart, REL_APART } from './chat-sources'
 import { filesOf, POSTED_CHARACTERS } from './chat-history'
-import { createAttachments, fileKey } from './chat-attachments'
+import { createAttachments, fileKey, fileSizeLimit } from './chat-attachments'
 import { createChatSession } from './chat-session'
 import { imagePrefixes, keepReplyImages } from './reply-images'
 import Calls from './chat-calls.kay'
@@ -200,6 +200,9 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   // Markup under the form, such as a link to the help or a limit counter.
   footer?: Snippet | undefined
 }>()
+
+// A size that is none fails as the chat renders, not at the first file attached.
+fileSizeLimit(maxSize ?? maxFileSize)
 
 // The props they read are getters, so each read stays a live read of the prop.
 const statuses = { get running() { return runningLabel }, get done() { return doneLabel }, get failed() { return failedLabel } }

@@ -6,12 +6,25 @@ import { importsOf, walk } from './ast'
 import { scan } from './renamed-exports'
 
 const OLD_NAME = /\b(?:maxAttachmentBytes|maxSize)\b/
+const SIZE_TEXT = /^\d+(?:\.\d+)?(?:b|kb|mb)$/i
 const AI_PACKAGE = '@kaynooo/kayjs-ai'
 // An extension's file imports kay or one of its libraries.
 const CONFIG_HOLDER = /\bfrom\s+['"](?:kay|kayjs-[\w-]+|@kaynooo\/kayjs-[\w-]+)(?:\/[^'"]*)?['"]/
 
 function isPlain(property: ObjectExpression['properties'][number]): property is ObjectProperty {
   return property.type === 'Property' && property.kind === 'init' && !property.method && !property.computed
+}
+
+// A map of limits by path as an extension writes it: every key a path and every value a number or a size such as `'8mb'`, so an app's own `{ name, maxSize: { width: 100 } }` is left alone.
+function isPathMap(map: ObjectExpression): boolean {
+  return map.properties.length > 0 && map.properties.every((property) => {
+    if (!isPlain(property))
+      return false
+
+    const value = unwrapped(property.value)
+
+    return keyName(property)?.startsWith('/') === true && value.type === 'Literal' && (typeof value.value === 'number' || (typeof value.value === 'string' && SIZE_TEXT.test(value.value)))
+  })
 }
 
 // A size limit under the name it had before 1.90, when every size limit became `maxSize` (one size) or `maxSizeByPath` (a map by path): `maxAttachmentBytes` of kayjs-ai's `ask` and the path map of an extension written out as `maxSize`.
@@ -62,7 +75,7 @@ export async function sizeLimits(root: string, options: CheckOptions): Promise<C
         const size = plain.find(one => keyName(one) === 'maxSize')
         const value = size && unwrapped(size.value)
 
-        if (value?.type === 'ObjectExpression' && plain.some(one => keyName(one) === 'name'))
+        if (value?.type === 'ObjectExpression' && plain.some(one => keyName(one) === 'name') && isPathMap(value))
           rename(node, 'maxSize', 'maxSizeByPath', 'an extension')
       })
     }

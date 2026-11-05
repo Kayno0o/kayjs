@@ -23,7 +23,8 @@ describe('deprecated-size-limits', () => {
     const extension = 'import type { KayExtension } from \'kay/server\'\n\nexport const upload = (): KayExtension => ({ name: \'upload\', maxSize: { \'/upload\': \'8mb\' } })\n'
     const own = 'import { ask } from \'./mine\'\nimport type { KayExtension } from \'kay/server\'\n\nexport const read = ask([], { maxAttachmentBytes: 1 })\nexport const sized = { name: \'x\', maxSize: 5 }\nexport const scalar: KayExtension = { name: \'y\', maxSize: undefined }\n'
     const elsewhere = 'export const other = { name: \'z\', maxSize: { a: 1 } }\n'
-    const root = await project({ 'src/asking.ts': asking, 'src/shorthand.ts': shorthand, 'src/namespaced.ts': namespaced, 'src/routes/fence.kay': fence, 'src/clash.ts': clash, 'src/extension.ts': extension, 'src/own.ts': own, 'src/elsewhere.ts': elsewhere })
+    const logo = 'import { image } from \'kay/content\'\n\nexport const logo = { name: \'logo\', maxSize: { width: 100, height: 100 } }\nexport const mixed = { name: \'m\', maxSize: { \'/a\': \'8mb\', \'/b\': limit } }\nexport const slashless = { name: \'s\', maxSize: { a: \'8mb\' } }\n'
+    const root = await project({ 'src/asking.ts': asking, 'src/shorthand.ts': shorthand, 'src/namespaced.ts': namespaced, 'src/routes/fence.kay': fence, 'src/clash.ts': clash, 'src/extension.ts': extension, 'src/own.ts': own, 'src/elsewhere.ts': elsewhere, 'src/logo.ts': logo })
 
     try {
       const found = await sizeLimits(root, {})
@@ -46,6 +47,7 @@ describe('deprecated-size-limits', () => {
       expect(await Bun.file(join(root, 'src/clash.ts')).text()).toBe(clash)
       expect(await Bun.file(join(root, 'src/own.ts')).text()).toBe(own)
       expect(await Bun.file(join(root, 'src/elsewhere.ts')).text()).toBe(elsewhere)
+      expect(await Bun.file(join(root, 'src/logo.ts')).text()).toBe(logo)
       expect((await sizeLimits(root, {})).map(diagnostic => diagnostic.file.slice(root.length + 1))).toEqual(['src/clash.ts'])
       expect(await sizeLimits(root, { lints: { 'deprecated-size-limits': 'allow' } })).toEqual([])
     }

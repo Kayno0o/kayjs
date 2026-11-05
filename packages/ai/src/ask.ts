@@ -295,7 +295,9 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchem
   const schema = described?.plain
   const maxInputChars = options.maxInputChars ?? DEFAULT_MAX_INPUT_CHARS
   // `maxAttachmentBytes` is the name before 1.90.
-  const maxAttachmentBytes = byteSize(options.maxSize ?? options.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES, 'the maxSize of ask')
+  const attachmentSize = options.maxSize ?? options.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES
+  // `Infinity` lifts the limit, as it does `maxInputChars`.
+  const maxAttachmentBytes = attachmentSize === Infinity ? Infinity : byteSize(attachmentSize, `the ${options.maxSize === undefined ? 'maxAttachmentBytes' : 'maxSize'} of ask`)
 
   if (typeof maxInputChars !== 'number' || !(maxInputChars >= 1))
     throw configError('maxInputChars is a number of characters of 1 or more')
