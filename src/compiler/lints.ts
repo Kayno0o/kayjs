@@ -149,7 +149,7 @@ export const LINTS = {
   'invalid-nesting': {
     level: 'warn',
     group: 'islands',
-    summary: 'Markup the HTML parser rewrites or drops, so the server\'s HTML and the DOM an island builds differ: a block in a `p`, a `form` in a `form`, a `tr` straight in a `table`, a cell outside a row, an `option` outside a `select`, a heading in a heading, an `li` outside a list or anything but an `li` straight in one. A parent holding a component, a slot or a snippet between it and the child is left alone.',
+    summary: 'Markup the HTML parser rewrites or HTML forbids: a block in a `p`, a `form` in a `form`, a `tr` straight in a `table`, a cell outside a row, an `option` outside a `select`, a heading in a heading, an `li` outside a list or anything but an `li` straight in one. The parser\'s rewrites make the server\'s HTML differ from the DOM an island builds. A parent holding a component, a slot or a snippet between it and the child is left alone.',
     wrong: 'p\n  div Total\ntable\n  tr\n    td Plan',
     right: 'div\n  div Total\ntable\n  tbody\n    tr\n      td Plan',
   },

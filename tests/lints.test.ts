@@ -1362,8 +1362,22 @@ describe('invalid-nesting', () => {
     expect(nesting('select\n  option a\n  select\n')).toEqual(['select'])
   })
 
-  it('reports an option outside a select, an optgroup or a datalist', () => {
+  it('reports an option with no select or datalist above it, and an optgroup outside a select', () => {
     expect(nesting('select\n  optgroup\n    option a\ndatalist\n  option b\ndiv\n  option c\ndiv\n  optgroup\n')).toEqual(['option', 'optgroup'])
+    expect(nesting('select\n  div\n    option a\n  label\n    option b\n')).toEqual([])
+  })
+
+  it('reports a th outside a tr, and a tfoot or a colgroup outside a table', () => {
+    expect(nesting('div\n  th a\ndiv\n  tfoot\ndiv\n  colgroup\ntable\n  tbody\n    th a\n')).toEqual(['th', 'tfoot', 'colgroup', 'th'])
+  })
+
+  it('treats dialog, summary and markdown as blocks in a p', () => {
+    expect(nesting('p\n  dialog\n  summary\n  markdown\n    # Title\n')).toEqual(['dialog', 'summary', 'markdown'])
+  })
+
+  it('looks through await and match blocks, and restarts at a pending block or a layout block', () => {
+    expect(nesting('ul\n  await items then rows\n    div x\nul\n  match kind\n    when "a"\n      li a\n    else\n      div y\n')).toEqual(['div', 'div'])
+    expect(nesting('ul\n  pending\n    div x\n@sidebar\n  li a\n@footer\n  p\n    div z\n')).toEqual(['div'])
   })
 
   it('reports a list item outside a list and anything but an li straight in one', () => {
@@ -1389,6 +1403,11 @@ describe('invalid-nesting', () => {
   it('does not report an element at the root of a template, which a component may be placed under anything', () => {
     expect(nesting('li x\n')).toEqual([])
     expect(nesting('tr\n  td x\n')).toEqual([])
+  })
+
+  it('reports the snippet it promises: a block called from a snippet inside a p is left alone', () => {
+    expect(nesting('snippet row()\n  div x\np\n  row()\n')).toEqual([])
+    expect(nesting('p\n  snippet row()\n    li x\n')).toEqual([])
   })
 
   it('reports inline elements written inside text, and honours `// kay-allow`', () => {
