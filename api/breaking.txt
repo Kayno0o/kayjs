@@ -21,3 +21,16 @@ auth [.] resolveRules
 auth [.] usernameProblem
 cms [.] EntryForm
 cms [.] FormScope
+ui [./audio-player.kay] default
+ui [./avatar.kay] default
+ui [./combobox.kay] default
+ui [./form-dialog.kay] default
+ui [./icon-picker.kay] default
+ui [./image-cropper.kay] default
+ui [./multi-select.kay] default
+ui [./record-button.kay] default
+ui [./save-form.kay] default
+ui [./select.kay] default
+ui [./site-favicon.kay] default
+ui [./table.kay] default
+ui [./virtual-list.kay] default

@@ -20,6 +20,16 @@ const FAILURE_EXEMPT: Record<string, readonly string[]> = {
   'select': ['retryLabel'],
   // A branch shows a spinner while it loads.
   'tree-view': ['loadingLabel'],
+  // A call's failure is worded, with no data to load or ask for again: a button's pending label says the wait, and a failure is not retried by a word.
+  'save-form': ['loadingLabel', 'retryLabel'],
+  'confirm-delete': ['loadingLabel', 'retryLabel'],
+  'form-dialog': ['loadingLabel', 'retryLabel'],
+  'copy-button': ['loadingLabel', 'retryLabel'],
+  'record-button': ['loadingLabel', 'retryLabel'],
+  'audio-player': ['loadingLabel', 'retryLabel'],
+  'image-cropper': ['loadingLabel', 'retryLabel'],
+  // Its search words `searchingLabel`, and typing again asks again.
+  'icon-picker': ['loadingLabel', 'retryLabel'],
 }
 
 describe('every data component words its empty state the same way', () => {

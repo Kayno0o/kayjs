@@ -646,11 +646,12 @@ component default
 }
   cues?: readonly AudioCue[] | undefined
   failure?: string | undefined
+  failureLabel?: string | undefined
   linkLabel?: string | undefined
   nextLabel?: string | undefined
   onChapterChange?: ((index: number) => unknown) | undefined
   onEnded?: (() => unknown) | undefined
-  onError?: ((error: DOMException | MediaError | null) => unknown) | undefined
+  onError?: ((failure: { error: DOMException | MediaError | null; event?: Event; }) => unknown) | undefined
   onPause?: (() => unknown) | undefined
   onPlay?: (() => unknown) | undefined
   onPositionChange?: ((seconds: number) => unknown) | undefined
@@ -671,7 +672,7 @@ component default
   href?: string | undefined
   label?: string | undefined
   name: string
-  onError?: ((event: Event) => unknown) | undefined
+  onError?: ((failure: { event: Event; }) => unknown) | undefined
   onLoad?: ((event: Event) => unknown) | undefined
   size?: "lg" | "md" | "sm" | "xs" | undefined
   src?: null | string | undefined
@@ -981,7 +982,7 @@ component default
   name?: string | undefined
   onChange?: ((value: "" | Value, option: ComboboxOption<Value> | undefined) => unknown) | undefined
   onCreate?: ((text: string) => unknown) | undefined
-  onError?: ((error: unknown, query: string) => unknown) | undefined
+  onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
   onInput?: ((text: string) => unknown) | undefined
   onLoad?: ((options: readonly ComboboxOption<Value>[], query: string) => unknown) | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
@@ -1063,7 +1064,8 @@ component default
   confirmLabel?: string | undefined
   details?: Element
   disabled?: boolean | undefined
-  failure: string
+  failure?: string | undefined
+  failureLabel?: string | undefined
   label?: string | undefined
   message: string
   onConfirm: () => unknown
@@ -1135,9 +1137,11 @@ component default
   copiedFor?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   copiedLabel?: string | undefined
   failure?: string | undefined
+  failureLabel?: string | undefined
   html?: string | undefined
   label: string
   onCopy?: ((text: string) => unknown) | undefined
+  onError?: ((failure: { error: unknown; }) => unknown) | undefined
   onFail?: ((error: unknown) => unknown) | undefined
   size?: "lg" | "md" | "sm" | "xs" | undefined
   text: (() => Promise<string> | string) | string
@@ -1400,13 +1404,14 @@ component default
   closeHref?: string | undefined
   closeLabel?: string | undefined
   extra?: Element
-  failure: string
+  failure?: string | undefined
+  failureLabel?: string | undefined
   header?: Element
   heading?: Element
   id?: string | undefined
   level?: 2 | 3 | 4 | 5 | 6 | undefined
   modal?: boolean | undefined
-  onError?: ((error: unknown) => unknown) | undefined
+  onError?: ((failure: { error: unknown; }) => unknown) | undefined
   onOpenChange: (open: boolean) => unknown
   onSaved?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
   open: boolean
@@ -1484,13 +1489,14 @@ component default
   empty?: Element
   emptyLabel?: string | undefined
   errorLabel?: string | undefined
+  failureLabel?: string | undefined
   gridLabel?: string | undefined
   icons?: readonly IconChoice[] | undefined
   invalid?: boolean | undefined
   moreLabel?: string | undefined
   name?: string | undefined
   onChange?: ((name: string) => unknown) | undefined
-  onError?: ((error: unknown) => unknown) | undefined
+  onError?: ((failure: { error: unknown; }) => unknown) | undefined
   onSearch?: ((query: string) => unknown) | undefined
   placeholder?: string | undefined
   search?: ((query: string, limit: number, offset: number) => Promise<IconChoice[]>) | undefined
@@ -1521,13 +1527,14 @@ component default
   cropLabel?: string | undefined
   cropText?: string | undefined
   errorLabel?: string | undefined
+  failureLabel?: string | undefined
   fallback?: Element
   footer?: ((reset: () => void) => Element) | undefined
   grid?: boolean | undefined
   minSize?: number | undefined
   onCrop?: ((crop: CropRect) => unknown) | undefined
   onCropEnd?: ((crop: CropRect) => unknown) | undefined
-  onError?: (() => unknown) | undefined
+  onError?: ((failure: { event?: Event | undefined; error?: unknown; }) => unknown) | undefined
   onLoad?: ((size: ImageSize) => unknown) | undefined
   ratio?: number | undefined
   src: string
@@ -1790,7 +1797,7 @@ component default
   name?: string | undefined
   noneLabel?: string | undefined
   onChange?: ((value: Value[]) => unknown) | undefined
-  onError?: ((error: unknown, query: string) => unknown) | undefined
+  onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
   onLoad?: ((options: readonly MultiSelectOption<Value>[], query: string) => unknown) | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
@@ -1992,10 +1999,11 @@ component default
   };
 }
   failure?: string | undefined
+  failureLabel?: string | undefined
   label?: string | undefined
   maxDuration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   onCancel?: (() => unknown) | undefined
-  onError?: ((problem: "send" | RecordProblem, cause?: unknown) => unknown) | undefined
+  onError?: ((failure: RecordFailure) => unknown) | undefined
   onRecord: (audio: File) => unknown
   onRecordingChange?: ((recording: boolean) => unknown) | undefined
   onStart?: (() => unknown) | undefined
@@ -2083,8 +2091,9 @@ component default
   dirtyLabel?: string | undefined
   discardLabel?: string | undefined
   failure?: string | undefined
+  failureLabel?: string | undefined
   onDiscard?: (() => unknown) | undefined
-  onError?: ((error: unknown) => unknown) | undefined
+  onError?: ((failure: { error: unknown; }) => unknown) | undefined
   onSave?: (() => Promise<unknown>) | undefined
   onSaved?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
@@ -2159,7 +2168,7 @@ component default
   invalid?: boolean | undefined
   loadingLabel?: string | undefined
   onChange?: ((value: (Empty extends string | true ? "" : never) | Value) => unknown) | undefined
-  onError?: ((error: unknown) => unknown) | undefined
+  onError?: ((failure: { error: unknown; }) => unknown) | undefined
   onLoad?: ((options: readonly SelectOption<Value>[]) => unknown) | undefined
   options: ((input: ComboboxQuery) => PromiseLike<readonly SelectOption<Value>[]>) | readonly SelectOption<Value>[]
   param?: string | undefined
@@ -2218,7 +2227,7 @@ component default
   class?: string | undefined | { root?: string | undefined; img?: string | undefined; icon?: string | undefined | { root?: string | undefined; }; }
   fallback?: Element
   name: string
-  onError?: ((event: Event) => unknown) | undefined
+  onError?: ((failure: { event: Event; }) => unknown) | undefined
   onLoad?: ((event: Event) => unknown) | undefined
   src?: null | string | undefined
 
@@ -2469,7 +2478,7 @@ component default
   skeletonCell?: string | undefined;
   skeletonBar?: string | undefined;
   emptyCell?: string | undefined;
-}; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list?: undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((error: unknown) => unknown) | undefined; onLoad?: ((rows: Row[]) => unknown) | undefined; onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows: (RowsSource<Row> | undefined) & RowsSource<Row>; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
+}; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list?: undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onLoad?: ((rows: Row[]) => unknown) | undefined; onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows: (RowsSource<Row> | undefined) & RowsSource<Row>; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
   | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: string | undefined | {
   root?: string | undefined;
   filter?: string | undefined;
@@ -2515,7 +2524,7 @@ component default
   skeletonCell?: string | undefined;
   skeletonBar?: string | undefined;
   emptyCell?: string | undefined;
-}; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list: InfiniteList<Row>; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((error: unknown) => unknown) | undefined; onLoad?: ((rows: Row[]) => unknown) | undefined; onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
+}; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list: InfiniteList<Row>; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onLoad?: ((rows: Row[]) => unknown) | undefined; onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
 
 [./tabs.kay] default
 component default
@@ -2703,7 +2712,7 @@ component default
   item?: string | undefined;
   itemLink?: string | undefined;
   itemButton?: string | undefined;
-}; empty?: Element; emptyLabel?: string | undefined; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items: (RowsSource<Item> | undefined) & RowsSource<Item>; label: string; list?: undefined; loadingLabel?: string | undefined; onError?: ((error: unknown) => unknown) | undefined; onItemClick?: ((item: Item, index: number, event: MouseEvent) => unknown) | undefined; onLoad?: ((items: Item[]) => unknown) | undefined; overscan?: number | undefined; retryLabel?: string | undefined; skeletonItems?: number | undefined }
+}; empty?: Element; emptyLabel?: string | undefined; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items: (RowsSource<Item> | undefined) & RowsSource<Item>; label: string; list?: undefined; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onItemClick?: ((item: Item, index: number, event: MouseEvent) => unknown) | undefined; onLoad?: ((items: Item[]) => unknown) | undefined; overscan?: number | undefined; retryLabel?: string | undefined; skeletonItems?: number | undefined }
   | { busy?: boolean | undefined; class?: string | undefined | {
   root?: string | undefined;
   notices?: string | undefined;
@@ -2718,7 +2727,7 @@ component default
   item?: string | undefined;
   itemLink?: string | undefined;
   itemButton?: string | undefined;
-}; empty?: Element; emptyLabel?: string | undefined; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items?: undefined; label: string; list: InfiniteList<Item>; loadingLabel?: string | undefined; onError?: ((error: unknown) => unknown) | undefined; onItemClick?: ((item: Item, index: number, event: MouseEvent) => unknown) | undefined; onLoad?: ((items: Item[]) => unknown) | undefined; overscan?: number | undefined; retryLabel?: string | undefined; skeletonItems?: number | undefined }
+}; empty?: Element; emptyLabel?: string | undefined; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items?: undefined; label: string; list: InfiniteList<Item>; loadingLabel?: string | undefined; onError?: ((failure: { error: unknown; }) => unknown) | undefined; onItemClick?: ((item: Item, index: number, event: MouseEvent) => unknown) | undefined; onLoad?: ((items: Item[]) => unknown) | undefined; overscan?: number | undefined; retryLabel?: string | undefined; skeletonItems?: number | undefined }
 
 [./when-visible.kay] default
 component default
