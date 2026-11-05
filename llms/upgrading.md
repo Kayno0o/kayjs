@@ -17,6 +17,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `context(default)` from `kay` is `createContext(default)`, as `context` read as `ctx` and `defineContext`, which are other things. The old name works until 1.93; `deprecated-context-name` renames the import and its uses.
 
+### The root of kayjs-auth and kayjs-cms stops repeating their browser entries
+
+- `normalizeEmail`, `normalizeUsername`, `emailProblem`, `usernameProblem`, `passwordProblem`, `resolveRules`, `DEFAULT_RULES`, `mixesConfusableScripts`, the length constants and their types are imported from `@kaynooo/kayjs-auth/rules`, no longer from `@kaynooo/kayjs-auth`; `EntryForm` and `FormScope` from `@kaynooo/kayjs-cms/form`, no longer from `@kaynooo/kayjs-cms`. `deprecated-import-path` rewrites the import.
+
 ## 1.89.0
 
 ### Defaults that fit production

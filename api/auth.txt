@@ -859,11 +859,6 @@ function createWsAuthStore<T>(verify: (token: string, ws: Ws) => Promise<T | nul
   forget: (ws: Ws) => boolean;
 }
 
-[.] CredentialRules
-interface CredentialRules
-  password?: undefined | { min?: number | undefined; max?: number | undefined; check?: ((password: string) => string | undefined) | undefined; }
-  username?: undefined | { min?: number | undefined; max?: number | undefined; }
-
 [.] DataExport
 interface DataExport
   app: unknown
@@ -976,9 +971,6 @@ const DEFAULT_LIMITS: {
   oauthToken: { ...#28d361f4 (4 lines)
   link: { ...#e18004fc (5 lines)
 
-[.] DEFAULT_RULES
-const DEFAULT_RULES: ResolvedRules
-
 [.] defaultTemplates
 const defaultTemplates: Templates
 
@@ -1022,12 +1014,6 @@ interface EmailOptions
   templates?: Partial<Templates> | undefined
   translations?: Record<string, Partial<Templates>> | undefined
   unverifiedMaxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-
-[.] emailProblem
-function emailProblem(email: string): "invalid" | undefined
-
-[.] EmailProblem
-type EmailProblem = 'invalid'
 
 [.] EnableTwoFactorResult
 type EnableTwoFactorResult = { ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited' }
@@ -1271,15 +1257,6 @@ function memoryAuthStore(): AuthStore
 
 [.] microsoftProvider
 function microsoftProvider(opts?: OpenIdOptions & { tenant?: string; }): OAuthProvider<OpenIdClaims & { tid?: string; xms_edov?: boolean | number | string; }, OAuthUser>
-
-[.] mixesConfusableScripts
-function mixesConfusableScripts(value: string): boolean
-
-[.] normalizeEmail
-function normalizeEmail(email: string): string
-
-[.] normalizeUsername
-function normalizeUsername(username: string): string
 
 [.] OAuthApp
 interface OAuthApp
@@ -1562,18 +1539,6 @@ interface PasskeyRecord
 [.] PasskeySignInResult
 type PasskeySignInResult = { ok: true, redirect: string } | { ok: false, error: 'expired' | 'invalid' | 'limited' | 'banned' }
 
-[.] PASSWORD_MAX_LENGTH
-const PASSWORD_MAX_LENGTH: 128
-
-[.] PASSWORD_MIN_LENGTH
-const PASSWORD_MIN_LENGTH: 10
-
-[.] passwordProblem
-function passwordProblem(password: string, rules?: CredentialRules): PasswordProblem | undefined
-
-[.] PasswordProblem
-type PasswordProblem = 'too-short' | 'too-long' | (string & {})
-
 [.] PasswordSignInInput
 interface PasswordSignInInput
   identifier: string
@@ -1633,9 +1598,6 @@ interface Profile extends OAuthUser
   provider: string
   providerId: string
   username: string
-
-[.] PROFILE_MAX_LENGTH
-const PROFILE_MAX_LENGTH: 500
 
 [.] ProfileField
 interface ProfileField
@@ -1762,14 +1724,6 @@ interface RequireUserOptions<Scope extends string, Role extends string>
 
 [.] ResetPasswordResult
 type ResetPasswordResult = LinkResult | { ok: false, errors: { password: PasswordProblem | 'breached' } }
-
-[.] ResolvedRules
-interface ResolvedRules
-  password: { min: number; max: number; check?: ((password: string) => string | undefined) | undefined; }
-  username: { min: number; max: number; }
-
-[.] resolveRules
-function resolveRules(rules?: CredentialRules): ResolvedRules
 
 [.] RevokeGrantResult
 type RevokeGrantResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
@@ -1926,18 +1880,6 @@ interface User<Data extends object = Record<string, unknown>> extends BareUser<D
   roles: string[]
   twoFactor: boolean
   username: null | string
-
-[.] USERNAME_MAX_LENGTH
-const USERNAME_MAX_LENGTH: 32
-
-[.] USERNAME_MIN_LENGTH
-const USERNAME_MIN_LENGTH: 2
-
-[.] usernameProblem
-function usernameProblem(username: string, rules?: CredentialRules): UsernameProblem | undefined
-
-[.] UsernameProblem
-type UsernameProblem = 'length' | 'characters' | 'mixed-scripts'
 
 [.] UserRecord
 interface UserRecord

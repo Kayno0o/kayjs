@@ -45,10 +45,11 @@ import { hookNames } from './hook-names'
 import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
 import { mcpRoutes } from './mcp-routes'
+import { movedImports } from './moved-imports'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
-import { removedUiTokens } from './removed-ui-tokens'
 
+import { removedUiTokens } from './removed-ui-tokens'
 import { exportNames, contextName, roomTypes, sourceTypes } from './renamed-exports'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
@@ -155,6 +156,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => hookNames(root, options),
   async ({ root, options }) => deprecatedLifetimes(root, options),
   async ({ root, options }) => contextName(root, options),
+  async ({ root, options }) => movedImports(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

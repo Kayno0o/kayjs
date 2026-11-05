@@ -626,6 +626,9 @@ interface MinTimeOptions
 [.] MinTimeRefusal
 type MinTimeRefusal = 'early' | 'expired'
 
+[.] mount
+function mount<P extends object>(component: (props: P) => unknown, element: Element, ...[props]: PropsOf<P>): () => void
+
 [.] navigate
 function navigate(to: { query: Readonly<Record<string, null | number | string | undefined>>; }, options?: NavigateOptions | undefined): Promise<boolean>
 function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions | undefined): Promise<boolean>
@@ -3619,6 +3622,9 @@ interface SignOptions
 
 [./server] SNIFFED_BYTES
 const SNIFFED_BYTES: 4096
+
+[./server] sqliteCache
+function sqliteCache(path: string): SyncCacheStore
 
 [./server] sqliteData
 function sqliteData(path: string): {

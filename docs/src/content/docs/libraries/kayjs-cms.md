@@ -821,7 +821,7 @@ In the page, read what the screen reads with `entryScreen`, `listScreen` and `co
 
 ## Building an entry screen
 
-To arrange an entry screen in a way the layout cannot, build it from the parts the default one is made of. `createEntryForm` from `@kaynooo/kayjs-cms/form` keeps the state: drafts, save, publish, delete, reset and the warning when you leave with edits. Each part takes that `form`.
+To arrange an entry screen in a way the layout cannot, build it from the parts the default one is made of. `createEntryForm` from `@kaynooo/kayjs-cms/form`, with the `EntryForm` and `FormScope` types, keeps the state: drafts, save, publish, delete, reset and the warning when you leave with edits. Each part takes that `form`.
 
 ```kay
 ---

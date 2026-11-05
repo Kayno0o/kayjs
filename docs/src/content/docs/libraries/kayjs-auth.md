@@ -249,7 +249,7 @@ createAuth({
 })
 ```
 
-`check` returns a problem code or a message, and the prebuilt pages show it as it is. Registering, resetting, changing a password and `admin.createUser` all follow the rules, and so do the pages' hints. An island checks before posting with the same values: `passwordProblem(value, auth.features().rules)` from `@kaynooo/kayjs-auth/rules`, with `features().rules` passed down as a prop. A password longer than a ceiling you lowered later can still sign in.
+`check` returns a problem code or a message, and the prebuilt pages show it as it is. Registering, resetting, changing a password and `admin.createUser` all follow the rules, and so do the pages' hints. An island checks before posting with the same values: `passwordProblem(value, auth.features().rules)` from `@kaynooo/kayjs-auth/rules`, the only entry exporting the rules, with `features().rules` passed down as a prop. A password longer than a ceiling you lowered later can still sign in.
 
 Methods that can fail answer `{ ok: true, ... }` or `{ ok: false, error }`, with codes such as `'invalid'` or `'limited'`. Your page words them.
 

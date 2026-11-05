@@ -111,7 +111,7 @@ Types include `BrowserError` and `CspViolationError`, the browser errors and CSP
 | `kay/words` | `wording`, `pageLocale`, `sizeText`: the lookup a library words its default texts through. See [Internationalization](/guides/i18n) |
 | `kay/params` | The route matchers `integer`, `uuid` and `slug` |
 | `kay/pg-orm` | `jobTables`, with `KayJobs` and `KayLocks`: the job queue's tables as pg-orm definitions, for the app's `new Database({ tables })`. Needs `@kaynooo/pg-orm`. See [Background jobs](/guides/background-jobs#postgres) |
-| `kay/cache` | `cached`, `cache`, `cacheTag`, `invalidate`, `invalidatePage`, `sqliteCache`. See [Caching and streaming](/guides/caching-and-streaming) |
+| `kay/cache` | `cached`, `cache`, `cacheTag`, `invalidate`, `invalidatePage`, `sqliteCache` (also exported from `kay/server`). See [Caching and streaming](/guides/caching-and-streaming) |
 | `kay/analytics` | `analytics`, the extension counting visits through your own origin, `consent`, the visitor's answer to its notice, and `vitals` with `vitalsReport`, the real visitors' Web Vitals. See [Privacy](/guides/privacy#counting-visits) |
 | `kay/library` | What a library's extension, commands and dev routes use: `KayCommand`, `underKayDev`, `missingTranslations`, `writeDraftMessages`, `escapeHtml` and more. See [Component libraries](/guides/component-libraries#extensions) |
 | `kay/image` | `image`, `shareImage`, `shareCard` |
@@ -120,7 +120,7 @@ Types include `BrowserError` and `CspViolationError`, the browser errors and CSP
 | `kay/test/preload` | The preload `kay test` loads, and a project's `bunfig.toml` lists for a plain `bun test`; it also closes the test sites and copies a database per file from a `pg-orm.config.ts`. See [Testing](/guides/testing#a-database-for-each-test-file) |
 | `kay/test/dom` | Registers happy-dom's DOM, popover API included, which `mountComponent` loads on its first mount. See [Testing](/guides/testing#one-component) |
 | `kay/bun` | `kay`, the Bun plugin compiling `.kay` files for a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |
-| `kay/mount` | `mount`, which renders a component into an element on a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |
+| `kay/mount` | `mount` (also exported from `kay`), which renders a component into an element on a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |
 | `kay/eslint` | The ESLint processor for `.kay` files. See [Checks](/reference/checks) |
 | `kay/tsconfig.json` | The base tsconfig a project extends |
 | `kay/jsx-runtime` | Where TypeScript finds the JSX types, through the `jsxImportSource` of the base tsconfig. Nothing to import |

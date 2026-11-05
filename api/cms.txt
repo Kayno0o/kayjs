@@ -1,5 +1,5 @@
 [.] Action
-type Action = CmsAction
+type Action = typeof ACTIONS[number]
 
 [.] BODY
 const BODY: typeof BODY
@@ -15,14 +15,6 @@ interface Choice
 
 [.] cms
 function cms(options?: CmsOptions): KayExtension<AnyElysia>
-
-[.] CmsAction
-type CmsAction = typeof ACTIONS[number]
-
-[.] CmsDraftEntry
-interface CmsDraftEntry extends EntryRef
-  body?: string | undefined
-  data: Record<string, unknown>
 
 [.] CmsOptions
 interface CmsOptions
@@ -69,20 +61,20 @@ interface Commit
 function createDrafts({
   show, delay, keep
 }: DraftsOptions): {
-  open(entry: CmsDraftEntry, version?: string | undefined): void;
-  entry(ref: EntryRef): CmsDraftEntry | undefined;
+  open(entry: DraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): DraftEntry | undefined;
   kept(ref: EntryRef): boolean;
   version(ref: EntryRef): string | undefined;
   value(ref: EntryRef, path: FieldPath): unknown;
   set(ref: EntryRef, path: FieldPath, value: unknown): void;
   changed(ref: EntryRef): boolean;
   reset(ref: EntryRef): void;
-  markSaved(ref: EntryRef, sent: CmsDraftEntry, version?: string | undefined): void;
+  markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void;
   refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
   refusal(ref: EntryRef): Refusal | undefined;
   keepEdits(ref: EntryRef): void;
-  adopt(ref: EntryRef, entry: CmsDraftEntry, version: string | undefined): void;
-  differences(ref: EntryRef, other: CmsDraftEntry): FieldPath[];
+  adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: DraftEntry): FieldPath[];
   anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
   flush: () => void;
   discardAll(): void;
@@ -116,7 +108,12 @@ interface CustomFieldProps
 const defaults: Settings
 
 [.] DraftEntry
-type DraftEntry = CmsDraftEntry
+interface DraftEntry extends EntryRef
+  body?: string | undefined
+  collection: string
+  data: Record<string, unknown>
+  locale?: string | undefined
+  slug: string
 
 [.] DraftKeeper
 interface DraftKeeper
@@ -137,96 +134,19 @@ type Drafts = ReturnType<typeof createDrafts>
 interface DraftsOptions
   delay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   keep?: DraftKeeper | undefined
-  show: (entries: CmsDraftEntry[]) => Promise<DraftResult>
+  show: (entries: DraftEntry[]) => Promise<DraftResult>
 
 [.] emptyValue
 function emptyValue(field: Field): unknown
-
-[.] EntryForm
-interface EntryForm extends FormScope
-  approve: () => Promise<boolean>
-  askReferrers: () => Promise<void>
-  canSave: () => boolean
-  clearEnd: () => Promise<void>
-  collection: ScreenCollection
-  denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>> | undefined
-  dirty: () => boolean
-  drafts: {
-  open(entry: CmsDraftEntry, version?: string | undefined): void;
-  entry(ref: EntryRef): CmsDraftEntry | undefined;
-  kept(ref: EntryRef): boolean;
-  version(ref: EntryRef): string | undefined;
-  value(ref: EntryRef, path: FieldPath): unknown;
-  set(ref: EntryRef, path: FieldPath, value: unknown): void;
-  changed(ref: EntryRef): boolean;
-  reset(ref: EntryRef): void;
-  markSaved(ref: EntryRef, sent: CmsDraftEntry, version?: string | undefined): void;
-  refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
-  refusal(ref: EntryRef): Refusal | undefined;
-  keepEdits(ref: EntryRef): void;
-  adopt(ref: EntryRef, entry: CmsDraftEntry, version: string | undefined): void;
-  differences(ref: EntryRef, other: CmsDraftEntry): FieldPath[];
-  anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
-  flush: () => void;
-  discardAll(): void;
-  recovery(ref: EntryRef): Recovery | undefined;
-  recreating(ref: EntryRef): boolean;
-  reapply(): void;
-  stale(): EntryRef[];
-  report(refusals: readonly Issue[], ref?: EntryRef | undefined): void;
-  dismissWhere(ref: EntryRef, match: (issue: Issue) => boolean): void;
-  block(ref: EntryRef, path: string, message: string | undefined): void;
-  blocked(ref: EntryRef, path?: string | undefined): {
-    path: string;
-    message: string;
-  }[];
-  issues(ref: EntryRef, path?: FieldPath | undefined): Issue[];
-  failure: () => string | undefined;
-  rendering: () => boolean;
-  pending: () => boolean;
-}
-  ended: () => boolean
-  ends: () => string | undefined
-  entry: EntryRef
-  isDraft: () => boolean
-  name: string
-  newLocale: Signal<string>
-  prefix: string
-  problem?: string | undefined
-  publish: () => Promise<void>
-  publishNow: () => Promise<void>
-  readSlugs: () => Promise<void>
-  referrers: () => string[]
-  remove: () => Promise<void>
-  rename: (slug: string, onRefused?: ((message: string) => void) | undefined) => Promise<boolean>
-  reset: () => void
-  review: () => ReviewView | undefined
-  reviewing: () => boolean
-  save: () => Promise<void>
-  saveAndAdd: () => Promise<void>
-  savedAt: () => SavedState | undefined
-  saving: Signal<boolean>
-  scheduled: () => string | undefined
-  sendBack: (note: string) => Promise<boolean>
-  shown: Shown
-  slug: Signal<string>
-  slugNeedsTyping: () => boolean
-  slugReport: (typed?: string | undefined) => SlugReport | undefined
-  source?: PairedEntry | undefined
-  stored: StoredEntry | undefined
-  stranded: Signal<Stranded | undefined>
-  submit: () => Promise<boolean>
-  subtitle: string | undefined
-  suggestsSlug: Signal<boolean>
-  typeSlug: (text: string) => void
-  unpublish: () => Promise<void>
-  unschedule: () => Promise<void>
 
 [.] entryKey
 function entryKey({ collection, slug, locale }: EntryRef): string
 
 [.] EntryRef
 interface EntryRef
+  collection: string
+  locale?: string | undefined
+  slug: string
 
 [.] EntryRow
 interface EntryRow
@@ -284,7 +204,10 @@ type Field = | FieldBase & {
 
 [.] FieldMarker
 interface FieldMarker extends EntryRef
+  collection: string
+  locale?: string | undefined
   path: FieldPath
+  slug: string
 
 [.] fieldOf
 function fieldOf(key: number | string, schema: JsonSchema, required: boolean): Field
@@ -359,49 +282,6 @@ interface FormLayout
   previewClass?: string | undefined
   toolbar?: ToolbarAction[] | boolean | undefined
 
-[.] FormScope
-interface FormScope
-  collection: ScreenCollection
-  denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>> | undefined
-  drafts: {
-  open(entry: CmsDraftEntry, version?: string | undefined): void;
-  entry(ref: EntryRef): CmsDraftEntry | undefined;
-  kept(ref: EntryRef): boolean;
-  version(ref: EntryRef): string | undefined;
-  value(ref: EntryRef, path: FieldPath): unknown;
-  set(ref: EntryRef, path: FieldPath, value: unknown): void;
-  changed(ref: EntryRef): boolean;
-  reset(ref: EntryRef): void;
-  markSaved(ref: EntryRef, sent: CmsDraftEntry, version?: string | undefined): void;
-  refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
-  refusal(ref: EntryRef): Refusal | undefined;
-  keepEdits(ref: EntryRef): void;
-  adopt(ref: EntryRef, entry: CmsDraftEntry, version: string | undefined): void;
-  differences(ref: EntryRef, other: CmsDraftEntry): FieldPath[];
-  anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
-  flush: () => void;
-  discardAll(): void;
-  recovery(ref: EntryRef): Recovery | undefined;
-  recreating(ref: EntryRef): boolean;
-  reapply(): void;
-  stale(): EntryRef[];
-  report(refusals: readonly Issue[], ref?: EntryRef | undefined): void;
-  dismissWhere(ref: EntryRef, match: (issue: Issue) => boolean): void;
-  block(ref: EntryRef, path: string, message: string | undefined): void;
-  blocked(ref: EntryRef, path?: string | undefined): {
-    path: string;
-    message: string;
-  }[];
-  issues(ref: EntryRef, path?: FieldPath | undefined): Issue[];
-  failure: () => string | undefined;
-  rendering: () => boolean;
-  pending: () => boolean;
-}
-  entry: EntryRef
-  problem?: string | undefined
-  shown: Shown
-  source?: PairedEntry | undefined
-
 [.] github
 function github({ repo, branch, token, baseUrl, timeout: wait, fetch: request }: GithubOptions): FileSaver
 
@@ -440,9 +320,12 @@ interface Identity
 [.] Issue
 interface Issue extends EntryRef
   body?: true | undefined
+  collection: string
   key?: "locale" | "slug" | undefined
+  locale?: string | undefined
   message: string
   path: string
+  slug: string
 
 [.] joinPath
 function joinPath(parent: string, key: number | string): string
@@ -454,7 +337,7 @@ interface JsonSchema
 interface KeptDraft
   at: number
   base?: string | undefined
-  entry: CmsDraftEntry
+  entry: DraftEntry
   version: string | undefined
 
 [.] LazyGuard
@@ -628,7 +511,7 @@ component default
 
 [./entry-presence.kay] default
 component default
-  member: CmsMember
+  member: Member
   room: string
 
 [./entry-table.kay] default
@@ -648,20 +531,20 @@ component default
 [./field-input.kay] default
 component default
   drafts: {
-  open(entry: CmsDraftEntry, version?: string | undefined): void;
-  entry(ref: EntryRef): CmsDraftEntry | undefined;
+  open(entry: DraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): DraftEntry | undefined;
   kept(ref: EntryRef): boolean;
   version(ref: EntryRef): string | undefined;
   value(ref: EntryRef, path: FieldPath): unknown;
   set(ref: EntryRef, path: FieldPath, value: unknown): void;
   changed(ref: EntryRef): boolean;
   reset(ref: EntryRef): void;
-  markSaved(ref: EntryRef, sent: CmsDraftEntry, version?: string | undefined): void;
+  markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void;
   refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
   refusal(ref: EntryRef): Refusal | undefined;
   keepEdits(ref: EntryRef): void;
-  adopt(ref: EntryRef, entry: CmsDraftEntry, version: string | undefined): void;
-  differences(ref: EntryRef, other: CmsDraftEntry): FieldPath[];
+  adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: DraftEntry): FieldPath[];
   anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
   flush: () => void;
   discardAll(): void;
@@ -726,20 +609,20 @@ interface EntryForm extends FormScope
   denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>> | undefined
   dirty: () => boolean
   drafts: {
-  open(entry: CmsDraftEntry, version?: string | undefined): void;
-  entry(ref: EntryRef): CmsDraftEntry | undefined;
+  open(entry: DraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): DraftEntry | undefined;
   kept(ref: EntryRef): boolean;
   version(ref: EntryRef): string | undefined;
   value(ref: EntryRef, path: FieldPath): unknown;
   set(ref: EntryRef, path: FieldPath, value: unknown): void;
   changed(ref: EntryRef): boolean;
   reset(ref: EntryRef): void;
-  markSaved(ref: EntryRef, sent: CmsDraftEntry, version?: string | undefined): void;
+  markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void;
   refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
   refusal(ref: EntryRef): Refusal | undefined;
   keepEdits(ref: EntryRef): void;
-  adopt(ref: EntryRef, entry: CmsDraftEntry, version: string | undefined): void;
-  differences(ref: EntryRef, other: CmsDraftEntry): FieldPath[];
+  adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: DraftEntry): FieldPath[];
   anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
   flush: () => void;
   discardAll(): void;
@@ -798,20 +681,20 @@ interface EntryForm extends FormScope
 
 [./form] formScope
 function formScope(drafts: {
-  open(entry: CmsDraftEntry, version?: string | undefined): void;
-  entry(ref: EntryRef): CmsDraftEntry | undefined;
+  open(entry: DraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): DraftEntry | undefined;
   kept(ref: EntryRef): boolean;
   version(ref: EntryRef): string | undefined;
   value(ref: EntryRef, path: FieldPath): unknown;
   set(ref: EntryRef, path: FieldPath, value: unknown): void;
   changed(ref: EntryRef): boolean;
   reset(ref: EntryRef): void;
-  markSaved(ref: EntryRef, sent: CmsDraftEntry, version?: string | undefined): void;
+  markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void;
   refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
   refusal(ref: EntryRef): Refusal | undefined;
   keepEdits(ref: EntryRef): void;
-  adopt(ref: EntryRef, entry: CmsDraftEntry, version: string | undefined): void;
-  differences(ref: EntryRef, other: CmsDraftEntry): FieldPath[];
+  adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: DraftEntry): FieldPath[];
   anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
   flush: () => void;
   discardAll(): void;
@@ -837,20 +720,20 @@ interface FormScope
   collection: ScreenCollection
   denied?: Partial<Record<"delete" | "publish" | "redirects" | "review" | "upload", string>> | undefined
   drafts: {
-  open(entry: CmsDraftEntry, version?: string | undefined): void;
-  entry(ref: EntryRef): CmsDraftEntry | undefined;
+  open(entry: DraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): DraftEntry | undefined;
   kept(ref: EntryRef): boolean;
   version(ref: EntryRef): string | undefined;
   value(ref: EntryRef, path: FieldPath): unknown;
   set(ref: EntryRef, path: FieldPath, value: unknown): void;
   changed(ref: EntryRef): boolean;
   reset(ref: EntryRef): void;
-  markSaved(ref: EntryRef, sent: CmsDraftEntry, version?: string | undefined): void;
+  markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void;
   refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
   refusal(ref: EntryRef): Refusal | undefined;
   keepEdits(ref: EntryRef): void;
-  adopt(ref: EntryRef, entry: CmsDraftEntry, version: string | undefined): void;
-  differences(ref: EntryRef, other: CmsDraftEntry): FieldPath[];
+  adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: DraftEntry): FieldPath[];
   anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
   flush: () => void;
   discardAll(): void;
@@ -885,17 +768,10 @@ interface Stranded
   kind: "created" | "deleted" | "renamed"
   to: string
 
-[./pg] CmsSeedEntry
-interface CmsSeedEntry
-  body?: string | undefined
-  data: Record<string, unknown>
-  locale?: string | undefined
-  slug: string
-
 [./pg] LoaderOptions
 interface LoaderOptions
   name: string
-  seed?: (() => Promise<readonly CmsSeedEntry[]> | readonly CmsSeedEntry[]) | readonly CmsSeedEntry[] | undefined
+  seed?: (() => Promise<readonly SeedEntry[]> | readonly SeedEntry[]) | readonly SeedEntry[] | undefined
   table?: string | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
@@ -906,52 +782,50 @@ function pgLoader(options: PgLoaderOptions): ContentLoader<unknown>
 [./pg] PgLoaderOptions
 interface PgLoaderOptions extends LoaderOptions
   name: string
-  seed?: (() => Promise<readonly CmsSeedEntry[]> | readonly CmsSeedEntry[]) | readonly CmsSeedEntry[] | undefined
+  seed?: (() => Promise<readonly SeedEntry[]> | readonly SeedEntry[]) | readonly SeedEntry[] | undefined
   sql?: SQL | string | undefined
   table?: string | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
 
 [./pg] SeedEntry
-type SeedEntry = CmsSeedEntry
+interface SeedEntry
+  body?: string | undefined
+  data: Record<string, unknown>
+  locale?: string | undefined
+  slug: string
 
 [./presence] entryPresence
 function entryPresence(ctx: GuardContext, collection: string, entry: { slug: string; locale?: string | undefined; }): Promise<EntryPresence>
 
 [./presence] EntryPresence
 interface EntryPresence
-  member: CmsMember
+  member: Member
   room: string
 
-[./room] CmsMember
-interface CmsMember
+[./room] entryRoom
+function entryRoom(collection: string, entry: { slug: string; locale?: string | undefined; }, listed: Member): { room: string; member: Member; }
+
+[./room] Member
+interface Member
   name: string
   page?: true | undefined
   watching?: true | undefined
 
-[./room] entryRoom
-function entryRoom(collection: string, entry: { slug: string; locale?: string | undefined; }, listed: CmsMember): { room: string; member: CmsMember; }
-
-[./room] Member
-type Member = CmsMember
-
-[./sqlite] CmsSeedEntry
-interface CmsSeedEntry
-  body?: string | undefined
-  data: Record<string, unknown>
-  locale?: string | undefined
-  slug: string
-
 [./sqlite] LoaderOptions
 interface LoaderOptions
   name: string
-  seed?: (() => Promise<readonly CmsSeedEntry[]> | readonly CmsSeedEntry[]) | readonly CmsSeedEntry[] | undefined
+  seed?: (() => Promise<readonly SeedEntry[]> | readonly SeedEntry[]) | readonly SeedEntry[] | undefined
   table?: string | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
 
 [./sqlite] SeedEntry
-type SeedEntry = CmsSeedEntry
+interface SeedEntry
+  body?: string | undefined
+  data: Record<string, unknown>
+  locale?: string | undefined
+  slug: string
 
 [./sqlite] sqliteLoader
 function sqliteLoader(options: SqliteLoaderOptions): ContentLoader<unknown>
@@ -960,7 +834,7 @@ function sqliteLoader(options: SqliteLoaderOptions): ContentLoader<unknown>
 interface SqliteLoaderOptions extends LoaderOptions
   database?: Database | string | undefined
   name: string
-  seed?: (() => Promise<readonly CmsSeedEntry[]> | readonly CmsSeedEntry[]) | readonly CmsSeedEntry[] | undefined
+  seed?: (() => Promise<readonly SeedEntry[]> | readonly SeedEntry[]) | readonly SeedEntry[] | undefined
   table?: string | undefined
   ttl?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   watch?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined

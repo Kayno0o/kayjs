@@ -825,6 +825,15 @@ export const LINTS = {
     wrong: '--- server\nimport { context } from \'kay\'\n\nexport const Theme = context(\'light\')\n---\np x',
     right: '--- server\nimport { createContext } from \'kay\'\n\nexport const Theme = createContext(\'light\')\n---\np x',
   },
+  'deprecated-import-path': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.90',
+    site: true,
+    summary: 'A name imported from the root of a library that its own entry exports since 1.90, the root no longer repeating it: kayjs-auth\'s credential rules (`normalizeEmail`, `normalizeUsername`, `emailProblem`, `usernameProblem`, `passwordProblem`, `resolveRules`, `DEFAULT_RULES`, `PASSWORD_MIN_LENGTH` and the other lengths, and their types) are in `@kaynooo/kayjs-auth/rules`, which is browser-safe, and kayjs-cms\'s `EntryForm` and `FormScope` are in `@kaynooo/kayjs-cms/form`. Found in the TypeScript files and `.kay` fences of the project; the fix changes the module of an import that held only those names, and moves them to an import of their own entry otherwise. An import with a default or a namespace beside them is reported with no fix.',
+    wrong: '--- server\nimport { normalizeEmail } from \'@kaynooo/kayjs-auth\'\n\nexport const email = (value: string) => normalizeEmail(value)\n---\np x',
+    right: '--- server\nimport { normalizeEmail } from \'@kaynooo/kayjs-auth/rules\'\n\nexport const email = (value: string) => normalizeEmail(value)\n---\np x',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

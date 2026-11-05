@@ -42,6 +42,7 @@ export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
   markInvalid: 'browser',
   mediaQuery: 'browser',
   memo: 'browser',
+  mount: 'browser',
   navigate: 'browser',
   navigation: 'browser',
   onBeforeNavigate: 'browser',

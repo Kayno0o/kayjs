@@ -518,7 +518,7 @@ The server renders the fallback, `false` unless you pass another, as in `mediaQu
 
 ## A page kay does not serve
 
-A page bundled by something else, such as an HTML file `Bun.serve` imports, can render `.kay` components too. List `"kay/bun"` under `[serve.static] plugins` in `bunfig.toml`, or pass `kay({ root })` from `kay/bun` to `Bun.build`. Then render one with `mount` from `kay/mount`, which returns a function that removes it.
+A page bundled by something else, such as an HTML file `Bun.serve` imports, can render `.kay` components too. List `"kay/bun"` under `[serve.static] plugins` in `bunfig.toml`, or pass `kay({ root })` from `kay/bun` to `Bun.build`. Then render one with `mount` from `kay` (`kay/mount` is the same function), which returns a function that removes it.
 
 ```ts
 import { mount } from 'kay/mount'
