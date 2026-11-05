@@ -305,11 +305,11 @@ export default defineConfig({
 
 A redirect answers 308, or 307 with `permanent: false`. `status` names another: 301 or 302 for clients and crawlers that expect them.
 
-A link to the old path is valid too: `kay check` counts the source of a redirect as a page, so `a(href="/old")` passes. A source ending in `*`, such as `/docs/*`, does not make `/docs` itself count. A redirect added while the site runs counts only while `data/not-found.sqlite` is there, so for a link that must pass everywhere, such as in CI, add the redirect to `redirects`.
+A link to the old path is valid too: `kay check` counts the source of a redirect as a page, so `a(href="/old")` passes. A source ending in `*`, such as `/docs/*`, does not make `/docs` itself count. A redirect added while the site runs counts only while that file is there, so for a link that must pass everywhere, such as in CI, add the redirect to `redirects`.
 
 ### Find the old URLs visitors still use
 
-After a site moves, old links keep answering 404. A production server counts the pages visitors asked for and found nothing at, in `data/not-found.sqlite`. It keeps the path, how often it was hit and the host of the page that linked to it, never anything about the visitor. A path nobody asked for in 90 days is forgotten. The counts reach the file in one write a second, so `kay not-found` can lag the running site by that much.
+After a site moves, old links keep answering 404. A production server counts the pages visitors asked for and found nothing at, in the SQLite file of your `store`, else `data/not-found.sqlite`. It keeps the path, how often it was hit and the host of the page that linked to it, never anything about the visitor. A path nobody asked for in 90 days is forgotten. The counts reach the file in one write a second, so `kay not-found` can lag the running site by that much.
 
 The file belongs to the machine, not to the app `store`, so replicas on several machines each count their own.
 
@@ -321,7 +321,7 @@ The list starts with the most hit. A path asked for twice also gets a suggestion
 
 In `kay dev`, the dev tool's Not found tab shows the same list from the file a production run left, with a field for the target and an Add redirect button on each path. It writes the same line to `kay.config.ts`. `kay dev` counts nothing itself, so the tab is empty until that file exists.
 
-A redirect in `kay.config.ts` needs a deploy. To add one to the running site instead, run `kay not-found --redirect /old --runtime`. kay writes it to the same `data/not-found.sqlite`, and the server answers it from the next request with a 307, which browsers do not keep, so removing it undoes it for everyone. The config's redirects and your pages always win over it, and it is only looked up for a path that would have been a 404, which includes a file of `public/` you deleted while the site runs.
+A redirect in `kay.config.ts` needs a deploy. To add one to the running site instead, run `kay not-found --redirect /old --runtime`. kay writes it to the same file, and the server answers it from the next request with a 307, which browsers do not keep, so removing it undoes it for everyone. The config's redirects and your pages always win over it, and it is only looked up for a path that would have been a 404, which includes a file of `public/` you deleted while the site runs.
 
 An added redirect can only go to a page of your site. kay refuses a target like `//evil.example` or `https://evil.example/`, a redirect back to its own path (also through other redirects), and a target no page serves. To allow another site, list its host in `runtimeRedirects` in `kay.config.ts`: `runtimeRedirects: { hosts: ['example.org'] }`. Use `redirects` for what belongs in the repository, and this for what an editor adds while the site runs.
 

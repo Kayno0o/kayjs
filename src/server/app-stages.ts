@@ -58,6 +58,7 @@ import { jobsPageOf, serveJobsPage } from './jobs-page'
 import { countWrites, NO_WRITES } from './kept-pages'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { liveConnections, serveLive } from './live'
+import { warnOfLocalFiles } from './local-files'
 import { announceStart, logRequests, pathOf, requestRefusalLogger, useLogger } from './log'
 import { mcpBodyLimit, receiveDispatched, serveMcp, serveToolCallsThrough } from './mcp'
 import { METRICS_PATH, metricsOf, serveMetrics } from './metrics'
@@ -758,6 +759,8 @@ export async function pageRoutes(boot: Boot, { redirects, publicServed, redirect
 
   if (env.serving)
     countMissing(app, { known: knownPaths(client, table), settings: i18n?.settings, trailingSlash: env.trailingSlash })
+
+  warnOfLocalFiles()
 
   // After the hooks above, which a public file deleted since boot is answered through as a path nothing serves.
   await servePublic(app, served, publicServed, env.dev ? undefined : publicCache, compressing && !env.dev, pageFor)

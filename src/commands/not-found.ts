@@ -6,7 +6,7 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 import { loadConfig } from '../config-loader'
 import { buildingWithoutEnv } from '../server/env-state'
-import { answeredBy, missingStore, NOT_FOUND_FILE } from '../server/not-found'
+import { answeredBy, missingStore, notFoundFile } from '../server/not-found'
 import { addRedirect, checkRedirect, redirectEntry, withRedirect } from '../server/not-found-config'
 import { formatOption, printDocument, printFailure, projectRoot, shellQuote, withStdoutOnStderr } from './command'
 
@@ -44,12 +44,11 @@ export const notFound: Command = {
     if (runtime && redirect === undefined)
       return refuse('--runtime goes with --redirect')
 
-    const file = typeof values.file === 'string' ? values.file : join(root, NOT_FOUND_FILE)
-
     buildingWithoutEnv()
 
     try {
       const config = await withStdoutOnStderr(async () => loadConfig(root))
+      const file = typeof values.file === 'string' ? values.file : notFoundFile(config.store?.database, root)
       const redirects = Object.keys(config.redirects ?? {})
       const redirected = new Set(redirects)
       // A dry run with no file keeps its store in memory, so it creates none.
@@ -162,7 +161,7 @@ function formatListing(missing: MissingPath[], redirected: boolean): string {
     return 'Every recorded path has a redirect.'
 
   if (missing.length === 0)
-    return 'No missing path recorded: the production server records the pages visitors asked for and found nothing at in data/not-found.sqlite.'
+    return 'No missing path recorded: the production server records the pages visitors asked for and found nothing at in the SQLite file of the app\'s store, or data/not-found.sqlite.'
 
   return missing.map(({ path, hits, referrers, target, reason }) => {
     const hosts = [...new Set(referrers.map(({ host }) => host))]

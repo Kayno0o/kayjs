@@ -5,8 +5,9 @@ import type { RuntimeRedirect, RuntimeRules, RuntimeStatus } from './runtime-red
 import { existsSync } from 'node:fs'
 import { joinBase } from '../runtime/base'
 import { kayLog } from '../runtime/log'
+import { appStore } from './app-store'
 import { pathOf } from './log'
-import { countedPath, dropStore, isPageRequest, markEditorGone, missingStore, NOT_FOUND_FILE, sharedStore, storeFile } from './not-found'
+import { countedPath, dropStore, isPageRequest, markEditorGone, missingStore, notFoundFile, sharedStore, storeFile } from './not-found'
 import { requestUrl } from './request-url'
 import { answerFor, plainPath, RedirectRefusedError } from './runtime-redirects'
 
@@ -59,7 +60,7 @@ function inStore<T>(file: string | undefined, write: boolean, use: (store: Retur
   if (file === undefined && sharedStore(storeFile(), false))
     return use(sharedStore(storeFile(), false)!)
 
-  const path = file ?? NOT_FOUND_FILE
+  const path = file ?? notFoundFile(appStore()?.database)
 
   if (!write && !existsSync(path))
     return undefined

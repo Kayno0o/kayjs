@@ -4,6 +4,8 @@ import { availableParallelism, constants } from 'node:os'
 import { basename, join } from 'node:path'
 import process from 'node:process'
 import { kayLog } from '../runtime/log'
+import { databaseOf } from './app-database'
+import { noteLocalFile } from './local-files'
 import { isInMemory } from './memory-mark'
 import { START_PARENT, WORKER_COUNT, WORKER_INDEX } from './parent'
 
@@ -70,17 +72,51 @@ export function shareThePort(): void {
   Bun.serve = ((options: Record<string, unknown>) => serve((options.unix === undefined ? { ...options, reusePort: true } : options) as unknown as Parameters<typeof Bun.serve>[0])) as unknown as typeof Bun.serve
 }
 
-// What the app's `store` leaves out and one process would keep in its memory, kept in a SQLite file the workers share; a store the app names is left as it is.
+// The stores the workers share when the app's `store` leaves them out.
+const SHARED_KINDS = ['cache', 'live', 'rates', 'rooms', 'vitals', 'notifications', 'push', 'kv'] as const
+
+// What the app's `store` leaves out and one process would keep in its memory, kept where the rest of the app's data is: the database the store names (its SQLite file, or its Postgres), else a SQLite file the workers share; a store the app names is left as it is.
 export async function sharedStores(store: AppStore | undefined): Promise<AppStore | undefined> {
   if (workerCount() < 2)
     return store
 
   warnOfMemoryStores(store)
 
-  const { sqliteData } = await import('./sqlite-data')
-  const { cache, live, rates, rooms, vitals, notifications, push, kv } = sqliteData(SHARED_PATH)
+  if (SHARED_KINDS.every(kind => store?.[kind] !== undefined))
+    return store
 
-  return { ...store, cache: store?.cache ?? cache, live: store?.live ?? live, rates: store?.rates ?? rates, rooms: store?.rooms ?? rooms, vitals: store?.vitals ?? vitals, notifications: store?.notifications ?? notifications, push: store?.push ?? push, kv: store?.kv ?? kv }
+  const database = databaseOf(store)
+  let home: Pick<AppStore, typeof SHARED_KINDS[number]>
+  let closeHome: (() => unknown) | undefined
+
+  if (database?.kind === 'pg') {
+    const { pgData } = await import('./pg-data')
+    const data = pgData(database.source)
+
+    home = data
+    closeHome = data.close
+  }
+  else {
+    const { sqliteData } = await import('./sqlite-data')
+
+    home = sqliteData(database?.path ?? SHARED_PATH)
+
+    if (database === undefined)
+      noteLocalFile('workers', `what the ${workerCount()} workers share is kept in ${SHARED_PATH}, a SQLite file of this machine, emptied at each start: set the app's \`store\` (\`sqliteData\` or \`pgData\`) in kay.config.ts to keep it with the rest of the app's data`)
+  }
+
+  const kept = { ...store, cache: store?.cache ?? home.cache, live: store?.live ?? home.live, rates: store?.rates ?? home.rates, rooms: store?.rooms ?? home.rooms, vitals: store?.vitals ?? home.vitals, notifications: store?.notifications ?? home.notifications, push: store?.push ?? home.push, kv: store?.kv ?? home.kv }
+
+  // The connection the stores filled in opened is closed with the app's own.
+  if (closeHome === undefined)
+    return kept
+
+  const own = store?.close
+
+  return { ...kept, close: async () => {
+    await own?.()
+    await closeHome()
+  } }
 }
 
 // `reusePort` balances connections between processes on Linux only; elsewhere one worker serves, as without the flag.

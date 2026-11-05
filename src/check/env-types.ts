@@ -16,7 +16,7 @@ import { publicEnvModules } from '../server/env-state'
 import { FAVICON_PATHS } from '../server/favicon'
 import { DEFAULT_LANG, extensionMessageFiles, localePattern, localePrefixes, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
-import { NOT_FOUND_FILE } from '../server/not-found'
+import { notFoundFile } from '../server/not-found'
 import { patternShapes } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 import { ROBOTS, SITEMAP } from '../server/site-paths'
@@ -89,7 +89,7 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
     ])]
     : routes.flatMap(route => shapesOf(route, route.pattern))
   // A redirect's source is a path a visitor reaches as a page's is, at the path as written whatever the locale; its params match any segment, no matcher checks them.
-  const sources = [...Object.keys(options.redirects ?? {}), ...readRuntimeRedirects(join(root, NOT_FOUND_FILE)).map(({ from }) => from)].map(source => source.replace(REDIRECT_PARAM, ':'))
+  const sources = [...Object.keys(options.redirects ?? {}), ...readRuntimeRedirects(notFoundFile(options.storeDatabase, root)).map(({ from }) => from)].map(source => source.replace(REDIRECT_PARAM, ':'))
   const reachable = localized.length > 0 ? [...new Set([...localized, ...sources])] : localized
   const modulePath = (file: string) => relative(shadowDir, file).replace(TS_FILE, '')
   const apiMounts = apiModules.map(module => ({ mount: module.mount, module: modulePath(module.file) }))

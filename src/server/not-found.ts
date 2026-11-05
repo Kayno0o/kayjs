@@ -4,17 +4,45 @@ import type { TrailingSlash } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { RedirectSet } from './runtime-redirects'
 import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { localePath, splitLocale } from '../runtime/i18n'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
+import { sqlitePath } from './app-database'
+import { appStore } from './app-store'
+import { noteLocalFile } from './local-files'
 import { pathOf } from './log'
 import { onReload } from './reload'
 import { requestUrl } from './request-url'
 import { slashedPath, withoutSlash } from './routes'
 import { redirectSet } from './runtime-redirects'
 
-// Where the production server keeps the paths visitors asked for and found nothing at, next to the job store.
+// Where the production server keeps the paths visitors asked for and found nothing at when the app's `store` names no SQLite file.
 export const NOT_FOUND_FILE = 'data/not-found.sqlite'
+
+// The file the 404 log and the redirects added while the site runs live in: the SQLite file of the app's `store` (`database` is its `sqlite:///abs/path` url), else `data/not-found.sqlite` under `root`. A `data/not-found.sqlite` that exists keeps being used, so an app upgrading loses no count nor redirect.
+export function notFoundFile(database: string | undefined, root = ''): string {
+  const local = join(root, NOT_FOUND_FILE)
+  const shared = sqlitePath(database)
+
+  return shared === undefined || existsSync(local) ? local : shared
+}
+
+// What production warns of when the log is a file of this machine, worded as the libraries' warnings are.
+function localNotFoundSentence(database: string | undefined, file: string): string {
+  if (sqlitePath(database) !== undefined)
+    return `the paths visitors found nothing at, and the redirects added while the site runs, are kept in ${file}, which exists, though the app's store names a SQLite file: to use that file, delete ${file} once it holds nothing you need`
+
+  if (database !== undefined && database !== '')
+    return `the paths visitors found nothing at, and the redirects added while the site runs, are kept in ${file}, a SQLite file of this machine, as they do not use the app's Postgres store yet`
+
+  return `the paths visitors found nothing at, and the redirects added while the site runs, are kept in ${file}, a SQLite file of this machine: set the app's \`store\` (\`sqliteData\`) in kay.config.ts for a file shared with the rest of the app`
+}
+
+// Whether the log goes to a file of the machine, which the app's `store` does not name.
+export function keepsNotFoundLocally(database: string | undefined, root = ''): boolean {
+  return notFoundFile(database, root) === join(root, NOT_FOUND_FILE)
+}
 
 // Past this many distinct paths, the least hit and oldest is forgotten for a new one, so a flood of made-up paths never grows the file nor pushes out a path real visitors keep coming to.
 const MAX_PATHS = 1000
@@ -529,7 +557,7 @@ export function dropStore(): void {
 
 // The file the server keeps its store in: memory under test.
 export function storeFile(file?: string): string {
-  return file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : NOT_FOUND_FILE)
+  return file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : notFoundFile(appStore()?.database))
 }
 
 // The requests an editor's 410 answered, which are not counted again as a path nobody found.
@@ -554,6 +582,13 @@ export function countMissing<App extends Elysia>(app: App, options: { known: () 
   let suggest: ReturnType<typeof suggester> | undefined
   let told = false
   const file = storeFile(options.file)
+
+  if (options.file === undefined && process.env.NODE_ENV !== 'test') {
+    const database = appStore()?.database
+
+    if (keepsNotFoundLocally(database))
+      noteLocalFile('not-found', localNotFoundSentence(database, file))
+  }
 
   // Global, as a plugin's hook reaches the routes the app adds after it too: only what no route took, or a page route, is counted.
   app.onAfterResponse({ as: 'global' }, ({ request, set, responseValue, route }) => {
@@ -617,7 +652,7 @@ export function unansweredPaths(file?: string): MissingPath[] {
   if (file === undefined && current)
     return current.list().filter(row => !answered(row.path))
 
-  file ??= NOT_FOUND_FILE
+  file ??= notFoundFile(appStore()?.database)
 
   if (!existsSync(file))
     return []
@@ -654,7 +689,7 @@ function inMissing<T>(file: string | undefined, use: (store: MissingStore) => T)
   if (file === undefined && current)
     return use(current)
 
-  file ??= NOT_FOUND_FILE
+  file ??= notFoundFile(appStore()?.database)
 
   if (!existsSync(file))
     return undefined

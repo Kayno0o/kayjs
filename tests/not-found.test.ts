@@ -6,7 +6,7 @@ import { describe, expect, it, setSystemTime } from 'bun:test'
 import { Elysia } from 'elysia'
 import { devNotFound, devRedirect } from '../src/server/dev-not-found'
 import { clearMissing, dismissMissing } from '../src/server/library'
-import { answeredBy, countedPath, countMissing, flushStores, knowRedirects, missingPaths, missingStore, pageRequested, referrerHost, referrerOf, suggester, unansweredPaths } from '../src/server/not-found'
+import { answeredBy, countedPath, countMissing, flushStores, keepsNotFoundLocally, knowRedirects, missingPaths, missingStore, notFoundFile, pageRequested, referrerHost, referrerOf, suggester, unansweredPaths } from '../src/server/not-found'
 import { withRedirect } from '../src/server/not-found-config'
 import { readRuntimeRedirects } from '../src/server/runtime-redirects'
 import { eventually } from './helpers/eventually'
@@ -779,5 +779,26 @@ describe('the dev tool tab', () => {
     expect(result.listed.body.missing.map(row => row.path)).toEqual(['/old', '/other'])
     expect(result.added.status).toBe(200)
     expect(result.served).toBe(404)
+  })
+})
+
+describe('the file the log lives in', () => {
+  it('is the SQLite file of the app\'s store, else data/not-found.sqlite', async () => {
+    const root = await scratchDir('not-found-file-')
+
+    expect(notFoundFile(`sqlite://${root}/app.sqlite`, root)).toBe(`${root}/app.sqlite`)
+    expect(notFoundFile(undefined, root)).toBe(join(root, 'data/not-found.sqlite'))
+    expect(notFoundFile('postgres://user@host/db', root)).toBe(join(root, 'data/not-found.sqlite'))
+    expect(notFoundFile('sqlite://relative.sqlite', root)).toBe(join(root, 'data/not-found.sqlite'))
+    expect(keepsNotFoundLocally(`sqlite://${root}/app.sqlite`, root)).toBe(false)
+    expect(keepsNotFoundLocally('postgres://user@host/db', root)).toBe(true)
+  })
+
+  it('keeps being the old data/not-found.sqlite once it exists', async () => {
+    const root = await scratchDir('not-found-file-')
+
+    await Bun.write(join(root, 'data/not-found.sqlite'), '')
+
+    expect(notFoundFile(`sqlite://${root}/app.sqlite`, root)).toBe(join(root, 'data/not-found.sqlite'))
   })
 })

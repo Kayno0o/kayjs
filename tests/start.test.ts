@@ -236,7 +236,10 @@ describe('kay start', () => {
       expect(await (await fetch(`http://localhost:${port}/`)).text()).toContain('Home</h1>')
     })
 
-    expect(served).toMatchObject({ port, warned: '', code: 0 })
+    expect(served).toMatchObject({ port, code: 0 })
+    // The one boot warning of an app whose store names no file for the 404 log.
+    expect(served.warned.trim().split('\n')).toHaveLength(1)
+    expect(served.warned).toContain('are kept in data/not-found.sqlite, a SQLite file of this machine')
 
     const later = new Date(Date.now() + 60_000)
 

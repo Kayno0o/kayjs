@@ -1,8 +1,9 @@
 import type { MissingPath } from './not-found'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { isCrossSite } from './actions'
-import { answeredBy, missingStore, NOT_FOUND_FILE } from './not-found'
+import { appStore } from './app-store'
+import { answeredBy, missingStore, notFoundFile } from './not-found'
 import { addRedirect, checkRedirect } from './not-found-config'
 
 const HEADER = 'x-kay-dev'
@@ -17,16 +18,17 @@ export interface DevNotFound {
 }
 
 export function devNotFound(root: string, redirects: string[]): DevNotFound {
-  const file = join(root, NOT_FOUND_FILE)
+  const file = notFoundFile(appStore()?.database, root)
+  const shown = relative(root, file)
 
   if (!existsSync(file))
-    return { file: NOT_FOUND_FILE, recorded: false, missing: [] }
+    return { file: shown, recorded: false, missing: [] }
 
   const store = missingStore(file, false)
   const answered = answeredBy(redirects)
 
   try {
-    return { file: NOT_FOUND_FILE, recorded: true, missing: store.list().filter(row => !answered(row.path)) }
+    return { file: shown, recorded: true, missing: store.list().filter(row => !answered(row.path)) }
   }
   finally {
     store.close()
@@ -54,7 +56,7 @@ export async function devRedirect(root: string, request: Request, redirects: str
   if (typeof body.path !== 'string' || (body.to !== undefined && typeof body.to !== 'string'))
     return refused('path and to are texts')
 
-  const file = join(root, NOT_FOUND_FILE)
+  const file = notFoundFile(appStore()?.database, root)
   const store = existsSync(file) ? missingStore(file, false) : undefined
 
   try {

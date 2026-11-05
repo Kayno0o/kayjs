@@ -78,6 +78,8 @@ export interface CheckOptions extends Omit<Pick<KayConfig, (typeof CHECK_CONFIG)
   // Only the request id header is checked, so the rest of the bag is not carried.
   observe?: Pick<ObserveConfig, 'requestIdHeader'> | undefined
   tsconfig?: string | undefined
+  // The database url of the app's `store`, where the redirects added while the site runs may be kept.
+  storeDatabase?: string | undefined
   // The tree alone is wanted, as `kay dev` writes it: the diagnostics only `kay check` reports are not looked for.
   typesOnly?: boolean | undefined
   // Whether to report the lints of what a site lacks before it goes public, as `kay build` and `kay check --only seo` do.
@@ -109,7 +111,7 @@ function helped({ message, help }: CheckDiagnostic): Pick<CheckDiagnostic, 'help
 export function configCheckOptions(config: LoadedConfig): CheckOptions {
   const { observe, ...picked } = pickConfig(config, CHECK_CONFIG)
 
-  return { ...picked, ...observe !== undefined && { observe: { requestIdHeader: observe.requestIdHeader } }, ...config.publicEnv !== undefined && { publicEnv: config.publicEnv } }
+  return { ...picked, ...config.store?.database !== undefined && { storeDatabase: config.store.database }, ...observe !== undefined && { observe: { requestIdHeader: observe.requestIdHeader } }, ...config.publicEnv !== undefined && { publicEnv: config.publicEnv } }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

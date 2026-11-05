@@ -65,7 +65,7 @@ The conversation of a `remember` chat is what the visitor wrote, so tell them.
 - **Rooms**: a message 30 seconds in `sqliteRooms`.
 - **Notifications**: the title, link and read state of each, 90 days by default or what `ttl` says, the newest 200 per user. See [Notifications](/guides/live-and-realtime#notifications).
 - **Uploads**: until the app deletes them, without the metadata a camera writes in a JPEG, PNG, WebP, AVIF or HEIC.
-- **Missing pages**: the paths visitors found nothing at, in `data/not-found.sqlite`, until 90 days after the last visit.
+- **Missing pages**: the paths visitors found nothing at, in the SQLite file of your `store`, else `data/not-found.sqlite`, until 90 days after the last visit.
 
 Every SQLite file kay creates is readable by the server's user alone.
 

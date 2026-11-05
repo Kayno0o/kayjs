@@ -601,11 +601,11 @@ kay not-found --redirect /old-page --to /new-page
 kay not-found --redirect /old-page --runtime
 ```
 
-Lists the paths visitors asked for and found nothing at, most hit first, with the hosts they came from and a suggested target. It reads `data/not-found.sqlite`, which the production server writes, or the file `--file` names. A path a `redirects` entry answers already is left out.
+Lists the paths visitors asked for and found nothing at, most hit first, with the hosts they came from and a suggested target. It reads the SQLite file of the app's `store`, else `data/not-found.sqlite`, which the production server writes, or the file `--file` names. A path a `redirects` entry answers already is left out.
 
 `--redirect` adds the path to `redirects` in `kay.config.ts`, going to `--to` or to the suggestion, and removes it from the list. When `kay.config.ts` has no object to add it to, kay prints the line to add by hand.
 
-`--runtime` writes it to `data/not-found.sqlite` instead, which the running site reads, so the redirect answers with no deploy and `kay.config.ts` stays as it is. It goes only to a page of the site unless `runtimeRedirects.hosts` lists the host. See [Redirects](/essentials/routing#redirects).
+`--runtime` writes it to that file instead, which the running site reads, so the redirect answers with no deploy and `kay.config.ts` stays as it is. It goes only to a page of the site unless `runtimeRedirects.hosts` lists the host. See [Redirects](/essentials/routing#redirects).
 
 ## kay routes
 
