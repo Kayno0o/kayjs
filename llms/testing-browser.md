@@ -55,6 +55,7 @@ expect(await page.path()).toBe('/account')
 - `path()` reads where the page is.
 - `errors` holds the page's console errors and uncaught exceptions.
 - Once `errors` logs a problem kay recovers from in production, such as an island that did not match its server markup or had no client chunk, or a message no locale has, the page's next call fails naming it, unless `strict: false` was given to `open` or `browse`, which leaves it in `errors`.
+- A page's first load in a browser kay just started (the first of a file, and the first after kay restarts a browser it recycled) waits 20 s when you gave no `timeout`, as Chrome starts its renderer then, which a busy CI host takes seconds over; every later load and a `timeout` you gave keep their own limit, so a real hang still fails fast.
 - `lenient: true` returns a page that does not load and hydrate within the timeout as it stands, the reason in `errors`; `colorScheme: 'dark'` asks it for that scheme from its first load.
 - `javaScript: false` opens a page as a visitor who turned JavaScript off: its scripts never run, so islands never hydrate and a test sees what the server rendered; `evaluate`, the waits and `click` still work, `goto` resolves once the page loaded, and a click goes to the element's middle, or the first point nothing covers, without Bun's own actionability wait.
 - `reducedMotion: 'reduce'` (or `'no-preference'`) asks the page for that motion preference from its first load, `prefers-reduced-motion` and `matchMedia` alike, as `colorScheme` does for the scheme.

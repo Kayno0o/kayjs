@@ -19,7 +19,7 @@ export interface BrowserOptions {
   path?: string | undefined
   width?: number | undefined
   height?: number | undefined
-  // How long a page waits for an element, a condition or a navigation, 5 seconds by default.
+  // How long a page waits for an element, a condition or a navigation, 5 seconds by default, except its first load in a browser just started, which waits 20 seconds unless this is given.
   timeout?: Duration | undefined
   // The page's next call fails once it logs a problem kay recovers from in production, such as an island that did not match its server markup; `false` leaves it in `errors`.
   strict?: boolean | undefined
@@ -188,6 +188,8 @@ const INSTALLED = [
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
 ]
 const TIMEOUT_MS = 5000
+// How long the first load of a browser just started waits when the page's timeout is the default: Chrome starts its renderer and network service on it, which a CI host sharing its cores with a whole test run takes seconds over.
+const COLD_LOAD_MS = 20_000
 const POLL_MS = 25
 // What `within` resolves with when the page did not answer in time.
 const TIMED_OUT = Symbol('timed out')
@@ -372,6 +374,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   // Chrome refuses to run its sandbox as root, as in a CI container, whose small /dev/shm crashes its renderer.
   const rootArgv = process.getuid?.() === 0 ? ['--no-sandbox', '--disable-dev-shm-usage'] : []
   const { dir, first } = await claimBrowser()
+  // Whether the next load is the first of a browser just started.
+  let cold = first
   // `--enable-automation` lets Chrome tell its command line, which names the profile Bun made.
   // `--site-per-process` gives chrome-headless-shell the out-of-process iframes desktop Chrome has, so a sandboxed frame stuck in a loop leaves its page answering.
   const argv = [...rootArgv, `--user-data-dir=${join(dir, 'profile')}`, '--enable-automation', '--site-per-process']
@@ -549,9 +553,9 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   }
 
   // Waits for the page to settle, naming the files it failed to load when it does not.
-  const settle = async (expression: string, wanted: string) => {
+  const settle = async (expression: string, wanted: string, wait = timeout) => {
     try {
-      await poll(expression, wanted)
+      await poll(expression, wanted, wait)
     }
     catch (error) {
       let failed: string[] | typeof TIMED_OUT = []
@@ -827,11 +831,16 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
       const navigate = async () => retriedOnce(async () => live(async () => view.navigate(target.href)), () => gone)
 
-      // A page that does not finish loading, a stalled image holding its load event, is not waited on past the timeout.
-      if (await within(navigate(), timeout) === TIMED_OUT)
-        throw new Error(`${UNSETTLED} ${timeout}ms waiting for ${target.pathname} to load${heldConnections()}`)
+      // The first load of a browser kay just started is allowed longer than the timeout kay/test defaults to, which a later load, and a timeout the test chose, are not.
+      const budget = cold && options.timeout === undefined ? COLD_LOAD_MS : timeout
 
-      await settle(ready, `${target.pathname} to load and hydrate its islands`)
+      cold = false
+
+      // A page that does not finish loading, a stalled image holding its load event, is not waited on past the budget.
+      if (await within(navigate(), budget) === TIMED_OUT)
+        throw new Error(`${UNSETTLED} ${budget}ms waiting for ${target.pathname} to load${heldConnections()}`)
+
+      await settle(ready, `${target.pathname} to load and hydrate its islands`, budget)
     }),
     path: async () => serial(async () => inView<string>('location.pathname + location.search')),
     click: async (selector, { modifiers, at: aim, ...wait } = {}) => serial(async () => {
