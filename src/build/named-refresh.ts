@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative } from 'node:path'
 
 // A `refresh: 'name'`, `refresh: ['name', ...]` or `refresh('name')` in a source: the project names page loads to refresh. A name held in a constant or built elsewhere goes unseen, and its refresh asks for the whole page, as it always did.
@@ -50,8 +50,11 @@ export function namedRefresh(file: string, root: string): boolean {
   return named
 }
 
-// The source files under the folder, walking none of node_modules or a dot folder.
+// The source files under the folder, walking none of node_modules or a dot folder, and none for a folder missing from the disk (a file compiled from memory).
 function* sourcePaths(source: string): Generator<string> {
+  if (!existsSync(source))
+    return
+
   for (const entry of readdirSync(source, { withFileTypes: true })) {
     if (entry.name.startsWith('.') || SKIPPED.has(entry.name))
       continue
