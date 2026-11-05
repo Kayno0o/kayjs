@@ -21,3 +21,24 @@
 - Links are read as rendered, with `base`, `trailingSlash` and the host of a locale served by domain taken off.
 - They point at the page's module and name the path; a page rendered per request is not read.
 - One at `deny` fails the build and leaves the last one in place, as a failing check does; `--no-check` reads none.
+
+### The lints
+
+| Lint | Default | Group | Reports |
+| --- | --- | --- | --- |
+| `missing-site` | warn | seo | `seo` set with no `site`, in kay.config.ts or `SITE_URL`, on a `kay build --static` export: no canonical links, `og:url`, sitemap or robots.txt. A server warns at boot instead. |
+| `missing-description` | warn | seo | A public site with no `seo.description`. |
+| `missing-share-image` | warn | seo | A public site with no `seo.image`, and no `.kay` file of the project setting an `og:image`. |
+| `default-favicon` | warn | seo | A public site with no `favicon`, showing kay's mark. |
+| `untitled-page` | warn | seo | A prerendered page with no `title`. |
+| `undescribed-page` | warn | seo | A prerendered page with no description, its own or `seo.description`. |
+| `duplicate-title` | warn | seo | A prerendered page with the title of another of the same locale. |
+| `long-description` | warn | seo | A description over 160 characters, which search results cut: `seo.description`, reported in kay.config.ts by `kay check` and `kay build`, or a prerendered page's own, reported at the page by `kay build`. |
+| `unsized-share-image` | warn | seo | A prerendered page whose `og:image` has no `og:image:width`, kay reading no size off it. |
+| `noindex-in-sitemap` | warn | seo | A prerendered page whose head says `noindex` while the sitemap lists it; `noindex: true` in `page` does both. |
+| `long-title` | warn | seo | A prerendered page whose title runs over 60 characters, which search results cut, `seo.titleTemplate` included (`kay check` measures it through the default locale's template, a `raw` title without). |
+| `duplicate-description` | warn | seo | A prerendered page with the description of another of the same locale; the `seo.description` every page inherits is left alone. |
+| `orphan-page` | warn | seo | A prerendered page no other page links to and the sitemap does not list, reported by `kay build` alone, on a site with `site` set whose own pages are all prerendered: a page of the app rendered per request may link to anything, while the pages a library mounts (kayjs-auth's sign-in, kayjs-cms) link within the library and do not turn it off. The home page, a locale's root, `noindex` pages and guarded pages are left out. |
+| `broken-canonical` | warn | seo | A prerendered page whose canonical link points at a page the build rendered as a 404 or a redirect, or at a path `redirects` sends elsewhere; reported by `kay build` alone. |
+| `one-way-hreflang` | warn | seo | An alternate (`hreflang`) of a page that does not point back at it from the page it names, or names a page that is not a 200; reported by `kay build` alone, at the page lacking the link back. |
+| `redirect-chain` | warn | seo | A redirect in `redirects` or a prerendered redirect whose target redirects again, naming the target to send it to directly; `kay check` reads `redirects` (at the redirect's line in kay.config.ts), `kay build` the redirects it rendered. |
