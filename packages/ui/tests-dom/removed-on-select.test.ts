@@ -9,9 +9,19 @@ const mount = mountComponent as (component: unknown, props: unknown) => Promise<
 
 // The `onSelect` of 1.87 is gone: it fails `kay check`, and a caller the check never saw gets an error, not a DOM listener on the root.
 test.each([
-  ['Table', Table, { rows: [] }],
+  ['Table', Table, { rows: [], columns: [] }],
   ['TreeView', TreeView, { nodes: [], label: 'x' }],
   ['Timeline', Timeline, { entries: [] }],
 ] as const)('%s throws for an onSelect, naming onSelectedChange', async (name, component, props) => {
   await expect(mount(component, { ...props, onSelect: () => undefined })).rejects.toThrow(`a ${name} has no onSelect since 1.91; use onSelectedChange`)
+})
+
+test.each([
+  ['Table', Table, { rows: [], columns: [] }],
+  ['TreeView', TreeView, { nodes: [], label: 'x' }],
+  ['Timeline', Timeline, { entries: [] }],
+] as const)('%s takes an onSelect a wrapper forwards as undefined', async (_name, component, props) => {
+  const mounted = await mount(component, { ...props, onSelect: undefined }) as { unmount: () => void }
+
+  mounted.unmount()
 })

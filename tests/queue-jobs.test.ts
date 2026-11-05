@@ -570,3 +570,7 @@ describe('the options 1.91 dropped', () => {
     expect(() => makeQueue('dropped', () => undefined, { [option]: option === 'onFailed' ? () => undefined : '1d' })).toThrow(`queue('dropped')'s ${option} is gone; use \`${replacement}\``)
   })
 })
+
+it('takes a dropped option left undefined, as a wrapper forwarding its own does', () => {
+  expect(() => makeQueue('forwarded', () => undefined, { onFailed: undefined, keepFailed: undefined } as never)).not.toThrow()
+})

@@ -162,7 +162,7 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   openRowLabel?: ((row: Row) => string) | undefined
 } & ({ rows: RowsSource<Row>, list?: undefined } | { rows?: undefined, list: InfiniteList<Row> })>()
 
-if ('onSelect' in rest)
+if ((rest as { onSelect?: unknown }).onSelect !== undefined)
   throw new Error('kayjs-ui: a Table has no onSelect since 1.91; use onSelectedChange')
 
 if (expandable && virtual)

@@ -597,7 +597,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
 
   // Options 1.91 dropped: ignored, a failure alert or a retention set through them would be lost without a word.
   for (const [old, now] of Object.entries(REMOVED_OPTIONS)) {
-    if (old in options)
+    if ((options as Record<string, unknown>)[old] !== undefined)
       throw new KayError('config-invalid', `kay: queue('${name}')'s ${old} is gone; use ${now}`)
   }
 

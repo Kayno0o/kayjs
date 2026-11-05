@@ -213,13 +213,17 @@ export function memoryFiles(): FileStore {
   }
 }
 
+// The memory store of the site under test being served, which stands in for the default one while it lives.
+let siteFiles: FileStore | undefined
+
 export function defaultFileStore(): FileStore {
-  return defaultStore ??= process.env.NODE_ENV === 'test' ? memoryFiles() : diskFiles()
+  return siteFiles ?? (defaultStore ??= process.env.NODE_ENV === 'test' ? memoryFiles() : diskFiles())
 }
 
-// The next default file store is a new one, for a test site whose app names none.
-export function resetDefaultFiles(): void {
-  defaultStore = undefined
+// A site under test serves its own files from memory, whatever the process's default is; a later site takes over, and a site closing releases only the store it set.
+export function setSiteFiles(store: FileStore | undefined, replacing?: FileStore): void {
+  if (store !== undefined || siteFiles === replacing)
+    siteFiles = store
 }
 
 // The file store a config names: `store.files`, which only an app writing it has: no store factory fills it, so what an app already keeps never moves.

@@ -41,7 +41,7 @@ import { sendFrom } from '../server/rewrite'
 import { memoryRooms } from '../server/rooms'
 import { acceptCookieData, memorySessions } from '../server/session'
 import { SITEMAP } from '../server/site-paths'
-import { resetDefaultFiles } from '../server/storage'
+import { memoryFiles, setSiteFiles } from '../server/storage'
 import { servedThrough } from '../server/visit'
 import { memoryVitals } from '../server/vitals-store'
 import { browse } from './browser'
@@ -192,9 +192,7 @@ async function islandsChecked(root: string, options: ClientOptions, inBrowser: b
   }
 }
 
-// The project's pages and actions without a server, their islands built for the browser as a check: pages then render their islands' markup and no scripts.
-
-// The stores a site under test runs on: the app's own swapped for memory ones unless the test names its own. An app naming no store keeps none, so libraries see what they see in production; its files are fresh memory ones unless the test names a store of them, never the store `store.files` names.
+// The stores a site under test runs on: the app's own swapped for memory ones unless the test names its own. An app naming no store keeps none, so libraries see what they see in production; its files are the memory store of the site (`ownFiles`) unless the test names a store of them, never the store `store.files` names.
 function testStore(configured: AppStore | undefined, given: AppStore | undefined): AppStore | undefined {
   const others: AppStore = Object.fromEntries(Object.entries(configured ?? {}).filter(([key]) => key !== 'files'))
   const swapped: AppStore = given === undefined && configured !== undefined ? { ...configured.sessions && { sessions: memorySessions() }, jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms(), vitals: memoryVitals(), notifications: memoryNotifications(), kv: memoryKv() } : others
@@ -202,11 +200,10 @@ function testStore(configured: AppStore | undefined, given: AppStore | undefined
   if (given?.files !== undefined)
     return { ...swapped, files: given.files }
 
-  resetDefaultFiles()
-
   return Object.keys(swapped).length === 0 ? undefined : swapped
 }
 
+// The project's pages and actions without a server, their islands built for the browser as a check: pages then render their islands' markup and no scripts.
 export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const root = testRoot(options.root)
   const serving = loaderRoot()
@@ -223,6 +220,12 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const loaded = await withConfig(root, options)
   // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names, and so do the sessions, jobs, rate counts, presence rooms, vitals and notifications of its `store` (sessions only when it keeps them), its cached and live values staying in the process.
   const mcpKey = options.mcpKey ?? (mcpKeySetting(loaded.mcp) === undefined ? undefined : crypto.randomUUID())
+  // Without a store of files of its own, the site serves them from memory of its own, until it closes.
+  const ownFiles = options.store?.files === undefined ? memoryFiles() : undefined
+
+  if (ownFiles !== undefined)
+    setSiteFiles(ownFiles)
+
   const config = { ...loaded, ...mcpKey !== undefined && loaded.mcp !== undefined && loaded.mcp !== false && { mcp: { ...loaded.mcp === true ? {} : loaded.mcp, key: mcpKey } }, site: loaded.site ?? ORIGIN, store: testStore(loaded.store, options.store) }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false, devRoutes: config.dev === true })
   const inBrowser = options.browser !== undefined && options.browser !== false
@@ -451,6 +454,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       },
       close: async () => {
         forget()
+        setSiteFiles(undefined, ownFiles)
         untap()
 
         for (const page of opened)

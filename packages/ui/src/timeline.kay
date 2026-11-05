@@ -33,10 +33,10 @@ const { entries, selected, onSelectedChange, label, emptyLabel, empty, ...rest }
   empty?: Snippet | undefined
 }>()
 
-// The empty text is a div, not the list's own element, so it takes the attributes as a div does.
-if ('onSelect' in rest)
+if ((rest as { onSelect?: unknown }).onSelect !== undefined)
   throw new Error('kayjs-ui: a Timeline has no onSelect since 1.91; use onSelectedChange')
 
+// The empty text is a div, not the list's own element, so it takes the attributes as a div does.
 const loose = rest as unknown as JSX.IntrinsicElements['div']
 
 // Held as string or number: a signal cannot take a type parameter that might be a function.
