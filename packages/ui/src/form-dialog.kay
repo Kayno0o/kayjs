@@ -3,7 +3,7 @@ import type { Action, Answer, FailureData, JSX, Snippet, Success } from 'kay'
 import { effect, recipe, signal, uid } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
-import { callAction, formIssues } from './forms'
+import { callAction, formIssues, showIssues } from './forms'
 import type { OverlaySize } from './overlay'
 import { wording } from 'kay/words'
 
@@ -57,10 +57,16 @@ let form: HTMLFormElement | undefined
 
 formIssues.provide(issues)
 
+
 // The dialog drops its content once closed, which empties the form; however it closed, its messages are cleared too, so the next open starts afresh.
 effect(() => {
-  if (!open)
+  if (!open) {
     issues = {}
+
+    // The fields a static page gave the dialog are kept from one opening to the next, so the messages are taken off them now.
+    if (form)
+      void showIssues(form, {})
+  }
 })
 
 async function submit(event: SubmitEvent) {

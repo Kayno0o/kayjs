@@ -1,5 +1,6 @@
 import type { Action, Answer, FailureData, Signal, Success } from 'kay'
 import { ActionError, createContext, describeField, effect, focusInvalid, formErrors, markInvalid, uid } from 'kay'
+import { liveElements } from './field-look'
 import { answerMessage } from './internal/answer-message'
 import { toast } from './toast'
 
@@ -10,7 +11,7 @@ export const fieldNamed = createContext<(() => string | undefined) | undefined>(
 export const formIssues = createContext<(() => Record<string, string>) | undefined>(undefined)
 
 // What a FormField's label names in its slot: the first control taking focus.
-const CONTROL = 'input:not([type="hidden"]), select, textarea, button, [contenteditable], [tabindex]'
+export const CONTROL = 'input:not([type="hidden"]), select, textarea, button, [contenteditable], [tabindex]'
 // What a group marks while its message shows: the fields of the group, which take `aria-invalid`, not the buttons of a picker.
 const FIELDS = 'input:not([type="hidden"]), select, textarea'
 const SPACES = /\s+/
@@ -43,8 +44,19 @@ export function fieldLinks(group: () => boolean, hint: () => boolean, messages: 
 
   const marked = new Set<HTMLElement>()
   let grouped = false
+  let claimed = false
 
   effect(() => {
+    // Told to the painter of a static page's fields, which leaves this one to draw its own messages.
+    if (!claimed) {
+      const frame = document.querySelector(`[data-kui-field="${links.frame}"]`)
+
+      if (frame) {
+        liveElements.add(frame)
+        claimed = true
+      }
+    }
+
     if (group()) {
       grouped = true
       markGroup(links, messages().length > 0, marked, required())
@@ -57,7 +69,7 @@ export function fieldLinks(group: () => boolean, hint: () => boolean, messages: 
       grouped = false
       markGroup(links, false, marked, false)
 
-      for (const field of fieldsOf(links)) {
+      for (const field of fieldsOf(links.frame)) {
         if (requiredByUs.delete(field))
           field.removeAttribute('aria-required')
       }
@@ -88,8 +100,8 @@ export function fieldLinks(group: () => boolean, hint: () => boolean, messages: 
 }
 
 // The fields of the group itself, those of a FormField nested in it left to that one.
-function fieldsOf(links: FieldLinks): HTMLElement[] {
-  return [...document.querySelectorAll<HTMLElement>(`[data-kui-field="${links.frame}"] :is(${FIELDS})`)].filter(field => field.closest('[data-kui-field]')?.getAttribute('data-kui-field') === links.frame)
+export function fieldsOf(frame: string): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>(`[data-kui-field="${frame}"] :is(${FIELDS})`)].filter(field => field.closest('[data-kui-field]')?.getAttribute('data-kui-field') === frame)
 }
 
 // The input types whose role takes no `aria-required`.
@@ -104,7 +116,7 @@ function requireField(field: HTMLElement): void {
 
 // The fields the group marked, which it clears once its message does; `markInvalid` leaves one the page or a refused post still marks.
 function markGroup(links: FieldLinks, shown: boolean, marked: Set<HTMLElement>, required: boolean): void {
-  for (const field of fieldsOf(links)) {
+  for (const field of fieldsOf(links.frame)) {
     if (required)
       requireField(field)
 
@@ -121,7 +133,7 @@ function markGroup(links: FieldLinks, shown: boolean, marked: Set<HTMLElement>, 
     }
   }
 
-  const fields = shown ? fieldsOf(links) : [...marked]
+  const fields = shown ? fieldsOf(links.frame) : [...marked]
 
   for (const field of fields) {
     const own = (field.getAttribute('aria-describedby') ?? '').split(SPACES).filter(id => id !== '' && id !== links.issues)
@@ -175,6 +187,7 @@ export async function callAction<Output>(form: HTMLFormElement, action: Action<n
     const shown = (name: string) => [...form.querySelectorAll('[data-field]')].some(field => field.getAttribute('data-field') === name)
 
     issues.set(byField)
+    await showIssues(form, byField)
 
     // A message no FormField shows, such as a limit or a refusal of the whole form under the empty name, is toasted rather than lost; a failure carrying none toasts the page's own message.
     for (const message of messages.length === 0 ? [failure] : messages.filter(([name]) => !shown(name)).map(([, message]) => message))
@@ -184,6 +197,19 @@ export async function callAction<Output>(form: HTMLFormElement, action: Action<n
     await focusInvalid(form)
 
     return undefined
+  }
+}
+
+// Writes the messages into the FormFields a static page gave the form as children, which no script of theirs reaches in the browser; the ones inside an island draw their own. The code is a chunk of its own, fetched only for a form that holds such a field and has a message to put or take away.
+export async function showIssues(form: HTMLFormElement, byField: Record<string, string>): Promise<void> {
+  if (form.querySelectorAll('[data-field]').length === 0 || (Object.keys(byField).length === 0 && form.querySelectorAll('[data-form-issue]').length === 0))
+    return
+
+  try {
+    (await import('./internal/paint-issues')).paintIssues(form, byField)
+  }
+  catch (error) {
+    console.error('kayjs-ui: the messages of a form could not be shown', error)
   }
 }
 

@@ -1,0 +1,14 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const claim = action(t.Object({ handle: t.String({ minLength: 3, maxLength: 40, error: 'Three letters at least' }) }), () => 'ok')
+---
+---
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import DialogHost from '../components/form-static-dialog.kay'
+---
+main
+  DialogHost(claim={claim})
+    FormField(label="Handle" name="handle")
+      input#handle(name="handle" value="ab")

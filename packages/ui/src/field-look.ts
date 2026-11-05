@@ -39,6 +39,9 @@ export function fieldSize(size: FieldSize | undefined): FieldSize | undefined {
   return size === 'md' ? undefined : size
 }
 
+// The frames of the FormFields running in the browser, which draw their own messages: the ones a static page gave a form as children are painted from outside (`paintIssues`).
+export const liveElements = new WeakSet<Element>()
+
 // The `aria-invalid` a control draws, read once: `keepInvalid` holds it in the browser after.
 export function fieldInvalid(invalid: () => boolean | undefined): 'true' | undefined {
   return untrack(invalid) === true ? 'true' : undefined

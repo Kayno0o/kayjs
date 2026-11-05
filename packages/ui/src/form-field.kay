@@ -47,6 +47,8 @@ const ends = () => actions ?? action
 const small = () => size === 'sm'
 const reports = () => !small() || name !== undefined || issue !== undefined
 const messages = fieldIssues(() => name, () => issue)
+// Which of them the form gave, for the browser to replace those of a call without touching the page's own.
+const sourced = fieldIssues(() => name, () => undefined)
 
 fieldNamed.provide(() => name)
 const links = fieldLinks(() => group, () => hint !== undefined && hint !== '', messages, () => required)
@@ -69,7 +71,7 @@ if group
     if reports()
       span(part="issues" id={messages().length > 0 ? links.issues : undefined} aria-live="polite" data-field={name})
         for message, index of messages() key={index}
-          span(part="issue") {message}
+          span(part="issue" data-form-issue={sourced().includes(message) ? '' : undefined}) {message}
 else
   div(part="root" {...rest} data-kui-field={links.frame} data-compact={small() ? '' : undefined})
     label(part="label")
@@ -87,4 +89,4 @@ else
     if reports()
       span(part="issues" id={messages().length > 0 ? links.issues : undefined} aria-live="polite" data-field={name})
         for message, index of messages() key={index}
-          span(part="issue") {message}
+          span(part="issue" data-form-issue={sourced().includes(message) ? '' : undefined}) {message}

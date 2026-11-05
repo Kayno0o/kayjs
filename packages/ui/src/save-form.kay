@@ -2,7 +2,7 @@
 import type { Action, Answer, FailureData, JSX, Success } from 'kay'
 import { effect, guardLeave, onCleanup, onMount, recipe, shortcut, signal } from 'kay'
 import Button from './button.kay'
-import { callAction, formIssues } from './forms'
+import { callAction, formIssues, showIssues } from './forms'
 import { holdDefaults, onFormReset } from './form-reset'
 import { toast } from './toast'
 import { wording } from 'kay/words'
@@ -230,6 +230,7 @@ async function submit(event: SubmitEvent) {
     return
 
   issues = {}
+  await showIssues(form, {})
   baseline = sent
   adopt()
   check()
@@ -255,7 +256,7 @@ function confirmSave() {
   confirmed = false
 }
 
-function discard() {
+async function discard() {
   if (busy())
     return
 
@@ -267,6 +268,9 @@ function discard() {
   asking = false
   onDiscard?.()
   check()
+
+  if (form)
+    await showIssues(form, {})
 }
 
 // Ctrl or Cmd with S saves unless `shortcut` says otherwise, the browser's own save dialog kept away even when there is nothing to save.

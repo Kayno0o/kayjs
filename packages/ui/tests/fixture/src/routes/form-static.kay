@@ -1,0 +1,29 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const claim = action(t.Object({
+  handle: t.String({ minLength: 3, maxLength: 40, error: 'Three letters at least' }),
+  nick: t.String({ minLength: 3, maxLength: 40, error: '<img src=x onerror=alert(1)>' }),
+  terms: t.String({ minLength: 3, error: 'Accept the terms' }),
+}), () => 'ok')
+---
+---
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Form from '@kaynooo/kayjs-ui/form.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+---
+main
+  Form(action={claim} id="claim")
+    FormField(label="Handle" name="handle" issue="Page note")
+      input#handle(name="handle" value="ab")
+    FormField(label="Nick" name="nick")
+      input#nick(name="nick" value="cd")
+    Checkbox(name="terms" label="Terms" value="no" checked)
+    button#claim-submit(formnovalidate) Claim
+  Form(action={claim} id="other")
+    FormField(label="Other handle" name="handle")
+      input#other-handle(name="handle" value="ab")
+    button#other-submit(formnovalidate) Claim
+  Toaster

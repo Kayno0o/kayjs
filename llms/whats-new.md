@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.90.0
 
+- The FormFields (and Checkboxes, Toggles) a static page gives kayjs-ui's Form, SaveForm or FormDialog as children show a refused call's message with JavaScript, with no island of yours holding the fields: [forms](../packages/ui/llms/forms-and-steps.md).
 - kayjs-ui fields share one `onInput` (live) and `onChange` (committed) convention: MarkdownEditor gains `onChange`, DateInput, TimeInput and ColorInput gain `onInput`, and Select, RadioGroup, Segmented, IconPicker pass the picked option as a second argument, ChipGroup and MultiSelect the picked options: [Forms](../packages/ui/llms/forms.md).
 - Every rate limit option is one `RateLimit` (`{ max, window, store?, key? }`, from `kay`, `kay/server` and `kay/library`) alone or in a list: kayjs-ai's `rateLimit` takes a list, kayjs-auth's buckets take a list and a `store` each: [rate limits](rate-limits.md#in-the-libraries).
 - kayjs-ui Select, RadioGroup, Slider, ColorInput, Rating, Segmented and ChipGroup take no `value` like the text fields: they keep what is picked, post it under `name` with no JavaScript and a form reset goes back to what they first showed: [forms](../packages/ui/llms/forms.md).

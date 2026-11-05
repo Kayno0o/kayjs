@@ -40,6 +40,9 @@ function keepInvalid(box: Element, invalid: () => boolean | undefined): void
 [./field-look] LABEL_TEXT
 const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]"
 
+[./field-look] liveElements
+const liveElements: WeakSet<Element>
+
 [./field-look] RADIO_INVALID
 const RADIO_INVALID: "aria-invalid:accent-danger aria-invalid:outline aria-invalid:outline-offset-2 aria-invalid:outline-danger group-aria-invalid/radios:accent-danger group-aria-invalid/radios:outline group-aria-invalid/radios:outline-offset-2 group-aria-invalid/radios:outline-danger"
 
@@ -1022,6 +1025,9 @@ function keepInvalid(box: Element, invalid: () => boolean | undefined): void
 [./lib/field-look] LABEL_TEXT
 const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]"
 
+[./lib/field-look] liveElements
+const liveElements: WeakSet<Element>
+
 [./lib/field-look] RADIO_INVALID
 const RADIO_INVALID: "aria-invalid:accent-danger aria-invalid:outline aria-invalid:outline-offset-2 aria-invalid:outline-danger group-aria-invalid/radios:accent-danger group-aria-invalid/radios:outline group-aria-invalid/radios:outline-offset-2 group-aria-invalid/radios:outline-danger"
 
@@ -1053,6 +1059,9 @@ function callAction<Output>(form: HTMLFormElement, action: Action<never, Output,
   result: Answer<Success<Output>>;
 }>
 
+[./lib/forms] CONTROL
+const CONTROL: "input:not([type=\"hidden\"]), select, textarea, button, [contenteditable], [tabindex]"
+
 [./lib/forms] fieldIssues
 function fieldIssues(name: () => string | undefined, issue: () => string | undefined): () => string[]
 
@@ -1069,8 +1078,14 @@ interface FieldLinks
 [./lib/forms] fieldNamed
 const fieldNamed: Context<(() => string | undefined) | undefined>
 
+[./lib/forms] fieldsOf
+function fieldsOf(frame: string): HTMLElement[]
+
 [./lib/forms] formIssues
 const formIssues: Context<(() => Record<string, string>) | undefined>
+
+[./lib/forms] showIssues
+function showIssues(form: HTMLFormElement, byField: Record<string, string>): Promise<void>
 
 [./lib/hover-card] HoverCardPlacement
 type HoverCardPlacement = PopoverPlacement | 'top' | 'bottom' | 'left' | 'right'

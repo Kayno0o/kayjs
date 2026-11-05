@@ -1,7 +1,7 @@
 --- <Output>
 import type { Action, Answer, FailureData, JSX, Success } from 'kay'
 import { recipe, signal } from 'kay'
-import { callAction, formIssues } from './forms'
+import { callAction, formIssues, showIssues } from './forms'
 import { toast } from './toast'
 import { wording } from 'kay/words'
 
@@ -40,6 +40,7 @@ async function submit(event: SubmitEvent) {
     return
 
   issues = {}
+  await showIssues(form, {})
 
   if (saved)
     toast.success(saved)

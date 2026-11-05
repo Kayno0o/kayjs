@@ -1819,3 +1819,100 @@ inBrowser('a Form calling an action in the browser', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 })
+
+inBrowser('the FormFields a static page gives a Form, SaveForm or FormDialog as children', () => {
+  // What a field shows: its messages, and what its control says about them.
+  const read = (page: { evaluate: <T>(run: () => T) => Promise<T> }) => page.evaluate(() => [...document.querySelectorAll('#claim [data-field], [data-part="form"] [data-field]')].map((field) => {
+    const control = field.parentElement!.querySelector<HTMLInputElement>('input')!
+
+    return { name: field.getAttribute('data-field'), messages: [...field.children].map(message => message.textContent), invalid: control.getAttribute('aria-invalid'), linked: field.id !== '' && (control.getAttribute('aria-describedby') ?? '').split(' ').includes(field.id), value: control.value }
+  }))
+
+  test('show the messages of a refused call with no island of the app, keep what was typed, link and focus the field, and clear them once the call goes through', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/form-static')
+
+    await page.click('#claim-submit')
+    await page.waitFor('#claim [data-part="issue"]', { text: 'Three letters at least' })
+
+    const refused = await read(page)
+
+    expect(refused.map(field => field.messages)).toEqual([['Three letters at least', 'Page note'], ['<img src=x onerror=alert(1)>'], ['Accept the terms']])
+    expect(refused.map(field => [field.invalid, field.linked])).toEqual([['true', true], ['true', true], ['true', true]])
+    expect(refused.slice(0, 2).map(field => field.value)).toEqual(['ab', 'cd'])
+    expect(await page.evaluate(() => [document.activeElement?.id, document.querySelectorAll('#claim img').length])).toEqual(['handle', 0])
+    expect(await page.evaluate(() => document.querySelector('#other [data-part="issue"]'))).toBeNull()
+
+    await page.fill('#handle', 'abc')
+    await page.fill('#nick', 'cde')
+    await page.evaluate(() => {
+      document.querySelector<HTMLInputElement>('#claim [type="checkbox"]')!.value = 'yes'
+    })
+    await page.click('#claim-submit')
+    await page.waitUntil(() => document.querySelectorAll('#claim [data-form-issue]').length === 0)
+
+    const cleared = await read(page)
+
+    expect(cleared.map(field => field.messages)).toEqual([['Page note'], [], []])
+    expect(cleared.map(field => [field.invalid, field.linked])).toEqual([['true', true], [null, false], [null, false]])
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('paint the Form that was called and no other one of the page', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/form-static')
+
+    await page.click('#other-submit')
+    await page.waitFor('#other [data-part="issue"]', { text: 'Three letters at least' })
+    expect(await page.evaluate(() => document.querySelectorAll('#claim [data-form-issue]').length)).toBe(0)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('leave a Form with no FormField alone', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/form-static-plain')
+
+    await page.click('#claim-submit')
+    await page.waitFor('.kui-toast [data-part=message]', { text: 'Three letters at least' })
+    expect(await page.evaluate(() => document.querySelectorAll('[data-form-issue]').length)).toBe(0)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('a SaveForm shows them, and Discard takes them away', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/form-static-save')
+
+    await page.fill('#handle', 'a')
+    await page.click('button[type="submit"]')
+    await page.waitFor('#claim [data-part="issue"]', { text: 'Three letters at least' })
+    expect((await read(page))[0]).toMatchObject({ value: 'a', invalid: 'true', linked: true })
+
+    await page.click('[data-part="actions"] button:not([type="submit"])')
+    await page.waitUntil(() => document.querySelectorAll('#claim [data-part="issue"]').length === 0)
+    expect((await read(page))[0]).toMatchObject({ value: 'ab', invalid: null, linked: false })
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('a FormDialog shows them and starts afresh when it opens again', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/form-static-dialog')
+
+    await page.click('#open')
+    await page.waitFor('#handle')
+    await page.click('button[type="submit"]')
+    await page.waitFor('[data-field="handle"] [data-part="issue"]', { text: 'Three letters at least' })
+    expect(await page.evaluate(() => document.getElementById('handle')!.getAttribute('aria-invalid'))).toBe('true')
+
+    await page.press('Escape')
+    await page.waitUntil(() => document.getElementById('handle') === null)
+    await page.click('#open')
+    await page.waitFor('#handle')
+    expect(await page.evaluate(() => [document.querySelectorAll('[data-part="issue"]').length, document.getElementById('handle')!.getAttribute('aria-invalid'), document.getElementById('handle')!.getAttribute('aria-describedby')])).toEqual([0, null, null])
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})

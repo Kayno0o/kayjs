@@ -1,0 +1,13 @@
+---
+import type { Action } from 'kay'
+import { signal } from 'kay'
+import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+
+// The island holding the dialog's state; the fields are the page's, handed in as its slot.
+const { claim } = props<{ claim: Action<never, string> }>()
+
+const open = signal(false)
+---
+button#open(onClick={() => open = true}) Open
+FormDialog(open={open()} title="Claim" action={claim} submitLabel="Claim" onOpenChange={shown => open = shown})
+  slot

@@ -21,7 +21,7 @@ Form(action={add} saved="Added.")
   Button(type="submit" tone="accent" label="Add")
 ```
 
-Without JavaScript the form posts to the action as any `form(action={add})` does, and the page comes back with the messages in place. With JavaScript it calls the action, so the page does not reload. The fields must be in the template of a component with state or handlers (an island) to show the message of a call made with JavaScript: fields a static page hands Form as children are static markup, which the browser cannot update, so there the message is toasted.
+Without JavaScript the form posts to the action as any `form(action={add})` does, and the page comes back with the messages in place. With JavaScript it calls the action, so the page does not reload. The fields can be the page's own markup: after a call made with JavaScript the form writes each message into the FormField of that `name`, links it to the control, marks the control invalid and focuses the first one, with no island of yours.
 
 ## Saving
 
