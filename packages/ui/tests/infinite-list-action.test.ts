@@ -1,9 +1,12 @@
 import type { Action, CallOptions } from 'kay'
 import type { PageAt } from '../src/infinite-list'
 import { describe, expect, test } from 'bun:test'
-import { action, s } from 'kay'
-import { infiniteList } from '../src/infinite-list'
+import { action, root, s } from 'kay'
+import { infiniteList as unowned } from '../src/infinite-list'
 import { pageFields, pageOf } from '../src/paging'
+
+// The list's effects need an owner, which a test has none to give.
+const infiniteList = ((...args: Parameters<typeof unowned>) => root(() => unowned(...args))) as typeof unowned
 
 interface Ban {
   id: number

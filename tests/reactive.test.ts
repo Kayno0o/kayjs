@@ -2099,6 +2099,8 @@ describe('effect and onMount types', () => {
       // eslint-disable-next-line ts/no-misused-promises
       onMount(async () => undefined)
       onMount(() => n = 3)
+      // @ts-expect-error the parameter is a function, not any
+      effect(3)
     }
 
     expect(forms).toBeTypeOf('function')
@@ -2118,10 +2120,13 @@ describe('effect and onMount types', () => {
   })
 
   it('leaves the warnings out of a production bundle of the runtime', async () => {
-    const built = await Bun.build({ entrypoints: [new URL('../src/runtime/reactive.ts', import.meta.url).pathname], minify: true, define: { 'process.env.NODE_ENV': '"production"' }, target: 'browser' })
+    const built = await Bun.build({ entrypoints: [new URL('../src/runtime/reactive.ts', import.meta.url).pathname], minify: true, conditions: ['browser'], define: { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': '"production"' }, target: 'browser' })
     const text = (await Promise.all(built.outputs.map(async output => output.text()))).join('')
 
     expect(built.success).toBe(true)
-    expect(text).not.toContain('no owner')
+    expect(text).toContain('effects still writing')
+
+    for (const dev of ['no owner', 'is dropped', 'lives until the page goes', 'Still queued'])
+      expect(text, dev).not.toContain(dev)
   })
 })

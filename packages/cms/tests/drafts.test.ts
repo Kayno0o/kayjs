@@ -48,15 +48,15 @@ describe('opening an entry again', () => {
 
 describe('opening from an effect, as the page editor does', () => {
   it('keeps a save and the edits typed after it when the effect runs again, and takes a copy it is offered anew', async () => {
-    const { effect, signal, flush } = await import('kay')
+    const { effect, root, signal, flush } = await import('kay')
     const drafts = createDrafts({ show: async () => ({}) })
     const source = signal({ entry: post, version: 'v1' })
 
-    effect(() => {
+    root(() => effect(() => {
       const offer = source()
 
       drafts.open(offer.entry, offer.version)
-    })
+    }))
     flush()
 
     drafts.set(post, 'title', 'Saved')
