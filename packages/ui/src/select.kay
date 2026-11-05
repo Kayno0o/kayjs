@@ -7,6 +7,7 @@ import { controlledValue } from './controlled-value'
 import { FIELD_LOOK, FIELD_SELECT_BOX, fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import { changeAccepted } from './change'
 import { paramChange } from './param-change'
+import { paramPick } from './param-value'
 import { startRef } from './form-reset'
 import { wording } from 'kay/words'
 
@@ -27,7 +28,7 @@ const { size = 'md', invalid, value, options, onChange, param, paramDefault, nam
   options: readonly SelectOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly SelectOption<Value>[]>)
   // Handed the option's own value, a number for a number option, or the empty string for the `emptyOption`, and the option itself as a second argument, `undefined` for the empty one.
   onChange?: ((value: Value | (Empty extends string | true ? '' : never), option: SelectOption<Value> | undefined) => unknown) | undefined
-  // Holds a query param of the page instead of, or besides, `onChange`: a pick goes to the current page with `param` set to the option, or left out for the empty option, and every other param kept. Give `value` the param as the page read it. The select takes it as its name, so a GET form around it sends it without JavaScript.
+  // Holds a query param of the page instead of, or besides, `onChange`: a pick goes to the current page with `param` set to the option, or left out for the empty option, and every other param kept. Left without `value`, the select shows the option the address names, else `paramDefault`. The select takes it as its name, so a GET form around it sends it without JavaScript.
   param?: string | undefined
   // The value the page shows while `param` is left out: picking it leaves the param out.
   paramDefault?: string | number | undefined
@@ -46,7 +47,15 @@ const { size = 'md', invalid, value, options, onChange, param, paramDefault, nam
 
 // A select with no callback is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
 const sent = onChange || param !== undefined ? undefined : postedValue(name, value)
-const current = () => value === undefined ? undefined : String(value)
+// Holding a param with no `value`, the pick is the address's.
+const current = () => {
+  if (value !== undefined)
+    return String(value)
+
+  const held = paramPick(list(), param, paramDefault)
+
+  return held === undefined ? undefined : String(held)
+}
 const wanted = () => sent ?? current()
 
 interface SelectOption<Choice> { value: Choice, label: string, disabled?: boolean | undefined }

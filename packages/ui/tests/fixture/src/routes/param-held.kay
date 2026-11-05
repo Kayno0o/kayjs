@@ -1,0 +1,6 @@
+---
+import ParamHeld from '../components/param-held.kay'
+import '../app.css'
+---
+main
+  ParamHeld

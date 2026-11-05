@@ -2031,6 +2031,14 @@ function withRecent(recent: string[], href: string, limit?: number): string[]
 [./lib/param-change] paramChange
 function paramChange<Value extends string | null | number, Option = never>(param: string | undefined, paramDefault: number | string | undefined, onChange: ((value: Value, option: Option) => unknown) | undefined): ((value: Value, option: Option) => unknown) | undefined
 
+[./lib/param-value] paramPick
+function paramPick<Choice extends string | null | number>(options: readonly {
+  value: Choice;
+}[], param: string | undefined, paramDefault: number | string | undefined): Choice | undefined
+
+[./lib/param-value] paramText
+function paramText(name: string | undefined): string | undefined
+
 [./lib/plot] axisExtent
 function axisExtent(values: readonly number[], axis: ScatterAxis): [number, number]
 

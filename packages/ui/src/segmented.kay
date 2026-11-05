@@ -8,6 +8,7 @@ import { controlledRadios } from './controlled-radios'
 import { GROUP_INVALID, LABEL_TEXT } from './field-look'
 import { sentOption } from './refill'
 import { paramChange } from './param-change'
+import { paramPick } from './param-value'
 import Icon from './icon.kay'
 
 // 'kui-segmented' stays as the component's name for an app's CSS and the skins; the border colour reads --_control-line, which a skin sets.
@@ -39,7 +40,7 @@ const { options, value, label, showLabel = false, name, invalid, param, paramDef
   invalid?: boolean | undefined
   // The radios' name, which the group submits under inside a form; one unique on the page is drawn when none is given.
   name?: string | undefined
-  // Holds a query param of the page instead of, or besides, `onChange`: a pick goes to the current page with `param` set to the option and every other param kept, the group busy until the page shows it, and each option also covers a link to that address, so a middle click, a new tab, a copy or a crawler finds it. Give `value` the param as the page read it. The radios take its name, so a GET form around the group sends it without JavaScript.
+  // Holds a query param of the page instead of, or besides, `onChange`: a pick goes to the current page with `param` set to the option and every other param kept, the group busy until the page shows it, and each option also covers a link to that address, so a middle click, a new tab, a copy or a crawler finds it. Left without `value`, the group shows the option the address names, else `paramDefault`. The radios take its name, so a GET form around the group sends it without JavaScript.
   param?: string | undefined
   // The value the page shows while `param` is left out: picking it leaves the param out.
   paramDefault?: string | number | undefined
@@ -59,11 +60,14 @@ const { options, value, label, showLabel = false, name, invalid, param, paramDef
 const first = options.find(option => !option.disabled)?.value ?? null
 const sent = onChange || param !== undefined ? undefined : postedValue(name, value === undefined ? first : value)
 
+// The option the group starts on and follows: the app's `value`, else the one a param holds, else the first.
+const start = () => value === undefined ? paramPick(options, param, paramDefault) ?? first : value
+
 const { group, picked, busy, ref, pick } = controlledRadios({
   control: 'Segmented',
   input: '[data-part=input]',
   options: () => options,
-  value: () => sentOption(sent, options, value === undefined ? first : value),
+  value: () => sentOption(sent, options, start()),
   name: () => name ?? param,
   onChange: () => paramChange(param, paramDefault, onChange as ((value: string | number | null, option: unknown) => unknown) | undefined),
   appRef: rest.ref,
@@ -101,7 +105,7 @@ snippet radios()
   div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() ? 'true' : undefined})
     for option of options key={option.value}
       label(part="option")
-        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, options, value === undefined ? first : value))} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => pick(option.value)})
+        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, options, start()))} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => pick(option.value)})
         span(part="label")
           if drawRow
             | {drawRow(option)}
