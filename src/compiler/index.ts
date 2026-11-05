@@ -27,6 +27,7 @@ import { scopeAttribute } from './scoped-style'
 import { analyzeScript, analyzeServer } from './script'
 import { outerReads, templateReads, templateWords } from './template-reads'
 import { ISLAND_TWIN } from './twin'
+import { unownedEffects } from './unowned-effects'
 import { validate } from './validate'
 
 export type { Diagnostic } from './ast'
@@ -314,8 +315,11 @@ export function compileKay(original: string, filename: string, options: CompileO
   const checked = options.check === true && options.typesOnly !== true
 
   // Type checking only, so a page still runs while it is fixed, and fails there in development naming the same fixes.
-  if (checked && !client)
-    diagnostics.push(...coded(browserReads(file, island !== undefined, server?.data.map(data => data.name) ?? [], routeFile), 'browser-only-read'))
+  if (checked && !client) {
+    const serverNames = server?.data.map(data => data.name) ?? []
+
+    diagnostics.push(...coded(browserReads(file, island !== undefined, serverNames, routeFile), 'browser-only-read'), ...coded(unownedEffects(file, serverNames), 'template-invalid'))
+  }
 
   // Code that did not compile may have taken reads and writes with it, so a file with an error is not searched for unread names or unwritten signals.
   const broken = diagnostics.some(diagnostic => !diagnostic.checkOnly)

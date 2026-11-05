@@ -527,9 +527,18 @@ export function memo<T>(fn: () => T, options?: SignalOptions<T>): () => T {
 
 // Runs `fn` once the current render is done, then again whenever what it read changes; never on the server.
 // kept: free
-export function effect(fn: () => void): void {
+// A function `fn` returns runs as its cleanup, as one passed to `onCleanup` does.
+export function effect(fn: () => void | (() => void)): void {
+  createEffect(fn, 'effect')
+}
+
+// `effect` for `api`, which a development warning names, with the start of `named`, when it runs with no owner.
+export function createEffect(fn: () => void | (() => void), api: string, named: (...args: never[]) => unknown = fn): void {
   if (typeof KAY_BROWSER === 'undefined' && serverRendering > 0)
     return
+
+  if (process.env.NODE_ENV !== 'production' && !owner)
+    warnOnce(`${api}() ran with no owner (at module scope, after an await or in a timer), so nothing ever stops it: it lives until the page goes. Call it in a component's script, or inside root() and call its dispose when done.\n${sourceStart(named)}`)
 
   const node = computation(fn, 'user', false)
 
@@ -546,7 +555,7 @@ export function renderEffect(fn: () => void): void {
 
 // Runs once, after the component's markup is in place.
 // kept: free
-export function onMount(fn: () => void): void {
+export function onMount(fn: () => void | (() => void)): void {
   effect(() => untrack(fn))
 }
 
@@ -555,6 +564,19 @@ export function onMount(fn: () => void): void {
 export function onCleanup(fn: () => void): void {
   if (owner)
     (owner.cleanups ??= []).push(fn)
+  else if (process.env.NODE_ENV !== 'production' && serverRendering === 0)
+    warnOnce(`onCleanup() ran with no owner (at module scope, after an await or in a timer), so its function is dropped and never runs. Call it in a component's script or an effect, or inside root().\n${sourceStart(fn)}`)
+}
+
+const warned = new Set<string>()
+
+// Development only: one console warning per message.
+function warnOnce(message: string): void {
+  if (warned.has(message))
+    return
+
+  warned.add(message)
+  console.warn(`[kay] ${message}`)
 }
 
 // Reads signals without making the current computation depend on them.
@@ -601,7 +623,11 @@ export function root<T>(fn: (dispose: () => void) => T): T {
 
 // What names an effect in a report: its function's name, else the start of its source.
 function effectName(node: Computation): string {
-  return node.fn.name || node.fn.toString().replace(WHITESPACE, ' ').slice(0, 80)
+  return sourceStart(node.fn)
+}
+
+function sourceStart(fn: (...args: never[]) => unknown): string {
+  return fn.name || fn.toString().replace(WHITESPACE, ' ').slice(0, 80)
 }
 
 // Runs every effect whose sources changed, now.
@@ -822,6 +848,10 @@ function run(node: Computation): void {
 
   try {
     node.value = node.fn()
+
+    // What an effect returns, when a function, is its cleanup.
+    if (node.effect === 'user' && typeof node.value === 'function')
+      (node.cleanups ??= []).push(node.value as () => void)
   }
   finally {
     owner = previousOwner

@@ -265,6 +265,8 @@ p {game.miners[0].ore}
 
 - `effect(fn)` runs once the render is done and again whenever what it read changes.
 - `onMount`, `onCleanup`, `untrack`, `batch`, `root` and `flush` come from `kay` too.
+- A function an `effect` or `onMount` callback returns runs as its cleanup, as one passed to `onCleanup` does: `effect(() => { const t = setInterval(tick, 1000); return () => clearInterval(t) })`.
+- `effect`, `watch`, `every`, `listen` and `onCleanup` run with no owner at a module's top level, after an `await`, or in a timer: nothing stops the first four, which live until the page goes, and `onCleanup` drops its function. In development each logs a `[kay]` warning naming it, once, and `kay check` reports a call in a handler, a timer, a promise callback or after an `await` as the `unowned-effect` lint; `root(fn)` is the owner to give them.
 - An event handler runs under the owner it was bound in, the enclosing block or component, so an `onCleanup` it registers runs when that goes.
 - An `onCleanup` that throws is logged and handed to the page's error report (`reportError`), never to an `onError` or `catch` boundary, and the owner's other cleanups and children still end.
 - `root(fn)` runs `fn(dispose)` under an owner of its own, not attached to the one it was called under: the effects and `onCleanup`s created inside live until `dispose()` is called, and `root` returns what `fn` returns. It is for code with no component to stop it, such as a module-level subscription.

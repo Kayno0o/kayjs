@@ -305,7 +305,7 @@ function durationMs(value: `${number}d` | `${number}h` | `${number}m` | `${numbe
 function editing(): boolean
 
 [.] effect
-function effect(fn: () => void): void
+function effect(fn: () => (() => void) | void): void
 
 [.] elementSize
 function elementSize(): ElementSize
@@ -653,7 +653,7 @@ type Once = <T>(key: string, load: () => T) => Promise<Awaited<T>>
 function onCleanup(fn: () => void): void
 
 [.] onMount
-function onMount(fn: () => void): void
+function onMount(fn: () => (() => void) | void): void
 
 [.] onNavigate
 function onNavigate(fn: (event: NavigateEvent) => unknown): () => void

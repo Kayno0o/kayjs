@@ -1912,3 +1912,175 @@ describe('listen', () => {
     expect(reads).toBe(0)
   })
 })
+
+describe('effects with no owner', () => {
+  const warnings = () => spyOn(console, 'warn').mockImplementation(() => undefined)
+  // Each call hands a function of its own, as a warning is given once per function.
+  let calls = 0
+  const named = () => Object.defineProperty(() => undefined, 'name', { value: `unowned${++calls}` })
+  const unowned = { effect: () => effect(named()), watch: () => watch(() => 1, named()), every: () => every('1s', named()), listen: () => listen(new EventTarget(), 'ping', named()) }
+
+  for (const [name, start] of Object.entries(unowned)) {
+    it(`warn in development when ${name} runs at module scope, naming it`, () => {
+      const warn = warnings()
+
+      start()
+      flush()
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0]![0])).toContain(`${name}()`)
+      warn.mockRestore()
+    })
+
+    it(`warn when ${name} runs after an await or in a timer`, async () => {
+      const warn = warnings()
+
+      await root(async () => {
+        await Promise.resolve()
+        start()
+      })
+      await new Promise<void>(resolve => setTimeout(() => {
+        start()
+        resolve()
+      }, 0))
+      flush()
+      expect(warn.mock.calls.length).toBe(2)
+      warn.mockRestore()
+    })
+
+    it(`do not warn when ${name} runs under a root or another effect`, () => {
+      const warn = warnings()
+      const dispose = root((close) => {
+        start()
+        effect(start)
+
+        return close
+      })
+
+      flush()
+      dispose()
+      expect(warn).not.toHaveBeenCalled()
+      warn.mockRestore()
+    })
+
+    it(`do not warn when ${name} runs while the server renders, nor in production`, () => {
+      const warn = warnings()
+      const env = process.env.NODE_ENV
+
+      renderOnServer(start)
+      process.env.NODE_ENV = 'production'
+
+      try {
+        start()
+        flush()
+      }
+      finally {
+        process.env.NODE_ENV = env as string
+      }
+
+      expect(warn).not.toHaveBeenCalled()
+      warn.mockRestore()
+    })
+  }
+
+  it('warn that onCleanup dropped its function when it has no owner, and only then', () => {
+    const warn = warnings()
+    const dropped = jest.fn()
+
+    onCleanup(dropped)
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(String(warn.mock.calls[0]![0])).toContain('onCleanup()')
+    warn.mockClear()
+    root((close) => {
+      onCleanup(dropped)
+      close()
+    })
+    expect(dropped).toHaveBeenCalledTimes(1)
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('warn once per effect, not on each call', () => {
+    const warn = warnings()
+    const start = () => effect(() => {
+      return undefined
+    })
+
+    start()
+    start()
+    expect(warn).toHaveBeenCalledTimes(1)
+    warn.mockRestore()
+  })
+})
+
+describe('a function an effect returns', () => {
+  it('runs as its cleanup when the effect runs again and when its owner goes away', () => {
+    const count = signal(0)
+    const cleaned: number[] = []
+    const dispose = root((close) => {
+      effect(() => {
+        const seen = count()
+
+        return () => void cleaned.push(seen)
+      })
+
+      return close
+    })
+
+    flush()
+    count.set(1)
+    flush()
+    expect(cleaned).toEqual([0])
+    dispose()
+    expect(cleaned).toEqual([0, 1])
+  })
+
+  it('runs for onMount too, when the island goes away', () => {
+    const cleaned = jest.fn()
+    const dispose = root((close) => {
+      onMount(() => cleaned)
+
+      return close
+    })
+
+    flush()
+    expect(cleaned).not.toHaveBeenCalled()
+    dispose()
+    expect(cleaned).toHaveBeenCalledTimes(1)
+  })
+
+  it('is ignored when it is not a function, and a render effect or memo keeps its value', () => {
+    const dispose = root((close) => {
+      effect(() => 3 as unknown as void)
+      renderEffect(() => () => {
+        throw new Error('not a cleanup')
+      })
+
+      return close
+    })
+
+    flush()
+    expect(() => dispose()).not.toThrow()
+  })
+
+  it('reports a throwing cleanup and still runs the rest', () => {
+    const reported = spyOn(console, 'error').mockImplementation(() => undefined)
+    const after = jest.fn()
+    const dispose = root((close) => {
+      effect(() => {
+        onCleanup(after)
+
+        return () => {
+          throw new Error('boom')
+        }
+      })
+
+      return close
+    })
+
+    flush()
+    dispose()
+    expect(after).toHaveBeenCalledTimes(1)
+    expect(reported).toHaveBeenCalled()
+    reported.mockRestore()
+  })
+})

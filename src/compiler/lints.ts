@@ -441,6 +441,13 @@ export const LINTS = {
     wrong: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst year = new Date().getFullYear()\n---\nbutton(onClick={() => count++}) {count()} (c) {year}',
     right: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n// kay-allow hydration-mismatch\nconst year = new Date().getFullYear()\n---\nbutton(onClick={() => count++}) {count()} (c) {year}',
   },
+  'unowned-effect': {
+    level: 'warn',
+    group: 'islands',
+    summary: '`effect`, `watch`, `every`, `listen`, `debounced`, `onMount` or `onCleanup` called in an event handler, a `listen` handler, a timer or promise callback, or after an `await`: the component\'s owner is not there to stop them, so each call adds an effect that lives until the page goes, and `onCleanup` drops its function. Call them in the component\'s script, or inside `root()`, which hands over the `dispose` to call when done.',
+    wrong: '---\nimport { effect, signal } from \'kay\'\n\nconst open = signal(false)\n---\nbutton(onClick={() => effect(() => console.log(open()))}) Log',
+    right: '---\nimport { effect, signal } from \'kay\'\n\nconst open = signal(false)\n\neffect(() => console.log(open()))\n---\nbutton(onClick={() => open.set(true)}) Log',
+  },
   'draft-message': {
     level: 'warn',
     group: 'i18n',

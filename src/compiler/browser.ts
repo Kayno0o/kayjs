@@ -9,10 +9,12 @@ import { importedFromKay } from './rewrite'
 import { walkScope } from './walk'
 
 // One part of the program `browserReads` analyzes: generated text standing for the source from `source` on, character for character.
-interface Segment {
+export interface Segment {
   generated: number
   source: number
   length: number
+  // A template value the browser calls later, as a handler.
+  deferred?: boolean | undefined
 }
 
 interface Read {
@@ -301,16 +303,16 @@ function inType(path: Path): boolean {
 
 // The script, then each template value as a statement of its own, so one scope analysis sees them all: a handler or ref sits in a function, which runs in the browser only.
 // Names the server fence and the template bind are declared first, so they shadow the globals they are named after.
-function buildProgram(file: KayFile, serverNames: string[], expressions: { span: Span, deferred: boolean }[]): { code: string, segments: Segment[] } {
+export function buildProgram(file: KayFile, serverNames: string[], expressions: { span: Span, deferred: boolean }[]): { code: string, segments: Segment[] } {
   const { source } = file
   const bound = [...new Set([...serverNames, ...templateNames(file)])]
   // Each template value sits in a block of its own declaring them, so they shadow the script's names rather than clash with them.
   const declared = bound.length > 0 ? `let ${bound.join(', ')}; ` : ''
   let code = ''
   const segments: Segment[] = []
-  const add = (span: Span, before: string, after: string) => {
+  const add = (span: Span, before: string, after: string, deferred?: boolean) => {
     code += before
-    segments.push({ generated: code.length, source: span.start, length: span.end - span.start })
+    segments.push({ generated: code.length, source: span.start, length: span.end - span.start, deferred })
     code += `${source.slice(span.start, span.end)}${after}`
   }
 
@@ -322,7 +324,7 @@ function buildProgram(file: KayFile, serverNames: string[], expressions: { span:
     add(file.script, '', '\n')
 
   for (const expression of expressions)
-    add(expression.span, expression.deferred ? `;() => { ${declared}(` : `;{ ${declared}(`, ') }\n')
+    add(expression.span, expression.deferred ? `;() => { ${declared}(` : `;{ ${declared}(`, ') }\n', expression.deferred)
 
   return { code, segments }
 }
@@ -359,7 +361,7 @@ function templateNames(file: KayFile): string[] {
 }
 
 // Every value the template computes, deferred when it is a handler or a ref, which the browser calls later.
-function templateExpressions(file: KayFile): { span: Span, deferred: boolean }[] {
+export function templateExpressions(file: KayFile): { span: Span, deferred: boolean }[] {
   const found: { span: Span, deferred: boolean }[] = []
 
   visitNodes(file.template, (node) => {

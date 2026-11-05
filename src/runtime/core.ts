@@ -6,7 +6,7 @@ import type { Duration } from './duration'
 import type { Locale } from './i18n'
 import type { PlainValue, SignalOptions } from './reactive'
 import { durationMs } from './duration'
-import { createSignal, effect, getOwner, markSignal, memo, onCleanup, ownSignal, provideContext, readContext, runWithOwner, tracking, untrack, withSetter } from './reactive'
+import { createEffect, createSignal, getOwner, markSignal, memo, onCleanup, ownSignal, provideContext, readContext, runWithOwner, tracking, untrack, withSetter } from './reactive'
 import { tabVisible } from './visibility'
 
 // Writes a value, or what a function makes of the current one.
@@ -53,7 +53,7 @@ export function every(interval: Duration, run: () => unknown, options?: EveryOpt
   if (!(ms >= 1 && ms <= MAX_TIMER))
     throw new Error(`kay: every() takes a duration of 1 ms to 24 days such as '3s' or '250ms', not ${typeof interval === 'string' ? JSON.stringify(interval) : String(interval)}`)
 
-  effect(() => {
+  createEffect(() => {
     if (options?.while && !options.while()) {
       paused = false
 
@@ -88,7 +88,7 @@ export function every(interval: Duration, run: () => unknown, options?: EveryOpt
       void tick()
 
     paused = false
-  })
+  }, 'every', run)
 }
 
 export interface WatchOptions {
@@ -108,7 +108,7 @@ export function watch<T>(source: () => T, run: (next: T, previous: T | undefined
   let first = true
   let previous: T | undefined
 
-  effect(() => {
+  createEffect(() => {
     const next = value()
     const before = previous
     const runs = !first || options?.immediate === true
@@ -118,7 +118,7 @@ export function watch<T>(source: () => T, run: (next: T, previous: T | undefined
 
     if (runs)
       untrack(() => run(next, before))
-  })
+  }, 'watch', run)
 }
 
 // `source`'s value once it has stopped changing for `delay`, starting with its value now: `watch(debounced(typed, '300ms'), lookUp)` looks a name up as the user pauses.
@@ -128,12 +128,12 @@ export function debounced<T>(source: () => T, delay: Duration): Memo<T> {
   const wait = durationMs(delay)
   const [settled, write] = createSignal(untrack(source))
 
-  effect(() => {
+  createEffect(() => {
     const next = source()
     const timer = setTimeout(write, wait, next)
 
     onCleanup(() => clearTimeout(timer))
-  })
+  }, 'debounced', source)
 
   return settled
 }
@@ -148,7 +148,7 @@ type EventMapOf<T> = T extends Window ? WindowEventMap : T extends Document ? Do
 export function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: T | (() => T | null | undefined), type: K, handler: (event: EventMapOf<T>[K]) => void, options?: boolean | AddEventListenerOptions): void {
   const owner = getOwner()
 
-  effect(() => {
+  createEffect(() => {
     const at = typeof target === 'function' ? target() : target
 
     if (!at)
@@ -158,7 +158,7 @@ export function listen<T extends EventTarget, K extends keyof EventMapOf<T> & st
 
     at.addEventListener(type, listener, options)
     onCleanup(() => at.removeEventListener(type, listener, options))
-  })
+  }, 'listen', handler)
 }
 
 // A signal an island edits locally that takes `source`'s value again whenever it changes: `const tiers = linked(() => board.tiers)` follows the prop once the page brings a new board.
