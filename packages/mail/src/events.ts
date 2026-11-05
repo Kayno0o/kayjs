@@ -62,13 +62,18 @@ const SECRET_ENV: Record<keyof EventSecrets, string> = { postmark: 'MAIL_EVENTS_
 const OLD_INBOUND_ENV = 'MAIL_INBOUND_SECRET'
 let warnedOldInboundName = false
 
-// Warns once, as the mailer boots, that the environment holds the old inbound name.
-export function warnOldInboundName(): void {
-  if (!warnedOldInboundName && (process.env[OLD_INBOUND_ENV] ?? '') !== '') {
+// The inbound secret under its old name, which warns once when it is what the secret is read from.
+function oldInboundSecret(): string | undefined {
+  const value = process.env[OLD_INBOUND_ENV]
+
+  if (!warnedOldInboundName && value !== undefined && value !== '') {
     warnedOldInboundName = true
-    log.warn(`${OLD_INBOUND_ENV} is now ${SECRET_ENV.inbound}: rename it in the environment, the old name is read until 1.94`)
+    log.warn(`${OLD_INBOUND_ENV} is now ${SECRET_ENV.inbound}: rename it in your .env or compose service, the old name is read until 1.94`)
   }
+
+  return value
 }
+
 // A bad destination address (5.1.x) or a disabled mailbox (5.2.1): not a full mailbox, a policy block or a reputation one, which say nothing of the address.
 const ADDRESS_GONE = /^5\.(?:1\.\d+|2\.1)$/
 const WHSEC = /^whsec_/
@@ -80,7 +85,7 @@ export function secretsOf(given: EventSecrets | undefined): EventSecrets {
   const secrets: EventSecrets = {}
 
   for (const name of Object.keys(SECRET_ENV) as (keyof EventSecrets)[]) {
-    const value = given?.[name] ?? process.env[SECRET_ENV[name]] ?? (name === 'inbound' ? process.env[OLD_INBOUND_ENV] : undefined)
+    const value = given?.[name] ?? process.env[SECRET_ENV[name]] ?? (name === 'inbound' ? oldInboundSecret() : undefined)
 
     if (value !== undefined && value !== '')
       secrets[name] = value

@@ -162,7 +162,7 @@ function databaseUrlFromEnv(): string | undefined {
 
   if (old !== undefined && !warnedOldDatabaseName) {
     warnedOldDatabaseName = true
-    log.warn('KAYJS_AUTH_DATABASE_URL is now AUTH_DATABASE_URL: rename it in the environment, the old name is read until 1.94')
+    log.warn('KAYJS_AUTH_DATABASE_URL is now AUTH_DATABASE_URL: rename it in your .env or compose service, the old name is read until 1.94')
   }
 
   return old

@@ -18,7 +18,7 @@ import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
 import { defaultSender, parseMailUrl } from './env'
-import { mountEventRoutes, secretsOf, warnOldInboundName } from './events'
+import { mountEventRoutes, secretsOf } from './events'
 import { createLists, mountListRoutes } from './list'
 import { log } from './log'
 import { messageId } from './message-id'
@@ -347,7 +347,6 @@ function defined<T extends object>(options: T): Partial<T> {
 function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean, overrides: SmtpOverrides = {}): { transport: Transport, from: Address, to: string | undefined, server: string, missing: () => string[] } {
   const env = defineEnv(smtpEnv({ optional }))
 
-  warnOldInboundName()
   // Parsed as the server boots, so a URL that is no server stops it; absent under `optional`, where the first mail says so.
   const server = env.MAIL_URL === undefined || env.MAIL_URL === '' ? undefined : parseMailUrl(env.MAIL_URL)
 
