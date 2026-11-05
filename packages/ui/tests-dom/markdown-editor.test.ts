@@ -416,8 +416,25 @@ describe('MarkdownEditor onChange', () => {
 
     expect([state.value, committed]).toEqual(['ab', []])
 
-    state.area.dispatchEvent(new Event('change', { bubbles: true }))
+    state.area.dispatchEvent(new Event('blur'))
+    state.area.dispatchEvent(new Event('blur'))
 
     expect(committed).toEqual(['ab'])
+  })
+})
+
+describe('MarkdownEditor onChange from the toolbar', () => {
+  test('a toolbar-only edit is reported once the field is left', async () => {
+    const committed: string[] = []
+    const state = await editor('word', undefined, { onChange: (next: string) => committed.push(next) })
+
+    state.area.setSelectionRange(0, 4)
+    named(state.root, 'Bold').click()
+
+    expect(committed).toEqual([])
+
+    state.area.dispatchEvent(new Event('blur'))
+
+    expect(committed).toEqual(['**word**'])
   })
 })

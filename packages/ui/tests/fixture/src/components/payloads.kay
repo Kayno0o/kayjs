@@ -1,0 +1,27 @@
+---
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
+import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
+import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
+import type { IconChoice } from '@kaynooo/kayjs-ui'
+
+// Each control reports into the callbacks the test hands over, to read the payloads of `onInput` and `onChange`.
+const { onMoved, onSelect, onSegment, onChips, onMulti, onIcon, onTimeInput, onRequiredInput, onDateInput } = props<{ onMoved: (...args: unknown[]) => unknown, onSelect: (...args: unknown[]) => unknown, onSegment: (...args: unknown[]) => unknown, onChips: (...args: unknown[]) => unknown, onMulti: (...args: unknown[]) => unknown, onIcon: (...args: unknown[]) => unknown, onTimeInput: (value: string) => unknown, onRequiredInput: (value: string) => unknown, onDateInput: (value: string) => unknown }>()
+
+const days = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]
+const icons: IconChoice[] = [{ name: 'tabler:home', icon: { viewBox: '0 0 24 24', width: '1em', height: '1em', innerHTML: '' } as never }]
+const remote = async () => days
+---
+form#form
+  Select#select(options={days} value="a" emptyOption="None" aria-label="Pick" onChange={onSelect})
+  Select#moved(options={days} param="sel" aria-label="Moved" onChange={onMoved})
+  Segmented#segmented(options={days} value="a" label="Segment" param="seg" onChange={onSegment})
+  ChipGroup#chips(options={days} label="Chips" onChange={onChips})
+  MultiSelect#multi(options={remote} value={['a', 'ghost']} label="Multi" open onChange={onMulti})
+  IconPicker#icon(icons={icons} name="icon" onChange={onIcon})
+  TimeInput#time(name="time" onInput={onTimeInput} onChange={() => undefined})
+  TimeInput#required(name="required" value="10:00" required onInput={onRequiredInput})
+  DateInput#date(name="date" onInput={onDateInput})

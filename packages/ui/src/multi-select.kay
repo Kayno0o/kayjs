@@ -94,7 +94,7 @@ const { size = 'md', invalid, id, options, value = [], label, placeholder = word
   // Shows the panel when the page sets it; the trigger, a click outside and Escape open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
-  // Gets the picked options as a second argument, among the ones loaded so far.
+  // Gets the picked options as a second argument, a value never loaded and without a `valueLabels` entry gets `{ value, label: String(value) }`, so `options` always lines up with the values.
   onChange?: ((value: Value[], options: MultiSelectOption<Value>[]) => unknown) | undefined
 }>()
 
@@ -223,7 +223,9 @@ effect(() => {
 
 function set(next: Value[]) {
   picked = next
-  onChange?.(next, pool().filter(option => next.includes(option.value)))
+  const known = pool()
+
+  onChange?.(next, next.map(one => known.find(option => option.value === one) ?? { value: one, label: String(one) }))
 }
 
 // What a reset goes back to: the values it started with, or the ones last saved by a SaveForm.

@@ -33,7 +33,8 @@ const { tabs, value, param, paramDefault, label, onChange, tab, panel, ...rest }
   tabs: readonly ({ value: Value } & NavItem)[]
   // Names the tab list for screen readers.
   label: string
-  onChange?: ((value: Value) => unknown) | undefined
+  // Gets the tab shown as a second argument.
+  onChange?: ((value: Value, tab: { value: Value } & NavItem) => unknown) | undefined
   // Draws the text of each tab in place of its `label`: `@tab(tab)`, given the tab. The icon and the badge it names are still drawn around it; `label` is still the string the data holds.
   tab?: Snippet<[tab: { value: Value } & NavItem]> | undefined
   // Draws each tab's panel: `@panel(tab)`, given the tab's value. Every panel is drawn once and hidden while its tab is not shown, so what it holds survives a switch.
@@ -84,7 +85,7 @@ function show(next: Value) {
   else
     shown = next
 
-  onChange?.(next)
+  onChange?.(next, tabs.find(entry => entry.value === next)!)
 }
 
 // Moving with the keys shows the tab it lands on, and focus goes with it: only the shown tab is in the page's tab order.

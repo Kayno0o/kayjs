@@ -2554,7 +2554,7 @@ component default
   };
   badge?: string | undefined;
   panel?: string | undefined;
-}; label: string; onChange?: ((value: Value) => unknown) | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: readonly ({ value: Value; } & NavItem)[]; value: Value }
+}; label: string; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: readonly ({ value: Value; } & NavItem)[]; value: Value }
   | { class?: string | undefined | {
   root?: string | undefined;
   list?: string | undefined;
@@ -2564,7 +2564,7 @@ component default
   };
   badge?: string | undefined;
   panel?: string | undefined;
-}; label: string; onChange?: ((value: Value) => unknown) | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: readonly ({ value: Value; } & NavItem)[]; value?: undefined }
+}; label: string; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: readonly ({ value: Value; } & NavItem)[]; value?: undefined }
 
 [./text-input.kay] default
 component default
