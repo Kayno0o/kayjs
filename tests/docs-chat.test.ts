@@ -1,8 +1,10 @@
 import type { Action } from 'kay'
+import type { Limiter } from 'kay/library'
 import type { ToolAction } from '../packages/ai/src'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, afterEach, describe, expect, it } from 'bun:test'
+import { limiter } from 'kay/library'
 import { memoryRates } from 'kay/server'
 import { testSite } from 'kay/test'
 import { chatPages, partOfPage, readPage, searchPages, systemPrompt } from '../docs/src/chat-corpus'
@@ -27,20 +29,22 @@ const question = (content: string) => ({ messages: [{ role: 'user', content }] }
 
 // The settings docs/kay.config.ts gives `ai()`, read where the library keeps them.
 interface Counted {
-  settings: { budget?: { tokens: number, total: number | undefined, ms: number, store: ReturnType<typeof memoryRates> }, limit?: { max: number, ms: number, store: ReturnType<typeof memoryRates> } }
+  settings: { budget?: { tokens: number, total: number | undefined, ms: number, counting: Limiter }, limit?: { max: number, ms: number, counting: Limiter } }
 }
 
 const counted = () => (globalThis as Record<symbol, Counted | undefined>)[Symbol.for('kayjs-ai.limits')]!.settings
+// Counts as the library does, under the same names, in the store given.
+const budgetCounting = (store: ReturnType<typeof memoryRates>) => limiter({ max: counted().budget!.tokens, window: '1d', store, name: 'ai:budget', failure: 'refuse' })
 // The config keeps the counts in a file that outlives a run, which every test here would meet again: they count in memory instead.
 const kept = counted()
-const configured = { limit: kept.limit?.store, budget: kept.budget?.store }
+const configured = { limit: kept.limit!.counting, budget: kept.budget!.counting }
 
-kept.limit!.store = memoryRates()
-kept.budget!.store = memoryRates()
+kept.limit!.counting = limiter({ max: kept.limit!.max, window: '1m', store: memoryRates(), name: 'ai:limit', failure: 'refuse' })
+kept.budget!.counting = budgetCounting(memoryRates())
 
 afterAll(async () => {
-  kept.limit!.store = configured.limit!
-  kept.budget!.store = configured.budget!
+  kept.limit!.counting = configured.limit
+  kept.budget!.counting = configured.budget
   await site.close()
   await release()
 })
@@ -245,16 +249,16 @@ describe('the caps set in docs/kay.config.ts', () => {
   // Starts every test from empty counts, and puts the store back after it.
   const fresh = async (run: (store: ReturnType<typeof memoryRates>) => Promise<void>) => {
     const { budget } = counted()
-    const kept = budget!.store
+    const kept = budget!.counting
     const store = memoryRates()
 
-    budget!.store = store
+    budget!.counting = budgetCounting(store)
 
     try {
       await run(store)
     }
     finally {
-      budget!.store = kept
+      budget!.counting = kept
     }
   }
 
