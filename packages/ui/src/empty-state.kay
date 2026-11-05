@@ -1,17 +1,27 @@
 ---
 import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
+
+import Icon from './icon.kay'
 
 const look = recipe({
   parts: {
     root: 'kui-empty-state flex flex-col items-center gap-3 py-16',
-    title: 'text-xs [font-weight:var(--font-weight-semibold)] tracking-label text-accent [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
+    icon: 'size-8 text-[var(--_empty-tone,var(--color-accent))]',
+    title: 'text-xs [font-weight:var(--font-weight-semibold)] tracking-label text-[var(--_empty-tone,var(--color-accent))] [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     description: 'text-xs text-[var(--color-muted)]',
     actions: 'flex flex-wrap items-center justify-center gap-2',
   },
+  variants: {
+    // The colour of the icon and the title: `danger` for a failed list, `warning` for a limit reached. `neutral` keeps the component's own look.
+    tone: { neutral: '', accent: '', info: '[--_empty-tone:var(--color-info)]', success: '[--_empty-tone:var(--color-success)]', warning: '[--_empty-tone:var(--color-warning)]', danger: '[--_empty-tone:var(--color-danger)]' },
+  },
+  defaults: { tone: 'neutral' },
 })
 
-const { title, level, description, actions, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title' | 'children'> & {
+const { title, level, description, actions, icon, tone = 'neutral', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'title' | 'children'> & {
   // A `@title` block draws markup inside the heading, or the paragraph, instead of the string.
   title: string | Snippet
   // Makes the title a heading of that level, `1` for an empty state standing for the whole page, such as a 404; without it, a paragraph under the page's own heading.
@@ -20,9 +30,14 @@ const { title, level, description, actions, ...rest } = props<Omit<JSX.Intrinsic
   description?: string | Snippet | undefined
   // Below the description: a button or a link leading out of the empty list, such as the one that adds the first item.
   actions?: Snippet
+  // Drawn above the title: an icon of your own.
+  icon?: IconSlot | IconProps | undefined
+
 }>()
 ---
-div({...rest})
+div({...rest} data-tone={tone})
+  if icon
+    Icon(icon={icon} part="icon")
   if level === 1
     h1(part="title") {title}
   else if level === 2

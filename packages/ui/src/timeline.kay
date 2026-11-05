@@ -1,9 +1,10 @@
 --- <Key extends string | number>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { TimelineEntry } from './timeline'
 import { tabOf } from './outside'
 import { effect, recipe, signal } from 'kay'
 import Icon from './icon.kay'
+import { wording } from 'kay/words'
 
 // 'kui-timeline' stays as the component's name for an app's CSS. A picked entry is marked by aria-pressed, a toned one by data-tone on its item.
 const look = recipe({
@@ -17,7 +18,7 @@ const look = recipe({
   },
 })
 
-const { entries, selected, onSelectedChange, onSelect, label, ...rest } = props<Omit<JSX.IntrinsicElements['ol'], 'class' | 'children' | 'onSelect'> & {
+const { entries, selected, onSelectedChange, onSelect, label, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['ol'], 'class' | 'children' | 'onSelect'> & {
   // In the order they are shown, which is the time order: the timeline never sorts them.
   entries: readonly TimelineEntry<Key>[]
   // The key of the picked entry, if any; a new one from the parent is followed.
@@ -29,7 +30,13 @@ const { entries, selected, onSelectedChange, onSelect, label, ...rest } = props<
   onSelect?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
   // Names the list for screen readers.
   label: string
+  // What the component reads with nothing to show; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
+  emptyLabel?: string | undefined
+  empty?: Snippet | undefined
 }>()
+
+// The empty text is a div, not the list's own element, so it takes the attributes as a div does.
+const loose = rest as unknown as JSX.IntrinsicElements['div']
 
 // Held as string or number: a signal cannot take a type parameter that might be a function.
 const picked = signal<string | number | undefined>(selected)
@@ -45,24 +52,32 @@ function pick(entry: TimelineEntry<Key>) {
   onSelectedChange ? onSelectedChange(next, entry) : onSelect?.(next, entry)
 }
 ---
-ol(part="root" {...rest} aria-label={label})
-  for entry of entries key={entry.key}
-    li(part="item" data-tone={entry.tone})
-      if entry.href !== undefined
-        a(part="entry" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={picked() === entry.key ? 'true' : undefined})
-          span(part="time") {entry.time}
-          if entry.icon
-            Icon(icon={entry.icon} part="icon")
-          span(part="text") {entry.text}
-      else if selectable() && entry.pickable !== false
-        button(part="entry" type="button" aria-pressed={picked() === entry.key} onClick={() => pick(entry)})
-          span(part="time") {entry.time}
-          if entry.icon
-            Icon(icon={entry.icon} part="icon")
-          span(part="text") {entry.text}
-      else
-        div(part="entry")
-          span(part="time") {entry.time}
-          if entry.icon
-            Icon(icon={entry.icon} part="icon")
-          span(part="text") {entry.text}
+if entries.length === 0
+  // The app's attributes stay on whichever element shows.
+  if empty
+    div.kui-timeline-empty(part="root" {...loose} role="status")
+      | {empty}
+  else if emptyLabel !== ''
+    div.kui-timeline-empty(part="root" {...loose} role="status") {emptyLabel ?? wording('ui.timeline.empty', 'No events yet.')}
+else
+  ol(part="root" {...rest} aria-label={label})
+    for entry of entries key={entry.key}
+      li(part="item" data-tone={entry.tone})
+        if entry.href !== undefined
+          a(part="entry" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={picked() === entry.key ? 'true' : undefined})
+            span(part="time") {entry.time}
+            if entry.icon
+              Icon(icon={entry.icon} part="icon")
+            span(part="text") {entry.text}
+        else if selectable() && entry.pickable !== false
+          button(part="entry" type="button" aria-pressed={picked() === entry.key} onClick={() => pick(entry)})
+            span(part="time") {entry.time}
+            if entry.icon
+              Icon(icon={entry.icon} part="icon")
+            span(part="text") {entry.text}
+        else
+          div(part="entry")
+            span(part="time") {entry.time}
+            if entry.icon
+              Icon(icon={entry.icon} part="icon")
+            span(part="text") {entry.text}

@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { IconChoice } from './icon-picker'
 import { batch, effect, flush, onCleanup, postedValue, recipe, signal } from 'kay'
 import { fieldInvalid, keepInvalid } from './field-look'
@@ -14,7 +14,7 @@ const DEBOUNCE_MS = 200
 
 const look = recipe({ parts: { root: 'kui-icon-picker', search: '', grid: 'kui-icon-grid', option: 'kui-icon-grid-option', empty: 'kui-icon-grid-empty', bar: 'kui-icon-grid-bar', selection: 'kui-icon-grid-selection', clear: 'kui-icon-grid-clear', error: 'kui-icon-grid-error', more: 'kui-icon-grid-more' } })
 
-const { search, icons: given, value = '', name, invalid, disabled = false, onChange, onSearch, onError, searchLabel = wording('ui.iconPicker.search', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.grid', 'Icons'), searchingLabel = wording('ui.iconPicker.searching', 'Searching…'), emptyLabel = wording('ui.iconPicker.empty', 'No icons found.'), errorLabel = wording('ui.iconPicker.error', 'The icons could not be loaded.'), clearLabel = wording('ui.iconPicker.clear', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.more', 'Show more'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onError'> & {
+const { search, icons: given, value = '', name, invalid, disabled = false, onChange, onSearch, onError, searchLabel = wording('ui.iconPicker.search', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.grid', 'Icons'), searchingLabel = wording('ui.iconPicker.searching', 'Searching…'), emptyLabel = wording('ui.iconPicker.empty', 'No icons found.'), empty, errorLabel = wording('ui.iconPicker.error', 'The icons could not be loaded.'), clearLabel = wording('ui.iconPicker.clear', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.more', 'Show more'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onError'> & {
   // The icons matching `query` from the `offset`th on, at most `limit` of them: typically an action, since a whole icon set is too large to ship. A page of fewer than `limit` is the last. A rejection is logged and leaves the last grid on screen under `errorLabel`.
   search?: ((query: string, limit: number, offset: number) => Promise<IconChoice[]>) | undefined
   // A fixed set of icons instead of `search`, filtered by the text typed and paged like its answers: no action is needed for a small set. Give one of the two.
@@ -39,6 +39,8 @@ const { search, icons: given, value = '', name, invalid, disabled = false, onCha
   gridLabel?: string | undefined
   searchingLabel?: string | undefined
   emptyLabel?: string | undefined
+  // Replaces the empty text with the app's own markup, such as a link to add the missing one: an `@empty` block.
+  empty?: Snippet | undefined
   errorLabel?: string | undefined
   clearLabel?: string | undefined
   moreLabel?: string | undefined
@@ -192,7 +194,11 @@ div(part="root" {...rest} ref={ref})
         button(part="option" type="button" disabled={disabled} aria-label={nameOf(choice.name)} data-tooltip={nameOf(choice.name)} aria-pressed={picked() === choice.name ? 'true' : 'false'} onClick={() => choose(choice)})
           Icon(icon={choice.icon})
     if icons().length === 0
-      li(part="empty") {pending() ? searchingLabel : failed() ? errorLabel : emptyLabel}
+      li(part="empty")
+        if empty && !pending() && !failed()
+          | {empty}
+        else
+          | {pending() ? searchingLabel : failed() ? errorLabel : emptyLabel}
   div(part="bar")
     if picked()
       span(part="selection" aria-live="polite")

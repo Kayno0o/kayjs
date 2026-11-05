@@ -12,6 +12,7 @@ import { virtualRows } from './virtual'
 const look = recipe({
   parts: {
     root: 'kui-virtual-list',
+    empty: 'text-xs text-muted',
     // An item that is a link or a button: the anchor or the button is stretched over it, the links and buttons the item draws sitting above.
     item: 'data-linked:relative data-linked:isolate data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=itemLink],[data-part=itemButton])]:relative data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=itemLink],[data-part=itemButton])]:z-1',
     itemLink: 'absolute inset-0 z-0 m-0 block h-full w-full cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
@@ -25,7 +26,7 @@ const look = recipe({
   },
 })
 
-const { items: given, list: source, item, itemKey, estimate = 48, overscan = 4, label, busy = false, skeletonItems = 5, loadingLabel = wording('ui.virtualList.loading', 'Loading…'), failureLabel = wording('ui.virtualList.failure', 'Could not load the items.'), retryLabel = wording('ui.virtualList.retry', 'Try again'), onLoad, onError, itemHref, onItemClick, itemLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'tabindex' | 'onLoad' | 'onError'> & {
+const { items: given, list: source, item, itemKey, estimate = 48, overscan = 4, label, busy = false, skeletonItems = 5, emptyLabel = wording('ui.virtualList.empty', 'No items.'), empty, loadingLabel = wording('ui.virtualList.loading', 'Loading…'), failureLabel = wording('ui.virtualList.failure', 'Could not load the items.'), retryLabel = wording('ui.virtualList.retry', 'Try again'), onLoad, onError, itemHref, onItemClick, itemLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'tabindex' | 'onLoad' | 'onError'> & {
   // The items to draw: an array, a function returning them, or a promise of them. An array is drawn by the server; a function is called in the browser only (it may touch `window`, and the server draws the skeleton), and so is a promise's answer, skeleton items standing in meanwhile; a refresh keeps the items shown, then a failure with a retry (a function is called again) if it rejects. Left out when `list` holds them: one of the two is required.
   items?: RowsSource<Item> | undefined
   // Items loaded page by page, from `infiniteList`: `LoadMore` follows the rows inside the box, loading the next page as the reader nears the end and showing a failed page's alert with its retry.
@@ -59,12 +60,16 @@ const { items: given, list: source, item, itemKey, estimate = 48, overscan = 4, 
   onItemClick?: ((item: Item, index: number, event: MouseEvent) => unknown) | undefined
   // Names an item's link or button; `Open item <position>` without one.
   itemLabel?: ((item: Item, index: number) => string) | undefined
+  // What the list reads with no item; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
+  emptyLabel?: string | undefined
+  empty?: Snippet | undefined
 } & ({ items: RowsSource<Item>, list?: undefined } | { items?: undefined, list: InfiniteList<Item> })>()
 
 const loaded = asyncRows<Item>(() => given, { onLoad: answer => onLoad?.(answer), onError: error => onError?.(error) })
 const items = () => source ? source.rows() : loaded.rows()
 const waiting = () => busy || (source ? source.pending() && !source.failed() : loaded.loading())
 const skeleton = () => waiting() && items().length === 0
+const none = () => items().length === 0 && !waiting() && !loaded.failed() && (source === undefined || (source.ended() && !source.failed()))
 // LoadMore announces a list's pending page itself.
 const announced = () => source !== undefined && source.pending()
 const skeletonIndexes = () => Array.from({ length: Math.max(1, Math.floor(skeletonItems)) }, (_, index) => index)
@@ -91,6 +96,12 @@ div(part="root" {...rest} ref={element => box = element} role="list" tabindex="0
         p(part="message") {failureLabel}
         if loaded.retryable()
           Button(label={retryLabel} variant="ghost" size="sm" onClick={loaded.retry})
+    if none()
+      div(part="empty")
+        if empty
+          | {empty}
+        else
+          | {emptyLabel}
     if skeleton()
       div(part="skeletons" aria-hidden="true")
         for index of skeletonIndexes() key={index}

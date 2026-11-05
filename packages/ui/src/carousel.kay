@@ -13,6 +13,7 @@ import { wording } from 'kay/words'
 const look = recipe({
   parts: {
     root: 'kui-carousel flex flex-col gap-3',
+    empty: 'text-xs text-muted',
     viewport: 'relative w-full overflow-hidden bg-surface',
     // Every slide sits over the viewport, moved a width aside per place it stands from the one shown.
     slide: 'absolute inset-0 transition-transform duration-700 ease-in-out motion-reduce:transition-none',
@@ -27,7 +28,7 @@ const look = recipe({
   },
 })
 
-const { slides: given, slide, list, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previous', 'Previous slide'), nextLabel = wording('ui.carousel.next', 'Next slide'), pauseLabel = wording('ui.carousel.pause', 'Pause'), playLabel = wording('ui.carousel.play', 'Play'), slideLabel = wording('ui.carousel.slide', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dot', 'Go to slide {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
+const { slides: given, slide, list, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wording('ui.carousel.label', 'Carousel'), previousLabel = wording('ui.carousel.previous', 'Previous slide'), nextLabel = wording('ui.carousel.next', 'Next slide'), pauseLabel = wording('ui.carousel.pause', 'Pause'), playLabel = wording('ui.carousel.play', 'Play'), slideLabel = wording('ui.carousel.slide', 'Slide {n} of {count}'), dotLabel = wording('ui.carousel.dot', 'Go to slide {n}'), emptyLabel = wording('ui.carousel.empty', 'No slides.'), empty, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'children'> & {
   // The slides to draw. Left out when `list` holds them: one of the two is required.
   // A slide with an `href` makes the picture a link to that address, as a promo banner needs: middle-click and a new tab work, and an address off the site opens in one.
   slides?: readonly Slide[] | undefined
@@ -52,6 +53,9 @@ const { slides: given, slide, list, index = 0, onIndexChange, autoplay, ratio = 
   // `{n}` stands for the slide's number and `{count}` for how many there are.
   slideLabel?: string | undefined
   dotLabel?: string | undefined
+  // What the carousel reads with no slide; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
+  emptyLabel?: string | undefined
+  empty?: Snippet | undefined
 } & ({ slides: readonly Slide[], list?: undefined } | { slides?: undefined, list: InfiniteList<Slide> })>()
 
 const all = () => list ? list.rows() : given ?? []
@@ -102,6 +106,8 @@ effect(() => {
 })
 
 const active = () => stepIndex(shown(), 0, all().length)
+// A paged list is empty once it has ended with nothing, not while its first page loads.
+const none = () => all().length === 0 && (list === undefined || (list.ended() && !list.failed()))
 
 function go(next: number) {
   shown = next
@@ -117,7 +123,13 @@ function numbered(text: string, position: number) {
 }
 ---
 section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-label={label} onPointerEnter={() => pointed = true} onPointerLeave={() => pointed = false} onFocusIn={() => focused = true} onFocusOut={() => focused = false})
-  div(part="viewport" style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
+  if none()
+    div(part="empty" role="status")
+      if empty
+        | {empty}
+      else
+        | {emptyLabel}
+  div(part="viewport" hidden={none()} style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
     for entry, position of all() key={entry.src}
       div(part="slide" role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={position === active() ? undefined : 'true'} inert={position !== active()} style={`transform: translateX(${(position - active()) * 100}%)`})
         if slide

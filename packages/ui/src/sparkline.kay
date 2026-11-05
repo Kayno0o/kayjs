@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { Tone } from './tone'
 import type { SparkMark } from './chart-marks'
 import { memo, recipe, signal } from 'kay'
@@ -7,6 +7,7 @@ import { tabOf } from './outside'
 import type { NewTab } from './outside'
 import { activeMarks, markKind } from './chart-marks'
 import { steppedPoint } from './plot'
+import { wording } from 'kay/words'
 
 // 'kui-sparkline' stays as the component's name for an app's CSS. A bar is coloured by its own `data-tone`, which wins over `tone`.
 const look = recipe({
@@ -17,7 +18,7 @@ const look = recipe({
   },
 })
 
-const { values, tone = 'accent', tones, hints, onSelect, href, newTab, onActive, active, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
+const { values, tone = 'accent', tones, hints, onSelect, href, newTab, onActive, active, label, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
   // One bar per value, the largest filling the height; a `null`, a zero or a negative value leaves a hairline.
   values: readonly (number | null)[]
   // Colours every bar; `accent` by default.
@@ -38,6 +39,9 @@ const { values, tone = 'accent', tones, hints, onSelect, href, newTab, onActive,
   active?: number | null | undefined
   // Says what the whole chart shows, in one sentence, such as "Requests per hour, 1,204 in all, busiest at 14:00".
   label: string
+  // What the component reads with nothing to show; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
+  emptyLabel?: string | undefined
+  empty?: Snippet | undefined
 }>()
 
 const finite = (value: number | null): value is number => value !== null && Number.isFinite(value)
@@ -93,22 +97,30 @@ function pressed(event: MouseEvent, at: number) {
 // Each bar's height against the largest value; a reading that is not a finite number leaves a hairline.
 const percent = (value: number | null) => largest() > 0 && finite(value) ? Math.max(0, value) / largest() * 100 : 0
 ---
-snippet bar(value: number | null, at: number)
-  span(part="bar" data-tone={tones?.[at] ?? tone} style={`height: ${percent(value)}%`})
-if interactive()
-  div(part="root" {...rest} role="group" aria-label={label})
-    for value, at of values key={at}
-      if markKind(link(at)?.href, onSelect !== undefined) === 'link'
-        a(part="item" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
-          {bar(value, at)}
-      else if onSelect
-        button(part="item" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined} onClick={() => void onSelect?.(mark(at))} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
-          {bar(value, at)}
-      else
+if values.length === 0
+  // The app's id and class stay on whichever element shows.
+  if empty
+    div.kui-sparkline-empty(part="root" id={rest.id})
+      | {empty}
+  else
+    p.kui-sparkline-empty(part="root" id={rest.id}) {emptyLabel ?? wording('ui.sparkline.empty', 'No data yet.')}
+else
+  snippet bar(value: number | null, at: number)
+    span(part="bar" data-tone={tones?.[at] ?? tone} style={`height: ${percent(value)}%`})
+  if interactive()
+    div(part="root" {...rest} role="group" aria-label={label})
+      for value, at of values key={at}
+        if markKind(link(at)?.href, onSelect !== undefined) === 'link'
+          a(part="item" {...link(at)} data-kind="link" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined} onClick={event => pressed(event, at)} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+            {bar(value, at)}
+        else if onSelect
+          button(part="item" type="button" data-kind="button" tabindex={at === current() ? '0' : '-1'} aria-label={name(at)} data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined} onClick={() => void onSelect?.(mark(at))} onKeyDown={keyDown} onFocus={event => focused(event, at)} onBlur={() => marks.leave(at)} onPointerEnter={event => marks.enter(at, event.currentTarget)} onPointerLeave={() => marks.leave(at)})
+            {bar(value, at)}
+        else
+          span(part="item" aria-hidden="true" data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined})
+            {bar(value, at)}
+  else
+    div(part="root" {...rest} role="img" aria-label={label})
+      for value, at of values key={at}
         span(part="item" aria-hidden="true" data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined})
           {bar(value, at)}
-else
-  div(part="root" {...rest} role="img" aria-label={label})
-    for value, at of values key={at}
-      span(part="item" aria-hidden="true" data-hint={hints?.[at]} data-lit={marks.current() === at ? '' : undefined})
-        {bar(value, at)}

@@ -32,7 +32,7 @@ const look = recipe({
   },
 })
 
-const { items: given, list, caption, index = 0, onIndexChange, open = false, onOpenChange, ratio = '16 / 9', emptyLabel, previousLabel = wording('ui.mediaGallery.previous', 'Previous'), nextLabel = wording('ui.mediaGallery.next', 'Next'), closeLabel = wording('ui.mediaGallery.close', 'Close'), openLabel = wording('ui.mediaGallery.open', 'Open full size'), itemLabel = wording('ui.mediaGallery.item', 'Media {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { items: given, list, caption, index = 0, onIndexChange, open = false, onOpenChange, ratio = '16 / 9', emptyLabel, empty, previousLabel = wording('ui.mediaGallery.previous', 'Previous'), nextLabel = wording('ui.mediaGallery.next', 'Next'), closeLabel = wording('ui.mediaGallery.close', 'Close'), openLabel = wording('ui.mediaGallery.open', 'Open full size'), itemLabel = wording('ui.mediaGallery.item', 'Media {n}'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   // The items to show. Left out when `list` holds them: one of the two is required.
   items?: Item[] | undefined
   // Items loaded page by page, from `infiniteList`: the next page loads when the reader reaches the last items, and a failed page shows LoadMore's alert with its retry under the strip.
@@ -50,6 +50,8 @@ const { items: given, list, caption, index = 0, onIndexChange, open = false, onO
   ratio?: string | undefined
   // What the gallery reads with no items.
   emptyLabel?: string | undefined
+  // Replaces `emptyLabel` with the app's own markup, such as a link to add the first one: an `@empty` block.
+  empty?: Snippet | undefined
   previousLabel?: string | undefined
   nextLabel?: string | undefined
   closeLabel?: string | undefined
@@ -201,7 +203,11 @@ snippet captioned(item: Item, position: number)
     | {item.title}
 if !current()
   // The app's id and class stay on whichever element shows.
-  p.kui-media-gallery-empty.text-xs.text-muted(part="root" id={rest.id}) {nothing()}
+  if empty
+    div.kui-media-gallery-empty(part="root" id={rest.id})
+      | {empty}
+  else
+    p.kui-media-gallery-empty.text-xs.text-muted(part="root" id={rest.id}) {nothing()}
   if list && list.failed()
     LoadMore(list={list})
 else

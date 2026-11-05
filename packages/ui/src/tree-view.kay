@@ -12,7 +12,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-tree-view', item: 'kui-tree-view-item', toggle: 'kui-tree-view-toggle', spinner: 'kui-tree-view-spinner animate-spin motion-reduce:animate-none', icon: 'kui-tree-view-icon', label: 'kui-tree-view-label', link: 'kui-tree-view-link', failed: 'kui-tree-view-failed', retry: 'kui-tree-view-retry', trailing: 'kui-tree-view-trailing' } })
 
-const { nodes, label, selected, expanded = [], onSelectedChange, onSelect, onOpenChange, onToggle, trailing, failureLabel = wording('ui.treeView.failure', 'Could not load.'), retryLabel = wording('ui.treeView.retry', 'Try again'), ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect' | 'onToggle'> & {
+const { nodes, label, selected, expanded = [], onSelectedChange, onSelect, onOpenChange, onToggle, trailing, emptyLabel, empty, failureLabel = wording('ui.treeView.failure', 'Could not load.'), retryLabel = wording('ui.treeView.retry', 'Try again'), ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect' | 'onToggle'> & {
   nodes: readonly TreeNode<Id>[]
   // Names the tree for screen readers.
   label: string
@@ -33,7 +33,13 @@ const { nodes, label, selected, expanded = [], onSelectedChange, onSelect, onOpe
   onSelect?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
   // Controls at the end of a row, such as a star or a count, dimmed away until the row is hovered or holds focus: `@trailing(node)`.
   trailing?: Snippet<[TreeNode<Id>]> | undefined
+  // What the component reads with nothing to show; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
+  emptyLabel?: string | undefined
+  empty?: Snippet | undefined
 }>()
+
+// The empty text is a div, not the list's own element, so it takes the attributes as a div does.
+const loose = rest as unknown as JSX.IntrinsicElements['div']
 
 // The page's address, which a page rendered once at build time does not have.
 function address() {
@@ -272,29 +278,37 @@ function keyDown(event: KeyboardEvent) {
     toggle('open' in move ? move.open : move.close)
 }
 ---
-// The rows of every open branch in one list, each saying its depth and place for screen readers, so the arrows walk them in reading order.
-ul(part="root" {...rest} ref={element => list = element} role="tree" aria-label={label} onKeyDown={keyDown})
-  for row of rows() key={row.node.id}
-    li(part="item" role="treeitem" aria-level={row.level} aria-posinset={row.position} aria-setsize={row.size} aria-expanded={row.node.children ? String(open().has(row.node.id)) : undefined} aria-busy={loading().has(row.node.id) ? 'true' : undefined} aria-selected={row.node.id === current() ? 'true' : 'false'} tabindex={row.node.id === stop() ? 0 : -1} style={`--_tree-level: ${row.level - 1}`} onFocus={() => focused = row.node.id} onClick={event => click(event, row)} onContextMenu={event => contextMenu(event, row)})
-      if row.node.children
-        span(part="toggle" aria-hidden="true")
-          if loading().has(row.node.id)
-            Icon(icon="spinner" part="spinner")
-          else
-            Icon(icon="chevron")
-      else
-        span(part="toggle")
-      if row.node.icon
-        Icon(icon={row.node.icon} part="icon")
-      if row.node.href !== undefined
-        a(part="link" href={row.node.href} {...tabOf(row.node.href, row.node.newTab)} tabindex="-1" aria-current={row.node.id === current() ? 'page' : undefined}) {row.node.label}
-      else
-        span(part="label") {row.node.label}
-      if failed().has(row.node.id)
-        span(part="failed" role="alert") {failureLabel}
-        button(part="retry" type="button") {retryLabel}
-      if trailing
-        span(part="trailing")
-          | {trailing(row.node)}
-if hasMenu()
-  Menu(items={menu()?.items ?? []} label={menu()?.name ?? label} at={menu()?.at ?? { x: 0, y: 0 }} open={menu() !== undefined} onOpenChange={shown => { if (!shown) menu = undefined }})
+if nodes.length === 0
+  // The app's attributes stay on whichever element shows.
+  if empty
+    div.kui-tree-view-empty(part="root" {...loose} role="status")
+      | {empty}
+  else if emptyLabel !== ''
+    div.kui-tree-view-empty(part="root" {...loose} role="status") {emptyLabel ?? wording('ui.treeView.empty', 'Nothing here yet.')}
+else
+  // The rows of every open branch in one list, each saying its depth and place for screen readers, so the arrows walk them in reading order.
+  ul(part="root" {...rest} ref={element => list = element} role="tree" aria-label={label} onKeyDown={keyDown})
+    for row of rows() key={row.node.id}
+      li(part="item" role="treeitem" aria-level={row.level} aria-posinset={row.position} aria-setsize={row.size} aria-expanded={row.node.children ? String(open().has(row.node.id)) : undefined} aria-busy={loading().has(row.node.id) ? 'true' : undefined} aria-selected={row.node.id === current() ? 'true' : 'false'} tabindex={row.node.id === stop() ? 0 : -1} style={`--_tree-level: ${row.level - 1}`} onFocus={() => focused = row.node.id} onClick={event => click(event, row)} onContextMenu={event => contextMenu(event, row)})
+        if row.node.children
+          span(part="toggle" aria-hidden="true")
+            if loading().has(row.node.id)
+              Icon(icon="spinner" part="spinner")
+            else
+              Icon(icon="chevron")
+        else
+          span(part="toggle")
+        if row.node.icon
+          Icon(icon={row.node.icon} part="icon")
+        if row.node.href !== undefined
+          a(part="link" href={row.node.href} {...tabOf(row.node.href, row.node.newTab)} tabindex="-1" aria-current={row.node.id === current() ? 'page' : undefined}) {row.node.label}
+        else
+          span(part="label") {row.node.label}
+        if failed().has(row.node.id)
+          span(part="failed" role="alert") {failureLabel}
+          button(part="retry" type="button") {retryLabel}
+        if trailing
+          span(part="trailing")
+            | {trailing(row.node)}
+  if hasMenu()
+    Menu(items={menu()?.items ?? []} label={menu()?.name ?? label} at={menu()?.at ?? { x: 0, y: 0 }} open={menu() !== undefined} onOpenChange={shown => { if (!shown) menu = undefined }})

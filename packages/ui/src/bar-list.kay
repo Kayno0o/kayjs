@@ -1,5 +1,5 @@
 --- <Row extends BarListRow>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { BarListRow } from './plot'
 import { tabOf } from './outside'
 import { memo, recipe } from 'kay'
@@ -17,12 +17,14 @@ const look = recipe({
   },
 })
 
-const { rows, onSelect, emptyLabel, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
+const { rows, onSelect, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
   rows: Row[]
   // Makes every row without an `href` a button handing back the row it was pressed on.
   onSelect?: ((row: Row) => unknown) | undefined
   // What the list reads with no rows.
   emptyLabel?: string | undefined
+  // Replaces `emptyLabel` with the app's own markup, such as a link to add the first one: an `@empty` block.
+  empty?: Snippet | undefined
 }>()
 
 const nothing = () => emptyLabel ?? wording('ui.barList.empty', 'No data yet.')
@@ -34,7 +36,11 @@ const percent = (row: Row) => largest() > 0 ? Math.max(0, row.value) / largest()
 ---
 if rows.length === 0
   // The app's id and class stay on whichever element shows.
-  p.kui-bar-list-empty.text-xs.text-muted(part="root" id={rest.id}) {nothing()}
+  if empty
+    div.kui-bar-list-empty(part="root" id={rest.id})
+      | {empty}
+  else
+    p.kui-bar-list-empty.text-xs.text-muted(part="root" id={rest.id}) {nothing()}
 else
   ul(part="root" {...rest})
     for row of rows key={row.key}

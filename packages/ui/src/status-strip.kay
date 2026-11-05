@@ -1,7 +1,8 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { Tone } from './tone'
 import { recipe } from 'kay'
+import { wording } from 'kay/words'
 
 // 'kui-status-strip' stays as the component's name for an app's CSS. A cell is coloured by its own `data-tone`, and one with none is a hairline along the bottom, so it reads as a gap at any width and not as the full-height `muted` cell.
 const look = recipe({
@@ -11,15 +12,26 @@ const look = recipe({
   },
 })
 
-const { cells, hints, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { cells, hints, label, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   // One cell per entry, in the order shown; a cell left `undefined` stays the empty ground.
   cells: readonly (Tone | undefined)[]
   // One note per cell, shown under the pointer by TooltipHost; the keyboard and screen readers have `label` alone.
   hints?: readonly (string | undefined)[] | undefined
   // Says what the whole strip shows in one sentence, which is all a screen reader hears: "Up 98% of the last 7 days, down since 09:10 today".
   label: string
+  // What the component reads with nothing to show; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
+  emptyLabel?: string | undefined
+  empty?: Snippet | undefined
 }>()
 ---
-div(part="root" {...rest} role="img" aria-label={label})
-  for tone, at of cells key={at}
-    span(part="cell" aria-hidden="true" data-tone={tone} data-hint={hints?.[at]})
+if cells.length === 0
+  // The app's id and class stay on whichever element shows.
+  if empty
+    div.kui-status-strip-empty(part="root" id={rest.id})
+      | {empty}
+  else
+    p.kui-status-strip-empty(part="root" id={rest.id}) {emptyLabel ?? wording('ui.statusStrip.empty', 'No data yet.')}
+else
+  div(part="root" {...rest} role="img" aria-label={label})
+    for tone, at of cells key={at}
+      span(part="cell" aria-hidden="true" data-tone={tone} data-hint={hints?.[at]})

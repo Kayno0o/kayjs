@@ -1205,7 +1205,13 @@
     @apply m-0 flex flex-col gap-2 pt-2 pr-3;
   }
 
-  .kui-bar-chart-empty {
+  .kui-bar-chart-empty,
+  .kui-contribution-graph-empty,
+  .kui-description-list-empty,
+  .kui-sparkline-empty,
+  .kui-status-strip-empty,
+  .kui-timeline-empty,
+  .kui-tree-view-empty {
     @apply text-xs text-muted;
   }
 

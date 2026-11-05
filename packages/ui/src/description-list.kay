@@ -2,6 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { DescriptionItem } from './description-list'
 import { recipe } from 'kay'
+import { wording } from 'kay/words'
 
 // 'kui-description-list' stays as the component's name for an app's CSS. The list is a container named `dl` that its items read: narrower than 24rem, its own width and not the screen's, each label sits above its value.
 const look = recipe({
@@ -13,20 +14,31 @@ const look = recipe({
   },
 })
 
-const { items, value, ...rest } = props<Omit<JSX.IntrinsicElements['dl'], 'class' | 'children'> & {
+const { items, value, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['dl'], 'class' | 'children'> & {
   items: readonly Item[]
   // Draws the value of an item that has none, as the rich value a text cannot be: a badge, a link, a copy button. An item with neither is drawn as a dash.
   value?: Snippet<[item: Item]> | undefined
+  // What the component reads with nothing to show; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
+  emptyLabel?: string | undefined
+  empty?: Snippet | undefined
 }>()
 ---
-dl(part="root" {...rest})
-  for item of items key={item.key ?? item.label}
-    div(part="item")
-      dt(part="term") {item.label}
-      dd(part="detail")
-        if item.value === undefined && value
-          | {value(item)}
-        else if item.value === undefined
-          | -
-        else
-          | {item.value}
+if items.length === 0
+  // The app's id and class stay on whichever element shows.
+  if empty
+    div.kui-description-list-empty(part="root" id={rest.id})
+      | {empty}
+  else
+    p.kui-description-list-empty(part="root" id={rest.id}) {emptyLabel ?? wording('ui.descriptionList.empty', 'No details.')}
+else
+  dl(part="root" {...rest})
+    for item of items key={item.key ?? item.label}
+      div(part="item")
+        dt(part="term") {item.label}
+        dd(part="detail")
+          if item.value === undefined && value
+            | {value(item)}
+          else if item.value === undefined
+            | -
+          else
+            | {item.value}

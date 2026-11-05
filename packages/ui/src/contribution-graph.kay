@@ -1,6 +1,6 @@
 ---
 import { recipe, signal } from 'kay'
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { ContributionDay } from './contribution'
 import { tabOf } from './outside'
 import type { NewTab } from './outside'
@@ -18,7 +18,7 @@ const look = recipe({
   },
 })
 
-const { days, color, today, label = wording('ui.contributionGraph.label', 'Contributions'), months = false, onSelect, href, newTab, onActive, active, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
+const { days, color, today, label = wording('ui.contributionGraph.label', 'Contributions'), months = false, onSelect, href, newTab, onActive, active, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   // Ascending days starting on a Monday, as `gridDays` from `@kaynooo/utils` lists them, each with how full its cell is.
   days: readonly ContributionDay[]
   // The CSS colour the filled cells shade towards.
@@ -39,6 +39,9 @@ const { days, color, today, label = wording('ui.contributionGraph.label', 'Contr
   onActive?: ((index: number | null) => unknown) | undefined
   // The cell to draw as active, `null` for none; the app controls it when it gives it.
   active?: number | null | undefined
+  // What the component reads with nothing to show; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
+  emptyLabel?: string | undefined
+  empty?: Snippet | undefined
 }>()
 
 const marks = activeMarks({ active: () => active, onActive: () => onActive })
@@ -96,14 +99,22 @@ const style = (day: ContributionDay, index: number) => {
 }
 ---
 // A year of days as a grid of weeks, each cell shaded by how full its day was.
-div(part="root" {...rest} role="group" aria-label={label} onKeyDown={keyDown} data-months={months ? '' : undefined})
-  if months
-    for start of monthStarts(days.map(day => day.day)) key={start.column}
-      span(part="month" aria-hidden="true" style={`grid-column: ${start.column + 1}`}) {start.label}
-  for day, index of days key={day.day}
-    if markKind(link(day)?.href, onSelect !== undefined) === 'link'
-      a(part="cell" {...link(day)} data-kind="link" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-lit={marks.current() === index ? '' : undefined} data-today={day.day === today || undefined} style={style(day, index)} onClick={event => pressed(event, day)} onFocus={event => focused(event, index)} onBlur={() => marks.leave(index)} onPointerEnter={event => marks.enter(index, event.currentTarget)} onPointerLeave={() => marks.leave(index)})
-    else if onSelect
-      button(part="cell" type="button" data-kind="button" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-lit={marks.current() === index ? '' : undefined} data-today={day.day === today || undefined} style={style(day, index)} onClick={() => void onSelect?.(day)} onFocus={event => focused(event, index)} onBlur={() => marks.leave(index)} onPointerEnter={event => marks.enter(index, event.currentTarget)} onPointerLeave={() => marks.leave(index)})
-    else
-      span(part="cell" role="img" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-lit={marks.current() === index ? '' : undefined} data-today={day.day === today || undefined} style={style(day, index)} onFocus={event => focused(event, index)} onBlur={() => marks.leave(index)} onPointerEnter={event => marks.enter(index, event.currentTarget)} onPointerLeave={() => marks.leave(index)})
+if days.length === 0
+  // The app's id and class stay on whichever element shows.
+  if empty
+    div.kui-contribution-graph-empty(part="root" id={rest.id})
+      | {empty}
+  else
+    p.kui-contribution-graph-empty(part="root" id={rest.id}) {emptyLabel ?? wording('ui.contributionGraph.empty', 'No data yet.')}
+else
+  div(part="root" {...rest} role="group" aria-label={label} onKeyDown={keyDown} data-months={months ? '' : undefined})
+    if months
+      for start of monthStarts(days.map(day => day.day)) key={start.column}
+        span(part="month" aria-hidden="true" style={`grid-column: ${start.column + 1}`}) {start.label}
+    for day, index of days key={day.day}
+      if markKind(link(day)?.href, onSelect !== undefined) === 'link'
+        a(part="cell" {...link(day)} data-kind="link" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-lit={marks.current() === index ? '' : undefined} data-today={day.day === today || undefined} style={style(day, index)} onClick={event => pressed(event, day)} onFocus={event => focused(event, index)} onBlur={() => marks.leave(index)} onPointerEnter={event => marks.enter(index, event.currentTarget)} onPointerLeave={() => marks.leave(index)})
+      else if onSelect
+        button(part="cell" type="button" data-kind="button" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-lit={marks.current() === index ? '' : undefined} data-today={day.day === today || undefined} style={style(day, index)} onClick={() => void onSelect?.(day)} onFocus={event => focused(event, index)} onBlur={() => marks.leave(index)} onPointerEnter={event => marks.enter(index, event.currentTarget)} onPointerLeave={() => marks.leave(index)})
+      else
+        span(part="cell" role="img" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-lit={marks.current() === index ? '' : undefined} data-today={day.day === today || undefined} style={style(day, index)} onFocus={event => focused(event, index)} onBlur={() => marks.leave(index)} onPointerEnter={event => marks.enter(index, event.currentTarget)} onPointerLeave={() => marks.leave(index)})

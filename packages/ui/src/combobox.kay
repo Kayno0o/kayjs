@@ -18,6 +18,7 @@ const look = recipe({
     option: 'cursor-pointer px-2 py-1.5 hover:bg-hover aria-selected:bg-hover aria-selected:outline-2 aria-selected:-outline-offset-2 aria-selected:outline-transparent aria-selected:[box-shadow:inset_2px_0_0_var(--color-accent)] aria-disabled:cursor-not-allowed aria-disabled:opacity-50 data-create:italic data-picked:font-medium data-picked:text-accent',
     optionLabel: 'block',
     optionDescription: 'block text-xs text-muted',
+    empty: 'px-2 py-1.5 text-xs text-muted',
     status: 'sr-only',
   },
 })
@@ -25,7 +26,7 @@ const look = recipe({
 // A remote search waits this long after the last key.
 const DEBOUNCE_MS = 200
 
-const { size = 'md', invalid, id, options, value = '', valueLabel, label, name, minLength = 1, create = false, createLabel, loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, open, onOpenChange, onChange, onCreate, onInput, onLoad, onError, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'onInput' | 'onLoad' | 'onError' | 'disabled' | 'role' | 'minLength'> & {
+const { size = 'md', invalid, id, options, value = '', valueLabel, label, name, minLength = 1, create = false, createLabel, loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), empty, failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, open, onOpenChange, onChange, onCreate, onInput, onLoad, onError, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'onInput' | 'onLoad' | 'onError' | 'disabled' | 'role' | 'minLength'> & {
   // The input's size: `md` by default, `sm` and `lg` change its padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
@@ -49,6 +50,8 @@ const { size = 'md', invalid, id, options, value = '', valueLabel, label, name, 
   createLabel?: string | ((text: string) => string) | undefined
   loadingLabel?: string | undefined
   emptyLabel?: string | undefined
+  // Replaces the empty text with the app's own markup, such as a link to add the missing one: an `@empty` block.
+  empty?: Snippet | undefined
   failureLabel?: string | undefined
   disabled?: boolean | undefined
   // Shows the list when the page sets it; focus, typing, Escape, a pick and focus leaving open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
@@ -135,7 +138,9 @@ const rows = () => remote ? found() : matchingOptions(known(), text())
 // A remote list is asked for once the text reaches `minLength`, and is waiting until its answer lands.
 const waiting = () => remote && text().trim().length >= minLength && answered() !== text()
 const offered = () => create && !waiting() && offersCreate(remote ? found() : known(), text())
-const shown = () => opened() && count() > 0
+// The `@empty` block opens the list on its own, once a question has an answer and it is none.
+const none = () => opened() && empty !== undefined && count() === 0 && !waiting() && !failed() && (!remote || text().trim().length >= minLength)
+const shown = () => opened() && (count() > 0 || none())
 const count = () => rows().length + (offered() ? 1 : 0)
 // The description, none when it is only whitespace.
 const described = (option: ComboboxOption<Value>) => option.description?.trim() || undefined
@@ -437,6 +442,9 @@ div(part="root")
           span(part="optionDescription" id={`${optionId(index)}-description`}) {described(option)}
         else
           | {option.label}
+    if none()
+      li(part="empty" role="presentation")
+        | {empty}
     if offered()
       li(part="option" id={optionId(rows().length)} role="option" aria-selected={active() === rows().length ? 'true' : 'false'} data-create="" onClick={() => pick(rows().length)}) {createLabel === undefined ? wording('ui.combobox.create', 'Create "{text}"', { text: text().trim() }) : labelText(createLabel, { text: text().trim() }, text().trim())}
   // Read out as the list loads and settles, which otherwise changes in silence.

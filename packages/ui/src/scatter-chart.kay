@@ -23,7 +23,7 @@ const look = recipe({
   },
 })
 
-const { points, x = {}, y = {}, quadrant, corners, onSelect, href, newTab, onActive, active, tooltip, emptyLabel, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const { points, x = {}, y = {}, quadrant, corners, onSelect, href, newTab, onActive, active, tooltip, emptyLabel, empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   points: Point[]
   x?: ScatterAxis | undefined
   y?: ScatterAxis | undefined
@@ -44,6 +44,8 @@ const { points, x = {}, y = {}, quadrant, corners, onSelect, href, newTab, onAct
   tooltip?: Snippet<[point: Point]> | undefined
   // What the chart reads with no points.
   emptyLabel?: string | undefined
+  // Replaces `emptyLabel` with the app's own markup, such as a link to add the first one: an `@empty` block.
+  empty?: Snippet | undefined
   // Describes the chart for screen readers.
   label: string
 }>()
@@ -104,7 +106,11 @@ const cornerEntries = () => Object.entries(corners ?? {}).filter(([, text]) => t
 ---
 if points.length === 0
   // The app's id and class stay on whichever element shows.
-  p.kui-scatter-chart-empty.text-xs.text-muted(part="root" id={rest.id}) {emptyLabel ?? wording('ui.scatterChart.empty', 'No data yet.')}
+  if empty
+    div.kui-scatter-chart-empty(part="root" id={rest.id})
+      | {empty}
+  else
+    p.kui-scatter-chart-empty.text-xs.text-muted(part="root" id={rest.id}) {emptyLabel ?? wording('ui.scatterChart.empty', 'No data yet.')}
 else
   figure(part="root" {...rest} aria-label={label})
     if y.label

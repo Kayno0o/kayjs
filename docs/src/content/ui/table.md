@@ -14,7 +14,7 @@ For rows loaded page by page, `list={list}` from `infiniteList` is better: the t
 
 ## Empty
 
-With a `@cell(row, column)` block, every column is drawn by it, except one marked `cell: false`, which shows its value as text. Once any column sets `cell: true`, the block draws only those columns. The `@empty` block is shown in place of the rows when there are none.
+With a `@cell(row, column)` block, every column is drawn by it, except one marked `cell: false`, which shows its value as text. Once any column sets `cell: true`, the block draws only those columns. The `@empty` block is shown in place of the rows when there are none, and `emptyLabel` (`No rows.`) when there is no block.
 
 <Demo name="table/empty" />
 

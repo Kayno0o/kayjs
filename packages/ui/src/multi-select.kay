@@ -48,7 +48,7 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
   End: (_, count) => count - 1,
 }
 
-const { size = 'md', invalid, id, options, value = [], label, placeholder = wording('ui.multiSelect.placeholder', 'Any'), searchLabel = wording('ui.multiSelect.search', 'Search'), allLabel = wording('ui.multiSelect.all', 'All'), noneLabel = wording('ui.multiSelect.none', 'None'), emptyLabel = wording('ui.multiSelect.empty', 'No match'), loadingLabel = wording('ui.multiSelect.loading', 'Loading…'), failureLabel = wording('ui.multiSelect.failure', 'Could not load the options'), minLength = 0, valueLabels, onLoad, onError, option: drawRow, selectedLabel, name, search, disabled = false, placement = 'bottom-start', open, onOpenChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children' | 'onChange' | 'onLoad' | 'onError'> & {
+const { size = 'md', invalid, id, options, value = [], label, placeholder = wording('ui.multiSelect.placeholder', 'Any'), searchLabel = wording('ui.multiSelect.search', 'Search'), allLabel = wording('ui.multiSelect.all', 'All'), noneLabel = wording('ui.multiSelect.none', 'None'), emptyLabel = wording('ui.multiSelect.empty', 'No match'), empty, loadingLabel = wording('ui.multiSelect.loading', 'Loading…'), failureLabel = wording('ui.multiSelect.failure', 'Could not load the options'), minLength = 0, valueLabels, onLoad, onError, option: drawRow, selectedLabel, name, search, disabled = false, placement = 'bottom-start', open, onOpenChange, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children' | 'onChange' | 'onLoad' | 'onError'> & {
   // The trigger's size: `md` by default, `sm` and `lg` change its padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `data-refused` on its trigger, a button taking no `aria-invalid`.
@@ -69,6 +69,8 @@ const { size = 'md', invalid, id, options, value = [], label, placeholder = word
   allLabel?: string | undefined
   noneLabel?: string | undefined
   emptyLabel?: string | undefined
+  // Replaces the empty text with the app's own markup, such as a link to add the missing one: an `@empty` block.
+  empty?: Snippet | undefined
   // What the status line says while a function `options` is answering, and once it rejected.
   loadingLabel?: string | undefined
   failureLabel?: string | undefined
@@ -311,7 +313,11 @@ div(part="root" {...rest} ref={ref} data-posted={sent === undefined ? undefined 
               Icon(icon={option.icon} part="icon")
             span(part="label") {option.label}
     // Read out as a search empties the list, which otherwise changes in silence.
-    p(part="empty" role={failed() && !waiting() ? 'alert' : 'status'}) {status()}
+    p(part="empty" role={failed() && !waiting() ? 'alert' : 'status'})
+      if empty && status() === emptyLabel
+        | {empty}
+      else
+        | {status()}
   if name
     for entry of picked() key={entry}
       input(type="hidden" name={name} value={entry} disabled={disabled})

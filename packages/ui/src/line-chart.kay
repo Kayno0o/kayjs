@@ -1,6 +1,6 @@
 ---
 import type { AxisFactory, ChartPlugin, DomRenderOutput, Layer, LineChartPresetOptions, LinePresetState, PluginEntry, Renderer } from 'chartist'
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { ChartMark } from './chart-marks'
 import type { ChartSeries } from './plot'
 import { effect, memo, navigate, onCleanup, onMount, recipe, signal, uid, untrack } from 'kay'
@@ -23,6 +23,7 @@ const look = recipe({
   parts: {
     root: 'kui-line-chart flex flex-col gap-2',
     frame: 'relative',
+    empty: 'text-xs text-muted',
     // chartist draws the plot, and the rules it needs from its own stylesheet stay on this class in theme.css.
     plot: 'kui-line-chart-plot h-[var(--chart-height,9rem)]',
     cursor: 'pointer-events-none absolute w-px bg-border-strong',
@@ -46,7 +47,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, onSelect, href, newTab, onActive, active, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, onSelect, href, newTab, onActive, active, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), emptyLabel = wording('ui.lineChart.empty', 'No data yet.'), empty, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.
@@ -83,6 +84,9 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   rangeHint?: string | undefined
   // Names the chart for screen readers, which read its values from a table they alone see.
   label: string
+  // What the chart reads with no labels, under an empty plot; `empty` replaces it with the app's own markup, such as a link to add the first reading: an `@empty` block.
+  emptyLabel?: string | undefined
+  empty?: Snippet | undefined
 }>()
 
 const id = uid()
@@ -619,6 +623,12 @@ div(part="root" {...rest} role="figure" aria-label={label})
     if band() !== null
       div(part="band" style={band()})
     div(part="overlay" role="slider" tabindex={labels.length > 0 ? '0' : '-1'} aria-label={label} aria-valuemin="0" aria-valuemax={Math.max(0, labels.length - 1)} aria-valuenow={current()} aria-valuetext={announced()} aria-describedby={onRange ? `${id}-hint` : undefined} data-range={onRange ? '' : undefined} onKeyDown={keyDown} onFocus={focused} onBlur={blurred} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishSpan} onPointerCancel={() => { dragged = null; pressedAt = null }} onPointerLeave={pointerLeave})
+  if labels.length === 0
+    div(part="empty" role="status")
+      if empty
+        | {empty}
+      else
+        | {emptyLabel}
   if hovered()
     div(part="tooltip" ref={watchTip} style={tipPlace()} aria-hidden="true")
       div(part="tooltipLabel") {heading(hovered()!.index)}

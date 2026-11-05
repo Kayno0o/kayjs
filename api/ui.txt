@@ -704,6 +704,7 @@ component default
   legendItem?: string | undefined;
   key?: string | undefined;
 }
+  empty?: Element
   emptyLabel?: string | undefined
   formatLabel?: LabelFormat | undefined
   formatValue?: ((value: number) => string) | undefined
@@ -731,6 +732,7 @@ component default
   track?: string | undefined;
   fill?: string | undefined;
 }
+  empty?: Element
   emptyLabel?: string | undefined
   onSelect?: ((row: Row) => unknown) | undefined
   rows: Row[]
@@ -842,6 +844,7 @@ component default
 component default
   | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: string | undefined | {
   root?: string | undefined;
+  empty?: string | undefined;
   viewport?: string | undefined;
   slide?: string | undefined;
   link?: string | undefined;
@@ -858,9 +861,10 @@ component default
       root?: string | undefined;
     };
   };
-}; dotLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides: readonly Slide[] }
+}; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides: readonly Slide[] }
   | { autoplay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; class?: string | undefined | {
   root?: string | undefined;
+  empty?: string | undefined;
   viewport?: string | undefined;
   slide?: string | undefined;
   link?: string | undefined;
@@ -877,7 +881,7 @@ component default
       root?: string | undefined;
     };
   };
-}; dotLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list: InfiniteList<Slide>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides?: undefined }
+}; dotLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; label?: string | undefined; list: InfiniteList<Slide>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; pauseLabel?: string | undefined; playLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined; slide?: ((slide: Slide, index: number) => Element) | undefined; slideLabel?: string | undefined; slides?: undefined }
 
 [./checkbox.kay] default
 component default
@@ -960,11 +964,13 @@ component default
   option?: string | undefined;
   optionLabel?: string | undefined;
   optionDescription?: string | undefined;
+  empty?: string | undefined;
   status?: string | undefined;
 }
   create?: boolean | undefined
   createLabel?: ((text: string) => string) | string | undefined
   disabled?: boolean | undefined
+  empty?: Element
   emptyLabel?: string | undefined
   failureLabel?: string | undefined
   id?: string | undefined
@@ -1008,6 +1014,7 @@ component default
   empty?: string | undefined;
   count?: string | undefined;
 }
+  empty?: Element
   emptyLabel?: string | undefined
   entries: PaletteEntry[]
   groups?: string[] | undefined
@@ -1112,6 +1119,8 @@ component default
   class?: string | undefined | { root?: string | undefined; month?: string | undefined; cell?: string | undefined; }
   color: string
   days: readonly ContributionDay[]
+  empty?: Element
+  emptyLabel?: string | undefined
   href?: ((day: ContributionDay) => string | undefined) | undefined
   label?: string | undefined
   months?: boolean | undefined
@@ -1219,6 +1228,8 @@ component default
 [./description-list.kay] default
 component default
   class?: string | undefined | { root?: string | undefined; item?: string | undefined; term?: string | undefined; detail?: string | undefined; }
+  empty?: Element
+  emptyLabel?: string | undefined
   items: readonly Item[]
   value?: ((item: Item) => Element) | undefined
 
@@ -1336,10 +1347,20 @@ interface SortableOptions
 [./empty-state.kay] default
 component default
   actions?: Element
-  class?: string | undefined | { root?: string | undefined; title?: string | undefined; description?: string | undefined; actions?: string | undefined; }
+  class?: string | undefined | {
+  root?: string | undefined;
+  icon?: string | undefined | {
+    root?: string | undefined;
+  };
+  title?: string | undefined;
+  description?: string | undefined;
+  actions?: string | undefined;
+}
   description?: Element
+  icon?: IconProps | IconSlot | undefined
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined
   title: Element
+  tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
 
 [./extension] ui
 function ui(): KayExtension<AnyElysia>
@@ -1460,6 +1481,7 @@ component default
 }
   clearLabel?: string | undefined
   disabled?: boolean | undefined
+  empty?: Element
   emptyLabel?: string | undefined
   errorLabel?: string | undefined
   gridLabel?: string | undefined
@@ -1522,6 +1544,7 @@ component default
   dot?: string | undefined;
   band?: string | undefined;
   overlay?: string | undefined;
+  empty?: string | undefined;
   tooltip?: string | undefined;
   tooltipLabel?: string | undefined;
   tooltipRow?: string | undefined;
@@ -1534,6 +1557,8 @@ component default
   legendItem?: string | undefined;
   key?: string | undefined;
 }
+  empty?: Element
+  emptyLabel?: string | undefined
   formatLabel?: ((label: string, context: LabelContext) => string) | undefined
   formatValue?: ((value: number) => string) | undefined
   href?: ((mark: ChartMark) => string | undefined) | undefined
@@ -1653,7 +1678,7 @@ component default
       root?: string | undefined;
     };
   };
-}; closeLabel?: string | undefined; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items: Item[]; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; onOpenChange?: ((open: boolean, index: number) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
+}; closeLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items: Item[]; list?: undefined; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; onOpenChange?: ((open: boolean, index: number) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
   | { caption?: ((item: Item, index: number) => Element) | undefined; class?: string | undefined | {
   root?: string | undefined;
   stage?: string | undefined;
@@ -1679,7 +1704,7 @@ component default
       root?: string | undefined;
     };
   };
-}; closeLabel?: string | undefined; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items?: undefined; list: InfiniteList<Item>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; onOpenChange?: ((open: boolean, index: number) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
+}; closeLabel?: string | undefined; empty?: Element; emptyLabel?: string | undefined; index?: number | undefined; itemLabel?: string | undefined; items?: undefined; list: InfiniteList<Item>; nextLabel?: string | undefined; onIndexChange?: ((index: number) => unknown) | undefined; onOpenChange?: ((open: boolean, index: number) => unknown) | undefined; open?: boolean | undefined; openLabel?: string | undefined; previousLabel?: string | undefined; ratio?: string | undefined }
 
 [./menu.kay] default
 component default
@@ -1754,6 +1779,7 @@ component default
   empty?: string | undefined;
 }
   disabled?: boolean | undefined
+  empty?: Element
   emptyLabel?: string | undefined
   failureLabel?: string | undefined
   id?: string | undefined
@@ -2084,6 +2110,7 @@ component default
   tooltip?: string | undefined;
 }
   corners?: undefined | { topLeft?: string; topRight?: string; bottomLeft?: string; bottomRight?: string; }
+  empty?: Element
   emptyLabel?: string | undefined
   href?: ((point: Point) => string | undefined) | undefined
   label: string
@@ -2257,6 +2284,8 @@ component default
 component default
   active?: null | number | undefined
   class?: string | undefined | { root?: string | undefined; bar?: string | undefined; item?: string | undefined; }
+  empty?: Element
+  emptyLabel?: string | undefined
   hints?: readonly (string | undefined)[] | undefined
   href?: ((mark: SparkMark) => string | undefined) | undefined
   label: string
@@ -2326,6 +2355,8 @@ component default
 component default
   cells: readonly (Tone | undefined)[]
   class?: string | undefined | { root?: string | undefined; cell?: string | undefined; }
+  empty?: Element
+  emptyLabel?: string | undefined
   hints?: readonly (string | undefined)[] | undefined
   label: string
 
@@ -2438,7 +2469,7 @@ component default
   skeletonCell?: string | undefined;
   skeletonBar?: string | undefined;
   emptyCell?: string | undefined;
-}; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list?: undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((error: unknown) => unknown) | undefined; onLoad?: ((rows: Row[]) => unknown) | undefined; onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows: (RowsSource<Row> | undefined) & RowsSource<Row>; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
+}; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list?: undefined; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((error: unknown) => unknown) | undefined; onLoad?: ((rows: Row[]) => unknown) | undefined; onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows: (RowsSource<Row> | undefined) & RowsSource<Row>; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
   | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; busy?: boolean | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: string | undefined | {
   root?: string | undefined;
   filter?: string | undefined;
@@ -2484,7 +2515,7 @@ component default
   skeletonCell?: string | undefined;
   skeletonBar?: string | undefined;
   emptyCell?: string | undefined;
-}; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list: InfiniteList<Row>; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((error: unknown) => unknown) | undefined; onLoad?: ((rows: Row[]) => unknown) | undefined; onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
+}; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; detail?: ((row: Row) => Element) | undefined; empty?: Element; emptyLabel?: string | undefined; expandLabel?: ((row: Row) => string) | undefined; expandable?: boolean | undefined; expanded?: RowKeyValue<Row, Key>[] | undefined; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: boolean | string | undefined; failureLabel?: string | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list: InfiniteList<Row>; loadingLabel?: string | undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onError?: ((error: unknown) => unknown) | undefined; onLoad?: ((rows: Row[]) => unknown) | undefined; onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; onRowClick?: ((row: Row, event: MouseEvent) => unknown) | undefined; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined; openRowLabel?: ((row: Row) => string) | undefined; retryLabel?: string | undefined; rowHref?: ((row: Row) => string | undefined) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; skeletonRows?: number | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
 
 [./tabs.kay] default
 component default
@@ -2544,6 +2575,8 @@ component default
   };
   text?: string | undefined;
 }
+  empty?: Element
+  emptyLabel?: string | undefined
   entries: readonly TimelineEntry<Key>[]
   label: string
   onSelect?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
@@ -2640,6 +2673,8 @@ component default
   retry?: string | undefined;
   trailing?: string | undefined;
 }
+  empty?: Element
+  emptyLabel?: string | undefined
   expanded?: readonly Id[] | undefined
   failureLabel?: string | undefined
   label: string
@@ -2660,6 +2695,7 @@ component default
   status?: string | undefined;
   failure?: string | undefined;
   message?: string | undefined;
+  empty?: string | undefined;
   skeletons?: string | undefined;
   skeleton?: string | undefined;
   skeletonBar?: string | undefined;
@@ -2667,13 +2703,14 @@ component default
   item?: string | undefined;
   itemLink?: string | undefined;
   itemButton?: string | undefined;
-}; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items: (RowsSource<Item> | undefined) & RowsSource<Item>; label: string; list?: undefined; loadingLabel?: string | undefined; onError?: ((error: unknown) => unknown) | undefined; onItemClick?: ((item: Item, index: number, event: MouseEvent) => unknown) | undefined; onLoad?: ((items: Item[]) => unknown) | undefined; overscan?: number | undefined; retryLabel?: string | undefined; skeletonItems?: number | undefined }
+}; empty?: Element; emptyLabel?: string | undefined; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items: (RowsSource<Item> | undefined) & RowsSource<Item>; label: string; list?: undefined; loadingLabel?: string | undefined; onError?: ((error: unknown) => unknown) | undefined; onItemClick?: ((item: Item, index: number, event: MouseEvent) => unknown) | undefined; onLoad?: ((items: Item[]) => unknown) | undefined; overscan?: number | undefined; retryLabel?: string | undefined; skeletonItems?: number | undefined }
   | { busy?: boolean | undefined; class?: string | undefined | {
   root?: string | undefined;
   notices?: string | undefined;
   status?: string | undefined;
   failure?: string | undefined;
   message?: string | undefined;
+  empty?: string | undefined;
   skeletons?: string | undefined;
   skeleton?: string | undefined;
   skeletonBar?: string | undefined;
@@ -2681,7 +2718,7 @@ component default
   item?: string | undefined;
   itemLink?: string | undefined;
   itemButton?: string | undefined;
-}; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items?: undefined; label: string; list: InfiniteList<Item>; loadingLabel?: string | undefined; onError?: ((error: unknown) => unknown) | undefined; onItemClick?: ((item: Item, index: number, event: MouseEvent) => unknown) | undefined; onLoad?: ((items: Item[]) => unknown) | undefined; overscan?: number | undefined; retryLabel?: string | undefined; skeletonItems?: number | undefined }
+}; empty?: Element; emptyLabel?: string | undefined; estimate?: number | undefined; failureLabel?: string | undefined; item: (args_0: Item, args_1: number) => Element; itemHref?: ((item: Item, index: number) => string | undefined) | undefined; itemKey?: ((item: Item, index: number) => unknown) | undefined; itemLabel?: ((item: Item, index: number) => string) | undefined; items?: undefined; label: string; list: InfiniteList<Item>; loadingLabel?: string | undefined; onError?: ((error: unknown) => unknown) | undefined; onItemClick?: ((item: Item, index: number, event: MouseEvent) => unknown) | undefined; onLoad?: ((items: Item[]) => unknown) | undefined; overscan?: number | undefined; retryLabel?: string | undefined; skeletonItems?: number | undefined }
 
 [./when-visible.kay] default
 component default

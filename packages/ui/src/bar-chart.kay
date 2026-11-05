@@ -31,7 +31,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.barChart.total', 'Total'), legend, emptyLabel, onSelect, href, newTab, onActive, active, tooltip, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.barChart.total', 'Total'), legend, emptyLabel, empty, onSelect, href, newTab, onActive, active, tooltip, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   labels: string[]
   series: BarSeries[]
   // Formats the y-axis labels, the tooltips and the readings screen readers hear.
@@ -60,6 +60,8 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   tooltip?: Snippet<[mark: ChartMark]> | undefined
   // What the chart reads with no labels.
   emptyLabel?: string | undefined
+  // Replaces `emptyLabel` with the app's own markup, such as a link to add the first one: an `@empty` block.
+  empty?: Snippet | undefined
   // Names the chart for screen readers.
   label: string
 }>()
@@ -146,7 +148,11 @@ snippet bars(at: number)
       span(part="bar" data-stub data-stacked={stacked ? '' : undefined} style={`background-color: ${colors(item, index, at)}`})
 if labels.length === 0
   // The app's id and class stay on whichever element shows.
-  p.kui-bar-chart-empty.text-xs.text-muted(part="root" id={rest.id}) {nothing()}
+  if empty
+    div.kui-bar-chart-empty(part="root" id={rest.id})
+      | {empty}
+  else
+    p.kui-bar-chart-empty.text-xs.text-muted(part="root" id={rest.id}) {nothing()}
 else
   figure(part="root" {...rest} aria-label={label})
     div(part="plot")

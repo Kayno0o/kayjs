@@ -1,5 +1,5 @@
 ---
-import type { JSX, SearchHit } from 'kay'
+import type { JSX, SearchHit, Snippet } from 'kay'
 import type { PaletteAction, PaletteEntry, PaletteLink } from './palette'
 import { effect, memo, onCleanup, recipe, searchResults, shortcut, signal, uid } from 'kay'
 import { stepIndex } from './cycle'
@@ -45,7 +45,7 @@ const look = recipe({
   defaults: { size: 'md' },
 })
 
-const { open = false, onOpenChange, size = 'md', entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearch', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.empty', 'No results'), recentLabel = wording('ui.commandPalette.recent', 'Recent'), resultsLabel, siteSearchMore, search, searchLabel = wording('ui.commandPalette.search', 'Found'), searchError = wording('ui.commandPalette.searchError', 'The search failed'), ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'class' | 'children' | 'open' | 'onClose' | 'closedby'> & {
+const { open = false, onOpenChange, size = 'md', entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearch', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.empty', 'No results'), empty, recentLabel = wording('ui.commandPalette.recent', 'Recent'), resultsLabel, siteSearchMore, search, searchLabel = wording('ui.commandPalette.search', 'Found'), searchError = wording('ui.commandPalette.searchError', 'The search failed'), ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'class' | 'children' | 'open' | 'onClose' | 'closedby'> & {
   // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
@@ -65,6 +65,8 @@ const { open = false, onOpenChange, size = 'md', entries, groups = [], recent = 
   label?: string | undefined
   placeholder?: string | undefined
   emptyLabel?: string | undefined
+  // Replaces the empty text with the app's own markup, such as a link to add the missing one: an `@empty` block.
+  empty?: Snippet | undefined
   // The heading the recently followed links sit under.
   recentLabel?: string | undefined
   // How many rows a query lists, as screen readers hear it.
@@ -321,5 +323,9 @@ dialog({...rest} part="root" data-size={size === 'md' ? undefined : size} ref={r
       else if lookFailed() && query().trim()
         p(part="empty") {searchError}
       else if rows().length === 0 && !site?.loading() && !looking()
-        p(part="empty") {emptyLabel}
+        p(part="empty")
+          if empty
+            | {empty}
+          else
+            | {emptyLabel}
     p(part="count" role="status") {query().trim() && !site?.loading() && !looking() ? counted(rows().length) : ''}
