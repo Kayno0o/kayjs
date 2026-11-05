@@ -1,5 +1,6 @@
 import type { JobStore } from './queue'
 import process from 'node:process'
+import { appStore } from './app-store'
 import { outsideRequest } from './clean-context'
 import { onDrain } from './drain'
 import { scheduledRun } from './jobs'
@@ -43,8 +44,9 @@ interface Entry {
 // The maintenance with timers armed in this process.
 const armed = new Set<Entry>()
 
-// A production server locks its maintenance as it does its schedules, so with several processes behind one database only one runs each pass.
-const locking = () => process.env.NODE_ENV === 'production' && process.env.KAY_LOCK_SCHEDULES !== 'false'
+// A production server locks its maintenance as it does its schedules, so with several processes behind one database only one runs each pass. Without a job store of the app's or of the call's own there is nothing shared to lock in, and the default sqlite store is not created for upkeep alone, so it runs unlocked.
+// A clock skewed by more than half of `every` between two processes names different lock slots, so both run the pass: harmless for upkeep, which is idempotent.
+const locking = (options: MaintenanceOptions) => options.lock !== false && process.env.NODE_ENV === 'production' && process.env.KAY_LOCK_SCHEDULES !== 'false' && (options.store !== undefined || appStore()?.jobs !== undefined)
 
 // A library's or a store's upkeep, such as pruning what expired: a schedule that is internal, started by the code that owns the data rather than by `app.use`, with the lock, the signal, the stop handling and the `kay_job_runs_total` series of `schedule()`, and an entry in the dev tool's Jobs tab.
 // Passes fall on the epoch's multiples of `every` (ms), so processes started apart share one lock slot per pass. Upkeep that is per process on purpose, such as pruning an in-memory cache, needs none of this.
@@ -62,7 +64,7 @@ export function maintenance(name: string, every: number, work: (signal: AbortSig
 
       throw error
     }
-  }, { get lock() { return options.lock !== false && locking() ? undefined : false }, store: options.store, timeout: options.timeout === undefined ? undefined : `${options.timeout}ms` }, { take: () => lock, release: () => undefined, name: () => lock })
+  }, { get lock() { return locking(options) ? undefined : false }, store: options.store, timeout: options.timeout === undefined ? undefined : `${options.timeout}ms` }, { take: () => lock, release: () => undefined, name: () => lock })
 
   let timer: Timer | undefined
   let first: Timer | undefined

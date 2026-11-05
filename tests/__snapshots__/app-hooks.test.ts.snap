@@ -581,6 +581,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "() => { if (options.holds()) warnMetricsOpen(options.proxy); }",
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
+    "() => { if (!started) { started = !0; listening++; } }",
     "() => { prune(); pruning = setInterval(() => void prune(), PRUNE_EVERY_MS); pruning.unref(); }",
     "() => { stopHearing ??= hear(); }",
     "() => { publishing.start(); for (const { track } of tracked) track(); }",
@@ -591,7 +592,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
-    "() => stopMaintenance()",
+    "() => { if (started) { started = !1; listening--; } if (listening === 0) stopMaintenance(); }",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
     "() => { stopHearing?.(); stopHearing = void 0; }",
@@ -785,6 +786,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
   "start": [
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
+    "() => { if (!started) { started = !0; listening++; } }",
     "async (root) => { await notify("onStart", [onStart], { url: root.server?.url.href }); }",
     "() => { prune(); pruning = setInterval(() => void prune(), PRUNE_EVERY_MS); pruning.unref(); }",
     "() => { publishing.start(); for (const { track } of tracked) track(); }",
@@ -795,7 +797,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
-    "() => stopMaintenance()",
+    "() => { if (started) { started = !1; listening--; } if (listening === 0) stopMaintenance(); }",
     "async () => { await notify("onStop", [onStop], {}); }",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
@@ -979,6 +981,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
   "start": [
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
+    "() => { if (!started) { started = !0; listening++; } }",
     "() => { prune(); pruning = setInterval(() => void prune(), PRUNE_EVERY_MS); pruning.unref(); }",
     "() => { publishing.start(); for (const { track } of tracked) track(); }",
     "(root) => { if (!root.server) return; const mode = process.env.NODE_ENV === void 0 ? "" : \` in \${pro...",
@@ -988,7 +991,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
-    "() => stopMaintenance()",
+    "() => { if (started) { started = !1; listening--; } if (listening === 0) stopMaintenance(); }",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
     "() => { publishing.stop(); for (const { release } of tracked) release(); clearContentMode(mode, outp...",
@@ -1290,6 +1293,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "GET /*",
   ],
   "start": [
+    "() => { if (!started) { started = !0; listening++; } }",
     "() => { prune(); pruning = setInterval(() => void prune(), PRUNE_EVERY_MS); pruning.unref(); }",
     "() => { publishing.start(); for (const { track } of tracked) track(); }",
     "(root) => { const paths = vanishable.get(root) ?? new Set; vanishable.set(root, paths); for (const p...",
@@ -1297,7 +1301,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
   ],
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
-    "() => stopMaintenance()",
+    "() => { if (started) { started = !1; listening--; } if (listening === 0) stopMaintenance(); }",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
     "() => { publishing.stop(); for (const { release } of tracked) release(); clearContentMode(mode, outp...",
@@ -1567,6 +1571,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
   "start": [
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
+    "() => { if (!started) { started = !0; listening++; } }",
     "() => { prune(); pruning = setInterval(() => void prune(), PRUNE_EVERY_MS); pruning.unref(); }",
     "() => { stopHearing ??= hear(); }",
     "() => { publishing.start(); for (const { track } of tracked) track(); }",
@@ -1576,7 +1581,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
-    "() => stopMaintenance()",
+    "() => { if (started) { started = !1; listening--; } if (listening === 0) stopMaintenance(); }",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
     "() => { stopHearing?.(); stopHearing = void 0; }",
@@ -1984,6 +1989,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
   "start": [
     "function refuseProcessKey() { if (productionServer && secret.from === "process" && process.env.KAY_E...",
     "(root) => { if (signalsTaken) return; signalsTaken = !0; const stop = async (why) => { if (lifecycle...",
+    "() => { if (!started) { started = !0; listening++; } }",
     "() => { prune(); pruning = setInterval(() => void prune(), PRUNE_EVERY_MS); pruning.unref(); }",
     "() => { stopHearing ??= hear(); }",
     "() => { publishing.start(); for (const { track } of tracked) track(); }",
@@ -1994,7 +2000,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
-    "() => stopMaintenance()",
+    "() => { if (started) { started = !1; listening--; } if (listening === 0) stopMaintenance(); }",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
     "() => { stopHearing?.(); stopHearing = void 0; }",

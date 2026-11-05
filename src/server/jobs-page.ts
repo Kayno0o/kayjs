@@ -4,10 +4,12 @@ import type { Guard } from '../runtime'
 import type { ActionOptions } from './actions'
 import type { LoadedGuard } from './guards'
 import type { JobView, QueueView } from './job-admin'
+import type { MaintenanceView } from './maintenance'
 import { KayError } from '../compiler/errors'
 import { escapeHtml } from '../runtime/escape'
 import { isCrossSite, passGuards } from './actions'
 import { JOB_MESSAGES, jobActions, jobOverview } from './job-admin'
+import { maintenanceOverview } from './maintenance'
 
 export const JOBS_PATH = '/_kay/jobs'
 const HTML = 'text/html; charset=utf-8'
@@ -51,12 +53,25 @@ function jobMarkup(queue: QueueView, job: JobView, action: (name: string) => str
   return `<li><p><strong>${run?.state ?? job.status}</strong> <code>${escapeHtml(job.id)}</code> ${job.attempts} of ${queue.attempts} attempts${run === undefined ? `, due ${time(job.runAt)}` : ''}${job.key === undefined ? '' : ` key <code>${escapeHtml(job.key)}</code>`}${job.progress === undefined ? '' : ` progress ${escapeHtml(job.progress)}`}</p>${where}${job.error === undefined ? '' : `<pre>${escapeHtml(job.error)}</pre>`}<details><summary>Payload</summary><pre>${escapeHtml(job.payload)}</pre></details><div>${send}${retry}${remove}</div></li>`
 }
 
-function pageMarkup(queues: QueueView[], action: (name: string) => string): string {
+function maintenanceMarkup(sweeps: MaintenanceView[]): string {
+  if (sweeps.length === 0)
+    return ''
+
+  const items = sweeps.map((sweep) => {
+    const last = sweep.last === undefined ? 'not run yet' : `${sweep.last.error === undefined ? 'ran' : 'failed'} at ${time(sweep.last.at)}`
+
+    return `<li><p><strong>${sweep.last?.error === undefined ? 'ok' : 'failed'}</strong> <code>${escapeHtml(sweep.name)}</code> every ${Math.round(sweep.every / 1000)} s, ${last}</p>${sweep.last?.error === undefined ? '' : `<pre>${escapeHtml(sweep.last.error)}</pre>`}</li>`
+  })
+
+  return `<section><h2>Maintenance</h2><ul>${items.join('')}</ul></section>`
+}
+
+function pageMarkup(queues: QueueView[], sweeps: MaintenanceView[], action: (name: string) => string): string {
   const body = queues.length === 0
     ? '<p>This server has no queue: make one with queue() from kay/server and its jobs are listed here.</p>'
     : queues.map(queue => `<section><h2>${escapeHtml(queue.name)}</h2>${queue.listsJobs ? '' : '<p>The queue\'s store lists no jobs, so only the failed ones show.</p>'}${queue.jobs.length === 0 ? '<p>No jobs.</p>' : `<ul>${queue.jobs.map(job => jobMarkup(queue, job, name => action(name))).join('')}</ul>`}${queue.truncated ? '<p>More jobs than are listed.</p>' : ''}</section>`).join('')
 
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Jobs</title></head><body><h1>Jobs</h1>${body}</body></html>`
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Jobs</title></head><body><h1>Jobs</h1>${body}${maintenanceMarkup(sweeps)}</body></html>`
 }
 
 // Serves the page and its two actions as plain HTML forms, so it needs no script and no style under any CSP; the guards run on every request, after the cross-site check on a post.
@@ -76,7 +91,7 @@ export function serveJobsPage(app: Elysia, page: JobsPage, options: ActionOption
     if (denied)
       return denied
 
-    return new Response(pageMarkup(await jobOverview(), action), { headers: { 'content-type': HTML, ...HEADERS } })
+    return new Response(pageMarkup(await jobOverview(), maintenanceOverview(), action), { headers: { 'content-type': HTML, ...HEADERS } })
   })
 
   for (const act of ['retry', 'delete', 'send', 'cancel'] as const) {

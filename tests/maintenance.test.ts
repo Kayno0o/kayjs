@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
@@ -7,6 +9,7 @@ import { hookLifecycle } from '../src/server/app-hooks'
 import { runStopHooks } from '../src/server/lifecycle'
 import { maintenance, maintenanceOverview, stopMaintenance } from '../src/server/maintenance'
 import { drainQueues } from '../src/server/queue'
+import { scratchDir } from './scratch'
 
 // An hour is far from the epoch's multiples a test could straddle, so every pass of a test falls in one lock slot.
 const HOUR = 3_600_000
@@ -133,6 +136,57 @@ describe('maintenance', () => {
     await Bun.sleep(100)
     expect(runs).toBe(1)
     expect(maintenanceOverview().some(view => view.name === 'stopped')).toBe(false)
+  })
+
+  it('stops only with the last server of the process, and a server started after a stop arms its own', async () => {
+    let runs = 0
+    const first = new Elysia()
+    const second = new Elysia()
+
+    hookLifecycle(first, {})
+    hookLifecycle(second, {})
+    await first.modules
+    // A server counts from its start.
+    for (const app of [first, second]) {
+      for (const hook of app.event.start ?? [])
+        await hook.fn(app)
+    }
+
+    const upkeep = maintenance('shared-by-apps', 30, () => void runs++)
+
+    upkeep.start()
+    await runStopHooks(first)
+    expect(maintenanceOverview().some(view => view.name === 'shared-by-apps')).toBe(true)
+    await until(() => runs >= 1)
+    await runStopHooks(second)
+    expect(maintenanceOverview().some(view => view.name === 'shared-by-apps')).toBe(false)
+
+    // The reload order: the old apps stopped, then the new app's upkeep armed.
+    const reloaded = maintenance('after-reload', 30, () => void runs++)
+    const before = runs
+
+    reloaded.start()
+    await until(() => runs > before)
+  })
+
+  it('creates no default job store in production when the app has none', async () => {
+    const cwd = process.cwd()
+    const dir = await scratchDir('maintenance-')
+    let runs = 0
+
+    process.chdir(dir)
+
+    try {
+      await production(async () => {
+        await maintenance('no-store', HOUR, () => void runs++).run()
+      })
+    }
+    finally {
+      process.chdir(cwd)
+    }
+
+    expect(runs).toBe(1)
+    expect(existsSync(join(dir, 'data'))).toBe(false)
   })
 
   it('is waited for by runJobs() while a pass is going', async () => {

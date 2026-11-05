@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { queue, workflow } from '../src/server'
 import { jobOverview } from '../src/server/job-admin'
+import { maintenance } from '../src/server/maintenance'
 import { memoryJobs } from '../src/server/queue'
 import { cleanUpAfterFile } from './job-stores'
 import { scratchDir } from './scratch'
@@ -163,6 +164,29 @@ describe('the production jobs page', () => {
 
     expect((await get(site, '/ops/jobs')).status).toBe(200)
     expect((await get(site, '/_kay/jobs')).status).toBe(404)
+  })
+
+  it('lists the maintenance with when it last ran and the escaped error of a failed pass', async () => {
+    const good = maintenance('page-good', 3_600_000, () => undefined)
+    const bad = maintenance('page-bad', 60_000, () => {
+      throw new Error('gone <b>')
+    })
+
+    try {
+      await good.run()
+      await bad.run()
+
+      const html = await (await get(await app({ jobs: { guard: allow } }), '/_kay/jobs')).text()
+
+      expect(html).toContain('<h2>Maintenance</h2>')
+      expect(html).toContain('<code>page-good</code> every 3600 s, ran at')
+      expect(html).toContain('<strong>failed</strong> <code>page-bad</code>')
+      expect(html).toContain('<pre>gone &lt;b&gt;</pre>')
+    }
+    finally {
+      good.stop()
+      bad.stop()
+    }
   })
 
   it('says so when the app has no queue', async () => {

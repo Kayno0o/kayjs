@@ -79,10 +79,29 @@ export function hookRequests(app: Elysia, { beforeRequest, onResponse }: AppHook
   }
 }
 
+// The apps of this process that started and have not stopped.
+let listening = 0
+
 // Registers `onStart` and `onStop` after the plugins and extensions, so the app's stop hook runs once theirs did.
 export function hookLifecycle(app: Elysia, { onStart, onStop }: AppHooks): void {
-  // The upkeep of kay's stores and libraries ends with the server, before the app's own hook runs.
-  app.onStop(() => stopMaintenance())
+  // The upkeep of kay's stores and libraries ends with the last server of the process to stop, before the app's own hook runs: it is shared by every app in the process, so one app stopping must not end the other's. A `kay dev` reload stops the old apps before the new ones are made, which then arm their own.
+  let started = false
+
+  app.onStart(() => {
+    if (!started) {
+      started = true
+      listening++
+    }
+  })
+  app.onStop(() => {
+    if (started) {
+      started = false
+      listening--
+    }
+
+    if (listening === 0)
+      stopMaintenance()
+  })
 
   if (onStart !== undefined) {
     app.onStart(async (root) => {
