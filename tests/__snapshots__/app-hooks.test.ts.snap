@@ -135,7 +135,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
         "mapResponse: ({ request }) => { const start = started.get(request); if (start) start.answered = performance.now()...",
         "mapResponse: ({ request }) => { const time = timing.get(request); if (time) time.answered = performance.now(); }",
         "mapResponse: ({ request, responseValue, set }) => { const owner = recordOf(request)?.apiOwner; if (owner !== void...",
-        "error: ({ request, error, code, set }) => { const refused = { request, error, code, set }; return (keepsEly...",
+        "error: ({ request, error, code, set }) => { const refused = { request, error, code, set }; return refusedIn...",
         "mapResponse: ({ responseValue, set }) => { keepCookiesPrivate(set, responseValue); return; }",
         "mapResponse: ({ request, set, responseValue, route }) => { const answered = responseValue instanceof Response ? r... NOT_FOUND && status !== GONE || route &&...",
         "mapResponse: ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, respon...",
