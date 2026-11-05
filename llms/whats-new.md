@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.89.0
 
 - A page's first load in a browser `kay/test` just started (the first of a file, and the first after it restarts the browser it recycles) waits 20 s instead of 5 s when you gave no `timeout`, so a CI host busy with other work does not fail it: [browser tests](testing-browser.md).
 

@@ -1,6 +1,72 @@
 # Upgrading, older releases
 
-What each minor release before 1.87 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+What each minor release before 1.88 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+
+## 1.87.0
+
+### `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `publicEnv` and `defineUi` no longer make a component an island
+
+- A component whose only value from `kay` is one of these is static now and ships no JavaScript: it loses its island chunk.
+- It renders without the `<slot data-component ...>` an island sits in, so a selector relying on that element (`>`, `+`, `:first-child`, `:nth-child`) sees one element fewer: re-check them.
+- `hydrate` and `persist` are island options: a parent passing them to such a component drops them, and `kay check` reports a leftover one as a type error on a component that declares props (one that declares none takes any attribute).
+- No lint can recognise it: the change is in what the compiler decides for a component, not in a form an app writes, so there is no old syntax for a `deprecated` lint to find and fix.
+- `kay explain island` and `kay build --format json` show the role of each component.
+### One vocabulary for the sources an island reads
+
+- `StreamStatus`, `ResourceStatus` and `ResourceFailure` from `kay` are `ConnectionStatus`, `LoadStatus` and `ApiError` (`kay upgrade` renames them, the old names work until 1.90). A socket the server closes with a code from 4000 to 4999 is now `failed` (its `error().status` the code minus 4000) instead of reconnecting: an app that closes with such a code and expects the client to retry must close with another code. An exhaustive `switch` over `SocketStatus` needs a `failed` case, and `resource().error()` is an `ApiError`, so `toEqual({ status, message })` on it becomes `toMatchObject`, and `JSON.stringify` of it no longer carries `message` (an `Error`'s own property is not enumerable).
+- `Socket`, `EventReader`, `StreamRun`, `Resource`, `TrackedCall`, `TrackedApi` and `ActionStream` gain `pending()` and `error()` (and all but `ActionStream` `retry()`), so a hand-built mock of one in a test needs them: `pending: () => false, error: () => undefined`. An `ActionStream` is no longer assignable to an `EventReader`, which has `retry()` and `ActionStream` does not yet. `ResourceStatus` gains `idle` as `LoadStatus` and `ResourceFailure` is a class as `ApiError`, so code narrowing on either may need a case.
+### Lifetimes are `ttl`
+
+- A page's `revalidate` is `ttl`, a `notify` option `keep` is `ttl`, a `queue` or `workflow` option `keepFailed` is `failedTtl` and kayjs-ai's `Chat` prop `keep` is `history`, so `keep` only ever means a boolean. The old names work until 1.90 and `deprecated-lifetimes` writes the new ones: [deprecated lints](deprecated-lints.md).
+### A component has no `--- server` fence
+
+- A component (a `.kay` file that is no page, layout or special page) with a `--- server` fence is a `fence-invalid` error in `kay check` and `kay build`: move the value into the page or layout and pass it as a prop. No `deprecated` lint is possible because the old form never worked: its values became required props nobody could pass.
+
+### A page at a collection's route prerenders
+
+- A page whose pattern is a collection's `route` (`src/routes/blog/[slug].kay` for `/blog/:slug`) is prerendered and listed in the sitemap for each of the collection's entries, as `prerender: posts` did, with no `page` export. One that was rendered per request and reads the cookies, the query, a session or preview mode now fails `kay build`: set `export const page = { prerender: false }` in it. A page that sets `prerender` keeps what it says. `kay check` cannot tell a page reading the request from one that does not, so no lint ships with this.
+
+### `url` as a function and a feed item's `path` beside a `route`
+
+- A collection with a literal `route` writes no `url` function, as its entries' `url` comes from the route, and a feed's `item` leaves out `path` when it is that route with the slug. Both forms keep working until 1.90, reported by the `deprecated-collection-links` lint, which `kay upgrade` fixes.
+
+### kayjs-ui: `size` on a field is its own
+
+- TextInput, Select, Combobox, DateInput and the other field controls take `size` as `sm`, `md` or `lg`, so the native `size` attribute (an input's character width, a select's row count) is no longer passed through: set the width with CSS (`w-48`).
+
+### kayjs-ui: one `Tone` for every component
+
+- `SparkTone`, and the `tone` of a `TimelineEntry`, a Sparkline bar and a StatusStrip cell, name the quiet grey `neutral` instead of `muted`: change `tone: 'muted'` to `'neutral'`. `SparkTone` is deprecated for `Tone` and goes in 2.0.0.
+- A Notice's `info` tone is now drawn in `--color-info` and its default tone is `neutral`, which keeps the look `info` had: pass `tone="info"` only for the coloured one. It writes `data-tone="neutral"` where it wrote `info`, so a `defineUi` restyle or a `[data-tone=info]` rule of an app no longer reaches a default Notice: target `neutral`, or pass `tone="info"`.
+
+### kayjs-ui: `onSelectedChange` on Table, TreeView and Timeline
+
+- `onSelect` on a `Table`, `TreeView` or `Timeline` is `onSelectedChange`, the `on<Prop>Change` of their `selected`; `onSelect` stays the press of an item on BarList, the charts, Steps and Menu. The old name still works until 1.90, heard only when `onSelectedChange` is not given: `kay check` reports it as `deprecated-ui-callbacks` and `kay upgrade` renames it in `.kay` files.
+
+### kayjs-ui: Dialog and SidePanel share a head line
+
+- A Dialog now draws a close button in its head line, so positional `button` selectors in an app's tests shift: pick the footer's buttons by `[data-part=footer] button` or by name. Its `title` part lost its border and padding to the new `head` part, so a restyle of `title` that set them is set on `head` now. A SidePanel closes no more on a click outside once something was typed inside, as a Dialog does (`dirty` locks it too), and `onInput` is no longer one of its props.
+### A queue or workflow `onFailed` is `onError`
+
+- `onFailed` of `queue()`, `workflow()` and `mailer({ queue })` is `onError`, the name every run that fails takes (`onStart`, `onSuccess`, `onRetry` and `onError` are new beside it). `onFailed` still works until 1.90, told right after `onError`; `kay upgrade` renames the key (`deprecated-hook-names`). A queue or workflow `onError` also gets the job's `id` and `attempts`.
+
+### kayjs-auth: the account, provider and audit methods are grouped
+
+- `auth.deleteAccount(proof)`, `auth.listAuditLog()` and the other flat account, provider and audit methods are `auth.account.delete(proof)`, `auth.audit.list()` and so on, and `createUser` on the `createAuth` result is `admin.createUser` ([the table](../packages/auth/llms/grouped-methods.md)). The flat names work until 1.90; `kay upgrade` renames the calls (`deprecated-auth-account-methods`).
+
+### kayjs-auth: breached passwords are checked in production
+
+- `breachedPasswords` defaults to on when `NODE_ENV` is `production`: `password.register`, `password.reset`, `password.change` and `createUser` ask Have I Been Pwned (the first five characters of the SHA-1 only; an outage lets the password through) and refuse a listed one as `errors.password: 'breached'`. An app that must not call the service sets `breachedPasswords: false`; a test running with `NODE_ENV=production` stubs `fetch` or sets it.
+- In production `createAuth` warns when password sign-up is open with no `email` option, as registering then answers `taken` for a held address. No lint recognises it.
+
+### Every failure carries `status`, `message`, `errors` and `data`
+
+- `ApiError.answer` is `data`, and `ApiError` gains `errors`; an `ActionError`'s `answer` stays its response body text, now named `body`. Both old names work until 1.90. `kay upgrade` renames a read inside `if (x instanceof ActionError)` (or the right side of an `&&`) to `.body`; a read narrowed to `ApiError` gets a `.data` fix that `kay upgrade` does not apply, as the receiver may be an `ActionError`; a receiver only a `catch` or a cast says is an error is reported with no fix (`deprecated-api-error-answer`).
+- `refusalMessage(error, fallback)` is deprecated: an `ApiError`'s `message` is always safe to show, a status 0 one reading `The server could not be reached` with the browser's error as `cause`. `kay check` offers `error instanceof ApiError && error.status !== 0 ? error.message : fallback` but `kay upgrade` does not apply it, as an `ActionError`'s message now also reads its field messages and `data.message` where `refusalMessage` gave the fallback (`deprecated-refusal-message`).
+- The failed branch of a `track()` result, `FormFailure` and `LocalIssue` gain `message`; an object built by hand to satisfy one of these types needs the field. A route's refusal now reads its `message` as `errors['']`, else the field messages, else `data.message`, else the text it answered.
+### `fileStore` is `store.files`
+
+- `fileStore: x` in `kay.config.ts` (and in `pages()`, `testSite()` and an extension's `config`) is `store: { files: x }`: it works until 1.90, `kay check` reports it as `deprecated-file-store` and `kay upgrade` moves it, unless the object has a `store` already, where `files` goes into it by hand. `sqliteData` and `pgData` leave files where they are: `store.files` is only what an app writes, and `fileStore` wins while both are written.
 
 ## 1.86.0
 
@@ -133,71 +199,4 @@ What each minor release before 1.87 broke, and what an app changed to move to it
 
 - `stepDraft(..., { maxAge: 3600 })` is a type error now: write `maxAge: '1h'`. The deprecated `deprecated-step-draft-max-age` lint is gone with the number form, so run `kay check --fix` on 1.74 to 1.76 before moving.
 
-## 1.76.0
-
-### A restricted-role Postgres app creates `kay_push_subscriptions` before listing `push()`
-
-- Nothing changes for an app that does not list `push()`. One that does, on a Postgres whose app role may not create tables, has the owner create `kay_push_subscriptions` once, as it does for the other `kay_` tables ([Queues](queues.md)).
-
-### A component generic in its option value casts the `options` it hands Segmented or RadioGroup
-
-- kayjs-ui type-checks a null option against the group's `value`, so a wrapper whose option value is a type parameter (`<V>` passing `options: { value: V }[]` through) fails `kay check` on `options` and casts what it passes. A wrapper with concrete option types changes nothing ([Segmented](../packages/ui/llms/tables-navigation-and-layout.md)).
-
-## 1.75.0
-
-### The forms deprecated in 1.72 are gone
-
-- kayjs-ui's old prop names are no longer read: `Select` takes `busy` (not `loading`), `QrCode` `pixels` (not `size`), `Badge` `variant="stamp"` or `variant="solid"` (not `stamp` or `solid`), and `FormField`, `FileDrop` and `Notice` `size="sm"` (not `compact`). A prop left under its old name does nothing.
-- `ConfirmDelete`'s `onOpen` and `SplitLayout`'s `onSidebarClose` are gone: use `onOpenChange` (called with `false` on closing too, so `onOpenChange={open => open && ask()}` keeps running on opening alone) and `onSidebarOpenChange(false)`.
-- The old `kui-` theme tokens no longer alias the app's own names, and the components stop reading them first. Set the new name in your `@theme`, write `bg-border` for `bg-kui-surface2`, and read `var(--color-muted)` for `var(--color-kui-muted)`: a utility still written with an old name builds nothing, and an old name set in `@theme` or on an element changes nothing. `--font-label` has no default declaration any more: it falls back to the text's own font.
-
-| Old | New |
-| --- | --- |
-| `--color-kui-canvas`, `text` | `--color-background`, `--color-foreground` |
-| `--color-kui-accent`, `success`, `warning`, `info` | `--color-accent`, `--color-success`, `--color-warning`, `--color-info` |
-| `--color-kui-error` | `--color-danger` |
-| `--color-kui-field-border`, `field-focus` | `--color-input`, `--color-ring` |
-| `--color-kui-mantle`, `surface0`, `surface1`, `surface2` | `--color-popover`, `--color-surface`, `--color-surface-strong`, `--color-border` |
-| `--color-kui-overlay0` | `--color-border-strong` |
-| `--color-kui-muted`, `subtext0` | `--color-muted` |
-| `--color-kui-accent-hi`, `on-accent`, `row-hover` | `--color-accent-hover`, `--color-accent-foreground`, `--color-hover` |
-| `--color-kui-chart-1` to `6` | `--color-chart-1` to `6` |
-| `--text-kui-2xs` (and its `--line-height`), `--tracking-kui-label` | `--text-2xs`, `--tracking-label` |
-| `--kui-density`, `--kui-label-case`, `--kui-label-font`, `--kui-border-width` | `--density`, `--label-case`, `--font-label`, `--border-width` |
-| `--kui-shadow-raised`, `--kui-shadow-press`, `--kui-press-travel` | `--shadow-raised`, `--shadow-press`, `--press-travel` |
-| `--kui-table-height`, `--kui-line-chart-height`, `--kui-bar-chart-height`, `--kui-scatter-chart-height`, `--kui-zoom-scale` | `--table-height`, `--chart-height` (the three charts), `--zoom-scale` |
-
-The names folded into a Tailwind step or a recipe have no pair: `--radius-kui-*` is `--radius-sm/md/lg`, `--kui-border-card`, `--kui-border-input`, `--kui-border-badge`, `--kui-border-stamp`, `--kui-border-notice` and `--kui-border-avatar` are the one `--border-width` that draws every frame (an app with `--border-width: 0px` that kept `--kui-border-input: 1px` for its fields sets `--border-width: 1px` on the field, or `[border-width:1px]` on the part in `src/ui.ts`), and the badge, notice, avatar, field and stamp knobs are set on the part in `src/ui.ts`, as are `--kui-badge-case`, `--kui-badge-font`, `--kui-badge-solid-text` and `--kui-field-focus-shadow`; `--color-kui-overlay1` is `--color-muted`, and `--color-kui-fill-hover`, `--color-kui-fill-danger` and the stamp colours are set on the part too.
-
-- A `ui.*` or `cms.*` message key still ending in `Label` (`ui.table.filterLabel`) no longer overrides the library's text: word it as the bare name (`ui.table.filter`), `Aria` where the bare name met a visible text (`cms.admin.searchLabel` is `cms.admin.searchAria`), and `cms.history.restoreLabel` is `cms.history.restoreButton`. The props `loadingLabel`, `backLabel` and the like keep their names.
-- `deprecated-ui-prop`, `deprecated-ui-callback`, `deprecated-ui-token` and `deprecated-message-key` are gone with the forms they reported, so run `kay check --fix` on 1.74 before moving. What an app still writes with an old `kui-` name is reported by `removed-ui-token` (a utility such as `bg-kui-surface2`, a `var(--color-kui-muted)`), and `kay check --fix` rewrites it where a new name stands for it.
-
-## 1.74.0
-
-### The forms deprecated in 1.71 are gone
-
-An action's `rateLimit`, `honeypot`, `minTime` and `proofOfWork` on the third argument itself are no longer read, and `kay check` reports them as a type error: put them under `protect: { ... }` ([Protecting actions](action-protection.md#protecting-an-action)). `deprecated-action-options` is gone with the form it moved.
-
-kayjs-ui's `theme.css` has no rule left for the part classes its components stopped setting (`kui-card-head`, `kui-stat-value`, `kui-dialog-title` and the rest listed under 1.71.0 and 1.72.0), nor for the old rule of the roots of Card, Dialog, Menu, Popover, HoverCard, SidePanel, CommandPalette, Toaster, TooltipHost, Badge, Notice, Avatar, Widget, CardRow, Checkbox, RadioGroup, ChipGroup, CopyButton, EmptyState, FileDrop, Meter, Progress, Skeleton, PageHeader, PageSection, DateInput, DateRangeInput, Segmented, Slider, ColorInput, Combobox, MultiSelect, Rating, Toggle and FormField, whose recipes draw the look: markup of yours written by hand with one of those classes is no longer styled, so give it utilities or select `[data-part]` on the component. `deprecated-ui-class` is gone, and a stylesheet selecting a removed class matches nothing.
-
-The selectors a stylesheet moves to, inside the component's root: `.kui-table-row` is `[data-part='row']` (`.kui-table-cell` is `[data-part='cell']`), `.kui-checkbox-input` is `[data-part='input']`, `.kui-line-chart-legend` is `[data-part='legend']` and `.kui-site-nav-list` is `[data-part='list']`. The Table's narrow form is a container named `table` (`@container table`, which was `kui-table`), so a container query on the old name becomes `@container table (max-width: 30rem)`. The part names are the keys of each component's recipe in `packages/ui/src/`.
-
-kayjs-cms answers on `/_kay/cms` alone: the `/api/cms` path of 1.70 and before is no longer served, so point a webhook or a script at the new one.
-
-### The 1.70 names that were read for three minors are gone
-
-- kayjs-mail reads `MAIL_URL`, `MAIL_INSECURE`, `MAIL_DKIM_SELECTOR`, `MAIL_DKIM_PRIVATE_KEY`, `MAIL_DKIM_DOMAIN`, `MAIL_FROM` and `MAIL_RATE_LIMIT` alone: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` and `SMTP_PASS` (now the login and server of `MAIL_URL`, such as `smtp://user:pass@mail.example.com:465`), `SMTP_INSECURE`, `SMTP_DKIM_*`, `SMTP_FROM` and `SMTP_RATE_LIMIT` are no longer read, so rename them in the deploy's environment.
-- `publicEnv` in kay.config.ts is refused at boot: mark the fields `s.Public` in `defineEnv` in a `.ts` module under `src` instead: kay finds public fields only there, so a schema in `common/` or another folder outside `src` types its fields as strings in islands (`kay check` reports it as `public-env-outside-src`). The `publicEnv` an island imports from `kay` stays; the `PublicEnvOf` type is gone.
-- The `ORIGIN` env is no longer read for the site's URL: set `SITE_URL`. `kay env` stops listing it.
-- `kay migrate astro --out` is `--outdir`, and `kay new --host` is `--forge`; the old flags are unknown options.
-- kayjs-ai: the `failed` field of a `ToolOutcome` (`results` of a `ProviderMessage`) is gone, read `ok`; a provider written against `failed` reads `!ok`.
-- kayjs-cms: `cms({ logo })` is gone, a type error: give `logo: { src, alt }` in the cms settings module. The `kcms_session` cookie is no longer read, so an editor signed in with the 1.69 cookie signs in again.
-- `paginate()`'s result drops `size`, the old name of `pageSize`.
-
-kayjs-auth's `auth_*` tables are no longer `renamedFrom` their old names on 1.74 to 1.76: a database still on `auth_*` tables moves straight to 1.77 or later, whose tables rename them again for good, through the migration `db.sync()` or `bunx pg-orm generate` writes.
-
-### Props typed `Signal<T>` or `Memo<T>` are plain values
-
-A prop typed `Signal<T>` or `Memo<T>` is a plain value of that type now, no longer read by calling it or assigned: type a prop the child writes `Bindable<T>`, read and assign it as `open`, and bind it with `bind:open={open}`; a `Memo<T>` prop is a `T`, passed as `value={memo()}`. `kay check` reports a prop still typed `Signal<T>` or `Memo<T>` from `kay`.
-
-Releases before 1.74 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+Releases before 1.77 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
