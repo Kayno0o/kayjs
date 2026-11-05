@@ -40,7 +40,7 @@ export default defineConfig({
 - The site's public origin, which OAuth callbacks, mailed links and passkeys are built on, is the `site` of `kay.config.ts` (or `SITE_URL`).
 - The store is the database of your app's `store` in kay.config.ts when it names one (`sqliteData(path)`, `pgData(url)`). kayjs-auth creates its `kay_*` tables there and leaves every other table alone, except under `bun test` and in a static export, where users stay in memory, and when `data/auth.db` already exists, which it keeps using.
 - Without one it is a SQLite file `data/auth.sqlite` (`data/auth.db` where an app already has it) kept through pg-orm, and in memory under `bun test`.
-- `KAYJS_AUTH_DATABASE_URL` names a Postgres or SQLite database of kayjs-auth's own and wins over the app's. A `pgData` given a connection rather than a URL names no database, so give `KAYJS_AUTH_DATABASE_URL` or `store` there.
+- `AUTH_DATABASE_URL` names a Postgres or SQLite database of kayjs-auth's own and wins over the app's. A `pgData` given a connection rather than a URL names no database, so give `AUTH_DATABASE_URL` or `store` there.
 - To use your app's pg-orm database, give `store: async () => pgStore((await import('./src/db')).db)`; `store` also takes `{ url }` or a store.
 - Mail goes through `mail.enqueue` of `src/mail.ts` when it exports `mail` (kayjs-mail, themed when `mail()` is in `kay.config.ts`). `email: false` sends none, and an `email` of your own replaces it.
 - `oauth: { github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from the environment, and `kay env` lists them. The presets are github, discord, google, microsoft and gitlab. An object adds `label`, `scopes` or `keepTokens`, and `clientId` and `clientSecret` skip the environment.
@@ -49,7 +49,7 @@ export default defineConfig({
 
 Every page, action and guard can now read `ctx.locals.auth`, typed. A file of yours at a page's path, such as `src/routes/auth/sign-in.kay`, replaces that page.
 
-`kay add auth` writes the one-line setup for a project with a server and Tailwind: `auth({ name })` in `kay.config.ts` with kayjs-ui's `ui()`, a `store` loading your pg-orm `Database` when the project has one (with `...authTables` added to its tables), a root `src/routes/_guard.ts` exporting `authGuard()`, and the session secret and `SITE_URL` in `.env.example` (`KAYJS_AUTH_DATABASE_URL` too without a project `Database`). There is no `src/auth.ts`.
+`kay add auth` writes the one-line setup for a project with a server and Tailwind: `auth({ name })` in `kay.config.ts` with kayjs-ui's `ui()`, a `store` loading your pg-orm `Database` when the project has one (with `...authTables` added to its tables), a root `src/routes/_guard.ts` exporting `authGuard()`, and the session secret and `SITE_URL` in `.env.example` (`AUTH_DATABASE_URL` too without a project `Database`). There is no `src/auth.ts`.
 
 ### The createAuth form
 

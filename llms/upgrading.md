@@ -23,6 +23,9 @@ Their `deprecated-*` lints go with them: run `kay upgrade` on 1.90 first and it 
 - `refusalMessage(error, fallback)` is `error instanceof ApiError ? error.message : fallback`.
 - The types StreamStatus, ResourceStatus and ResourceFailure from `kay` are `ConnectionStatus`, `LoadStatus` and `ApiError`.
 - `api({ errorShape })` is gone: a refused input always answers `{ errors, status }`, and `'elysia'` no longer keeps Elysia's own body.
+### Environment variable names follow one rule
+
+- `KAYJS_AUTH_DATABASE_URL` is `AUTH_DATABASE_URL` (kayjs-auth), and `MAIL_INBOUND_SECRET` is `MAIL_EVENTS_INBOUND` (kayjs-mail), as `MAIL_EVENTS_<PROVIDER>` is named. The old names are read until 1.94, with one warning at boot, and `kay env` warns when the environment, a compose file or `.env.example` holds one; `kay check` reads code, not the environment, so no lint ships: rename them in your `.env`, compose files and deployment. `SITE_URL`, `SITE_BASE`, the vendors' keys and `<PROVIDER>_CLIENT_ID` and `_SECRET` keep their names. The rule is in [Environment variables](environment.md).
 
 ## 1.90.0
 

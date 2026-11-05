@@ -807,7 +807,7 @@ describe('kay new', () => {
       expect(files).not.toContain('src/auth.ts')
       expect(files).not.toContain('.env.test')
       expect(await Bun.file(join(dir, '.env.example')).text()).toStartWith('# Each one generated and kept out of the repository: ')
-      expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/\nKAY_SECRET=\nSITE_URL=\nKAYJS_AUTH_DATABASE_URL=\n$/)
+      expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/\nKAY_SECRET=\nSITE_URL=\nAUTH_DATABASE_URL=\n$/)
       expect((await Bun.file(join(dir, '.gitignore')).text()).split('\n')).toContain('data')
       expect((await Bun.file(join(dir, '.dockerignore')).text()).split('\n')).toContain('data')
 

@@ -6,15 +6,16 @@ describe('the mail extension\'s environment', () => {
   it('lists the mail variables with the server required in production only, so an app lists them without wiring', () => {
     const { env } = mail({ module: './src/mail' })
 
-    expect(Object.keys(env!.properties)).toEqual(['MAIL_URL', 'MAIL_INSECURE', 'MAIL_RATE_LIMIT', 'MAIL_DKIM_SELECTOR', 'MAIL_DKIM_PRIVATE_KEY', 'MAIL_DKIM_DOMAIN', 'MAIL_FROM', 'MAIL_TO', 'MAIL_EVENTS_POSTMARK', 'MAIL_EVENTS_MAILGUN', 'MAIL_EVENTS_SENDGRID', 'MAIL_EVENTS_RESEND', 'MAIL_EVENTS_SES', 'MAIL_INBOUND_SECRET'])
+    expect(Object.keys(env!.properties)).toEqual(['MAIL_URL', 'MAIL_INSECURE', 'MAIL_RATE_LIMIT', 'MAIL_DKIM_SELECTOR', 'MAIL_DKIM_PRIVATE_KEY', 'MAIL_DKIM_DOMAIN', 'MAIL_FROM', 'MAIL_TO', 'MAIL_EVENTS_POSTMARK', 'MAIL_EVENTS_MAILGUN', 'MAIL_EVENTS_SENDGRID', 'MAIL_EVENTS_RESEND', 'MAIL_EVENTS_SES', 'MAIL_EVENTS_INBOUND'])
     expect(env!.properties.MAIL_EVENTS_POSTMARK).toMatchObject({ description: expect.stringContaining('user:password'), pattern: '^[^:\\s]+:\\S+$' })
     const topics = new RegExp(String((env!.properties.MAIL_EVENTS_SES as unknown as { pattern: string }).pattern))
 
     expect(topics.test('arn:aws:sns:eu-west-1:123456789012:a, arn:aws:sns:eu-west-1:123456789012:b')).toBe(true)
     expect(topics.test('arn:aws:sns:eu-west-1:123456789012:a')).toBe(true)
     expect(topics.test('https://example.com')).toBe(false)
-    expect(env!.properties.MAIL_INBOUND_SECRET).toMatchObject({ description: expect.stringContaining('/_kay/mail/inbound') })
-    expect(env!.required ?? []).not.toContain('MAIL_INBOUND_SECRET')
+    expect(env!.properties.MAIL_EVENTS_INBOUND).toMatchObject({ description: expect.stringContaining('/_kay/mail/inbound') })
+    expect(env!.required ?? []).not.toContain('MAIL_EVENTS_INBOUND')
+    expect(Object.keys(env!.properties).every(name => (name).startsWith('MAIL_'))).toBe(true)
     expect(env!.properties.MAIL_URL).toMatchObject({ requiredInProduction: true })
     expect(env!.properties.MAIL_FROM).not.toMatchObject({ requiredInProduction: true })
     expect(mail({ server: async () => ({}) as never }).env).toBeDefined()

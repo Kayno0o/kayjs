@@ -57,7 +57,18 @@ export interface EventHost {
 const BODY_MAX = 1_048_576
 const INBOUND_MAX = 5_242_880
 const WINDOW_SECONDS = 300
-const SECRET_ENV: Record<keyof EventSecrets, string> = { postmark: 'MAIL_EVENTS_POSTMARK', mailgun: 'MAIL_EVENTS_MAILGUN', sendgrid: 'MAIL_EVENTS_SENDGRID', resend: 'MAIL_EVENTS_RESEND', ses: 'MAIL_EVENTS_SES', inbound: 'MAIL_INBOUND_SECRET' }
+const SECRET_ENV: Record<keyof EventSecrets, string> = { postmark: 'MAIL_EVENTS_POSTMARK', mailgun: 'MAIL_EVENTS_MAILGUN', sendgrid: 'MAIL_EVENTS_SENDGRID', resend: 'MAIL_EVENTS_RESEND', ses: 'MAIL_EVENTS_SES', inbound: 'MAIL_EVENTS_INBOUND' }
+// What the inbound secret was called before 1.91, read until 1.94.
+const OLD_INBOUND_ENV = 'MAIL_INBOUND_SECRET'
+let warnedOldInboundName = false
+
+// Warns once, as the mailer boots, that the environment holds the old inbound name.
+export function warnOldInboundName(): void {
+  if (!warnedOldInboundName && (process.env[OLD_INBOUND_ENV] ?? '') !== '') {
+    warnedOldInboundName = true
+    log.warn(`${OLD_INBOUND_ENV} is now ${SECRET_ENV.inbound}: rename it in the environment, the old name is read until 1.94`)
+  }
+}
 // A bad destination address (5.1.x) or a disabled mailbox (5.2.1): not a full mailbox, a policy block or a reputation one, which say nothing of the address.
 const ADDRESS_GONE = /^5\.(?:1\.\d+|2\.1)$/
 const WHSEC = /^whsec_/
@@ -69,7 +80,7 @@ export function secretsOf(given: EventSecrets | undefined): EventSecrets {
   const secrets: EventSecrets = {}
 
   for (const name of Object.keys(SECRET_ENV) as (keyof EventSecrets)[]) {
-    const value = given?.[name] ?? process.env[SECRET_ENV[name]]
+    const value = given?.[name] ?? process.env[SECRET_ENV[name]] ?? (name === 'inbound' ? process.env[OLD_INBOUND_ENV] : undefined)
 
     if (value !== undefined && value !== '')
       secrets[name] = value

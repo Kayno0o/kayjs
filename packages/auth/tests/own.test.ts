@@ -32,6 +32,7 @@ afterEach(() => {
   setSite(undefined)
   delete process.env.GITHUB_CLIENT_ID
   delete process.env.GITHUB_CLIENT_SECRET
+  delete process.env.AUTH_DATABASE_URL
   delete process.env.KAYJS_AUTH_DATABASE_URL
 })
 
@@ -237,12 +238,26 @@ describe('the store', () => {
     expect(existsSync(join(root, 'data/auth.db'))).toBe(true)
   })
 
-  test('is KAYJS_AUTH_DATABASE_URL when set', async () => {
-    process.env.KAYJS_AUTH_DATABASE_URL = 'sqlite://data/other.db'
+  test('is AUTH_DATABASE_URL when set', async () => {
+    process.env.AUTH_DATABASE_URL = 'sqlite://data/other.db'
 
     await registerOn({})
 
     expect(existsSync(join(root, 'data/other.db'))).toBe(true)
+  })
+
+  test('still reads KAYJS_AUTH_DATABASE_URL, the name before 1.91, and AUTH_DATABASE_URL wins', async () => {
+    process.env.KAYJS_AUTH_DATABASE_URL = 'sqlite://data/old-name.db'
+
+    await registerOn({})
+
+    expect(existsSync(join(root, 'data/old-name.db'))).toBe(true)
+
+    process.env.AUTH_DATABASE_URL = 'sqlite://data/new-name.db'
+
+    await registerOn({})
+
+    expect(existsSync(join(root, 'data/new-name.db'))).toBe(true)
   })
 
   test('follows the project root when the process runs elsewhere, as kay/test of a nested project does', async () => {
@@ -270,8 +285,8 @@ describe('the store', () => {
     expect(existsSync(join(root, 'data'))).toBe(false)
   })
 
-  test('takes an empty KAYJS_AUTH_DATABASE_URL, as .env.example lists it, for none', async () => {
-    process.env.KAYJS_AUTH_DATABASE_URL = ''
+  test('takes an empty AUTH_DATABASE_URL, as .env.example lists it, for none', async () => {
+    process.env.AUTH_DATABASE_URL = ''
     process.env.NODE_ENV = 'development'
 
     try {
@@ -327,11 +342,11 @@ describe('the store', () => {
       expect(tables().things).toEqual([{ id: 'kept' }])
     })
 
-    test('yields to the store option and to KAYJS_AUTH_DATABASE_URL', async () => {
+    test('yields to the store option and to AUTH_DATABASE_URL', async () => {
       await withAppTable()
       await inDevelopment(async () => registerOn({ store: { url: 'sqlite://data/own.db' } }, `sqlite://${shared()}`))
 
-      process.env.KAYJS_AUTH_DATABASE_URL = 'sqlite://data/other.db'
+      process.env.AUTH_DATABASE_URL = 'sqlite://data/other.db'
 
       await inDevelopment(async () => registerOn({}, `sqlite://${shared()}`))
 
@@ -354,11 +369,11 @@ describe('the store', () => {
       own.close()
     })
 
-    test('shares the database of the app\'s store when KAYJS_AUTH_DATABASE_URL writes the same file another way', async () => {
+    test('shares the database of the app\'s store when AUTH_DATABASE_URL writes the same file another way', async () => {
       await withAppTable()
-      process.env.KAYJS_AUTH_DATABASE_URL = 'sqlite://data/app.sqlite'
+      process.env.AUTH_DATABASE_URL = 'sqlite://data/app.sqlite'
       await inDevelopment(async () => registerOn({}, `sqlite://${shared()}`))
-      process.env.KAYJS_AUTH_DATABASE_URL = `sqlite://${root}/data/../data/app.sqlite`
+      process.env.AUTH_DATABASE_URL = `sqlite://${root}/data/../data/app.sqlite`
       await inDevelopment(async () => registerOn({}, `sqlite://${shared()}`))
 
       expect(tables().names).toContain('kay_users')
@@ -407,7 +422,8 @@ describe('the store', () => {
   })
 
   test('lists the database url for kay env while the app gives no store', () => {
-    expect(Object.keys((auth({}).env as unknown as { properties: object }).properties)).toEqual(['KAYJS_AUTH_DATABASE_URL'])
+    expect(Object.keys((auth({}).env as unknown as { properties: object }).properties)).toEqual(['AUTH_DATABASE_URL'])
+    expect(Object.keys((auth({ oauth: { github: true } }).env as unknown as { properties: object }).properties).every(name => (/^AUTH_|^[A-Z]+_CLIENT_(?:ID|SECRET)$/).test(name))).toBe(true)
     expect(Object.keys((auth({ store: memoryAuthStore() }).env as unknown as { properties: object }).properties)).toEqual([])
   })
 

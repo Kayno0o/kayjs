@@ -18,7 +18,7 @@ import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
 import { defaultSender, parseMailUrl } from './env'
-import { mountEventRoutes, secretsOf } from './events'
+import { mountEventRoutes, secretsOf, warnOldInboundName } from './events'
 import { createLists, mountListRoutes } from './list'
 import { log } from './log'
 import { messageId } from './message-id'
@@ -81,7 +81,7 @@ export interface MailerOptions {
   listStore?: ListStore | undefined
   // Where bounces and complaints are kept, such as `pgSuppressions(db)` for a site on several servers with no list. Without it they go where the lists keep theirs, else in the app's database or `data/mail-list.sqlite`, made by the first one.
   suppressionStore?: SuppressionStore | undefined
-  // The secrets of the routes where a provider reports bounces and complaints (`/_kay/mail/events/<provider>`) and a mail server hands over delivery reports and replies (`/_kay/mail/inbound`), `MAIL_EVENTS_<PROVIDER>` and `MAIL_INBOUND_SECRET` in the environment unless given here. A route without its secret answers 404.
+  // The secrets of the routes where a provider reports bounces and complaints (`/_kay/mail/events/<provider>`) and a mail server hands over delivery reports and replies (`/_kay/mail/inbound`), `MAIL_EVENTS_<PROVIDER>` and `MAIL_EVENTS_INBOUND` in the environment unless given here. A route without its secret answers 404.
   events?: EventSecrets | undefined
   // Called with each reply handed to `/_kay/mail/inbound` (anything but a delivery report, which suppresses its failed recipients instead). A reply carries the `Message-ID` of the mail it answers as `inReplyTo`.
   inbound?: ((reply: MailReply) => Promise<void> | void) | undefined
@@ -334,7 +334,7 @@ function smtpEnv({ optional = false, listed = false }: { optional?: boolean, lis
     MAIL_EVENTS_SENDGRID: s.Optional(s.String({ description: 'the base64 public key of the SendGrid Event Webhook, for bounces and complaints' })),
     MAIL_EVENTS_RESEND: s.Optional(s.String({ description: 'the whsec_ signing secret of the Resend webhook, for bounces and complaints' })),
     MAIL_EVENTS_SES: s.Optional(s.String({ pattern: '^arn:aws:sns:[^\\s,]+(?:\\s*,\\s*arn:aws:sns:[^\\s,]+)*$', description: 'the ARN of the SNS topic SES publishes bounces and complaints to (several, comma separated)' })),
-    MAIL_INBOUND_SECRET: s.Optional(s.String({ description: 'the bearer secret of /_kay/mail/inbound, where a mail server posts delivery reports and replies' })),
+    MAIL_EVENTS_INBOUND: s.Optional(s.String({ description: 'the bearer secret of /_kay/mail/inbound, where a mail server posts delivery reports and replies' })),
   })
 }
 
@@ -346,6 +346,8 @@ function defined<T extends object>(options: T): Partial<T> {
 // SMTP from `MAIL_URL`, `MAIL_INSECURE`, `MAIL_RATE_LIMIT`, `MAIL_DKIM_*`, `MAIL_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
 function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean, overrides: SmtpOverrides = {}): { transport: Transport, from: Address, to: string | undefined, server: string, missing: () => string[] } {
   const env = defineEnv(smtpEnv({ optional }))
+
+  warnOldInboundName()
   // Parsed as the server boots, so a URL that is no server stops it; absent under `optional`, where the first mail says so.
   const server = env.MAIL_URL === undefined || env.MAIL_URL === '' ? undefined : parseMailUrl(env.MAIL_URL)
 

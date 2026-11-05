@@ -340,3 +340,11 @@ describe('cms() check', () => {
     })
   })
 })
+
+describe('the environment', () => {
+  test('lists only CMS_ variables', () => {
+    const names = Object.keys((cms().env as unknown as { properties: object }).properties)
+
+    expect(names).toEqual(['CMS_HOST', 'CMS_BASE_URL', 'CMS_REPO', 'CMS_TOKEN', 'CMS_BRANCH'])
+  })
+})

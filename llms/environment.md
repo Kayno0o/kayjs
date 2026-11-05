@@ -58,6 +58,7 @@ button(onClick={() => console.log(publicEnv.MAP_KEY)}) Log the map key
 ### Environment
 
 - `defineEnv` from `kay/server` reads `process.env` once against a schema, as the server boots, and gives it back typed.
+- Names follow one rule. kay's own start `KAY_` (`KAY_SECRET`, `KAY_PROXY_KEY`, `KAY_MCP_KEY`, `KAY_METRICS_TOKEN`) apart from the ones a host sets for the app, `PORT`, `HOST`, `SITE_URL` and `SITE_BASE`. Each library has one prefix: `AUTH_` (kayjs-auth), `MAIL_`, `AI_`, `CMS_`. A vendor's own name stays as the vendor spells it: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `<PROVIDER>_CLIENT_ID` and `<PROVIDER>_CLIENT_SECRET`. `MAIL_INSECURE` and `AI_INSECURE` both mean `true` lets a secret go over a connection a network you trust carries in clear. The renamed ones, `KAYJS_AUTH_DATABASE_URL` (now `AUTH_DATABASE_URL`) and `MAIL_INBOUND_SECRET` (now `MAIL_EVENTS_INBOUND`), are read as before until 1.94 with a boot warning, and `kay env` reports one found in the environment, a compose file or `.env.example`.
 - A number or boolean is read from its text as a form field is, a variable left out takes its `default`, and any missing or refused stops the boot with an error naming each one.
 - An empty variable, `PORT=` or `PORT=""` in a `.env` file, counts as left out: it takes the default, satisfies `s.Optional` and fails a required one, rather than an empty string reaching the schema.
 - So an empty string is not a value a variable can carry: a setting that means something when blank is `s.Optional`, read as `undefined`.

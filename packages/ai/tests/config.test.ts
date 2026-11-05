@@ -140,6 +140,7 @@ describe('the extension', () => {
     const { env } = ai()
 
     expect(Object.keys(env!.properties)).toEqual(['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'AI_BASE_URL', 'AI_MODEL', 'AI_INSECURE', 'AI_PROVIDER', 'AI_AUDIO_URL', 'AI_AUDIO_KEY', 'AI_TRANSCRIBE_MODEL', 'AI_SPEECH_MODEL', 'AI_VOICE', 'AI_EMBED_URL', 'AI_EMBED_KEY', 'AI_EMBED_MODEL'])
+    expect(Object.keys(env!.properties).every(name => name.startsWith('AI_') || name === 'ANTHROPIC_API_KEY' || name === 'OPENAI_API_KEY')).toBe(true)
     expect(env!.properties.AI_MODEL).toMatchObject({ requiredInProduction: true })
     expect(env!.properties.ANTHROPIC_API_KEY).not.toMatchObject({ requiredInProduction: true })
   })

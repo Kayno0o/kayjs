@@ -719,7 +719,7 @@ it('adds kayjs-auth as the one line auth() in the config, with the guard and the
     expect(config).toContain('auth({ name: \'My Shop\' })')
     expect(config).toContain('ui()')
     expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/^SITE_URL=$/m)
-    expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/^KAYJS_AUTH_DATABASE_URL=$/m)
+    expect(await Bun.file(join(dir, '.env.example')).text()).toMatch(/^AUTH_DATABASE_URL=$/m)
     expect(await Bun.file(join(dir, '.gitignore')).text()).toMatch(/^data$/m)
     expect(result.notes.join('\n')).toContain('kay add mail')
 
@@ -757,7 +757,7 @@ it('adds kayjs-auth over the project\'s pg-orm tables, the mailer being found by
 
     expect(config).toContain('store: async () => (await import(\'@kaynooo/kayjs-auth/pg\')).pgStore((await import(\'./src/db\')).db)')
     expect(existsSync(join(dir, 'src/auth.ts'))).toBe(false)
-    expect(await Bun.file(join(dir, '.env.example')).text()).not.toContain('KAYJS_AUTH_DATABASE_URL')
+    expect(await Bun.file(join(dir, '.env.example')).text()).not.toContain('AUTH_DATABASE_URL')
     expect((await addFeatures(dir, ['mail', 'auth'], { install: false })).written).toEqual([])
   }
   finally {

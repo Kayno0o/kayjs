@@ -8,6 +8,7 @@ import { Database } from 'bun:sqlite'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { memoryJobs } from 'kay/server'
 import { scratchDir, testSite } from 'kay/test'
+import { secretsOf } from '../src/events'
 import { createLists } from '../src/list'
 import { openLists } from '../src/list-store'
 import { mailer } from '../src/mailer'
@@ -33,7 +34,7 @@ beforeAll(() => {
   process.env.MAIL_EVENTS_MAILGUN = 'mailgun-signing-key'
   process.env.MAIL_EVENTS_SENDGRID = SENDGRID_KEY
   process.env.MAIL_EVENTS_RESEND = SVIX_SECRET
-  process.env.MAIL_INBOUND_SECRET = INBOUND
+  process.env.MAIL_EVENTS_INBOUND = INBOUND
 })
 
 const post = async (path: string, body: BodyInit, headers: Record<string, string> = {}) => site.fetch(path, { method: 'POST', body, headers })
@@ -463,15 +464,34 @@ describe('inbound replies', () => {
   })
 
   it('answers 404 while no secret is set', async () => {
-    const saved = process.env.MAIL_INBOUND_SECRET
+    const saved = process.env.MAIL_EVENTS_INBOUND
 
-    delete process.env.MAIL_INBOUND_SECRET
+    delete process.env.MAIL_EVENTS_INBOUND
 
     try {
       expect((await inbound('Subject: x\r\n\r\ny')).status).toBe(404)
     }
     finally {
-      process.env.MAIL_INBOUND_SECRET = saved
+      process.env.MAIL_EVENTS_INBOUND = saved
+    }
+  })
+})
+
+describe('the inbound secret\'s old name', () => {
+  it('is still read as MAIL_INBOUND_SECRET until 1.94, the new name winning', async () => {
+    const saved = process.env.MAIL_EVENTS_INBOUND
+
+    delete process.env.MAIL_EVENTS_INBOUND
+    process.env.MAIL_INBOUND_SECRET = INBOUND
+
+    try {
+      expect(secretsOf(undefined).inbound).toBe(INBOUND)
+      process.env.MAIL_EVENTS_INBOUND = 'new-name-secret'
+      expect(secretsOf(undefined).inbound).toBe('new-name-secret')
+    }
+    finally {
+      delete process.env.MAIL_INBOUND_SECRET
+      process.env.MAIL_EVENTS_INBOUND = saved
     }
   })
 })

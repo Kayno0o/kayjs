@@ -371,7 +371,7 @@ A complaint is about the mail it reported, so it stops only bulk mail: a list's 
 
 Suppressions are kept with the mailing lists, or in your app's database (else `data/mail-list.sqlite`) when there are none, made by the first one. A site on several servers with no list keeps them in Postgres instead, with `mailer({ suppressionStore: pgSuppressions(db) })`, where `db` is what `pgData` takes. `sqliteSuppressions(path)` names another SQLite file, and any object with `suppress`, `suppressed` and `lift` is a store.
 
-Mail servers also answer a failed delivery with a report mail (a DSN). Pipe those, and the replies to your mails, to `POST /_kay/mail/inbound` with `Authorization: Bearer` and `MAIL_INBOUND_SECRET`. A report suppresses the recipients it names, but only when it returns a mail your app sent to that address, which needs `KAY_SECRET`. Any other message goes to the function you give the mailer:
+Mail servers also answer a failed delivery with a report mail (a DSN). Pipe those, and the replies to your mails, to `POST /_kay/mail/inbound` with `Authorization: Bearer` and `MAIL_EVENTS_INBOUND`. A report suppresses the recipients it names, but only when it returns a mail your app sent to that address, which needs `KAY_SECRET`. Any other message goes to the function you give the mailer:
 
 ```ts
 export const mail = mailer({

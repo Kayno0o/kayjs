@@ -4,7 +4,7 @@ import { buildOwn } from '../src/own'
 import { authTest } from '../src/test'
 
 afterEach(() => {
-  delete process.env.KAYJS_AUTH_DATABASE_URL
+  delete process.env.AUTH_DATABASE_URL
 })
 
 it('signs a site in through the auth() built with no module', async () => {

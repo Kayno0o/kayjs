@@ -62,7 +62,7 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
   cookie?: string | undefined
   // Providers by the name their routes take: `{ github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (a preset: github, discord, google, microsoft or gitlab), an object adds options to a preset, and a full `OAuthApp` is an app of any provider.
   oauth?: Record<string, true | PresetApp | OAuthApp> | undefined
-  // The users' data: a pg-orm database at `{ url }`, the store itself, or a function building it. `KAYJS_AUTH_DATABASE_URL` when set, else the database of the app's `store` (`sqliteData(path)`, `pgData(url)`), else `data/auth.sqlite` (SQLite; `data/auth.db` where it exists).
+  // The users' data: a pg-orm database at `{ url }`, the store itself, or a function building it. `AUTH_DATABASE_URL` when set, else the database of the app's `store` (`sqliteData(path)`, `pgData(url)`), else `data/auth.sqlite` (SQLite; `data/auth.db` where it exists).
   store?: StoreOption | undefined
   // Mail for verification, resets and magic links. Left out, `src/mail.ts` exporting kayjs-mail's `mail` sends them; `false` sends none.
   email?: EmailOptions | false | undefined
@@ -88,7 +88,7 @@ export function ownEnv(options: Pick<OwnOptions, 'oauth' | 'store'>) {
   const names = Object.entries(options.oauth ?? {}).filter(([, app]) => isPreset(app) && (app === true || app.clientId === undefined || app.clientSecret === undefined)).map(([name]) => name)
 
   return s.Object({
-    ...options.store === undefined && { KAYJS_AUTH_DATABASE_URL: s.Optional(s.String({ description: 'the database kayjs-auth keeps its users in, a Postgres or SQLite url; the one of the app\'s store, else data/auth.sqlite (SQLite; data/auth.db where it exists), when unset' })) },
+    ...options.store === undefined && { AUTH_DATABASE_URL: s.Optional(s.String({ description: 'the database kayjs-auth keeps its users in, a Postgres or SQLite url; the one of the app\'s store, else data/auth.sqlite (SQLite; data/auth.db where it exists), when unset' })) },
     ...Object.fromEntries(names.flatMap(name => [
       [`${name.toUpperCase()}_CLIENT_ID`, s.String({ description: `the ${name} OAuth app's client id`, requiredInProduction: true })],
       [`${name.toUpperCase()}_CLIENT_SECRET`, s.String({ description: `the ${name} OAuth app's client secret`, requiredInProduction: true })],
@@ -149,6 +149,24 @@ const OWN_FILE = 'data/auth.sqlite'
 // What the file was called before 1.88 gave every default data file the `.sqlite` extension: an app whose users are in it keeps it.
 const LEGACY_OWN_FILE = 'data/auth.db'
 const warned = new Set<string>()
+let warnedOldDatabaseName = false
+
+// The database url: `AUTH_DATABASE_URL`, else the name before 1.91, `KAYJS_AUTH_DATABASE_URL`, which warns once.
+function databaseUrlFromEnv(): string | undefined {
+  const given = filled(process.env.AUTH_DATABASE_URL)
+
+  if (given !== undefined)
+    return given
+
+  const old = filled(process.env.KAYJS_AUTH_DATABASE_URL)
+
+  if (old !== undefined && !warnedOldDatabaseName) {
+    warnedOldDatabaseName = true
+    log.warn('KAYJS_AUTH_DATABASE_URL is now AUTH_DATABASE_URL: rename it in the environment, the old name is read until 1.94')
+  }
+
+  return old
+}
 
 async function storeOf(store: StoreOption | undefined, root: string, shared: string | undefined, exporting: boolean | undefined): Promise<AuthStore> {
   if (typeof store === 'function')
@@ -158,7 +176,7 @@ async function storeOf(store: StoreOption | undefined, root: string, shared: str
     return store
 
   // An empty value, as .env.example lists it, is not a url.
-  const given = store?.url ?? filled(process.env.KAYJS_AUTH_DATABASE_URL)
+  const given = store?.url ?? databaseUrlFromEnv()
 
   // Tests start from no users each run, as a file kept between them would not, and a static export reads none and creates or migrates no table.
   if (exporting || (given === undefined && process.env.NODE_ENV === 'test'))
@@ -172,7 +190,7 @@ async function storeOf(store: StoreOption | undefined, root: string, shared: str
 
   if (kept && !warned.has(root)) {
     warned.add(root)
-    log.warn(`auth() keeps its users in ${file}, which exists, though the app's store names a database: to use that database, move the users into it and set KAYJS_AUTH_DATABASE_URL to its url (or delete the file when it holds none)`)
+    log.warn(`auth() keeps its users in ${file}, which exists, though the app's store names a database: to use that database, move the users into it and set AUTH_DATABASE_URL to its url (or delete the file when it holds none)`)
   }
 
   let orm: typeof import('@kaynooo/pg-orm')
@@ -277,12 +295,12 @@ export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<
   const hooks = loadHooks ? (await loadHooks()).hooks : conventionalHooks(app.modules.hooks)
   const mailer = await emailOf(email, app)
 
-  if (store === undefined && app.database === undefined && process.env.NODE_ENV === 'production' && filled(process.env.KAYJS_AUTH_DATABASE_URL) === undefined) {
+  if (store === undefined && app.database === undefined && process.env.NODE_ENV === 'production' && databaseUrlFromEnv() === undefined) {
     const file = existsSync(resolve(app.root, LEGACY_OWN_FILE)) ? LEGACY_OWN_FILE : OWN_FILE
 
     log.warn(appStore()?.sql === undefined
-      ? `auth() keeps its users in ${file}, a SQLite file: set the app's \`store\` (\`sqliteData\` or \`pgData\`) in kay.config.ts, KAYJS_AUTH_DATABASE_URL, or auth's \`store\`, for a database that outlives a deploy`
-      : `auth() keeps its users in ${file}, a SQLite file, because pgData was given a connection and names no url: set KAYJS_AUTH_DATABASE_URL or pass auth({ store: pgStore(db) }) for a database that outlives a deploy`)
+      ? `auth() keeps its users in ${file}, a SQLite file: set the app's \`store\` (\`sqliteData\` or \`pgData\`) in kay.config.ts, AUTH_DATABASE_URL, or auth's \`store\`, for a database that outlives a deploy`
+      : `auth() keeps its users in ${file}, a SQLite file, because pgData was given a connection and names no url: set AUTH_DATABASE_URL or pass auth({ store: pgStore(db) }) for a database that outlives a deploy`)
   }
 
   const made = createAuth({

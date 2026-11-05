@@ -45,7 +45,7 @@ export default function auth(project: Project) {
     ignore: ownDatabase ? [] : ['data'],
     extension: { import: 'import { auth } from \'@kaynooo/kayjs-auth\'', expression: authCall(siteName(project.name), ownDatabase) },
     notes: [
-      ownDatabase ? 'Run your migration generator (bun run db:generate) for the kay_* tables kayjs-auth added to the tables.' : 'kayjs-auth keeps its users in data/auth.sqlite: set KAYJS_AUTH_DATABASE_URL (a Postgres url) before production.',
+      ownDatabase ? 'Run your migration generator (bun run db:generate) for the kay_* tables kayjs-auth added to the tables.' : 'kayjs-auth keeps its users in data/auth.sqlite: set AUTH_DATABASE_URL (a Postgres url) before production.',
       ...mailed ? [] : [mailDepended ? 'Without a mailer, password resets, magic links and verification mails cannot be sent: add mail() to the extensions of kay.config.ts, and auth() sends through it.' : 'Without a mailer, password resets, magic links and verification mails cannot be sent: run `kay add mail`, and auth() sends through it.'],
       'Set KAY_SECRET and SITE_URL in production.',
     ],
@@ -54,7 +54,7 @@ export default function auth(project: Project) {
 
 // The `.env.example` keys: the session secret and the site's address, and the database url of the SQLite default.
 function authExample(ownDatabase: boolean): string[] {
-  return ['KAY_SECRET', 'SITE_URL', ...ownDatabase ? [] : ['KAYJS_AUTH_DATABASE_URL']]
+  return ['KAY_SECRET', 'SITE_URL', ...ownDatabase ? [] : ['AUTH_DATABASE_URL']]
 }
 
 // The `auth()` of kay.config.ts: the name mails and authenticator apps show, and over the app's own database a store loading it as the server starts, so the config stays off the database.

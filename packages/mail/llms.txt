@@ -12,3 +12,7 @@ The rest is split by topic, each file read whole with one command:
 - [The contact form, testing, development and kayjs-auth](llms/contact-form-and-testing.md): the contact form action, testing mails, the development outbox, other transports, and the mails kayjs-auth sends
 - [A mailing list](llms/mailing-list.md): the subscribe form with double opt-in, one-click unsubscribe, sending to the list through the queue and erasing a subscriber
 - [Bounces, complaints and replies](llms/bounces-and-replies.md): provider webhooks and delivery reports that stop mails to a dead address, and a reply reaching an app function
+
+## Environment
+
+Every variable starts `MAIL_`. `MAIL_INSECURE=true` sends without STARTTLS to a server you trust, as `AI_INSECURE=true` of kayjs-ai lets a key go over plain http to one. `MAIL_INBOUND_SECRET` is `MAIL_EVENTS_INBOUND`, the old name read until 1.94.
