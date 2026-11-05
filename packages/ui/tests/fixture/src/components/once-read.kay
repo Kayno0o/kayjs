@@ -1,0 +1,32 @@
+---
+import type { Action } from 'kay'
+import { signal } from 'kay'
+import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
+import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import VirtualList from '@kaynooo/kayjs-ui/virtual-list.kay'
+
+// Each prop below is passed from one signal the test flips with `#go`, to see the component follow what it reads at construction.
+const { onIndexChange } = props<{ onIndexChange: (index: number) => void }>()
+
+const later = signal(false)
+const slides = ['a', 'b', 'c'].map(name => ({ src: `/${name}.png`, alt: name }))
+const rows = Array.from({ length: 200 }, (_, index) => ({ id: index }))
+const stub = (schema?: object) => Object.assign(async () => undefined, { url: '/_kay/action/mail/form', pending: () => false, succeeded: () => false, failed: () => false, error: () => undefined, schema }) as unknown as Action<never, unknown>
+const plain = stub()
+const consenting = stub({ properties: { consent: { 'x-kay-consent': true } } })
+---
+button#go(type="button" onClick={() => later = true}) Go
+div#carousel
+  Carousel(slides={slides} autoplay={later() ? '40ms' : undefined} onIndexChange={onIndexChange})
+div#virtual
+  VirtualList(items={rows} itemKey={row => row.id} label="Rows" estimate={later() ? 100 : 20} overscan={later() ? 10 : 2})
+    @item(row)
+      | {row.id}
+div#field
+  FormField(label="Pick" group={later()})
+    input(name="one")
+div#consent
+  ContactForm(action={plain} consent={later()})
+div#swapped
+  ContactForm(action={later() ? consenting : plain})

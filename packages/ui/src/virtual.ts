@@ -48,9 +48,9 @@ export interface VirtualOptions<Item> {
   items: () => Item[]
   // Tells a row from another, so a measured height follows its row when the list shifts.
   keyOf: (item: Item, index: number) => unknown
-  // The height of a row not measured yet, in pixels.
-  estimate: number
-  overscan: number
+  // The height of a row not measured yet, in pixels, and the rows drawn beyond the window on each side: read on every layout, so a parent changing them is followed.
+  estimate: () => number
+  overscan: () => number
 }
 
 // The rows a scroll box shows out of a long list and the room above and below them standing for the others. Heights start as `estimate` and become what the rendered rows measure, so a list of rows of any height scrolls to the right length.
@@ -76,9 +76,9 @@ export function virtualRows<Item>(options: VirtualOptions<Item>) {
       }
     }
 
-    return offsetsOf(list.length, index => heights.get(keyOf(list[index]!, index)) ?? estimate)
+    return offsetsOf(list.length, index => heights.get(keyOf(list[index]!, index)) ?? estimate())
   })
-  const range = memo(() => windowOf(offsets(), top(), viewport(), overscan), { equals: (a, b) => a.start === b.start && a.end === b.end })
+  const range = memo(() => windowOf(offsets(), top(), viewport(), overscan()), { equals: (a, b) => a.start === b.start && a.end === b.end })
   const rows = memo(() => items().slice(range().start, range().end))
   // The room standing for the rows above the window and for those below it.
   const before = memo(() => offsets()[range().start]!)
@@ -116,7 +116,7 @@ export function virtualRows<Item>(options: VirtualOptions<Item>) {
 
         const key = keyOf(item, index)
 
-        const known = heights.get(key) ?? estimate
+        const known = heights.get(key) ?? estimate()
 
         if (known !== height) {
           if (offsets()[index + 1]! <= top())

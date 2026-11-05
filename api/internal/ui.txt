@@ -1036,7 +1036,7 @@ function callAction<Output>(form: HTMLFormElement, action: Action<never, Output,
 function fieldIssues(name: () => string | undefined, issue: () => string | undefined): () => string[]
 
 [./lib/forms] fieldLinks
-function fieldLinks(group: boolean, hint: () => boolean, messages: () => readonly unknown[], required?: () => boolean): FieldLinks
+function fieldLinks(group: () => boolean, hint: () => boolean, messages: () => readonly unknown[], required?: () => boolean): FieldLinks
 
 [./lib/forms] FieldLinks
 interface FieldLinks
@@ -2452,10 +2452,10 @@ function offsetsOf(count: number, sizeAt: (index: number) => number): Float64Arr
 
 [./lib/virtual] VirtualOptions
 interface VirtualOptions<Item>
-  estimate: number
+  estimate: () => number
   items: () => Item[]
   keyOf: (item: Item, index: number) => unknown
-  overscan: number
+  overscan: () => number
 
 [./lib/virtual] virtualRows
 function virtualRows<Item>(options: VirtualOptions<Item>): {

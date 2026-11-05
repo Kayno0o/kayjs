@@ -72,7 +72,7 @@ const openLabel = (row: Item, index: number) => itemLabel ? itemLabel(row, index
 const linked = () => itemHref !== undefined || onItemClick !== undefined
 
 const keyOf = (row: Item, index: number) => itemKey === undefined ? index : itemKey(row, index)
-const list = virtualRows({ items, keyOf, estimate, overscan })
+const list = virtualRows({ items, keyOf, estimate: () => estimate, overscan: () => overscan })
 const entries = memo(() => list.rows().map((row, position) => ({ row, index: list.start() + position })))
 let box: HTMLElement | undefined
 let content: HTMLElement | undefined

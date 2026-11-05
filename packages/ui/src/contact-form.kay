@@ -40,7 +40,7 @@ const { action, nameLabel = wording('ui.contactForm.name', wording('mail.contact
 }>()
 
 // Server actions carry their schema; the consent checkbox is drawn when `consent: true` marked the field.
-const asksConsent = consent ?? (action as { schema?: { properties?: Record<string, Record<string, unknown> | undefined> } }).schema?.properties?.consent?.['x-kay-consent'] === true
+const asksConsent = () => consent ?? (action as { schema?: { properties?: Record<string, Record<string, unknown> | undefined> } }).schema?.properties?.consent?.['x-kay-consent'] === true
 ---
 // Posts without JavaScript; the honeypot, the time check and the refused fields' messages come from the action. Fields beyond those three go in as children, between the email and the message.
 form(part="root" {...rest} action={action} novalidate)
@@ -51,7 +51,7 @@ form(part="root" {...rest} action={action} novalidate)
   slot
   FormField(label={messageLabel} required issue={action.error('message')})
     textarea(field="message" rows={rows})
-  if asksConsent
+  if asksConsent()
     div(part="consent")
       Checkbox(part="consentBox issues issue" name="consent" label={consentLabel} issue={action.error('consent')})
       if privacy

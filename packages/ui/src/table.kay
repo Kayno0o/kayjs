@@ -320,7 +320,7 @@ const endpoint = memo(() => {
 })
 
 // Without `virtual` every row is drawn; with it the others stand for room above and below.
-const windowed = virtual ? virtualRows({ items: () => shown(), keyOf: row => rowKeyOf(row, rowKey), estimate: 48, overscan: 8 }) : undefined
+const windowed = virtual ? virtualRows({ items: () => shown(), keyOf: row => rowKeyOf(row, rowKey), estimate: () => 48, overscan: () => 8 }) : undefined
 const drawn = memo(() => windowed ? windowed.rows() : shown())
 let box: HTMLElement | undefined
 let body: HTMLElement | undefined

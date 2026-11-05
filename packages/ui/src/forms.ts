@@ -28,25 +28,29 @@ export interface FieldLinks {
 // A required field's control, each field of a group, takes `aria-required` unless the page set one, since the star beside the label is hidden from a screen reader.
 // A group has no control of its own: while a message shows, each field in it is marked invalid and described by the message, so `focusInvalid` reaches the group's first field.
 // The control is the page's own markup: the server hands it the ids as it renders, and inside an island the browser keeps the link as the messages change; drawn here rather than in the component, which stays static on a page of its own.
-export function fieldLinks(group: boolean, hint: () => boolean, messages: () => readonly unknown[], required: () => boolean = () => false): FieldLinks {
+export function fieldLinks(group: () => boolean, hint: () => boolean, messages: () => readonly unknown[], required: () => boolean = () => false): FieldLinks {
   const links: FieldLinks = { frame: uid(), hint: uid(), issues: uid(), described: () => [hint() ? links.hint : undefined, messages().length > 0 ? links.issues : undefined].filter(id => id !== undefined) }
 
   // A static page renders the field outside any island, where nothing drops the effect as an island's server render does.
   if (typeof document === 'undefined') {
-    describeField(group ? '' : links.described().join(' '), { required: required() && (group ? 'all' : true) })
+    describeField(group() ? '' : links.described().join(' '), { required: required() && (group() ? 'all' : true) })
 
     return links
   }
 
-  if (group) {
-    const marked = new Set<HTMLElement>()
-
-    effect(() => markGroup(links, messages().length > 0, marked, required()))
-
-    return links
-  }
+  const marked = new Set<HTMLElement>()
 
   effect(() => {
+    if (group()) {
+      markGroup(links, messages().length > 0, marked, required())
+
+      return
+    }
+
+    // A group that became a single field leaves nothing marked behind.
+    if (marked.size > 0)
+      markGroup(links, false, marked, false)
+
     const ours = links.described()
     const invalid = messages().length > 0
     const control = document.querySelector(`[data-kui-field="${links.frame}"] > label`)?.querySelector<HTMLElement>(CONTROL)

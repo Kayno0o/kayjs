@@ -89,11 +89,15 @@ effect(() => {
 if (autoplay !== undefined)
   durationMs(autoplay)
 
-if (autoplay) {
-  const still = reducedMotion()
+const still = reducedMotion()
 
-  every(autoplay, () => step(1), { while: () => !paused() && !pointed() && !focused() && !offscreen() && !still() })
-}
+// Rerun when `autoplay` changes: `every` takes its interval once and stops with the effect that created it.
+effect(() => {
+  const interval = autoplay
+
+  if (interval)
+    every(interval, () => step(1), { while: () => !paused() && !pointed() && !focused() && !offscreen() && !still() })
+})
 
 const active = () => stepIndex(shown(), 0, all().length)
 
