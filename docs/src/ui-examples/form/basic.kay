@@ -1,0 +1,28 @@
+---
+import type { Action, Failure } from 'kay'
+import { ActionError, signal } from 'kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Form from '@kaynooo/kayjs-ui/form.kay'
+
+const pending = signal(false)
+
+// Stands in for a page's action, which a static site cannot serve: it refuses a title under two letters, as the schema would.
+const add = Object.assign(async (form: FormData) => {
+  pending = true
+  await new Promise(resolve => setTimeout(resolve, 800))
+  pending = false
+
+  const title = String(form.get('title'))
+
+  if (title.length < 2)
+    throw new ActionError(422, '', { title: 'Two letters at least' })
+
+  return title
+}, { pending, url: '', failed: () => undefined }) as unknown as Action<{ title: string }, string | Failure<never>>
+---
+.max-w-md
+  Form(action={add} failureLabel="Could not add" saved="Added.")
+    FormField(label="Title" name="title" required)
+      input.kui-field-input(name="title")
+    Button(type="submit" tone="accent" label="Add")

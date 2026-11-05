@@ -14,7 +14,7 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 ---
 main
   ContactForm(action={contact} submitLabel="Send it")
-    FormField(label="Topic" issue={contact.error('topic')})
+    FormField(label="Topic" name="topic")
       select(name="topic")
         option(value="quote") Quote
         option(value="other") Other

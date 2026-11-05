@@ -27,9 +27,9 @@ const look = recipe({
 
 const { label, name, issue, hint, required = false, group = false, size = 'md', actions, action, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   label: string
-  // The field the control posts as: inside a FormDialog, the message its call was refused with for that field shows here.
+  // The field the control posts as: the message its form's action refused it with shows here, inside a `form(action)`, a Form, a FormDialog or a SaveForm.
   name?: string | undefined
-  // A message of the page's own, such as `add.failed()?.errors.title` after a plain form post.
+  // A message of the page's own, shown beside the one the form's action gave `name`.
   issue?: string | undefined
   // What the control takes or what it does, under it and above any message.
   hint?: string | undefined

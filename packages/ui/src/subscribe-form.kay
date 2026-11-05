@@ -40,7 +40,7 @@ const shownWording = () => wordingId ?? (noticeText === undefined ? 'stock' : 'c
 ---
 // Posts without JavaScript; the honeypot, the time stamp and the refused email's message come from the action.
 form(part="root" {...rest} action={action} novalidate)
-  FormField(label={label} required issue={action.error('email')})
+  FormField(label={label} required name="email")
     input(field="email" type="email" autocomplete="email")
   // Fields beyond the email, between it and the notice.
   slot

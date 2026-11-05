@@ -224,6 +224,16 @@ export function actionOf(element: ElementNode, source: string): Extract<Attribut
   return attribute?.kind === 'expression' ? attribute : undefined
 }
 
+// The `action={add}` a component is given, such as a Form: the fields in its content read that action's messages as the ones in a `form(action={add})` do.
+export function componentAction(element: ElementNode, source: string): Extract<Attribute, { kind: 'expression' }> | undefined {
+  if (!element.component)
+    return undefined
+
+  const attribute = element.attributes.find(candidate => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === 'action')
+
+  return attribute?.kind === 'expression' ? attribute : undefined
+}
+
 // `a(href="/docs" section)` or `section={active}`: kay's own attribute marking a link current on the pages below it, read by the server markup and never written out.
 export function sectionOf(element: ElementNode, source: string): Extract<Attribute, { kind: 'boolean' | 'expression' }> | undefined {
   if (element.component)
@@ -532,6 +542,8 @@ export interface TemplateFacts {
   interactive: boolean
   // A form posts to an action.
   actionForm: boolean
+  // A component is given an `action`, whose fields in its content read that action's messages.
+  scopedForm: boolean
   helpers: Set<TemplateHelper>
   // The names `await` blocks render as they are, `await comments`.
   awaited: Set<string>
@@ -768,13 +780,14 @@ function addRecipe(facts: TemplateFacts, file: KayFile, recipe: string): void {
 }
 
 function factsOf(file: KayFile): TemplateFacts {
-  const facts: TemplateFacts = { interactive: false, actionForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: formTargets(file.template, file.source), functions: new Map(), bindables: new Map(), shadowedBinds: new WeakSet() }
+  const facts: TemplateFacts = { interactive: false, actionForm: false, scopedForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: formTargets(file.template, file.source), functions: new Map(), bindables: new Map(), shadowedBinds: new WeakSet() }
   const text = (span: Span) => file.source.slice(span.start, span.end)
 
   visitNodes(file.template, (node) => {
     if (node.kind === 'element') {
       facts.interactive ||= node.attributes.some(attribute => attribute.kind !== 'spread' && INTERACTIVE_ATTRIBUTE.test(text(attribute.name)))
       facts.actionForm ||= actionOf(node, file.source) !== undefined
+      facts.scopedForm ||= componentAction(node, file.source) !== undefined
       facts.slot ||= isSlot(node)
       facts.childrenSlot ||= isChildrenSlot(node)
       facts.classes.push(...node.classes.map(text))

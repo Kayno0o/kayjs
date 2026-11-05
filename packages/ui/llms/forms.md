@@ -48,5 +48,5 @@ See [MarkdownEditor](markdown-editor.md).
 
 ## Reference
 
-- FormField, SaveForm, ContactForm, FormDialog and Steps are in [Forms and Steps](forms-and-steps.md).
+- FormField, Form, SaveForm, ContactForm, FormDialog and Steps are in [Forms and Steps](forms-and-steps.md).
 - RangeInput, Slider, ColorInput, MultiSelect, Combobox, FileDrop, Menu and IconPicker are in [Sliders, pickers, file drops and menus](pickers.md).

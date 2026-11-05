@@ -1,7 +1,7 @@
 import type { Action } from '../src/runtime/action'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { formChecked, formScope, postedChecked, postedValue, postedValues } from '../src/runtime/action'
+import { formChecked, formErrors, formScope, postedChecked, postedValue, postedValues } from '../src/runtime/action'
 import { ACTION } from '../src/runtime/action-shared'
 import { submittedValues } from '../src/server/flash'
 import { testSite } from '../src/test'
@@ -165,5 +165,29 @@ describe('a component inside a form posting to an action', () => {
     expect(find(html, 'a-x')).toContain('data-text="abc"')
 
     expect(find((await site.visit('/')).html, 'a-x')).not.toContain('data-text')
+  })
+})
+
+describe('formErrors', () => {
+  it('reads the messages of the action of the form being rendered, fixed when it was taken', () => {
+    const target = refused(undefined) as unknown as Record<string, unknown>
+
+    target.error = (field: string) => field === 'title' ? 'Too short' : undefined
+
+    const read = inside(target, () => formErrors())
+
+    expect(read('title')).toBe('Too short')
+    expect(read('slug')).toBeUndefined()
+    expect(formErrors()('title')).toBeUndefined()
+  })
+
+  it('answers the innermost form and nothing for a plain URL form', () => {
+    const outer = refused(undefined) as unknown as Record<string, unknown>
+    const inner = refused(undefined) as unknown as Record<string, unknown>
+
+    outer.error = () => 'outer'
+    inner.error = () => 'inner'
+    expect(inside(outer, () => inside(inner, () => formErrors()('x')))).toBe('inner')
+    expect(inside(outer, () => inside('/plain', () => formErrors()('x')))).toBeUndefined()
   })
 })

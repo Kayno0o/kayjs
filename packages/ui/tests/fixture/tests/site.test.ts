@@ -1436,3 +1436,16 @@ describe('a refused no-JS post', () => {
     expect(refused.find('input[name=tags][checked]')).toHaveLength(0)
   })
 })
+
+describe('FormField in a form calling an action', () => {
+  test.each(['/form-named', '/form-component'])('shows the message the action refused its name with, with no issue prop and no JavaScript, on %p', async (path) => {
+    const { claim } = await import(`../src/routes${path}.kay`)
+
+    expect((await site.visit(path)).html).not.toContain('Three letters at least')
+
+    const refused = await site.submit(claim, { handle: 'ab' }, { from: path })
+
+    expect(refused.html).toContain('Three letters at least')
+    expect(refused.html).toMatch(/<input name="handle"[^>]*aria-describedby="[\w-]+"/)
+  })
+})

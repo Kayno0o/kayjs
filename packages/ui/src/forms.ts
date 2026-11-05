@@ -1,5 +1,5 @@
 import type { Action, Answer, FailureData, Signal, Success } from 'kay'
-import { ActionError, createContext, describeField, effect, focusInvalid, markInvalid, uid } from 'kay'
+import { ActionError, createContext, describeField, effect, focusInvalid, formErrors, markInvalid, uid } from 'kay'
 import { answerMessage } from './internal/answer-message'
 import { toast } from './toast'
 
@@ -187,13 +187,16 @@ export async function callAction<Output>(form: HTMLFormElement, action: Action<n
   }
 }
 
-// The messages shown for one field: those its form's last call was refused with under `name`, then the page's own `issue`. Read in a component's script, where the form's context is.
+// The messages shown for one field: those its form's last call was refused with under `name`, the one its `form(action)` holds for it, then the page's own `issue`, none twice. Read in a component's script, where the form's context is.
 export function fieldIssues(name: () => string | undefined, issue: () => string | undefined): () => string[] {
   const refused = formIssues.use()
+  const held = formErrors()
 
   return () => {
     const field = name()
 
-    return [field === undefined ? undefined : refused?.()[field], issue()].filter(message => message !== undefined)
+    const messages = [field === undefined ? undefined : refused?.()[field], field === undefined ? undefined : held(field), issue()]
+
+    return [...new Set(messages.filter((message): message is string => message !== undefined && message !== ''))]
   }
 }

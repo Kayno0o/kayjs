@@ -32,6 +32,7 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Form from '@kaynooo/kayjs-ui/form.kay'
 import HoverCard from '@kaynooo/kayjs-ui/hover-card.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
@@ -142,6 +143,7 @@ export const COMPONENTS = {
   'dialog': Dialog,
   'empty-state': EmptyState,
   'file-drop': FileDrop,
+  'form': Form,
   'form-dialog': FormDialog,
   'form-field': FormField,
   'hover-card': HoverCard,
@@ -237,6 +239,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'dialog': { open: false, title: 'Rename', onOpenChange: noop, children: 'Body', size: 'full', bare: true },
   'empty-state': { title: 'No moons', description: 'Add one' },
   'file-drop': { 'aria-label': 'Photos', 'onFiles': noop, 'content': () => 'Drop files' },
+  'form': { action, failureLabel: 'Failed' },
   'form-dialog': { open: false, title: 'Rename', action, submitLabel: 'Save', failure: 'Failed', onOpenChange: noop },
   'form-field': { label: 'Name', hint: 'As shown', children: '' },
   'hover-card': {},

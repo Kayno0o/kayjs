@@ -23,6 +23,7 @@ const FAILURE_EXEMPT: Record<string, readonly string[]> = {
   // A call's failure is worded, with no data to load or ask for again: a button's pending label says the wait, and a failure is not retried by a word.
   'save-form': ['loadingLabel', 'retryLabel'],
   'confirm-delete': ['loadingLabel', 'retryLabel'],
+  'form': ['loadingLabel', 'retryLabel'],
   'form-dialog': ['loadingLabel', 'retryLabel'],
   'copy-button': ['loadingLabel', 'retryLabel'],
   'record-button': ['loadingLabel', 'retryLabel'],

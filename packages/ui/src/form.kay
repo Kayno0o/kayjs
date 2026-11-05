@@ -1,0 +1,51 @@
+--- <Output>
+import type { Action, Answer, FailureData, JSX, Success } from 'kay'
+import { recipe, signal } from 'kay'
+import { callAction, formIssues } from './forms'
+import { toast } from './toast'
+import { wording } from 'kay/words'
+
+const look = recipe({ parts: { root: 'kui-form-grid' } })
+
+const { action, refused, saved, onSaved, onError, failureLabel, ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'onSubmit' | 'onError'> & {
+  // The page's action the form calls with its fields, which posts it as a plain form without JavaScript: the messages it refuses a field with show on the FormField of that `name`, and the first invalid field takes the focus.
+  action: Action<never, Output>
+  // Toasted when the call fails other than on a field.
+  failureLabel?: string | undefined
+  // What a refusal of the action's handler says, from the data it passed to `ctx.fail`: a message per field, each shown on its FormField, or one message, toasted. Without it, or when it answers undefined or an empty message, `failureLabel` is toasted.
+  refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
+  // Toasted as a success once the action has run.
+  saved?: string | undefined
+  // What the action returned, for the page to patch into what it shows.
+  onSaved?: ((result: Answer<Success<Output>>) => unknown) | undefined
+  // Called with `{ error }` before the toast: the `ActionError` of a refusal (its `errors` by field, its `data`), or whatever the call threw.
+  onError?: ((failure: { error: unknown }) => unknown) | undefined
+}>()
+
+const issues = signal<Record<string, string>>({})
+let form: HTMLFormElement | undefined
+
+// The messages of the last refusal, the ones a post the page was rendered for came back with included, which the call's own then replace.
+formIssues.provide(() => ({ ...action.failed()?.errors as Record<string, string> | undefined, ...issues() }))
+
+async function submit(event: SubmitEvent) {
+  event.preventDefault()
+
+  if (action.pending() || !form)
+    return
+
+  const done = await callAction(form, action, issues, failureLabel ?? wording('ui.form.failure', 'Could not save.'), refused, onError)
+
+  if (!done)
+    return
+
+  issues = {}
+
+  if (saved)
+    toast.success(saved)
+
+  onSaved?.(done.result)
+}
+---
+form(part="root" {...rest} action={action} ref={element => form = element} onSubmit={submit})
+  slot

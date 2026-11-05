@@ -1470,6 +1470,17 @@ component default
   required?: boolean | undefined
   size?: "md" | "sm" | undefined
 
+[./form.kay] default
+component default
+  action: Action<never, Output, never>
+  children?: Element
+  class?: string | undefined | { root?: string | undefined; }
+  failureLabel?: string | undefined
+  onError?: ((failure: { error: unknown; }) => unknown) | undefined
+  onSaved?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
+  refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
+  saved?: string | undefined
+
 [./hover-card.kay] default
 component default
   anchor?: Element | null | undefined

@@ -35,7 +35,7 @@ FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" 
 ```
 
 - FormDialog calls `action` with `new FormData(form)`, read on the server as a plain form post and answered as a call. An action that redirects takes the browser there instead.
-- When the action refuses a field, its message shows on the FormField with that `name`, and the dialog stays open. That is the `formIssues` context of kayjs-ui, which FormDialog and SaveForm provide in an island and a FormField reads: a form of your own calling an action does `formIssues.provide(() => ({ title: 'Too short' }))` to show messages the same way.
+- When the action refuses a field, its message shows on the FormField with that `name`, and the dialog stays open. That is the `formIssues` context of kayjs-ui, which FormDialog, SaveForm and Form provide in an island and a FormField reads: a form of your own that calls an action by hand does `formIssues.provide(() => ({ title: 'Too short' }))` to show messages the same way.
 - A refused message no FormField shows is toasted instead, a refusal of the whole form under the empty name included. A failure carrying no message toasts `failureLabel`, `Could not save.` by default.
 - A refusal of the handler, `ctx.fail(400, { error: 'Slug taken' })`, reaches the dialog through `refused`, which reads that data and answers a message per field (`{ slug: data.error }`), shown on the FormFields, or one message (`data.error`), toasted. Without `refused`, or when it answers undefined, a string `ctx.fail` data or a string `error` or `message` in it that reads as a message is toasted, else `failureLabel`: `FormDialog(... failureLabel="Could not save" refused={data => data.error})`.
 - A save hands what the action returned to `onSaved`, then closes the dialog. A refusal or a failure calls `onError({ error })` before the toast, with the `ActionError` (its `errors` by field, its `data`) or whatever the call threw, and the dialog stays open.
@@ -43,6 +43,17 @@ FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" 
 - The submit button sits in the footer, paired with the form by `id`. Without an `id`, it draws one unique on the page.
 - Enter submits from a single-line field, and Ctrl+Enter from a textarea. While the call is under way, the buttons are disabled, and Escape or a click outside leaves the dialog open.
 - `extra` fills the left end of the footer, for a ConfirmDelete with `triggerLook="button"`.
+
+A form needs no wiring per field: a FormField (and a Checkbox or Toggle) with a `name` inside any `form(action={add})` shows `add.error('name')`, with and without JavaScript, so `issue` is for a message of your own only. `formErrors()` from `kay` is what they read, for a component of yours drawing a field: `const errors = formErrors()` in its script, then `errors('title')` where it shows the message.
+
+`Form(action={add})` is the plain form of a page, the FormDialog's call without the dialog: it posts as a form without JavaScript, and with JavaScript calls the action, shows each refused field's message on its FormField, focuses the first invalid field and toasts what no field shows. It takes `failureLabel`, `refused`, `saved`, `onSaved` and `onError` as SaveForm and FormDialog do, and `class` and any other `form` attribute; the submit button is yours.
+
+```kay
+Form(action={add} saved="Added.")
+  FormField(label="Title" name="title" required)
+    input(name="title")
+  Button(type="submit" label="Add")
+```
 
 SaveForm is the form of an editor page: `SaveForm(action={rename} failureLabel="Could not save" saved="Saved.")` around the fields, each control named as for FormDialog, draws a sticky bar with a status line, Discard and Save.
 
@@ -72,7 +83,7 @@ FormField also works outside a dialog, in a plain form posting to an action:
 `ContactForm(action={contact})` is the form for the action `contactForm(mail, ...)` from kayjs-mail builds (any action with `name`, `email` and `message` fields works): a `form` posting without JavaScript, a FormField per field with the message the action refused it with, a submit button, and a `Notice` that the message went out (`sentLabel`) or why not (`contact.error()`). The labels read the `ui.contactForm.*` messages, then kayjs-mail's `mail.contact.form` ones in the page's language (English else), and the `*Label` props replace them.
 - `onSent(data)` runs once the message went out, with what the action returned (an analytics conversion, closing a dialog around the form), and `onError(failure)` when the post was refused or failed, with `contact.failed()`'s `{ status, message, errors, data }`; the notice and the messages still show. `@sent` replaces the success notice. A form given neither stays static; the callbacks are functions, so they go to a form inside an island.
 
-- Fields beyond the three go in as children, between the email and the message, in a `FormField` with `issue={contact.error('topic')}` and a control named with `name`, since `field` is only valid inside the form's own markup.
+- Fields beyond the three go in as children, between the email and the message, in a `FormField` with a `name` (`FormField(label="Topic" name="topic")`) and a control named the same.
 - `nameLabel`, `emailLabel`, `messageLabel`, `submitLabel`, `sentLabel` replace the labels from the `ui.contactForm.*` messages, then kayjs-mail's `mail.contact.form` ones, `rows` sets the message box, `class` goes on the form.
 - An action with `consent: true` gets a consent checkbox (`consentLabel`), a Checkbox (restyle it as `Checkbox`, its parts nested under ContactForm's `consent`), read from the `consent` field `contactForm({ consent: true })` marks, so an app's own `consent` extra field or hand-written schema gets none (write `consent` on the form to force the box, as inside an island, where the action carries no schema to read), and `privacy="/privacy"` links the privacy page after it, with or without the consent (`privacyLabel`).
 

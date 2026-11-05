@@ -1,0 +1,48 @@
+---
+import type { Action, Failure } from 'kay'
+import { ActionError, signal } from 'kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Form from '@kaynooo/kayjs-ui/form.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+
+// `add` stands in for the server: it answers the saved title, or throws the messages a schema refusal carries.
+const { add: call, onSaved, onError, refused } = props<{ add: (input: { title: string }) => Promise<string | { errors: Record<string, string> } | { data: unknown }>, onSaved: (title: string) => void, onError?: ((failure: { error: unknown }) => unknown) | undefined, refused?: ((data: never) => Record<string, string> | string | undefined) | undefined }>()
+
+const pending = signal(false)
+const last = signal<ActionError | undefined>(undefined)
+
+const add = Object.assign(async (form: FormData) => {
+  pending = true
+
+  try {
+    const answer = await call({ title: String(form.get('title')) })
+
+    if (typeof answer !== 'string') {
+      const error = 'errors' in answer ? new ActionError(422, '', answer.errors) : new ActionError(409, '', {}, answer.data)
+
+      last = error
+      throw error
+    }
+
+    last = undefined
+
+    return answer
+  }
+  finally {
+    pending = false
+  }
+}, {
+  [Symbol.for('kay.action')]: true,
+  pending,
+  url: '/_kay/action/form/add',
+  failed: () => last() ? { status: last()!.status, errors: last()!.errors } : undefined,
+  error: (field = '') => last()?.errors[field],
+}) as unknown as Action<{ title: string }, string | Failure<never>>
+---
+Form(action={add} failureLabel="Could not add" saved="Added." onSaved={onSaved} onError={onError} refused={refused})
+  FormField(label="Title" name="title")
+    input#title(name="title")
+  FormField(label="Slug" name="slug")
+    input#slug(name="slug")
+  button#submit(type="submit") Add
+Toaster

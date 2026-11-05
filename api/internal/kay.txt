@@ -638,6 +638,9 @@ function autoDefer<T>(value: T): T
 [./internal] bindable
 function bindable<Props extends object>(props: Props, keys: readonly string[]): Props
 
+[./internal] errorScope
+function errorScope<Result>(target: unknown, render: () => Result): Result
+
 [./internal] fill
 function fill(name: string, block: () => unknown): string
 
@@ -663,7 +666,7 @@ function formMarked(element: Element, target: unknown, field: string): void
 function formProtection(target: unknown, kept?: boolean): string
 
 [./internal] formScope
-function formScope(target: unknown, render: () => string): string
+function formScope<Result>(target: unknown, render: () => Result): Result
 
 [./internal] formValue
 function formValue(target: unknown, name: string): string | undefined

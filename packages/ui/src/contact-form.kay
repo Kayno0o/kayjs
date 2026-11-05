@@ -42,18 +42,18 @@ const { action, nameLabel = wording('ui.contactForm.name', wording('mail.contact
 // Server actions carry their schema; the consent checkbox is drawn when `consent: true` marked the field.
 const asksConsent = () => consent ?? (action as { schema?: { properties?: Record<string, Record<string, unknown> | undefined> } }).schema?.properties?.consent?.['x-kay-consent'] === true
 ---
-// Posts without JavaScript; the honeypot, the time check and the refused fields' messages come from the action. Fields beyond those three go in as children, between the email and the message.
+// Posts without JavaScript; the honeypot, the time check and the refused fields' messages come from the action, each FormField showing its own by `name`. Fields beyond those three go in as children, between the email and the message.
 form(part="root" {...rest} action={action} novalidate)
-  FormField(label={nameLabel} required issue={action.error('name')})
+  FormField(label={nameLabel} required name="name")
     input(field="name" autocomplete="name")
-  FormField(label={emailLabel} required issue={action.error('email')})
+  FormField(label={emailLabel} required name="email")
     input(field="email" autocomplete="email")
   slot
-  FormField(label={messageLabel} required issue={action.error('message')})
+  FormField(label={messageLabel} required name="message")
     textarea(field="message" rows={rows})
   if asksConsent()
     div(part="consent")
-      Checkbox(part="consentBox issues issue" name="consent" label={consentLabel} issue={action.error('consent')})
+      Checkbox(part="consentBox issues issue" name="consent" label={consentLabel})
       if privacy
         a(part="link" href={privacy} {...OUTSIDE}) {privacyLabel}
   else if privacy

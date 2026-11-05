@@ -11,6 +11,7 @@ const done = signal<{ data: unknown } | undefined>(undefined)
 const failed = signal<FormFailure<never, unknown> | undefined>(undefined)
 
 const action = Object.assign(async () => undefined, {
+  [Symbol.for('kay.action')]: true,
   url: '/_kay/action/mail/form',
   pending: () => false,
   succeeded: () => done(),

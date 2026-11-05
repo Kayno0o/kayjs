@@ -37,6 +37,8 @@ type Binding = (variable: (node: TemplateNode) => string) => void
 
 // A template as code building its DOM in the browser, or claiming the server's markup of it when an island hydrates.
 export class DomTemplate extends TemplateWriter {
+  protected override readonly scoping = 'errorScope'
+
   protected override readonly lazySlots = true
   private readonly templates: string[] = []
   private counter = 0
@@ -124,8 +126,28 @@ export class DomTemplate extends TemplateWriter {
         break
       case 'slot':
         b.wrap(item.node, () => {
+          const form = this.facts.forms.get(item.node)
+
           b.add(`KayInsert(${at}, () => `)
-          slotValue(b, item.node)
+
+          // The content a parent gives a form is built here, inside the form's scope, so the fields in it read the form's action as the ones written in the form do.
+          if (form) {
+            b.add(`${helperName(this.scoping)}((`).addSource(form).add('), () => ')
+
+            if (item.node.outlet) {
+              slotValue(b, item.node)
+            }
+            else {
+              b.add('{ const KayC = ')
+              slotValue(b, item.node)
+              b.add('; return typeof KayC === "function" ? KayC() : KayC }')
+            }
+
+            b.add(')')
+          }
+          else {
+            slotValue(b, item.node)
+          }
 
           if (item.node.children.length > 0) {
             b.add(' ?? (')
@@ -724,13 +746,22 @@ export class DomTemplate extends TemplateWriter {
     // A tag read at runtime may name a form, whose `submit` handler, written or spread, is held as a written form's is.
     const holds = dynamic && element.attributes.some(attribute => attribute.kind === 'spread' || this.source(attribute.name).toLowerCase() === 'onsubmit')
 
+    const form = this.facts.forms.get(element)
+
     if (holds)
       b.add(`(${helperName('holdSubmits')}(), `)
+
+    // The component's script runs inside the form's scope, so the fields it draws show the form's action's messages with no prop.
+    if (form)
+      b.add(`${helperName(this.scoping)}((`).addSource(form).add('), () => ')
 
     b.add(dynamic ? 'KayDynamic(' : 'KayComponent(').addSource(element.tag).add(', ')
 
     this.componentProps(element, true)
     b.add(holds ? '))' : ')')
+
+    if (form)
+      b.add(')')
   }
 
   protected rendered(nodes: Node[]): void {

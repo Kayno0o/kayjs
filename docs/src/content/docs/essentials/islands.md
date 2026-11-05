@@ -14,7 +14,7 @@ button(onClick={() => count++}) Clicked {count()} times
 
 A component is an island when it has an `on*` handler, a `bind:` or a `ref`, or when its script uses a value from `kay`, such as `signal`.
 
-The helpers that compute the same on both sides do not count: `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `byteCount`, `ctx`, `defer`, `defineUi`, `describeField`, `durationMs`, `escapeHtml`, `isEmail`, `localPath`, `postedChecked`, `postedValue`, `postedValues`, `publicEnv`, `recipe`, `refusalMessage`, `route`, `s`, `sanitizeHtml`, `trustHtml`, `uid`, `withBase` and `withQuery` keep a component static.
+The helpers that compute the same on both sides do not count: `ActionError`, `ActionRedirectError`, `ApiError`, `apiUrl`, `byteCount`, `ctx`, `defer`, `defineUi`, `describeField`, `durationMs`, `escapeHtml`, `formErrors`, `isEmail`, `localPath`, `postedChecked`, `postedValue`, `postedValues`, `publicEnv`, `recipe`, `refusalMessage`, `route`, `s`, `sanitizeHtml`, `trustHtml`, `uid`, `withBase` and `withQuery` keep a component static.
 
 A namespace or default import of `kay` or `kay/i18n` (`import * as i18n from 'kay/i18n'`) always makes an island, so import the names you use instead.
 

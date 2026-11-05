@@ -91,16 +91,40 @@ export function formValue(target: unknown, name: string): string | undefined {
 // The actions of the forms being rendered, the innermost last, which a component inside one reads to show a refused post's values again.
 const enclosing: unknown[] = []
 
-// Renders a form's content with the form's action as the one `postedValue` and `postedChecked` read.
-export function formScope(target: unknown, render: () => string): string {
+// Renders a form's content with the form's action as the one `postedValue`, `postedChecked` and `formErrors` read.
+export function formScope<Result>(target: unknown, render: () => Result): Result {
   enclosing.push(target)
+
+  try {
+    return errorScope(target, render)
+  }
+  finally {
+    enclosing.pop()
+  }
+}
+
+// The actions of the forms being rendered in the browser, whose messages `formErrors` reads: a component of an island's template knows its form by this, where `postedValue` keeps reading the server's markup.
+const reading: unknown[] = []
+
+// Renders a form's content with the form's action as the one `formErrors` reads.
+export function errorScope<Result>(target: unknown, render: () => Result): Result {
+  reading.push(target)
 
   try {
     return render()
   }
   finally {
-    enclosing.pop()
+    reading.pop()
   }
+}
+
+// The messages of the form being rendered, its action's `error(field)`, for a component drawing a field to show them without an `issue` prop: taken in the component's script, where the form is known, and read later, in an effect or a template.
+// The server's render, and a component an island's template calls inside a `form(action)`, both know the form; outside one, or for a plain URL, no field has a message.
+// kept: free, as `postedValue` is.
+export function formErrors(): (field: string) => string | undefined {
+  const target = reading.at(-1)
+
+  return isAction(target) ? field => (target as FormTarget).error(field) : () => undefined
 }
 
 const QUOTES = /["\\]/g

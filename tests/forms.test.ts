@@ -864,3 +864,64 @@ describe('formsScript', () => {
     expect(formsScript(pages, true)).toContain('two')
   })
 })
+
+describe('the form a component is drawn in', () => {
+  const head = '---\nimport Field from \'./field.kay\'\nimport { add } from \'./page.kay\'\n---\n'
+  const source = `${head}Field(name="outside")\nform(action={add})\n  Field(name="title")\n  if add.pending()\n    Field(name="more")\n`
+
+  it('is the scope an island\'s component runs in, as on the server, and no component outside one is wrapped', () => {
+    const dom = compileKay(source, 'page.kay', { output: 'dom' }).tsx
+
+    expect(dom).toContain('errorScope as KayErrorScope')
+    expect(dom.match(/KayErrorScope\(\(add\), \(\) => KayComponent\(Field/g)).toHaveLength(2)
+    expect(dom.match(/KayComponent\(Field/g)).toHaveLength(3)
+  })
+
+  it('imports the scope only for a template drawing a component inside a form', () => {
+    expect(compileKay('form(action={add})\n  input(name="title")\n', 'page.kay', { output: 'dom' }).tsx).not.toContain('errorScope')
+    expect(compileKay(`${head}Field(name="outside")\n`, 'page.kay', { output: 'dom' }).tsx).not.toContain('errorScope')
+  })
+
+  it('scopes a component of a form with its own action inside a loop by that action', () => {
+    const dom = compileKay(`${head}for row of rows\n  form(action={add.with({ id: row.id })})\n    Field(name="title")\n`, 'page.kay', { output: 'dom' }).tsx
+
+    expect(dom).toContain('KayErrorScope((add.with({ id: row().id })), () => KayComponent(Field')
+  })
+})
+
+describe('the content a component gives a form', () => {
+  const form = '---\nimport { add } from \'./page.kay\'\nconst { action, ...rest } = props<{ action: typeof add }>()\n---\nform(part="root" {...rest} action={action})\n  slot\n'
+
+  it('is built in the form\'s scope, in the browser and on the server, a form spreading its attributes included', () => {
+    const dom = compileKay(form.replace('{action, ...rest}', '{ action, ...rest }'), 'form.kay', { output: 'dom' }).tsx
+    const html = compileKay(form, 'form.kay', { output: 'html' }).tsx
+
+    expect(dom).toContain('KayErrorScope((__props.action), () => { const KayC = __props.children; return typeof KayC === "function" ? KayC() : KayC })')
+    expect(html).toContain('KayFormScope((__props.action), () => ')
+  })
+
+  it('leaves the slot of a component with no form alone', () => {
+    expect(compileKay('slot\n', 'box.kay', { output: 'dom' }).tsx).not.toContain('errorScope')
+  })
+})
+
+describe('the content of a component given an action', () => {
+  const source = '---\nimport Form from \'./form.kay\'\nimport Field from \'./field.kay\'\nimport { add } from \'./page.kay\'\n---\nForm(action={add})\n  Field(name="title")\n  input(name="title")\nForm(action="/plain")\n  Field(name="other")\n'
+
+  it('renders inside the action\'s scope on the server and in the browser, a plain URL leaving it out', () => {
+    const html = compileKay(source, 'page.kay', { output: 'html' }).tsx
+    const dom = compileKay(source, 'page.kay', { output: 'dom' }).tsx
+
+    expect(html).toMatch(/get children\(\) \{ return KayFormScope\(\(add\), \(\) => \(/)
+    expect(html.match(/KayFormScope\(/g)).toHaveLength(1)
+    expect(dom).toMatch(/get children\(\) \{ return \(\) => \(KayErrorScope\(\(add\), \(\) => \(/)
+    expect(dom.match(/KayErrorScope\(\(add\)/g)).toBeTruthy()
+  })
+
+  it('leaves the fields written inside to the page, as the action\'s input types only the fields of a form', () => {
+    const html = compileKay(source, 'page.kay', { output: 'html' }).tsx
+
+    expect(html).not.toContain('KayFormValue')
+    expect(html).not.toContain('KayFormInvalid(')
+  })
+})

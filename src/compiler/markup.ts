@@ -4,7 +4,7 @@ import type { CodeBuilder } from './mapping'
 import { resolveClasses } from '../runtime/class-table'
 import { PART_END, PART_START } from '../runtime/markers'
 import { URL_ATTRIBUTES } from '../runtime/url-attributes'
-import { actionOf, bindsOwnProp, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, handedParts, modifiersOf, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
+import { actionOf, bindsOwnProp, componentAction, describedByOf, FIELD_ATTRIBUTE, FIELD_ELEMENTS, formFieldOf, handedParts, modifiersOf, partAttribute, partNames, partsOf, sectionOf, uiHasVariants, uiPartClasses } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
 import { PROPS } from './names'
 import { bindEvent } from './validate'
@@ -203,6 +203,9 @@ export abstract class TemplateWriter {
   // The server hands over the markup itself, which an island reads its static slots off, and so draws a slot's ids once per read where the browser draws them once per insert; the browser sets the ids it binds, so they agree.
   protected readonly lazySlots: boolean = false
 
+  // The helper scoping a form's content: the server's also lets the fields in it refill, the browser's only gives them the form's messages.
+  protected readonly scoping: 'formScope' | 'errorScope' = 'formScope'
+
   // Children rendered as the template renders them: markup on the server, a block in the browser.
   protected abstract rendered(nodes: Node[]): void
 
@@ -397,6 +400,7 @@ export abstract class TemplateWriter {
       b.add(`${helperName('merge')}(`)
 
     const props = this.sources(element, getters, true)
+    const scope = componentAction(element, this.src)?.expression
 
     for (const slot of element.children.filter((child): child is SlotNode => child.kind === 'slot' && child !== except)) {
       props.separate()
@@ -407,7 +411,7 @@ export abstract class TemplateWriter {
       }
       else {
         b.add(`get ${JSON.stringify(this.source(slot.name))}() { return `)
-        this.childrenValue(slot.children, this.lazySlots)
+        this.childrenValue(slot.children, this.lazySlots, scope)
         b.add(' }')
 
         // A client-only island shows the use's `@fallback` through a key of kay's own, so a component with a `fallback` prop keeps it.
@@ -424,7 +428,7 @@ export abstract class TemplateWriter {
     if (children.length > 0) {
       props.separate()
       b.add('get children() { return ')
-      this.childrenValue(children, this.lazySlots)
+      this.childrenValue(children, this.lazySlots, scope)
       b.add(' }')
     }
 
@@ -800,7 +804,8 @@ export abstract class TemplateWriter {
 
   // What a component receives as `children` or a slot: a lone line of text as its string or values, as JSX passes it, anything else rendered.
   // With `lazy`, rendered children are a function building them, which `eachChild` calls where they are put.
-  protected childrenValue(nodes: Node[], lazy = false): void {
+  // With `scope`, the expression of the `action` the component is given, the content renders as that action's form's does.
+  protected childrenValue(nodes: Node[], lazy = false, scope?: Span): void {
     const { b } = this
     const lone = nodes.length === 1 && nodes[0]!.kind === 'text' ? nodes[0] : undefined
 
@@ -808,7 +813,13 @@ export abstract class TemplateWriter {
       if (lazy)
         b.add('() => (')
 
+      if (scope)
+        b.add(`${helperName(this.scoping)}((`).addSource(scope).add('), () => (')
+
       this.rendered(nodes)
+
+      if (scope)
+        b.add('))')
 
       if (lazy)
         b.add(')')

@@ -587,4 +587,6 @@ Without one, a production server refuses to start, as it would sign with a key o
 
 ## Components that show a refused post
 
+A component inside a form reads the form's messages with `formErrors()` from `kay`: call it in the component's script, then `errors('title')` gives what the action refused `title` with (`add.error('title')`), or nothing outside a form. It is how a kayjs-ui FormField shows its message from its `name` alone. A component given an `action`, such as kayjs-ui's `Form`, is that form for its content.
+
 A component inside a form reads the refused post with `postedValue(name)`, `postedChecked(name, value)` and `postedValues(name)` from `kay`, so a control of your own can show it again as the kayjs-ui ones do. They answer `undefined` outside a refused post and for a field named like a secret. In the browser they read what the server rendered. A list field is posted back as `name[]`. Forms posting to the same action share one refused post.

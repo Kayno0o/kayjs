@@ -938,12 +938,22 @@ export class HtmlTemplate extends TemplateWriter {
     })
 
     if (children.length > 0) {
+      const action = actionOf(element, this.src)
+
       b.add(', () => ')
+
+      // The fields in a form spreading its attributes read its action as they render, as in one that does not.
+      if (action)
+        b.add(`${helperName('formScope')}((`).addSource(action.expression).add('), () => ')
+
       this.honeypot(element, () => {
         this.honeypotField(element)
         b.add(' + ')
       })
       this.markup(children, true)
+
+      if (action)
+        b.add(')')
     }
 
     b.add(').t')

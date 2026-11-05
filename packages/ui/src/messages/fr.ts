@@ -79,6 +79,7 @@ export default defineMessages({
     dialog: { close: 'Fermer' },
     dnd: { handleItem: 'Déplacer {item}', handle: 'Déplacer', moved: 'Déplacé en position {position} sur {count}' },
     fileDrop: { choose: 'Choisir des fichiers', drop: 'ou les déposer ici', remove: 'Retirer {file}' },
+    form: { failure: 'Enregistrement impossible.' },
     formDialog: { cancel: 'Annuler', failure: 'Enregistrement impossible.', saving: 'Enregistrement…' },
     iconPicker: {
       clear: 'Effacer l\'icône choisie',

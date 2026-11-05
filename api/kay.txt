@@ -421,6 +421,9 @@ interface FollowLogOptions
   items?: string | undefined
   threshold?: number | undefined
 
+[.] formErrors
+function formErrors(): (field: string) => string | undefined
+
 [.] FormFailure
 interface FormFailure<Input, Data, Honeypot extends string = never>
   data?: Data
