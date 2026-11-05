@@ -100,7 +100,7 @@ export function formScope<Result>(target: unknown, render: () => Result, only = 
   enclosing.push(target)
 
   try {
-    return errorScope(target, render)
+    return issueScope(target, render)
   }
   finally {
     enclosing.pop()
@@ -112,7 +112,7 @@ const reading: unknown[] = []
 
 // Renders a form's content with the form's action as the one `formErrors` reads, `only` as `formScope` takes it.
 // An island's own template on the server renders with none, as in the browser a page's form is not known to it.
-export function errorScope<Result>(target: unknown, render: () => Result, only = false): Result {
+export function issueScope<Result>(target: unknown, render: () => Result, only = false): Result {
   if (only && !isAction(target))
     return render()
 

@@ -2,7 +2,7 @@ import type { IslandComponent, IslandOptions } from './checks'
 import type { JSX } from './jsx'
 import type { Html } from './rendered'
 import { isAction } from './action'
-import { errorScope } from './action-form'
+import { issueScope } from './action-form'
 import { escapeAttribute, quotedAttribute } from './escape'
 import { withFieldMarks } from './fields'
 import { headMark, setsIslandTitle } from './head'
@@ -174,7 +174,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 
     try {
       // Detached, as in the browser, where an island reads nothing the page's components provide.
-      const { result: html, count } = browserOnly ? { result: placeholder((props as Record<string, unknown>)[USE_FALLBACK] as JSX.Element | undefined, ownFallback), count: 0 } : withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(prefix, () => errorScope(undefined, () => child(component!(given)))), true)))
+      const { result: html, count } = browserOnly ? { result: placeholder((props as Record<string, unknown>)[USE_FALLBACK] as JSX.Element | undefined, ownFallback), count: 0 } : withFieldMarks(undefined, () => renderOnServer(() => scope(() => countIds(prefix, () => issueScope(undefined, () => child(component!(given)))), true)))
       const shipped = slots.length === 0 ? '' : ` data-slots=${quotedAttribute(slotsValue(slots, html))}`
       // Marks an island whose title the page shows, so the browser leaves it alone while a later one has not hydrated.
       const titled = setsIslandTitle(mark) ? ` ${TITLED_ATTRIBUTE}` : ''

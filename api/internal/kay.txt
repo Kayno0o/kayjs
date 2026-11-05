@@ -638,9 +638,6 @@ function autoDefer<T>(value: T): T
 [./internal] bindable
 function bindable<Props extends object>(props: Props, keys: readonly string[]): Props
 
-[./internal] errorScope
-function errorScope<Result>(target: unknown, render: () => Result, only?: boolean): Result
-
 [./internal] fill
 function fill(name: string, block: () => unknown): string
 
@@ -673,6 +670,9 @@ function formValue(target: unknown, name: string): string | undefined
 
 [./internal] isAction
 function isAction(value: unknown): value is ServerAction<TSchema, unknown, never>
+
+[./internal] issueScope
+function issueScope<Result>(target: unknown, render: () => Result, only?: boolean): Result
 
 [./internal] loadTemplateContext
 function loadTemplateContext({ request }: { request: Request; }): Promise<void>

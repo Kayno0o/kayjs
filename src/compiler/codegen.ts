@@ -438,7 +438,7 @@ class ModuleShell {
 
     // A component inside a form, or inside a component given an `action`, reads the action as it renders, in the browser as on the server.
     if (facts.scopedForm || (mode === 'html' ? facts.actionForm : [...facts.forms.keys()].some(node => node.kind === 'element' && (node.component || isSlot(node)) && !facts.loose.has(node))))
-      kayHelpers.push(mode === 'dom' ? 'errorScope' : 'formScope')
+      kayHelpers.push(mode === 'dom' ? 'issueScope' : 'formScope')
 
     if (fence ? fence.exportNames.length > 0 : actions.length > 0)
       kayHelpers.push(fence ? 'registerActions' : 'actionStub')
@@ -1244,7 +1244,7 @@ function fillElement(block: SlotNode): ElementNode {
   return { kind: 'element', start: block.start, end: block.end, tag: { start: block.start, end: block.start }, name: 'KayFill', component: true, classes: [], attributes: [], children: block.children, fills: block.name }
 }
 
-type KayHelper = 'fill' | 'uiRecipe' | 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'formScope' | 'errorScope' | 'registerActions' | 'actionStub' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
+type KayHelper = 'fill' | 'uiRecipe' | 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'formScope' | 'issueScope' | 'registerActions' | 'actionStub' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
 
 type Helper = TemplateHelper | 'omit'
 

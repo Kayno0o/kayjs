@@ -204,7 +204,7 @@ export abstract class TemplateWriter {
   protected readonly lazySlots: boolean = false
 
   // The helper scoping a form's content: the server's also lets the fields in it refill, the browser's only gives them the form's messages.
-  protected readonly scoping: 'formScope' | 'errorScope' = 'formScope'
+  protected readonly scoping: 'formScope' | 'issueScope' = 'formScope'
 
   // Whether the browser leaves the fields of a component given an `action` to the component, which does not wire them to the action.
   protected readonly wiresLoose: boolean = true

@@ -1,7 +1,7 @@
 import type { Action } from '../src/runtime/action'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { errorScope, formChecked, formErrors, formScope, postedChecked, postedValue, postedValues } from '../src/runtime/action'
+import { formChecked, formErrors, formScope, issueScope, postedChecked, postedValue, postedValues } from '../src/runtime/action'
 import { ACTION } from '../src/runtime/action-shared'
 import { submittedValues } from '../src/server/flash'
 import { testSite } from '../src/test'
@@ -211,7 +211,7 @@ describe('formErrors', () => {
       throw new Error('boom')
     })).toThrow('boom')
     expect(formErrors()('x')).toBeUndefined()
-    expect(() => errorScope(target, () => {
+    expect(() => issueScope(target, () => {
       throw new Error('boom')
     })).toThrow('boom')
     expect(formErrors()('x')).toBeUndefined()
@@ -222,7 +222,7 @@ describe('formErrors', () => {
 
     target.error = () => 'page'
 
-    expect(inside(target, () => errorScope(undefined, () => formErrors()('x')))).toBeUndefined()
+    expect(inside(target, () => issueScope(undefined, () => formErrors()('x')))).toBeUndefined()
     expect(inside(target, () => formErrors()('x'))).toBe('page')
   })
 })

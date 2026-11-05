@@ -37,7 +37,7 @@ type Binding = (variable: (node: TemplateNode) => string) => void
 
 // A template as code building its DOM in the browser, or claiming the server's markup of it when an island hydrates.
 export class DomTemplate extends TemplateWriter {
-  protected override readonly scoping = 'errorScope'
+  protected override readonly scoping = 'issueScope'
 
   protected override readonly wiresLoose = false
 
