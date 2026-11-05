@@ -20,8 +20,8 @@ const { size = 'md', invalid, value, min = 0, max = 100, step, label, showValue 
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
-  // The value to start with; a slider whose parent passes another follows it.
-  value: number
+  // The value to start with, `min` when left out; a slider whose parent passes another follows it.
+  value?: number | undefined
   // The bounds, 0 and 100 by default.
   min?: number | undefined
   max?: number | undefined
@@ -40,12 +40,15 @@ const { size = 'md', invalid, value, min = 0, max = 100, step, label, showValue 
 }>()
 
 // A slider with no callback is plain: a refused post of its form, which the server renders it for, gives its figure back in place of its own.
-const sent = onInput || onChange ? undefined : postedValue(rest.name, value)
+// kay-allow once-read-prop: the figure a slider without a `value` starts on is chosen when it is created
+const start = min
+const figure = () => value ?? start
+const sent = onInput || onChange ? undefined : postedValue(rest.name, figure())
 const posted = Number(sent)
 
 const { shown, busy, ref: sliderRef, move, change: released } = controlledInput<number>({
   control: 'Slider',
-  value: () => sent !== undefined && Number.isFinite(posted) ? posted : value,
+  value: () => sent !== undefined && Number.isFinite(posted) ? posted : figure(),
   onChange: () => onChange,
   read: input => Number(input.value),
   write: (input, next) => {

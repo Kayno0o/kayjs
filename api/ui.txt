@@ -926,7 +926,7 @@ component default
   option?: ((option: { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[]
   showLabel?: boolean | undefined
-  value: readonly Value[]
+  value?: readonly Value[] | undefined
 
 [./collapsible-section.kay] default
 component default
@@ -955,7 +955,7 @@ component default
   invalid?: boolean | undefined
   label: string
   onChange?: ((value: string) => unknown) | undefined
-  value: string
+  value?: string | undefined
 
 [./combobox.kay] default
 component default
@@ -1930,7 +1930,7 @@ component default
   onChange?: ((value: (null extends Held ? Held & null : never) | Value) => unknown) | undefined
   option?: ((option: { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: readonly { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }[] & NullOption<Value, Held>
-  value: Held
+  value?: Held | undefined
 
 [./range-input.kay] default
 component default
@@ -1967,7 +1967,7 @@ component default
   max?: number | undefined
   name?: string | undefined
   onChange?: ((value: null | number) => unknown) | undefined
-  value: number
+  value?: number | undefined
 
 [./record-button.kay] default
 component default
@@ -2161,7 +2161,7 @@ component default
   param?: string | undefined
   paramDefault?: number | string | undefined
   showLabel?: boolean | undefined
-  value: Held
+  value?: Held | undefined
 
 [./select.kay] default
 component default
@@ -2179,7 +2179,7 @@ component default
   paramDefault?: number | string | undefined
   size?: FieldSize | undefined
   submit?: boolean | undefined
-  value: (Empty extends string | true ? "" : never) | Value
+  value?: (Empty extends string | true ? "" : never) | Value | undefined
 
 [./side-panel.kay] default
 component default
@@ -2291,7 +2291,7 @@ component default
   showValue?: boolean | undefined
   size?: FieldSize | undefined
   step?: number | undefined
-  value: number
+  value?: number | undefined
 
 [./sparkline.kay] default
 component default

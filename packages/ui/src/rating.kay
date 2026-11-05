@@ -18,9 +18,9 @@ const look = recipe({
   },
 })
 
-const { value, max = 5, label, onChange, name, invalid, icon = 'star', allowClear = false, disabled = false, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role' | 'onChange'> & {
-  // Any number from 0 to `max`, so an average such as 4.6 fills part of its fifth star. A rating that is picked holds a whole number, 0 for none, and follows the parent when it passes another.
-  value: number
+const { value = 0, max = 5, label, onChange, name, invalid, icon = 'star', allowClear = false, disabled = false, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role' | 'onChange'> & {
+  // Any number from 0 to `max`, so an average such as 4.6 fills part of its fifth star. A rating that is picked holds a whole number, 0 for none, and follows the parent when it passes another. 0 when left out.
+  value?: number | undefined
   max?: number | undefined
   // What screen readers read, such as `Rated 4 out of 5`; required as Meter's and Progress's are, since the stars alone name nothing. A rating that is picked names its group by it, such as `Your rating`.
   label: string

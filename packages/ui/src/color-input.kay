@@ -14,9 +14,9 @@ const look = recipe({
   },
 })
 
-const { value, label, invalid, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'onInput' | 'onChange'> & {
-  // The colour as `#rrggbb`, which is what the native picker and a form hold; a box whose parent passes another one follows it.
-  value: string
+const { value = '#000000', label, invalid, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'class' | 'children' | 'type' | 'value' | 'onInput' | 'onChange'> & {
+  // The colour as `#rrggbb`, which is what the native picker and a form hold, black when left out; a box whose parent passes another one follows it.
+  value?: string | undefined
   // Written beside the swatch and naming the input for screen readers.
   label: string
   // Marks the swatch as refused, its keyline in the danger colour, with `aria-invalid`. A FormField showing a message marks it on its own.

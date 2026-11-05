@@ -1,0 +1,23 @@
+---
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
+import Slider from '@kaynooo/kayjs-ui/slider.kay'
+import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
+import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+
+// Every control left without a `value` or a callback, inside a form: each keeps what is picked and posts it under its name.
+const { onPick } = props<{ onPick?: (value: string) => unknown }>()
+const sizes = [{ value: 'a', label: 'A', disabled: true }, { value: 'b', label: 'B' }, { value: 'c', label: 'C' }]
+---
+form#form
+  Select#pick(name="pick" options={sizes.map(size => ({ ...size, disabled: false }))})
+  RadioGroup(name="radio" label="Radio" options={sizes})
+  Slider(name="slide" label="Slide" min={10} max={50})
+  ColorInput(name="colour" label="Colour")
+  Rating(name="stars" label="Stars")
+  Segmented(name="seg" label="Seg" options={sizes})
+  ChipGroup(name="chips" label="Chips" options={sizes})
+  Select#heard(name="heard" options={sizes.map(size => ({ ...size, disabled: false }))} onChange={onPick})
+  button#reset(type="reset") Reset

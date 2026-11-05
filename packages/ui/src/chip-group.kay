@@ -8,6 +8,8 @@ import { GROUP_INVALID, LABEL_TEXT } from './field-look'
 import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 import Icon from './icon.kay'
 
+const NONE: readonly never[] = []
+
 // 'kui-chip' stays as the name of a chip for an app's CSS and the skins; the label reads the input before it.
 const look = recipe({
   parts: {
@@ -21,11 +23,11 @@ const look = recipe({
   },
 })
 
-const { options, value, label, showLabel = false, name, invalid, disabled = false, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value = NONE, label, showLabel = false, name, invalid, disabled = false, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that chip as it is.
   options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
-  // The options picked to start with, in any order; a group whose parent passes others follows them.
-  value: readonly Value[]
+  // The options picked to start with, in any order, none when left out; a group whose parent passes others follows them.
+  value?: readonly Value[] | undefined
   // Names the group for screen readers.
   label: string
   // Writes `label` above the chips, in a Slider's label type, and names the group by it.

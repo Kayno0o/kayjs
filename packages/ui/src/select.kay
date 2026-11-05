@@ -20,8 +20,8 @@ const { size = 'md', invalid, value, options, onChange, param, paramDefault, nam
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
-  // One of the options' values, or the empty string once there is an `emptyOption`.
-  value: Value | (Empty extends string | true ? '' : never)
+  // One of the options' values, or the empty string once there is an `emptyOption`. Left out, the select keeps its pick and starts on its first option, which a form reset goes back to.
+  value?: Value | (Empty extends string | true ? '' : never) | undefined
   // `disabled` keeps that option from being picked. A native option draws no icon, so it has none.
   // A list, or a function answering it, such as an action or a wrapped API call: asked once, with an empty `q`, when the select is drawn in the browser, the select busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected.
   options: readonly SelectOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly SelectOption<Value>[]>)
@@ -46,7 +46,7 @@ const { size = 'md', invalid, value, options, onChange, param, paramDefault, nam
 
 // A select with no callback is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
 const sent = onChange || param !== undefined ? undefined : postedValue(name, value)
-const wanted = () => String(sent ?? value)
+const wanted = () => sent ?? (value === undefined ? undefined : String(value))
 
 interface SelectOption<Choice> { value: Choice, label: string, disabled?: boolean | undefined }
 
@@ -91,7 +91,15 @@ effect(() => {
 })
 
 // The options carry the value to the select, so only what the app last handed is kept; a reset that changes the select has the app's `onChange` told, without submitting.
-const { heard } = controlledValue({ box: () => box, value: () => String(value), write: false, report: select => report(select) })
+const controlled = controlledValue({ box: () => box, value: () => value === undefined ? undefined : String(value), write: false, report: select => report(select) })
+
+// What the select was last told of, which a refused move puts back when the app holds no `value`.
+let known = ''
+
+function heard(text: string) {
+  known = text
+  controlled.heard(text)
+}
 
 function report(select: HTMLSelectElement) {
   heard(select.value)
@@ -107,6 +115,7 @@ const moving = signal(false)
 
 async function move(select: HTMLSelectElement) {
   const choice = list().find(option => String(option.value) === select.value)
+  const before = known
 
   heard(select.value)
 
@@ -114,7 +123,7 @@ async function move(select: HTMLSelectElement) {
     return
 
   // What the app renders now, which it may have changed while the move was under way.
-  const kept = String(value)
+  const kept = value === undefined ? before : String(value)
 
   select.value = kept
   heard(kept)
@@ -174,6 +183,8 @@ function left(event: FocusEvent & { currentTarget: HTMLSelectElement }) {
 
 const ref = startRef<HTMLSelectElement>((element) => {
   box = element
+  // Without a `value` the select starts on the browser's pick, the first option, which a reset goes back to.
+  heard(element.value)
   keepInvalid(element, () => invalid)
 }, rest.ref)
 ---
