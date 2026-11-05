@@ -610,8 +610,8 @@ describe('kay command line', () => {
       terminal.write('\x1B[H\x1B[1;5B \x1B[B\x1B[B\x1B[B \r')
 
       expect(await child.exited).toBe(0)
-      expect(screen).toContain('Start from \x1B[36mblank')
-      expect(screen).toContain('Features \x1B[36mserver, starter, tailwind, accents\x1B')
+      expect(screen).toContain('✓ Start from blank')
+      expect(screen).toContain('✓ Features server, starter, tailwind, accents')
 
       const files = await readdir(join(dir, 'picked'), { recursive: true })
 
