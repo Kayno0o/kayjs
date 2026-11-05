@@ -91,10 +91,10 @@ describe('attachments to the fake', () => {
     expect(error.kind).toBe('too-long')
     expect((await failure(ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxSize: '999b' }))).kind).toBe('too-long')
     expect((await failure(ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxAttachmentBytes: 999 }))).kind).toBe('too-long')
-    expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxSize: '1kb', maxAttachmentBytes: 10 })).toBe('Fake reply to: x')
     expect(error.status).toBeUndefined()
     expect(fakeAi.asked).toHaveLength(0)
     expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi })).toBe('Fake reply to: x')
+    expect(await ask([{ role: 'user', content: 'x', attachments: [big] }], { provider: fakeAi, maxSize: '1kb', maxAttachmentBytes: 10 })).toBe('Fake reply to: x')
   })
 
   it('counts an image and a PDF against maxInputChars', async () => {

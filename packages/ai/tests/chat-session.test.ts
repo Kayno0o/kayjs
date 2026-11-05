@@ -606,7 +606,7 @@ test('a file size limit is bytes or a size with its unit, 5 MB by default', () =
   expect(fileSizeLimit(undefined)).toBe(5 * 1024 * 1024)
   expect(fileSizeLimit(100)).toBe(100)
   expect(fileSizeLimit('2kb')).toBe(2048)
-  expect(fileSizeLimit('1.5MB')).toBe(1.5 * 1024 * 1024)
+  expect(fileSizeLimit('1.5mb')).toBe(1.5 * 1024 * 1024)
   expect(() => fileSizeLimit('5gb' as never)).toThrow('maxSize')
   expect(() => fileSizeLimit(0)).toThrow('maxSize')
 })
