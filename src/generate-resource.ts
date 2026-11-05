@@ -321,7 +321,7 @@ function editPage(names: Names, fields: readonly Field[], project: ResourceProje
   const removal = `form(action={remove.with({ id: ${row}.id })})\n  button Delete\na(href="/${folder}") Back\n`
 
   if (project.ui)
-    return `${server}--- script\nimport FormField from '@kaynooo/kayjs-ui/form-field.kay'\nimport SaveForm from '@kaynooo/kayjs-ui/save-form.kay'\n---\n${head}SaveForm(action={update} failure="Could not save the ${label.toLowerCase()}" saved="Saved.")\n  input(type="hidden" name="id" value={${row}.id})\n${controls(fields, true, row, 1).join('\n')}\n${removal}`
+    return `${server}--- script\nimport FormField from '@kaynooo/kayjs-ui/form-field.kay'\nimport SaveForm from '@kaynooo/kayjs-ui/save-form.kay'\n---\n${head}SaveForm(action={update} failureLabel="Could not save the ${label.toLowerCase()}" saved="Saved.")\n  input(type="hidden" name="id" value={${row}.id})\n${controls(fields, true, row, 1).join('\n')}\n${removal}`
 
   return `${server}---\n${head}form(action={update.with({ id: ${row}.id })})\n${controls(fields, false, row, 1).join('\n')}\n  button Save\n${removal}`
 }
@@ -339,7 +339,7 @@ import { create } from '../routes/${names.folder}/_actions.kay'
 const writing = signal(false)
 ---
 Button(label="New ${label}" tone="accent" icon="plus" onClick={() => writing = true})
-FormDialog(open={writing()} title="New ${label}" action={create} submitLabel="Create" failure="Could not create the ${label}" onOpenChange={open => writing = open})
+FormDialog(open={writing()} title="New ${label}" action={create} submitLabel="Create" failureLabel="Could not create the ${label}" onOpenChange={open => writing = open})
 ${controls(fields, true, undefined, 1).join('\n')}
 `
 }

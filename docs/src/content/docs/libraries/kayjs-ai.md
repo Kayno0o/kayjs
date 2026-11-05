@@ -121,13 +121,13 @@ A source is `{ n, title, href }`, and its `href` is an `http(s)` address, a path
 
 Every text is looked up in the app's catalogs under an `ai.chat.<name>` key first (`ai.chat.send`, `ai.chat.greeting`, `ai.chat.open`, `ai.chat.running` and so on), and kayjs-ai ships the French of each, so a site on `lang: 'fr'` needs no setup; a key the app words in its own `src/messages/<locale>.ts` replaces it.
 
-Every label is also a prop, which replaces the message: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them), `greeting` and `errorMessage`.
+Every label is also a prop, which replaces the message: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them), `greeting` and `failureLabel` (`errorMessage` until 1.93). The wording keys keep their names, such as `ai.chat.error`.
 
 The status of a tool call and the two parts it opens to are labels too: `runningLabel`, `doneLabel`, `failedLabel`, `argumentsLabel` and `resultLabel`. A call held for the visitor's yes has `approvalLabel`, `allowLabel`, `denyLabel`, `allowedLabel` and `deniedLabel`.
 
 The line under the chat has its own prop, `disclosure`, [explained below](#personal-data-and-the-ai-notice).
 
-The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with, each a `ChatTurn` (`{ role, content, sources? }`, a type `@kaynooo/kayjs-ai` exports): a message carrying attachments cannot be passed, as an island prop holds no file.
+The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `failureLabel`. `initial` gives messages to start with, each a `ChatTurn` (`{ role, content, sources? }`, a type `@kaynooo/kayjs-ai` exports): a message carrying attachments cannot be passed, as an island prop holds no file.
 
 The chat posts its last 20 messages with each one; the `history` prop changes that, and what is posted always opens on one of the visitor's, so an assistant greeting in `initial` is never the first message. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
 

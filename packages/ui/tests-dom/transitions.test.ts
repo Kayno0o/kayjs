@@ -52,7 +52,7 @@ describe('Avatar and SiteFavicon', () => {
     root.querySelector('#favicon img')!.dispatchEvent(new Event('error'))
     await settle()
 
-    expect(calls).toEqual(['avatar load', 'favicon load', 'avatar error', 'favicon error'])
+    expect(calls).toEqual(['avatar load', 'favicon load', 'avatar error error', 'favicon error error'])
   })
 
   test('draw the fallback block in place of the initial and the globe', async () => {
@@ -90,14 +90,14 @@ describe('CopyButton', () => {
 
     click(refused.root.querySelector('#copy'))
     await settle()
-    expect(refused.calls).toEqual(['failed'])
+    expect(refused.calls).toEqual(['failed true'])
     mounted?.unmount()
 
     const broken = await mount('broken')
 
     click(broken.root.querySelector('#copy'))
     await settle()
-    expect(broken.calls).toEqual(['failed'])
+    expect(broken.calls).toEqual(['failed true'])
   })
 
   test('writes nothing and tells onError for a text that resolves to nothing', async () => {
@@ -107,6 +107,6 @@ describe('CopyButton', () => {
     click(root.querySelector('#copy'))
     await settle()
     expect(written).toEqual([])
-    expect(calls).toEqual(['failed'])
+    expect(calls).toEqual(['failed true'])
   })
 })

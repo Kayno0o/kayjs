@@ -14,12 +14,12 @@ const sources = {
   empty: async () => '',
 }
 ---
-Avatar#avatar(src="/ada.png" name="Ada" onLoad={() => calls.push('avatar load')} onError={() => calls.push('avatar error')})
+Avatar#avatar(src="/ada.png" name="Ada" onLoad={() => calls.push('avatar load')} onError={({ event }) => calls.push(`avatar error ${event.type}`)})
 Avatar#drawn(src="/ada.png" name="Ada")
   @fallback
     b.fallback ?
-SiteFavicon#favicon(src="/favicon.png" name="Site" onLoad={() => calls.push('favicon load')} onError={() => calls.push('favicon error')})
+SiteFavicon#favicon(src="/favicon.png" name="Site" onLoad={() => calls.push('favicon load')} onError={({ event }) => calls.push(`favicon error ${event.type}`)})
 SiteFavicon#globe(src="/favicon.png" name="Site")
   @fallback
     b.fallback ?
-CopyButton#copy(text={sources[source]} label="Copy" onCopy={copied => calls.push(`copied ${copied}`)} onError={() => calls.push('failed')})
+CopyButton#copy(text={sources[source]} label="Copy" onCopy={copied => calls.push(`copied ${copied}`)} onError={({ error }) => calls.push(`failed ${error instanceof Error}`)})

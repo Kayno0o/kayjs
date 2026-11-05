@@ -384,13 +384,14 @@ describe('ImageCropper callbacks and crop', () => {
   })
 
   test('onError runs when the image does not load, and the stage says so', async () => {
-    let failures = 0
-    const root = await media({ onCropError: () => failures++ })
+    const failures: { event?: Event | undefined, error?: unknown }[] = []
+    const root = await media({ onCropError: (failure: { event?: Event | undefined, error?: unknown }) => failures.push(failure) })
 
     root.querySelector('.kui-image-cropper [data-part="image"]')!.dispatchEvent(new Event('error'))
     await settle()
 
-    expect(failures).toBe(1)
+    expect(failures).toHaveLength(1)
+    expect(failures[0]!.event?.type).toBe('error')
     expect(root.querySelector('.kui-image-cropper [data-part="error"]')?.textContent).toBe('The image could not be loaded.')
   })
 })

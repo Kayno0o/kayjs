@@ -1561,7 +1561,7 @@ describe('once-read-prop', () => {
 })
 
 describe('deprecated-ui-failures', () => {
-  const imports = 'import CopyButton from \'@kaynooo/kayjs-ui/copy-button.kay\'\nimport SaveForm from \'@kaynooo/kayjs-ui/save-form.kay\'\nimport IconPicker from \'@kaynooo/kayjs-ui/icon-picker.kay\'\nimport Other from \'./other.kay\'\n'
+  const imports = 'import CopyButton from \'@kaynooo/kayjs-ui/copy-button.kay\'\nimport SaveForm from \'@kaynooo/kayjs-ui/save-form.kay\'\nimport ConfirmDelete from \'@kaynooo/kayjs-ui/confirm-delete.kay\'\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\nimport IconPicker from \'@kaynooo/kayjs-ui/icon-picker.kay\'\nimport Other from \'./other.kay\'\n'
   const found = (template: string) => {
     const source = `---\n${imports}---\n${template}\n`
     const result = compileKay(source, 'failures.kay', { check: true })
@@ -1575,6 +1575,19 @@ describe('deprecated-ui-failures', () => {
     expect(found('CopyButton(text="x" {failure})')).toEqual([{ at: 'failure', fix: ['{failure}->failureLabel={failure}'] }])
   })
 
+  it('renames the message of a ConfirmDelete, a SaveForm and a kayjs-ai Chat', () => {
+    expect(found('ConfirmDelete(message="x" failure="No" onConfirm={run})')).toEqual([{ at: 'failure', fix: ['failure->failureLabel'] }])
+    expect(found('SaveForm(failure="No")')).toEqual([{ at: 'failure', fix: ['failure->failureLabel'] }])
+    expect(found('Chat(action={reply} errorMessage="No")')).toEqual([{ at: 'errorMessage', fix: ['errorMessage->failureLabel'] }])
+  })
+
+  it('finds the old name beside a spread', () => {
+    expect(found('CopyButton(text="x" {...rest} failure="No")')).toEqual([{ at: 'failure', fix: ['failure->failureLabel'] }])
+  })
+
+  it('reports a shorthand onFail alone', () => {
+    expect(found('CopyButton(text="x" {onFail})')).toEqual([{ at: 'onFail', fix: undefined }])
+  })
 
   it('reports onFail alone, as onError takes an object', () => {
     expect(found('CopyButton(text="x" onFail={log})')).toEqual([{ at: 'onFail', fix: undefined }])

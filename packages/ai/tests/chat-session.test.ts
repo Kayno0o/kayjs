@@ -545,7 +545,7 @@ test('the app hears a refused call with its status, and a stream that broke off 
   broken.end('failed')
   flush()
 
-  expect(failures).toMatchObject([{ message: 'Slow down', status: 429 }, { message: 'The reply failed.', status: undefined }])
+  expect(failures).toEqual([{ message: 'Slow down', status: 429, error: expect.any(ActionError) }, { message: 'The reply failed.', status: undefined }])
 })
 
 test('the app hears a regenerate and an edit before the request they send', async () => {

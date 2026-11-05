@@ -1,0 +1,16 @@
+---
+import type { Action } from 'kay'
+import { signal } from 'kay'
+import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+
+// A FormDialog whose action always fails, the failure words left to the test's props.
+const { words, onError } = props<{ words: { failureLabel?: string, failure?: string }, onError: (failure: { error: unknown }) => unknown }>()
+
+const pending = signal(false)
+const save = Object.assign(async () => Promise.reject(new Error('down')), { pending, url: '/_kay/action/form/save' }) as unknown as Action<FormData, string>
+
+---
+FormDialog(open onOpenChange={() => undefined} title="Save" action={save} submitLabel="Save" onError={onError} {...words})
+  input(name="name" value="Ada")
+Toaster

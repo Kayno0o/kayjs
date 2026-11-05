@@ -237,7 +237,7 @@ async function submit(event: SubmitEvent) {
   if (saved)
     toast.success(saved)
 
-  if (!run)
+  if (!onSave)
     onSaved?.(done.result as Answer<Success<Output>>)
 }
 

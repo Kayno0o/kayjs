@@ -123,14 +123,14 @@ test('tells onPlay, onPause, onEnded and onError as the audio moves through them
   audio.dispatchEvent(new Event('error'))
   await settle()
 
-  expect(events).toEqual(['play', 'pause', 'ended', 'error media'])
+  expect(events).toEqual(['play', 'pause', 'ended', 'error media error'])
 
   Object.defineProperty(audio, 'play', { value: async () => {
     throw new DOMException('blocked', 'NotAllowedError')
   }, configurable: true })
   click(part('play')[0]!)
   await settle()
-  expect(events.at(-1)).toBe('error NotAllowedError')
+  expect(events.at(-1)).toBe('error NotAllowedError undefined')
 })
 
 test('the slider seeks, and speaks the time', async () => {

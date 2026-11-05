@@ -20,4 +20,4 @@ It takes a Button's `variant`, `tone` and `size`.
 
 ## Text built on the click
 
-`text` may be a function returning the text or a promise of it, for a value that has to be fetched or built when the button is pressed, such as a signed link. The copy still starts inside the click, so Safari accepts it. `onCopy(text)` is called with the text once it is copied, and `onError({ error })` when it could not be built or the browser refused it, beside the `failure` toast.
+`text` may be a function returning the text or a promise of it, for a value that has to be fetched or built when the button is pressed, such as a signed link. The copy still starts inside the click, so Safari accepts it. `onCopy(text)` is called with the text once it is copied, and `onError({ error })` when it could not be built or the browser refused it, beside the `failureLabel` toast.

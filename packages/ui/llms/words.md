@@ -28,8 +28,8 @@ ui: { sidePanel: { close: 'Fermer' } }
 - ContributionGraph's month names and the day and month a LineChart draws on its axis follow the page's locale; `en` keeps `5 Jan`.
 - RangeInput's and DateRangeInput's `{label}` fill the messages of the same name.
 - ContactForm's labels read `ui.contactForm.*`, then kayjs-mail's `mail.contact.form.*` messages (English and French) before the English, SubscribeForm's `ui.subscribeForm.*`, then kayjs-mail's `mail.list.form.*`, and MarkdownEditor's `Uploading name…` marker, a placeholder in the text until the upload ends, stays English.
-- Texts the app's data owns, a `failure`, a `message` or a `label` it passes, are the app's to word.
-- Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The library's own words (`Close`, `Cancel`, `Loading…`...) are looked up in the app's catalogs under `ui.<component>.<prop>` keys, `ui.sidePanel.close`, before their English, and a prop given to the component replaces both. The French of every key ships with the library and is read on a French page with no setup.
+- Texts the app's data owns, a `failureLabel`, a `message` or a `label` it passes, are the app's to word.
+- Messages about the app's data are its own, passed as props (`failureLabel`, `message`, `label`). The library's own words (`Close`, `Cancel`, `Loading…`...) are looked up in the app's catalogs under `ui.<component>.<prop>` keys, `ui.sidePanel.close`, before their English, and a prop given to the component replaces both. The French of every key ships with the library and is read on a French page with no setup.
 
 ### The keys
 

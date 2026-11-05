@@ -7,7 +7,7 @@ import WhenVisible from '@kaynooo/kayjs-ui/when-visible.kay'
 import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
 
 // What the test reads back: each turn of the gallery, each crop, and each call for more rows; `onTiles` hands it a way to change the masonry's tiles.
-const { onIndexChange, onCrop, onCropEnd, onCropError, startCrop, onMore, onTiles } = props<{ onCropEnd?: (crop: { x: number, y: number, w: number, h: number }) => void, onCropError?: () => void, startCrop?: { x: number, y: number, w: number, h: number }, onIndexChange: (index: number) => void, onCrop: (crop: { x: number, y: number, w: number, h: number }) => void, onMore: () => void, onTiles?: (set: (tiles: string[]) => void) => void }>()
+const { onIndexChange, onCrop, onCropEnd, onCropError, startCrop, onMore, onTiles } = props<{ onCropEnd?: (crop: { x: number, y: number, w: number, h: number }) => void, onCropError?: (failure: { event?: Event | undefined, error?: unknown }) => void, startCrop?: { x: number, y: number, w: number, h: number }, onIndexChange: (index: number) => void, onCrop: (crop: { x: number, y: number, w: number, h: number }) => void, onMore: () => void, onTiles?: (set: (tiles: string[]) => void) => void }>()
 
 const tiles = signal(['a', 'b', 'c'])
 // The crop the app controls: `#preset` sets another, as a preset button would.

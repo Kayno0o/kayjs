@@ -15,7 +15,7 @@ const look = recipe({
   variants: { tone: { neutral: '', accent: 'kui-btn-accent', success: 'kui-btn-success', warning: 'kui-btn-warning', danger: 'kui-btn-danger', info: 'kui-btn-info' } },
 })
 
-const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', copiedLabel = wording('ui.copyButton.copied', 'Copied!'), failureLabel, failure, onCopy, onError, onFail, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type' | 'onCopy'> & {
+const { text, label, html, variant = 'solid', size = 'md', copiedFor = '2s', copiedLabel = wording('ui.copyButton.copied', 'Copied!'), failureLabel, failure, onCopy, onError, onFail, ...rest } = props<Omit<JSX.IntrinsicElements['button'], 'class' | 'children' | 'onClick' | 'type' | 'onCopy' | 'onError'> & {
   // What is copied: the text, or a function returning it, or a promise of it, for a value that has to be fetched or built on the click (a signed link). Nothing is copied while it is empty.
   text: string | (() => string | Promise<string>)
   label: string
