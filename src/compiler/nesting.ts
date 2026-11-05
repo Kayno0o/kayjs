@@ -95,7 +95,7 @@ function nestingOf(element: ElementNode, chain: Chain, report: Report) {
   // A customizable select takes an `option` under a `div` or a `label` in it, so only one with no `select` or `datalist` anywhere above is reported.
   if (name === 'option' && !chain.some(ancestor => OPTION_HOSTS.has(ancestor.name)))
     report('This `option` sits outside a `select`', 'HTML wants an `option` in a `select` or a `datalist`, and it adds nothing to a form anywhere else', 'put it in a `select`', parent)
-  else if (name === 'optgroup' && parent.name !== 'select')
+  else if (name === 'optgroup' && !chain.some(ancestor => ancestor.name === 'select'))
     report(`This \`optgroup\` sits inside a \`${parent.name}\``, 'HTML wants an `optgroup` in a `select`, and it groups nothing anywhere else', 'put it in a `select`', parent)
 }
 

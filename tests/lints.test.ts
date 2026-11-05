@@ -1365,6 +1365,7 @@ describe('invalid-nesting', () => {
   it('reports an option with no select or datalist above it, and an optgroup outside a select', () => {
     expect(nesting('select\n  optgroup\n    option a\ndatalist\n  option b\ndiv\n  option c\ndiv\n  optgroup\n')).toEqual(['option', 'optgroup'])
     expect(nesting('select\n  div\n    option a\n  label\n    option b\n')).toEqual([])
+    expect(nesting('select\n  div\n    optgroup\n      option a\ndatalist\n  optgroup\n')).toEqual(['optgroup'])
   })
 
   it('reports a th outside a tr, and a tfoot or a colgroup outside a table', () => {
