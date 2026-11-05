@@ -3,20 +3,20 @@ function createShown(): Shown
 
 [./form] formScope
 function formScope(drafts: {
-  open(entry: DraftEntry, version?: string | undefined): void;
-  entry(ref: EntryRef): DraftEntry | undefined;
+  open(entry: CmsDraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): CmsDraftEntry | undefined;
   kept(ref: EntryRef): boolean;
   version(ref: EntryRef): string | undefined;
   value(ref: EntryRef, path: FieldPath): unknown;
   set(ref: EntryRef, path: FieldPath, value: unknown): void;
   changed(ref: EntryRef): boolean;
   reset(ref: EntryRef): void;
-  markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void;
+  markSaved(ref: EntryRef, sent: CmsDraftEntry, version?: string | undefined): void;
   refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
   refusal(ref: EntryRef): Refusal | undefined;
   keepEdits(ref: EntryRef): void;
-  adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void;
-  differences(ref: EntryRef, other: DraftEntry): FieldPath[];
+  adopt(ref: EntryRef, entry: CmsDraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: CmsDraftEntry): FieldPath[];
   anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
   flush: () => void;
   discardAll(): void;
