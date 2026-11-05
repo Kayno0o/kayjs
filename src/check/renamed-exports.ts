@@ -218,6 +218,23 @@ async function renamedTypes(root: string, options: CheckOptions, config: Renamed
   return scan(root, options, config.lint, config.needle, ({ parsed, unparsed, report }) => {
     for (const { ast, base } of parsed) {
       for (const statement of ast.body) {
+        // A re-export keeps its public name: `export { context } from 'kay'` becomes `export { createContext as context } from 'kay'`.
+        if (statement.type === 'ExportNamedDeclaration' && statement.source?.value === config.module) {
+          for (const specifier of statement.specifiers) {
+            const old = specifier.local.type === 'Identifier' ? specifier.local.name : specifier.local.value
+
+            if (!Object.hasOwn(config.names, old))
+              continue
+
+            const next = config.names[old]!
+            const plain = specifier.exported.start === specifier.local.start
+
+            report(base + specifier.local.start, base + specifier.local.end, `\`${old}\` is renamed \`${next}\` since ${config.since}, and the old name works until ${config.until}`, `rename it to \`${next}\``, [{ start: base + specifier.local.start, end: base + specifier.local.end, text: plain ? `${next} as ${old}` : next }], config.safe(old))
+          }
+
+          continue
+        }
+
         if (statement.type !== 'ImportDeclaration' || !Object.hasOwn(config.modules, statement.source.value))
           continue
 

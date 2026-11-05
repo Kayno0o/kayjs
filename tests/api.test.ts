@@ -123,9 +123,10 @@ const WORD = /[\w$]+/g
 const DOC_FILES = ['llms.txt', 'llms/**/*.md', 'packages/*/llms.txt', 'packages/*/llms/**/*.md', 'docs/src/content/docs/**/*.md']
 // What happened to a name is no documentation of it: the upgrade notes, the release notes and the table of deprecated lints name old forms.
 const HISTORY = /(?:^|\/)(?:upgrading|whats-new)(?:-archive)?\.md$|(?:^|\/)deprecated-lints\.md$|reference\/checks\.md$/
-const VALUE_BLOCK = /^(?:function|const|class) /
+const VALUE_BLOCK = /^(?:function|const|let|var|class|enum) /
 
 // 2.0 freezes whatever the snapshot holds, so a value nothing tells an app to use is listed as internal (`INTERNAL` in scripts/api.ts) rather than left public by default.
+// The heuristic is loose on purpose: a name counts as documented when it appears as a word in any doc (an unrelated mention passes), so this catches a value no doc names at all.
 it('names every value export in the docs or lists it as internal', () => {
   const documented = new Set<string>()
 
@@ -151,7 +152,7 @@ it('names every value export in the docs or lists it as internal', () => {
     }
   }
 
-  expect(missing, 'no llms/, library llms/ or docs page names these values: document them, or add them to INTERNAL in scripts/api.ts and regenerate api/ with `--break="<key>"`').toEqual([])
+  expect(missing, 'no llms/, library llms/ or docs page names these values: document each one in llms/, a library llms/ or docs/, or add it to INTERNAL in scripts/api.ts, then rerun `bun scripts/api.ts --update` (a move between the api and internal files needs no --break)').toEqual([])
 })
 
 const ANY = /(?<![\w$])any(?![\w$])/

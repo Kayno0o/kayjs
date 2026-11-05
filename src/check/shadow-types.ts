@@ -48,7 +48,6 @@ import { mcpRoutes } from './mcp-routes'
 import { movedImports } from './moved-imports'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
-
 import { removedUiTokens } from './removed-ui-tokens'
 import { exportNames, contextName, roomTypes, sourceTypes } from './renamed-exports'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'

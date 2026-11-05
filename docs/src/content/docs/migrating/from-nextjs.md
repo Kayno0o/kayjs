@@ -122,7 +122,7 @@ As in Next.js, props to an island are serialized, so a page cannot pass one a fu
 | `useEffect(() => ..., [a])` | `effect(() => ...)`, which runs after the render and again when a signal it read changes |
 | `useEffect(() => ..., [])` | `onMount(() => ...)`, in the browser only |
 | `useRef` and `ref={...}` | `ref={element => ...}` |
-| `useContext` | `context`, see the [islands reference](/llms/islands) |
+| `useContext` | `createContext`, see the [islands reference](/llms/islands) |
 | `children` | `slot` |
 | A prop that is JSX | An `@name` block, rendered with `slot name` |
 | `props` | `const { title } = props<{ title: string }>()` |

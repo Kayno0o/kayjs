@@ -113,9 +113,9 @@ A `context` from `kay`, provided by a component and used by anything it renders:
 
 ```ts
 // src/theme.ts
-import { context } from 'kay'
+import { createContext } from 'kay'
 
-export const Theme = context<'light' | 'dark'>('light')
+export const Theme = createContext<'light' | 'dark'>('light')
 ```
 
 ```kay

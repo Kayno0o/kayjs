@@ -128,6 +128,10 @@ describe('deprecated-context-name', () => {
       expect(await read(root, 'src/a.ts')).toBe('import { createContext } from \'kay\'\n\nexport const Theme = createContext<\'light\' | \'dark\'>(\'light\')\n')
       expect(await read(root, 'src/b.ts')).toContain('context(1)')
       expect(await contextName(root, { lints: { 'deprecated-context-name': 'allow' } })).toEqual([])
+
+      await Bun.write(join(root, 'src/d.ts'), 'export { context, context as theme } from \'kay\'\n')
+      await applySafeFixes(root, await contextName(root, {}))
+      expect(await read(root, 'src/d.ts')).toBe('export { createContext as context, createContext as theme } from \'kay\'\n')
     }
     finally {
       await rm(root, { recursive: true, force: true })

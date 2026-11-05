@@ -29,7 +29,7 @@ In a `.ts` file nothing is added. `kay/server` also exports `s`, so a server mod
 | `every` | A timer running while an island lives, and while a condition holds |
 | `durationMs` | The milliseconds a duration written with its unit stands for, `durationMs('3s')` being 3000, for a timer of your own. A bare number throws |
 | `listen` | An event listener on `window`, `document` or another target while an island lives |
-| `persisted`, `queryParam`, `linked`, `selection`, `context` | Signal helpers: stored, one query param of the page read by its schema, derived from a source, one selected key, shared down a tree |
+| `persisted`, `queryParam`, `linked`, `selection`, `createContext` | Signal helpers: stored, one query param of the page read by its schema, derived from a source, one selected key, shared down a tree |
 | `followLog` | Keeps a scrolling list at its bottom while the reader is there. See [Islands](/essentials/islands#following-a-log) |
 | `elementSize` | An element's width and height as reactive values, observed while an island lives. See [Islands](/essentials/islands#reading-an-elements-size) |
 | `mediaQuery`, `reducedMotion` | Whether a media query, or reduced motion, matches, following a change while an island lives. See [Islands](/essentials/islands#following-a-media-query) |

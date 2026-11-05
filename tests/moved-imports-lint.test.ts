@@ -60,3 +60,21 @@ it('reports with no fix a default beside the moved names, ignores other modules 
     await rm(root, { recursive: true, force: true })
   }
 })
+
+it('moves a re-export, and merges the names into an import of the entry the file already has', async () => {
+  const root = await project({
+    'src/reexport.ts': 'export { normalizeEmail } from \'@kaynooo/kayjs-auth\'\nexport { createAuth, type EntryForm } from \'@kaynooo/kayjs-auth\'\n',
+    'src/merge.ts': 'import { createAuth, passwordProblem } from \'@kaynooo/kayjs-auth\'\nimport { emailProblem } from \'@kaynooo/kayjs-auth/rules\'\n\nexport const a = [createAuth, passwordProblem, emailProblem]\n',
+    'src/whole.ts': 'import { normalizeEmail } from \'@kaynooo/kayjs-auth\'\nimport { emailProblem } from \'@kaynooo/kayjs-auth/rules\'\n\nexport const a = [normalizeEmail, emailProblem]\n',
+  })
+
+  try {
+    await applySafeFixes(root, await movedImports(root, {}))
+    expect(await read(root, 'src/reexport.ts')).toBe('export { normalizeEmail } from \'@kaynooo/kayjs-auth/rules\'\nexport { createAuth, type EntryForm } from \'@kaynooo/kayjs-auth\'\n')
+    expect(await read(root, 'src/merge.ts')).toBe('import { createAuth } from \'@kaynooo/kayjs-auth\'\nimport { emailProblem, passwordProblem } from \'@kaynooo/kayjs-auth/rules\'\n\nexport const a = [createAuth, passwordProblem, emailProblem]\n')
+    expect(await read(root, 'src/whole.ts')).toBe('import { emailProblem, normalizeEmail } from \'@kaynooo/kayjs-auth/rules\'\n\nexport const a = [normalizeEmail, emailProblem]\n')
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
