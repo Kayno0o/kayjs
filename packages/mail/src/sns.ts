@@ -1,7 +1,7 @@
 import type { KeyObject } from 'node:crypto'
 import type { Found } from './events'
 import { createVerify, X509Certificate } from 'node:crypto'
-import { normalizeAddress } from './list-address'
+import { normalizeAddress } from 'kay/library'
 
 // Amazon SES delivers its events through an SNS topic subscribed to the app's endpoint. The message format and its signature are Amazon SNS's: https://docs.aws.amazon.com/sns/latest/dg/sns-verify-signature-of-message.html
 

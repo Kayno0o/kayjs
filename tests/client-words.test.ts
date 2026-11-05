@@ -13,6 +13,7 @@ import { servePages } from '../src/server/app'
 import { formsScript } from '../src/server/forms'
 import { INVALID_PARAMS } from '../src/server/words'
 import { workScript } from '../src/server/work'
+import { BAD_EMAILS, GOOD_EMAILS } from './helpers/emails'
 
 const FIXTURE = 'tests/fixtures/client-words'
 const I18N = /<script type="application\/json" data-kay-i18n>(.*?)<\/script>/
@@ -247,6 +248,26 @@ describe('the browser\'s form check in the page\'s locale', () => {
     blank: t.String({ minLength: 1 }),
   })
   const fields: [string, string][] = [['short', 'ab'], ['long', 'abc'], ['word', 'A1'], ['mail', 'nope'], ['count', '0'], ['top', '9'], ['kind', 'b'], ['tags', 'x'], ['many', 'a'], ['many', 'b'], ['blank', '']]
+
+  it('checks the email format as the server does, over every address of the shared lists', () => {
+    const submitted = action(t.Object({ mail: t.String({ format: 'email' }) }), () => undefined)
+
+    ;(submitted as { url: string }).url = '/act'
+    document.head.insertAdjacentHTML('beforeend', formsScript(new Set([submitted])))
+    document.body.insertAdjacentHTML('afterbegin', '<form><input name="mail"></form>')
+
+    const form = document.querySelector('form')!
+    const input = form.querySelector('input')!
+    const passes = (address: string): boolean => {
+      input.value = address
+
+      return checkForm(form, '/act')
+    }
+
+    expect(GOOD_EMAILS.filter(address => !passes(address))).toEqual([])
+    // A text input drops line breaks from its value, so only the addresses it can hold are tried.
+    expect(BAD_EMAILS.filter(address => !(/[\r\n]/).test(address) && passes(address))).toEqual([])
+  })
 
   it('speaks Elysia\'s English on a page that brought no messages, as a site without i18n', () => {
     expect(check(fields, schema)).toEqual({

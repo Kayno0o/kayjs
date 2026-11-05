@@ -3,9 +3,26 @@ const MAX_LOCAL = 64
 const MAX_LABEL = 63
 // RFC 5322's atext, with the letters and digits of any script, the dot apart: a local part has no quote, space, comma, angle bracket or parenthesis.
 const LOCAL = /^[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+(?:\.[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+)*$/u
+const FORMAT_CHARACTER = /\p{Cf}/u
+const FOLDED_STOP = /[\u3002\uFF0E\uFF61]/
 const LABEL = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
 const HOST_FORBIDDEN = /[\s/?#@:\\[\]%\p{Cc}]/u
 const NUMERIC = /^\d+$/
+
+// A host the URL parser would rewrite into another string (a soft hyphen or zero-width space it drops, a fullwidth letter or ideographic full stop it folds) would give one inbox several stored forms: it is refused, and an address is typed with its plain dots and letters.
+function isStable(host: string): boolean {
+  return !FORMAT_CHARACTER.test(host) && !FOLDED_STOP.test(host) && host === host.normalize('NFKC')
+}
+
+// A function of the URL parser, which `URL.parse` would give but older browsers lack.
+function hostOf(host: string): string | undefined {
+  try {
+    return new URL(`http://${host}`).hostname
+  }
+  catch {
+    return undefined
+  }
+}
 
 // The form an address is stored and compared in: Unicode normalised, trimmed, in lower case, its domain in punycode. Undefined for anything that is not one plain address: a second `@`, a comma list, a line break, a name with angle brackets, a domain without a dot, an IP.
 // `+tag` stays part of the address, as providers treat it as theirs.
@@ -22,10 +39,10 @@ export function normalizeAddress(input: unknown): string | undefined {
   const local = text.slice(0, at).toLowerCase()
   const raw = text.slice(at + 1)
 
-  if (local.length > MAX_LOCAL || !LOCAL.test(local) || raw === '' || HOST_FORBIDDEN.test(raw))
+  if (local.length > MAX_LOCAL || !LOCAL.test(local) || raw === '' || HOST_FORBIDDEN.test(raw) || !isStable(raw))
     return undefined
 
-  const host = URL.parse(`http://${raw}`)?.hostname
+  const host = hostOf(raw)
 
   if (host === undefined || host === '' || host.length > MAX_ADDRESS - at - 1)
     return undefined

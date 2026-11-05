@@ -2,8 +2,7 @@ import type { Database } from 'bun:sqlite'
 import type { MaybePromise } from 'kay/library'
 import type { Suppression, SuppressionReason } from './events'
 import { existsSync } from 'node:fs'
-import { openSqlite } from 'kay/library'
-import { normalizeAddress } from './list-address'
+import { normalizeAddress, openSqlite } from 'kay/library'
 import { log } from './log'
 
 // Where bounces and complaints are kept, the addresses in `normalizeAddress` form: `pgSuppressions(db)`, `sqliteSuppressions(path)`, or a list store, which keeps them beside its lists.

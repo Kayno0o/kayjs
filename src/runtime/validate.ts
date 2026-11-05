@@ -31,8 +31,10 @@ export interface FormRules {
 
 // The schemas of the actions a page's forms post to, by action path, in one JSON script of the page's head, and one more after each streamed block bringing forms the page lacked.
 export const FORMS_SCRIPT = 'script[data-kay-forms]'
-// Elysia's own checks of the formats the browser checks too; any other format is left to the server.
-const FORMATS: Record<string, RegExp | ((value: string) => boolean)> = {
+type Format = RegExp | ((value: string) => boolean)
+
+// The formats the browser checks too, as the server does (`email` is kay's own, the rest Elysia's); any other format is left to the server.
+const FORMATS: Record<string, Format> = {
   email: isEmail,
   uuid: /^(?:urn:uuid:)?[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i,
 }
@@ -104,14 +106,14 @@ function controlOf(form: HTMLFormElement, name: string): HTMLInputElement | HTML
   return control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement ? control : undefined
 }
 
-// The schema's own `error` for a refused field, else the `kay.invalid.*` text of the keyword it fails, which the server words the same way; a site without the key reads Elysia's English.
-function formatFails(format: RegExp | ((value: string) => boolean) | undefined, value: string): boolean {
+function formatFails(format: Format | undefined, value: string): boolean {
   if (format === undefined)
     return false
 
   return typeof format === 'function' ? !format(value) : !format.test(value)
 }
 
+// The schema's own `error` for a refused field, else the `kay.invalid.*` text of the keyword it fails, which the server words the same way; a site without the key reads Elysia's English.
 function fieldMessage(name: string, field: FieldRules, value: unknown): string | undefined {
   const message = refusal(name, field, value)
 
