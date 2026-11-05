@@ -8,6 +8,8 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 `pgLists`, `createMailListTables`, `mailListTables`, `pgSuppressions`, `createMailSuppressionTable` and `sqliteSuppressions` are imported from `@kaynooo/kayjs-mail/pg` and `@kaynooo/kayjs-mail/sqlite`, and `sqliteConversations` from `@kaynooo/kayjs-ai/sqlite` (`pgConversations` is in `/pg`). `kay check` cannot tell an import it should move, so no lint ships: change the import path.
 
+## 1.91.0
+
 ### The forms 1.87 deprecated are gone
 
 Their `deprecated-*` lints go with them: run `kay upgrade` on 1.90 first and it rewrites every one that has a fix. On 1.91 each fails `kay check`, and a Table, TreeView or Timeline `onSelect`, a `queue()`, `workflow()` or `mailer({ queue })` `onFailed` or `keepFailed`, and `fileStore` in the config also throw when they run, so none is a silent change.
