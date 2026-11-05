@@ -25,12 +25,12 @@ const { cells, hints, label, emptyLabel, empty, ...rest } = props<Omit<JSX.Intri
 }>()
 ---
 if cells.length === 0
-  // The app's id and class stay on whichever element shows.
+  // The app's attributes stay on whichever element shows.
   if empty
-    div.kui-status-strip-empty(part="root" id={rest.id})
+    div.kui-status-strip-empty(part="root" {...rest} role="status")
       | {empty}
-  else
-    p.kui-status-strip-empty(part="root" id={rest.id}) {emptyLabel ?? wording('ui.statusStrip.empty', 'No data yet.')}
+  else if emptyLabel !== ''
+    p.kui-status-strip-empty(part="root" {...rest} role="status") {emptyLabel ?? wording('ui.statusStrip.empty', 'No data yet.')}
 else
   div(part="root" {...rest} role="img" aria-label={label})
     for tone, at of cells key={at}

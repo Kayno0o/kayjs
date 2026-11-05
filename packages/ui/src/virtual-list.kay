@@ -69,7 +69,7 @@ const loaded = asyncRows<Item>(() => given, { onLoad: answer => onLoad?.(answer)
 const items = () => source ? source.rows() : loaded.rows()
 const waiting = () => busy || (source ? source.pending() && !source.failed() : loaded.loading())
 const skeleton = () => waiting() && items().length === 0
-const none = () => items().length === 0 && !waiting() && !loaded.failed() && (source === undefined || (source.ended() && !source.failed()))
+const none = () => items().length === 0 && !waiting() && !loaded.failed() && (source === undefined || (source.ended() && !source.failed() && !source.pending()))
 // LoadMore announces a list's pending page itself.
 const announced = () => source !== undefined && source.pending()
 const skeletonIndexes = () => Array.from({ length: Math.max(1, Math.floor(skeletonItems)) }, (_, index) => index)
@@ -96,7 +96,7 @@ div(part="root" {...rest} ref={element => box = element} role="list" tabindex="0
         p(part="message") {failureLabel}
         if loaded.retryable()
           Button(label={retryLabel} variant="ghost" size="sm" onClick={loaded.retry})
-    if none()
+    if none() && (empty || emptyLabel !== '')
       div(part="empty")
         if empty
           | {empty}

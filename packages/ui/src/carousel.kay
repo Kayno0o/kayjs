@@ -107,7 +107,7 @@ effect(() => {
 
 const active = () => stepIndex(shown(), 0, all().length)
 // A paged list is empty once it has ended with nothing, not while its first page loads.
-const none = () => all().length === 0 && (list === undefined || (list.ended() && !list.failed()))
+const none = () => all().length === 0 && (list === undefined || (list.ended() && !list.failed() && !list.pending()))
 
 function go(next: number) {
   shown = next
@@ -123,7 +123,7 @@ function numbered(text: string, position: number) {
 }
 ---
 section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-label={label} onPointerEnter={() => pointed = true} onPointerLeave={() => pointed = false} onFocusIn={() => focused = true} onFocusOut={() => focused = false})
-  if none()
+  if none() && (empty || emptyLabel !== '')
     div(part="empty" role="status")
       if empty
         | {empty}

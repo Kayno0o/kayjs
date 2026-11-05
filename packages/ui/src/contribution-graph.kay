@@ -100,12 +100,12 @@ const style = (day: ContributionDay, index: number) => {
 ---
 // A year of days as a grid of weeks, each cell shaded by how full its day was.
 if days.length === 0
-  // The app's id and class stay on whichever element shows.
+  // The app's attributes stay on whichever element shows.
   if empty
-    div.kui-contribution-graph-empty(part="root" id={rest.id})
+    div.kui-contribution-graph-empty(part="root" {...rest} role="status")
       | {empty}
-  else
-    p.kui-contribution-graph-empty(part="root" id={rest.id}) {emptyLabel ?? wording('ui.contributionGraph.empty', 'No data yet.')}
+  else if emptyLabel !== ''
+    p.kui-contribution-graph-empty(part="root" {...rest} role="status") {emptyLabel ?? wording('ui.contributionGraph.empty', 'No data yet.')}
 else
   div(part="root" {...rest} role="group" aria-label={label} onKeyDown={keyDown} data-months={months ? '' : undefined})
     if months

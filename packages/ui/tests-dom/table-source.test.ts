@@ -427,3 +427,52 @@ describe('Table source races and refreshes', () => {
     expect(mounted.root.querySelector('[data-part="cell"]')?.className).not.toContain('z-1')
   })
 })
+
+describe('the empty text of a Table', () => {
+  const empty = (root: HTMLElement) => root.querySelector('[data-part="emptyCell"]')?.textContent
+
+  test('is absent while rows are on their way and after a failure, and drawn once they landed empty', async () => {
+    const quiet = spyOn(console, 'error').mockImplementation(() => undefined)
+    const wait = deferred<Planet[]>()
+
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: wait.promise, rowKey: 'id' })
+
+    expect(empty(mounted.root)).toBeUndefined()
+
+    wait.resolve([])
+    await settle()
+
+    expect(empty(mounted.root)).toBe('No rows.')
+
+    mounted.unmount()
+
+    const down = deferred<Planet[]>()
+
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: down.promise, rowKey: 'id' })
+    down.reject(new Error('down'))
+    await settle()
+
+    expect(empty(mounted.root)).toBeUndefined()
+    quiet.mockRestore()
+  })
+
+  test('is drawn for a paged list whose first page is empty, absent while it restarts, and an empty emptyLabel draws nothing', async () => {
+    const wait = deferred<Planet[]>()
+    const feed = infiniteList<Planet>([], { pageSize: 2, load: async () => wait.promise })
+
+    mounted = await mountComponent(Table, { columns: COLUMNS, list: feed, rowKey: 'id' })
+
+    expect(empty(mounted.root)).toBe('No rows.')
+
+    void feed.restart({ filter: { text: 'x' } })
+    await settle()
+
+    expect(feed.pending()).toBe(true)
+    expect(empty(mounted.root)).toBeUndefined()
+
+    mounted.unmount()
+    mounted = await mountComponent(Table, { columns: COLUMNS, rows: [], rowKey: 'id', emptyLabel: '' })
+
+    expect(mounted.root.querySelector('[data-part="emptyCell"]')).toBeNull()
+  })
+})

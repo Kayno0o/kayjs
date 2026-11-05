@@ -39,6 +39,15 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - `kay check` types the attributes HTML limits to keywords: `type` on `button`, `input` and `ol`, `loading` and `decoding` on `img`, `crossorigin`, `referrerpolicy`, `scope` on `th`, `dir`, `inputmode`, `enterkeyhint`, `method`, `enctype`, `formmethod`, `formenctype`, and `target` (a keyword or a named browsing context), so a typo (`loading="lazyy"`) or a value held in a `string` (`type={kind}` with `kind: string`) is an error: write the keyword in lowercase, or type the value as the union (`'button' | 'submit' | 'reset'`).
 - The new `invalid-aria-value` lint (a11y, deny) reports an ARIA state written as text with a value ARIA does not define, `aria-expanded="yes"` for one, its quick fix writing the closest value; an expression is not read, and other `aria-*` stay free text.
 - An SVG element takes the SVG attributes, spelled as SVG does (`viewBox`, `stroke-width`), prefixed names (`xlink:href`), `data-*` and `aria-*`, where it took any name: `viewbox` or `strokeWidth` is an error naming the nearest attribute. TypeScript does not check a hyphenated name, so `stroke-widht` still passes. A custom element still takes any. A bare `crossorigin`, a `false` and `type={1}` on an `ol` still pass.
+### kayjs-ui: empty components draw a default text
+
+- Table with neither `@empty` nor `@noMatch` draws a `No rows.` row, and LineChart, ContributionGraph, Sparkline, StatusStrip, Timeline, DescriptionList, TreeView, Carousel and VirtualList draw their `ui.<component>.empty` text where they drew nothing. `emptyLabel=""` draws nothing again, and an `@empty` block replaces the text.
+
+## 1.90.0
+
+### kayjs-ui: empty components draw a default text
+
+- Table with neither `@empty` nor `@noMatch` draws a `No rows.` row, and LineChart, ContributionGraph, Sparkline, StatusStrip, Timeline, DescriptionList, TreeView, Carousel and VirtualList draw their `ui.<component>.empty` text where they drew nothing. `emptyLabel=""` draws nothing again, and an `@empty` block replaces the text.
 
 ## 1.89.0
 

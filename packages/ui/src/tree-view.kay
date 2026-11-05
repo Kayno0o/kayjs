@@ -41,6 +41,9 @@ const { nodes, label, selected, expanded = [], onSelectedChange, onSelect, onOpe
 // The empty text is a div, not the list's own element, so it takes the attributes as a div does.
 const loose = rest as unknown as JSX.IntrinsicElements['div']
 
+// The empty text is a div, not the list's own element, so it takes the attributes as a div does.
+const loose = rest as unknown as JSX.IntrinsicElements['div']
+
 // The page's address, which a page rendered once at build time does not have.
 function address() {
   try {

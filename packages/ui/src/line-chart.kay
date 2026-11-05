@@ -623,7 +623,7 @@ div(part="root" {...rest} role="figure" aria-label={label})
     if band() !== null
       div(part="band" style={band()})
     div(part="overlay" role="slider" tabindex={labels.length > 0 ? '0' : '-1'} aria-label={label} aria-valuemin="0" aria-valuemax={Math.max(0, labels.length - 1)} aria-valuenow={current()} aria-valuetext={announced()} aria-describedby={onRange ? `${id}-hint` : undefined} data-range={onRange ? '' : undefined} onKeyDown={keyDown} onFocus={focused} onBlur={blurred} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishSpan} onPointerCancel={() => { dragged = null; pressedAt = null }} onPointerLeave={pointerLeave})
-  if labels.length === 0
+  if labels.length === 0 && (empty || emptyLabel !== '')
     div(part="empty" role="status")
       if empty
         | {empty}

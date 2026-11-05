@@ -98,12 +98,12 @@ function pressed(event: MouseEvent, at: number) {
 const percent = (value: number | null) => largest() > 0 && finite(value) ? Math.max(0, value) / largest() * 100 : 0
 ---
 if values.length === 0
-  // The app's id and class stay on whichever element shows.
+  // The app's attributes stay on whichever element shows.
   if empty
-    div.kui-sparkline-empty(part="root" id={rest.id})
+    div.kui-sparkline-empty(part="root" {...rest} role="status")
       | {empty}
-  else
-    p.kui-sparkline-empty(part="root" id={rest.id}) {emptyLabel ?? wording('ui.sparkline.empty', 'No data yet.')}
+  else if emptyLabel !== ''
+    p.kui-sparkline-empty(part="root" {...rest} role="status") {emptyLabel ?? wording('ui.sparkline.empty', 'No data yet.')}
 else
   snippet bar(value: number | null, at: number)
     span(part="bar" data-tone={tones?.[at] ?? tone} style={`height: ${percent(value)}%`})

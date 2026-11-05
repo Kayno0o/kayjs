@@ -22,14 +22,17 @@ const { items, value, emptyLabel, empty, ...rest } = props<Omit<JSX.IntrinsicEle
   emptyLabel?: string | undefined
   empty?: Snippet | undefined
 }>()
+
+// The empty text is a div, not the list's own element, so it takes the attributes as a div does.
+const loose = rest as unknown as JSX.IntrinsicElements['div']
 ---
 if items.length === 0
-  // The app's id and class stay on whichever element shows.
+  // The app's attributes stay on whichever element shows.
   if empty
-    div.kui-description-list-empty(part="root" id={rest.id})
+    div.kui-description-list-empty(part="root" {...loose} role="status")
       | {empty}
-  else
-    p.kui-description-list-empty(part="root" id={rest.id}) {emptyLabel ?? wording('ui.descriptionList.empty', 'No details.')}
+  else if emptyLabel !== ''
+    div.kui-description-list-empty(part="root" {...loose} role="status") {emptyLabel ?? wording('ui.descriptionList.empty', 'No details.')}
 else
   dl(part="root" {...rest})
     for item of items key={item.key ?? item.label}

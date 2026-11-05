@@ -455,7 +455,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
           tr
             td(part="emptyCell" colspan={columnCount()})
               | {noMatch}
-        else if !broke()
+        else if !broke() && (empty || emptyLabel !== '') && (!list || (list.ended() && !list.failed() && !list.pending()))
           tr
             td(part="emptyCell" colspan={columnCount()})
               if empty
