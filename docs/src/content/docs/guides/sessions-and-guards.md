@@ -59,7 +59,7 @@ Use it before the pages: `new Elysia().use(sessions).use(await pages())`.
 
 With a store, the cookie only carries an id. A session uses the app's store unless you give it one: `session({ store })`. `memorySessions()` is for development. `sqliteSessions(path)` fits one machine. Any object with `get`, `set` and `delete` works as a store, as [Your own store](#your-own-store) shows.
 
-Without a store of your own, sessions are kept in `data/sessions.sqlite`, the way jobs are kept in `data/jobs.sqlite`, so signing out ends every copy of the cookie. That fits one machine; a site on several servers gives the app a shared `store`, and a production server logs once that the file is its own. The file opens as the server starts, so a `data` folder that cannot be written stops it with an error that names `store: false` and a shared store.
+Without a store of your own, sessions are kept in `data/sessions.sqlite`, the way jobs are kept in `data/jobs.sqlite`, so signing out ends every copy of the cookie. That fits one machine; a site on several servers gives the app a shared `store`, and a production server logs once, a `kay start` cluster from its first worker, that the file is its own. The file opens as the server starts, so a `data` folder that cannot be written stops it with an error that names `store: false` and a shared store.
 
 To keep the data in the cookie instead, pass `session({ store: false })`. It is sealed, but limited to about 3.5 KB and impossible to revoke. Signing out clears only the browser's copy.
 

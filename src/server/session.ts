@@ -13,6 +13,7 @@ import { appStore } from './app-store'
 import { nodeCrypto } from './builtins'
 import { requestCookies } from './cookies'
 import { inMemory } from './memory-mark'
+import { WORKER_INDEX } from './parent'
 import { onReload } from './reload'
 import { overHttps, requestUrl } from './request-url'
 import { readPersonally } from './scope'
@@ -139,8 +140,11 @@ function openDefaultSessions(): SessionStore {
     throw new KayError('config-invalid', `kay: sessions are kept in ${DEFAULT_SESSIONS_PATH} when no store is given, and that file cannot be opened (${error instanceof Error ? error.message : String(error)}); make \`data/\` writable, give \`session({ store })\` or the app's \`store.sessions\` a shared store, or set \`store: false\` to keep them in the cookie`)
   }
 
-  if (process.env.NODE_ENV === 'production')
-    kayLog('info', `sessions are kept in ${DEFAULT_SESSIONS_PATH}, a file of this machine: servers sharing KAY_SECRET behind one balancer do not share them; give \`store.sessions\` a shared store, or set \`store: false\` to keep them in the cookie`)
+  // Once per server: the workers of a `kay start` cluster share the file, and worker 0 speaks for them.
+  const worker = process.env[WORKER_INDEX]
+
+  if (process.env.NODE_ENV === 'production' && (worker === undefined || worker === '0'))
+    kayLog('info', `sessions are kept in ${DEFAULT_SESSIONS_PATH}, a file of this machine, which fits one server; for several, give \`store.sessions\` a shared store, or set \`store: false\` to keep them in the cookie`)
 
   return defaultSessions
 }

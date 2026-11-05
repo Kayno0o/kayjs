@@ -190,7 +190,7 @@ describe('sessions', () => {
     })
 
     // A production process in a folder of its own, so the default file is the real one.
-    async function inProduction(prepare: string, script: string) {
+    async function inProduction(prepare: string, script: string, env: Record<string, string> = {}) {
       const cwd = await scratchDir('session-default-')
       const entry = join(cwd, 'run.ts')
 
@@ -204,7 +204,7 @@ const app = new Elysia().use(session({ secret: 'x'.repeat(10) + 'aB3dE5gH7jK9mN1
   .get('/out', async ({ session }) => { await session.destroy(); return 'out' })
 ${script}`)
 
-      const run = Bun.spawnSync([process.execPath, entry], { cwd, env: { ...process.env, NODE_ENV: 'production' }, stdout: 'pipe', stderr: 'pipe' })
+      const run = Bun.spawnSync([process.execPath, entry], { cwd, env: { ...process.env, NODE_ENV: 'production', ...env }, stdout: 'pipe', stderr: 'pipe' })
 
       return { cwd, out: run.stdout.toString(), err: run.stderr.toString(), code: run.exitCode }
     }
@@ -224,6 +224,13 @@ process.exit(0)`)
       expect(JSON.parse(out.trim().split('\n').at(-1)!)).toEqual({ before: '1', after: 'none', file: true })
       expect(out).toContain('a file of this machine')
       expect(out).toContain('store: false')
+    })
+
+    it('logs the file line from worker 0 of a cluster only', async () => {
+      const script = 'await app.handle(new Request(\'https://localhost/set\'))\nprocess.exit(0)'
+
+      expect((await inProduction('', script, { KAY_WORKER: '0', KAY_WORKERS: '2' })).out).toContain('a file of this machine')
+      expect((await inProduction('', script, { KAY_WORKER: '1', KAY_WORKERS: '2' })).out).not.toContain('a file of this machine')
     })
 
     it('answers a data folder that cannot be written with an error naming store: false', async () => {
