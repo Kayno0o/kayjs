@@ -18,3 +18,7 @@ main
     FormField(label="Handle" name="handle")
       input#submit-handle(name="handle" value="abc")
     button#submit-submit Claim
+  form#off(action={claim} validate="false")
+    FormField(label="Handle" name="handle")
+      input#off-handle(name="handle" value="abc")
+    button#off-submit Claim

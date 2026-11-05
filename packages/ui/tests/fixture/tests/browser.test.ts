@@ -2047,6 +2047,17 @@ inBrowser('a Form checking its fields against the action\'s schema', () => {
     expect([seen.count, page.errors]).toEqual([0, []])
   }, 120_000)
 
+  test('a plain form written validate="false" keeps the browser\'s bubble and shows no message as text', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/form-validate-plain')
+
+    await page.fill('#off-handle', 'ab')
+    await page.click('#off-submit')
+    await page.waitUntil(() => (document.getElementById('off-handle') as HTMLInputElement).validationMessage !== '')
+    expect(await page.evaluate(() => document.querySelectorAll('#off [data-form-issue]').length)).toBe(0)
+  }, 120_000)
+
   test('a SaveForm checks before it asks its question', async () => {
     const site = await shared()
 

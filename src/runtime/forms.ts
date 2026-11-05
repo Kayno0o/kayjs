@@ -69,7 +69,7 @@ export async function submit(form: HTMLFormElement, submitter: HTMLElement | nul
   const ours = checkedForms.has(form)
 
   // Past the schema, the constraints the template writes itself, which the browser no longer checks once kay took the form.
-  if ((form.hasAttribute('novalidate') && !ours) || submitter?.hasAttribute('formnovalidate') || (await passes(form, withoutBase(url.pathname), ours && form.hasAttribute('validate')) && (!ours || HTMLFormElement.prototype.reportValidity.call(form)))) {
+  if ((form.hasAttribute('novalidate') && !ours) || submitter?.hasAttribute('formnovalidate') || (await passes(form, withoutBase(url.pathname), ours && (form.getAttribute('validate') ?? 'false') !== 'false') && (!ours || HTMLFormElement.prototype.reportValidity.call(form)))) {
     // Its `pending` blocks stay shown until the page the answer leads to is in, a redirect's included; a document that replaces the page keeps them shown while it loads.
     const loads = navigation.loads
 

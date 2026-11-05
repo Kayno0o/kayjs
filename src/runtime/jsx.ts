@@ -162,7 +162,7 @@ interface SpelledAttributes {
   // `commandfor` names the element a press acts on and `command` the action, both ways to open a popover or a dialog with no script: the HTML keywords, or a `--custom` one the element hears as a `command` event.
   button: { popovertarget?: AttributeValue, commandfor?: AttributeValue, command?: ButtonCommand | undefined }
   // `validate` on a `form(action)`: its fields are checked against the action's schema in the browser, the messages shown as text in the `data-field` elements (a FormField's) in place of the browser's bubble, when the form is sent, or also (`blur`) as each field loses focus.
-  form: { 'accept-charset'?: AttributeValue, 'validate'?: Keyword<'submit' | 'blur'> | true }
+  form: { 'accept-charset'?: AttributeValue, 'validate'?: Keyword<'submit' | 'blur' | 'false'> | true }
   input: { popovertarget?: AttributeValue }
   label: { for?: AttributeValue }
   // `property` names an Open Graph tag.
