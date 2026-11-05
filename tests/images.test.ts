@@ -1245,9 +1245,9 @@ describe('pruneVariants', () => {
         serveImages(app, { clientDir: dir, cacheDir: dir, ttl })
         app.listen(0)
 
-        // The prune at start runs apart from the listening, so the short ttl is waited for and the long one given the time to remove something.
+        // The prune at start runs apart from the listening and removes one file after another, so the short ttl is waited for on both old files and the long one given the time to remove something.
         if (ttl === '3d') {
-          for (let waited = 0; await exists(dir, 'old-640.webp'); waited += 20) {
+          for (let waited = 0; await exists(dir, 'old-640.webp') || await exists(dir, 'older-640.avif'); waited += 20) {
             expect(waited).toBeLessThan(3000)
             await Bun.sleep(20)
           }
