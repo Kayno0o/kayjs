@@ -476,7 +476,8 @@ process.exit(0)
     // An empty `secret: process.env.KAY_SECRET` is none.
     const empty = await run(script(', secret: \'\''), { KAY_SECRET: long })
 
-    expect(config.warnings).toEqual([])
+    // The fixture names no `store`, so its 404 log's local file is warned of, and that warning alone.
+    expect(config.warnings.filter(warning => !warning.includes('data/not-found.sqlite'))).toEqual([])
     expect(config.shared).toBeDefined()
     expect(env).toEqual(config)
     expect(empty).toEqual(config)
