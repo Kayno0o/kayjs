@@ -1,7 +1,7 @@
 import type { Editor, EditorSetup } from '../editors'
 import type { Feature, Host, Preset } from '../new'
 import type { Command, Parsed } from './command'
-import process from 'node:process'
+import { isInteractive } from '@kaynooo/cli-kit'
 import { confirm } from '@kaynooo/cli-kit/prompt'
 import { colors } from '@kaynooo/utils/tools/colors'
 import { EDITORS, findEditors, installEditor, printSetups } from '../editors'
@@ -68,7 +68,7 @@ export const scaffold: Command = {
       await refuseTarget(dir)
 
       // With no option saying what to scaffold, a terminal asks; anything else takes the preset, the server's by default, with what --with and --without change.
-      const ask = template === undefined && added === undefined && removed === undefined && yes !== true && process.stdin.isTTY && process.stderr.isTTY
+      const ask = template === undefined && added === undefined && removed === undefined && yes !== true && isInteractive()
       const chosen = new Set(PRESETS[(template as Preset | undefined) ?? 'server'].features)
 
       for (const name of listed(added))
@@ -87,7 +87,7 @@ export const scaffold: Command = {
 
       const files = await createProject(dir, { kay: typeof values.kay === 'string' ? values.kay : undefined, features, host: forge === undefined ? await detectHost(dir) : forge as Host, runner: typeof values.runner === 'string' ? values.runner : undefined, dryRun })
 
-      const editors = dryRun ? [] : await setUpEditors(dir, wanted.filter(name => name !== 'none') as Editor[], values.editor === undefined && yes !== true && format === 'text' && process.stdin.isTTY && process.stderr.isTTY)
+      const editors = dryRun ? [] : await setUpEditors(dir, wanted.filter(name => name !== 'none') as Editor[], values.editor === undefined && yes !== true && format === 'text' && isInteractive())
 
       if (format === 'json') {
         printDocument({ dir, features, files, dryRun, editors })

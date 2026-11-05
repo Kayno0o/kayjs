@@ -221,4 +221,17 @@ describe('usage on a refusal', () => {
     expect(commands.stderr).toBe('')
     expect(options.stdout).toContain('--no-check\t')
   })
+
+  it('keeps no usage log of the commands it runs, and takes the kit\'s output flags', async () => {
+    const root = await project({})
+    const state = await project({})
+    const env = { NODE_ENV: 'production', XDG_STATE_HOME: state }
+    const plain = await kay(['--plain', '--version'], root, env)
+    const colored = await kay(['--color', 'never', 'bogus'], root, env)
+
+    expect([plain.code, plain.stderr]).toEqual([0, ''])
+    expect(colored.code).toBe(2)
+    expect(colored.stderr).toBe('error: kay: no command bogus\n  hint: run kay --help for its commands\n')
+    expect(await readdir(state)).toEqual([])
+  })
 })

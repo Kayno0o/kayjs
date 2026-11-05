@@ -40,7 +40,7 @@ async function main(args: string[]): Promise<number> {
   }
 
   try {
-    return await runCli({ name: 'kay', version, about: 'a Bun web framework', commands, extraCommands: extension }, args)
+    return await runCli({ name: 'kay', version, about: 'a Bun web framework', commands, extraCommands: extension, usage: false }, args)
   }
   catch (error) {
     // What the extensions could not give, thrown from the kit's call for them.

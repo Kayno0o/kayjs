@@ -6,7 +6,7 @@
       "name": "kay",
       "dependencies": {
         "@jsquash/avif": "2.1.1",
-        "@kaynooo/cli-kit": "0.19.0",
+        "@kaynooo/cli-kit": "0.35.0",
         "@kaynooo/utils": "^2.31.0",
         "@resvg/resvg-js": "^2.6.2",
         "axe-core": "^4.14.0",
@@ -266,7 +266,7 @@
 
     "@jsquash/avif": ["@jsquash/avif@2.1.1", "", { "dependencies": { "wasm-feature-detect": "^1.2.11" } }, "sha512-LMRxd0fMgfCLtobDh0/sFYJMMiRJTNYSEEWvRDKXlAeZ08t3gI5V+1thIT0XjXJ+SVG7Zug9B0XPyx0Ti5VRNA=="],
 
-    "@kaynooo/cli-kit": ["@kaynooo/cli-kit@0.19.0", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fcli-kit/-/0.19.0/cli-kit-0.19.0.tgz", { "dependencies": { "@kaynooo/utils": "^2.31.2" } }, "sha512-tI/qMKpQH8c5QEB98S7xgtiIxr8e4RRVCxLvjV852mlqIMsDIHy//fwhqvzvaO+aY14zAPBXfrJ9jEOT/5zMZA=="],
+    "@kaynooo/cli-kit": ["@kaynooo/cli-kit@0.35.0", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Fcli-kit/-/0.35.0/cli-kit-0.35.0.tgz", { "dependencies": { "@kaynooo/utils": "^2.31.2" } }, "sha512-zsnswAz0DidsO5oRO68I3ftMNqLFFTPtc8Ua59TmANbrR0hB57rQphCfWZCCekD5sj6qkX5/K8DksAFmw29q8g=="],
 
     "@kaynooo/eslint": ["@kaynooo/eslint@7.1.4", "https://git.kaynooo.fr/api/packages/kaynooo/npm/%40kaynooo%2Feslint/-/7.1.4/eslint-7.1.4.tgz", { "dependencies": { "@e18e/eslint-plugin": "^0.8.0", "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2", "@eslint/markdown": "^8.0.3", "@stylistic/eslint-plugin": "^5.10.0", "@typescript-eslint/eslint-plugin": "^8.67.0", "@typescript-eslint/parser": "^8.67.0", "eslint-config-flat-gitignore": "^2.3.0", "eslint-flat-config-utils": "^3.2.0", "eslint-merge-processors": "^2.0.0", "eslint-plugin-antfu": "^3.2.3", "eslint-plugin-better-tailwindcss": "^4.7.0", "eslint-plugin-format": "^2.0.1", "eslint-plugin-import-lite": "^0.6.0", "eslint-plugin-jsonc": "^3.4.1", "eslint-plugin-no-only-tests": "^3.4.0", "eslint-plugin-perfectionist": "^5.10.1", "eslint-plugin-regexp": "^3.2.0", "eslint-plugin-toml": "^1.5.0", "eslint-plugin-unicorn": "^73.0.0", "eslint-plugin-unused-imports": "^4.4.1", "eslint-plugin-yml": "^3.8.1", "globals": "^17.11.0", "toml-eslint-parser": "^1.0.3", "yaml-eslint-parser": "^2.1.0" }, "peerDependencies": { "eslint": "^10.7.0" }, "bin": { "keslint": "dist/bin.js" } }, "sha512-WzbUlbnDhMDvsqmb5qf1VsK4kOJ581k9UDoqfCSCTUONCo2zCQB1uSe0pRyNyX576ejjHOgUt0vRMyV6FOI76A=="],
 
