@@ -789,6 +789,15 @@ export const LINTS = {
     wrong: '--- server\nimport { cssColours } from \'@kaynooo/kayjs-mail\'\n\nexport const colour = cssColours(\'a { --brand: #0047ff }\')\n---\np x',
     right: '--- server\nimport { cssColors } from \'@kaynooo/kayjs-mail\'\n\nexport const colour = cssColors(\'a { --brand: #0047ff }\')\n---\np x',
   },
+  'deprecated-library-names': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.91',
+    site: true,
+    summary: 'An import of an export under the name it had before 1.91, when the libraries\' constructors became nouns and every Postgres helper took one `PgSource`: kayjs-auth\'s `createAuth` is `authCore`, `createGate` is `authGate`, `createRoleHierarchy` is `roleHierarchy`, `createWsAuthStore` is `wsAuthStore`, `memoryAuthStore` is `memoryAuth` and `pgStore` is `pgAuth`; kayjs-cms\'s `createDrafts` and `createEntryForm` are `cmsDrafts` and `cmsEntryForm`; kayjs-mail\'s `createMailSuppressionTable` and `mailListTables` from `/pg` are `createMailSuppressionTables` and `mailListTableNames`; `PgJobsSource` of `kay/server` is `PgSource`. The `sql` key of a `pgLoader({ ... })` literal is `source`. The old names work until 1.94. Found in the TypeScript files and `.kay` fences of the project; the fix renames the import and every use of it, or the key. An aliased import is renamed without its uses, and a file where the new name is already taken, or the old one is declared again, exported or read in a template, is reported with no fix, as is a `sql` written beside a `source`. A re-export, `import(\'pkg\').X` and a namespace use are not found.',
+    wrong: '--- server\nimport { createGate } from \'@kaynooo/kayjs-auth\'\n\nexport const gate = createGate\n---\np x',
+    right: '--- server\nimport { authGate } from \'@kaynooo/kayjs-auth\'\n\nexport const gate = authGate\n---\np x',
+  },
   'deprecated-context-name': {
     level: 'warn',
     group: 'deprecated',
@@ -873,6 +882,7 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.88' },
   { since: '1.89' },
   { since: '1.90' },
+  { since: '1.91' },
 ]
 
 // The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.

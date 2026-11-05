@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- A constructor is a noun across the libraries (`authCore`, `authGate`, `memoryAuth`, `pgAuth`, `cmsDrafts`, `cmsEntryForm`), every Postgres store and table helper takes one `PgSource` (a Bun `SQL`, a pg-orm `Database` or a URL; `pgLoader` takes it as `source`), `createXTables` creates, `xTableNames` lists names: see [Component libraries: conventions](component-library-conventions.md#conventions); `deprecated-library-names` renames the old names.
+
 ## 1.90.0
 
 - `add.validate(form, field?)` checks a form in the browser against the action's schema and writes the messages into `add.error(field)` as a refusal does, and kayjs-ui's Form, SaveForm and FormDialog take `validate="submit" | "blur"` to show them on their FormField live: [actions](actions.md#reading-the-outcome), [forms](../packages/ui/llms/forms-and-steps.md).

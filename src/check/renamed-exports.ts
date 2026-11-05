@@ -216,7 +216,7 @@ function withoutSpecifier(statement: ImportDeclaration, specifier: ImportSpecifi
 
 // A name imported from one of `config.modules` under an old name, as a type or a value import: the fix renames the import and every use of it.
 // A file where the new name is taken, the old one is declared again, exported or read in a template, or an aliased import, gets the report with no fix beyond the import itself.
-async function renamedTypes(root: string, options: CheckOptions, config: RenamedTypes): Promise<CheckDiagnostic[]> {
+export async function renamedTypes(root: string, options: CheckOptions, config: RenamedTypes): Promise<CheckDiagnostic[]> {
   if (lintLevel(config.lint, options.lints) === 'allow')
     return []
 

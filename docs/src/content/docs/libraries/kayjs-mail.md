@@ -345,7 +345,7 @@ Every mail ends with an unsubscribe link in the subscriber's language, and carri
 
 An app whose `store` is `pgData(url)` needs nothing more. To keep the lists elsewhere, give the mailer a store: `mailer({ listStore: pgLists(db) })` (from `@kaynooo/kayjs-mail/pg`), where `db` is what `pgData` takes. A single list can name its own with `mail.list('news', { store })`. The same three `kay_mail_*` tables are created when missing.
 
-If your database role cannot create tables, the owner runs `createMailListTables(db)` once, and you list `mailListTables` in pg-orm's `ignoreTables`.
+If your database role cannot create tables, the owner runs `createMailListTables(db)` once, and you list `mailListTableNames` in pg-orm's `ignoreTables`.
 
 With `listStore` on the mailer, a link in a mail and `mail.erase` reach the store without any list being declared. Moving a site from SQLite to Postgres means copying the three tables over, or the links in mails already sent will not work.
 
@@ -442,11 +442,11 @@ A view written from scratch can take its default wording from `authWords(mail)`.
 
 ```ts
 // src/auth.ts
-import { createAuth } from '@kaynooo/kayjs-auth'
+import { authCore } from '@kaynooo/kayjs-auth'
 import { authMailer } from '@kaynooo/kayjs-mail'
 import { mail } from './mail'
 
-export const auth = createAuth({
+export const auth = authCore({
   // ...
   email: { mailer: authMailer(mail.enqueue) },
 })

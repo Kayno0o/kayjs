@@ -132,7 +132,7 @@ Type the result `KayExtension<typeof plugin>` when it has a `server` of its own,
 
 ## Tables in the app's Postgres
 
-A library that keeps its own tables in the app's Postgres reads the connection and the schema the way kay's `pgData` does. All three helpers come from `kay/library`, with the `PgJobsSource` type.
+A library that keeps its own tables in the app's Postgres reads the connection and the schema the way kay's `pgData` does. All three helpers come from `kay/library`, with the `PgSource` type.
 
 - `connectionOf(source)` gives the Bun `SQL` of a `SQL`, a pg-orm `Database` or a connection URL.
 - `relationsMissing(db, names)` tells whether one of the tables does not exist.

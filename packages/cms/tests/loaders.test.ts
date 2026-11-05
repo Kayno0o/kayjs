@@ -156,7 +156,7 @@ const postgresTest = test.skipIf(skipPostgres)
 contract('pgLoader', (options) => {
   shared ??= new SQL(Object.assign(new URL(url), { pathname: `/${database}` }).href, { max: 4 })
 
-  return pgLoader({ ...options, sql: shared })
+  return pgLoader({ ...options, source: { sql: shared } })
 }, postgresTest)
 
 if (admin !== undefined) {

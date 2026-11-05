@@ -1,4 +1,5 @@
 import type { ContentLoader } from 'kay/content'
+import type { PgSource } from 'kay/library'
 import type { CmsSeedEntry, LoaderOptions, Row, SavedEntry } from './shared'
 import { SQL } from 'bun'
 import { contentSource, existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
@@ -6,8 +7,10 @@ import { contentSource, existsError, loadedOf, placeOf, scopeOf, seededKey, seed
 export type { CmsSeedEntry, LoaderOptions }
 
 export interface PgLoaderOptions extends LoaderOptions {
-  // A connection URL, or the Bun `SQL` the app already has: a pg-orm app passes `db.sql`. The app's `store: pgData(url)` when left out.
-  sql?: string | SQL | undefined
+  // A connection URL, the Bun `SQL` the app already has or a pg-orm `Database`, as `pgData` takes it. The app's `store: pgData(url)` when left out.
+  source?: PgSource | undefined
+  /** @deprecated Renamed `source` in 1.91, as every Postgres store takes its database under that name; the old key works until 1.94. */
+  sql?: PgSource | undefined
 }
 
 // Any statement runner of Bun's SQL: the client, or a transaction's.
@@ -19,21 +22,21 @@ const LOCK = 7_624_881
 // The clients opened from a URL, one per URL, so the collections of an app share a pool.
 const clients = new Map<string, SQL>()
 
-function clientOf(sql: string | SQL): SQL {
-  if (typeof sql !== 'string')
-    return sql
+function clientOf(source: PgSource): SQL {
+  if (typeof source !== 'string')
+    return 'sql' in source ? source.sql : source
 
-  let client = clients.get(sql)
+  let client = clients.get(source)
 
   if (client === undefined) {
-    client = new SQL(sql)
-    clients.set(sql, client)
+    client = new SQL(source)
+    clients.set(source, client)
   }
 
   return client
 }
 
-// A collection's entries kept in one Postgres table of JSON entries: `collection(pgLoader({ name: 'posts', sql: db.sql, seed }), { schema })`. The table is created, and the seed written, when the first read or save comes; a save of several entries is one transaction.
+// A collection's entries kept in one Postgres table of JSON entries: `collection(pgLoader({ name: 'posts', source: db, seed }), { schema })`. The table is created, and the seed written, when the first read or save comes; a save of several entries is one transaction.
 export function pgLoader(options: PgLoaderOptions): ContentLoader {
   const { name, ttl } = options
   const table = tableOf(options.table)
@@ -42,8 +45,9 @@ export function pgLoader(options: PgLoaderOptions): ContentLoader {
   // The rows' count and the sum of the transactions that wrote them move with an insert, an update and a delete, whoever made them, but also with a `VACUUM FREEZE` or any rewrite of the rows that changed nothing; so the rows are read and hashed only when it moves, and what is reported is that hash.
   let moved: string | undefined
   let fingerprint = ''
-  const sqlOf = () => options.sql ?? contentSource()
-  const watching = watcher(name, `${scopeOf(options.sql ?? 'the app\'s store')}/${table}`, options.watch, '2s', async (force) => {
+  const given = options.source ?? options.sql
+  const sqlOf = () => given ?? contentSource()
+  const watching = watcher(name, `${scopeOf(given === undefined || typeof given === 'string' ? given ?? 'the app\'s store' : clientOf(given))}/${table}`, options.watch, '2s', async (force) => {
     const client = clientOf(sqlOf())
     const [row] = await client.unsafe<{ signature: string }[]>(`SELECT count(*)::text || ':' || coalesce(sum(xmin::text::bigint), 0)::text AS signature FROM ${table} WHERE collection = $1`, [name])
 

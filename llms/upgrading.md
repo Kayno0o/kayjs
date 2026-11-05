@@ -27,6 +27,13 @@ Their `deprecated-*` lints go with them: run `kay upgrade` on 1.90 first and it 
 
 - `KAYJS_AUTH_DATABASE_URL` is `AUTH_DATABASE_URL` (kayjs-auth), and `MAIL_INBOUND_SECRET` is `MAIL_EVENTS_INBOUND` (kayjs-mail), as `MAIL_EVENTS_<PROVIDER>` is named. The old names are read until 1.94, with one warning at boot, and `kay env` warns when the environment, a compose file or `.env.example` holds one; `kay check` reads code, not the environment, so no lint ships: rename them in your `.env`, compose files and deployment. `SITE_URL`, `SITE_BASE`, the vendors' keys and `<PROVIDER>_CLIENT_ID` and `_SECRET` keep their names. The rule is in [Environment variables](environment.md).
 
+### Constructors are nouns, Postgres helpers share one `PgSource`
+
+- kayjs-auth's `createAuth` is `authCore`, `createGate` is `authGate`, `createRoleHierarchy` is `roleHierarchy`, `createWsAuthStore` is `wsAuthStore`, `memoryAuthStore` is `memoryAuth` and `pgStore` is `pgAuth`; kayjs-cms's `createDrafts` and `createEntryForm` are `cmsDrafts` and `cmsEntryForm`.
+- `PgJobsSource` is `PgSource` (`kay/server`, `kay/library`), which every Postgres store and table helper takes; kayjs-mail's `createMailSuppressionTable` from `@kaynooo/kayjs-mail/pg` is `createMailSuppressionTables` and its `mailListTables` is `mailListTableNames`, as `jobTableNames` lists names and `createXTables` creates.
+- The `sql` key of `pgLoader({ ... })` in kayjs-cms is `source`, which also takes a pg-orm `Database`.
+- The old names work until 1.94, and `kay check` flags an import of each, and the `sql` key, as `deprecated-library-names`, with a safe fix that `kay upgrade` applies.
+
 ## 1.90.0
 
 ### FileDrop is a form control

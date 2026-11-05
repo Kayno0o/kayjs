@@ -52,7 +52,7 @@ export type { Inbox, Notification, NotificationStore, NotifyOptions, StoredNotif
 export { memoryNotifications, notifications, notify, sqliteNotifications } from './notifications'
 export type { PageHook, RenderedPage } from './page-hook'
 export { createDataTables, dataTableNames, dataTables, pgData } from './pg-data'
-export type { PgJobsSource } from './pg-jobs'
+export type { PgJobsSource, PgSource } from './pg-jobs'
 export { createJobTables, jobTableNames, jobTables, pgJobs } from './pg-jobs'
 export { editedEntry, editRequested, editSessionOf, enterPreview, exitPreview, previewUrl } from './preview'
 export type { ApiRateLimit, Limiter, LimiterOptions, RateLimiter } from './protection'

@@ -34,12 +34,12 @@ export function contentFile(): string {
   return file
 }
 
-// The connection of a loader given no `sql`: the one `pgData` of the app's `store` works through.
+// The connection of a loader given no `source`: the one `pgData` of the app's `store` works through.
 export function contentSource(): SQL | string {
   const database = appDatabase()
 
   if (database?.kind !== 'pg')
-    throw configError('pgLoader has no `sql`, and the app\'s `store` names no Postgres: give the loader a connection URL or a Bun `SQL`, or set `store: pgData(url)` in kay.config.ts')
+    throw configError('pgLoader has no `source`, and the app\'s `store` names no Postgres: give the loader a connection URL, a Bun `SQL` or a pg-orm `Database`, or set `store: pgData(url)` in kay.config.ts')
 
   return database.source
 }

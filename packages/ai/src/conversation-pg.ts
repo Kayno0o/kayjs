@@ -1,5 +1,5 @@
 import type { SQL } from 'bun'
-import type { PgJobsSource } from 'kay/library'
+import type { PgSource } from 'kay/library'
 import type { ConversationKey, ConversationStore, StoredConversation } from './conversation-store'
 import type { ConversationSummary } from './conversation-title'
 import { connectionOf, privilegeRefused, relationsMissing } from 'kay/library'
@@ -14,7 +14,7 @@ const INDEX = 'CREATE INDEX IF NOT EXISTS kay_ai_conversations_updated ON kay_ai
 interface Row { id: string, title: string, revision: number, updated_at: string, turns: string }
 
 // Creates the table unless it exists, for an app whose role creates nothing: run it as the database's owner, in a boot script, and list `kay_ai_conversations` in pg-orm's `ignoreTables`.
-export async function createConversationTable(source: PgJobsSource): Promise<void> {
+export async function createConversationTable(source: PgSource): Promise<void> {
   const db = connectionOf(source)
 
   try {
@@ -29,7 +29,7 @@ export async function createConversationTable(source: PgJobsSource): Promise<voi
 
 // The conversations of a Chat with `keepOnServer` in the app's Postgres, shared by every process of every replica: `ai({ conversations: pgConversations(db) })`, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgData` takes. An app whose `store` is `pgData(url)` needs to write nothing.
 // The table is created on first use, which takes a role that may create tables.
-export function pgConversations(source: PgJobsSource): ConversationStore & { close: () => Promise<void> } {
+export function pgConversations(source: PgSource): ConversationStore & { close: () => Promise<void> } {
   const db = connectionOf(source)
   let ready: Promise<SQL> | undefined
 

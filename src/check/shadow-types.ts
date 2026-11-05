@@ -40,6 +40,7 @@ import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsChe
 import { unguardedRoutes, unguardedTools } from './guards'
 import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
+import { libraryNames, pgLoaderSource } from './library-names'
 import { mcpRoutes } from './mcp-routes'
 import { movedImports } from './moved-imports'
 import { unreadOpenSettings } from './open-settings'
@@ -142,6 +143,8 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
   async ({ root, options }) => roomTypes(root, options),
   async ({ root, options }) => exportNames(root, options),
+  async ({ root, options }) => libraryNames(root, options),
+  async ({ root, options }) => pgLoaderSource(root, options),
   async ({ root, options }) => durationSeconds(root, options),
   async ({ root, options }) => deprecatedConfigKeys(root, options),
   async ({ root, options }) => contextName(root, options),

@@ -18,7 +18,10 @@ interface PgJobRow {
 type PgStateRow = PgJobRow & { failed: boolean, held: boolean }
 
 // Whatever holds a Bun SQL on Postgres: the `SQL` itself, a pg-orm `Database` (its `sql`), or a connection URL.
-export type PgJobsSource = SQL | { sql: SQL } | string
+export type PgSource = SQL | { sql: SQL } | string
+
+/** @deprecated Renamed `PgSource` in 1.91, as every Postgres store and table helper of kay and its libraries takes it, not the jobs alone; the old name works until 1.94. */
+export type PgJobsSource = PgSource
 
 // What replicas starting together take turns on while one creates the tables.
 const MIGRATION_LOCK = 'kay_jobs'
@@ -227,7 +230,7 @@ export async function rowsOf<Row>(query: PromiseLike<unknown>): Promise<Row[]> {
   return await query as Row[]
 }
 
-export function connectionOf(source: PgJobsSource): SQL {
+export function connectionOf(source: PgSource): SQL {
   if (typeof source === 'string')
     return new Bun.SQL(source, CONNECTION)
 
@@ -236,7 +239,7 @@ export function connectionOf(source: PgJobsSource): SQL {
 
 // Creates `kay_jobs` and `kay_locks` and their indexes unless they exist (an index missing on tables already there is created on its own, without a lock that waits on a writer), for an app whose migrations do not: run it as the database's owner, in a boot script, when the app connects with a role that creates nothing (the app template's `app_rw`). `pgJobs` creates them itself when its role may.
 // Replicas running it together take turns, and tables already there are left alone.
-export async function createJobTables(source: PgJobsSource): Promise<void> {
+export async function createJobTables(source: PgSource): Promise<void> {
   const db = connectionOf(source)
 
   try {
@@ -264,12 +267,12 @@ export async function createJobTables(source: PgJobsSource): Promise<void> {
 // Jobs kept in the app's Postgres, shared by every process of every replica opening it, each job running in one of them: a claim is one `UPDATE` over a `FOR UPDATE SKIP LOCKED` pick.
 // The tables `kay_jobs` and `kay_locks` are looked for first, and an app on pg-orm lists `jobTables` from `kay/pg-orm` in its `new Database({ tables })` so its own migrations create them. A store that finds them missing creates them, which takes a role that may create tables: with one that may not, `createJobTables` run by the owner makes them, and pg-orm's `ignoreTables` then needs the names in `jobTables` of `kay/server`.
 // A hold lasts from the database's clock, whichever replica claims: replicas' clocks need not agree. A job's `runAt` stays the clock of the process that enqueued or retried it, compared with the claiming process's.
-export function pgJobs(source: PgJobsSource): JobStore {
+export function pgJobs(source: PgSource): JobStore {
   return jobsAfter(source)
 }
 
 // `pgJobs` that first awaits `before`, which `pgData` uses to claim the database for its app before a job is touched.
-export function jobsAfter(source: PgJobsSource, before?: () => Promise<unknown>): JobStore {
+export function jobsAfter(source: PgSource, before?: () => Promise<unknown>): JobStore {
   let sql: SQL | undefined
   let ready: Promise<SQL> | undefined
   const connect = (): SQL => {

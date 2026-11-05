@@ -1,7 +1,7 @@
 import type { SQL } from 'bun'
 import type { StoreBase } from '../runtime/store-base'
 import type { AppStore } from './app-store'
-import type { PgIndex, PgJobsSource } from './pg-jobs'
+import type { PgIndex, PgSource } from './pg-jobs'
 import type { DeletableSessionStore } from './session'
 import { kayLog } from '../runtime/log'
 import { appName, claimDatabase } from './app-identity'
@@ -47,7 +47,7 @@ export interface PgHandle {
 
 // Creates every table `pgData` keeps its data in, the jobs' included, unless they exist, for an app whose migrations do not: run it as the database's owner, in a boot script, when the app connects with a role that creates nothing. `pgData` creates them itself when its role may.
 // Replicas running it together take turns, and tables already there are left alone.
-export async function createDataTables(source: PgJobsSource): Promise<void> {
+export async function createDataTables(source: PgSource): Promise<void> {
   const db = connectionOf(source)
 
   try {
@@ -212,7 +212,7 @@ export function pgHandle(db: SQL): PgHandle & { close: () => Promise<void> } {
 // Sessions, cached values, jobs, rate counts, the members of presence rooms, the values of `live()`, the Web Vitals visitors reported, the notifications and push subscriptions of a person and the `store.kv` values in the app's Postgres, shared by every process of every replica opening it: `store: pgData(db)` in kay.config.ts, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgJobs` takes.
 // The `kay_*` tables are created when missing, which takes a role that may create tables: with one that may not, `createDataTables` run by the owner makes them (`kay_kv` included, which a database made before 1.88 lacks). Replicas hear each other's invalidations, live values and room messages by polling, within about half a second, so nothing needs LISTEN and a pooler in front of Postgres is fine.
 // A room's state is kept there too, so `rooms({ state, store: pgData(db).rooms })` keeps a room's state.
-export function pgData(source: PgJobsSource) {
+export function pgData(source: PgSource) {
   const db = connectionOf(source)
 
   const handle = pgHandle(db)
