@@ -4,6 +4,8 @@ import type { LabelFormat } from './chart-axis'
 import type { BarSeries } from './plot'
 import type { ChartMark } from './chart-marks'
 import { memo, recipe, signal } from 'kay'
+import { tabOf } from './outside'
+import type { NewTab } from './outside'
 import { activeMarks, chartTooltip, markKind, TOOLTIP_LOOK } from './chart-marks'
 import { headings, labelTimes, tickIndices, tickTexts } from './chart-axis'
 import { barRatios, PALETTE, steppedPoint, valueTicks } from './plot'
@@ -29,7 +31,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.barChart.total', 'Total'), legend, emptyLabel, onSelect, href, onActive, active, tooltip, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.barChart.total', 'Total'), legend, emptyLabel, onSelect, href, newTab, onActive, active, tooltip, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   labels: string[]
   series: BarSeries[]
   // Formats the y-axis labels, the tooltips and the readings screen readers hear.
@@ -48,6 +50,8 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   onSelect?: ((mark: ChartMark) => unknown) | undefined
   // The address a column links to, or `undefined` for none: a middle click, a new tab or a crawler finds it, and a plain click goes through `onSelect` when the app gave one.
   href?: ((mark: ChartMark) => string | undefined) | undefined
+  // Opens the links of `href` in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
+  newTab?: NewTab | undefined
   // Hears the index of the column the pointer or the focus is on, `null` when it leaves.
   onActive?: ((index: number | null) => unknown) | undefined
   // The column to draw as active, `null` for none; the app controls it when it gives it, and the pointer and focus then only report through `onActive`.
@@ -115,7 +119,7 @@ const tip = chartTooltip()
 function link(at: number) {
   const to = href?.(mark(at))
 
-  return to === undefined || to === '' ? undefined : { href: to }
+  return to === undefined || to === '' ? undefined : { href: to, ...tabOf(to, newTab) }
 }
 
 // A plain click on a link goes to `onSelect` when the app gave one; a modified or middle click is left to the browser.

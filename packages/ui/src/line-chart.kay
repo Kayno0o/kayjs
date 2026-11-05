@@ -7,7 +7,8 @@ import { effect, memo, navigate, onCleanup, onMount, recipe, signal, uid, untrac
 import type { LabelContext } from './chart-axis'
 import { loaders } from './chartist'
 import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, totalAt, xAxisOptions } from './chart-axis'
-import { isExternal } from './outside'
+import { isExternal, tabOf } from './outside'
+import type { NewTab } from './outside'
 import { dashSample, PALETTE, SERIES_DASHES, steppedPoint } from './plot'
 import { wording } from 'kay/words'
 
@@ -45,7 +46,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, onSelect, href, onActive, active, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, onSelect, href, newTab, onActive, active, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.
@@ -70,8 +71,10 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   onRange?: ((from: number, to: number) => unknown) | undefined
   // Hears the point a click without a drag lands on, or Enter with no span being picked, as `{ index, label, values }`.
   onSelect?: ((mark: ChartMark) => unknown) | undefined
-  // The address a point goes to, or `undefined` for none: a click without a drag on a point that has one, or Enter on it, follows it (an address leaving the site in a new tab) unless the app gave `onSelect`, which hears it instead, as for the other charts.
+  // The address a point goes to, or `undefined` for none: a click without a drag on a point that has one, or Enter on it, follows it. The plot is one element, not a link per point, so unlike the other charts there is no middle click or "copy link", the address is read out with the point, and `onSelect`, when given, hears the press in its place.
   href?: ((mark: ChartMark) => string | undefined) | undefined
+  // Opens the address of `href` in a new tab (`true`), the same one (`false`), or a new one when it leaves the site (`'auto'`, the default).
+  newTab?: NewTab | undefined
   // Hears the index of the point the pointer or the keyboard is on, `null` when it leaves.
   onActive?: ((index: number | null) => unknown) | undefined
   // The point whose cursor and dots are drawn, `null` for none; the app controls them when it gives it, the tooltip following the pointer and keyboard alone.
@@ -211,10 +214,19 @@ function choose(index: number) {
   if (to === undefined || to === '')
     return
 
-  if (isExternal(to))
+  if (Object.keys(tabOf(to, newTab)).length > 0)
     window.open(to, '_blank', 'noopener,noreferrer')
+  else if (isExternal(to))
+    location.assign(to)
   else
     void navigate(to)
+}
+
+// The address of the point the keyboard is on, or none.
+const linkAt = (index: number) => {
+  const to = href?.(mark(index))
+
+  return to === undefined || to === '' ? undefined : to
 }
 
 let lastActive: number | null = null
@@ -272,7 +284,9 @@ const announced = () => {
   const readings = [...series.map(item => `${item.name} ${valueText(item, index)}`), ...stacked ? [`${totalLabel} ${totalText(index)}`] : []].join(', ')
   const picked = span && span.from !== span.to ? `; ${heading(Math.min(span.from, span.to))} - ${heading(Math.max(span.from, span.to))}` : ''
 
-  return `${heading(index)}: ${readings}${picked}`
+  const to = linkAt(index)
+
+  return `${heading(index)}: ${readings}${picked}${to ? `; ${to}` : ''}`
 }
 
 // Reads the y labels as drawn, which stay on one line, and gives them the room they took: a redraw settles at once, as a label's own size does not depend on the room it is given.
@@ -558,7 +572,7 @@ function keyDown(event: KeyboardEvent) {
     return
   }
 
-  if (event.key === 'Enter' && (onSelect || href) && labels.length > 0) {
+  if (event.key === 'Enter' && (onSelect || linkAt(current()) !== undefined) && labels.length > 0) {
     event.preventDefault()
     choose(current())
 

@@ -2,6 +2,8 @@
 import type { JSX, Snippet } from 'kay'
 import type { ScatterAxis, ScatterPoint } from './plot'
 import { memo, recipe, signal } from 'kay'
+import { tabOf } from './outside'
+import type { NewTab } from './outside'
 import { activeMarks, chartTooltip, markKind, TOOLTIP_LOOK } from './chart-marks'
 import { axisExtent, axisPercent, dotSize, steppedPoint } from './plot'
 import { wording } from 'kay/words'
@@ -21,7 +23,7 @@ const look = recipe({
   },
 })
 
-const { points, x = {}, y = {}, quadrant, corners, onSelect, href, onActive, active, tooltip, emptyLabel, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
+const { points, x = {}, y = {}, quadrant, corners, onSelect, href, newTab, onActive, active, tooltip, emptyLabel, label, ...rest } = props<Omit<JSX.IntrinsicElements['figure'], 'class' | 'children' | 'onSelect'> & {
   points: Point[]
   x?: ScatterAxis | undefined
   y?: ScatterAxis | undefined
@@ -32,6 +34,8 @@ const { points, x = {}, y = {}, quadrant, corners, onSelect, href, onActive, act
   onSelect?: ((point: Point) => unknown) | undefined
   // The address a dot links to, or `undefined` for none: a dot that has one is a link, and a plain click goes to `onSelect` when the app gave one.
   href?: ((point: Point) => string | undefined) | undefined
+  // Opens the links of `href` in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
+  newTab?: NewTab | undefined
   // Hears the index of the dot the pointer or the focus is on, `null` when it leaves.
   onActive?: ((index: number | null) => unknown) | undefined
   // The dot to draw as active, `null` for none; the app controls it when it gives it.
@@ -79,7 +83,7 @@ const tip = chartTooltip()
 function link(point: Point) {
   const to = href?.(point)
 
-  return to === undefined || to === '' ? undefined : { href: to }
+  return to === undefined || to === '' ? undefined : { href: to, ...tabOf(to, newTab) }
 }
 
 // A plain click on a link goes to `onSelect` when the app gave one; a modified or middle click is left to the browser.

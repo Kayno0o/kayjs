@@ -717,6 +717,7 @@ component default
   label: string
   labels: string[]
   legend?: boolean | undefined
+  newTab?: NewTab | undefined
   onActive?: ((index: null | number) => unknown) | undefined
   onSelect?: ((mark: ChartMark) => unknown) | undefined
   series: BarSeries[]
@@ -1120,6 +1121,7 @@ component default
   href?: ((day: ContributionDay) => string | undefined) | undefined
   label?: string | undefined
   months?: boolean | undefined
+  newTab?: NewTab | undefined
   onActive?: ((index: null | number) => unknown) | undefined
   onSelect?: ((day: ContributionDay) => unknown) | undefined
   today: string
@@ -1544,6 +1546,7 @@ component default
   label: string
   labels: string[]
   legend?: boolean | undefined
+  newTab?: NewTab | undefined
   onActive?: ((index: null | number) => unknown) | undefined
   onRange?: ((from: number, to: number) => unknown) | undefined
   onSelect?: ((mark: ChartMark) => unknown) | undefined
@@ -2090,6 +2093,7 @@ component default
   emptyLabel?: string | undefined
   href?: ((point: Point) => string | undefined) | undefined
   label: string
+  newTab?: NewTab | undefined
   onActive?: ((index: null | number) => unknown) | undefined
   onSelect?: ((point: Point) => unknown) | undefined
   points: Point[]
@@ -2262,6 +2266,7 @@ component default
   hints?: readonly (string | undefined)[] | undefined
   href?: ((mark: SparkMark) => string | undefined) | undefined
   label: string
+  newTab?: NewTab | undefined
   onActive?: ((index: null | number) => unknown) | undefined
   onSelect?: ((mark: SparkMark) => unknown) | undefined
   tone?: Tone | undefined

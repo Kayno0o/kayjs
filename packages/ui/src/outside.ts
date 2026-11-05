@@ -6,7 +6,7 @@ export type NewTab = boolean | 'auto'
 
 const OTHER_SITE = /^(?:https?:)?\/\//
 
-// Whether a link leaves the site: an absolute (`https://...`) or protocol-relative (`//host`) address, read the same on the server and in the browser so hydration agrees. The test every component with link entries uses for its `newTab: 'auto'`.
+// Whether a link leaves the site: any absolute http(s) (`https://...`) or protocol-relative (`//host`) address counts, the site's own origin included, as the server and the browser must read it the same for hydration to agree. The test every component with link entries uses for its `newTab: 'auto'`.
 export function isExternal(href: string): boolean {
   return OTHER_SITE.test(href)
 }

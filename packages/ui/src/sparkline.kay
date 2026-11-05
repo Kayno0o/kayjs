@@ -3,6 +3,8 @@ import type { JSX } from 'kay'
 import type { Tone } from './tone'
 import type { SparkMark } from './chart-marks'
 import { memo, recipe, signal } from 'kay'
+import { tabOf } from './outside'
+import type { NewTab } from './outside'
 import { activeMarks, markKind } from './chart-marks'
 import { steppedPoint } from './plot'
 
@@ -15,7 +17,7 @@ const look = recipe({
   },
 })
 
-const { values, tone = 'accent', tones, hints, onSelect, href, onActive, active, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
+const { values, tone = 'accent', tones, hints, onSelect, href, newTab, onActive, active, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onSelect'> & {
   // One bar per value, the largest filling the height; a `null`, a zero or a negative value leaves a hairline.
   values: readonly (number | null)[]
   // Colours every bar; `accent` by default.
@@ -28,6 +30,8 @@ const { values, tone = 'accent', tones, hints, onSelect, href, onActive, active,
   onSelect?: ((mark: SparkMark) => unknown) | undefined
   // The address a bar links to, or `undefined` for none.
   href?: ((mark: SparkMark) => string | undefined) | undefined
+  // Opens the links of `href` in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
+  newTab?: NewTab | undefined
   // Hears the index of the bar the pointer or the focus is on, `null` when it leaves.
   onActive?: ((index: number | null) => unknown) | undefined
   // The bar to draw as active, `null` for none; the app controls it when it gives it.
@@ -47,7 +51,7 @@ const name = (at: number) => hints?.[at] ?? String(values[at] ?? '-')
 function link(at: number) {
   const to = href?.(mark(at))
 
-  return to === undefined || to === '' ? undefined : { href: to }
+  return to === undefined || to === '' ? undefined : { href: to, ...tabOf(to, newTab) }
 }
 
 // The bar the keyboard stands at, one tab stop in all: the first until it moves.

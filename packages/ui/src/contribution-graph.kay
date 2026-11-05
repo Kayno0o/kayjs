@@ -2,6 +2,8 @@
 import { recipe, signal } from 'kay'
 import type { JSX } from 'kay'
 import type { ContributionDay } from './contribution'
+import { tabOf } from './outside'
+import type { NewTab } from './outside'
 import { activeMarks, markKind } from './chart-marks'
 import { monthStarts, steppedCell } from './contribution'
 import { shade } from './shade'
@@ -16,7 +18,7 @@ const look = recipe({
   },
 })
 
-const { days, color, today, label = wording('ui.contributionGraph.label', 'Contributions'), months = false, onSelect, href, onActive, active, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
+const { days, color, today, label = wording('ui.contributionGraph.label', 'Contributions'), months = false, onSelect, href, newTab, onActive, active, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   // Ascending days starting on a Monday, as `gridDays` from `@kaynooo/utils` lists them, each with how full its cell is.
   days: readonly ContributionDay[]
   // The CSS colour the filled cells shade towards.
@@ -31,6 +33,8 @@ const { days, color, today, label = wording('ui.contributionGraph.label', 'Contr
   onSelect?: ((day: ContributionDay) => unknown) | undefined
   // The address a cell links to, or `undefined` for none.
   href?: ((day: ContributionDay) => string | undefined) | undefined
+  // Opens the links of `href` in a new tab (`true`), the same one (`false`), or a new one when the address leaves the site (`'auto'`, the default).
+  newTab?: NewTab | undefined
   // Hears the index of the cell the pointer or the focus is on, `null` when it leaves.
   onActive?: ((index: number | null) => unknown) | undefined
   // The cell to draw as active, `null` for none; the app controls it when it gives it.
@@ -42,7 +46,7 @@ const marks = activeMarks({ active: () => active, onActive: () => onActive })
 function link(day: ContributionDay) {
   const to = href?.(day)
 
-  return to === undefined || to === '' ? undefined : { href: to }
+  return to === undefined || to === '' ? undefined : { href: to, ...tabOf(to, newTab) }
 }
 
 // A plain click on a link goes to `onSelect` when the app gave one; a modified or middle click is left to the browser.
