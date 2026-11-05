@@ -45,9 +45,11 @@ const RELEASES_NOTE = 'Releases before 0.0 are in the notes of their releases, a
 // A minor release is named by its minor, a patch one by its full version, so the line reads back to the release it stops at.
 const boundaryVersion = (version: string) => version.replace(PATCH_ZERO, '')
 
-// Names the `## Unreleased` section after the version being released, and the `## Unreleased (continued)` an archive holds for it; a page without one is left as it is.
+// Names the `## Unreleased` section after the version being released, and the `## Unreleased (continued)` an archive holds for it; a page without one is left as it is. A release run again after it stamped the page once adds the new lines to that version's section rather than opening a second one.
 export function stampUnreleased(text: string, version: string): string {
-  return text.replace(UNRELEASED_HEADING, `## ${version}`)
+  const repeated = new RegExp(`^## Unreleased( \\(continued\\))?\\n\\n([\\s\\S]*?)\\n+## ${RegExp.escape(version)}\\1\\n\\n`, 'm')
+
+  return repeated.test(text) ? text.replace(repeated, `## ${version}$1\n\n$2\n`) : text.replace(UNRELEASED_HEADING, `## ${version}`)
 }
 
 // Moves the oldest releases of a page to the top of its archive while the page is over `limit` bytes, keeping its newest release, and moves the "before" version of the page's last line and the archive's intro up with them.

@@ -88,8 +88,17 @@ describe('kay\'s libraries', () => {
 
 // scripts/version.ts names What's new's pending section after the release, where the release notes read it.
 describe('what\'s new', () => {
-  it('names the Unreleased section after the version, and leaves a page without one as it is', () => {
+  it('names each release once on What\'s new and Upgrading', async () => {
+    for (const page of ['llms/whats-new.md', 'llms/upgrading.md']) {
+      const headings = (await Bun.file(page).text()).match(/^## .+$/gm) ?? []
+
+      expect({ page, twice: headings.filter((heading, at) => headings.indexOf(heading) !== at) }).toEqual({ page, twice: [] })
+    }
+  })
+
+  it('names the Unreleased section after the version, adds to it on a release run again, and leaves a page without one as it is', () => {
     expect(stampUnreleased('# What\'s new\n\n## Unreleased\n\n- a\n\n## 1.43.0\n\n- b\n', '1.44.0')).toBe('# What\'s new\n\n## 1.44.0\n\n- a\n\n## 1.43.0\n\n- b\n')
+    expect(stampUnreleased('# What\'s new\n\n## Unreleased\n\n- c\n\n## 1.44.0\n\n- a\n\n## 1.43.0\n\n- b\n', '1.44.0')).toBe('# What\'s new\n\n## 1.44.0\n\n- c\n- a\n\n## 1.43.0\n\n- b\n')
     expect(stampUnreleased('# What\'s new\n\nNothing is ## Unreleased here.\n\n### Unreleased\n\n## 1.43.0\n', '1.44.0')).toBe('# What\'s new\n\nNothing is ## Unreleased here.\n\n### Unreleased\n\n## 1.43.0\n')
   })
 
