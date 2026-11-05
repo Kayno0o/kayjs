@@ -21,6 +21,7 @@ main
     Echo(id="a-password" name="password")
     Echo(id="a-nectar" name="nectar")
     Echo(id="a-yes" name="yes")
+    // kay-allow invalid-nesting
     form#inner(action={second})
       Echo(id="inner-x" name="x")
     Echo(id="a-after" name="x")

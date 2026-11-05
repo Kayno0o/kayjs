@@ -103,7 +103,7 @@ describe('kay explain', () => {
     const [heading, blank, ...rows] = lintList('islands').split('\n')
 
     expect([heading, blank]).toEqual([`islands: ${LINT_GROUPS.islands}`, ''])
-    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-marker', 'promoted-island', 'hydration-mismatch'])
+    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['invalid-nesting', 'positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-marker', 'promoted-island', 'hydration-mismatch'])
   })
 
   it('explains a lint with an example it reports and the same written right, indented as code, and every lint\'s examples hold', () => {
@@ -1336,5 +1336,68 @@ describe('unreturned-fail', () => {
 
     expect(moduleChecks(module).map(d => d.code)).toEqual(['unreturned-fail'])
     expect(moduleChecks(module.replace('  ctx', '  return ctx'))).toEqual([])
+  })
+})
+
+describe('invalid-nesting', () => {
+  const nesting = (source: string) => lints(source).filter(d => d.code === 'invalid-nesting').map(d => d.at)
+
+  it('reports a block in a p, at any depth, with the severity of a warning', () => {
+    expect(nesting('p\n  div x\np\n  span\n    ul\n      li a\nh2 ok\np\n  | text\n  strong fine\n')).toEqual(['div', 'ul'])
+    expect(lints('p\n  div x\n')[0]).toMatchObject({ code: 'invalid-nesting', severity: 'warning' })
+    expect(nesting('p\n  h3 Title\np\n  form\n  p nested\n')).toEqual(['h3', 'form', 'p'])
+  })
+
+  it('stops looking for a p at a button, a table cell or an svg, where the parser does', () => {
+    expect(nesting('p\n  button\n    div x\np\n  svg\n    a\ntable\n  tbody\n    tr\n      td\n        div x\n')).toEqual([])
+  })
+
+  it('reports the table parts the parser re-parents or drops', () => {
+    expect(nesting('table\n  tr\n    td a\ntable\n  tbody\n    tr\n      td a\ntable\n  tbody\n    td a\ndiv\n  tr\n    td a\ndiv\n  thead\n')).toEqual(['tr', 'td', 'tr', 'thead'])
+    expect(nesting('table\n  caption c\n  colgroup\n  thead\n    tr\n      th a\n  tfoot\n    tr\n      td a\n')).toEqual([])
+  })
+
+  it('reports a form in a form and a select in a select, but not siblings', () => {
+    expect(nesting('form\n  div\n    form\nform\nform\n  select\n    option a\n  select\n')).toEqual(['form'])
+    expect(nesting('select\n  option a\n  select\n')).toEqual(['select'])
+  })
+
+  it('reports an option outside a select, an optgroup or a datalist', () => {
+    expect(nesting('select\n  optgroup\n    option a\ndatalist\n  option b\ndiv\n  option c\ndiv\n  optgroup\n')).toEqual(['option', 'optgroup'])
+  })
+
+  it('reports a list item outside a list and anything but an li straight in one', () => {
+    expect(nesting('ul\n  li a\nol\n  li b\nmenu\n  li c\ndiv\n  li d\nul\n  div e\nol\n  script\n  template\n')).toEqual(['li', 'div'])
+  })
+
+  it('reports a heading in a heading', () => {
+    expect(nesting('h2\n  h3 x\nh2\n  span\n    h3 fine\n')).toEqual(['h3'])
+  })
+
+  it('looks through if, for and await blocks', () => {
+    expect(nesting('---\nconst { rows } = props<{ rows: string[] }>()\n---\nul\n  for row of rows\n    li {row}\n  if rows.length\n    li more\ntable\n  for row of rows\n    tr\n      td {row}\np\n  if rows.length\n    div x\n')).toEqual(['tr', 'div'])
+  })
+
+  it('leaves a parent holding a component, a slot or a snippet between it and the child', () => {
+    const header = '---\nimport Item from \'./Item.kay\'\n---\n'
+
+    expect(nesting(`${header}ul\n  Item\n    li a\np\n  Item\n    div x\nform\n  Item\n    form\n`)).toEqual([])
+    expect(nesting('ul\n  slot\n    li a\nul\n  slot items\ndiv\n  slot\ntable\n  slot rows\n')).toEqual([])
+    expect(nesting('li a\ntr\n  td a\ntd b\noption c\n')).toEqual([])
+  })
+
+  it('does not report an element at the root of a template, which a component may be placed under anything', () => {
+    expect(nesting('li x\n')).toEqual([])
+    expect(nesting('tr\n  td x\n')).toEqual([])
+  })
+
+  it('reports inline elements written inside text, and honours `// kay-allow`', () => {
+    expect(nesting('p Text #[div inner]\n')).toEqual(['div'])
+    expect(nesting('p\n  // kay-allow invalid-nesting\n  div x\n')).toEqual([])
+  })
+
+  it('is a warning in the islands group, allowed by config', () => {
+    expect(LINTS['invalid-nesting']).toMatchObject({ level: 'warn', group: 'islands' })
+    expect(lints('p\n  div x\n', { lints: { 'invalid-nesting': 'allow' } })).toEqual([])
   })
 })

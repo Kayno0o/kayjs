@@ -3,6 +3,7 @@ import { accessibilityLints } from './a11y'
 import { keyedByPosition, someNode, walkNodes } from './ast'
 import { positionAt } from './mapping'
 import { VOID_ELEMENTS } from './markup'
+import { nestingLints } from './nesting'
 
 // `allow` reports nothing, `warn` a warning that fails nothing unless `kay check --deny-warnings` runs, `deny` an error.
 export type LintLevel = 'allow' | 'warn' | 'deny'
@@ -144,6 +145,13 @@ export const LINTS = {
     summary: 'A link, button, field or other control inside a link or a button, which HTML forbids: a click and a screen reader reach only one of them.',
     wrong: 'a(href="/posts/1")\n  h2 First post\n  button(onClick={save}) Save',
     right: 'a(href="/posts/1")\n  h2 First post\nbutton(onClick={save}) Save',
+  },
+  'invalid-nesting': {
+    level: 'warn',
+    group: 'islands',
+    summary: 'Markup the HTML parser rewrites or drops, so the server\'s HTML and the DOM an island builds differ: a block in a `p`, a `form` in a `form`, a `tr` straight in a `table`, a cell outside a row, an `option` outside a `select`, a heading in a heading, an `li` outside a list or anything but an `li` straight in one. A parent holding a component, a slot or a snippet between it and the child is left alone.',
+    wrong: 'p\n  div Total\ntable\n  tr\n    td Plan',
+    right: 'div\n  div Total\ntable\n  tbody\n    tr\n      td Plan',
   },
   'duplicate-id': {
     level: 'deny',
@@ -972,7 +980,7 @@ export function templateLints(file: KayFile): Diagnostic[] {
     return literal
   })
 
-  return [...found, ...accessibilityLints(file)]
+  return [...found, ...nestingLints(file), ...accessibilityLints(file)]
 }
 
 // Whether the file declares `name` as a value: a `const`, a prop or import, a loop or `then` name.
