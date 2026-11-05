@@ -3,7 +3,7 @@ import type { SecurityEvent } from './mail'
 import type { RequestState } from './state'
 import type { AuditCursor, UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
-import { configError } from 'kay/library'
+import { configError, maintenance } from 'kay/library'
 import { truncatedAddress } from './address'
 import { linkedUser } from './core'
 import { log } from './log'
@@ -255,5 +255,6 @@ async function prune(core: Core): Promise<void> {
     return
 
   core.audit.prunedAt = now
-  await audit(core).prune(new Date(now - core.audit.maxAge * 1000))
+  core.audit.sweep ??= maintenance('auth-audit-prune', PRUNE_EVERY_MS, async () => audit(core).prune(new Date(Date.now() - core.audit!.maxAge * 1000)))
+  await core.audit.sweep.run()
 }

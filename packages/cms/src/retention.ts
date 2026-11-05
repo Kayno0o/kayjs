@@ -1,6 +1,6 @@
 import type { ContentLoader } from 'kay/content'
 import type { EntryRef } from './kay/contract'
-import { kv, outsideRequest } from 'kay/library'
+import { kv, maintenance } from 'kay/library'
 import { isEvent, pruneActivity } from './activity'
 import { hiddenOf, rowOf, SWEEP_MARKER } from './hidden'
 import { collections, entries } from './kay/content'
@@ -158,20 +158,11 @@ async function sweepCollection(name: string, cutoff: number | undefined, request
   }
 }
 
-let sweeping: ReturnType<typeof setTimeout> | undefined
+const sweeping = maintenance('cms-history', SWEEP_EVERY, async () => sweepHistory(), { first: FIRST_SWEEP })
 
 // Sweeps a few minutes after the server starts and every hour from then on, on timers that do not keep the process alive, so what expired goes whether or not anyone opens the trash.
 export function startSweeping(): void {
-  if (sweeping !== undefined)
-    return
-
-  const sweep = () => void sweepHistory()
-
-  sweeping = outsideRequest(() => setTimeout(() => {
-    sweep()
-    outsideRequest(() => setInterval(sweep, SWEEP_EVERY)).unref()
-  }, FIRST_SWEEP))
-  sweeping.unref()
+  sweeping.start()
 }
 
 // Removes an entry from the trash, its revisions and the activity log, for good: what an erasure request needs once the entry itself is deleted. The entry in the collection is not touched, and when a new entry took the slug its revisions and activity stay, as they are its own. Returns how many rows went.

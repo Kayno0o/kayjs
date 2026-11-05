@@ -12,6 +12,7 @@ import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { nodeCrypto } from './builtins'
 import { requestCookies } from './cookies'
+import { maintenance } from './maintenance'
 import { inMemory } from './memory-mark'
 import { WORKER_INDEX } from './parent'
 import { onReload } from './reload'
@@ -600,16 +601,10 @@ function openSqliteStore(path: string): { store: SqliteSessionStore, close: () =
 
   sweep.run(Date.now())
 
-  const timer = setInterval(() => {
-    try {
-      sweep.run(Date.now())
-    }
-    catch (error) {
-      kayLog('error', 'dropping the expired sessions failed; trying again in an hour', error)
-    }
-  }, SWEEP_MS)
+  // The file is this host's own, so the sweep is not locked across hosts.
+  const upkeep = maintenance('sqlite-sessions', SWEEP_MS, () => void sweep.run(Date.now()), { lock: false })
 
-  timer.unref()
+  upkeep.start()
 
   const store: SqliteSessionStore = {
     get(id) {
@@ -659,7 +654,7 @@ function openSqliteStore(path: string): { store: SqliteSessionStore, close: () =
   }
 
   return { store, close: () => {
-    clearInterval(timer)
+    upkeep.stop()
     db.close()
   } }
 }

@@ -83,7 +83,7 @@ function autoLock(when: string | number, job: Job) {
   }
 }
 
-type AutoLock = ReturnType<typeof autoLock>
+export type AutoLock = ReturnType<typeof autoLock>
 
 // Runs `job` on a cron schedule, such as `@hourly` or `30 2 * * MON`, or every so long, `'30s'` or `30` seconds, from when the server starts until it stops: once per process, or once across processes with `lock`, never two runs at a time.
 // A list of jobs, or a table of schedules to jobs, gives each job a schedule of its own in one plugin, a table's `tz` read by its crons alone; with `lock`, each job's lock is its schedule and its place in that schedule's list, `report:@hourly:0`.
@@ -241,7 +241,7 @@ async function taken(lock: string, boot: boolean, slotMs: number, options: Sched
   }
 }
 
-function scheduledRun(label: string, slotMs: number, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
+export function scheduledRun(label: string, slotMs: number, job: Job, options: ScheduleOptions, auto: AutoLock | undefined) {
   const timeout = options.timeout === false ? undefined : durationSeconds(options.timeout ?? DEFAULT_TIMEOUT, `the timeout of the schedule ${label}`) * 1000
   const active = new Set<AbortController>()
 

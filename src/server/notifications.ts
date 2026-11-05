@@ -5,6 +5,7 @@ import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
+import { maintenance } from './maintenance'
 import { inMemory } from './memory-mark'
 import { pushAlongside, pushSettings } from './push-settings'
 import { pushStore } from './push-store'
@@ -222,9 +223,10 @@ function openNotifications(path: string): NotificationStore {
   const exists = db.query<{ found: number }, [string, string, number]>('SELECT 1 AS found FROM kay_notifications WHERE user_id = ?1 AND id = ?2 AND expires > ?3')
   const erase = db.query('DELETE FROM kay_notifications WHERE user_id = ?1')
   const prune = db.query('DELETE FROM kay_notifications WHERE expires <= ?1')
-  const timer = setInterval(() => prune.run(Date.now()), PRUNE_EVERY_MS)
+  // The file is this host's own, so the prune is not locked across hosts.
+  const upkeep = maintenance('sqlite-notifications', PRUNE_EVERY_MS, () => void prune.run(Date.now()), { lock: false })
 
-  timer.unref()
+  upkeep.start()
   prune.run(Date.now())
 
   return {
@@ -244,7 +246,7 @@ function openNotifications(path: string): NotificationStore {
     erase: user => erase.run(user).changes,
     prune: now => prune.run(now).changes,
     close: () => {
-      clearInterval(timer)
+      upkeep.stop()
       db.close()
     },
   }

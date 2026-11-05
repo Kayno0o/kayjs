@@ -1,5 +1,6 @@
 import type { Guard } from 'kay'
-import type { Kv } from 'kay/library'
+import type { Kv, Maintenance } from 'kay/library'
+import type { SessionSettings } from 'kay/server'
 import type { Access } from './access'
 import type { CaptchaOptions } from './captcha'
 import type { EmailCore, PendingCode } from './email'
@@ -183,9 +184,9 @@ export interface Core {
   onAuthEvent?: ((info: AuthEventInfo) => void | Promise<void>) | undefined
   organizations?: OrganizationsCore | undefined
   // Kept with the `audit` option: entries live `maxAge` seconds.
-  audit?: { maxAge: number, prunedAt: number, ip: 'full' | 'truncated' } | undefined
+  audit?: { maxAge: number, prunedAt: number, ip: 'full' | 'truncated', sweep?: Maintenance | undefined } | undefined
   // When the store last pruned what expired.
-  pruned: { at: number }
+  pruned: { at: number, settings?: SessionSettings | undefined, sweep?: Maintenance | undefined }
 }
 
 // What a provider token refresh works on: the identity, and its tokens opened.

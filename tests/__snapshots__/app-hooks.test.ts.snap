@@ -591,6 +591,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
+    "() => stopMaintenance()",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
     "() => { stopHearing?.(); stopHearing = void 0; }",
@@ -794,6 +795,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
+    "() => stopMaintenance()",
     "async () => { await notify("onStop", [onStop], {}); }",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
@@ -986,6 +988,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
+    "() => stopMaintenance()",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
     "() => { publishing.stop(); for (const { release } of tracked) release(); clearContentMode(mode, outp...",
@@ -1294,6 +1297,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
   ],
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
+    "() => stopMaintenance()",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
     "() => { publishing.stop(); for (const { release } of tracked) release(); clearContentMode(mode, outp...",
@@ -1572,6 +1576,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
+    "() => stopMaintenance()",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
     "() => { stopHearing?.(); stopHearing = void 0; }",
@@ -1989,6 +1994,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
   "stop": [
     "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
+    "() => stopMaintenance()",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
     "() => { stopHearing?.(); stopHearing = void 0; }",

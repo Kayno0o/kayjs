@@ -50,6 +50,19 @@ describe('the Jobs tab', () => {
     done()
   })
 
+  it('lists the maintenance with when it last ran and the error of a failed pass', async () => {
+    const { panel, done } = open(() => Response.json({ queues: [], maintenance: [{ name: 'maintenance-ok', every: 3_600_000, last: { at: 0 } }, { name: 'maintenance-bad', every: 60_000, last: { at: 0, error: 'the table is gone' } }, { name: 'maintenance-new', every: 1000 }] }))
+
+    await eventually(() => {
+      expect(panel.querySelector('.heading')!.textContent).toBe('Maintenance')
+      expect([...panel.querySelectorAll('.pill')].map(pill => pill.textContent)).toEqual(['ok', 'failed', 'ok'])
+      expect(panel.querySelector('.value')!.textContent).toBe('the table is gone')
+      expect(panel.textContent).toContain('every 3600 s')
+      expect(panel.textContent).toContain('not run yet')
+    })
+    done()
+  })
+
   it('lists each queue\'s jobs by status with a failed one\'s error, and offers retry only for a failed job', async () => {
     const { panel, done } = open(() => Response.json({ queues: [queueOf({ jobs: [job({ id: 'a', status: 'running', attempts: 1 }), job({ id: 'b' }), job({ id: 'c', status: 'failed', attempts: 3, error: 'Error: smtp down' })] })] }))
 

@@ -1,8 +1,10 @@
 import type { JobStore } from '../src/server'
 import type { JobView, QueueView } from '../src/server/job-admin'
+import type { MaintenanceView } from '../src/server/maintenance'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { queue, workflow } from '../src/server'
+import { maintenance } from '../src/server/maintenance'
 import { forgetQueue, GiveUpError } from '../src/server/queue'
 import { eventually } from './helpers/eventually'
 import { cleanUpAfterFile, kinds } from './job-stores'
@@ -36,6 +38,21 @@ async function act(site: App, action: 'retry' | 'delete' | 'send' | 'cancel', qu
 }
 
 describe('the dev tool\'s jobs endpoints', () => {
+  it('lists the maintenance running beside the queues', async () => {
+    const upkeep = maintenance('dev-jobs-listed', 3_600_000, () => undefined)
+
+    try {
+      await upkeep.run()
+
+      const answer = await (await (await app()).handle(new Request('http://localhost/_kay/dev/jobs', { headers: HEADERS }))).json() as { maintenance: MaintenanceView[] }
+
+      expect(answer.maintenance.find(view => view.name === 'dev-jobs-listed')).toMatchObject({ every: 3_600_000, last: { at: expect.any(Number) } })
+    }
+    finally {
+      upkeep.stop()
+    }
+  })
+
   it('lists no queue for an app without one', async () => {
     expect(await listed(await app())).toEqual([])
   })

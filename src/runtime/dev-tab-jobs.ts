@@ -1,4 +1,5 @@
 import type { QueueView } from '../server/job-admin'
+import type { MaintenanceView } from '../server/maintenance'
 import type { DevTab, DevTool } from './dev-tool'
 
 // The Jobs tab's code, fetched the first time the tab opens: each queue of the app with its running, waiting and failed jobs, a failed one's payload and error, a button to retry or delete it, and for a workflow run its state and steps with buttons to send the event it waits for or cancel it. It imports types only, as the browser loads it as it is.
@@ -30,6 +31,7 @@ const DONE = { retry: 'Put back in', delete: 'Removed from', send: 'Sent the eve
 export default function jobsTab(tool: DevTool, tab: DevTab): () => void {
   const status = tool.make('div', 'note')
   const queues = tool.make('div', 'stack')
+  const upkeep = tool.make('div', 'group')
   let asked = 0
   let reread: (() => Promise<void>) | undefined
 
@@ -116,17 +118,35 @@ export default function jobsTab(tool: DevTool, tab: DevTab): () => void {
     const id = ++asked
 
     try {
-      const { queues: found } = await ask<{ queues: QueueView[] }>('/_kay/dev/jobs', { method: 'GET' })
+      const { queues: found, maintenance = [] } = await ask<{ queues: QueueView[], maintenance?: MaintenanceView[] }>('/_kay/dev/jobs', { method: 'GET' })
 
       if (id !== asked)
         return
+
+      upkeep.replaceChildren(...maintenance.length === 0
+        ? []
+        : [tool.make('h3', 'heading', 'Maintenance'), ...maintenance.map((sweep) => {
+          const row = tool.make('div', 'actions')
+          const last = sweep.last === undefined ? 'not run yet' : `${sweep.last.error === undefined ? 'ran' : 'failed'} at ${new Date(sweep.last.at).toLocaleTimeString('en-GB')}`
+
+          row.append(tool.make('span', `pill ${sweep.last?.error === undefined ? 'ok' : 'error'}`, sweep.last?.error === undefined ? 'ok' : 'failed'), tool.make('span', 'mono', sweep.name), tool.make('span', 'note', `every ${Math.round(sweep.every / 1000)} s, ${last}`))
+
+          if (sweep.last?.error === undefined)
+            return row
+
+          const failed = tool.make('div', 'row')
+
+          failed.append(row, tool.make('pre', 'value error', sweep.last.error))
+
+          return failed
+        })])
 
       const failed = found.reduce((sum, queue) => sum + queue.jobs.filter(job => job.status === 'failed').length, 0)
 
       tab.count(failed, failed > 0 ? 'error' : undefined)
 
       if (found.length === 0) {
-        status.textContent = 'The app has no queue: make one with queue() from kay/server and this tab lists its jobs.'
+        status.textContent = maintenance.length === 0 ? 'The app has no queue: make one with queue() from kay/server and this tab lists its jobs.' : ''
         queues.replaceChildren()
 
         return
@@ -162,7 +182,7 @@ export default function jobsTab(tool: DevTool, tab: DevTab): () => void {
   }
 
   reread = async () => list(true)
-  tab.panel.append(status, queues)
+  tab.panel.append(status, queues, upkeep)
 
   return () => void list()
 }

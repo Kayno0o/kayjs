@@ -3,6 +3,7 @@ import type { Locals } from '../runtime'
 import type { Hook, HookContext } from './hooks'
 import { decide, hookContext, notify } from './hooks'
 import { answeringRequest, statusOf } from './log'
+import { stopMaintenance } from './maintenance'
 
 // What a request hook is told: the request, its URL and the app's `ctx.locals` as they stand when the hook runs, before the extensions' and plugins' own `derive` and `resolve` values are added; `context` holds who asks.
 export interface RequestEvent {
@@ -80,6 +81,9 @@ export function hookRequests(app: Elysia, { beforeRequest, onResponse }: AppHook
 
 // Registers `onStart` and `onStop` after the plugins and extensions, so the app's stop hook runs once theirs did.
 export function hookLifecycle(app: Elysia, { onStart, onStop }: AppHooks): void {
+  // The upkeep of kay's stores and libraries ends with the server, before the app's own hook runs.
+  app.onStop(() => stopMaintenance())
+
   if (onStart !== undefined) {
     app.onStart(async (root) => {
       await notify('onStart', [onStart], { url: root.server?.url.href })

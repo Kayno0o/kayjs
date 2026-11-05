@@ -12,6 +12,7 @@ import { buildClient } from '../src/build/client'
 import { configuredSite, setSite } from '../src/runtime/site'
 import { memorySessions, session, sqliteSessions } from '../src/server'
 import { setupStore } from '../src/server/app-store'
+import { maintenanceOverview, stopMaintenance } from '../src/server/maintenance'
 import { renderPage } from '../src/server/render'
 import { scanRoutes } from '../src/server/routes'
 import { sealWith } from '../src/server/seal'
@@ -864,33 +865,42 @@ process.exit(0)`)
     expect(await memory.deleteWhere(() => true)).toBe(0)
   })
 
-  it('opens one sqlite store per file, whose hourly sweep logs a failure rather than throwing', async () => {
-    const sweeps: (() => void)[] = []
-    const intervals = spyOn(globalThis, 'setInterval').mockImplementation(((run: () => void) => {
-      sweeps.push(run)
+  it('opens one sqlite store per file, whose hourly sweep is a maintenance reporting a failure rather than throwing', async () => {
+    const HOUR = 3_600_000
+    const file = join(await scratchDir('sessions-'), 'sessions.sqlite')
+    const store = sqliteStoreAt(file)
+    const sweeps = () => maintenanceOverview().filter(view => view.name === 'sqlite-sessions')
 
-      return { unref: () => undefined }
-    }) as unknown as typeof setInterval)
+    stopMaintenance()
 
     try {
-      const file = join(await scratchDir('sessions-'), 'sessions.sqlite')
+      const logged = await logsOf(async () => {
+        // The next hour is 40 ms away on the clock the timer is planned by.
+        setSystemTime(new Date(Math.ceil(Date.now() / HOUR) * HOUR - 40))
+        expect(store).toBe(sqliteStoreAt(join(file, '..', 'sessions.sqlite')))
+        expect(sweeps()).toHaveLength(0)
+        await store.get('first')
+        await store.get('second')
 
-      const store = sqliteStoreAt(file)
+        const db = new Database(file)
 
-      expect(store).toBe(sqliteStoreAt(join(file, '..', 'sessions.sqlite')))
-      expect(sweeps).toHaveLength(0)
-      await store.get('first')
-      await store.get('second')
-      expect(sweeps).toHaveLength(1)
+        db.run('DROP TABLE kay_sessions')
+        db.close()
+        expect(sweeps()).toHaveLength(1)
 
-      const db = new Database(file)
+        for (const start = Date.now(); sweeps()[0]?.last?.error === undefined;) {
+          if (Date.now() - start > 3000)
+            throw new Error('the sweep never ran')
 
-      db.run('DROP TABLE kay_sessions')
-      db.close()
-      expect(await logsOf(async () => sweeps[0]!())).toEqual(['error: dropping the expired sessions failed; trying again in an hour'])
+          await Bun.sleep(10)
+        }
+      })
+
+      expect(logged.some(line => line.startsWith('error: the job scheduled maintenance:sqlite-sessions failed'))).toBe(true)
     }
     finally {
-      intervals.mockRestore()
+      setSystemTime()
+      stopMaintenance()
     }
   })
 

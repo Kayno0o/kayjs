@@ -1,6 +1,6 @@
 import type { SessionSettings } from 'kay/server'
 import type { Core } from './core'
-import { durationSeconds, trackDetached } from 'kay/library'
+import { durationSeconds, maintenance } from 'kay/library'
 import { log } from './log'
 
 // What expired is deleted at most this often.
@@ -10,7 +10,7 @@ const BEARER_EXPIRED_KEPT_MS = 30 * 24 * 60 * 60 * 1000
 const STALE_PER_BATCH = 500
 const STALE_BATCHES_PER_RUN = 20
 
-// Starts the store's pruning when it is due, without making the request wait for it; the run is tracked as detached work, so a test's `runJobs()` waits for it. A failure is logged, and the next try is an hour away.
+// Starts the store's pruning when it is due, without making the request wait for it; the run is a maintenance, locked across processes, counted with the schedules and tracked as detached work, so a test's `runJobs()` waits for it. A failure is logged, and the next try is an hour away.
 export function pruneWhenDue(core: Core, settings: SessionSettings): void {
   const now = Date.now()
 
@@ -18,7 +18,9 @@ export function pruneWhenDue(core: Core, settings: SessionSettings): void {
     return
 
   core.pruned.at = now
-  trackDetached(prune(core, settings, now))
+  core.pruned.settings = settings
+  core.pruned.sweep ??= maintenance('auth-prune', PRUNE_EVERY_MS, async () => prune(core, core.pruned.settings!, Date.now()))
+  void core.pruned.sweep.run()
 }
 
 async function prune(core: Core, settings: SessionSettings, now: number): Promise<void> {

@@ -1,5 +1,5 @@
 import type { ListStore } from './list-store'
-import { outsideRequest } from 'kay/library'
+import { maintenance } from 'kay/library'
 import { log } from './log'
 
 // The first sweep of the stores waits for the app to boot; the next ones follow at this pace.
@@ -22,26 +22,13 @@ export function listSweeper(stores: () => Iterable<ListStore | undefined>, timin
     }
   }
 
-  let first: ReturnType<typeof setTimeout> | undefined
-  let every: ReturnType<typeof setInterval> | undefined
+  // Started by the first `mail.list()`, which may run in a request the sweeps must not keep: the maintenance makes its timers outside any request.
+  const upkeep = maintenance('mail-lists', timing.every ?? SWEEP_EVERY_MS, async () => sweep(), { first: timing.after ?? FIRST_SWEEP_MS })
 
   return {
     sweep,
-    start: (): void => {
-      if (every !== undefined)
-        return
-
-      // Started by the first `mail.list()`, which may run in a request the sweeps must not keep.
-      first = outsideRequest(() => setTimeout(() => void sweep(), timing.after ?? FIRST_SWEEP_MS))
-      every = outsideRequest(() => setInterval(() => void sweep(), timing.every ?? SWEEP_EVERY_MS))
-      first.unref()
-      every.unref()
-    },
+    start: upkeep.start,
     // Ends the timers, which a `kay dev` reload does through the mailer's `onStop` so the app that follows starts its own and they do not stack.
-    stop: (): void => {
-      clearTimeout(first)
-      clearInterval(every)
-      first = every = undefined
-    },
+    stop: upkeep.stop,
   }
 }

@@ -1,6 +1,7 @@
 import type { JobActionName } from './job-admin'
 import { isCrossSite } from './actions'
 import { JOB_MESSAGES, jobActions, jobOverview } from './job-admin'
+import { maintenanceOverview } from './maintenance'
 
 const HEADER = 'x-kay-dev'
 
@@ -16,7 +17,7 @@ export async function devJobs(request: Request): Promise<Response> {
     return denied
 
   try {
-    return Response.json({ queues: await jobOverview() })
+    return Response.json({ queues: await jobOverview(), maintenance: maintenanceOverview() })
   }
   catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 502 })

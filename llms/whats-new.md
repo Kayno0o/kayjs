@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- The upkeep of kay's stores and libraries (expired sessions and notifications on Postgres, kayjs-auth's prune, kayjs-mail's list sweep, kayjs-cms's history sweep) runs once per pass across the processes sharing a database, counts in `kay_job_runs_total` as `maintenance:<name>`, shows under Maintenance in the dev tool's Jobs tab and stops with the server: [production](production.md#run-a-job-on-a-schedule).
 - kayjs-ai: a Chat message sent while the conversation is still being read (right after New conversation, or on a slow page) waits for the read and goes, where it used to be dropped with the text left in the field.
 - kayjs-auth: a passkey ES256 signature whose r or s carries a leading zero DER does not write is refused, as a second encoding of the same signature: [passkeys](../packages/auth/llms/oauth-passkeys-two-factor.md).
 - The hook of `kay/test` that drops a file's test database waits 90 s instead of 20, as Postgres can take that long to drop a database on a busy host: [testing setup](testing-setup.md).

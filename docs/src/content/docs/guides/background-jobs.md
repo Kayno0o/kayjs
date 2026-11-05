@@ -47,6 +47,10 @@ A production server (`NODE_ENV=production`) runs each schedule once across all i
 
 In a rolling deploy, old and new builds with a changed job both run, as their locks differ. `{ lock: 'weekly-report' }` names it yourself, and `{ lock: false }` runs the job in every process. With `lock` and several jobs, each job locks as `<lock>:<its schedule>:<its place in that schedule's list>`.
 
+The upkeep kay and its libraries run on a timer works the same way: expired sessions and notifications in Postgres, kayjs-auth's prune, kayjs-mail's list sweep and kayjs-cms's history sweep each run once per pass across the processes sharing a database.
+
+Each counts in `kay_job_runs_total` as `maintenance:<name>`, shows in the dev tool's Jobs tab, and stops with the server. What belongs to one host stays per process: the sqlite session and notification stores, image variants and loader watchers.
+
 An app running one process sets `KAY_LOCK_SCHEDULES=false` once, and no schedule locks unless it names a `lock`. `{ enabled: false }` on a schedule or on `background(work, { enabled })` adds nothing, so a job that needs an optional service is switched by its setting, `{ enabled: ZIGBEE_URL !== undefined }`, with no conditional plugin around it.
 
 A run that takes longer than `timeout`, 10 minutes by default, is logged as failed and left behind, so a job that never settles does not block the next run. A shutdown aborts the signal and waits at most 3 seconds, less with a short `serve.shutdownTimeout`, for a run that ignores it.

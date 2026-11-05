@@ -8,7 +8,7 @@ import type { DeletableSessionStore, SessionData } from './session'
 import type { VitalCount, VitalReading, VitalsStore } from './vitals-store'
 import { parse, stringify } from 'devalue'
 import { kayLog } from '../runtime/log'
-import { outsideRequest } from './clean-context'
+import { maintenance } from './maintenance'
 import { rowsOf } from './pg-jobs'
 import { limited, limitedStore, MAINTENANCE_TIMEOUT_MS } from './pg-limit'
 import { closeWith, TimeoutError } from './pg-poll'
@@ -27,7 +27,6 @@ const RATES_KEY = 'rates_key'
 
 // Sessions in Postgres, shared by every replica; `deleteWhere` reads the live sessions a page at a time, only the ones holding an object match's values in the database, and deletes the ones `match` accepts.
 export function pgSessions(pg: PgHandle): DeletableSessionStore {
-  let timer: ReturnType<typeof setInterval> | undefined
   let writes = 0
 
   const sweep = async () => {
@@ -47,14 +46,10 @@ export function pgSessions(pg: PgHandle): DeletableSessionStore {
   }
 
   // Started by the first call, so loading a config that names the store connects to nothing.
-  const start = () => {
-    if (timer !== undefined)
-      return
+  const sweeping = maintenance('sessions', SWEEP_SESSIONS_MS, sweepLogged)
+  const start = sweeping.start
 
-    timer = outsideRequest(() => setInterval(() => void sweepLogged(), SWEEP_SESSIONS_MS))
-    timer.unref()
-    closeWith(pg, () => clearInterval(timer))
-  }
+  closeWith(pg, sweeping.stop)
 
   return limitedStore({
     async get(id) {
@@ -242,8 +237,6 @@ export function pgVitals(pg: PgHandle): VitalsStore {
 
 // Notifications in Postgres, one row each, so replicas share a person's inbox; the clock a notification expires by is the caller's, as the store only compares.
 export function pgNotifications(pg: PgHandle): NotificationStore {
-  let timer: ReturnType<typeof setInterval> | undefined
-
   const counted = async (text: string, values: (string | number)[]) => {
     const db = await pg.db()
     const [row] = await query<{ count: string }>(db, `WITH changed AS (${text} RETURNING 1) SELECT count(*)::text AS count FROM changed`, values)
@@ -262,14 +255,10 @@ export function pgNotifications(pg: PgHandle): NotificationStore {
   }
 
   // Started by the first call, so loading a config that names the store connects to nothing.
-  const start = () => {
-    if (timer !== undefined)
-      return
+  const sweeping = maintenance('notifications', SWEEP_SESSIONS_MS, sweep)
+  const start = sweeping.start
 
-    timer = outsideRequest(() => setInterval(() => void sweep(), SWEEP_SESSIONS_MS))
-    timer.unref()
-    closeWith(pg, () => clearInterval(timer))
-  }
+  closeWith(pg, sweeping.stop)
 
   return limitedStore({
     async add(user, note, most) {

@@ -1056,6 +1056,22 @@ interface Logo
   src: string
   width?: number | undefined
 
+[./library] maintenance
+function maintenance(name: string, every: number, work: (signal: AbortSignal) => unknown, options?: MaintenanceOptions): Maintenance
+
+[./library] Maintenance
+interface Maintenance
+  run: () => Promise<void>
+  start: () => void
+  stop: () => void
+
+[./library] MaintenanceOptions
+interface MaintenanceOptions
+  first?: number | undefined
+  lock?: false | undefined
+  store?: JobStore | undefined
+  timeout?: number | undefined
+
 [./library] matchLocale
 function matchLocale(locales: readonly string[], wanted: readonly string[]): string | undefined
 
