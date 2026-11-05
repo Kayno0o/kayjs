@@ -67,7 +67,10 @@ const dirs: string[] = []
 export function cleanUpAfterFile(): void {
   afterAll(async () => {
     await Promise.all(dirs.splice(0).map(async dir => rm(dir, { recursive: true, force: true })))
-    await Promise.all(clients.splice(0).map(async client => client.close()))
+    // Each client closed once, its queries given two seconds: a close that never settles (seen on CI after the last case) is left to the forced drop below rather than holding the hook past its timeout.
+    const closing = Promise.all([...new Set(clients.splice(0))].map(async client => client.close({ timeout: 2 })))
+
+    await Promise.race([closing, Bun.sleep(5_000)])
 
     if (databaseUrl !== undefined) {
       const admin = new SQL(Object.assign(new URL(url!.href), { pathname: '/postgres' }).href)
