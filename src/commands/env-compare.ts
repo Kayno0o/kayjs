@@ -1,6 +1,7 @@
 import type { CheckDiagnostic } from '../check'
 import type { Listed } from './env'
 import { dirname, join, relative, resolve } from 'node:path'
+import { CONFIG_FILE } from '../config'
 import { loadConfig } from '../config-loader'
 import { CONTENT_CONFIG } from '../project'
 import { fileFormOf } from '../server/env-state'
@@ -44,6 +45,8 @@ const SOURCE_EXTENSIONS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '/i
 
 // Read by kay or the runtime itself, never by a schema.
 export const IGNORED_READS = new Set(['NODE_ENV'])
+// Read by Docker Compose from the `.env` beside the compose file, as `COMPOSE_FILE` or `DOCKER_HOST`, never by the app.
+const COMPOSE_OWN = /^(?:COMPOSE|DOCKER)_/
 
 // Every string of a parsed compose file, where its `${VAR}` references are read from: a comment or a key is no reference.
 function strings(value: unknown): string[] {
@@ -74,10 +77,11 @@ function refersTo(value: string, name: string): boolean {
   return [...value.matchAll(INTERPOLATED)].some(match => match[1] === name)
 }
 
-// What the services of a compose file set for the container: each `environment` entry, and every variable an `env_file` holds.
-async function composeAssignments(file: string, text: string, problem: (message: string, line?: number) => void): Promise<{ set: Map<string, Assignment>, interpolated: Set<string> }> {
+// What the services of a compose file set for the container: each `environment` entry, and every variable an `env_file` holds; `filled` the variables of an `env_file` the checkout leaves out, read from the example it is filled from.
+async function composeAssignments(file: string, text: string, problem: (message: string, line?: number) => void): Promise<{ set: Map<string, Assignment>, interpolated: Set<string>, filled: Set<string> }> {
   const set = new Map<string, Assignment>()
   const interpolated = new Set<string>()
+  const filled = new Set<string>()
   let document: unknown
 
   try {
@@ -86,7 +90,7 @@ async function composeAssignments(file: string, text: string, problem: (message:
   catch (error) {
     problem(`${relative(process.cwd(), file)} is not valid YAML (${error instanceof Error ? error.message : String(error)})`)
 
-    return { set, interpolated }
+    return { set, interpolated, filled }
   }
 
   for (const value of strings(document)) {
@@ -138,6 +142,14 @@ async function composeAssignments(file: string, text: string, problem: (message:
         if (required)
           problem(`env_file ${path} of ${relative(process.cwd(), file)} does not exist`)
 
+        // A file the checkout leaves out, such as a gitignored `.env`, is filled from the example beside it, so it sets every variable the example lists.
+        const example = Bun.file(`${target}.example`)
+
+        if (await example.exists()) {
+          for (const { name } of parseEnvFile(await example.text()))
+            filled.add(name)
+        }
+
         continue
       }
 
@@ -148,7 +160,7 @@ async function composeAssignments(file: string, text: string, problem: (message:
     }
   }
 
-  return { set, interpolated }
+  return { set, interpolated, filled }
 }
 
 // Where a read sits in its line when it is a direct one, a destructured name having no span to replace.
@@ -254,6 +266,36 @@ async function standaloneFiles(root: string): Promise<Set<string>> {
   return found
 }
 
+// The names one line reads from the environment: each direct read, then those of a one-line destructuring. A comment line reads none.
+function lineReads(source: string): { direct: RegExpExecArray[], names: string[] } {
+  if (COMMENT_LINE.test(source))
+    return { direct: [], names: [] }
+
+  const row = source.replace(TRAILING_COMMENT, '')
+  const direct = [...row.matchAll(RAW_READ)]
+  const names = direct.map(match => (match[1] ?? match[2])!)
+  const destructured = DESTRUCTURED_ENV.exec(row)?.[1]
+
+  if (destructured !== undefined)
+    names.push(...destructured.split(',').flatMap(part => LEADING_NAME.exec(part)?.[1] ?? []))
+
+  return { direct, names }
+}
+
+// The variables kay.config.ts and the files `standaloneFiles` names read themselves, such as `process.env.UMAMI_HOST` in the config: they load before any schema, so what they read is declared by the read.
+async function ownReads(root: string): Promise<Set<string>> {
+  const found = new Set<string>()
+
+  for (const file of [join(root, CONFIG_FILE), ...await standaloneFiles(root)]) {
+    for (const source of (await readText(file)).split(LINE_BREAK)) {
+      for (const name of lineReads(source).names)
+        found.add(name)
+    }
+  }
+
+  return found
+}
+
 // The reads of `process.env.X`, `process.env['X']`, `Bun.env.X` and a one-line `const { X } = process.env` in the project's own sources, tests apart, and apart from the files `standaloneFiles` names and those carrying `// kay-env: raw`; a read on several lines, through a variable name or `import.meta.env` is not seen, and a trailing `//` comment is dropped.
 export async function rawReads(root: string): Promise<RawRead[]> {
   const found: RawRead[] = []
@@ -267,16 +309,7 @@ export async function rawReads(root: string): Promise<RawRead[]> {
       continue
 
     for (const [index, source] of text.split('\n').entries()) {
-      if (COMMENT_LINE.test(source))
-        continue
-
-      const row = source.replace(TRAILING_COMMENT, '')
-      const direct = [...row.matchAll(RAW_READ)]
-      const names = direct.map(match => (match[1] ?? match[2])!)
-      const destructured = DESTRUCTURED_ENV.exec(row)?.[1]
-
-      if (destructured !== undefined)
-        names.push(...destructured.split(',').flatMap(part => LEADING_NAME.exec(part)?.[1] ?? []))
+      const { direct, names } = lineReads(source)
 
       for (const [at, name] of names.entries())
         found.push({ name, file: join(root, file), line: index + 1, ...at < direct.length && { column: direct[at]!.index, length: direct[at]![0].length } })
@@ -303,6 +336,7 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
   const fileOf = (variable: Listed) => fileFormOf(variable.name, variable.type, variable.public, declared)
   const set = new Map<string, Assignment>()
   const interpolated = new Set<string>()
+  const filled = new Set<string>()
   let composeRead = false
 
   for (const file of composes) {
@@ -323,6 +357,9 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
 
     for (const name of read.interpolated)
       interpolated.add(name)
+
+    for (const name of read.filled)
+      filled.add(name)
   }
 
   if (composeRead) {
@@ -331,7 +368,7 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
     for (const variable of variables.filter(({ required, source }) => required !== false && source !== 'kay')) {
       const file = fileOf(variable)
 
-      if (!set.has(variable.name) && !(file !== undefined && set.has(file)))
+      if (!set.has(variable.name) && !filled.has(variable.name) && !(file !== undefined && (set.has(file) || filled.has(file))))
         problems.push(diagnostic('error', composes[0]!, 1, `${variable.name} is required in production (${variable.source}) and no service of ${composeNames} sets it`))
     }
 
@@ -353,9 +390,10 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
     else {
       const example = parseEnvFile(await source.text())
       const listed = new Set(example.map(({ name }) => name))
+      const readByConfig = await ownReads(root)
 
       for (const { name, line } of example) {
-        if (complete && !declared.has(name) && !fileNames.has(name) && !set.has(name) && !interpolated.has(name))
+        if (complete && !declared.has(name) && !fileNames.has(name) && !set.has(name) && !interpolated.has(name) && !readByConfig.has(name) && !COMPOSE_OWN.test(name))
           problems.push(diagnostic('error', examplePath, line, `${name} is in ${relative(root, examplePath)} and no schema declares it${composeRead ? ', no compose service sets it and none interpolates it' : ''}`))
       }
 

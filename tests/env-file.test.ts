@@ -189,3 +189,46 @@ describe('kay env and kay check with the file form', () => {
     expect(stdout).toContain('<NAME>_FILE')
   })
 })
+
+describe('kay check with an env_file the checkout leaves out', () => {
+  const variables = describeEnv(schema).map(variable => ({ ...variable, source: 'src/env.ts' }))
+
+  it('counts every variable the example beside a missing env_file lists as set, as the file is filled from it', async () => {
+    const root = await folder({
+      'compose.yaml': 'services:\n  app:\n    env_file:\n      - path: .env\n        required: false\n',
+      '.env.example': 'API_KEY=\nTOKEN=\n',
+    })
+
+    expect(await compareEnv(root, variables, { compose: 'compose.yaml', example: '.env.example' })).toEqual([])
+  })
+
+  it('still asks for a variable the example beside a missing env_file does not list', async () => {
+    const root = await folder({
+      'compose.yaml': 'services:\n  app:\n    env_file:\n      - path: .env\n        required: false\n',
+      '.env.example': 'API_KEY=\n',
+    })
+    const messages = (await compareEnv(root, variables, { compose: 'compose.yaml' })).map(({ message }) => message)
+
+    expect(messages).toEqual([expect.stringContaining('TOKEN is required')])
+  })
+
+  it('does not call a variable kay.config.ts reads itself undeclared, and an example filling an env_file still names a stray one', async () => {
+    const root = await folder({
+      'compose.yaml': 'services:\n  app:\n    env_file:\n      - path: .env\n        required: false\n',
+      'kay.config.ts': 'const host = process.env.UMAMI_HOST?.trim() || \'http://umami:3000\'\nconst { UMAMI_ID } = process.env\n\nexport default { host, id: UMAMI_ID }\n',
+      '.env.example': 'API_KEY=\nTOKEN=\nUMAMI_HOST=\nUMAMI_ID=\nSTRAY=\n',
+    })
+    const messages = (await compareEnv(root, variables, { compose: 'compose.yaml', example: '.env.example' })).map(({ message }) => message)
+
+    expect(messages).toEqual(['STRAY is in .env.example and no schema declares it, no compose service sets it and none interpolates it'])
+  })
+})
+
+describe('kay check with the variables Docker Compose reads itself', () => {
+  it('leaves COMPOSE_* and DOCKER_* of the example to Compose', async () => {
+    const root = await folder({ '.env.example': 'COMPOSE_FILE=compose.dev.yaml\nDOCKER_HOST=\nCOMPOSED=\n' })
+    const messages = (await compareEnv(root, [], { example: '.env.example' })).map(({ message }) => message)
+
+    expect(messages).toEqual(['COMPOSED is in .env.example and no schema declares it'])
+  })
+})

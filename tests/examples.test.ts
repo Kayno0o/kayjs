@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { check } from '../src/check'
+
 import { loadConfig } from '../src/config-loader'
 import { takeDocsBuild } from './docs-build'
 import { listeningPort } from './listening'
@@ -39,6 +40,16 @@ describe('the shipped apps', () => {
       finally {
         await release?.()
       }
+    }
+  }, 120_000)
+
+  // `kay check` compares the environment too, which `check` alone leaves to the command; `kay env` runs that comparison in a process of its own, as it imports the app's modules.
+  it('declare every variable their compose and example files name', async () => {
+    for (const app of await shippedApps()) {
+      const child = Bun.spawn([process.execPath, CLI, 'env', '--quiet'], { cwd: app, env: { PATH: process.env.PATH! }, stdout: 'pipe', stderr: 'pipe' })
+      const [report, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+      expect({ app, code, report: code === 0 ? '' : report }).toEqual({ app, code: 0, report: '' })
     }
   }, 120_000)
 })

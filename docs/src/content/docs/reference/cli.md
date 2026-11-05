@@ -550,10 +550,10 @@ kay env --compose compose.prod.yaml --example .env.example
 
 This checks your deploy files against what the project declares. It reports an error when:
 
-- a variable production needs is set by no service of the compose file, in `environment` or in an `env_file`
+- a variable production needs is set by no service of the compose file, in `environment` or in an `env_file`. An `env_file` missing from the checkout, such as a gitignored `.env`, counts as setting what the `.env.example` beside it lists
 - `proxy.key` is set and no service sets `KAY_PROXY_KEY` or `KAY_PROXY_KEY_FILE` (likewise `mcp.key: true` and `KAY_MCP_KEY` or `KAY_MCP_KEY_FILE`)
 - a variable production needs is missing from the example file, unless a compose service gives it a value
-- the example file lists a variable that no schema declares, no service sets and the compose file never reads as `${VAR}`
+- the example file lists a variable that no schema declares, no service sets, the compose file never reads as `${VAR}` and `kay.config.ts` does not read itself. `COMPOSE_*` and `DOCKER_*` are left to Docker Compose, which reads them
 
 A `process.env.X` or `Bun.env.X` read in `src` that nothing declares is a warning. `NODE_ENV` and test files are left out.
 
