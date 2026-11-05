@@ -7,6 +7,9 @@ type BoundProp<Tag, Key> = Key extends BindableKeys<Tag> ? unknown : { kayError:
 [.] BoundValue
 type BoundValue<Tag, Key> = Key extends keyof PropsOfComponent<Tag> ? Required<PropsOfComponent<Tag>>[Key] : never
 
+[.] carrySchema
+function carrySchema(target: unknown): void
+
 [.] CheckedHref
 type CheckedHref<Href extends string> = string extends Href ? unknown : Href extends `//${string}` | `/_kay/${string}` ? unknown : Href extends `/${string}` ? IsRoute<PathOf<Href>> extends true ? unknown : {
   kayError: `${typeof UNSERVED_MESSAGE} ${PathOf<Href>}`

@@ -75,6 +75,13 @@ export function formAction(target: string | Action<never, unknown>): string {
   return (target as { formUrl?: string }).formUrl ?? target.url
 }
 
+// Has the page carry the schema of `target`, as a `form(action={target})` does, for `target.validate` to check a form against: called by a component that checks the form it draws, such as a SaveForm with `validate`. Nothing in the browser.
+// kept: free, as `formAction` is: the schema is the action's, the same for every visitor.
+export function carrySchema(target: unknown): void {
+  if (isAction(target))
+    renderedForms?.add(target)
+}
+
 export type FieldName<Target> = Target extends Action<infer Input, unknown> ? Extract<keyof Input, string> | HoneypotOf<Target> : string
 
 // An action as the fields of a form posting to it read it, whatever its input.
@@ -96,10 +103,6 @@ const enclosing: unknown[] = []
 export function formScope<Result>(target: unknown, render: () => Result, only = false): Result {
   if (only && !isAction(target))
     return render()
-
-  // A component given the action, such as a SaveForm that calls it, has the page carry its schema too, for `action.validate`.
-  if (only && isAction(target))
-    renderedForms?.add(target)
 
   enclosing.push(target)
 

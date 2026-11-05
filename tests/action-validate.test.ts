@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
 import { action } from '../src/runtime/action'
 import { actionStub } from '../src/runtime/action-call'
+import { validateForm } from '../src/runtime/validate'
 import { resetWords } from '../src/runtime/words.client'
 import { formsScript } from '../src/server/forms'
 
@@ -82,5 +83,58 @@ describe('action.validate in the browser', () => {
 
     expect(await other.validate(form)).toBe(true)
     expect(other.failed()).toBeUndefined()
+  })
+})
+
+describe('validate on a form(action)', () => {
+  beforeAll(() => GlobalRegistrator.register())
+  afterAll(async () => GlobalRegistrator.unregister())
+  beforeEach(() => {
+    resetWords()
+    document.head.innerHTML = ''
+    document.body.innerHTML = ''
+  })
+
+  const line = (name: string) => `<span data-field="${name}" data-issue-class="red"></span>`
+
+  it('writes each refusal as text into the element of its field, marking the control invalid and described', () => {
+    const form = page({ title: 'ab', slug: 'a', count: '2' }, `${line('title')}${line('slug')}`)
+
+    expect(validateForm(form, '/act')).toBe(false)
+
+    const [title, slug] = form.querySelectorAll<HTMLElement>('[data-field]')
+    const input = form.querySelector<HTMLInputElement>('[name="title"]')!
+
+    expect([title!.textContent, slug!.textContent, title!.firstElementChild!.className]).toEqual(['Three letters at least', '', 'red'])
+    expect([input.getAttribute('aria-invalid'), input.getAttribute('aria-describedby') === title!.id, title!.id !== '']).toEqual(['true', true, true])
+  })
+
+  it('checks one field alone and clears its message once fixed', () => {
+    const form = page({ title: 'ab', slug: 'A', count: '2' }, `${line('title')}${line('slug')}`)
+    const input = form.querySelector<HTMLInputElement>('[name="title"]')!
+
+    expect(validateForm(form, '/act', 'title')).toBe(false)
+    expect(form.querySelectorAll('[data-form-issue]')).toHaveLength(1)
+
+    input.value = 'abc'
+    expect(validateForm(form, '/act', 'title')).toBe(true)
+    expect([form.querySelectorAll('[data-form-issue]').length, input.getAttribute('aria-invalid'), input.getAttribute('aria-describedby')]).toEqual([0, null, null])
+  })
+
+  it('takes over the message a refused post rendered, and sets a hostile one as text', () => {
+    const form = page({ title: 'ab', slug: 'a', count: '2' }, '<span data-field="title"><span data-form-issue>Old</span></span>')
+
+    expect(validateForm(form, '/act')).toBe(false)
+    expect(form.querySelector('[data-field]')!.textContent).toBe('Three letters at least')
+    expect(form.querySelectorAll('[data-form-issue]')).toHaveLength(1)
+  })
+
+  it('leaves a message element inside an island to the island, and accepts a page with no schema', () => {
+    const form = page({ title: 'ab', slug: 'a', count: '2' })
+
+    form.insertAdjacentHTML('beforeend', '<slot data-component="x.kay"><span data-field="title"></span></slot>')
+    expect(validateForm(form, '/act')).toBe(false)
+    expect(form.querySelector('slot [data-field]')!.textContent).toBe('')
+    expect(validateForm(form, '/other')).toBe(true)
   })
 })

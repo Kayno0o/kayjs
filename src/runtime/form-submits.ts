@@ -23,6 +23,12 @@ export function listenToForms(): void {
     takeFormCheck(form)
 }
 
+const blurring = new WeakSet<HTMLFormElement>()
+
+async function onFocusOut(event: FocusEvent): Promise<void> {
+  (await loadForms()).blurred(event)
+}
+
 function onFocusIn(event: FocusEvent): void {
   const form = event.target instanceof Element ? event.target.closest('form') : null
 
@@ -34,6 +40,12 @@ function onFocusIn(event: FocusEvent): void {
 export function focused(form: HTMLFormElement): void {
   listen()
   takeFormCheck(form)
+
+  // A form written `validate="blur"` checks each field as it loses focus.
+  if (form.getAttribute('validate') === 'blur' && !blurring.has(form)) {
+    blurring.add(form)
+    form.addEventListener('focusout', event => void onFocusOut(event))
+  }
 
   const url = swappedActionUrl(form, null)
 

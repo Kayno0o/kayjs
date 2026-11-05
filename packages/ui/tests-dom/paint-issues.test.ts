@@ -52,7 +52,7 @@ test('sets a hostile message as text', () => {
   expect(form!.querySelector('[data-form-issue]')!.textContent).toBe('<img src=x onerror=alert(1)>')
 })
 
-test('leaves the fields of another form, of a nested form and of a component running in the browser alone', () => {
+test('leaves the fields of another form and of a component running in the browser alone', () => {
   const [first, second] = page(`<form id="a">${field('x')}</form><form id="b">${field('x')}</form>`)
 
   liveElements.add(second!.querySelector('[data-kui-field]')!)
@@ -62,6 +62,36 @@ test('leaves the fields of another form, of a nested form and of a component run
 
   paintIssues(second!, { x: 'Refused' })
   expect(second!.querySelector('[data-form-issue]')).toBeNull()
+})
+
+test('leaves the fields of a form nested in the form alone', () => {
+  document.body.innerHTML = `<form id="outer">${field('x')}</form>`
+
+  const outer = document.querySelector('form')!
+  const inner = document.createElement('form')
+
+  inner.innerHTML = field('x')
+  outer.append(inner)
+  paintIssues(outer, { x: 'Refused' })
+  expect([outer.querySelectorAll('[data-form-issue]').length, inner.querySelectorAll('[data-form-issue]').length]).toEqual([1, 0])
+})
+
+test('paints each row of a repeated form with its own message', () => {
+  const [one, two, three] = page(`<form id="1">${field('title')}</form><form id="2">${field('title')}</form><form id="3">${field('title')}</form>`)
+
+  paintIssues(two!, { title: 'Too short' })
+  expect([one, two, three].map(form => form!.querySelector('[data-field]')!.textContent)).toEqual(['', 'Too short', ''])
+
+  paintIssues(two!, {})
+  paintIssues(three!, { title: 'Taken' })
+  expect([one, two, three].map(form => form!.querySelector('[data-field]')!.textContent)).toEqual(['', '', 'Taken'])
+})
+
+test('reads a name that is a property of every object as no message', () => {
+  const [form] = page(`<form>${field('constructor')}</form>`)
+
+  paintIssues(form!, {})
+  expect(form!.querySelector('[data-form-issue]')).toBeNull()
 })
 
 test('marks every field of a group and the group itself', () => {
@@ -79,7 +109,7 @@ test('marks every field of a group and the group itself', () => {
 })
 
 test('marks a Checkbox on its own, and leaves it to the FormField of the same name', () => {
-  const [alone, framed] = page(`<form id="a"><slot data-component="node_modules/@kaynooo/kayjs-ui/src/checkbox.kay"><div data-part="field"><label><input type="checkbox" name="terms"></label><span data-part="issues" data-field="terms"></span></div></slot></form><form id="b"><div data-kui-field="f"><label><div data-part="field"><label><input type="checkbox" name="terms"></label><span data-part="issues" data-field="terms"></span></div></label><span data-part="issues" data-field="terms"></span></div></form>`)
+  const [alone, framed] = page(`<form id="a"><slot data-component="node_modules/@kaynooo/kayjs-ui/src/checkbox.kay"><div data-part="field" data-kui-control="checkbox"><label><input type="checkbox" name="terms"></label><span data-part="issues" data-field="terms"></span></div></slot></form><form id="b"><div data-kui-field="f"><label><div data-part="field" data-kui-control="checkbox"><label><input type="checkbox" name="terms"></label><span data-part="issues" data-field="terms"></span></div></label><span data-part="issues" data-field="terms"></span></div></form>`)
 
   paintIssues(alone!, { terms: 'Accept' })
   expect([alone!.querySelector('[data-form-issue]')!.textContent, alone!.querySelector('input')!.getAttribute('aria-invalid')]).toEqual(['Accept', 'true'])
@@ -87,4 +117,32 @@ test('marks a Checkbox on its own, and leaves it to the FormField of the same na
   paintIssues(framed!, { terms: 'Accept' })
   expect(framed!.querySelectorAll('[data-form-issue]')).toHaveLength(1)
   expect(framed!.querySelector('[data-kui-field] > [data-field]')!.textContent).toBe('Accept')
+})
+
+test('marks a FileDrop\'s zone, and a component of the app carrying no mark is left alone', () => {
+  const [drop, own] = page(`<form id="a"><slot data-component="x/file-drop.kay"><div data-part="field" data-kui-control="drop"><div role="group"><input type="file" name="photo"></div><span data-part="issues" data-field="photo"></span></div></slot></form><form id="b"><slot data-component="app/checkbox.kay"><div data-part="field"><label><input type="checkbox" name="terms"></label><span data-part="issues" data-field="terms"></span></div></slot></form>`)
+
+  paintIssues(drop!, { photo: 'Too big' })
+  expect([drop!.querySelector('[data-form-issue]')!.textContent, drop!.querySelector('[role="group"]')!.getAttribute('aria-invalid')]).toEqual(['Too big', 'true'])
+
+  paintIssues(own!, { terms: 'Accept' })
+  expect(own!.querySelector('[data-form-issue]')).toBeNull()
+})
+
+test('does not paint a Checkbox that is inside an island of the app', () => {
+  const [form] = page(`<form><slot data-component="app/page.kay"><div><div data-part="field" data-kui-control="checkbox"><label><input type="checkbox" name="terms"></label><span data-part="issues" data-field="terms"></span></div></div></slot></form>`)
+
+  paintIssues(form!, { terms: 'Accept' })
+  expect(form!.querySelector('[data-form-issue]')).toBeNull()
+})
+
+test('takes over the message a Checkbox, a Toggle and a FileDrop rendered for a refused post, replacing it and clearing it', () => {
+  const [form] = page(`<form><slot data-component="x/checkbox.kay"><div data-part="field" data-kui-control="checkbox"><label><input type="checkbox" name="terms" aria-invalid="true" aria-describedby="m"></label><span data-part="issues" id="m" data-field="terms"><span data-part="issue" data-form-issue>Old</span></span></div></slot></form>`)
+  const box = form!.querySelector('input')!
+
+  paintIssues(form!, { terms: 'New' })
+  expect([...form!.querySelectorAll('[data-field] > span')].map(message => message.textContent)).toEqual(['New'])
+
+  paintIssues(form!, {})
+  expect([form!.querySelectorAll('[data-form-issue]').length, box.getAttribute('aria-invalid'), box.getAttribute('aria-describedby')]).toEqual([0, null, null])
 })

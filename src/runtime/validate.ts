@@ -1,8 +1,11 @@
 import type { TSchema } from 'elysia'
 import type { InvalidWord } from '../server/words'
 import { isEmail } from './email'
+import { focusInvalid } from './focus'
 import { formInput, NUMERIC_FORMATS } from './form'
 import { controlsOf } from './form-controls'
+import { markInvalid } from './invalid'
+import { uid } from './uid'
 import { wording } from './words.client'
 
 // What the server sends of an action's schema, for the forms of a page to be checked before they post: the top-level fields, the keywords the browser checks, and their `error` messages.
@@ -61,6 +64,73 @@ export function checkForm(form: HTMLFormElement, action: string): boolean {
     HTMLFormElement.prototype.reportValidity.call(form)
 
   return valid
+}
+
+// What holds the `aria-invalid` of a control a `validate` form refused.
+const PAINTED = {}
+
+// A form written with `validate` shows what the schema refuses as text where the page put a place for it, not as the browser's bubble: checks the form (or `only` its field) like `checkForm` and writes each message into the element carrying `data-field="<name>"`, the control marked invalid and described by it. True when it may post; a refusal of the whole form focuses its first invalid field.
+// The elements inside an island are left to it, which draws the messages of its own.
+export function validateForm(form: HTMLFormElement, action: string, only?: string): boolean {
+  const messages = fieldMessages(form, action, only)
+
+  if (!messages)
+    return true
+
+  for (const box of form.querySelectorAll<HTMLElement>('[data-field]')) {
+    const name = box.getAttribute('data-field') ?? ''
+
+    if (name === '' || (only !== undefined && only !== name) || box.closest('form') !== form || box.closest('slot[data-component]'))
+      continue
+
+    paintMessage(form, box, name, messages[name])
+  }
+
+  const valid = Object.keys(messages).length === 0
+
+  if (!valid && only === undefined)
+    void focusInvalid(form)
+
+  return valid
+}
+
+function paintMessage(form: HTMLFormElement, box: HTMLElement, name: string, message: string | undefined): void {
+  const control = controlOf(form, name)
+  const shown = [...box.children].filter(child => child.hasAttribute('data-form-issue'))
+  const sample = shown[0]?.className ?? box.getAttribute('data-issue-class') ?? ''
+
+  // A message the server rendered goes with its mark, taken over as the first message is written or cleared here.
+  if (shown.length > 0)
+    control?.removeAttribute('aria-invalid')
+
+  for (const old of shown)
+    old.remove()
+
+  if (message !== undefined) {
+    const line = document.createElement('span')
+
+    line.setAttribute('data-part', 'issue')
+    line.setAttribute('data-form-issue', '')
+    line.className = sample
+    line.textContent = message
+    box.prepend(line)
+    box.id ||= uid()
+  }
+
+  if (!control)
+    return
+
+  const ids = (control.getAttribute('aria-describedby') ?? '').split(' ').filter(id => id !== '' && id !== box.id)
+
+  if (message !== undefined)
+    ids.push(box.id)
+
+  if (ids.length > 0)
+    control.setAttribute('aria-describedby', ids.join(' '))
+  else
+    control.removeAttribute('aria-describedby')
+
+  markInvalid(control, PAINTED, message !== undefined)
 }
 
 // The messages the schema of the action at `action` refuses the fields of a form with, by field name, none for a field it accepts: all the fields, or `only` alone. Undefined when the page holds no schema for the action. Nothing is reported on the form, for a page to show the messages itself.

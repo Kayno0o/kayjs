@@ -48,7 +48,7 @@ export const INTERNAL: Record<string, InternalRules> = {
     // What compiled `.kay` files and kay's generated entries import (`llms/project.md`), and what kay's libraries share with it, released in lockstep.
     entries: [/^\.\/(?:html|dom|dom-[a-z]+|pending|i18n-links|island|await|client|arrival|jsx-runtime|internal(?:\/.+)?|library(?:\/.+)?)$/],
     // The compile-time machinery behind the generated shadow types, named by no doc.
-    names: { '.': ['BindableMark', 'IslandBrand', 'HandedPart', 'HandsPart', 'HandedSignal', 'UnresolvedParameter', 'WidenedProps', 'CheckedHref', 'CheckedHtml', 'BoundProp', 'BoundValue', 'PlainIslandProp', 'FunctionProp', 'Inferred', 'TemplateHelpers', 'TemplateValues', 'Truthy'],
+    names: { '.': ['carrySchema', 'BindableMark', 'IslandBrand', 'HandedPart', 'HandsPart', 'HandedSignal', 'UnresolvedParameter', 'WidenedProps', 'CheckedHref', 'CheckedHtml', 'BoundProp', 'BoundValue', 'PlainIslandProp', 'FunctionProp', 'Inferred', 'TemplateHelpers', 'TemplateValues', 'Truthy'],
       // Named by no doc: the analytics extension's paths and tracker tags, what kayjs-cms's loaders key a collection by, and the reader of a preview session.
       './analytics': ['ANALYTICS_PATH', 'ANALYTICS_PROVIDERS', 'ANALYTICS_SCRIPT_PATH', 'CUSTOM_COLLECT_PATH', 'CUSTOM_SCRIPT_PATH', 'INTEGRITY', 'isGated', 'LazyGuard', 'NOTICE_SCRIPT_PATH', 'TRACKER_TAGS'], './content': ['COLLECTION', 'contentKey', 'PUBLISH_TIMES'], './server': ['editSessionOf'] },
   },

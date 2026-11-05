@@ -1,17 +1,17 @@
 --- <Output>
 import type { Action, Answer, FailureData, JSX, Snippet, Success } from 'kay'
-import { effect, recipe, signal, uid } from 'kay'
+import { carrySchema, effect, recipe, signal, uid } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
 import type { FormValidation } from './forms'
-import { callAction, checkSchema, formIssues, leftField, showIssues } from './forms'
+import { callAction, checkSchema, checkSent, formIssues, leftField, showIssues } from './forms'
 import type { OverlaySize } from './overlay'
 import { wording } from 'kay/words'
 
 
 const look = recipe({ parts: { root: '', footer: 'flex w-full flex-wrap items-center gap-2', actions: 'ml-auto flex flex-wrap justify-end gap-2', form: 'kui-form-grid' } })
 
-const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failureLabel, failure, validate = false, refused, onSaved, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'id' | 'onClose' | 'onInput' | 'onError' | 'closedby' | 'closedBy' | 'children'> & {
+const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failureLabel, failure, validate = false, onFocusOut, refused, onSaved, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'id' | 'onClose' | 'onInput' | 'onError' | 'closedby' | 'closedBy' | 'children'> & {
   // Shows the dialog; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -56,17 +56,21 @@ const { open, title, heading, action, submitLabel, savingLabel = wording('ui.for
 
 const formId = id ?? uid()
 const issues = signal<Record<string, string>>({})
+const checking = signal(false)
 let form: HTMLFormElement | undefined
 
 formIssues.provide(issues)
 
+// The page carries the action's schema for the check, which a form of the dialog's own would otherwise bring.
+if (validate !== false)
+  carrySchema(action)
 
-// The dialog drops its content once closed, which empties the form; however it closed, its messages are cleared too, so the next open starts afresh.
+// However the dialog closed, its messages are cleared, so the next open starts afresh.
 effect(() => {
   if (!open) {
     issues = {}
 
-    // The fields a static page gave the dialog are kept from one opening to the next, so the messages are taken off them now.
+    // The dialog drops the content of its own on closing, but the fields a static page gave it stay from one opening to the next, so the messages are taken off them now.
     if (form)
       void showIssues(form, {})
   }
@@ -75,12 +79,12 @@ effect(() => {
 async function submit(event: SubmitEvent) {
   event.preventDefault()
 
-  if (action.pending() || !form)
+  if (action.pending() || checking() || !form)
     return
 
   const failureText = failureLabel ?? failure ?? wording('ui.formDialog.failure', 'Could not save.')
 
-  if (validate !== false && !(await checkSchema(form, action, issues, failureText)))
+  if (validate !== false && !(await checkSent(form, action, issues, failureText, checking)))
     return
 
   const done = await callAction(form, action, issues, failureText, refused, onError)
@@ -94,6 +98,8 @@ async function submit(event: SubmitEvent) {
 }
 
 async function leave(event: FocusEvent) {
+  onFocusOut?.(event as never)
+
   const field = leftField(event)
 
   if (validate === 'blur' && form && field !== undefined)
@@ -117,5 +123,5 @@ Dialog({...rest} open={open} title={title} heading={heading} size={size} level={
       div(part="actions")
         Button(label={cancelLabel} disabled={action.pending()} onClick={() => onOpenChange(false)})
         Button(label={action.pending() ? savingLabel : submitLabel} type="submit" form={formId} tone="accent" busy={action.pending()} disabled={action.pending()})
-  form(part="form" id={formId} ref={element => form = element} onSubmit={submit} onFocusOut={leave} onKeyDown={submitOnCtrlEnter})
+  form(part="form" id={formId} ref={element => form = element} onSubmit={submit} onFocusOut={validate === 'blur' || onFocusOut ? leave : undefined} onKeyDown={submitOnCtrlEnter})
     slot

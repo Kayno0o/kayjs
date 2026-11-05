@@ -27,6 +27,12 @@ Without JavaScript the form posts to the action as any `form(action={add})` does
 
 `validate="submit"` checks the fields against the action's schema when the form is sent: a refused field shows its message with the same words the server would give, the first one takes the focus and the action is not called. `validate="blur"` also checks each field as it loses focus, and the message goes once the value is fixed. By default the check is the server's. Files and missing fields are always the server's.
 
+A message appearing under a field moves what follows it, which can shift the page under a click on the next control: with `blur`, reserve room for the message (a minimum height on the FormField's message area).
+
+The check reads the schema the page carries for the action. Form, a SaveForm or FormDialog with `validate` and a `form(action)` bring it, and a form drawn only in the browser, inside an island that no page render collected, has none, so `validate="submit"` accepts it and the server decides. A check replaces the last outcome of the action, so a blur check clears what `succeeded()` returned.
+
+The same goes for a `form(action={add})` of your own: write `validate` (or `validate="blur"`) on it and the messages show as text in the FormFields of the form that no island draws, with the control marked invalid, instead of the browser's bubble. `novalidate` and `formnovalidate` still skip the check.
+
 ## Saving
 
 A refused field shows its message on its FormField and takes the focus. Any other message is toasted, and `refused` words a handler's refusals, as in a [FormDialog](/ui/form-dialog). A failure carrying no message toasts `failureLabel`.

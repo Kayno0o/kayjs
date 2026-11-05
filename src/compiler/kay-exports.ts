@@ -11,6 +11,7 @@ export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
   apiUrl: 'shared',
   batch: 'browser',
   byteCount: 'shared',
+  carrySchema: 'browser',
   call: 'browser',
   context: 'browser',
   createContext: 'browser',

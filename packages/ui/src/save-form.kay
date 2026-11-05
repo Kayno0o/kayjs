@@ -1,16 +1,16 @@
 --- <Output>
 import type { Action, Answer, FailureData, JSX, Success } from 'kay'
-import { effect, guardLeave, onCleanup, onMount, recipe, shortcut, signal } from 'kay'
+import { carrySchema, effect, guardLeave, onCleanup, onMount, recipe, shortcut, signal } from 'kay'
 import Button from './button.kay'
 import type { FormValidation } from './forms'
-import { callAction, checkSchema, formIssues, leftField, showIssues } from './forms'
+import { callAction, checkSchema, checkSent, formIssues, leftField, showIssues } from './forms'
 import { holdDefaults, onFormReset } from './form-reset'
 import { toast } from './toast'
 import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-save-form', grid: 'kui-form-grid', bar: 'kui-save-bar', status: 'kui-save-bar-status', actions: 'kui-save-bar-actions', confirm: '' } })
 
-const { action, refused, saved, onSaved, onError, onDiscard, dirty, onSave, status, failureLabel, failure, validate = false, dirtyLabel = wording('ui.saveForm.dirty', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.clean', 'No unsaved change.'), savingLabel = wording('ui.saveForm.saving', 'Saving…'), saveLabel = wording('ui.saveForm.save', 'Save'), discardLabel = wording('ui.saveForm.discard', 'Discard'), cancelLabel = wording('ui.saveForm.cancel', 'Cancel'), cancelHref, confirm, confirmLabel, saveDisabled, shortcut: saveKeys = 'mod+s', ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'children' | 'onSubmit' | 'onInput' | 'onChange' | 'onFocusOut' | 'onError'> & {
+const { action, refused, saved, onSaved, onError, onDiscard, dirty, onSave, status, failureLabel, failure, validate = false, onFocusOut, dirtyLabel = wording('ui.saveForm.dirty', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.clean', 'No unsaved change.'), savingLabel = wording('ui.saveForm.saving', 'Saving…'), saveLabel = wording('ui.saveForm.save', 'Save'), discardLabel = wording('ui.saveForm.discard', 'Discard'), cancelLabel = wording('ui.saveForm.cancel', 'Cancel'), cancelHref, confirm, confirmLabel, saveDisabled, shortcut: saveKeys = 'mod+s', ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'children' | 'onSubmit' | 'onInput' | 'onChange' | 'onError'> & {
   // The page's action the form calls with its fields, as FormDialog does. An editor whose state is signals gives `dirty` and `onSave` instead.
   action?: Action<never, Output> | undefined
   // Toasted when the call fails other than on a field, or when `onSave` rejects.
@@ -57,6 +57,7 @@ const issues = signal<Record<string, string>>({})
 const changed = signal(false)
 const saving = signal(false)
 const asking = signal(false)
+const checking = signal(false)
 // The dialog of `confirm`, a chunk of its own fetched once there is a question to ask, held in a list of at most one component.
 const failureText = () => failureLabel ?? failure ?? wording('ui.saveForm.failure', 'Could not save.')
 const confirmView = signal<(typeof import('./internal/save-confirm.kay'))['default'][]>([])
@@ -69,6 +70,9 @@ let form: HTMLFormElement | undefined
 let baseline = ''
 
 formIssues.provide(issues)
+
+if (validate !== false && action && !onSave)
+  carrySchema(action)
 
 // Follows `confirm`, which a parent may set after mount.
 effect(() => {
@@ -138,7 +142,7 @@ function values(): () => void {
 }
 
 const isDirty = () => dirty ?? changed()
-const busy = () => saving() || action?.pending() === true
+const busy = () => saving() || checking() || action?.pending() === true
 
 function check() {
   if (dirty === undefined)
@@ -197,7 +201,7 @@ async function submit(event: SubmitEvent) {
     return
 
   // Before any question is asked: a form the schema refuses is not worth one.
-  if (action && !onSave && validate !== false && !(await checkSchema(form, action, issues, failureText())))
+  if (action && !onSave && validate !== false && !(await checkSent(form, action, issues, failureText(), checking)))
     return
 
   if (confirm !== undefined && !sure) {
@@ -281,6 +285,8 @@ async function discard() {
 }
 
 async function leave(event: FocusEvent) {
+  onFocusOut?.(event as never)
+
   const field = leftField(event)
 
   if (validate === 'blur' && action && form && field !== undefined)
@@ -290,7 +296,7 @@ async function leave(event: FocusEvent) {
 // Ctrl or Cmd with S saves unless `shortcut` says otherwise, the browser's own save dialog kept away even when there is nothing to save.
 shortcut(() => saveKeys || null, requestSubmit, { on: () => form })
 ---
-form(part="root" {...rest} ref={element => form = element} onSubmit={submit} onInput={checkSoon} onChange={checkSoon} onFocusOut={leave})
+form(part="root" {...rest} ref={element => form = element} onSubmit={submit} onInput={checkSoon} onChange={checkSoon} onFocusOut={validate === 'blur' || onFocusOut ? leave : undefined})
   div(part="grid")
     slot
   div(part="bar")

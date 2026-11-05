@@ -1062,8 +1062,19 @@ function callAction<Output>(form: HTMLFormElement, action: Action<never, Output,
 [./lib/forms] checkSchema
 function checkSchema(form: HTMLFormElement, action: Validating, issues: Signal<Record<string, string>>, failure: string, field?: string | undefined): Promise<boolean>
 
+[./lib/forms] checkSent
+function checkSent(form: HTMLFormElement, action: Validating, issues: Signal<Record<string, string>>, failure: string, checking: Signal<boolean>): Promise<boolean>
+
 [./lib/forms] CONTROL
 const CONTROL: "input:not([type=\"hidden\"]), select, textarea, button, [contenteditable], [tabindex]"
+
+[./lib/forms] FieldIssue
+interface FieldIssue
+  form: boolean
+  message: string
+
+[./lib/forms] fieldIssueList
+function fieldIssueList(name: () => string | undefined, issue: () => string | undefined): () => FieldIssue[]
 
 [./lib/forms] fieldIssues
 function fieldIssues(name: () => string | undefined, issue: () => string | undefined): () => string[]
@@ -1094,7 +1105,7 @@ type FormValidation = 'blur' | 'submit' | false | undefined
 function leftField(event: FocusEvent): string | undefined
 
 [./lib/forms] showIssues
-function showIssues(form: HTMLFormElement, byField: Record<string, string>): Promise<void>
+function showIssues(form: HTMLFormElement, byField: Record<string, string>): Promise<boolean>
 
 [./lib/hover-card] HoverCardPlacement
 type HoverCardPlacement = PopoverPlacement | 'top' | 'bottom' | 'left' | 'right'

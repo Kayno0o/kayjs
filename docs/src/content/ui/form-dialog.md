@@ -55,6 +55,10 @@ FormDialog(
 
 The dialog calls `action` with the form's data. Give each control the `name` of its field in the action's schema. When the action refuses a field, its message shows on the [FormField](/ui/form-field) with that `name` and the dialog stays open. `onSaved` receives what the action returned, then the dialog closes.
 
+## Checking as you type
+
+`validate="submit"` checks the fields against the action's schema when the form is sent, and `validate="blur"` also as each field loses focus; a refused field shows its message and nothing is called. See [Form](/ui/form#checking-as-you-type) for what it checks.
+
 ## Failures
 
 When the action is refused or fails, `onError` is called with `{ error }` before the toast, and the dialog stays open. A refusal is an `ActionError` with its `errors` by field and its `data`, and any other failure is what the call threw.

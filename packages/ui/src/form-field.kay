@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import { recipe } from 'kay'
 import { FIELD_MESSAGE, LABEL_TEXT } from './field-look'
-import { fieldIssues, fieldLinks, fieldNamed } from './forms'
+import { fieldIssueList, fieldLinks, fieldNamed } from './forms'
 
 // One wrapping row, the label taking no box of its own: the head and the action share the first line, the action wrapping under the head rather than over the control, and the rest take a line each.
 // A floated legend is no longer the fieldset's rendered legend, so it sits in the row like the label's head, its padding zeroed so an app's own `legend` styles do not indent it.
@@ -46,9 +46,9 @@ const ends = () => actions ?? action
 
 const small = () => size === 'sm'
 const reports = () => !small() || name !== undefined || issue !== undefined
-const messages = fieldIssues(() => name, () => issue)
-// Which of them the form gave, for the browser to replace those of a call without touching the page's own.
-const sourced = fieldIssues(() => name, () => undefined)
+// Each told by who gave it, for the browser to replace those of a call without touching the page's own.
+const found = fieldIssueList(() => name, () => issue)
+const messages = () => found().map(item => item.message)
 
 fieldNamed.provide(() => name)
 const links = fieldLinks(() => group, () => hint !== undefined && hint !== '', messages, () => required)
@@ -69,9 +69,9 @@ if group
     if hint
       span(part="hint" id={links.hint}) {hint}
     if reports()
-      span(part="issues" id={messages().length > 0 ? links.issues : undefined} aria-live="polite" data-field={name})
-        for message, index of messages() key={index}
-          span(part="issue" data-form-issue={sourced().includes(message) ? '' : undefined}) {message}
+      span(part="issues" id={messages().length > 0 ? links.issues : undefined} aria-live="polite" data-field={name} data-issue-class={name === undefined ? undefined : FIELD_MESSAGE.issue})
+        for item, index of found() key={index}
+          span(part="issue" data-form-issue={item.form ? '' : undefined}) {item.message}
 else
   div(part="root" {...rest} data-kui-field={links.frame} data-compact={small() ? '' : undefined})
     label(part="label")
@@ -87,6 +87,6 @@ else
     if hint
       span(part="hint" id={links.hint}) {hint}
     if reports()
-      span(part="issues" id={messages().length > 0 ? links.issues : undefined} aria-live="polite" data-field={name})
-        for message, index of messages() key={index}
-          span(part="issue" data-form-issue={sourced().includes(message) ? '' : undefined}) {message}
+      span(part="issues" id={messages().length > 0 ? links.issues : undefined} aria-live="polite" data-field={name} data-issue-class={name === undefined ? undefined : FIELD_MESSAGE.issue})
+        for item, index of found() key={index}
+          span(part="issue" data-form-issue={item.form ? '' : undefined}) {item.message}

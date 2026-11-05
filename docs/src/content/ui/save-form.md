@@ -26,6 +26,10 @@ SaveForm(action={rename} failureLabel="Could not save" saved="Saved.")
 
 The form is dirty when what its controls hold differs from what they held when it was last clean. Typing a change back makes it clean again, and the page needs no `dirty` or `saving` signal of its own. A control added or removed counts as a change.
 
+## Checking before saving
+
+`validate="submit"` checks the fields against the action's schema when Save is pressed, before the `confirm` question, and `validate="blur"` also as each field loses focus. A refused field shows its message and takes the focus, and nothing is called. It is read with `action`, not with `onSave`. See [Form](/ui/form#checking-as-you-type) for what it checks.
+
 ## Saving
 
 Save calls the action. It does nothing while the form is clean or a save is under way.

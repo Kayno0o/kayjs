@@ -192,10 +192,12 @@ export async function callAction<Output>(form: HTMLFormElement, action: Action<n
 // Shows a refusal: the messages go to the FormFields, a message no FormField shows (a limit, or a refusal of the whole form under the empty name) is toasted rather than lost, a refusal carrying none toasts `failure`, and the first invalid field takes the focus.
 async function refuse(form: HTMLFormElement, byField: Record<string, string>, issues: Signal<Record<string, string>>, failure: string): Promise<void> {
   const messages = Object.entries(byField)
-  const shown = (name: string) => [...form.querySelectorAll('[data-field]')].some(field => field.getAttribute('data-field') === name)
 
   issues.set(byField)
-  await showIssues(form, byField)
+
+  const painted = await showIssues(form, byField)
+  // A painter that could not load shows nothing, so every message is toasted rather than lost.
+  const shown = (name: string) => painted && [...form.querySelectorAll('[data-field]')].some(field => field.getAttribute('data-field') === name)
 
   for (const message of messages.length === 0 ? [failure] : messages.filter(([name]) => !shown(name)).map(([, message]) => message))
     toast.error(message)
@@ -218,6 +220,18 @@ export function leftField(event: FocusEvent): string | undefined {
   const control = event.target
 
   return (control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement) && control.name !== '' ? control.name : undefined
+}
+
+// `checkSchema` for a send, `checking` set meanwhile: the first use fetches the check, and a second send meanwhile (a double Enter, Ctrl+S twice) is the form's to refuse.
+export async function checkSent(form: HTMLFormElement, action: Validating, issues: Signal<Record<string, string>>, failure: string, checking: Signal<boolean>): Promise<boolean> {
+  checking.set(true)
+
+  try {
+    return await checkSchema(form, action, issues, failure)
+  }
+  finally {
+    checking.set(false)
+  }
 }
 
 // Checks the form against the action's schema in the browser, as the server would, and puts the messages where a refusal's go. Sent, a refusal shows as a call's does and nothing is called; with a `field`, the one that lost focus, only its message changes and the focus stays. True when what was checked is accepted.
@@ -245,30 +259,61 @@ export async function checkSchema(form: HTMLFormElement, action: Validating, iss
 }
 
 // Writes the messages into the FormFields a static page gave the form as children, which no script of theirs reaches in the browser; the ones inside an island draw their own. The code is a chunk of its own, fetched only for a form that holds such a field and has a message to put or take away.
-export async function showIssues(form: HTMLFormElement, byField: Record<string, string>): Promise<void> {
-  if (form.querySelectorAll('[data-field]').length === 0 || (Object.keys(byField).length === 0 && form.querySelectorAll('[data-form-issue]').length === 0))
-    return
+// False when the messages could not be shown, the chunk failing to load.
+export async function showIssues(form: HTMLFormElement, byField: Record<string, string>): Promise<boolean> {
+  const fields = [...form.querySelectorAll('[data-field]')].filter((field) => {
+    const frame = field.closest('[data-kui-field]')
+
+    return !frame || !liveElements.has(frame)
+  })
+
+  if (fields.length === 0 || (Object.keys(byField).length === 0 && form.querySelectorAll('[data-form-issue]').length === 0))
+    return true
 
   try {
     (await import('./internal/paint-issues')).paintIssues(form, byField)
+
+    return true
   }
   catch (error) {
     console.error('kayjs-ui: the messages of a form could not be shown', error)
+
+    return false
   }
 }
 
 // The messages shown for one field: those its form's last call was refused with under `name`, else the one its `form(action)` holds for it, then the page's own `issue`, none twice and none empty. Read in a component's script, where the form's context is.
 // A Form, FormDialog or SaveForm gives `formIssues` and clears it itself, so the action's own error, which stays until a call succeeds, is not read beside it.
 export function fieldIssues(name: () => string | undefined, issue: () => string | undefined): () => string[] {
+  const list = fieldIssueList(name, issue)
+
+  return () => list().map(item => item.message)
+}
+
+// One message of a field, and whether the form gave it: the page's own `issue` is not, and a form's message the page's `issue` repeats is the page's.
+export interface FieldIssue {
+  message: string
+  form: boolean
+}
+
+// `fieldIssues` told apart by who gave each message, for a static page to replace the form's alone.
+export function fieldIssueList(name: () => string | undefined, issue: () => string | undefined): () => FieldIssue[] {
   const refused = formIssues.use()
   const held = formErrors()
   const read = (field: string) => refused ? refused()[field] : held(field)
 
   return () => {
     const field = name()
+    const given = issue()
+    const formed = field === undefined ? undefined : read(field)
+    const found: FieldIssue[] = []
 
-    const messages = [field === undefined ? undefined : read(field), issue()]
+    if (formed !== undefined && formed !== '' && formed !== given)
+      found.push({ message: formed, form: true })
 
-    return [...new Set(messages.filter((message): message is string => message !== undefined && message !== ''))]
+    if (given !== undefined && given !== '')
+      found.push({ message: given, form: false })
+
+    return found
   }
 }

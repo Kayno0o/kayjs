@@ -7,8 +7,10 @@ export const claim = action(t.Object({ handle: t.String({ minLength: 3, maxLengt
 ---
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 ---
 main
   SaveForm(action={claim} id="claim")
     FormField(label="Handle" name="handle")
       input#handle(name="handle" value="ab")
+  Toaster

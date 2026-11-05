@@ -3,7 +3,7 @@ import type { JSX } from 'kay'
 import { postedChecked, recipe, uid } from 'kay'
 import { controlledCheckbox } from './controlled-checkbox'
 import { CHECKBOX, FIELD_MESSAGE, fieldInvalid, keepInvalid } from './field-look'
-import { fieldIssues, fieldNamed } from './forms'
+import { fieldIssueList, fieldNamed } from './forms'
 import { without } from './props-without'
 
 // The track reads the input before it, named so a toggle inside another peer is left alone.
@@ -48,7 +48,8 @@ const shown = name !== undefined || 'issue' in given
 const checking = shown || 'invalid' in given
 // A FormField naming the same field shows its messages itself.
 const framed = checking ? fieldNamed.use() : undefined
-const messages = checking ? fieldIssues(() => framed?.() === name ? undefined : name, () => given.issue) : () => []
+const found = checking ? fieldIssueList(() => framed?.() === name ? undefined : name, () => given.issue) : () => []
+const messages = () => found().map(item => item.message)
 const marked = () => given.invalid === true || messages().length > 0
 const issuesId = shown ? uid() : ''
 
@@ -67,10 +68,10 @@ snippet control()
     if given.hint !== undefined
       span(part="hint") {given.hint}
 if shown
-  div(part="field")
+  div(part="field" data-kui-control="checkbox")
     {control()}
     span(part="issues" id={messages().length > 0 ? issuesId : undefined} aria-live="polite" data-field={name})
-      for message, index of messages() key={index}
-        span(part="issue") {message}
+      for item, index of found() key={index}
+        span(part="issue" data-form-issue={item.form ? '' : undefined}) {item.message}
 else
   {control()}

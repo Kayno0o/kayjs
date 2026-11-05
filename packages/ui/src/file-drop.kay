@@ -6,7 +6,7 @@ import { wording } from 'kay/words'
 import { acceptsFile } from './accept'
 import { FIELD_MESSAGE, GROUP_INVALID } from './field-look'
 import { onFormReset } from './form-reset'
-import { fieldIssues, fieldNamed } from './forms'
+import { fieldIssueList, fieldNamed } from './forms'
 import IconButton from './icon-button.kay'
 
 // 'kui-file-drop' stays as the component's name for an app's CSS and the skins; the border colour reads --_control-line, which a skin sets.
@@ -69,7 +69,8 @@ let input: HTMLInputElement | undefined
 
 // A FormField naming the same field shows its messages itself.
 const framed = fieldNamed.use()
-const messages = fieldIssues(() => framed?.() === name ? undefined : name, () => issue)
+const found = fieldIssueList(() => framed?.() === name ? undefined : name, () => issue)
+const messages = () => found().map(item => item.message)
 const issuesId = uid()
 const keeping = () => name !== undefined || list
 const reporting = () => name !== undefined || issue !== undefined
@@ -232,7 +233,7 @@ snippet zoneView()
       button(part="choose" type="button" disabled={disabled} onClick={open}) {chooseLabel}
       span(part="drop") {dropLabel}
 if list || reporting()
-  div(part="field")
+  div(part="field" data-kui-control="drop")
     {zoneView()}
     if list && chosen().length > 0
       ul(part="files")
@@ -243,7 +244,7 @@ if list || reporting()
             IconButton(icon="close" size="xs" variant="ghost" label={removeLabel ? removeLabel(file) : wording('ui.fileDrop.remove', 'Remove {file}', { file: file.name })} disabled={disabled} onClick={() => remove(file)})
     if reporting()
       span(part="issues" id={messages().length > 0 ? issuesId : undefined} aria-live="polite" data-field={name})
-        for message, index of messages() key={index}
-          span(part="issue") {message}
+        for item, index of found() key={index}
+          span(part="issue" data-form-issue={item.form ? '' : undefined}) {item.message}
 else
   {zoneView()}

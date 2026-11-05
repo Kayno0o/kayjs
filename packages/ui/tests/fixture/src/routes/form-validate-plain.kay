@@ -1,0 +1,20 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const claim = action(t.Object({
+  handle: t.String({ minLength: 3, maxLength: 40, error: 'Three letters at least' }),
+}), () => 'ok')
+---
+---
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+---
+main
+  form#blur(action={claim} validate="blur")
+    FormField(label="Handle" name="handle")
+      input#blur-handle(name="handle" value="abc")
+    button#blur-submit Claim
+  form#submit(action={claim} validate)
+    FormField(label="Handle" name="handle")
+      input#submit-handle(name="handle" value="abc")
+    button#submit-submit Claim

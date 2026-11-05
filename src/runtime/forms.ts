@@ -1,6 +1,6 @@
 import { withoutBase } from './base'
 import { controlsOf } from './form-controls'
-import { busyForms, checkedForms, submitNatively } from './form-submits'
+import { busyForms, checkedForms, submitNatively, swappedActionUrl } from './form-submits'
 import { leave, loadAgain, navigation, prefetched, swappable } from './navigation'
 import { pendingBlocks } from './pending'
 import { FAILURE_HEADER, NAVIGATE_HEADER, OUTCOME_SCRIPT, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
@@ -69,7 +69,7 @@ export async function submit(form: HTMLFormElement, submitter: HTMLElement | nul
   const ours = checkedForms.has(form)
 
   // Past the schema, the constraints the template writes itself, which the browser no longer checks once kay took the form.
-  if ((form.hasAttribute('novalidate') && !ours) || submitter?.hasAttribute('formnovalidate') || (await passes(form, withoutBase(url.pathname)) && (!ours || HTMLFormElement.prototype.reportValidity.call(form)))) {
+  if ((form.hasAttribute('novalidate') && !ours) || submitter?.hasAttribute('formnovalidate') || (await passes(form, withoutBase(url.pathname), ours && form.hasAttribute('validate')) && (!ours || HTMLFormElement.prototype.reportValidity.call(form)))) {
     // Its `pending` blocks stay shown until the page the answer leads to is in, a redirect's included; a document that replaces the page keeps them shown while it loads.
     const loads = navigation.loads
 
@@ -121,6 +121,16 @@ async function loadSwap(): Promise<Swapper> {
   return swapModule ??= import('./page-swap')
 }
 
+// A control of a `validate="blur"` form lost focus: its field is checked, the message shown as text.
+export function blurred(event: FocusEvent): void {
+  const control = event.target
+  const form = control instanceof Element ? control.closest('form') : null
+  const url = form ? swappedActionUrl(form, null) : undefined
+
+  if (form && url && checkedForms.has(form) && (control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement) && control.name !== '')
+    void passes(form, withoutBase(url.pathname), true, control.name)
+}
+
 // A form posting to the action at `action` took focus; one with `proofOfWork`, or holding a `workChallenge` field, starts on its challenge as the visitor fills it in, so its post seldom waits for it.
 export async function preloadChecks(action?: string, form?: HTMLFormElement): Promise<void> {
   try {
@@ -141,11 +151,12 @@ export async function preloadChecks(action?: string, form?: HTMLFormElement): Pr
 }
 
 // A check that breaks, on a pattern the browser cannot read for one, or checks that cannot load, leave the form to the server rather than unsendable.
-async function passes(form: HTMLFormElement, action: string): Promise<boolean> {
+// A form written with `validate` shows the schema's refusals as text, not as the browser's bubble.
+async function passes(form: HTMLFormElement, action: string, inline = false, only?: string): Promise<boolean> {
   try {
-    const { checkForm } = await loadChecks()
+    const { checkForm, validateForm } = await loadChecks()
 
-    return checkForm(form, action)
+    return inline ? validateForm(form, action, only) : checkForm(form, action)
   }
   catch (error) {
     console.error(error)

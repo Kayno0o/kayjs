@@ -25,7 +25,7 @@ main
     FormField(label="Nick" name="nick")
       input#submit-nick(name="nick" value="abc")
     button#submit-submit Claim
-  Form(action={claim} id="off" saved="Added.")
+  Form(action={claim} id="off" saved="Added." onFocusOut={() => document.body.setAttribute('data-left', '')})
     FormField(label="Handle" name="handle")
       input#off-handle(name="handle" value="abc")
     FormField(label="Nick" name="nick")

@@ -12,7 +12,7 @@ const classes = new WeakMap<Element, string>()
 // The fields whose server-rendered messages were taken over.
 const adopted = new WeakSet<Element>()
 
-// The controls a message field names, none for a field that draws its own messages (a component running in the browser) or that another one shows: a Checkbox or Toggle inside a FormField of the same name.
+// The controls a message field names, none for a field that draws its own messages (a component running in the browser) or that another one shows: a Checkbox, Toggle or FileDrop inside a FormField of the same name.
 function controlsOf(field: Element, name: string): HTMLElement[] | undefined {
   const parent = field.parentElement
 
@@ -33,11 +33,15 @@ function controlsOf(field: Element, name: string): HTMLElement[] | undefined {
   if (frame?.querySelector(':scope > [data-field]')?.getAttribute('data-field') === name)
     return undefined
 
-  // A Checkbox or Toggle is an island of its own on a static page, which knows no form around it and so draws no message; inside an island of the app it draws its own.
-  const host = parent?.parentElement?.getAttribute('data-component') ?? ''
-  const box = parent?.querySelector<HTMLInputElement>(':scope > label > input[type="checkbox"]')
+  // A Checkbox, Toggle or FileDrop is an island of its own on a static page, which knows no form around it and so draws no message; inside an island of the app it draws its own.
+  const kind = parent?.getAttribute('data-kui-control')
 
-  return box && (host.endsWith('/checkbox.kay') || host.endsWith('/toggle.kay')) ? [box] : undefined
+  if (!parent || kind === null || kind === '' || !parent.parentElement?.matches('slot[data-component]'))
+    return undefined
+
+  const control = parent.querySelector<HTMLElement>(kind === 'drop' ? ':scope > [role="group"]' : ':scope > label > input[type="checkbox"]')
+
+  return control ? [control] : undefined
 }
 
 // Writes `byField` into the message fields of the FormFields, Checkboxes and Toggles a static page gave `form`: the message of a field, replaced or taken away with the `aria-invalid` and `aria-describedby` of its control, the message of the page's own `issue` left in place.
@@ -52,7 +56,7 @@ export function paintIssues(form: HTMLFormElement, byField: Record<string, strin
     const controls = controlsOf(field, name)
 
     if (controls)
-      paintField(form, field, controls, byField[name] === '' ? undefined : byField[name])
+      paintField(form, field, controls, Object.hasOwn(byField, name) && byField[name] !== '' ? byField[name] : undefined)
   }
 }
 
