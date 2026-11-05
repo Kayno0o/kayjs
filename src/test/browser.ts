@@ -895,18 +895,23 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       }
     }),
     fill: async (selector, text) => serial(async () => {
-      // The field is waited on and focused in one script, as a render can replace it between two.
-      await poll(script((css: string) => {
+      // The field is waited on and focused in one script, as a render can replace it between two. A field of an island not hydrated yet is waited on too, as hydrating would write the text typed into it away: a click replays, typing cannot.
+      await poll(script((css: string, island: string) => {
         const field = document.querySelector<HTMLInputElement>(css)
 
         if (field === null)
+          return false
+
+        const owner = field.closest<HTMLElement & { _$k?: boolean }>(`${island}:not([data-hydrate=visible]):not([data-hydrate=idle])`)
+
+        if (owner !== null && !owner._$k)
           return false
 
         field.focus()
         field.select()
 
         return true
-      }, [selector]), selector)
+      }, [selector, ISLAND]), selector)
 
       await live(async () => text === '' ? view.press('Delete') : view.type(text))
     }),
