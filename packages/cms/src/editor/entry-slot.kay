@@ -22,7 +22,7 @@ effect(() => {
     untrack(() => openEntry(entry))
 })
 
-// kay-allow once-read-prop
+// kay-allow once-read-prop: the editor is made for one form, entry or collection
 const name = entry.slug === SINGLE_SLUG ? entry.collection : `${entry.collection}/${entry.slug}`
 ---
 if wanted()

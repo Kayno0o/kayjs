@@ -8,14 +8,14 @@ import type { ComponentUse } from '../content/server'
 import type { ContentProblem } from '../content/validate'
 import type { ServedProject, ShadowTypes } from './shadow-types'
 import { existsSync, realpathSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { findKayFiles, findProjectFiles, inWalkScope, writeIfChanged } from '../build/files'
 import { missingContextModules } from '../build/manifests'
 import { mentionsServerOnly } from '../build/server-only'
 import { importedSignals } from '../build/signals'
-import { browserRole, promotedChecks } from '../compiler'
+import { browserRole, onceReadChecks, promotedChecks } from '../compiler'
 import { moduleChecks, turnsCaptchaOff } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
 import { CONFIG_FILE } from '../config'
@@ -28,6 +28,7 @@ import { configLocator, readConfigSource } from './config-keys'
 import { dockerfileProblems } from './dockerfile'
 import { CONTENT_CHECK, contentPropsCheck } from './generated'
 import { browserModules, islandEdges } from './island-modules'
+import { islandOnlyComponents, renderedInIslands } from './island-only'
 import { FILES_MARKER, stampOf } from './loaded'
 import { configSeoLints } from './seo'
 import { serverOnlyInIsland } from './server-only-reads'
@@ -161,6 +162,12 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
       return level === 'allow' ? [] : [fromCompile(file, source, { ...diagnostic, severity: level === 'warn' ? 'warning' : 'error' })]
     })
   }
+  // A component the compile does not read as an island's: one a page or a static component also renders, and one the build promotes.
+  const componentFiles = [...componentTexts.keys()]
+  const routes = projectPaths(root, options).routes
+  const browserRun = islands.length > 0 || promoted.size > 0 ? await renderedInIslands(root, componentFiles, componentTexts, [...islands, ...promoted], file => roles.get(file) === 'island') : new Set<string>()
+  const readByCompile = browserRun.size > 0 ? await islandOnlyComponents(root, routes, componentFiles, componentTexts, file => roles.get(file) === 'island') : new Set<string>()
+  const onceRead = [...new Set([...browserRun, ...promoted])].filter(file => roles.get(file) !== 'island' && !readByCompile.has(file) && !file.startsWith(routes + sep))
   const found = [
     ...files.flatMap((file) => {
       const source = texts.get(file)!
@@ -168,6 +175,7 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
       return report(file, source, moduleChecks(source, inBrowser.has(realpathSync(file))))
     }),
     ...[...promoted].flatMap(file => report(file, componentTexts.get(file)!, promotedChecks(componentTexts.get(file)!, root, importedSignals(file, componentTexts.get(file)!)))),
+    ...onceRead.flatMap(file => report(file, componentTexts.get(file)!, onceReadChecks(componentTexts.get(file)!, root, importedSignals(file, componentTexts.get(file)!)))),
     ...browser ? await serverOnlyInIsland(root, browser) : [],
     ...await builtinImportsInIsland(root, browser?.seeds ?? islands, browser?.edges ?? islandEdges(islands, componentTexts, api), api),
   ]

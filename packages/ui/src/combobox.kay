@@ -68,7 +68,7 @@ const { size = 'md', invalid, id, options, value = '', valueLabel, label, name, 
 }>()
 
 const listId = id ?? uid()
-// kay-allow once-read-prop
+// kay-allow once-read-prop: a list or a loader is chosen when the component is created
 const remote = typeof options === 'function'
 const known = () => typeof options === 'function' ? [] : options
 const startOption = () => known().find(option => option.value === value)

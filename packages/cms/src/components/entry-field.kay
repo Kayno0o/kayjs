@@ -12,7 +12,6 @@ import { gapOf, translatable } from '../translations'
 // `field` is the form layout's own copy of it, a group without the fields the layout placed elsewhere.
 const { form, name, field: given } = props<{ form: FormScope, name: string, field?: Field | undefined }>()
 
-// kay-allow once-read-prop
 markdownOptions.provide({ toolbar: form.collection.layout?.form?.toolbar, previewClass: form.collection.layout?.form?.previewClass })
 
 const field = memo(() => {
@@ -34,7 +33,6 @@ const field = memo(() => {
 })
 
 // In a locale other than the default's, a text still reading as the default locale's, or empty beside it, is said under the field.
-// kay-allow once-read-prop
 const translated = form.source === undefined ? new Set<string>() : new Set(translatable(form.collection).map(candidate => String(candidate.key)))
 
 const note = () => {
@@ -55,7 +53,7 @@ effect(() => {
 })
 
 // The draft flag and the publish and end dates are the role's to change when it may publish: the others see them, locked with the reason.
-// kay-allow once-read-prop
+// kay-allow once-read-prop: the editor is made for one form, entry or collection
 const { draftField, publishField, unpublishField } = form.collection
 const locked = () => [draftField, publishField, unpublishField].includes(name) ? form.denied?.publish : undefined
 ---

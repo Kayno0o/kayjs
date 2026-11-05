@@ -338,6 +338,19 @@ describe('Table with a filter', () => {
     expect(mounted.root.querySelector('.kui-table-wrap > [role="status"]')?.textContent).toBe('')
   })
 
+  test('follows a `countLabel` the parent changes while it is mounted', async () => {
+    mounted = await mountComponent(FilteredTable, { rows: MOONS })
+
+    filter(mounted.root, 'mars')
+    await settle()
+
+    expect(mounted.root.querySelector('.kui-table-wrap > [role="status"]')?.textContent).toBe('2 rows')
+
+    await mounted.setProps({ countLabel: (count: number) => `${count} lunes` })
+
+    expect(mounted.root.querySelector('.kui-table-wrap > [role="status"]')?.textContent).toBe('2 lunes')
+  })
+
   test('keeps the typed text in the URL under filterParam, and starts from it', async () => {
     visit('http://localhost/?q=io')
     mounted = await mountComponent(FilteredTable, { rows: MOONS, filterParam: 'q' })
@@ -520,6 +533,16 @@ describe('Table with a selection', () => {
     expect(toolbar(mounted.root)).toContain('2 choisis')
     expect(header(mounted.root, 0).textContent).toBe('Tout')
     expect(boxes(mounted.root).map(box => box.getAttribute('aria-label'))).toEqual(['Choisir Io', 'Choisir Europa', 'Choisir Amalthea'])
+  })
+
+  test('follows a `selectedLabel` the parent changes while it is mounted', async () => {
+    mounted = await mountComponent(SelectableTable, { rows: MOONS, selected: [1, 2] })
+
+    expect(toolbar(mounted.root)).toContain('2 selected')
+
+    await mounted.setProps({ selectedLabel: (count: number) => `${count} choisis` })
+
+    expect(toolbar(mounted.root)).toContain('2 choisis')
   })
 
   test('starts from `selected` and drops keys of rows that are not there, telling the page', async () => {

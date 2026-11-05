@@ -54,7 +54,6 @@ const { options, value, label, showLabel = false, name, invalid, param, paramDef
 }>()
 
 // A group with no callback or param is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
-// kay-allow once-read-prop
 const sent = onChange || param !== undefined ? undefined : postedValue(name, value)
 
 const { group, picked, busy, ref, pick } = controlledRadios({
@@ -92,7 +91,6 @@ function follow(event: MouseEvent, value: Value) {
     void pick(value)
 }
 
-// kay-allow once-read-prop
 const heading = showLabel ? uid() : undefined
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field.

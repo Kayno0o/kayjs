@@ -97,7 +97,6 @@ const query = signal('')
 const selected = signal(0)
 let dialog: HTMLDialogElement | undefined
 const ref = startRef<HTMLDialogElement>(element => dialog = element, rest.ref)
-// kay-allow once-read-prop
 const searching = siteSearch
 const site = searching ? searchResults(query, searching === true ? {} : searching) : undefined
 // The rows `search` answered, with the query they answer.

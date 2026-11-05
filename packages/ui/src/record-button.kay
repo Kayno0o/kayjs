@@ -49,7 +49,6 @@ const { onRecord, onStart, onStop, onCancel, onError, recording, onRecordingChan
   maxDuration?: Duration | undefined
 }>()
 
-// kay-allow once-read-prop
 const voice = recorder({ onAudio: audio => onRecord(audio), words: recordWords(), failure, maxMs: durationMs(maxDuration), onStart, onStop, onCancel, onError, onRecordingChange })
 
 // Follows `recording` when the app sets it; only its changes act, so a recording that ended on its own is not started again.

@@ -12,9 +12,7 @@ const notes = local({
   })) : call(notesApi, '/', { signal }),
   put: save,
   remove: drop,
-  // kay-allow once-read-prop
   version,
-  // kay-allow once-read-prop
   conflict: theirs ? () => undefined : both ? ({ mine, theirs: held }) => ({ ...held, title: `${mine?.title}+${held.title}` }) : undefined,
 })
 const text = signal('')

@@ -25,7 +25,7 @@ import { patternNames } from './pattern-names'
 import { findRewrites } from './rewrite'
 import { scopeAttribute } from './scoped-style'
 import { analyzeScript, analyzeServer } from './script'
-import { outerReads, templateReads } from './template-reads'
+import { outerReads, templateReads, templateWords } from './template-reads'
 import { ISLAND_TWIN } from './twin'
 import { validate } from './validate'
 
@@ -237,7 +237,17 @@ export function promotedChecks(original: string, root?: string, imported?: Impor
   const announced = site === undefined || marker !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${describeCause(site)}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `// kay-island` in it to say so, or pass the island what can be serialized', checkOnly: true }]
   const contradicted = marker?.kind === 'static' && site !== undefined ? [{ start: marker.start, end: marker.end, code: 'island-marker', message: `This component renders as an island, and \`// kay-static\` says it does not: ${describeCause(site)}`, note: 'it passes an island what only an island can send', help: 'delete the marker, or pass the island what can be serialized', checkOnly: true }] : []
 
-  return [...scriptFences(script).flatMap(fence => [...serverOnlyImports(fence), ...fence === script.fence ? onceReadProps(fence, script.props) : []]), ...announced, ...contradicted]
+  return [...scriptFences(script).flatMap(fence => serverOnlyImports(fence)), ...announced, ...contradicted]
+}
+
+// The props of a component's script read once into a value a function or the template reads later, for a component the browser runs that compiling it alone cannot tell is one: the project knows which.
+export function onceReadChecks(original: string, root?: string, imported?: ImportedSignals): Diagnostic[] {
+  const { file } = parseExpanded(original)
+  const source = file.source
+  const server = analyzeServer(source, file.server)
+  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root), imported)
+
+  return script.fence ? onceReadProps(script.fence, script.props, templateWords(file)) : []
 }
 
 const FAILED_FUNCTION = /^function KayFailed\(/m
@@ -316,7 +326,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...browserScript.flatMap(fence => [...serverOnlyImports(fence), ...fence === script.fence ? onceReadProps(fence, script.props) : []]), ...unusedLints, ...templateLints(file))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file))
   }
 
   const marker = checked ? islandMarker(source) : undefined

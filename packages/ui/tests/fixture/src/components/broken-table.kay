@@ -5,7 +5,6 @@ import Table from '@kaynooo/kayjs-ui/table.kay'
 
 const { load } = props<{ load: () => Promise<{ id: number, name: string }[]> }>()
 
-// kay-allow once-read-prop
 const feed = infiniteList<{ id: number, name: string }>([], { pageSize: 2, load })
 ---
 Table(columns={[{ key: 'name', header: 'Name', sortValue: true }]} list={feed} rowKey="id" sort={{ key: 'name', direction: 'asc' }} filterParam="q")

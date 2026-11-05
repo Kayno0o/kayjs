@@ -4,11 +4,9 @@ import { CASES, COMPONENTS, VARIANTS } from '../contract'
 // A component of the library drawn with its fixture props, in an island of its own, which a ref makes it, so one taking a function renders where the server meets it as the browser does.
 const { name } = props<{ name: string }>()
 
-// kay-allow once-read-prop
 const variant = VARIANTS[name]
-// kay-allow once-read-prop
 const Target = COMPONENTS[variant?.of ?? name]!
-// kay-allow once-read-prop
+// kay-allow once-read-prop: a fixture mounted with props it does not change
 const given = variant?.props ?? CASES[name]!
 ---
 div(ref={() => undefined})

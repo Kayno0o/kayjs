@@ -160,7 +160,6 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   openRowLabel?: ((row: Row) => string) | undefined
 } & ({ rows: RowsSource<Row>, list?: undefined } | { rows?: undefined, list: InfiniteList<Row> })>()
 
-// kay-allow once-read-prop
 if (expandable && virtual)
   throw new Error('kayjs-ui: a Table cannot be both expandable and virtual, a detail row breaks the single row height a virtual table measures by')
 
@@ -168,20 +167,16 @@ const tableId = uid()
 const source = asyncRows<Row>(() => passed, { onLoad: loaded => onLoad?.(loaded), onError: error => onError?.(error) })
 const rows = () => list ? list.rows() : source.rows()
 const columns = memo(() => given.map(column => resolvedColumn(column, sortable)))
-// kay-allow once-read-prop
 const keptKey = sortParam === undefined ? undefined : persisted(sortParam, '', { storage: 'query' })
-// kay-allow once-read-prop
 const directionParam = sortParam === undefined ? undefined : sortParam === 'sort' ? 'direction' : `${sortParam}Direction`
 const keptDirection = directionParam === undefined ? undefined : persisted(directionParam, '', { storage: 'query' })
 const restored = restoredSort(columns(), keptKey?.(), keptDirection?.())
 const current = signal(restored ?? sort)
 let following = restored === undefined
-// kay-allow once-read-prop
 const typed = filterParam === undefined ? signal('') : persisted(filterParam, '', { storage: 'query' })
-// kay-allow once-read-prop
+// kay-allow once-read-prop: the extra fields are read when the table is created
 const extra = fields ?? []
 // The query names the table writes itself, which a field's own would overwrite: the sort's, the search's, and those of the export address.
-// kay-allow once-read-prop
 const taken = new Set(['sort', 'direction', filterParam ?? 'q', sortParam, directionParam])
 
 for (const field of extra) {

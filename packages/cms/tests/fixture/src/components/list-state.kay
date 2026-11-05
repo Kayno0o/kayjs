@@ -10,9 +10,7 @@ const entry = { collection: 'posts', slug: 'hello' }
 const drafts = createDrafts({ show: async () => ({}) })
 
 // Imported by file, so the package's own types see them as another module's.
-// kay-allow once-read-prop
 drafts.open({ ...entry, data: { tags: data } })
-// kay-allow once-read-prop
 drafts.report(issues.map(issue => ({ ...entry, ...issue })))
 ---
 FieldInput(drafts={drafts as unknown as Input['drafts']} entry={entry} field={field} path="tags")

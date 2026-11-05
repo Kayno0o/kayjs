@@ -633,8 +633,6 @@ export function unreturnedFails(fence: ParsedFence): Diagnostic[] {
 
 // A prop named like an initial value is read once on purpose, and so is a callback (`onChange`), which a component reads to tell whether one was given.
 const INITIAL_PROP = /^(?:(?:initial|default)(?![a-z])|on[A-Z])/
-// Calls whose arguments only start a value, so a prop read there is the first value on purpose: `signal` and `persisted`, and the `posted...` readers of kay/forms.
-const STARTING_CALLS = /^(?:signal|persisted|posted\w*)$/
 // The TypeScript nodes that wrap a value rather than describe a type.
 const VALUE_TS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'TSInstantiationExpression'])
 
@@ -649,38 +647,75 @@ function isReference(node: NodeOfType<'Identifier'>, parent: Node | undefined): 
   return parent?.type !== 'LabeledStatement' && parent?.type !== 'BreakStatement' && parent?.type !== 'ContinueStatement' && parent?.type !== 'ExportSpecifier'
 }
 
-// A destructured prop read at the top of the script, outside a function, `memo` or `effect`: that code runs once, so the read keeps the prop's first value after the parent changes it.
-export function onceReadProps(fence: ParsedFence, props: PropsDeclaration | undefined): Diagnostic[] {
-  const names = (props?.bindings ?? []).filter(binding => !INITIAL_PROP.test(binding.key)).map(binding => fence.code.slice(binding.local.start - fence.offset, binding.local.end - fence.offset))
-
-  if (!props || names.length === 0)
+// A destructured prop read into a top-level `const` or `let` that a function or the template reads later: the declaration runs once, when the component is created, so the value keeps the prop's first value after the parent changes it.
+// A prop read as the test of a condition, as an argument of a call or `new`, as a write target or inside a class is left alone: those choose or build something once, and a name declared again anywhere in the script is left alone too.
+export function onceReadProps(fence: ParsedFence, props: PropsDeclaration | undefined, templateNames: readonly string[]): Diagnostic[] {
+  if (!props)
     return []
 
-  const watched = new Set(names)
-  const topLevel = (visit: (node: Node, parent: Node | undefined) => boolean | void) => eachNode(fence.ast, (node, parent) => {
-    if (isFunction(node) || (node.type.startsWith('TS') && !VALUE_TS.has(node.type)) || (node.type === 'VariableDeclaration' && fence.shift(node).start === props.statement.start))
-      return false
+  const watched = new Set(props.bindings.filter(binding => !INITIAL_PROP.test(binding.key)).map(binding => fence.code.slice(binding.local.start - fence.offset, binding.local.end - fence.offset)))
 
-    return visit(node, parent)
+  if (watched.size === 0)
+    return []
+
+  const isDeclaration = (node: Node) => node.type === 'VariableDeclaration' && fence.shift(node).start === props.statement.start
+  const closureReads = new Set(templateNames)
+
+  eachNode(fence.ast, (node) => {
+    if (!isFunction(node))
+      return
+
+    eachNode(node, (inner) => {
+      if (inner.type === 'Identifier')
+        closureReads.add(inner.name)
+    })
+
+    return false
   })
 
-  // A top-level block or loop that declares a name again reads its own.
-  topLevel((node) => {
+  eachNode(fence.ast, (node) => {
+    if (isDeclaration(node))
+      return false
+
     if (node.type === 'VariableDeclarator' || node.type === 'CatchClause') {
       for (const name of patternNames(node.type === 'CatchClause' ? node.param : node.id))
         watched.delete(name)
     }
+
+    return true
   })
 
   const diagnostics: Diagnostic[] = []
   const seen = new Set<number>()
-
-  topLevel((node, parent) => {
-    // The arguments of `signal(...)`, `persisted(...)` and the `posted...(...)` readers of a form's first render are the first value, and so is `id ?? uid()`: an id is made once.
-    if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && STARTING_CALLS.test(node.callee.name))
+  const reads = (node: Node, parent: Node | undefined): boolean | void => {
+    if (isFunction(node) || node.type === 'ClassBody' || (node.type.startsWith('TS') && !VALUE_TS.has(node.type)))
       return false
 
-    if (node.type === 'LogicalExpression' && node.operator === '??' && node.right.type === 'CallExpression' && node.right.callee.type === 'Identifier' && node.right.callee.name === 'uid')
+    // Only the callee of a call and the target of `new` are read; the arguments choose what is built.
+    if (node.type === 'CallExpression' || node.type === 'NewExpression') {
+      eachNode(node.callee, reads, node)
+
+      return false
+    }
+
+    if (node.type === 'ConditionalExpression') {
+      eachNode(node.consequent, reads, node)
+      eachNode(node.alternate, reads, node)
+
+      return false
+    }
+
+    if (node.type === 'AssignmentExpression') {
+      eachNode(node.right, reads, node)
+
+      return false
+    }
+
+    if (node.type === 'UpdateExpression')
+      return false
+
+    // `id ?? uid()`: an id is made once.
+    if (node.type === 'LogicalExpression' && node.operator === '??' && node.left.type === 'Identifier' && node.right.type === 'CallExpression' && node.right.callee.type === 'Identifier' && node.right.callee.name === 'uid')
       return false
 
     if (node.type !== 'Identifier' || !watched.has(node.name) || !isReference(node, parent) || seen.has(node.start))
@@ -691,10 +726,21 @@ export function onceReadProps(fence: ParsedFence, props: PropsDeclaration | unde
       ...fence.shift(node),
       code: 'once-read-prop',
       message: `\`${node.name}\` is read once, when the component is created, so it keeps its first value after the parent changes it`,
-      note: 'a destructured prop is live in the template and in a function, but a read at the top of the script runs a single time',
-      help: 'read it where it is used, in the template or a `memo(() => ...)`, or write `// kay-allow once-read-prop` when the first value is meant',
+      note: 'a destructured prop is live in the template and in a function, but the value of a `const` computed from it at the top of the script is set a single time',
+      help: 'compute it where it is used, in the template or a `memo(() => ...)`, or write `// kay-allow once-read-prop` when the first value is meant',
       checkOnly: true,
     })
+
+    return true
+  }
+
+  // The declarations of the script, nested ones included.
+  eachNode(fence.ast, (node) => {
+    if (isFunction(node) || isDeclaration(node) || (node.type.startsWith('TS') && !VALUE_TS.has(node.type)))
+      return false
+
+    if (node.type === 'VariableDeclarator' && node.init && patternNames(node.id).some(name => closureReads.has(name)))
+      eachNode(node.init, reads, node)
 
     return true
   })

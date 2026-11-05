@@ -7,7 +7,6 @@ import { editorsOf, entryRoom, openRoom, watchRoom } from '../room'
 // Tells a list that an entry is being edited, by name when the editors have one. The list watches through rooms of its own, so it is no editor to anyone.
 // Every editor is in the room that names them, which the server strips of names for who the guard did not let in, and in the one that holds none.
 const { collection, entry } = props<{ collection: string, entry: EntryRef }>()
-// kay-allow once-read-prop
 const { room, member } = entryRoom(collection, entry, { name: '', watching: true })
 const here = presence(watchRoom(room), member)
 const onPage = presence(watchRoom(openRoom(room)), member)

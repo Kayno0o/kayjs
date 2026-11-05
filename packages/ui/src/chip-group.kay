@@ -46,7 +46,6 @@ const { options, value, label, showLabel = false, name, invalid, disabled = fals
 
 const group = name ?? uid()
 // The heading's id while `showLabel` writes it, which then names the group in place of `aria-label`.
-// kay-allow once-read-prop
 const heading = showLabel ? uid() : undefined
 // Held as string or number: a signal cannot take a type parameter that might be a function.
 // A group with no callback is plain: a refused post of its form, which the server renders it for, gives its choices back in place of its own.

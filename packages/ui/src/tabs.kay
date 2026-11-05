@@ -57,7 +57,6 @@ const { tabs, value, param, paramDefault, label, onChange, tab, panel, ...rest }
 const id = uid()
 // Held as a string: a signal cannot take a type parameter that might be a function.
 const shown = signal<string>(value ?? '')
-// kay-allow once-read-prop
 const kept = param === undefined ? undefined : persisted(param, paramDefault ?? '', { storage: 'query' })
 let list: HTMLElement | undefined
 

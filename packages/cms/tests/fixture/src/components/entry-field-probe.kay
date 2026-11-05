@@ -13,7 +13,6 @@ const drafts = createDrafts({ show: async () => ({}) })
 drafts.open({ ...entry, data: {} })
 
 // Imported by file, so the package's own types see them as another module's.
-// kay-allow once-read-prop
 const form = formScope(drafts, entry, collection, undefined, undefined, denied) as unknown as Input['form']
 ---
 EntryField(form={form} name={name})

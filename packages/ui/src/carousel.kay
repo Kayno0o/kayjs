@@ -86,9 +86,7 @@ effect(() => {
 })
 
 // Checked at once, so a bare number throws even where the effect would return early, as on the server or under reduced motion.
-// kay-allow once-read-prop
 if (autoplay !== undefined)
-  // kay-allow once-read-prop
   durationMs(autoplay)
 
 const still = reducedMotion()

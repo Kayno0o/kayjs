@@ -4,14 +4,12 @@ import { importsOf } from '../build/libraries'
 import { importedSignals } from '../build/signals'
 import { rendersAsIsland } from '../compiler'
 
-// The static components of a project that only islands render, directly or through other such components: their children render inline with the island, so the props they pass are not serialized.
-// A page, a layout or a script importing a component renders it in a static context, as does a static component rendered there; a component no island reaches counts as static too.
-// `isIsland` tells whether a component renders as an island, for a caller that knows it already.
-export async function islandOnlyComponents(root: string, routesDir: string, files: string[], sources: Map<string, string>, isIsland = (file: string) => rendersAsIsland(sources.get(file)!, importedSignals(file, sources.get(file)!), root)): Promise<Set<string>> {
+type IsIsland = (file: string) => boolean
+
+// Which component imports which, and the components a script imports, which may render them on the server.
+async function componentImporters(root: string, files: string[], sources: Map<string, string>): Promise<{ importers: Map<string, Set<string>>, fromScript: Set<string> }> {
   const known = new Set(files)
-  const islands = new Set(files.filter(isIsland))
   const importers = new Map<string, Set<string>>(files.map(file => [file, new Set()]))
-  // Imported from a script, which may render it on the server.
   const fromScript = new Set<string>()
   const scripts = await findProjectFiles(root, SCRIPT_FILE, { project: true, ownOnly: true, ownKayOnly: true })
 
@@ -30,6 +28,42 @@ export async function islandOnlyComponents(root: string, routesDir: string, file
     }
   }))
 
+  return { importers, fromScript }
+}
+
+const renders = (root: string, sources: Map<string, string>): IsIsland => file => rendersAsIsland(sources.get(file)!, importedSignals(file, sources.get(file)!), root)
+
+// The components rendered, directly or through other components, by an island or by one of `extraSeeds`, whatever else renders them: a Card used on a page and inside an island is in the set.
+// `isIsland` tells whether a component renders as an island, for a caller that knows it already.
+export async function renderedInIslands(root: string, files: string[], sources: Map<string, string>, extraSeeds: Iterable<string> = [], isIsland: IsIsland = renders(root, sources)): Promise<Set<string>> {
+  const { importers } = await componentImporters(root, files, sources)
+  const children = new Map<string, string[]>()
+
+  for (const [target, from] of importers) {
+    for (const importer of from)
+      children.set(importer, [...children.get(importer) ?? [], target])
+  }
+
+  const reached = new Set<string>()
+  const queue = [...files.filter(isIsland), ...extraSeeds]
+
+  for (const file of queue) {
+    for (const child of children.get(file) ?? []) {
+      if (!reached.has(child)) {
+        reached.add(child)
+        queue.push(child)
+      }
+    }
+  }
+
+  return reached
+}
+
+// The static components of a project that only islands render, directly or through other such components: their children render inline with the island, so the props they pass are not serialized.
+// A page, a layout or a script importing a component renders it in a static context, as does a static component rendered there; a component no island reaches counts as static too.
+export async function islandOnlyComponents(root: string, routesDir: string, files: string[], sources: Map<string, string>, isIsland: IsIsland = renders(root, sources)): Promise<Set<string>> {
+  const islands = new Set(files.filter(isIsland))
+  const { importers, fromScript } = await componentImporters(root, files, sources)
   const candidates = new Set(files.filter(file => !islands.has(file) && !file.startsWith(routesDir + sep) && !fromScript.has(file) && importers.get(file)!.size > 0))
   let changed = true
 

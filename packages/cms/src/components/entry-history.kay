@@ -17,7 +17,7 @@ const { prefix, collection, entry, rows } = props<{ prefix: string, collection: 
 // Looks up what a restore says once the page has loaded, so the page sends it.
 shipWords()
 
-// kay-allow once-read-prop
+// kay-allow once-read-prop: the editor is made for one form, entry or collection
 const ref = { collection: collection.name, slug: entry.slug, locale: entry.locale }
 
 const verbs: Record<string, string> = {

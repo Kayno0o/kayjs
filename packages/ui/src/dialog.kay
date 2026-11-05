@@ -62,7 +62,6 @@ const edited = signal(false)
 let dialog: HTMLDialogElement | undefined
 
 // Read once: the open attribute is what the server renders, and the client opens and closes the dialog by its methods.
-// kay-allow once-read-prop
 const serverOpen = renderedOpen(open, modal, closeHref)
 
 effect(() => {

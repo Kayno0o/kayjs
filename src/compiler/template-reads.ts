@@ -199,6 +199,20 @@ export function bindingNames(pattern: string): string[] {
   return parsedBindingNames(pattern) ?? pattern.match(WORD) ?? []
 }
 
+// Every word the template's expressions write, which the names it reads are among.
+export function templateWords(file: KayFile): string[] {
+  const words = new Set<string>()
+
+  visitNodes(file.template, (node) => {
+    for (const span of nodeExpressions(node)) {
+      for (const word of file.source.slice(span.start, span.end).match(WORD) ?? [])
+        words.add(word)
+    }
+  })
+
+  return [...words]
+}
+
 const reads = new WeakMap<KayFile, string[]>()
 
 // The values of `kay` the template's expressions read, bar the names the template binds itself and the ones a function in an expression takes as parameters: the script declares the rest or leaves them to the compiler to import. A binder or a parameter hides its name file-wide, not only where it is in scope, so a file mixing both uses of one name imports it from the script.

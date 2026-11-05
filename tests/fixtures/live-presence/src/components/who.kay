@@ -2,7 +2,6 @@
 import { presence } from 'kay'
 
 const { room, member } = props<{ room: string, member: { name: string } }>()
-// kay-allow once-read-prop
 const here = presence(room, member)
 ---
 p.names {here.others().map(other => other.name).join(', ')}

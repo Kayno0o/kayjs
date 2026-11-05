@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import * as parser from 'oxc-parser'
-import { compileKay, promotedChecks } from '../src/compiler'
+import { compileKay, onceReadChecks, promotedChecks } from '../src/compiler'
 import { moduleChecks } from '../src/compiler/fence-checks'
 import { explainLint, isLint, LINT_GROUPS, lintList, LINTS, typeLint } from '../src/compiler/lints'
 
@@ -1422,53 +1422,75 @@ describe('invalid-nesting', () => {
   })
 })
 describe('once-read-prop', () => {
-  const island = (body: string, props = 'items, size = \'md\'') => `---\nimport { signal, memo, effect } from 'kay'\n\nconst { ${props} } = props<{ items: string[], size?: string, initialOpen?: boolean, defaultValue?: string }>()\n${body}\n---\np x`
-  const found = (body: string, props?: string, options: CompileOptions = {}) => lints(island(body, props), options).filter(d => d.code === 'once-read-prop')
+  const island = (body: string, props = 'items, size = \'md\'', template = 'p x') => `---\nimport { signal, memo, effect } from 'kay'\n\nconst { ${props} } = props<{ items: string[], size?: string, initialOpen?: boolean, defaultValue?: string, onPick?: () => void }>()\n${body}\n---\n${template}`
+  const found = (body: string, props?: string, template?: string) => lints(island(body, props, template)).filter(d => d.code === 'once-read-prop')
+  const used = '\nconst show = () => [last, other]'
 
-  it('reports a prop read at the top of the script, outside any function', () => {
-    expect(found('const last = items.length - 1')).toEqual([{ code: 'once-read-prop', severity: 'warning', at: 'items' }])
-    expect(found('if (items.length > 1) console.log(1)\nconsole.log(size)')).toHaveLength(2)
-    expect(found('const a = items[0] + items[1]')).toHaveLength(2)
-    expect(found('const wide = { size }')).toHaveLength(1)
+  it('reports a prop read into a const that a function or the template reads later', () => {
+    expect(found(`const last = items.length - 1${used}`)).toEqual([{ code: 'once-read-prop', severity: 'warning', at: 'items' }])
+    expect(found('const last = items.length - 1', undefined, 'p {last}')).toHaveLength(1)
+    expect(found('let last = items.length\nconst other = 1\nconst show = memo(() => last)')).toHaveLength(1)
+    expect(found(`const last = items[0] + items[1]${used}`)).toHaveLength(2)
+    expect(found(`const last = { size }${used}`)).toHaveLength(1)
+    expect(found(`const last = \`\${size}!\`${used}`)).toHaveLength(1)
+    expect(found(`const last = await items${used}`)).toHaveLength(1)
+    expect(found(`const { first: last } = items${used}`)).toHaveLength(1)
+    expect(found(`const last = items.map(item => item)${used}`)).toHaveLength(1)
   })
 
-  it('leaves a read inside a function, a memo, an effect, a handler and a nested arrow alone', () => {
-    expect(found('const last = memo(() => items.length - 1)')).toEqual([])
-    expect(found('effect(() => console.log(items))')).toEqual([])
-    expect(found('function pick() {\n  return items[0]\n}')).toEqual([])
-    expect(found('const click = () => items.map(item => item + size)')).toEqual([])
-    expect(found('const obj = { onClick() { return items } }')).toEqual([])
+  it('leaves a const nothing reads later alone', () => {
+    expect(found('const last = items.length - 1')).toEqual([])
+    expect(found('const last = items.length - 1\nconst after = last + 1')).toEqual([])
   })
 
-  it('leaves an initial value of signal() and persisted() alone', () => {
-    expect(found('const open = signal(items.length > 0)')).toEqual([])
-    expect(found('const open = persisted(size, items.length)')).toEqual([])
-    expect(found('const open = signal(0)\nconst n = items.length')).toHaveLength(1)
+  it('leaves a read in a test, a call argument, a statement or a write alone', () => {
+    expect(found(`const last = size === 'md' ? 1 : 2${used}`)).toEqual([])
+    expect(found(`const last = items ? 1 : 2${used}`)).toEqual([])
+    expect(found(`const last = size ? items : size${used}`)).toHaveLength(2)
+    expect(found(`const last = make(items, { size })${used}`)).toEqual([])
+    expect(found(`const last = new Set(items)${used}`)).toEqual([])
+    expect(found(`if (items.length > 1) console.log(1)\nif (size) throw new Error(size)\nconst last = 1${used}`)).toEqual([])
+    expect(found(`let last = 0\nlast = items.length${used}`)).toEqual([])
+    expect(found(`let last = 0\nlast += items.length${used}`)).toEqual([])
+    expect(found(`let last = 0\nitems++${used}`)).toEqual([])
+    expect(found(`let last = 0\n;[items] = [[]]${used}`)).toEqual([])
+    expect(found(`let other = 0\nlet last = (items = [])${used}`)).toEqual([])
   })
 
-  it('leaves a callback prop, a posted reader and an id made once alone', () => {
-    expect(found('const given = onPick ? 1 : 2', 'items, onPick')).toEqual([])
-    expect(found('const sent = postedValue(size, items)')).toEqual([])
-    expect(found('const id = size ?? uid()')).toEqual([])
-    expect(found('const id = size || uid()')).toHaveLength(1)
+  it('leaves a read inside a function, a memo, an effect, a handler, a class and a type alone', () => {
+    expect(found('const last = memo(() => items.length - 1)\nconst show = () => last')).toEqual([])
+    expect(found('const last = effect(() => console.log(items))\nconst show = () => last')).toEqual([])
+    expect(found('function last() {\n  return items[0]\n}\nconst show = () => last')).toEqual([])
+    expect(found(`const last = { onClick() { return items } }${used}`)).toEqual([])
+    expect(found(`const last = class { field = items }${used}`)).toEqual([])
+    expect(found(`type Row = typeof items\nconst last = 1 as unknown as typeof items${used}`)).toEqual([])
+  })
+
+  it('leaves signal() and persisted() initial values, a posted reader and an id made once alone', () => {
+    expect(found(`const last = signal(items.length > 0)${used}`)).toEqual([])
+    expect(found(`const last = persisted(size, items.length)${used}`)).toEqual([])
+    expect(found(`const last = postedValue(size, items)${used}`)).toEqual([])
+    expect(found(`const last = size ?? uid()${used}`)).toEqual([])
+    expect(found(`const last = size || uid()${used}`)).toHaveLength(1)
+    expect(found(`const last = foo(items) ?? uid()${used}`)).toEqual([])
+    expect(found(`const last = items.at(0) ?? uid()${used}`)).toHaveLength(1)
   })
 
   it('reports a renamed prop under its local name, keeps watching one with a default, and skips the default itself', () => {
-    expect(found('const n = heading.length', 'items: heading')).toEqual([{ code: 'once-read-prop', severity: 'warning', at: 'heading' }])
-    expect(found('const n = size.length')).toHaveLength(1)
-    expect(found('', 'items, size = items[0]')).toEqual([])
+    expect(found(`const last = heading.length${used}`, 'items: heading')).toEqual([{ code: 'once-read-prop', severity: 'warning', at: 'heading' }])
+    expect(found(`const last = size.length${used}`)).toHaveLength(1)
+    expect(found(`const last = 1${used}`, 'items, size = items[0]')).toEqual([])
   })
 
-  it('watches nothing for a rest element, a whole props name or an initial*, default* prop', () => {
-    expect(found('const n = rest.length', '...rest')).toEqual([])
-    expect(lints(`---\nimport { signal } from 'kay'\n\nconst props = props<{ items: string[] }>()\nconst n = props.items.length\nconst s = signal(0)\n---\np x`).filter(d => d.code === 'once-read-prop')).toEqual([])
-    expect(found('const a = initialOpen\nconst b = defaultValue', 'initialOpen, defaultValue')).toEqual([])
+  it('watches nothing for a rest element, a whole props name or an initial*, default*, on* prop', () => {
+    expect(found(`const last = rest.length${used}`, '...rest')).toEqual([])
+    expect(lints(`---\nimport { signal } from 'kay'\n\nconst props = props<{ items: string[] }>()\nconst last = props.items.length\nconst show = () => last\n---\np x`).filter(d => d.code === 'once-read-prop')).toEqual([])
+    expect(found(`const last = initialOpen\nconst other = defaultValue + onPick${used}`, 'initialOpen, defaultValue, onPick')).toEqual([])
   })
 
-  it('leaves a shadowing local, a member name, an object key and a type alone', () => {
-    expect(found('for (const items of [[1]])\n  console.log(items)')).toEqual([])
-    expect(found('const a = other.items\nconst b = { items: 1 }\nconst c = other?.size')).toEqual([])
-    expect(found('type Row = typeof items\nconst c = 1 as unknown as typeof items')).toEqual([])
+  it('leaves a name declared again anywhere in the script, a member name and an object key alone', () => {
+    expect(found(`for (const items of [[1]])\n  console.log(items)\nconst last = items.length${used}`)).toEqual([])
+    expect(found(`const last = other.items + { items: 1 }.items + other?.size${used}`)).toEqual([])
   })
 
   it('reports only where the script runs in the browser', () => {
@@ -1476,17 +1498,20 @@ describe('once-read-prop', () => {
 
     expect(lints(plain).filter(d => d.code === 'once-read-prop')).toEqual([])
     expect(lints(plain, { insideIsland: true }).filter(d => d.code === 'once-read-prop')).toHaveLength(1)
-    expect(promotedChecks(plain).filter(d => d.code === 'once-read-prop')).toHaveLength(1)
+    expect(onceReadChecks(plain)).toHaveLength(1)
+    expect(promotedChecks(plain).filter(d => d.code === 'once-read-prop')).toEqual([])
   })
 
   it('has nothing to say about a component without a script or a page', () => {
     expect(lints('p hello').filter(d => d.code === 'once-read-prop')).toEqual([])
-    expect(lints('--- server\nconst { id } = props<{ id: string }>()\nconst n = id.length\n---\np {n}').filter(d => d.code === 'once-read-prop')).toEqual([])
+    expect(lints('--- server\nconst { id } = props<{ id: string }>()\nconst n = id.length\nconst show = () => n\n---\np {n}').filter(d => d.code === 'once-read-prop')).toEqual([])
   })
 
-  it('is allowed by a kay-allow comment', () => {
-    expect(found('// kay-allow once-read-prop\nconst last = items.length - 1')).toEqual([])
-    expect(found('const last = items.length - 1 // kay-allow once-read-prop')).toEqual([])
-    expect(found('// kay-allow-file once-read-prop\nconst last = items.length - 1')).toEqual([])
+  it('is allowed by a kay-allow comment, with or without a reason, and by a lints level', () => {
+    expect(found(`// kay-allow once-read-prop\nconst last = items.length - 1${used}`)).toEqual([])
+    expect(found(`const last = items.length - 1 // kay-allow once-read-prop: the first one is meant${used}`)).toEqual([])
+    expect(found(`// kay-allow-file once-read-prop\nconst last = items.length - 1${used}`)).toEqual([])
+    expect(lints(island(`const last = items.length - 1${used}`), { lints: { 'once-read-prop': 'deny' } }).filter(d => d.code === 'once-read-prop')[0]?.severity).toBe('error')
+    expect(lints(island(`const last = items.length - 1${used}`), { lints: { 'once-read-prop': 'allow' } }).filter(d => d.code === 'once-read-prop')).toEqual([])
   })
 })

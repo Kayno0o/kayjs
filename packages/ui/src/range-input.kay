@@ -34,7 +34,7 @@ const { size = 'md', invalid, value = [null, null], min, max, step, label, fromL
 
 let low: HTMLInputElement | undefined
 let high: HTMLInputElement | undefined
-// kay-allow once-read-prop
+// kay-allow once-read-prop: the drag starts from the value the component was created with
 let last: RangeValue = value
 
 effect(() => {

@@ -18,7 +18,7 @@ import ResetButton from './reset-button.kay'
 // `denied`, from `denials`, lists the actions the signed-in person's role may not do, whose buttons are then disabled with the reason.
 const { form, denied = {} } = props<{ form: EntryForm, denied?: Denials }>()
 
-// kay-allow once-read-prop
+// kay-allow once-read-prop: the editor is made for one form, entry or collection
 const entry = form.stored
 const unsaved = () => form.dirty() ? wording('cms.share.dirty', 'Save or reset your edits first') : undefined
 ---

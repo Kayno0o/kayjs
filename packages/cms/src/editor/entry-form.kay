@@ -45,9 +45,7 @@ const unmarked = memo(() => named(false))
 const frozen = memo(() => named(true))
 
 const source = resource(entriesApi, '/:collection/:slug', {
-  // kay-allow once-read-prop
   params: { collection: entry.collection, slug: entry.slug },
-  // kay-allow once-read-prop
   query: entry.locale === undefined ? {} : { locale: entry.locale },
 })
 // A single collection's entry is the collection: no slug under its title, its locale still shown. Until the collection is known its slug is taken for a single one's when it is `index`, the only slug a single entry has, so that slug never flashes.
@@ -55,7 +53,6 @@ const isSingle = () => { const loaded = source.value(); return loaded === undefi
 const collectionName = () => collectionTitle({ name: entry.collection, title: source.value()?.collection.title })
 const subtitle = memo(() => isSingle() ? entry.locale : entry.locale === undefined ? collectionName() : `${collectionName()} (${entry.locale})`)
 // The page editor asks no author and is listed with no name. The server strips the names of the room it joins for an edit link's holder, who is only counted, and sends them to an editor the app's guard let in.
-// kay-allow once-read-prop
 const room = entryRoom(entry.collection, entry, { name: '', page: true })
 const saving = signal(false)
 // Set once the entry is deleted, which locks its form until the page has moved on.
@@ -67,7 +64,6 @@ const lastSave = signal<SavedState>()
 const onSaved = savedHandler(() => source.value()?.entry.url, saved => lastSave = saved, rebuildFinished)
 onCleanup(onSaved.stop)
 // A click on the page types in the entry's text fields there while this form stands.
-// kay-allow once-read-prop
 onCleanup(registerInline(entryKey(entry), { collection: () => source.value()?.collection, failed: () => source.status() === 'failed', busy: () => saving() || removed() }))
 // What the signed-in person's role may not do, which locks the fields it covers once the server has said.
 const can = resource(editorApi, '/can')
@@ -205,7 +201,6 @@ async function save(): Promise<boolean> {
 
 // Publish and Unpublish change the draft flag alone: with edits not saved they refuse, saving nothing, and a refused save puts the flag back.
 const draftField = () => source.value()?.collection.draftField
-// kay-allow once-read-prop
 const stages = createReview(entry, undefined, drafts)
 
 effect(() => {
@@ -265,7 +260,6 @@ async function remove(): Promise<void> {
 }
 
 saveShortcut(save)
-// kay-allow once-read-prop
 onCleanup(registerSaver(entry, { pending: () => unsaved() && !saving() && !removed(), save }))
 ---
 PageSection.kcms-entry(title={isSingle() ? collectionName() : title()} level={3} subtitle={subtitle()} sticky aria-busy={saving()} ref={element => box = element})

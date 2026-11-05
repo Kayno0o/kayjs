@@ -113,7 +113,7 @@ effect(() => {
     picked = next
 })
 
-// kay-allow once-read-prop
+// kay-allow once-read-prop: a list or a loader is chosen when the component is created
 const remote = typeof options === 'function'
 const found = signal<readonly MultiSelectOption<Value>[]>([])
 // The text the answer held in `found` is for, and whether the last ask was rejected.
@@ -224,7 +224,6 @@ function set(next: Value[]) {
 }
 
 // What a reset goes back to: the values it started with, or the ones last saved by a SaveForm.
-// kay-allow once-read-prop
 const initial = defaultKept<readonly Value[]>(() => root, picked, value)
 
 // A reset puts the boxes back on their defaults, which are not the picked values; the control goes back to `initial` with an empty search and tells the app.

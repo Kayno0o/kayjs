@@ -28,7 +28,7 @@ const { list, margin, loadingLabel = wording('ui.loadMore.loading', 'Loading mor
 const added = signal(0)
 // Flips with each page, so two pages of one size still change the text a screen reader watches.
 const flip = signal(false)
-// kay-allow once-read-prop
+// kay-allow once-read-prop: the count the list started at
 let seen = list.rows().length
 
 effect(() => {

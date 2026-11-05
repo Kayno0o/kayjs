@@ -7,18 +7,14 @@ import { editorsOf, openRoom, watchRoom } from '../room'
 // Who else has an entry open: their names when `cms({ author })` gives them, else how many they are. `room` and `member` come from `entryPresence`, or from `entryRoom` with `page: true` for the on-page editor, which asks no author.
 // The server sends the names of the entry's room to an editor the app's guard let in alone, the on-page editor's included, and an edit link's holder is sent the members with none, so counts only. The room that holds no name counts everyone.
 const { room, member } = props<{ room: string, member: Member }>()
-// kay-allow once-read-prop
+// kay-allow once-read-prop: the editor is made for one form, entry or collection
 const onPage = member.page === true
-// kay-allow once-read-prop
 const open = openRoom(room)
-// kay-allow once-read-prop
 const nameless: Member = onPage ? member : { name: '' }
 const everyone = presence(open, nameless)
 // Also listed in the rooms a list watches the entry through, which nothing here shows: a room is joined by reading it.
 const watchedBy = presence(watchRoom(open), nameless)
-// kay-allow once-read-prop
 const named = presence(room, member)
-// kay-allow once-read-prop
 const namedWatchedBy = presence(watchRoom(room), member)
 
 effect(() => void watchedBy.count())

@@ -9,9 +9,7 @@ const entries: PaletteEntry[] = [
   { label: 'Table', group: 'Pages', href: '/table' },
   { label: 'Content', group: 'Pages', href: '/content', keywords: 'cards badges' },
   { label: 'Docs', group: 'Links', href: 'https://kaynooo.fr', external: true },
-  // kay-allow once-read-prop
   ...hostile ? [{ label: 'Hostile', group: 'Pages', href: 'javascript:alert(1)' }] : [],
-  // kay-allow once-read-prop
   ...loose ? [{ label: 'Tab left', group: 'Pages', href: '/tab-left' }] : [],
   { label: 'New moon', group: 'Actions', icon: 'plus', onSelect: () => onAction('new-moon') },
 ]
