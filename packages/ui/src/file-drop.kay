@@ -1,11 +1,10 @@
 ---
 import type { JSX, Snippet } from 'kay'
 import type { ByteSize } from 'kay/library'
-import { listen, recipe, signal, uid } from 'kay'
+import { byteCount, listen, recipe, signal, uid } from 'kay'
 import { wording } from 'kay/words'
 import { acceptsFile } from './accept'
 import { FIELD_MESSAGE, GROUP_INVALID } from './field-look'
-import { fileSizeLimit, fileSizeText } from './file-size'
 import { onFormReset } from './form-reset'
 import { fieldIssues, fieldNamed } from './forms'
 import IconButton from './icon-button.kay'
@@ -76,6 +75,28 @@ const keeping = () => name !== undefined || list
 const reporting = () => name !== undefined || issue !== undefined
 const marked = () => invalid === true || messages().length > 0
 
+// The bytes a `maxSize` stands for; no limit without one.
+function sizeLimit(): number {
+  if (maxSize === undefined)
+    return Number.POSITIVE_INFINITY
+
+  const bytes = byteCount(maxSize)
+
+  if (bytes === undefined)
+    throw new Error(`kay: the maxSize of FileDrop is ${JSON.stringify(maxSize)}; it takes a positive size, bytes or a string such as '2mb'`)
+
+  return bytes
+}
+
+// A file's size for a list, in the unit that keeps it short.
+function sizeText(bytes: number): string {
+  if (bytes < 1024)
+    return `${bytes} B`
+
+  return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+
 function open() {
   input?.click()
 }
@@ -110,7 +131,7 @@ function take(files: Iterable<File>, reporting = true): boolean {
   if (disabled)
     return false
 
-  const limit = fileSizeLimit(maxSize)
+  const limit = sizeLimit()
   const all = [...files]
   const wrongType = all.filter(file => !acceptsFile(accept, file))
   const typed = all.filter(file => !wrongType.includes(file))
@@ -218,7 +239,7 @@ if list || reporting()
         for file of chosen() key={`${file.name}\n${file.size}\n${file.lastModified}`}
           li(part="file")
             span(part="fileName") {file.name}
-            span(part="fileSize") {fileSizeText(file.size)}
+            span(part="fileSize") {sizeText(file.size)}
             IconButton(icon="close" size="xs" variant="ghost" label={removeLabel ? removeLabel(file) : wording('ui.fileDrop.remove', 'Remove {file}', { file: file.name })} disabled={disabled} onClick={() => remove(file)})
     if reporting()
       span(part="issues" id={messages().length > 0 ? issuesId : undefined} aria-live="polite" data-field={name})

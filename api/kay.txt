@@ -194,6 +194,9 @@ interface BeforeNavigate
 [.] Bindable
 type Bindable<T> = (T & BindableMark) | Extract<T, null | undefined>
 
+[.] byteCount
+function byteCount(value: unknown): number | undefined
+
 [.] call
 function call<Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<Answered<Received<MethodRoute<Module, Path, Chosen<M>>>>>
 

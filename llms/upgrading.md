@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.90.0
 
+### FileDrop is a form control
+
+- kayjs-ui FileDrop's `onReject(files, reason)` is called once per reason (`type`, `size`, `count`) instead of once with every file left out, so a toast counting the refused files fires once per reason; `kay check` cannot see it, the type being unchanged. Its `onChange` is the kept-files callback, no longer the root `div`'s DOM `onChange`: a handler reading an event there stops working, with no safe fix, so move it to a wrapping element.
+
 ### One name, one meaning
 
 - kayjs-mail's `cssColours` is `cssColors`, the spelling `colorField` and the `color` props use. The old name works until 1.93, and `kay check` flags an import of it as `deprecated-export-names`, with a safe fix that `kay upgrade` applies.

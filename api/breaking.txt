@@ -24,6 +24,7 @@ cms [.] FormScope
 ui [./audio-player.kay] default
 ui [./avatar.kay] default
 ui [./combobox.kay] default
+ui [./file-drop.kay] default
 ui [./form-dialog.kay] default
 ui [./icon-picker.kay] default
 ui [./image-cropper.kay] default

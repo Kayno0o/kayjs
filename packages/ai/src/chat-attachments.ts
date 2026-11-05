@@ -1,20 +1,16 @@
 import type { ByteSize } from 'kay/library'
-import { signal } from 'kay'
+import { byteCount, signal } from 'kay'
 
 const DEFAULT_MAX_SIZE = 5 * 1024 * 1024
-const SIZE_TEXT = /^(\d+(?:\.\d+)?)(b|kb|mb)$/i
-const UNIT_BYTES = { b: 1, kb: 1024, mb: 1024 * 1024 }
 
-// The bytes a `maxSize` stands for, 5 MB when none is given: bytes or `'2mb'`, parsed here as the browser cannot load kay's own parser.
+// The bytes a `maxSize` stands for, 5 MB when none is given: bytes or `'2mb'`.
 export function fileSizeLimit(size: ByteSize | undefined, key = 'maxSize'): number {
   if (size === undefined)
     return DEFAULT_MAX_SIZE
 
-  const text = typeof size === 'string' ? SIZE_TEXT.exec(size) : null
-  const fromText = text ? Number(text[1]) * UNIT_BYTES[text[2]!.toLowerCase() as keyof typeof UNIT_BYTES] : Number.NaN
-  const bytes = typeof size === 'number' ? size : fromText
+  const bytes = byteCount(size)
 
-  if (!Number.isFinite(bytes) || bytes <= 0)
+  if (bytes === undefined)
     throw new Error(`kay: the ${key} of Chat is ${JSON.stringify(size)}; it takes a positive size, bytes or a string such as '2mb'`)
 
   return bytes
