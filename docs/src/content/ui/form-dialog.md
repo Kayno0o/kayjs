@@ -75,7 +75,7 @@ FormDialog(
 )
 ```
 
-`extra` fills the left end of the footer, for a [ConfirmDelete](/ui/confirm-delete) with `trigger="button"`.
+`extra` fills the left end of the footer, for a [ConfirmDelete](/ui/confirm-delete) with `triggerLook="button"`.
 
 <ReadMore href="/essentials/forms-and-actions">Actions and forms are covered in their own guide.</ReadMore>
 

@@ -42,7 +42,7 @@ FormDialog(open={editing()} title="Rename" action={rename} submitLabel="Rename" 
 - `rowEditing<Row, Draft>()`, from the package, keeps which row one dialog adds or edits for a list: `edit(row)` opens it on a row, `create(draft)` on what a new row starts from, `close` shuts it, forgetting both, and `open()`, `row()` and `draft()` read it: `FormDialog(open={friend.open()} title={friend.row() ? 'Edit friend' : 'Add friend'} ... onOpenChange={friend.close})`. Without `Draft`, `create()` takes nothing.
 - The submit button sits in the footer, paired with the form by `id`. Without an `id`, it draws one unique on the page.
 - Enter submits from a single-line field, and Ctrl+Enter from a textarea. While the call is under way, the buttons are disabled, and Escape or a click outside leaves the dialog open.
-- `extra` fills the left end of the footer, for a ConfirmDelete with `trigger="button"`.
+- `extra` fills the left end of the footer, for a ConfirmDelete with `triggerLook="button"`.
 
 SaveForm is the form of an editor page: `SaveForm(action={rename} failureLabel="Could not save" saved="Saved.")` around the fields, each control named as for FormDialog, draws a sticky bar with a status line, Discard and Save.
 
@@ -62,7 +62,7 @@ A form in steps keeps the step in the URL: `Steps(steps={[{ key: 'account', labe
 FormField also works outside a dialog, in a plain form posting to an action:
 
 - `issue` shows a message of the page's own, such as `rename.failed()?.errors.title`.
-- `hint` explains the control, under it. `action` sits at the end of the label's line. `required` marks the label with a `*` hidden from screen readers, which read the control's own `required`.
+- `hint` explains the control, under it. `@actions` sits at the end of the label's line. `required` marks the label with a `*` hidden from screen readers, which read the control's own `required`.
 - The label holds only the label's text and the control, so the hint, the messages and the action stay out of the control's accessible name.
 - Inside an island, as in a FormDialog, the control's `aria-describedby` gains the hint and, while one shows, the messages, beside the ids it had, and the control is `aria-invalid` while a message shows. A FormDialog refusing a field focuses the first one marked so. On a static page, kay marks the fields of a refused plain post `aria-invalid` itself.
 - `group` makes it a `fieldset` with a `legend`, for a control made of several inputs.

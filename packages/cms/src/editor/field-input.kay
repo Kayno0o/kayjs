@@ -419,7 +419,7 @@ function leaveJson(): void {
         if issue()
           span(data-part="issue" class={FIELD_MESSAGE.issue}) {issue()}
     when 'list'
-      FormField(label={current.label} hint={[current.hint, boundsText()].filter(Boolean).join(' ') || undefined} issue={issue()} required={starred()} group action={countText()})
+      FormField(label={current.label} hint={[current.hint, boundsText()].filter(Boolean).join(' ') || undefined} issue={issue()} required={starred()} group actions={countText()})
         .kcms-list(ref={element => box = element})
           if count() > 0
             .kcms-list-tools
@@ -480,10 +480,10 @@ function leaveJson(): void {
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
         Textarea(rows="4" placeholder={current.placeholder} value={items().join('\n')} onInput={typedLines} onBlur={() => touched = true})
     when 'textarea'
-      FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} action={counter()})
+      FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} actions={counter()})
         Textarea(rows={current.rows ?? 4} placeholder={current.placeholder} ref={element => grow(element, current.rows)} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength})
     when 'markdown'
-      FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} action={counter()})
+      FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} actions={counter()})
         MarkdownEditor(toolbar={markdown.toolbar} previewClass={markdown.previewClass} preview={source => previewMarkdown(source, entry)} previewTrusted value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} onImage={uploadRefused() === undefined ? async file => (await uploadFile(entry.collection, file)).path : undefined})
     when 'number', 'integer'
       FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})
@@ -528,6 +528,6 @@ function leaveJson(): void {
       FormField(label={current.label} hint={current.hint ?? 'JSON'} issue={issue()} required={starred()})
         Textarea.kcms-json(rows="4" value={jsonShown()} onInput={setJson} onFocus={() => jsonFocused = true} onBlur={leaveJson})
     else
-      FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} action={counter()})
+      FormField(label={current.label} hint={hinted()} issue={issue()} required={starred()} actions={counter()})
         Adorned(prefix={current.prefix} suffix={current.suffix})
           TextInput(type={current.inputType ?? 'text'} placeholder={current.placeholder} value={text()} onInput={typed} onBlur={() => touched = true} required={starred()} minlength={current.limits?.minLength} maxlength={current.limits?.maxLength} pattern={htmlPattern(current.limits?.pattern)})

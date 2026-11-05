@@ -10,7 +10,7 @@ Pass `disabled` while something else is busy, such as a save running. It disable
 
 ## A labelled button
 
-`trigger="button"` draws a labelled danger button instead of the icon, and `label` renames it for a delete the reader knows by another name.
+`triggerLook="button"` draws a labelled danger button instead of the icon, and `label` renames it for a delete the reader knows by another name.
 
 <Demo name="confirm-delete/button" />
 
@@ -52,13 +52,13 @@ A deletion made with `call()` throws an `ApiError` when the route refuses. It is
 
 ## Opened by the app
 
-`open` shows the dialog or the armed pair when your code sets it, so a [Menu](/ui/menu) entry, a context menu or a shortcut can ask for the confirmation. With `trigger="none"` the component draws no trigger of its own. `onOpenChange(false)` follows a cancel, Escape and a delete that went through, to set `open` back to `false`; it does not run for a change your code made. An inline ask opened this way gives the focus back to the element that held it before.
+`open` shows the dialog or the armed pair when your code sets it, so a [Menu](/ui/menu) entry, a context menu or a shortcut can ask for the confirmation. With `triggerLook="none"` the component draws no trigger of its own. `onOpenChange(false)` follows a cancel, Escape and a delete that went through, to set `open` back to `false`; it does not run for a change your code made. An inline ask opened this way gives the focus back to the element that held it before.
 
 ```kay
 Menu(label="Row" icon="menu" items={[{ label: 'Delete', tone: 'danger', onSelect: () => asking = true }]})
-ConfirmDelete(trigger="none" open={asking()} onOpenChange={open => asking = open} message="Delete this row?" failureLabel="Could not delete" onConfirm={remove})
+ConfirmDelete(triggerLook="none" open={asking()} onOpenChange={open => asking = open} message="Delete this row?" failureLabel="Could not delete" onConfirm={remove})
 ```
 
 ## Attributes
 
-Other attributes, such as a `data-testid` or an `aria-describedby`, go on the trigger. A `trigger="none"` has none to receive them.
+Other attributes, such as a `data-testid` or an `aria-describedby`, go on the trigger. A `triggerLook="none"` has none to receive them.

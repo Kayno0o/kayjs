@@ -729,6 +729,7 @@ component default
   hash?: false | string | undefined
   history?: number | undefined
   icon?: Element
+  icons?: (Partial<Record<"attach" | "edit" | "new" | "record" | "regenerate" | "send" | "stop", IconProps | IconSlot>> & Partial<Record<"close" | "collapse" | "expand" | "open", IconProps | IconSlot | undefined>>) | undefined
   images?: string | string[] | undefined
   initial?: ChatTurn[] | undefined
   keep?: number | undefined
@@ -943,6 +944,7 @@ component default
   footer?: Element
   greeting?: string | undefined
   history?: number | undefined
+  icons?: Partial<Record<"attach" | "edit" | "new" | "record" | "regenerate" | "send" | "stop", IconProps | IconSlot>> | undefined
   images?: string | string[] | undefined
   initial?: ChatTurn[] | undefined
   keep?: number | undefined

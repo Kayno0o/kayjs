@@ -25,7 +25,7 @@ const look = recipe({
   },
 })
 
-const { label, name, issue, hint, required = false, group = false, size = 'md', action, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { label, name, issue, hint, required = false, group = false, size = 'md', actions, action, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   label: string
   // The field the control posts as: inside a FormDialog, the message its call was refused with for that field shows here.
   name?: string | undefined
@@ -37,8 +37,12 @@ const { label, name, issue, hint, required = false, group = false, size = 'md', 
   // A control made of several inputs, such as a picker, is a labelled group rather than one label.
   group?: boolean | undefined
   // Sits on the label's line, pushed right: a preset button, a unit, a count.
+  actions?: Snippet
+  // Before 1.90 `actions` was called `action`; both work until 1.93 (`deprecated-ui-actions`).
   action?: Snippet
 }>()
+
+const ends = () => actions ?? action
 
 const small = () => size === 'sm'
 const reports = () => !small() || name !== undefined || issue !== undefined
@@ -57,9 +61,9 @@ if group
         if required
           span(part="required" aria-hidden="true") *
     slot
-    if action
+    if ends()
       span(part="action")
-        | {action}
+        | {ends()}
     if hint
       span(part="hint" id={links.hint}) {hint}
     if reports()
@@ -75,9 +79,9 @@ else
           if required
             span(part="required" aria-hidden="true") *
       slot
-    if action
+    if ends()
       span(part="action")
-        | {action}
+        | {ends()}
     if hint
       span(part="hint" id={links.hint}) {hint}
     if reports()

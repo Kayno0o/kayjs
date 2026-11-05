@@ -154,7 +154,7 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
         if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined && denied.publish !== undefined
           Refused(label={wording('cms.entry.unpublish', 'Unpublish')} reason={denied.publish})
         else if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined
-          ConfirmDelete(tone="neutral" trigger="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: row.title })} failureLabel={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => unpublish(row)})
+          ConfirmDelete(tone="neutral" triggerLook="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: row.title })} failureLabel={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => unpublish(row)})
         if actions.has('duplicate') && !collection.single && row.problem === undefined
           Button(label={wording('cms.table.duplicate', 'Duplicate')} aria-label={wording('cms.table.duplicateAria', 'Duplicate {title}', { title: row.title })} onClick={() => copy(row)})
         if actions.has('rename') && !collection.single && row.problem === undefined

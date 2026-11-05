@@ -16,7 +16,7 @@ const replies = signal(true)
 ---
 .grid.gap-4.sm:grid-cols-2
   Card(title="Traffic")
-    @head
+    @actions
       Badge(label="Live" tone="success")
     .flex.flex-col.gap-4
       Segmented(options={PERIODS} value={period()} label="Period" onChange={period.set})

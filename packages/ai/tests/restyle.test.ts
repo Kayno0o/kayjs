@@ -122,6 +122,14 @@ describe('the chat\'s icons from kayjs-ui\'s settings.icons', () => {
     expect(html).not.toContain('M12 5v14m6-8l-6-6m-6 6l6-6')
   })
 
+  test('the icons prop names the slot or icon a button draws, the others keeping their own', () => {
+    const at = html.indexOf('aria-label="Icons prop"')
+    const chat = html.slice(at, html.indexOf('kai-launcher', at))
+
+    expect(chat).toContain(body('square-x'))
+    expect(chat).not.toContain(body('rocket'))
+  })
+
   test('the launcher draws the app\'s chat, close, plus and expand slots, the collapse one showing once it is large', () => {
     const launcher = html.slice(html.indexOf('class="kai-launcher mb-2"'))
 

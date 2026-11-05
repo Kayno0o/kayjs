@@ -12,7 +12,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-tree-view', item: 'kui-tree-view-item', toggle: 'kui-tree-view-toggle', spinner: 'kui-tree-view-spinner animate-spin motion-reduce:animate-none', icon: 'kui-tree-view-icon', label: 'kui-tree-view-label', link: 'kui-tree-view-link', failed: 'kui-tree-view-failed', retry: 'kui-tree-view-retry', trailing: 'kui-tree-view-trailing' } })
 
-const { nodes, label, selected, expanded = [], onSelectedChange, onSelect, onOpenChange, onToggle, trailing, emptyLabel, empty, failureLabel = wording('ui.treeView.failure', 'Could not load.'), retryLabel = wording('ui.treeView.retry', 'Try again'), ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect' | 'onToggle'> & {
+const { nodes, label, selected, expanded = [], onSelectedChange, onSelect, onOpenChange, onToggle, actions, trailing, emptyLabel, empty, failureLabel = wording('ui.treeView.failure', 'Could not load.'), retryLabel = wording('ui.treeView.retry', 'Try again'), ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect' | 'onToggle'> & {
   nodes: readonly TreeNode<Id>[]
   // Names the tree for screen readers.
   label: string
@@ -31,7 +31,9 @@ const { nodes, label, selected, expanded = [], onSelectedChange, onSelect, onOpe
   onSelectedChange?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
   // The name before 1.87, called until 1.90 only when `onSelectedChange` is not given; `kay check` reports it as `deprecated-ui-callbacks`.
   onSelect?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
-  // Controls at the end of a row, such as a star or a count, dimmed away until the row is hovered or holds focus: `@trailing(node)`.
+  // Controls at the end of a row, such as a star or a count, dimmed away until the row is hovered or holds focus: `@actions(node)`.
+  actions?: Snippet<[TreeNode<Id>]> | undefined
+  // Before 1.90 `actions` was called `trailing`; both work until 1.93 (`deprecated-ui-actions`).
   trailing?: Snippet<[TreeNode<Id>]> | undefined
   // What the component reads with nothing to show; `empty` replaces it with the app's own markup, such as a link to add the first one: an `@empty` block.
   emptyLabel?: string | undefined
@@ -307,8 +309,8 @@ else
         if failed().has(row.node.id)
           span(part="failed" role="alert") {failureLabel}
           button(part="retry" type="button") {retryLabel}
-        if trailing
+        if actions ?? trailing
           span(part="trailing")
-            | {trailing(row.node)}
+            | {(actions ?? trailing)!(row.node)}
   if hasMenu()
     Menu(items={menu()?.items ?? []} label={menu()?.name ?? label} at={menu()?.at ?? { x: 0, y: 0 }} open={menu() !== undefined} onOpenChange={shown => { if (!shown) menu = undefined }})

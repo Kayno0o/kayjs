@@ -24,7 +24,7 @@ const EDITS: Record<ToolbarAction, (text: string, start: number, end: number) =>
 
 const look = recipe({ parts: { wrap: 'kui-markdown', grid: 'kui-markdown-grid', root: 'kui-markdown-editor', bar: 'kui-markdown-bar', barFailed: 'kui-markdown-bar-failed', extra: 'kui-markdown-extra flex flex-wrap items-center gap-0.5' } })
 
-const { value = '', invalid, onInput, onImage, onImageError, toolbar = true, toolbarExtra, preview, previewing, onPreviewChange, previewTrusted = false, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
+const { value = '', invalid, onInput, onImage, onImageError, toolbar = true, actions, toolbarExtra, preview, previewing, onPreviewChange, previewTrusted = false, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
   // Marks the editor as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
   // The text to start with; an editor whose parent passes other text follows it.
@@ -41,6 +41,8 @@ const { value = '', invalid, onInput, onImage, onImageError, toolbar = true, too
   // `image` opens the file picker when `onImage` is given, else writes an image to fill in.
   toolbar?: boolean | readonly ToolbarAction[] | undefined
   // Your own buttons after the built-in ones: `tools` changes the field as the built-in buttons do, undone with Ctrl+Z. Each is a Tab stop of its own, and shows with `toolbar={false}` too.
+  actions?: Snippet<[tools: ToolbarTools]> | undefined
+  // Before 1.90 `actions` was called `toolbarExtra`; both work until 1.93 (`deprecated-ui-actions`).
   toolbarExtra?: Snippet<[tools: ToolbarTools]> | undefined
   // Renders the text as the page shows it, as HTML, on the server: given, a Preview button shows it beside the field, or in place of it on a narrow one. The HTML goes through `sanitizeHtml`, keeping images and tables, unless `previewTrusted` is set.
   preview?: ((markdown: string) => Promise<string>) | undefined
@@ -85,7 +87,7 @@ function isImage(file: File): boolean {
   return file.type.startsWith('image/')
 }
 
-function actions(): readonly ToolbarAction[] {
+function builtIn(): readonly ToolbarAction[] {
   const chosen = toolbar
 
   if (typeof chosen === 'boolean')
@@ -124,7 +126,7 @@ async function loadView<View>(load: () => Promise<{ default: View }>, keep: (vie
 
 // Follows `toolbar` and `preview`, which a parent may change after mount; a chunk that failed is not tried again on each change.
 effect(() => {
-  if ((actions().length > 0 || preview) && untrack(toolbarView).length === 0 && !untrack(toolbarFailed))
+  if ((builtIn().length > 0 || preview) && untrack(toolbarView).length === 0 && !untrack(toolbarFailed))
     void loadView(async () => import('./internal/markdown-toolbar.kay'), view => toolbarView = [view], () => toolbarFailed = true)
 })
 
@@ -171,7 +173,9 @@ function togglePreview(): void {
   onPreviewChange?.(next)
 }
 
-// What `toolbarExtra` gets: the field's selection and an edit through the same path as the built-in buttons.
+const own = () => actions ?? toolbarExtra
+
+// What `actions` gets: the field's selection and an edit through the same path as the built-in buttons.
 const tools: ToolbarTools = {
   selection: () => ({ start: area?.selectionStart ?? 0, end: area?.selectionEnd ?? 0, text: area?.value.slice(area.selectionStart, area.selectionEnd) ?? '' }),
   edit({ text, start, end, selectionStart, selectionEnd }) {
@@ -399,15 +403,15 @@ const previewParts = () => previewClass === undefined ? undefined : { body: prev
 div(part="wrap")
   div(part="grid" data-preview={previewShown() ? '' : undefined})
     textarea.kui-field-input(part="root" {...rest} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} onInput={event => { heard(event.currentTarget.value); text = event.currentTarget.value; onInput?.(event.currentTarget.value) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
-    if actions().length > 0 || preview || toolbarExtra
+    if builtIn().length > 0 || preview || own()
       div(part="bar" role="toolbar" aria-label={wording('ui.markdownEditor.toolbar', 'Formatting')})
         if toolbarFailed()
           span(part="barFailed" role="alert") {wording('ui.markdownEditor.toolbarFailure', 'The toolbar could not be loaded')}
         for View of toolbarView() key={View}
-          View(actions={actions()} hasPreview={preview !== undefined} previewing={previewShown()} onAction={action => action === 'image' ? pickImage() : runAction(action)} onPreview={togglePreview})
-        if toolbarExtra
+          View(actions={builtIn()} hasPreview={preview !== undefined} previewing={previewShown()} onAction={action => action === 'image' ? pickImage() : runAction(action)} onPreview={togglePreview})
+        if own()
           div(part="extra")
-            | {toolbarExtra(tools)}
+            | {own()!(tools)}
     if previewShown() && preview
       for View of previewView() key={View}
         View(text={text()} render={preview} trusted={previewTrusted} class={previewParts()})

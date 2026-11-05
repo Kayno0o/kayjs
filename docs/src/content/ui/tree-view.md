@@ -24,7 +24,7 @@ The address is compared with the `href` as you wrote it, so on a site with a loc
 
 ## Row controls
 
-A `@trailing(node)` block draws controls at the end of each row, such as a star or a count. They are hidden until the row is hovered or holds focus, and always shown on a touch screen. While hidden they are out of the tab order, so Tab reaches the controls of the focused row only. A click or a key on them never selects the row or moves in the tree.
+A `@actions(node)` block draws controls at the end of each row, such as a star or a count. They are hidden until the row is hovered or holds focus, and always shown on a touch screen. While hidden they are out of the tab order, so Tab reaches the controls of the focused row only. A click or a key on them never selects the row or moves in the tree.
 
 ## Context menu
 

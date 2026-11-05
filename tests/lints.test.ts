@@ -1600,3 +1600,52 @@ describe('deprecated-ui-failures', () => {
     expect(found('SaveForm(onSave={run})')).toEqual([])
   })
 })
+
+describe('deprecated-ui-actions', () => {
+  const imports = ['card', 'form-field', 'app-header', 'tree-view', 'markdown-editor', 'confirm-delete'].map(file => `import ${file.split('-').map(word => word[0]!.toUpperCase() + word.slice(1)).join('')} from '@kaynooo/kayjs-ui/${file}.kay'\n`).join('')
+  const found = (template: string, code = 'deprecated-ui-actions') => {
+    const source = `---\n${imports}---\n${template}\n`
+    const result = compileKay(source, 'actions.kay', { check: true })
+
+    return result.diagnostics.filter(d => d.code === code).map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
+  }
+
+  it('renames the block each component named differently', () => {
+    expect(found('Card(title="x")\n  @head\n    p y')).toEqual([{ at: 'head', fix: ['head->actions'] }])
+    expect(found('FormField(label="x")\n  @action\n    p y\n  input')).toEqual([{ at: 'action', fix: ['action->actions'] }])
+    expect(found('AppHeader(links={[]} current="/" label="x")\n  @end\n    p y')).toEqual([{ at: 'end', fix: ['end->actions'] }])
+    expect(found('TreeView(nodes={[]} label="x")\n  @trailing(node)\n    p y')).toEqual([{ at: 'trailing', fix: ['trailing->actions'] }])
+    expect(found('MarkdownEditor()\n  @toolbarExtra(tools)\n    p y')).toEqual([{ at: 'toolbarExtra', fix: ['toolbarExtra->actions'] }])
+  })
+
+  it('renames the attribute, and a ConfirmDelete\'s trigger string', () => {
+    expect(found('ConfirmDelete(message="x" trigger="button" onConfirm={run})')).toEqual([{ at: 'trigger', fix: ['trigger->triggerLook'] }])
+    expect(found('Card(title="x" {head})')).toEqual([{ at: 'head', fix: ['{head}->actions={head}'] }])
+  })
+
+  it('leaves the new names, a rename already written and other tags alone', () => {
+    expect(found('Card(title="x")\n  @actions\n    p y')).toEqual([])
+    expect(found('ConfirmDelete(message="x" triggerLook="button" onConfirm={run})')).toEqual([])
+    expect(found('Card(title="x")\n  @head\n    p y\n  @actions\n    p z')).toEqual([{ at: 'head', fix: undefined }])
+    expect(found('Other()\n  @head\n    p y')).toEqual([])
+  })
+})
+
+describe('deprecated-chat-icons', () => {
+  const imports = 'import Chat from \'@kaynooo/kayjs-ai/chat.kay\'\nimport ChatLauncher from \'@kaynooo/kayjs-ai/chat-launcher.kay\'\n'
+  const found = (template: string) => {
+    const source = `---\n${imports}---\n${template}\n`
+    const result = compileKay(source, 'icons.kay', { check: true })
+
+    return result.diagnostics.filter(d => d.code === 'deprecated-chat-icons').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.length }))
+  }
+
+  it('reports each icon block of a Chat and a ChatLauncher, with no fix', () => {
+    expect(found('Chat(action={reply})\n  @sendIcon\n    span go\n  @editIcon\n    span e')).toEqual([{ at: 'sendIcon', fix: undefined }, { at: 'editIcon', fix: undefined }])
+    expect(found('ChatLauncher(action={reply})\n  @closeIcon\n    span x')).toEqual([{ at: 'closeIcon', fix: undefined }])
+  })
+
+  it('leaves icons and the other blocks alone', () => {
+    expect(found('Chat(action={reply} icons={{ send: \'plus\' }})\n  @footer\n    p y')).toEqual([])
+  })
+})

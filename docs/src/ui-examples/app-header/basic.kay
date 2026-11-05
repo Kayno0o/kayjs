@@ -11,5 +11,5 @@ const links = [
 AppHeader(links={links} current="/ui/app-header" label="Main" sticky={false})
   @brand
     strong kay
-  @end
+  @actions
     Avatar(name="Ada Lovelace" label="Ada Lovelace")

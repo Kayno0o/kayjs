@@ -7,7 +7,7 @@ async function publish() {
 ---
 ConfirmDelete(
   tone="neutral"
-  trigger="button"
+  triggerLook="button"
   label="Publish"
   message="Publishing sends the post to every subscriber."
   failureLabel="Could not publish"

@@ -158,8 +158,8 @@ SidePanel#linked-side(open={true} title="Linked panel" closeHref="/list")
   p Body
 SidePanel#beside(open={true} modal={false} closeHref="/list" title="Detail" onOpenChange={() => undefined})
   p detail
-ConfirmDelete#confirm-link(message="Sure?" trigger="link" onConfirm={() => undefined})
-ConfirmDelete#confirm-inline(message="Sure?" ask="inline" trigger="button" onConfirm={() => undefined})
+ConfirmDelete#confirm-link(message="Sure?" triggerLook="link" onConfirm={() => undefined})
+ConfirmDelete#confirm-inline(message="Sure?" ask="inline" triggerLook="button" onConfirm={() => undefined})
 SaveForm#save(dirty={false} onSave={() => undefined})
   p field
 CommandPalette#palette(entries={[]})
@@ -171,7 +171,7 @@ SiteNav#sitenav(label="Main" current="/" links={[{ href: '/', label: 'Home', ico
 AppHeader#appheader(label="App" current="/" links={[{ href: '/', label: 'Home' }]})
   @brand
     span brand
-  @end
+  @actions
     span end
 Pagination#pager(page={10} pages={20} url="/list")
 SplitLayout#split(sidebarTitle="Filters" resizableList)

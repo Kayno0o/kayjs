@@ -34,6 +34,17 @@ const FAILURE_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>
   'image-cropper': { errorLabel: 'failureLabel' },
   'ai-chat': { errorMessage: 'failureLabel' },
 }
+// The kayjs-ui props and blocks that are `actions` since 1.90, where the role is the controls a component holds beside its own: the rest of a Card's title line, a FormField's label line, an AppHeader's far end, a TreeView row's end and a MarkdownEditor's toolbar. A ConfirmDelete's `trigger` string is `triggerLook`, as `trigger` is a block elsewhere.
+const ACTIONS_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  'card': { head: 'actions' },
+  'form-field': { action: 'actions' },
+  'app-header': { end: 'actions' },
+  'tree-view': { trailing: 'actions' },
+  'markdown-editor': { toolbarExtra: 'actions' },
+  'confirm-delete': { trigger: 'triggerLook' },
+}
+// kayjs-ai's Chat and ChatLauncher drew each round button's icon from a block of its own before 1.90; `icons` names them all.
+const CHAT_ICON_BLOCKS: Readonly<Record<string, string>> = { sendIcon: 'send', stopIcon: 'stop', newIcon: 'new', attachIcon: 'attach', regenerateIcon: 'regenerate', editIcon: 'edit', recordIcon: 'record', icon: 'open', closeIcon: 'close', expandIcon: 'expand', collapseIcon: 'collapse' }
 // The kayjs-ui field tags that took the native `size` before 1.87, when `size` became `sm`, `md` or `lg`.
 const FIELD_TAGS = new Set(['text-input', 'select', 'combobox', 'date-input', 'time-input', 'date-time-input'])
 const NUMBER = /^\s*\d+\s*$/
@@ -877,11 +888,48 @@ class Validator {
       }
     }
 
+    const actionRenames = ACTIONS_RENAMES[file]
+
+    if (actionRenames !== undefined) {
+      for (const child of element.children) {
+        const old = child.kind === 'slot' ? this.text(child.name) : undefined
+        const renamed = old === undefined ? undefined : actionRenames[old]
+
+        if (child.kind !== 'slot' || old === undefined || renamed === undefined)
+          continue
+
+        const named = element.children.some(other => other.kind === 'slot' && this.text(other.name) === renamed) || element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === renamed)
+
+        this.lint(child.name, 'deprecated-ui-actions', `\`@${old}\` on \`${element.name}\` is \`@${renamed}\` since kayjs-ui 1.90, the one name for the controls a component holds`, named ? { help: `Drop \`@${old}\`, \`@${renamed}\` is there` } : { help: `Write \`@${renamed}\``, fixes: [{ title: `Write \`@${renamed}\``, edits: [{ start: child.name.start, end: child.name.end, text: renamed }], safe: true }] })
+      }
+    }
+
+    if (file === AI_CHAT) {
+      for (const child of element.children) {
+        const old = child.kind === 'slot' ? this.text(child.name) : undefined
+        const icon = old === undefined ? undefined : CHAT_ICON_BLOCKS[old]
+
+        if (child.kind === 'slot' && old !== undefined && icon !== undefined)
+          this.lint(child.name, 'deprecated-chat-icons', `\`@${old}\` on \`${element.name}\` is \`icons={{ ${icon}: ... }}\` since kayjs-ai 1.90, one prop for every icon`, { help: `Give \`icons={{ ${icon}: <icon> }}\`, an icon of the app's set or one imported from \`~icons/<prefix>/<name>\`` })
+      }
+    }
+
     for (const attribute of element.attributes) {
       if (attribute.kind === 'spread')
         continue
 
       const name = this.text(attribute.name)
+
+      const actionRenamed = actionRenames?.[name]
+
+      if (actionRenamed !== undefined) {
+        const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === actionRenamed) || element.children.some(other => other.kind === 'slot' && this.text(other.name) === actionRenamed)
+        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: `${actionRenamed}={${name}}` } : { start: attribute.name.start, end: attribute.name.end, text: actionRenamed }
+
+        this.lint(attribute.name, 'deprecated-ui-actions', `\`${name}\` on \`${element.name}\` is \`${actionRenamed}\` since kayjs-ui 1.90, the one name for the controls a component holds`, named ? { help: `Drop \`${name}\`, \`${actionRenamed}\` is there` } : { help: `Write \`${actionRenamed}\``, fixes: [{ title: `Write \`${actionRenamed}\``, edits: [edit], safe: true }] })
+
+        continue
+      }
 
       if (file === WIDGET_TAG && name === 'isEmpty') {
         const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'empty={isEmpty}' } : { start: attribute.name.start, end: attribute.name.end, text: 'empty' }

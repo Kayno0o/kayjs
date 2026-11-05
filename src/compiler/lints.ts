@@ -827,6 +827,22 @@ export const LINTS = {
     wrong: '---\nimport CopyButton from \'@kaynooo/kayjs-ui/copy-button.kay\'\n---\nCopyButton(text="x" failure="Could not copy")',
     right: '---\nimport CopyButton from \'@kaynooo/kayjs-ui/copy-button.kay\'\n---\nCopyButton(text="x" failureLabel="Could not copy")',
   },
+  'deprecated-ui-actions': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.90',
+    summary: 'A kayjs-ui block or prop under the name it had before 1.90, when the controls a component holds beside its own all became `actions`: a Card\'s `@head`, a FormField\'s `@action`, an AppHeader\'s `@end`, a TreeView\'s `@trailing` and a MarkdownEditor\'s `@toolbarExtra`, and a ConfirmDelete\'s `trigger` string, which is `triggerLook` as `trigger` is a block elsewhere. The old names work until 1.93. The fix renames the block or attribute.',
+    wrong: '---\nimport Card from \'@kaynooo/kayjs-ui/card.kay\'\n---\nCard(title="Users")\n  @head\n    a(href="/new") New',
+    right: '---\nimport Card from \'@kaynooo/kayjs-ui/card.kay\'\n---\nCard(title="Users")\n  @actions\n    a(href="/new") New',
+  },
+  'deprecated-chat-icons': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.90',
+    summary: 'A kayjs-ai Chat or ChatLauncher icon block under its form before 1.90: `@sendIcon`, `@stopIcon`, `@newIcon`, `@attachIcon`, `@regenerateIcon`, `@editIcon` and `@recordIcon`, and the launcher\'s `@icon`, `@closeIcon`, `@expandIcon` and `@collapseIcon`, are one `icons` prop, `icons={{ send: SendIcon }}`, each an icon of the app\'s set or one imported from `~icons/<prefix>/<name>`. The blocks work until 1.93. Reported with no fix, as a block holds any markup where `icons` takes an icon.',
+    wrong: '---\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\nimport { chat } from \'./chat\'\n---\nChat(action={chat})\n  @sendIcon\n    span go',
+    right: '---\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\nimport { chat } from \'./chat\'\n---\nChat(action={chat} icons={{ send: \'plus\' }})',
+  },
   'deprecated-hook-names': {
     level: 'warn',
     group: 'deprecated',

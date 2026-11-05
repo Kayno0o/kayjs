@@ -9,6 +9,8 @@ import Panel from '@kaynooo/kayjs-ai/chat-panel.kay'
 
 // Never called: the page is only rendered.
 const reply = (() => undefined) as unknown as Action<{ messages: AiMessage[] }, AsyncIterable<string | Progress> | Failure<unknown>>
+// The icon blocks before 1.90 still work.
+// kay-allow-file deprecated-chat-icons
 const calls = [{ id: 'a', name: 'search', status: 'done' as const, input: {}, result: 'ok' }]
 ---
 //- Renders the chat `src/ui.ts` restyles, for the library's restyle test.
@@ -19,6 +21,7 @@ Chat(action={reply} label="Own icons")
     b.own-send own
   @stopIcon
     b.own-stop own
+Chat(action={reply} label="Icons prop" icons={{ send: 'close' }})
 Launcher(action={reply} variant="plain" tone="neutral" size="lg" class="mb-2")
 Calls(calls={calls} labels={{}} details={true} runningLabel="Running" doneLabel="Done" failedLabel="Failed" argumentsLabel="Arguments" resultLabel="Result")
 Sources(sources={[{ n: 1, title: 'Tides', href: '/tides' }]} label="Sources" here={true})

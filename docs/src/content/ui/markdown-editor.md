@@ -14,7 +14,7 @@ A toolbar over the field offers bold, italic, a heading, bulleted and numbered l
 
 A list keeps only the buttons it names, in its order: `toolbar={['bold', 'italic', 'link']}`. The other names are `heading`, `bulletList`, `numberedList` and `image`. The image button opens the file picker when `onImage` is given, and otherwise writes `![](url)` to fill in.
 
-Your own buttons go in the `toolbarExtra(tools)` block, after the built-in ones; they show with `toolbar={false}` too. `tools.wrap(open, closing)` puts text around the selection (and takes it off again when it already surrounds it), `tools.edit({ text, start, end })` replaces a range, the selection by default, and `tools.selection()` reads it. Both go through the same path as the built-in buttons, so Ctrl+Z undoes them. Each of your buttons is a Tab stop of its own.
+Your own buttons go in the `@actions(tools)` block, after the built-in ones; they show with `toolbar={false}` too. `tools.wrap(open, closing)` puts text around the selection (and takes it off again when it already surrounds it), `tools.edit({ text, start, end })` replaces a range, the selection by default, and `tools.selection()` reads it. Both go through the same path as the built-in buttons, so Ctrl+Z undoes them. Each of your buttons is a Tab stop of its own.
 
 ```kay
 ---

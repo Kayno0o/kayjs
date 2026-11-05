@@ -6,9 +6,9 @@ description: The frame a page's content is written on, with an optional title an
 
 ## Header
 
-`@head` fills the rest of the title's line, held at its far end: a count, a control, a link out.
+`@actions` fills the rest of the title's line, held at its far end: a count, a control, a link out.
 
-<Demo name="card/head" />
+<Demo name="card/actions" />
 
 ## Bare
 

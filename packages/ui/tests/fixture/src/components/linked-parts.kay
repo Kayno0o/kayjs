@@ -19,7 +19,7 @@ Avatar#avatar-plain(name="Ada")
 Badge#badge-link(label="tag" href="https://example.com/tag")
 Badge#badge-plain(label="tag")
 Card#card-link(title="Moons" href="https://example.com/moons")
-  @head
+  @actions
     button#card-control(type="button") Edit
   p Body
 Card#card-plain(title="Plain")

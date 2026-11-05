@@ -105,7 +105,7 @@ A page, with or without a `server` fence, hands the action straight to `Chat`. T
 - A screen reader hears each finished turn once, not word by word, and each tool call as it starts and ends.
 - An empty chat says `greeting` and offers the `suggestions` you give it, a few questions that send on a click.
 - The visitor's messages are bubbles at the right; answers take the full width. The tools a reply used fold into one muted line, such as `Searched the docs x2, Read a page`, which opens to the list; an action words its own calls with `tool: { label: 'Searched the docs' }`, `toolLabels` words a tool by its name instead, `{ search_docs: 'Searched the docs' }`, and a tool without either shows its name.
-- Send and Stop are round icon buttons, `@sendIcon` and `@stopIcon` replacing the arrow and the square, which are kayjs-ui icon slots (`send`, `stop`, `chat`, `expand`, `collapse`) an app restyles through `settings.icons`.
+- Send and Stop are round icon buttons, `icons` (`send`, `stop`) replacing the arrow and the square, which are kayjs-ui icon slots (`send`, `stop`, `chat`, `expand`, `collapse`) an app restyles through `settings.icons`.
 - A table wider than the chat scrolls sideways inside it, and the keyboard can scroll it.
 - A message the action's schema refuses (422) goes back to the field, also when it was a retry, and the refusal's message shows.
 - A link in a reply opens in a new tab, so following it never loses the conversation; `links="here"` opens a link to your own site in place, which `ChatLauncher` sets.
@@ -188,7 +188,7 @@ The button works from the keyboard: Enter or Space opens the panel and puts the 
 
 The panel has a fixed height, so it does not grow or shrink as the conversation fills or empties: the answers scroll inside it, the field stays at the bottom, and the greeting and suggestions sit above the field. On a short window it is as tall as the window leaves room for.
 
-Its header has a New conversation button, which clears the log and the kept history, and an Enlarge button for code-heavy answers (hidden on a phone). `openLabel` names the button and `closeLabel` its close button, `newLabel`, `expandLabel` and `collapseLabel` name the two others, `@icon`, `@closeIcon`, `@newIcon`, `@expandIcon` and `@collapseIcon` replace the icons, and `@note` adds a line under the chat. The button turns into a close icon while the panel is open.
+Its header has a New conversation button, which clears the log and the kept history, and an Enlarge button for code-heavy answers (hidden on a phone). `openLabel` names the button and `closeLabel` its close button, `newLabel`, `expandLabel` and `collapseLabel` name the two others, `icons` replaces the icons by name (`open`, `close`, `new`, `expand`, `collapse`, `send` and `stop`), and `@note` adds a line under the chat. The button turns into a close icon while the panel is open.
 
 `open` opens and closes the panel from your own button or after a navigation, and `onOpenChange(open)` tells you when the visitor does.
 
@@ -210,7 +210,7 @@ An edit stays open while the visitor sends something else, and Escape, Cancel an
 
 A chat that is the main content of a page, such as a page of its own for the assistant, takes the height of its container with `fill`: give the container a height (a flex column, a grid row, `h-dvh`) and the log scrolls inside it while the form stays at the bottom. Without `fill` the log stops growing at `32rem`.
 
-An inline `Chat` can show a New conversation button beside its field with `newButton`. It appears once the conversation has a turn, stops a reply under way and clears the log, the field and what `remember` kept. `newLabel` names it and `@newIcon` replaces its plus. To start over from your own control instead, dispatch a `kai-chat-new` event on the `.kai-chat` element.
+An inline `Chat` can show a New conversation button beside its field with `newButton`. It appears once the conversation has a turn, stops a reply under way and clears the log, the field and what `remember` kept. `newLabel` names it and `icons.new` replaces its plus. To start over from your own control instead, dispatch a `kai-chat-new` event on the `.kai-chat` element.
 
 To let a reload of the tab find the conversation again, give `remember` a name, and it is kept in the tab's session storage under it. Nothing is kept by default, because the next person to use the tab after a sign-out would read it. On a site with sign-in, make the name per visitor, such as `` `kai-chat-${user.id}` ``.
 

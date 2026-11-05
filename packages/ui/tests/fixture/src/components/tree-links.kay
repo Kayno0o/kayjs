@@ -15,5 +15,5 @@ const nodes: TreeNode[] = [
 ]
 ---
 TreeView#tree(nodes={nodes} label="Projects" onSelectedChange={onSelect})
-  @trailing(node)
+  @actions(node)
     button.star(type="button" data-id={node.id} onClick={() => onStar(node.id)}) Star

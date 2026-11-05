@@ -9,7 +9,7 @@ const nav = await navigation()
 const current = ctx.url.pathname.replace(/\/$/, '') || '/'
 --- script
 import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
-import Icon from '@kaynooo/kayjs-ui/icon.kay'
+
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import ArrowUp from '~icons/tabler/arrow-up'
 import ArrowsMaximize from '~icons/tabler/arrows-maximize'
@@ -27,20 +27,6 @@ const TOOL_LABELS = { search_docs: 'Searched the docs', read_page: 'Read a page'
 Shell(nav={nav} current={current})
   slot
 TooltipHost(persist hydrate="idle")
-ChatLauncher(action={reply} label="Ask the docs" greeting="What do you want to know about kay?" suggestions={SUGGESTIONS} toolLabels={TOOL_LABELS} placeholder="How do I..." toolDetails={false} openLabel="Ask the docs" closeLabel="Close the chat")
-  @icon
-    Icon(icon={MessageCircle})
-  @closeIcon
-    Icon(icon={X})
-  @newIcon
-    Icon(icon={Plus})
-  @expandIcon
-    Icon(icon={ArrowsMaximize})
-  @collapseIcon
-    Icon(icon={ArrowsMinimize})
-  @sendIcon
-    Icon(icon={ArrowUp})
-  @stopIcon
-    Icon(icon={PlayerStopFilled})
+ChatLauncher(action={reply} label="Ask the docs" greeting="What do you want to know about kay?" suggestions={SUGGESTIONS} toolLabels={TOOL_LABELS} placeholder="How do I..." toolDetails={false} openLabel="Ask the docs" closeLabel="Close the chat" icons={{ open: MessageCircle, close: X, new: Plus, expand: ArrowsMaximize, collapse: ArrowsMinimize, send: ArrowUp, stop: PlayerStopFilled }})
   @note
     | An AI model writes the answers from these docs, and it can be wrong. Check the pages it links before you rely on one. #[a(href="/guides/ask-the-docs") How the chat works].

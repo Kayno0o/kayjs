@@ -14,7 +14,7 @@ const look = recipe({
   },
 })
 
-const { links, link, current, label, menuLabel, expandLabel, open, onOpenChange, brand, end, sticky = true, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'children'> & {
+const { links, link, current, label, menuLabel, expandLabel, open, onOpenChange, brand, actions, end, sticky = true, ...rest } = props<Omit<JSX.IntrinsicElements['header'], 'class' | 'children'> & {
   // As for `SiteNav`: a link may hold `children`.
   links: readonly NavLink[]
   // Draws the text of each link in place of its `label`, as for `SiteNav`.
@@ -33,6 +33,8 @@ const { links, link, current, label, menuLabel, expandLabel, open, onOpenChange,
   // At the start: a logo and the site's name, usually a link home.
   brand?: Snippet
   // At the far end: a user menu, a theme toggle.
+  actions?: Snippet
+  // Before 1.90 `actions` was called `end`; both work until 1.93 (`deprecated-ui-actions`).
   end?: Snippet
   // Stays at the top of the page while it scrolls; `false` lets it scroll away.
   sticky?: boolean | undefined
@@ -44,6 +46,6 @@ header(part="root" {...rest} data-sticky={sticky ? '' : undefined})
     div(part="brand")
       | {brand}
   SiteNav(links={links} link={link} current={current} label={label} menuLabel={menuLabel} expandLabel={expandLabel} open={open} onOpenChange={onOpenChange} part="nav")
-  if end
+  if actions ?? end
     div(part="end")
-      | {end}
+      | {actions ?? end}

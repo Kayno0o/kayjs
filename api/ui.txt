@@ -534,6 +534,7 @@ function announce(message: string, from?: Element | null): void
 
 [./app-header.kay] default
 component default
+  actions?: Element
   brand?: Element
   class?: string | undefined | {
   root?: string | undefined;
@@ -838,8 +839,8 @@ component default
 
 [./card.kay] default
 component default
-  | { bare?: boolean | undefined; children?: Element; class?: string | undefined | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; }; head?: Element; href?: undefined; level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined; title?: Element }
-  | { bare?: boolean | undefined; children?: Element; class?: string | undefined | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; }; head?: Element; href: string; level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined; title: Element }
+  | { actions?: Element; bare?: boolean | undefined; children?: Element; class?: string | undefined | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; }; head?: Element; href?: undefined; level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined; title?: Element }
+  | { actions?: Element; bare?: boolean | undefined; children?: Element; class?: string | undefined | { root?: string | undefined; link?: string | undefined; head?: string | undefined; title?: string | undefined; body?: string | undefined; }; head?: Element; href: string; level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined; title: Element }
 
 [./carousel.kay] default
 component default
@@ -1078,6 +1079,7 @@ component default
   title?: string | undefined
   tone?: Tone | undefined
   trigger?: "button" | "icon" | "link" | "none" | undefined
+  triggerLook?: "button" | "icon" | "link" | "none" | undefined
   variant?: "ghost" | "inline" | "solid" | undefined
 
 [./contact-form.kay] default
@@ -1424,6 +1426,7 @@ component default
 [./form-field.kay] default
 component default
   action?: Element
+  actions?: Element
   children?: Element
   class?: string | undefined | {
   root?: string | undefined;
@@ -1630,6 +1633,7 @@ component default
 
 [./markdown-editor.kay] default
 component default
+  actions?: ((tools: ToolbarTools) => Element) | undefined
   class?: string | undefined | {
   root?: string | undefined;
   wrap?: string | undefined;
@@ -2666,6 +2670,7 @@ component default
 
 [./tree-view.kay] default
 component default
+  actions?: ((args_0: TreeNode<Id>) => Element) | undefined
   class?: string | undefined | {
   root?: string | undefined;
   item?: string | undefined;

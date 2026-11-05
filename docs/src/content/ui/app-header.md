@@ -8,7 +8,7 @@ description: The bar across the top of an app, with its brand, main links and an
 
 ## Brand and end area
 
-`@brand` holds the site's name or logo, usually a link home, and `@end` what the app puts at the far end. A block left out draws nothing, so a header with no end area is the brand and the links.
+`@brand` holds the site's name or logo, usually a link home, and `@actions` what the app puts at the far end. A block left out draws nothing, so a header with no actions is the brand and the links.
 
 ## Icons
 
@@ -22,7 +22,7 @@ A sticky header covers what an anchor link scrolls to. Give the page `scroll-pad
 
 ## Narrow screens
 
-Below the `lg` breakpoint the links fold behind SiteNav's menu button, which opens them as a popover the browser closes on Escape or a click outside. The button follows the brand, in the tab order too, and the end area keeps the far end. A long brand or end area wraps instead of widening the bar. `label` names the navigation and `menuLabel` the button.
+Below the `lg` breakpoint the links fold behind SiteNav's menu button, which opens them as a popover the browser closes on Escape or a click outside. The button follows the brand, in the tab order too, and the end area keeps the far end. A long brand or actions area wraps instead of widening the bar. `label` names the navigation and `menuLabel` the button.
 
 ## Colors
 

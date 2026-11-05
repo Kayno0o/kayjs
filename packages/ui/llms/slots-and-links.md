@@ -12,7 +12,7 @@
 ### Make a component a link
 
 - `href` on `Avatar`, `Badge`, `Card`, `CardRow` and a `Timeline` entry (`entries[].href`) renders an `a` with the same parts, so middle-click and a new tab work. An `Avatar` link is named by `label`, else by `name`.
-- `Card(href)` needs a `title`, which is the link's text, and `CardRow(href)` links its body. The link covers the whole card or row, and every button, input and link inside it, `actions` and `head` included, is lifted above the link and stays clickable; the card or row has `data-linked`.
+- `Card(href)` needs a `title`, which is the link's text, and `CardRow(href)` links its body. The link covers the whole card or row, and every button, input and link inside it, `actions` included, is lifted above the link and stays clickable; the card or row has `data-linked`.
 - A `Timeline` entry with an `href` is no button: `onSelectedChange` is not called, and the entry whose key is `selected` gets `aria-current="true"` in place of `aria-pressed`.
 - A `Carousel` slide with `href` draws its picture inside a link; with a `@slide` block the block draws the whole content, link included.
 - Every entry with an address takes `newTab: true | false | 'auto'`, `'auto'` by default: an `https://` or `//host` address opens in a new tab with `rel="noopener noreferrer"`, a path stays in the same one. It is on `MenuAction`, `BellItem`, `AudioChapter`, `PaletteLink` (its `external: true` is `newTab: true`), `NavLink` (`SiteNav`, `AppHeader`), `Breadcrumb` items, `TabNav` links, `Timeline` entries, `TreeView` nodes, `BarList` rows and `Carousel` slides; `AppSwitcher` keeps `false` as its default (switcher and app both take `'auto'`). `isExternal(href)` is the test they share, exported by kayjs-ui: any absolute http(s) or protocol-relative address counts as outside, the site's own origin included, as the server and the browser must agree; write `newTab: false` on such a link to keep it in the tab. The `href(mark)` charts (`BarChart`, `Sparkline`, `ScatterChart`, `ContributionGraph`, `LineChart`) take one `newTab` for all their links.
@@ -42,3 +42,10 @@
 - `SiteNav` link blocks apply to the links of `children` too; the `ui.siteNav.expand` text is `Show the pages under {label}`, and `ui.notice.dismiss` is `Dismiss`.
 - `Dialog`, `SidePanel` and `ConfirmDelete` keep their strings as the names screen readers hear; a block never replaces the `aria-label`.
 - The same names serve every component of a kind, so a component added later takes the block named after its entry the same way.
+
+### One name for one role
+
+- The same role has the same block name in every component: `@actions` the controls a component holds beside its own content (a Card, Widget, PageHeader, PageSection, EmptyState, Notice, FormField, AppHeader, SidePanel, Dialog's head line, TreeView's and AudioPlayer's rows, a MarkdownEditor's toolbar, a Chat turn), `@footer` the area under the content, `@empty` what a data component shows with nothing to list, `@item(entry)` and its kin (`@tab`, `@link`, `@slide`) the markup of one entry of a list, and `@trigger` the control opening a Popover, Menu, BellInbox or AppSwitcher.
+- A `Table`'s `@bulk(keys, clear)`, a `CardRow`'s `@right` readout and a `FormDialog`'s `@extra` stay as they are: they are shown on a condition (rows picked), always, and in the footer, not beside the content.
+- A prop that picks a look rather than content is not named like a block: ConfirmDelete's `triggerLook` is `icon`, `button`, `link` or `none`.
+- Before 1.90 these were `@head` (Card), `@action` (FormField), `@end` (AppHeader), `@trailing` (TreeView), `@toolbarExtra` (MarkdownEditor) and ConfirmDelete's `trigger`: they work until 1.93, and `kay check` reports them as `deprecated-ui-actions` with a safe fix.

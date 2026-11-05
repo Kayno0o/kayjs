@@ -48,6 +48,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - A CopyButton's `onFail(error)` is `onError({ error })`; the old name works until 1.93 and is reported with no fix, as its argument changes shape.
 - A component's `onError` receives one object, so a field is added without breaking a caller, `{ error }` for a thrown value and `{ event }` for a failure the DOM raised. Read the error from the object: `onError={error => log(error)}` is `onError={({ error }) => log(error)}` on Table, VirtualList, Select, IconPicker, FormDialog, SaveForm and CopyButton; Combobox and MultiSelect give `{ error, query }` where they gave `(error, query)`; RecordButton gives `{ problem, error }` where it gave `(problem, cause)`; Avatar and SiteFavicon give `{ event }`; AudioPlayer gives `{ error, event }`; ImageCropper gives `{ event }` or `{ error }` where it gave nothing. `callAction`'s `onError` and `recorder`'s too. `kay check` cannot tell an `onError` written for the old argument from one for the new, so no lint reports it: search the app for `onError` on these components.
 
+### kayjs-ui: the same role is one block name
+
+- The controls a component holds beside its own content are `@actions`: a Card's `@head`, a FormField's `@action`, an AppHeader's `@end`, a TreeView's `@trailing` and a MarkdownEditor's `@toolbarExtra` are renamed (a prop of the same name too), and a ConfirmDelete's `trigger` string, which picks a look rather than content, is `triggerLook`. The old names work until 1.93, and `kay check` flags them as `deprecated-ui-actions` with a safe fix.
+- kayjs-ai's Chat and ChatLauncher draw their round buttons' icons from one `icons` prop, `icons={{ send: ArrowUp }}`, in place of `@sendIcon`, `@stopIcon`, `@newIcon`, `@attachIcon`, `@regenerateIcon`, `@editIcon`, `@recordIcon` and the launcher's `@icon`, `@closeIcon`, `@expandIcon` and `@collapseIcon`. The blocks work until 1.93 and are flagged as `deprecated-chat-icons`, with no fix, as a block holds any markup.
+
 ## 1.89.0
 
 ### Defaults that fit production

@@ -6,6 +6,6 @@ const links = [{ href: '/', label: 'Home', icon: 'info' }, { href: '/data', labe
 AppHeader#header(links={links} current="/charts/moons" label="Main")
   @brand
     a#brand(href="/") Moons
-  @end
+  @actions
     button#user(type="button") Ada
 AppHeader#bare(links={links} current="/" label="Bare" sticky={false})

@@ -11,6 +11,6 @@ ConfirmDelete(
   message="Empty the trash?"
   failureLabel="Could not empty it"
   onConfirm={empty}
-  trigger="button"
+  triggerLook="button"
   label="Empty trash"
 )

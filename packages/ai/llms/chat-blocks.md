@@ -53,3 +53,10 @@ Chat(action={reply} label="Assistant" regenerate)
 - `@footer` sits under the form, inside the chat's root.
 - `ChatLauncher` takes the same six blocks and passes them to its chat. The block is a function, so the component writing it renders as an island, as for any block with parameters; a launcher given none stays static.
 - `ChatPanel` is the launcher's shell around the chat and draws none of these.
+
+### Change the icons
+
+`icons` names an icon for each round button, by the name of the button: `Chat(action={reply} icons={{ send: ArrowUp, stop: PlayerStopFilled }})`, each an icon of the app's settings or one imported from `~icons/<prefix>/<name>`, as `Icon` takes it. Only the names given change.
+
+- A `Chat` takes `send`, `stop`, `new`, `attach`, `regenerate`, `edit` and `record`; a `ChatLauncher` takes those and `open`, `close`, `expand` and `collapse` for its button and its panel's header.
+- Before 1.90 each was a block of its own, `@sendIcon`, `@stopIcon`, `@newIcon`, `@attachIcon`, `@regenerateIcon`, `@editIcon` and `@recordIcon`, and the launcher's `@icon`, `@closeIcon`, `@expandIcon` and `@collapseIcon`. They work until 1.93 and win over `icons`; `kay check` reports them as `deprecated-chat-icons`, with no fix, as a block holds any markup.

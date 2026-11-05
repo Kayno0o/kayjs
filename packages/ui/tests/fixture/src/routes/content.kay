@@ -11,7 +11,7 @@ import Select from '@kaynooo/kayjs-ui/select.kay'
 ---
 main
   Card#card(title="Moons")
-    @head
+    @actions
       Badge(tone="success" icon="success" label={3})
     p Phobos and Deimos
   Card#bare(bare)
@@ -19,7 +19,7 @@ main
   Card#outlined(title="Orbits" level={2})
     p Elliptic
   Card#page(title="<i>Sign in</i>" level={1})
-    @head
+    @actions
       span 1
     p Welcome
   h2#after-page Details
