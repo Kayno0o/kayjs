@@ -441,7 +441,7 @@ The page clicks and types as a user does.
 | `upload(selector, files)` | Puts files, given by path, in a file input, as the picker does |
 | `onDialog(handler)` | Answers the page's `alert`, `confirm`, `prompt` and `beforeunload` dialogs |
 
-A page's first load in a browser kay just started, the first of a file and the first after kay restarts a browser it recycled, waits 20 seconds when you gave no `timeout`, as Chrome starts its renderer then and a busy CI host can take seconds over it. Every later load keeps the 5 seconds.
+A page's load on a freshly started browser, one kay started or restarted after recycling it, waits 20 seconds when you gave no `timeout`, until one page has loaded, as Chrome starts its renderer then and a busy CI host can take seconds over it. Every later load keeps the 5 seconds.
 
 The waits give up after 5 seconds, or after `timeout` in their options, and fail naming what they waited for, with the stack of the test's own call. `evaluate` and `waitUntil` send only the source of the function, so it sees no variable of the test, only its arguments.
 

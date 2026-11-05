@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.89.0
 
-- A page's first load in a browser `kay/test` just started (the first of a file, and the first after it restarts the browser it recycles) waits 20 s instead of 5 s when you gave no `timeout`, so a CI host busy with other work does not fail it: [browser tests](testing-browser.md).
+- A page's load on a freshly started browser (until one page has loaded) waits 20 s instead of 5 s when you gave no `timeout`, so a CI host busy with other work does not fail it: [browser tests](testing-browser.md).
 
 ## 1.89.0
 

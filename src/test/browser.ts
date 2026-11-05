@@ -19,7 +19,7 @@ export interface BrowserOptions {
   path?: string | undefined
   width?: number | undefined
   height?: number | undefined
-  // How long a page waits for an element, a condition or a navigation, 5 seconds by default, except its first load in a browser just started, which waits 20 seconds unless this is given.
+  // How long a page waits for an element, a condition or a navigation, 5 seconds by default, except its loads on a freshly started browser, which waits 20 seconds unless this is given.
   timeout?: Duration | undefined
   // The page's next call fails once it logs a problem kay recovers from in production, such as an island that did not match its server markup; `false` leaves it in `errors`.
   strict?: boolean | undefined
@@ -259,8 +259,10 @@ const MAX_HOST_CONNECTIONS = 6
 // What a page's origin keeps in the browser, cleared before each page.
 const STORAGE_TYPES = 'cookies,local_storage,indexeddb,cache_storage,service_workers,file_systems,shared_storage,storage_buckets'
 
+interface BrowserState { dir: string, pages: number, views: number, ready: Promise<void>, idle?: Timer, launched?: boolean, warm?: boolean }
+
 // The browser of this process's pages. Bun runs one Chrome for every view and leaves the profile it gives it in the temp directory, so kay gives it one of its own and removes it once the browser closes.
-let browser: { dir: string, pages: number, views: number, ready: Promise<void>, idle?: Timer, launched?: boolean } | undefined
+let browser: BrowserState | undefined
 // The process of the Chrome the last close killed: Bun spawns another only once it reaped that one, and fails a view made sooner.
 let killed: number | undefined
 let exitHooked = false
@@ -373,9 +375,9 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   let seen = 0
   // Chrome refuses to run its sandbox as root, as in a CI container, whose small /dev/shm crashes its renderer.
   const rootArgv = process.getuid?.() === 0 ? ['--no-sandbox', '--disable-dev-shm-usage'] : []
-  const { dir, first } = await claimBrowser()
-  // Whether the next load is the first of a browser just started.
-  let cold = first
+  const { dir, first, claimed } = await claimBrowser()
+  // Whether the next load is one of a browser still starting: every page opened before one has loaded counts, not only the page that started it.
+  let cold = !claimed.warm
   // `--enable-automation` lets Chrome tell its command line, which names the profile Bun made.
   // `--site-per-process` gives chrome-headless-shell the out-of-process iframes desktop Chrome has, so a sandboxed frame stuck in a loop leaves its page answering.
   const argv = [...rootArgv, `--user-data-dir=${join(dir, 'profile')}`, '--enable-automation', '--site-per-process']
@@ -834,13 +836,18 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       // The first load of a browser kay just started is allowed longer than the timeout kay/test defaults to, which a later load, and a timeout the test chose, are not.
       const budget = cold && options.timeout === undefined ? COLD_LOAD_MS : timeout
 
+      const until = Date.now() + budget
+
       cold = false
 
       // A page that does not finish loading, a stalled image holding its load event, is not waited on past the budget.
       if (await within(navigate(), budget) === TIMED_OUT)
         throw new Error(`${UNSETTLED} ${budget}ms waiting for ${target.pathname} to load${heldConnections()}`)
 
-      await settle(ready, `${target.pathname} to load and hydrate its islands`, budget)
+      // Its renderer has started, so the pages that open from now on are no longer cold.
+      claimed.warm = true
+
+      await settle(ready, `${target.pathname} to load and hydrate its islands`, Math.max(until - Date.now(), timeout))
     }),
     path: async () => serial(async () => inView<string>('location.pathname + location.search')),
     click: async (selector, { modifiers, at: aim, ...wait } = {}) => serial(async () => {
@@ -1082,7 +1089,7 @@ function heldConnections(): string {
 }
 
 // A share of the browser for a page, the directory kay owns for it, and whether this page starts the browser.
-async function claimBrowser(): Promise<{ dir: string, first: boolean }> {
+async function claimBrowser(): Promise<{ dir: string, first: boolean, claimed: BrowserState }> {
   // Nothing is open, so closing the browser costs no page, and frees the renderers of the pages it has closed.
   if (browser && browser.pages === 0 && browser.views >= RECYCLE_AFTER)
     closeBrowser()
@@ -1093,7 +1100,7 @@ async function claimBrowser(): Promise<{ dir: string, first: boolean }> {
     browser.views++
     await browser.ready
 
-    return { dir: browser.dir, first: false }
+    return { dir: browser.dir, first: false, claimed: browser }
   }
 
   sweepProfiles()
@@ -1106,7 +1113,7 @@ async function claimBrowser(): Promise<{ dir: string, first: boolean }> {
   exitHooked = true
   await browser.ready
 
-  return { dir: browser.dir, first: true }
+  return { dir: browser.dir, first: true, claimed: browser }
 }
 
 // Closes the browser now when no page is open, for a server that drew a card and runs no test, rather than leave Chrome idle for minutes.
