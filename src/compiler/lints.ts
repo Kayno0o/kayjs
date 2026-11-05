@@ -4,6 +4,7 @@ import { keyedByPosition, someNode, walkNodes } from './ast'
 import { positionAt } from './mapping'
 import { VOID_ELEMENTS } from './markup'
 import { nestingLints } from './nesting'
+import { styleLints } from './style-lints'
 
 // `allow` reports nothing, `warn` a warning that fails nothing unless `kay check --deny-warnings` runs, `deny` an error.
 export type LintLevel = 'allow' | 'warn' | 'deny'
@@ -378,6 +379,20 @@ export const LINTS = {
     summary: 'Template text holding what reads as an HTML tag: kay escapes text, so readers see the tag as written rather than the element.',
     wrong: 'p Press <kbd>Ctrl</kbd> K to search',
     right: 'p Press #[kbd Ctrl] K to search',
+  },
+  'unused-selector': {
+    level: 'warn',
+    group: 'code',
+    summary: 'A rule of a `--- style` fence whose last compound (the classes, id and tag the scope attribute ends on) no element of the template can have, so it never matches. An element with a spread, a `class` expression or a `part`, and a class the component\'s code names, count as possible matches; a `:global(...)` compound is left alone.',
+    wrong: '--- style\n.card { color: red }\n.nope { color: blue }\n---\n.card hi',
+    right: '--- style\n.card { color: red }\n---\n.card hi',
+  },
+  'unreachable-selector': {
+    level: 'deny',
+    group: 'code',
+    summary: 'A rule of a `--- style` fence whose last compound is `:root`, `html` or `body`: kay ends each selector on the component\'s scope attribute, which those elements never carry. `kay check --fix` writes `:global(...)` around it.',
+    wrong: '--- style\nbody { margin: 0 }\n---\np hi',
+    right: '--- style\n:global(body) { margin: 0 }\n---\np hi',
   },
   'brace-in-attribute': {
     level: 'warn',
@@ -1030,7 +1045,7 @@ export function templateLints(file: KayFile): Diagnostic[] {
     return literal
   })
 
-  return [...found, ...nestingLints(file), ...accessibilityLints(file)]
+  return [...found, ...nestingLints(file), ...accessibilityLints(file), ...styleLints(file)]
 }
 
 // Whether the file declares `name` as a value: a `const`, a prop or import, a loop or `then` name.

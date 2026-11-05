@@ -44,14 +44,46 @@ describe('scopeCss', () => {
     expect(scopeCss(':global(body) .a, .b :global(.c), :global(.d) { x: y }', ATTR)).toBe(`body .a[${ATTR}], .b[${ATTR}] .c, .d { x: y }`)
   })
 
-  it('scopes the bodies of media, supports, layer and container, and leaves keyframes and font-face', () => {
-    const css = '@media (min-width: 1px) { .a { x: y } } @keyframes spin { from { x: y } } @font-face { font-family: f } @import "x.css"; @layer base { .b { x: y } }'
+  it('scopes the bodies of media, supports, layer and container, and leaves font-face', () => {
+    const css = '@media (min-width: 1px) { .a { x: y } } @font-face { font-family: f } @import "x.css"; @layer base { .b { x: y } }'
 
-    expect(scopeCss(css, ATTR)).toBe(`@media (min-width: 1px) { .a[${ATTR}] { x: y } } @keyframes spin { from { x: y } } @font-face { font-family: f } @import "x.css"; @layer base { .b[${ATTR}] { x: y } }`)
+    expect(scopeCss(css, ATTR)).toBe(`@media (min-width: 1px) { .a[${ATTR}] { x: y } } @font-face { font-family: f } @import "x.css"; @layer base { .b[${ATTR}] { x: y } }`)
+  })
+
+  it('leaves the selectors inside keyframes unscoped', () => {
+    expect(scopeCss('@keyframes spin { from { x: y } 50% { x: y } to { x: y } }', ATTR)).toBe('@keyframes spin-k-x { from { x: y } 50% { x: y } to { x: y } }')
   })
 
   it('reads past strings, comments and brackets that hold selector characters', () => {
     expect(scopeCss('/* a, b { */ a[href="x,{y}"]:not(.b, .c) { content: "}" } i { x: y }', ATTR)).toBe(`/* a, b { */ a[href="x,{y}"]:not(.b, .c)[${ATTR}] { content: "}" } i[${ATTR}] { x: y }`)
+  })
+})
+
+describe('scopeCss keyframes', () => {
+  it('scopes a name and the animation and animation-name values that use it', () => {
+    const css = '@keyframes spin { to { x: y } } .a { animation: spin 1s linear infinite, fade 2s; animation-name: spin } .b { -webkit-animation: spin 1s }'
+
+    expect(scopeCss(css, ATTR)).toBe(`@keyframes spin-k-x { to { x: y } } .a[${ATTR}] { animation: spin-k-x 1s linear infinite, fade 2s; animation-name: spin-k-x } .b[${ATTR}] { -webkit-animation: spin-k-x 1s }`)
+  })
+
+  it('reads keyframes and uses inside at-rules, vendor prefixes and nested rules', () => {
+    const css = '@media (x) { @keyframes pulse { to { x: y } } .a { animation: pulse 1s; &:hover { animation-name: pulse } } } @-webkit-keyframes pulse { to { x: y } }'
+
+    expect(scopeCss(css, ATTR)).toBe(`@media (x) { @keyframes pulse-k-x { to { x: y } } .a[${ATTR}] { animation: pulse-k-x 1s; &:hover[${ATTR}] { animation-name: pulse-k-x } } } @-webkit-keyframes pulse-k-x { to { x: y } }`)
+  })
+
+  it('keeps a name no keyframes of the component defines, and a longer name containing one', () => {
+    expect(scopeCss('@keyframes spin { to { x: y } } .a { animation: spin-slow 1s, spinner 1s, ping 1s; --spin: spin }', ATTR)).toBe(`@keyframes spin-k-x { to { x: y } } .a[${ATTR}] { animation: spin-slow 1s, spinner 1s, ping 1s; --spin: spin }`)
+  })
+
+  it('unwraps :global(...) as the name, leaving its uses as written', () => {
+    expect(scopeCss('@keyframes :global(spin) { to { x: y } } .a { animation: spin 1s }', ATTR)).toBe(`@keyframes spin { to { x: y } } .a[${ATTR}] { animation: spin 1s }`)
+  })
+
+  it('gives two components apart names for one keyframes name', () => {
+    const css = '@keyframes spin { to { x: y } } .a { animation: spin 1s }'
+
+    expect(scopeCss(css, 'data-k-aaaa')).not.toBe(scopeCss(css, 'data-k-bbbb'))
   })
 })
 

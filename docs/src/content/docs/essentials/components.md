@@ -36,6 +36,8 @@ li(class={size})
 
 `--- style` holds CSS scoped to the component. kay adds a `data-k-` attribute to each element the template writes and ends every selector on it, so `.card { color: red }` styles this file's `.card` alone. `:global(.x)` is the way out, `@media`, `@supports`, `@layer` and `@container` bodies and rules nested inside another are scoped alike, and a component the template calls keeps its root unscoped: reach it with `class` or a part. The CSS reaches the page as an imported stylesheet does.
 
+A `@keyframes` name is scoped to the component with the `animation` values that use it, and `@keyframes :global(spin)` keeps it as written. `kay check` warns of a rule no element of the template can match (`unused-selector`), and reports a rule ending on `:root`, `html` or `body` (`unreachable-selector`), since those elements carry no `data-k-` attribute: write `:global(body)`, and `kay check --fix` does.
+
 A fence ends on a `---` line, or on the line opening the next one. `--- script` spells the component script out, for when it follows another fence.
 
 ```kay
