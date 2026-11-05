@@ -27,7 +27,7 @@ const scenarios: Record<string, () => Promise<void>> = {
   },
   // The default app with the prebuilt pages, probed on a provider route it does not have.
   async pages() {
-    const visitor = testApp({ pages: auth({ plugin: false }) }).browser()
+    const visitor = testApp({ pages: auth({ server: false }) }).browser()
 
     await visitor.fetch('/auth/nope/callback')
     await visitor.fetch('/auth/nope')
@@ -112,7 +112,7 @@ const scenarios: Record<string, () => Promise<void>> = {
     await as.oauth.stub('discord', { id: '80351110224678912', email: 'ada@example.com', username: 'ada' })
   },
   async oauthServer() {
-    const visitor = testApp({ site: SITE, pages: auth({ plugin: false }), scopes: ['posts:read'] }).browser()
+    const visitor = testApp({ site: SITE, pages: auth({ server: false }), scopes: ['posts:read'] }).browser()
 
     await visitor.fetch('/auth/oauth/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'Claude Code', redirect_uris: ['http://127.0.0.1:33418/callback'] }) })
   },

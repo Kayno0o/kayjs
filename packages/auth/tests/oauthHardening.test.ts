@@ -156,7 +156,7 @@ function server(options: { documents?: Record<string, unknown>, limits?: Record<
 
   return testApp({
     ...options.url === null ? {} : { site: options.url ?? 'http://localhost' },
-    pages: auth({ plugin: false }),
+    pages: auth({ server: false }),
     scopes: ['posts:read', 'posts:write'],
     admin: 'admin',
     ...options.limits && { rateLimit: options.limits },

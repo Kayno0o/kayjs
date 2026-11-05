@@ -13,7 +13,7 @@ afterEach(() => {
 })
 
 function server(options: { scopes?: ('posts:read')[], oauthServer?: boolean } = {}) {
-  return testApp({ site: 'http://localhost', pages: auth({ plugin: false }), scopes: options.scopes ?? ['posts:read'], ...options.oauthServer === undefined ? {} : { oauthServer: options.oauthServer } } as never)
+  return testApp({ site: 'http://localhost', pages: auth({ server: false }), scopes: options.scopes ?? ['posts:read'], ...options.oauthServer === undefined ? {} : { oauthServer: options.oauthServer } } as never)
 }
 
 type Server = ReturnType<typeof server>
@@ -97,7 +97,7 @@ describe('the revocation endpoint (RFC 7009)', () => {
   })
 
   test('counts its own budget, apart from the token endpoint', async () => {
-    const app = testApp({ site: 'http://localhost', pages: auth({ plugin: false }), scopes: ['posts:read'], rateLimit: { oauthToken: { max: 2, window: '900s' } } } as never)
+    const app = testApp({ site: 'http://localhost', pages: auth({ server: false }), scopes: ['posts:read'], rateLimit: { oauthToken: { max: 2, window: '900s' } } } as never)
     const statuses = []
 
     for (let attempt = 0; attempt < 3; attempt++)
@@ -127,7 +127,7 @@ describe('an OAuth server without declared scopes', () => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      testApp({ site: 'http://localhost', pages: auth({ plugin: false }), oauthServer: true })
+      testApp({ site: 'http://localhost', pages: auth({ server: false }), oauthServer: true })
       expect(warned.mock.calls.flat().join(' ')).toContain('declares no `scopes`')
     }
     finally {
@@ -136,8 +136,8 @@ describe('an OAuth server without declared scopes', () => {
   })
 
   test.each([
-    ['declared scopes', { pages: auth({ plugin: false }), scopes: ['posts:read'], oauthServer: true }],
-    ['only the default, off the pages', { pages: auth({ plugin: false }) }],
+    ['declared scopes', { pages: auth({ server: false }), scopes: ['posts:read'], oauthServer: true }],
+    ['only the default, off the pages', { pages: auth({ server: false }) }],
   ])('stays quiet with %s', (_name, options) => {
     const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
 

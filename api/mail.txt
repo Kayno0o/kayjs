@@ -272,7 +272,7 @@ interface MailExtensionOptions extends MailerOptions
   module?: string | undefined
   optional?: boolean | undefined
   queue?: (QueueOptions<Mail> & { name?: string | undefined; }) | undefined
-  server?: (() => Promise<Mailer>) | undefined
+  server?: (() => Promise<Mailer>) | false | undefined
   smtp?: SmtpOverrides | undefined
   suppressionStore?: SuppressionStore | undefined
   to?: Address | Address[] | undefined

@@ -41,7 +41,7 @@ import { send } from '@kaynooo/kayjs-mail'
 await send({ to: 'ada@example.com', subject: 'Hello', text: 'Hi Ada' })
 ```
 
-A transport or views of your own need a module. `src/mail.ts` exports `mailer({ ... })` as `mail`, and `mail({ module: './src/mail' })` lists it, with the path relative to the project root.
+A transport or views of your own need a module. `src/mail.ts` exports `mailer({ ... })` as `mail`, and `mail()` with no argument uses it. `mail({ module: './src/mail' })` names another path, relative to the project root, and `mail({ server: false })` builds no mailer, for an app that uses `new Elysia().use(mail)` by hand.
 
 kay imports the module only as the server starts, and `kay build --compile` bakes it into the executable. Options go in the module then, not in `mail()`.
 

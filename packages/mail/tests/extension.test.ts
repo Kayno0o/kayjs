@@ -33,6 +33,64 @@ afterEach(async () => {
     await stop()
 })
 
+describe('mail() by convention and by hand', () => {
+  const app = (modules: Record<string, Record<string, unknown> | undefined>) => ({ root: '/', extensions: [], modules })
+  const build = async (extension: KayExtension<Mailer>, modules: Record<string, Record<string, unknown> | undefined>) => (extension.server as (app: unknown) => Promise<Mailer>)(app(modules))
+
+  it('names src/mail.ts as its file only when given no option', () => {
+    expect(mail().appFiles).toEqual({ mail: 'src/mail.ts' })
+    expect(mail({ from: 'site@site.test' }).appFiles).toBeUndefined()
+    expect(mail({ module: './src/mail' }).appFiles).toBeUndefined()
+  })
+
+  it('uses the mail a src/mail.ts exports, registered as the running one', async () => {
+    const own = mailer({ from: 'file@site.test' })
+    const built = await build(mail(), { mail: { mail: own } })
+
+    expect(built).toBe(own)
+    expect(await registeredMailer()).toBe(own)
+    own.listen(0)
+    stops.push(async () => void await own.stop())
+    await send(message('From the file'))
+    expect(outbox.last()?.from).toBe('file@site.test')
+  })
+
+  it('builds its own from the environment when the app has no src/mail.ts', async () => {
+    const built = await build(mail(), { mail: undefined })
+
+    built.listen(0)
+    stops.push(async () => void await built.stop())
+    await send(message('Bare'))
+    expect(outbox.last()?.subject).toBe('Bare')
+  })
+
+  it('keeps the inline options over the file', async () => {
+    const own = mailer({ from: 'file@site.test' })
+    const built = await build(mail({ from: 'inline@site.test' }), { mail: { mail: own } })
+
+    expect(built).not.toBe(own)
+    built.listen(0)
+    stops.push(async () => void await built.stop())
+    await send(message('Inline'))
+    expect(outbox.last()?.from).toBe('inline@site.test')
+  })
+
+  it('builds no server with server: false, and lists the variables and the dev tool alone', () => {
+    const extension = mail({ server: false })
+
+    expect(extension.server).toBeUndefined()
+    expect(extension.serverModule).toBeUndefined()
+    expect(extension.appFiles).toBeUndefined()
+    expect(extension.env).toBeDefined()
+    expect(extension.devTool).toBeDefined()
+  })
+
+  it('refuses server: false beside a module or options', () => {
+    expect(() => mail({ module: './src/mail', server: false })).toThrow('not both')
+    expect(() => mail({ from: 'a@b.test', server: false })).toThrow('not both')
+  })
+})
+
 describe('mail() with no module', () => {
   it('builds the mailer from its own options as the site starts', async () => {
     const extension = mail({ from: 'Site <site@site.test>', locale: 'fr' })

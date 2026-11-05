@@ -216,7 +216,7 @@ function conventionalHooks(loaded: Record<string, unknown> | undefined): AuthHoo
   const own = loaded?.auth
 
   if (typeof own === 'object' && own !== null && 'plugin' in own)
-    throw configError('src/auth.ts exports `auth`, a authCore result, while auth() builds its own: give `auth({ module: \'./src/auth\' })` for kay to mount it, or `auth({ plugin: false })` if you mount it by hand')
+    throw configError('src/auth.ts exports `auth`, a authCore result, while auth() builds its own: give `auth({ module: \'./src/auth\' })` for kay to mount it, or `auth({ server: false })` if you mount it by hand')
 
   return loaded?.hooks as AuthHooks | undefined
 }

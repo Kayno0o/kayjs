@@ -2,6 +2,8 @@
 
 > An LLM called from kay apps with no SDK and no streaming code: `ask()` over Anthropic or any OpenAI-compatible server (OpenAI, Ollama) through their HTTP APIs, a reply that streams into `await` blocks and into streaming actions as it is, and a scripted fake answering in development and tests.
 
+Setup: `ai()` runs with no argument and `ai({ rateLimit, budget, onFinish, ... })` takes its options inline, in `kay.config.ts`, which kay reads for the commands and the dev tool with no server running, so there is no module form.
+
 ## Topics
 
 `bunx kay docs <words>` prints the section of these files or kay's that matches.

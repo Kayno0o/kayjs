@@ -236,13 +236,13 @@ function viewerExtension(viewer: boolean | undefined): { context: string, layout
 export interface AuthExtensionOptions extends AuthPagesOptions {
   // The file exporting the app's `auth`, the `authCore` result, as a path from the project root: `'./src/auth'`. kay imports it as the server starts, never as the config is read, so the config stays off the app's database, and `kay check` types `ctx.locals.auth` and links to kayjs-auth's routes off it.
   module?: string | undefined
-  // Any other plugin carrying a `authCore` result, as a function, in place of `module`.
-  server?: (() => AnyElysia | Promise<AnyElysia>) | undefined
+  // Any other plugin carrying an `authCore` result, as a function, in place of `module`. `false` builds no plugin, for an app mounting it by hand, `new Elysia().use(auth.plugin).use(await pages())`: the extension then serves the pages alone, as `mail({ server: false })` serves nothing.
+  server?: (() => AnyElysia | Promise<AnyElysia>) | false | undefined
   // `false` leaves out the prebuilt pages and serves the plugin alone, for an app writing every page itself. `true` by default.
   pages?: boolean | undefined
   // Templates read `ctx.user`, `ctx.can(role)` and `ctx.impersonator` with no option, as `SignedIn`, `SignedOut`, `UserMenu` and `ImpersonationBanner` do, the session being read before the render of each page reaching one of them and of no other. `true` also reads the user ahead of every page, for an app whose own components call `currentUser`.
   viewer?: boolean | undefined
-  // `false` builds no plugin, for an app mounting the plugin by hand, `new Elysia().use(auth.plugin).use(await pages())`: the extension then serves the pages alone.
+  /** @deprecated Named `server: false` since 1.91, as kayjs-mail's escape is; the old name works until 1.94, and `kay upgrade` renames it. */
   plugin?: false | undefined
 }
 
@@ -303,9 +303,10 @@ function ownAuth(options: OwnOptions): AuthPages {
 }
 
 function moduleAuth(options: AuthExtensionOptions): AuthPages {
-  const { module, server, pages = true, viewer, prefix = DEFAULT_PREFIX, home } = options
+  const { module, pages = true, viewer, prefix = DEFAULT_PREFIX, home } = options
+  const server = options.server === false ? undefined : options.server
 
-  if (module !== undefined && server !== undefined)
+  if (module !== undefined && options.server !== undefined)
     throw new Error('kayjs-auth: auth() takes `module` or `server`, not both')
 
   const given = { prefix: options.prefix, home }

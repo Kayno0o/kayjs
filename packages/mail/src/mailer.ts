@@ -1,5 +1,5 @@
 import type { Hook } from 'kay/library'
-import type { EnqueueOptions, FailedJob, KayExtension, QueueOptions } from 'kay/server'
+import type { EnqueueOptions, ExtensionApp, FailedJob, KayExtension, QueueOptions } from 'kay/server'
 import type { EventSecrets, Found, Suppression, SuppressionReason } from './events'
 import type { ListOptions, ListRun, ListsHandle, MailingList, Subscription } from './list'
 import type { ListStore } from './list-store'
@@ -403,9 +403,12 @@ function relay(options: MailerOptions): Relay {
 export interface MailExtensionOptions extends MailerOptions {
   // The file exporting the app's mailer as `mail`, as a path from the project root: `'./src/mail'`. kay imports it as `pages()` builds the app and bakes it into an executable. For a transport or views of the app's own; the mailer options (`from`, `locale`...) go in `mail({})` itself instead.
   module?: string | undefined
-  // Any other way to load the mailer, in place of `module`.
-  server?: (() => Promise<Mailer>) | undefined
+  // Any other way to load the mailer, in place of `module`, as a function. `false` builds none, for an app using the mailer by hand, `new Elysia().use(mail)`: the extension then lists the variables and the dev tool alone, as `auth({ server: false })` does.
+  server?: (() => Promise<Mailer>) | false | undefined
 }
+
+// The file `mail()` with no options loads by convention, exporting the app's mailer as `mail`.
+const APP_FILES = { mail: 'src/mail.ts' }
 
 // The mailers of the sites running in this process, the latest started last: what `send` and `enqueue` use. A site that is closed without stopping (kaynooo/kayjs#3053) leaves its entry until the next start.
 const running: Mailer[] = []
@@ -457,7 +460,7 @@ export async function enqueue<P extends object>(message: MailMessage<P>, options
 const KNOWN_OPTIONS: Record<keyof MailExtensionOptions, true> = { module: true, server: true, from: true, fromName: true, to: true, transport: true, smtp: true, locale: true, queue: true, logRecipients: true, logSubjects: true, listStore: true, suppressionStore: true, events: true, inbound: true, optional: true }
 
 // Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`; its `mail.auth` and `mail.contact` messages come with the package (`kay.messages`).
-// `mail({ from, locale, ...})` takes the options of `mailer()` and builds it as `pages()` does, with no module; `module` or `server` are for a mailer written by the app, loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
+// `mail({ from, locale, ...})` takes the options of `mailer()` and builds it as `pages()` does, with no module, and `mail()` alone uses the `mail` a `src/mail.ts` exports when the app has one. `module` or `server` are for a mailer written by the app elsewhere, loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
 export function mail(options: MailExtensionOptions = {}): KayExtension<Mailer> {
   checkOptionKeys('mail()', options, KNOWN_OPTIONS)
 
@@ -466,7 +469,12 @@ export function mail(options: MailExtensionOptions = {}): KayExtension<Mailer> {
   if (module !== undefined && server !== undefined)
     throw new Error('kayjs-mail: mail() takes the path of the module or a `server`, not both')
 
-  if ((module !== undefined || server !== undefined) && Object.values(mailerOptions).some(value => value !== undefined))
+  if (module !== undefined && server === false)
+    throw new Error('kayjs-mail: mail() takes the path of the module or `server: false`, not both')
+
+  const given = Object.values(mailerOptions).some(value => value !== undefined)
+
+  if ((module !== undefined || server !== undefined) && given)
     throw new Error('kayjs-mail: mail() takes the options of mailer() or a `module` or `server` building the mailer, not both: put them in the mailer the module exports')
 
   const devTool = { module: `${import.meta.dir}/devTool.ts` }
@@ -479,16 +487,20 @@ export function mail(options: MailExtensionOptions = {}): KayExtension<Mailer> {
     } } }
   }
 
+  if (server === false)
+    return { name: '@kaynooo/kayjs-mail', devTool, env }
+
   // Built at each start of a site, so two sites in one process hold a mailer each.
-  const build = async (): Promise<Mailer> => {
-    const built = server === undefined ? mailer(mailerOptions) : await server()
+  const build = async (app?: ExtensionApp): Promise<Mailer> => {
+    const conventional = given || server !== undefined ? undefined : app?.modules.mail?.mail as Mailer | undefined
+    const built = conventional ?? (server === undefined ? mailer(mailerOptions) : await server())
 
     register(built)
 
     return built
   }
 
-  return { name: '@kaynooo/kayjs-mail', server: build, devTool, env }
+  return { name: '@kaynooo/kayjs-mail', server: build, ...!given && server === undefined && { appFiles: APP_FILES }, devTool, env }
 }
 
 // Sends mails written as `.kay` components, html or text: over SMTP in production, to the outbox in development and tests. Using it in the server runs the queue `enqueue` fills, and under `kay dev` lists the outbox at `/_kay/mail`.

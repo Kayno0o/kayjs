@@ -10,6 +10,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.91.0
 
+### kayjs-auth: the escape is `server: false`
+
+- `auth({ plugin: false })` is `auth({ server: false })`, the escape `mail({ server: false })` takes too; the old name works until 1.94 and `kay check` flags it as `deprecated-escape-option`, with a safe fix that `kay upgrade` applies.
+
 ### The forms 1.87 deprecated are gone
 
 Their `deprecated-*` lints go with them: run `kay upgrade` on 1.90 first and it rewrites every one that has a fix. On 1.91 each fails `kay check`, and a Table, TreeView or Timeline `onSelect`, a `queue()`, `workflow()` or `mailer({ queue })` `onFailed` or `keepFailed`, and `fileStore` in the config also throw when they run, so none is a silent change.

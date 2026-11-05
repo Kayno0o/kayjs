@@ -18,7 +18,7 @@ const mailer = (mails: Mail[]) => ({ send: (mail: Mail) => void mails.push(mail)
 describe('createAuth with the prebuilt pages', () => {
   test('the sign-in, two-factor and sessions pages and every mailed link default to the pages under their prefix', async () => {
     const mails: Mail[] = []
-    const { browser, store } = testApp({ site: 'http://localhost', pages: auth({ plugin: false, prefix: '/account-pages' }), oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } }, email: { mailer: mailer(mails), links: { 'magic-link': '/magic' }, requireVerified: false } })
+    const { browser, store } = testApp({ site: 'http://localhost', pages: auth({ server: false, prefix: '/account-pages' }), oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } }, email: { mailer: mailer(mails), links: { 'magic-link': '/magic' }, requireVerified: false } })
     const ada = browser()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
@@ -57,8 +57,8 @@ describe('auth({ module }) registers the app\'s auth module', () => {
     const extension = auth({ module: './src/auth' })
 
     expect(extension).toMatchObject({ name: '@kaynooo/kayjs-auth', serverModule: { path: './src/auth', export: 'auth' }, prefix: '/auth', home: '/', routes: { prefix: '/auth' } })
-    expect(extension.devTool).toEqual(auth({ plugin: false }).devTool)
-    expect(extension.commands).toEqual(auth({ plugin: false }).commands)
+    expect(extension.devTool).toEqual(auth({ server: false }).devTool)
+    expect(extension.commands).toEqual(auth({ server: false }).commands)
   })
 
   test('pages: false serves the plugin alone', () => {

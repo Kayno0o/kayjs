@@ -722,6 +722,15 @@ export const LINTS = {
     wrong: 'auth({ password: true, twoFactor: true, signUp: false })',
     right: 'auth({ signUp: false })',
   },
+  'deprecated-escape-option': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.91',
+    site: true,
+    summary: 'The escape of kayjs-auth\'s `auth()` under its name before 1.91: `plugin: false`, which builds no plugin for an app mounting it by hand, is `server: false` now, the escape `mail({ server: false })` takes too. The old name works until 1.94. Found in the options object written out at a call of `auth` read from `@kaynooo/kayjs-auth`; the fix renames the key, and a `server` set beside it is reported with no fix.',
+    wrong: 'auth({ plugin: false })',
+    right: 'auth({ server: false })',
+  },
   'deprecated-ui-props': {
     level: 'warn',
     group: 'deprecated',

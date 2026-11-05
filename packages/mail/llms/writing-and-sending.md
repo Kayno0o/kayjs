@@ -16,7 +16,7 @@ import { defineConfig } from 'kay/server'
 export default defineConfig({ extensions: [mail({ from: 'Site <contact@example.com>', locale: 'fr' })] })
 ```
 
-A mailer with a transport, views or hooks of the app's own is written in a module instead, which takes the options in place of `mail()`:
+A mailer with a transport, views or hooks of the app's own is written in a module instead, which takes the options in place of `mail()`. `mail()` with no argument uses the `mail` a `src/mail.ts` exports when the app has one, so the file alone is enough; `mail({ module: './src/mail' })` names another path, and `mail({ server: false })` builds nothing, for an app using `new Elysia().use(mail)` by hand:
 
 ```ts
 // src/mail.ts

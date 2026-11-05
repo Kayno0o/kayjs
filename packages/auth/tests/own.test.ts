@@ -89,6 +89,15 @@ describe('auth() with no module', () => {
     expect(await features()).toMatchObject({ pages: null })
   })
 
+  test('server: false builds none, for an app mounting it by hand, as plugin: false did', () => {
+    const extension = auth({ server: false })
+
+    expect(extension.server).toBeUndefined()
+    expect(extension.serverModule).toBeUndefined()
+    expect(extension.routes).toBeDefined()
+    expect(() => auth({ server: false, module: './src/auth' })).toThrow('not both')
+  })
+
   test('plugin: false builds none, for an app mounting it by hand', () => {
     const extension = auth({ plugin: false })
 
@@ -188,11 +197,11 @@ describe('found by convention', () => {
     expect(sent.map(mail => new URL(mail.url!).pathname)).toEqual(['/auth/verify-email'])
   })
 
-  test('a src/auth.ts exporting an auth object is refused, pointing at module and plugin: false', async () => {
+  test('a src/auth.ts exporting an auth object is refused, pointing at module and server: false', async () => {
     mkdirSync(join(root, 'src'))
     writeFileSync(join(root, 'src/auth.ts'), 'export const auth = { plugin: {} }\n')
 
-    await expect(served({})).rejects.toThrow('auth({ plugin: false })')
+    await expect(served({})).rejects.toThrow('auth({ server: false })')
   })
 
   test('an inline hook wins over the file\'s, and a src/auth.ts with no hooks is fine', async () => {

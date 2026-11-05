@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - A constructor is a noun across the libraries (`authCore`, `authGate`, `memoryAuth`, `pgAuth`, `cmsDrafts`, `cmsEntryForm`), every Postgres store and table helper takes one `PgSource` (a Bun `SQL`, a pg-orm `Database` or a URL; `pgLoader` takes it as `source`), `createXTables` creates, `xTableNames` lists names: see [Component libraries: conventions](component-library-conventions.md#conventions); `deprecated-library-names` renames the old names.
+- Each library runs with no argument and takes the same three forms: `mail()` uses a `src/mail.ts` exporting `mail` as `auth()` uses `src/auth.ts` and `src/mail.ts`, `mail({ from })` and `auth({ store })` take their options inline, `module` names a file of the app, and `server: false` is the one escape for an app mounting the plugin by hand (`auth({ plugin: false })` is renamed by `deprecated-escape-option`): [kayjs-mail](../packages/mail/llms/writing-and-sending.md), [kayjs-auth](../packages/auth/llms/setup.md).
 
 ## 1.90.0
 

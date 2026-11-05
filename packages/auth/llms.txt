@@ -2,6 +2,8 @@
 
 > Auth for kay apps, built on kay's `session()`: OAuth sign-in with any provider, passwords, mailed links (email verification, password reset, magic links, email change), TOTP two-factor with recovery codes, bearer tokens for devices and API clients, security mails, a proof-of-work CAPTCHA or a third party's, a breached-password check, a fail-closed gate for routes, and prebuilt sign-in and account pages. It works in kay pages, actions and guards, and in a plain Elysia app. Its data lives in a store: in memory for tests, in Postgres or SQLite through pg-orm, or in any object keeping the store contract.
 
+Setup, three ways: `auth()` runs with no argument (hooks from `src/auth.ts`, mail from `src/mail.ts`, a SQLite store), `auth({ oauth, roles, ... })` takes the options of `createAuth` inline, and `auth({ module: './src/auth' })` mounts a `createAuth` result of your own; `auth({ server: false })` is the escape for an app mounting the plugin by hand.
+
 ## Topics
 
 `bunx kay docs <words>` prints the section of these files or kay's that matches.

@@ -2,6 +2,8 @@
 
 > Components for kay apps, shipped as `.kay` sources the app compiles as its own and styled by the classes of one `theme.css` the app restyles: buttons, forms and inputs, dialogs, tables, navigation, layouts, charts, drag and drop, media and more.
 
+Setup: `ui()` runs with no argument and takes none; the settings an app replaces go in a module named by `librarySettings` in `kay.config.ts`.
+
 ## Topics
 
 `bunx kay docs <words>` prints the section of these files or kay's that matches.

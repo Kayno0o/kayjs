@@ -342,7 +342,7 @@ interface AuthExtensionOptions extends AuthPagesOptions
   pages?: boolean | undefined
   plugin?: false | undefined
   prefix?: string | undefined
-  server?: (() => AnyElysia | Promise<AnyElysia>) | undefined
+  server?: (() => AnyElysia | Promise<AnyElysia>) | false | undefined
   viewer?: boolean | undefined
 
 [.] AuthFeatures

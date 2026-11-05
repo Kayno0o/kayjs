@@ -40,7 +40,7 @@ describe('the dev tool\'s Auth tab', () => {
 
   test('is named by both extensions, as one file', () => {
     const extension = auth({ server: () => testApp().auth.plugin })
-    const pages = auth({ plugin: false })
+    const pages = auth({ server: false })
 
     expect(extension.devTool).toEqual(pages.devTool)
     expect(existsSync(pages.devTool!.module)).toBe(true)

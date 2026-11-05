@@ -28,7 +28,7 @@ function server(options: { documents?: Record<string, unknown>, scopes?: ('posts
 
   const app = testApp({
     site: 'http://localhost',
-    pages: auth({ plugin: false }),
+    pages: auth({ server: false }),
     scopes: options.scopes ?? ['posts:read', 'posts:write'],
     ...options.store && { store: options.store },
     oauthServer: {
@@ -192,7 +192,7 @@ describe('the authorization request', () => {
   })
 
   test('a default scope the app does not declare is refused at startup', () => {
-    expect(() => testApp({ site: 'http://localhost', pages: auth({ plugin: false }), scopes: ['posts:read'], oauthServer: { defaultScopes: ['posts:write'] } } as never)).toThrow('defaultScopes')
+    expect(() => testApp({ site: 'http://localhost', pages: auth({ server: false }), scopes: ['posts:read'], oauthServer: { defaultScopes: ['posts:write'] } } as never)).toThrow('defaultScopes')
   })
 
   test('shows the consent page once, then skips it until the client asks for more scopes', async () => {
@@ -507,7 +507,7 @@ describe('refresh tokens', () => {
 describe('the OAuth server being off', () => {
   test('serves nothing without pages, or with oauthServer false', async () => {
     const plain = testApp({ site: 'http://localhost' })
-    const off = testApp({ site: 'http://localhost', pages: auth({ plugin: false }), oauthServer: false })
+    const off = testApp({ site: 'http://localhost', pages: auth({ server: false }), oauthServer: false })
 
     for (const app of [plain, off]) {
       expect((await app.browser().fetch('/.well-known/oauth-authorization-server')).status).toBe(404)

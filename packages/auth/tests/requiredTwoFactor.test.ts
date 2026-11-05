@@ -306,7 +306,7 @@ describe('twoFactor.require in the admin pages', () => {
 
 describe('twoFactor.require in OAuth consent', () => {
   function server() {
-    return testApp({ site: 'http://localhost', pages: authPages({ plugin: false }), scopes: ['posts:read'], admin: 'admin', twoFactor: { require: ['admin'] }, oauthServer: { fetch: async () => new Response('missing', { status: 404 }) } })
+    return testApp({ site: 'http://localhost', pages: authPages({ server: false }), scopes: ['posts:read'], admin: 'admin', twoFactor: { require: ['admin'] }, oauthServer: { fetch: async () => new Response('missing', { status: 404 }) } })
   }
 
   async function consent(roles: ('admin' | 'editor')[], enrolled: boolean) {

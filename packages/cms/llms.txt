@@ -2,6 +2,8 @@
 
 > A CMS for kay sites: content edited on the page it renders, and collection screens.
 
+Setup: `cms()` runs with no argument and `cms({ role, files, ... })` takes its options inline, in `kay.config.ts`, which kay reads for `kay check` and the editor with no server running, so there is no module form.
+
 ## Topics
 
 `bunx kay docs <words>` prints the section of these files or kay's that matches.

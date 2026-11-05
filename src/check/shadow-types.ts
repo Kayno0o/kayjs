@@ -33,6 +33,7 @@ import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes,
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 import { deprecatedAuthOptions } from './deprecated-auth-options'
 import { deprecatedConfigKeys } from './deprecated-config-keys'
+import { deprecatedEscapeOption } from './deprecated-escape-option'
 import { ownFile } from './diagnose'
 import { durationSeconds } from './duration-seconds'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
@@ -150,6 +151,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => contextName(root, options),
   async ({ root, options }) => movedImports(root, options),
   async ({ root, options }) => deprecatedAuthOptions(root, options),
+  async ({ root, options }) => deprecatedEscapeOption(root, options),
   async ({ root, options }) => sizeLimits(root, options),
 ]
 
