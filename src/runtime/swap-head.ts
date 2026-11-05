@@ -125,7 +125,7 @@ function liveKey(element: Element): string {
 
 // Adds what the next head serves that this one lacks now, and drops what the server alone served here as the page is swapped: the page keeps its own styles until the next one's loaded.
 // An element a script changed or added since stays the script's, and the next page's copy of it is not added again, nor its meta of the same name serving another value.
-export function mergeHead(next: Document): { loaded: Promise<unknown>, commit: () => void } {
+export function mergeHead(next: Document, scoped = false): { loaded: Promise<unknown>, commit: () => void } {
   const incoming = [...next.head.children].filter(element => !element.matches(UNMERGED))
 
   if (!headWatch) {
@@ -157,7 +157,8 @@ export function mergeHead(next: Document): { loaded: Promise<unknown>, commit: (
   const named: Element[] = []
 
   for (const element of document.head.children as HTMLCollectionOf<HeadElement>) {
-    if (element.matches(KEPT))
+    // The live values a refresh of some loads leaves to the page are followed through the scripts of the page shown.
+    if (element.matches(KEPT) || (scoped && element.matches('script[data-kay-live]')))
       continue
 
     // A stylesheet `kay dev` swapped in for an edited one, and what the page's own scripts only touch the markup of, are the server's as they stand.

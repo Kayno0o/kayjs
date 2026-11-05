@@ -1,16 +1,18 @@
 import { join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
+import { logSink, setLogSink } from '../src/runtime/log'
 import { testSite } from '../src/test'
 
 const routesDir = 'tests/fixtures/load-refresh/src/routes'
 const site = await testSite({ routesDir, islands: false })
 const based = await testSite({ routesDir, islands: false, base: '/shop', trailingSlash: 'always' })
+const developing = await testSite({ routesDir, islands: false, dev: true })
 const { counts, reset } = await import(join(import.meta.dir, 'fixtures/load-refresh/src/calls.ts')) as typeof import('./fixtures/load-refresh/src/calls')
 
 const LOADS = 'x-kay-loads'
 
 afterAll(async () => {
-  await Promise.all([site.close(), based.close()])
+  await Promise.all([site.close(), based.close(), developing.close()])
 })
 
 beforeEach(reset)
@@ -22,7 +24,7 @@ async function asked(path: string, loads: string, target = site): Promise<{ html
 }
 
 function placeholders(html: string): string[] {
-  return [...html.matchAll(/<([a-z0-9-]+) data-kay-kept><\/\1>/g)].map(match => match[1]!)
+  return [...html.matchAll(/<([a-z0-9-]+) data-kay-kept data-kay-u="[\w-]+"><\/\1>/g)].map(match => match[1]!)
 }
 
 describe('a refresh asking for some of the page loads', () => {
@@ -82,7 +84,7 @@ describe('a refresh asking for some of the page loads', () => {
 
     expect(counts).toEqual({ cart: 1, wishlist: 1 })
     expect(placeholders(html)).toEqual([])
-    expect(html).toContain('<p class="both">1 1</p>')
+    expect(html).toMatch(/<p [^>]*class="both"[^>]*>1 1<\/p>/)
   })
 
   it('runs the loads a named load reads', async () => {
@@ -90,7 +92,7 @@ describe('a refresh asking for some of the page loads', () => {
 
     expect(counts).toEqual({ items: 1, cart: 1 })
     expect(placeholders(html)).toEqual(['p'])
-    expect(html).toContain('<p class="items">1 of 1</p>')
+    expect(html).toMatch(/<p [^>]*class="items"[^>]*>1 of 1<\/p>/)
   })
 
   it('runs a load read outside any element every time', async () => {
@@ -112,7 +114,8 @@ describe('a refresh asking for some of the page loads', () => {
       expect(html).not.toContain('<script>alert')
     }
 
-    expect(counts.cart ?? 0).toBeLessThanOrEqual(hostile.length)
+    // Every value but `__proto__`, a well-formed name no load answers to, shows the page whole.
+    expect(counts.cart).toBe(hostile.length - 1)
   })
 
   it('reads at most 32 names', async () => {
@@ -129,6 +132,116 @@ describe('a refresh asking for some of the page loads', () => {
       await asked('/', name)
       expect(counts).toEqual({})
     }
+  })
+
+  it('runs the loads a conditional and a loop show together with the one named, and keeps only what reads neither', async () => {
+    const { html } = await asked('/cond', 'cart')
+
+    expect(counts).toEqual({ cart: 1, wishlist: 1 })
+    expect(placeholders(html)).toEqual(['p'])
+    expect(html).toMatch(/<p [^>]*class="a"[^>]*>1<\/p>/)
+    expect(html).toContain('>a 1</li>')
+    expect(html).toContain('>b 1</li>')
+  })
+
+  it('runs a layout wrapping the page for its own loads and never leaves it to the browser', async () => {
+    const { html } = await asked('/shell', 'cart')
+
+    expect(counts).toEqual({ user: 1, cart: 1 })
+    expect(html).toContain('data-theme="dark"')
+    expect(placeholders(html)).toEqual([])
+
+    reset()
+
+    const other = await asked('/shell', 'user')
+
+    expect(counts).toEqual({ user: 1 })
+    expect(other.html).toContain('data-theme="dark"')
+    expect(placeholders(other.html)).toEqual(['main'])
+  })
+
+  it('maps a template constant back to the loads it reads, for the elements reading it', async () => {
+    const { html } = await asked('/derived', 'wishlist')
+
+    expect(counts).toEqual({ wishlist: 1 })
+    expect(placeholders(html)).toEqual(['section'])
+    expect(html).not.toContain('NaN')
+
+    reset()
+
+    const own = await asked('/derived', 'cart')
+
+    expect(own.html).toMatch(/class="total"[^>]*>2</)
+  })
+
+  it('reads a load spread in the fence like any other', async () => {
+    const { html, response } = await asked('/spread', 'wishlist')
+
+    expect(response.status).toBe(200)
+    expect(counts).toEqual({ cart: 1, wishlist: 1 })
+    expect(html).toMatch(/class="all"[^>]*>2</)
+  })
+
+  it('gives a name a statement changes the loads the statement reads', async () => {
+    const left = await asked('/mutate', 'wishlist')
+
+    expect(counts).toEqual({ wishlist: 1 })
+    expect(placeholders(left.html)).toEqual(['p'])
+    expect(left.html).not.toMatch(/class="totals"/)
+
+    reset()
+
+    const run = await asked('/mutate', 'cart')
+
+    expect(counts).toEqual({ cart: 1 })
+    expect(run.html).toMatch(/class="totals"[^>]*>2</)
+  })
+
+  it('gives every element left to the page an id of its own, and the element it stands for the same one', async () => {
+    const whole = await (await site.fetch('/')).text()
+    const ids = [...whole.matchAll(/data-kay-u="([\w-]+)"/g)].map(match => match[1]!)
+
+    expect(ids.length).toBeGreaterThan(2)
+    expect(new Set(ids).size).toBe(ids.length)
+
+    const { html } = await asked('/', 'cart')
+
+    for (const [, id] of html.matchAll(/data-kay-kept data-kay-u="([\w-]+)"/g))
+      expect(ids).toContain(id!)
+  })
+
+  it('answers a special page rendered for a refresh as a refresh, uncached', async () => {
+    const response = await site.fetch('/nope', { headers: { [LOADS]: 'cart' } })
+
+    expect(response.status).toBe(404)
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
+    expect(response.headers.get('vary')).toContain(LOADS)
+  })
+
+  it('answers a prerendered page asked for some of its loads', async () => {
+    const response = await site.fetch('/static', { headers: { [LOADS]: 'cart' } })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('vary')).toContain(LOADS)
+  })
+
+  it('warns once, in development, of a name no load answers to', async () => {
+    const logged: string[] = []
+    const previous = logSink()
+
+    setLogSink((_level, message) => void logged.push(message))
+
+    try {
+      await asked('/', 'nothing', developing)
+      await asked('/', 'nothing', developing)
+      await asked('/', 'cart', developing)
+    }
+    finally {
+      setLogSink(previous)
+    }
+
+    expect(logged.filter(message => message.includes('`nothing`'))).toHaveLength(1)
+    expect(logged.some(message => message.includes('`cart`'))).toBe(false)
   })
 
   it('answers the same way under a base and with trailing slashes', async () => {

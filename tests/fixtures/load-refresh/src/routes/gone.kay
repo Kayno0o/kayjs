@@ -1,0 +1,22 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import { run } from '../calls'
+import Bump from '../components/bump.kay'
+
+export const bump = action(t.Object({}), () => 'ok')
+
+const cart = await run('cart', n => ({ n }))
+const wishlist = await run('wishlist', n => ({ n }))
+
+if (cart.n > 1)
+  ctx.redirect('/island')
+---
+head
+  title Gone
+main
+  section.cart
+    p.cart {cart.n}
+    Bump(run={bump} loads="cart")
+  section.wishlist
+    p.wish {wishlist.n}

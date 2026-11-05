@@ -1,0 +1,13 @@
+--- server
+import { run } from '../calls'
+
+const cart = await run('cart', n => ({ n, items: ['a', 'b'] }))
+const wishlist = await run('wishlist', n => ({ n }))
+const totals: string[] = []
+
+for (const item of cart.items)
+  totals.push(item)
+---
+main
+  p.totals {totals.length}
+  p.wish {wishlist.n}

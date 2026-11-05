@@ -3,7 +3,7 @@ import { ISLAND } from './markers'
 import { moves, place } from './move'
 import { navigation } from './navigation'
 import { runnable, scriptMarkup } from './swap-head'
-import { KEPT, keptPairs, MISSING, morphChildren } from './swap-morph'
+import { KEPT, MISSING, morphChildren, UNIT } from './swap-morph'
 import { decodeServerValue } from './wire'
 
 const PERSISTENT = 'slot[data-persist]'
@@ -47,6 +47,36 @@ export function heldLate(): void {
   })()
 }
 
+const LIVE = 'script[data-kay-live]'
+
+// Throws `MISSING` before anything of the page changed when the next page, a refresh of some of its loads, cannot be put in place: an element it leaves to the page is gone, or it renders live values again, which would replace the connection of those the elements kept hold.
+export function checkKept(next: Document): void {
+  if (next.body.querySelector(`[${KEPT}]`) === null)
+    return
+
+  if (next.querySelector(LIVE) !== null)
+    throw MISSING
+
+  keptUnits(document.body, next.body)
+}
+
+// The live element each placeholder of the next page stands for, found by the id they share.
+function keptUnits(old: Element, body: Element): Map<Element, Element> {
+  const found = new Map<Element, Element>()
+
+  for (const placeholder of body.querySelectorAll(`[${KEPT}]`)) {
+    const id = placeholder.getAttribute(UNIT)
+    const live = id === null ? null : old.querySelector(`[${UNIT}="${CSS.escape(id)}"]`)
+
+    if (live === null || live.localName !== placeholder.localName)
+      throw MISSING
+
+    found.set(placeholder, live)
+  }
+
+  return found
+}
+
 // The next page's body morphed into this one: what it renders again stays the same element, so a layout's sidebar keeps its scroll, and the islands that live on are moved over before anything is taken away, so a playing video or an open socket never notices.
 export function swapBody(next: Document, policy: Policy, held: Held | undefined): void {
   const body = document.adoptNode(next.body)
@@ -54,14 +84,9 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined)
   const focused = heldFocus()
 
   const kept = new Set<Element>()
-  // What the server left to the page as it is, found before anything moves.
-  const left = body.querySelector(`[${KEPT}]`) ? keptPairs(old, body, new Set(old.querySelectorAll(LASTING))) : undefined
-
-  // A refresh of some of the page's loads whose markup the page cannot take, as it changed since: the whole page is asked for instead.
-  const lives = left ? [...left.values()].filter(live => live !== undefined) : []
-
-  if (left && lives.length !== left.size)
-    throw MISSING
+  // What the server left to the page as it is, found by its id before anything moves.
+  const left = body.querySelector(`[${KEPT}]`) ? keptUnits(old, body) : undefined
+  const lives = left ? [...left.values()] : []
 
   // The scroll of each element an island kept holds, which a move resets in a browser without `moveBefore`, and Chrome's swap loses with it too (a bare pair of moves keeps it, the swap's does not), so a restore puts back the ones the swap kept either way.
   const scrolls = new Map<Element, readonly [left: number, top: number]>()
@@ -98,7 +123,7 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined)
   }
 
   for (const [placeholder, live] of left ?? [])
-    keep(placeholder, live!)
+    keep(placeholder, live)
 
   for (const placeholder of body.querySelectorAll<HTMLElement>(PERSISTENT)) {
     const live = old.querySelector<KeptIsland>(`${PERSISTENT}[data-persist="${CSS.escape(placeholder.dataset.persist!)}"]`)

@@ -20,7 +20,7 @@ import { JsxTemplate } from './jsx'
 import { planLoads } from './load-plan'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 import { helperName } from './markup'
-import { defaultName, LOAD, LOAD_RUN, LOAD_TABLE, PROPS, VALUES } from './names'
+import { defaultName, LOAD, LOAD_KEY, LOAD_RUN, LOAD_TABLE, PROPS, VALUES } from './names'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { codeOf, reactiveValue } from './script'
 import { shadowedBinds } from './template-reads'
@@ -222,7 +222,7 @@ class ModuleShell {
     this.facts = options.ui !== undefined && owned.parts?.merges === true ? { ...owned, ui: options.ui } : owned
     this.styled = this.facts.ui !== undefined && uiHasVariants(this.facts.ui)
     this.deferred = deferredData(this.facts, this.fence)
-    this.loadPlan = this.mode === 'html' && this.fence !== undefined && options.pageFile === true ? planLoads(this.file, this.fence) : undefined
+    this.loadPlan = this.mode === 'html' && this.fence !== undefined && options.pageFile === true ? planLoads(this.file, this.fence, options.moduleId) : undefined
     this.params = paramsType(options)
     this.actionsTyped = this.mode === 'check' && (options.params !== undefined || (options.layoutFile === true && this.guardValues() !== undefined)) && (server?.actionCallees.length ?? 0) > 0
   }
@@ -466,7 +466,7 @@ class ModuleShell {
       b.add(htmlHelperImport())
 
     if (this.loadPlan)
-      b.add(`import { kept as ${helperName('kept')}, loadScope as ${helperName('loadScope')} } from 'kay/html'\n`)
+      b.add(`import { loadScope as ${helperName('loadScope')} } from 'kay/html'\n`)
 
     if (mode === 'dom')
       b.add(domHelperImport())
@@ -624,7 +624,7 @@ class ModuleShell {
     const located = this.options.inspect === true ? sourceLocator(this.options.inspectSource?.text ?? src, this.options.moduleId, this.options.inspectSource?.real) : undefined
 
     if (mode === 'html') {
-      new HtmlTemplate(b, src, this.facts, { classMerge: this.options.classMerge, hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located, kept: this.loadPlan && { table: LOAD_TABLE, groups: this.loadPlan.groups } }).value(visible)
+      new HtmlTemplate(b, src, this.facts, { classMerge: this.options.classMerge, hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located, kept: this.loadPlan && { groups: this.loadPlan.groups } }).value(visible)
       b.add('\n}\n')
     }
     else if (mode === 'dom') {
@@ -885,7 +885,7 @@ class ModuleShell {
 
       this.deferDeclared(server, span)
     }
-    const handOver = `return { ${server.data.map(data => this.deferred.has(data.name) ? `${data.name}: ${helperName('autoDefer')}(${data.name})` : data.name).join(', ')} }`
+    const handOver = `return { ${[...server.data.map(data => this.deferred.has(data.name) ? `${data.name}: ${helperName('autoDefer')}(${data.name})` : data.name), ...this.loadPlan ? [`${LOAD_KEY}: ${LOAD_RUN}`] : []].join(', ')} }`
 
     b.add('\n')
     this.sites.handOver = { start: b.code.length, end: b.code.length + handOver.length }

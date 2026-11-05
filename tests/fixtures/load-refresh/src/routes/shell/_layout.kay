@@ -1,0 +1,8 @@
+--- server
+import { run } from '../../calls'
+
+const user = await run('user', n => ({ n, theme: 'dark' }))
+---
+div.shell(data-theme={user.theme})
+  header.top {user.n}
+  slot

@@ -23,6 +23,8 @@ export const LOAD = 'load'
 // The table of a page's loads a refresh can run alone, and the function of `load` telling whether a statement of the fence runs.
 export const LOAD_TABLE = 'KayLoadTable'
 export const LOAD_RUN = 'KayRun'
+// The key a page's data carries the scope of its request under, which its markup asks which elements to leave to the page.
+export const LOAD_KEY = '__kayRun'
 // The component function's name in the analysis pass, which no read in the source can resolve to: the real one is chosen once the reads are known.
 export const SELF = 'KaySelf'
 

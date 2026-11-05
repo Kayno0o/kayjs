@@ -55,6 +55,13 @@ async function fetchPage(url: URL, signal?: AbortSignal, loads?: readonly string
   const response = await fetch(pageKey(url), { headers: { accept: 'text/html', [NAVIGATE_HEADER]: '1', ...loads && { [LOADS_HEADER]: loads.join(',') } }, signal: signal ?? null, ...loads && { cache: 'no-store' } })
   const type = response.headers.get('content-type') ?? ''
 
+  // A page that answers some of its loads is the same page still: a redirect, or another status, is for the whole page to show, since the placeholders it may hold stand for elements of the page asked.
+  if (loads && (!response.ok || response.redirected || pageKey(new URL(response.url)) !== pageKey(url))) {
+    void response.body?.cancel()
+
+    return fetchPage(url, signal)
+  }
+
   const full = response.headers.has(RELOAD_HEADER) || (isSecureContext && isolated(response.headers) !== crossOriginIsolated)
 
   // A file the browser loads itself once the swap gives up on it, so it is not read twice, as is a page a redirect took to another site, whose markup the swap never runs.

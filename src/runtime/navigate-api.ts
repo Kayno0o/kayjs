@@ -76,6 +76,18 @@ export async function navigateTo(to: string | { query: QueryChanges }, options: 
   return true
 }
 
+const LOAD_NAME = /^[\w$]{1,64}$/
+
+// Development: warns of a name the server would drop and of an empty list, which both ask for the whole page.
+function checkedLoads(asked: readonly string[]): readonly string[] {
+  const valid = asked.filter(name => LOAD_NAME.test(name))
+
+  if (asked.length === 0 || valid.length !== asked.length)
+    console.warn(asked.length === 0 ? 'kay: refresh() was given no load names, so it refreshes the whole page.' : `kay: refresh() was given load names that are not bindings (${asked.filter(name => !valid.includes(name)).map(name => JSON.stringify(name)).join(', ')}): they are left out.`)
+
+  return valid
+}
+
 // Runs the page's loads again and shows what they return, keeping scroll, focus and every island whose props did not change.
 // Named loads, the bindings of `const cart = await ...` in the page's or a layout's fence, run alone: the rest of the page stays as it is, unless it shows them.
 // kept: free
@@ -90,5 +102,7 @@ export async function refresh(loads?: string | readonly string[]): Promise<void>
   }
 
   prefetched.clear()
-  await follow(new URL(location.href), { intent: 'refresh', focused: document.activeElement, loads: typeof loads === 'string' ? [loads] : loads })
+  const names = typeof loads === 'string' ? [loads] : loads
+
+  await follow(new URL(location.href), { intent: 'refresh', focused: document.activeElement, loads: process.env.NODE_ENV === 'production' || names === undefined ? names : checkedLoads(names) })
 }

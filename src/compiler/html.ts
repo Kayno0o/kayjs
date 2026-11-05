@@ -8,7 +8,7 @@ import { actionOf, failedBlockOf, FIELD_ELEMENTS, keyedByPosition, marksServerIs
 import { decodeEntities } from './expression'
 import { addRowItem, childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
 import { addStyleArguments, BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, GROUP_HAS, groupValue, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
-import { SUBJECT } from './names'
+import { LOAD_KEY, PROPS, SUBJECT } from './names'
 
 // The attribute an image's `src` or a select's `selected` value is written as.
 const WRITTEN_AS = { image: 'src', selected: 'value' } as const
@@ -59,7 +59,7 @@ export interface HtmlOptions {
   // Development: the source position each element carries for `kay dev`'s inspector.
   located?: ((element: ElementNode) => string | undefined) | undefined
   // A refresh asking for some of the page's loads leaves an element reading none of them to the page as it is: the table of the loads, and the group of each such element by where it starts.
-  kept?: { table: string, groups: ReadonlyMap<number, number> } | undefined
+  kept?: { groups: ReadonlyMap<number, { group: number, id: string }> } | undefined
 }
 
 // Static parts gather into one string literal; each dynamic part is an expression of the markup it renders.
@@ -463,9 +463,9 @@ export class HtmlTemplate extends TemplateWriter {
 
   private element(element: ElementNode, markup: Markup): void {
     const { kept } = this.options
-    const group = kept?.groups.get(element.start)
+    const unit = kept?.groups.get(element.start)
 
-    if (kept === undefined || group === undefined) {
+    if (kept === undefined || unit === undefined) {
       this.written(element, markup)
 
       return
@@ -476,7 +476,7 @@ export class HtmlTemplate extends TemplateWriter {
     markup.dynamic(() => {
       const shown = new Markup(b)
 
-      b.add(`(${helperName('kept')}(${kept.table}, ${group}) ? ${JSON.stringify(`<${element.name} data-kay-kept>${VOID_ELEMENTS.has(element.name) ? '' : `</${element.name}>`}`)} : `)
+      b.add(`(${PROPS}.${LOAD_KEY}?.kept(${unit.group}) ? ${JSON.stringify(`<${element.name} data-kay-kept data-kay-u="${unit.id}">${VOID_ELEMENTS.has(element.name) ? '' : `</${element.name}>`}`)} : `)
       this.written(element, shown)
       shown.end()
       b.add(')')
@@ -543,6 +543,11 @@ export class HtmlTemplate extends TemplateWriter {
 
     if (plan.id !== undefined)
       markup.text(` id="${escapeStaticAttribute(plan.id)}"`)
+
+    const unit = this.options.kept?.groups.get(element.start)
+
+    if (unit !== undefined)
+      markup.text(` data-kay-u="${unit.id}"`)
 
     if (plan.classes?.parts) {
       const classes = plan.classes

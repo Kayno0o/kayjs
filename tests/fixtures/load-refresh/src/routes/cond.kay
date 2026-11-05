@@ -1,0 +1,17 @@
+--- server
+import { run } from '../calls'
+
+const cart = await run('cart', n => ({ n, items: ['a', 'b'] }))
+const wishlist = await run('wishlist', n => ({ n }))
+const user = await run('user', n => ({ n }))
+---
+main
+  section.cond
+    if cart.n > 0
+      p.a {wishlist.n}
+    else
+      p.b empty
+    ul.rows
+      for item of cart.items
+        li {item} {wishlist.n}
+  p.user {user.n}

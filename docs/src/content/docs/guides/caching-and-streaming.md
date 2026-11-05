@@ -219,9 +219,13 @@ main
 await addToCart({ id }, { refresh: 'cart' })
 ```
 
-The name is the binding of the load, so there is nothing to declare. Only `getCart()` runs again. The browser asks the page for that load alone, and the server sends an empty placeholder for each element that reads only loads it did not run, which the browser leaves exactly as it is, islands, focus and typed text included.
+The name is the binding of the load, so there is nothing to declare. Only `getCart()` runs again. The browser asks the page for that load alone, and the server sends an empty placeholder for each element that reads only loads it did not run. The browser finds the element it stands for by an id both carry and keeps it, with its islands, focus and typed text.
 
 A load runs anyway when something that is refreshed also needs it: another load that reads it, an element that shows both, or markup outside any element, such as at the root of the page or in `head`. Put the markup of a load in an element, and the page stays calm.
+
+An `if` or a `for` is part of the element around it, so that element is kept or rendered whole. A layout is never left alone around its page: the element holding the `slot` is rendered, and so are the loads it reads. When the browser cannot put the answer in place, because the page moved on, the answer is a redirect, or the rendered part reads a `live()` value, it asks for the whole page instead.
+
+The browser moves a kept element in the page. Where the browser has no `moveBefore`, an iframe or a video inside it starts again.
 
 ## Rendering to a string
 

@@ -8,7 +8,7 @@ import { HTML, ownOrigin, PAGE_TIMEOUT_MS, pageFor } from './swap-fetch'
 import { bounded, CHUNK_TIMEOUT_MS, inFlight, LATE, policyOf } from './swap-flight'
 import { moveFocus } from './swap-focus'
 import { mergeHead, swapRoot } from './swap-head'
-import { heldLate, holding, swapBody } from './swap-kept'
+import { checkKept, heldLate, holding, swapBody } from './swap-kept'
 import { MISSING } from './swap-morph'
 import { transitioned, viewTransitions } from './swap-transition'
 import { addressChanged } from './with-query'
@@ -98,7 +98,8 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   const key = pageKey(url)
   const running = inFlight.fetch
   // A traversal takes the page already being fetched; any other swap cancels it and fetches its own, a refresh to get a fresh page.
-  const reused = swap.intent === 'traverse' && running?.key === key ? running : undefined
+  // A fetch asking for some of the page's loads answers with placeholders, which only a refresh can show.
+  const reused = swap.intent === 'traverse' && running?.key === key && running.loads === undefined ? running : undefined
 
   if (!reused)
     running?.controller.abort()
@@ -281,8 +282,11 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     streamed.applyStreamed(next)
   }
 
+  // Before anything of the page changes: a refresh of some loads whose placeholders the page cannot take has the whole page asked for.
+  checkKept(next)
+
   const root = swapRoot(next)
-  const head = mergeHead(next)
+  const head = mergeHead(next, next.body.querySelector('[data-kay-kept]') !== null)
   const holds = holding()
 
   await Promise.all([head.loaded, reviveActionsOf(next)])

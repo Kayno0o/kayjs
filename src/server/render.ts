@@ -107,6 +107,8 @@ type Body = Written | Pieced | Bun.BunFile
 const editors = new Map<string, EditorModule>()
 
 const HTML_HEADERS = { 'content-type': 'text/html; charset=utf-8' }
+// The refreshed loads development already warned of, by route, so a button asking for one does not fill the log.
+const warnedLoads = new Set<string>()
 
 // HTML under the mount point already, as `kay build` rendered it or a server island's was rebased, which goes out as it is.
 class Rebased {
@@ -466,8 +468,13 @@ async function loadChainAsync(route: ServedRoute, files: string[], rendering: Re
     const data = loading instanceof Promise ? await againstDeadline(rendering.ctx.request, loading) : loading
 
     if (options.dev) {
-      for (const name of unansweredLoads(rendering.ctx.request))
+      for (const name of unansweredLoads(rendering.ctx.request)) {
+        if (warnedLoads.has(`${route.file} ${name}`))
+          continue
+
+        warnedLoads.add(`${route.file} ${name}`)
         kayLog('warn', `a refresh asked for the load \`${name}\`, which no page or layout of this route declares as a top-level \`const ${name} = await ...\` in its server fence: nothing was refreshed for it`)
+      }
     }
 
     return { files, modules, data, loaded, timings, phases: timing ? { guards, imports, loads: performance.now() - loadsStarted } : undefined, head: editing() ? undefined : await entryHeadOf(modules.at(-1)!, route, rendering.ctx) }

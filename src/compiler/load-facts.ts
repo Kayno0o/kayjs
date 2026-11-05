@@ -4,8 +4,8 @@ import type { Node } from './estree'
 import { eachNode } from './each-node'
 import { declaredIdentifiers } from './script-shared'
 
-// A name read: not a member after a dot.
-const WORD = /(?<![\w$.])[A-Z_$][\w$]*/gi
+// A name read: not a member after a dot, but a spread (`...name`) reads it.
+export const WORD = /(?<![\w$])(?<![^.]\.)[A-Z_$][\w$]*/gi
 const FUNCTIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'FunctionDeclaration', 'ClassDeclaration', 'ClassExpression'])
 // The statements that may run or not as a whole, with no name of their own for the rest of the fence.
 const GUARDABLE = new Set(['ExpressionStatement', 'IfStatement', 'TryStatement', 'ThrowStatement', 'ForStatement', 'ForInStatement', 'ForOfStatement', 'WhileStatement', 'DoWhileStatement', 'BlockStatement', 'SwitchStatement'])

@@ -1,0 +1,9 @@
+--- server
+import { run } from '../calls'
+
+export const page = { prerender: true }
+
+const cart = await run('cart', n => ({ n }))
+---
+main
+  p.cart {cart.n}

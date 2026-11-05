@@ -1,0 +1,8 @@
+--- server
+import { run } from '../calls'
+
+const cart = await run('cart', n => ({ n }))
+---
+main
+  h1 Not found
+  p.cart {cart.n}

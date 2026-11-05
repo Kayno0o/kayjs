@@ -115,6 +115,11 @@ async function forLoads(render: () => Promise<Response>): Promise<Response> {
   return response
 }
 
+// A page rendered for a request asking for some of its loads, a special page included, is answered as a refresh is.
+async function answeringLoads(request: Request, render: () => Promise<Response>): Promise<Response> {
+  return requestedLoads(request) === undefined ? render() : forLoads(render)
+}
+
 // How a page answers one request: rendered afresh, or the copy `kay build` rendered, revalidated, with its server islands filled in.
 export function pageResponder({ client, renderOptions, prerendered, settings, transforms, served: servedHooks, pageFile, pageSizes, writes }: ResponderOptions): PageResponder {
   // The locale the request is answered in, read where the page is rendered.
@@ -126,7 +131,7 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
     const rendered = servedHooks.length === 0
       ? async () => renderPage(route, context, params, client, renderOptions)
       : async () => hookedServed(await renderPage(route, context, params, client, renderOptions), servedHooks, url.pathname, localeOf(), pageFile, pageSizes)
-    const render = requestedLoads(context.request) === undefined ? rendered : async () => forLoads(rendered)
+    const render = async () => answeringLoads(context.request, rendered)
 
     const preview = previewRequested(context.request)
 
@@ -259,7 +264,7 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
 
     const last = candidates.at(-1)!.route
 
-    return renderUnmatched(last.special, context, client, withEditor(last, renderOptions))
+    return answeringLoads(context.request, async () => renderUnmatched(last.special, context, client, withEditor(last, renderOptions)))
   }
 
   for (const [path, offered] of table.paths) {
@@ -301,7 +306,7 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
       if (!own) {
         const last = served.values().next().value!.candidates.at(-1)!.route
 
-        return runInLocale(state, async () => renderUnmatched(last.special, context, client, withEditor(last, renderOptions)))
+        return runInLocale(state, async () => answeringLoads(context.request, async () => renderUnmatched(last.special, context, client, withEditor(last, renderOptions))))
       }
 
       const response = await runInLocale(state, async () => answeringPage(context.request, async () => answer(own.candidates, context, url)))
@@ -341,7 +346,7 @@ export function servePageRoutes(app: Elysia, { table, served: claims, matchers, 
   if (!(fallback.notFound ?? fallback.error))
     return { uncaught, unmatched: undefined }
 
-  const unmatched = async (context: RequestContext) => inFallbackLocale(context, async () => renderUnmatched(fallback, context, client, renderOptions))
+  const unmatched = async (context: RequestContext) => inFallbackLocale(context, async () => answeringLoads(context.request, async () => renderUnmatched(fallback, context, client, renderOptions)))
   const answerUnmatched: Unmatched = async given => carryContext(given.set, await unmatched(sharedContext(given.request, () => ({ ...given }))))
 
   app.get('/*', async (given) => {

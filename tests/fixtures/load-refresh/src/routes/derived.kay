@@ -1,0 +1,11 @@
+--- server
+import { run } from '../calls'
+
+const cart = await run('cart', n => ({ n }))
+const wishlist = await run('wishlist', n => ({ n }))
+---
+main
+  section.derived
+    const total = cart.n * 2
+    p.total {total}
+  p.wish {wishlist.n}

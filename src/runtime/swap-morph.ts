@@ -9,10 +9,12 @@ const OPAQUE_TAGS = new Set(['slot', 'script', 'template'])
 
 // Marks an element the server left to the page as it is, because a refresh of some of the page's loads shows none of what it reads.
 export const KEPT = 'data-kay-kept'
+// The id the server gives an element it may leave to the page, on the element and on its placeholder, so the one finds the other wherever it is.
+export const UNIT = 'data-kay-u'
 // Thrown before the page changed, when a placeholder has no element of the page to stand for.
 export const MISSING = Symbol('kept')
 
-// Two nodes the morph makes one of: of one kind and tag, and for an element, the same id and class.
+// Two nodes the morph makes one of: of one kind and tag, and for an element, the same id and class, or the same unit.
 function alike(live: Node, next: Node): boolean {
   if (live.nodeType !== next.nodeType || live.nodeName !== next.nodeName)
     return false
@@ -22,8 +24,12 @@ function alike(live: Node, next: Node): boolean {
 
   const other = next as Element
 
+  // A placeholder is put in the place of an element kept, never morphed into one.
   if (other.hasAttribute(KEPT))
-    return !OPAQUE_TAGS.has(live.localName) || !live.matches(OPAQUE)
+    return false
+
+  if (live.hasAttribute(UNIT) || other.hasAttribute(UNIT))
+    return live.getAttribute(UNIT) === other.getAttribute(UNIT)
 
   return live.id === other.id && live.getAttribute('class') === other.getAttribute('class') && (!OPAQUE_TAGS.has(live.localName) || (!live.matches(OPAQUE) && !other.matches(OPAQUE)))
 }
@@ -127,25 +133,37 @@ function morph(live: Node, next: Node): void {
 // `lasting` holds children of `live` the morph leaves where they are, matched against nothing.
 export function morphChildren(live: Element, next: Element, lasting: ReadonlySet<Node> = NOTHING): void {
   let cursor = past(live.firstChild, lasting)
+  let incoming = next.firstChild
 
-  for (const [match, incoming] of pairs(live, next, lasting)) {
-    if (!match) {
-      live.insertBefore(incoming, cursor)
+  while (incoming) {
+    const following: ChildNode | null = incoming.nextSibling
 
-      continue
+    if (cursor && alike(cursor, incoming)) {
+      morph(cursor, incoming)
+      cursor = past(cursor.nextSibling, lasting)
+    }
+    else {
+      const ahead = cursor && !later(following, cursor) ? later(cursor.nextSibling, incoming, lasting) : undefined
+
+      if (ahead) {
+        while (cursor !== ahead) {
+          const after: ChildNode | null = cursor!.nextSibling
+
+          if (!lasting.has(cursor!))
+            cursor!.remove()
+
+          cursor = after
+        }
+
+        morph(ahead, incoming)
+        cursor = past(ahead.nextSibling, lasting)
+      }
+      else {
+        live.insertBefore(incoming, cursor)
+      }
     }
 
-    while (cursor !== match) {
-      const after: ChildNode | null = cursor!.nextSibling
-
-      if (!lasting.has(cursor!))
-        cursor!.remove()
-
-      cursor = after
-    }
-
-    morph(match, incoming)
-    cursor = past(match.nextSibling, lasting)
+    incoming = following
   }
 
   while (cursor) {
@@ -156,47 +174,6 @@ export function morphChildren(live: Element, next: Element, lasting: ReadonlySet
 
     cursor = after
   }
-}
-
-// The live child each child of the next page takes the place of, none for one that is new, decided from the siblings alone.
-function pairs(live: Element, next: Element, lasting: ReadonlySet<Node>): [ChildNode | undefined, ChildNode][] {
-  const found: [ChildNode | undefined, ChildNode][] = []
-  let cursor = past(live.firstChild, lasting)
-
-  for (let incoming = next.firstChild; incoming; incoming = incoming.nextSibling) {
-    const following = incoming.nextSibling
-
-    if (cursor && alike(cursor, incoming)) {
-      found.push([cursor, incoming])
-      cursor = past(cursor.nextSibling, lasting)
-
-      continue
-    }
-
-    const ahead = cursor && !later(following, cursor) ? later(cursor.nextSibling, incoming, lasting) : undefined
-
-    found.push([ahead, incoming])
-
-    if (ahead)
-      cursor = past(ahead.nextSibling, lasting)
-  }
-
-  return found
-}
-
-// The live element each placeholder of the next page, one the server left to the page as it is, stands for; one that stands for none is listed as `undefined`.
-export function keptPairs(live: Element, next: Element, lasting: ReadonlySet<Node> = NOTHING, found = new Map<Element, Element | undefined>()): Map<Element, Element | undefined> {
-  for (const [match, incoming] of pairs(live, next, lasting)) {
-    if (!(incoming instanceof Element))
-      continue
-
-    if (incoming.hasAttribute(KEPT))
-      found.set(incoming, match instanceof Element ? match : undefined)
-    else if (match instanceof Element)
-      keptPairs(match, incoming, NOTHING, found)
-  }
-
-  return found
 }
 
 // The first of `node` and its next siblings the morph does not leave alone.
