@@ -84,6 +84,28 @@ describe('signatures', () => {
     expect(await verifyAuthentication(short!, EXPECTED, stored)).toMatchObject({ counter })
   })
 
+  // DER writes an integer in its fewest bytes, so a short r given a leading zero is another encoding of the same signature, which a minimal parser refuses.
+  test('an ES256 signature whose short r carries a leading zero is refused', async () => {
+    const { device, stored } = await es256Passkey()
+    let short: AuthenticationResponseJSON | undefined
+    let counter = 0
+
+    while (!short && counter < 5000) {
+      const answer = await device.get({ challenge: 'challenge' }, { counter: ++counter })
+
+      if (Buffer.from(answer.response.signature, 'base64url')[3]! < 32)
+        short = answer
+    }
+
+    const signature = Buffer.from(short!.response.signature, 'base64url')
+    const r = signature.subarray(4, 4 + signature[3]!)
+    const s = signature.subarray(4 + signature[3]!)
+    const padded = Buffer.concat([Buffer.from([0x02, r.length + 1, 0]), r])
+    const broken = Buffer.concat([Buffer.from([0x30, padded.length + s.length]), padded, s])
+
+    expect(await verifyAuthentication({ ...short!, response: { ...short!.response, signature: broken.toString('base64url') } }, EXPECTED, stored)).toBeUndefined()
+  })
+
   test('a DER signature with bytes after it, or an r past 32 bytes, is refused', async () => {
     const { device, stored } = await es256Passkey()
     const answer = await device.get({ challenge: 'challenge' })

@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-ai: a Chat message sent while the conversation is still being read (right after New conversation, or on a slow page) waits for the read and goes, where it used to be dropped with the text left in the field.
+- kayjs-auth: a passkey ES256 signature whose r or s carries a leading zero DER does not write is refused, as a second encoding of the same signature: [passkeys](../packages/auth/llms/oauth-passkeys-two-factor.md).
 - The hook of `kay/test` that drops a file's test database waits 90 s instead of 20, as Postgres can take that long to drop a database on a busy host: [testing setup](testing-setup.md).
 - kayjs-ui: Carousel (`autoplay`), VirtualList (`estimate`, `overscan`), FormField (`group`) and ContactForm (`consent`, `action`) follow a prop the parent changes after render, as [components](components.md#props) says of a read at the top of the script.
 - `kay check` warns of `invalid-nesting`, markup the HTML parser rewrites so the server and an island disagree (`p > div`, `form > form`, `table > tr`, an `li` outside a list); a parent holding a component or a slot is left alone: [lints](lints.md).

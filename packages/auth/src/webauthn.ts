@@ -342,7 +342,7 @@ function rawEcdsa(der: Uint8Array): Uint8Array<ArrayBuffer> {
   return raw
 }
 
-// Writes the DER integer at `offset` as the 32 bytes of `raw` from `at`, a shorter one padded and the zero byte that keeps a 32-byte one positive dropped, and answers where it ends.
+// Writes the DER integer at `offset` as the 32 bytes of `raw` from `at`, a shorter one padded and the zero byte that keeps a 32-byte one positive dropped, and answers where it ends. DER writes an integer in its fewest bytes and r and s are positive, so a leading zero before a byte without its high bit, or a first byte with it, is another encoding of the same signature and refused.
 function derInteger(der: Uint8Array, offset: number, raw: Uint8Array, at: number): number {
   const length = der[offset + 1]
 
@@ -352,12 +352,11 @@ function derInteger(der: Uint8Array, offset: number, raw: Uint8Array, at: number
   const end = offset + 2 + length
   let value = der.subarray(offset + 2, end)
 
-  if (value.length === 33) {
-    if (value[0] !== 0 || !(value[1]! & 0x80))
-      throw new Error('invalid DER integer')
+  if (value[0]! & 0x80 || (value.length > 1 && value[0] === 0 && !(value[1]! & 0x80)) || (value.length === 33 && value[0] !== 0))
+    throw new Error('invalid DER integer')
 
+  if (value.length === 33)
     value = value.subarray(1)
-  }
 
   raw.set(value, at + 32 - value.length)
 
