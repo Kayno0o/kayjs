@@ -271,7 +271,7 @@ describe('the buttons and fields whose recipe holds their look', () => {
       expect(classesOf('toggle', 'track')).not.toContain('w-9')
       expect(classesOf('toggle', 'track').at(-1)).toBe('w-12')
 
-      const compact = (merged.match(/<div class="(kui-form-field [^"]*)" data-part="root" data-kui-field="[^"]*" data-compact/)?.[1] ?? '').split(' ')
+      const compact = (merged.match(/<div data-part="root" data-kui-field="[^"]*" data-compact class="(kui-form-field [^"]*)"/)?.[1] ?? '').split(' ')
 
       expect(compact).not.toContain('w-auto')
       expect(compact).not.toContain('w-full')
@@ -291,12 +291,12 @@ describe('the buttons and fields whose recipe holds their look', () => {
   })
 
   test('a compact FormField is auto-wide by a recipe variant, so a class on it replaces the width and a plain one stays full-width', () => {
-    const compact = (html.match(/<div class="(kui-form-field [^"]*)" data-part="root" data-kui-field="[^"]*" data-compact/)?.[1] ?? '').split(' ')
+    const compact = (html.match(/<div data-part="root" data-kui-field="[^"]*" data-compact class="(kui-form-field [^"]*)"/)?.[1] ?? '').split(' ')
 
     expect(compact).toContain('w-auto')
     expect(compact).not.toContain('data-compact:w-auto')
     expect(compact.at(-1)).toBe('w-48')
-    const plain = (html.match(/<div class="(kui-form-field [^"]*)" data-part="root" data-kui-field="[^"]*">/)?.[1] ?? '').split(' ')
+    const plain = (html.match(/<div data-part="root" data-kui-field="[^"]*" class="(kui-form-field [^"]*)">/)?.[1] ?? '').split(' ')
 
     expect(plain).toContain('w-full')
     expect(plain).not.toContain('w-auto')

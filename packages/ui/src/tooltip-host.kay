@@ -1,5 +1,5 @@
 ---
-import type { Duration } from 'kay'
+import type { Duration, JSX } from 'kay'
 import { durationMs, effect, onCleanup, recipe, signal } from 'kay'
 import { claim } from './claim'
 
@@ -14,7 +14,7 @@ const PANEL_ID = 'kui-tooltip'
 // 'kui-tooltip' stays as the component's name for an app's CSS. Anchored to whichever element TooltipHost names --tooltip-anchor.
 const look = recipe({ parts: { root: 'kui-tooltip inset-auto m-1.5 max-w-xs overflow-visible border-solid border-[length:var(--border-width)] border-border-strong bg-surface-strong px-2 py-1 text-2xs text-foreground [position-anchor:--tooltip-anchor] [position-try-fallbacks:flip-block,flip-inline]' } })
 
-const { showDelay = '80ms', hideDelay = '150ms' } = props<{
+const { showDelay = '80ms', hideDelay = '150ms', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'id' | 'popover' | 'role'> & {
   // How long the pointer or focus rests on an element before its tooltip shows.
   showDelay?: Duration | undefined
   // How long a tooltip lingers once the pointer leaves, long enough by default for it to cross the gap onto the tooltip, which stays while hovered.
@@ -180,4 +180,4 @@ effect(() => {
 ---
 // Rendered in the root layout, it shows the tooltip of whichever element the pointer or a tab lands on. A second one, such as an extension's, renders nothing while the first is mounted.
 if owns()
-  div(part="root" id={PANEL_ID} ref={element => panel = element} popover="manual" role="tooltip") {aimed()?.text}
+  div(part="root" {...rest} id={PANEL_ID} ref={element => panel = element} popover="manual" role="tooltip") {aimed()?.text}

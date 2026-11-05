@@ -1,5 +1,5 @@
 --- <Item extends BellItem>
-import type { Snippet } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { BellItem, BellItems, BellTriggerProps } from './bell'
 
 import type { PopoverPlacement, PopoverTriggerProps } from './popover'
@@ -29,7 +29,7 @@ const look = recipe({
   },
 })
 
-const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-end', items: source, unread: unreadCount, onRead, open, onOpenChange, item: drawRow, trigger } = props<{
+const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-end', items: source, unread: unreadCount, onRead, open, onOpenChange, item: drawRow, trigger, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
   // Names the button and the list it opens; the `ui.bell.label` message by default.
   label?: string | undefined
   placement?: PopoverPlacement | undefined
@@ -114,7 +114,7 @@ async function send(id?: string) {
   asked?.refresh()
 }
 ---
-span(part="root")
+span(part="root" {...rest})
   Popover(placement={placement} part="menu" open={open} onOpenChange={onOpenChange})
     @trigger(attributes)
       if trigger

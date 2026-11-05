@@ -1,5 +1,6 @@
 ---
 import { effect, recipe, signal, untrack } from 'kay'
+import type { JSX } from 'kay'
 import type { InfiniteList } from './infinite-list'
 import Button from './button.kay'
 import WhenVisible from './when-visible.kay'
@@ -8,7 +9,7 @@ import { labelText } from './label-text'
 
 const look = recipe({ parts: { root: 'kui-load-more', failed: 'kui-load-more-failed', loading: 'kui-load-more-loading', announced: 'sr-only' } })
 
-const { list, margin, loadingLabel = wording('ui.loadMore.loading', 'Loading more…'), failureLabel = wording('ui.loadMore.failure', 'Could not load more.'), retryLabel = wording('ui.loadMore.retry', 'Try again'), button = false, moreLabel = wording('ui.loadMore.more', 'Load more'), loadedLabel } = props<{
+const { list, margin, loadingLabel = wording('ui.loadMore.loading', 'Loading more…'), failureLabel = wording('ui.loadMore.failure', 'Could not load more.'), retryLabel = wording('ui.loadMore.retry', 'Try again'), button = false, moreLabel = wording('ui.loadMore.more', 'Load more'), loadedLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   // The list this draws the end of, from `infiniteList`.
   list: InfiniteList<unknown>
   // How far outside the scroll box counts as in view already, in pixels: see WhenVisible.
@@ -43,7 +44,7 @@ effect(() => {
 const loaded = () => added() > 0 ? (loadedLabel === undefined ? wording('ui.loadMore.loaded', '{count} more loaded', { count: added() }) : labelText(loadedLabel, { count: added() }, added())) + (flip() ? '\u200B' : '') : ''
 ---
 // The end of an infinite list: the sentinel, or a button under `button`, while there are more rows, a status while a page loads, and an alert with a retry once a page failed, which loads no other until it is pressed.
-div(part="root")
+div(part="root" {...rest})
   if !list.ended()
     if list.failed()
       div(part="failed" role="alert")

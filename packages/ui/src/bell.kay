@@ -1,9 +1,10 @@
 ---
+import type { JSX } from 'kay'
 import type { BellItem } from './bell'
 import type { PopoverPlacement } from './popover'
 import BellInbox from './bell-inbox.kay'
 
-const { label, placement, items, unread } = props<{
+const { label, placement, items, unread, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
   // Names the button and the list it opens; the `ui.bell.label` message by default.
   label?: string | undefined
   placement?: PopoverPlacement | undefined
@@ -15,4 +16,4 @@ const { label, placement, items, unread } = props<{
 ---
 // A signed-in visitor's notifications, with the unread count: nothing at all for anyone else, and no JavaScript for them. A custom `items` list skips that check.
 if items !== undefined || ctx.inbox
-  BellInbox(label={label} placement={placement} items={items} unread={unread})
+  BellInbox({...rest} label={label} placement={placement} items={items} unread={unread})

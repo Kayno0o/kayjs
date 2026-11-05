@@ -1,5 +1,5 @@
 ---
-import type { Snippet } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import { recipe } from 'kay'
 import { FIELD_MESSAGE, LABEL_TEXT } from './field-look'
 import { fieldIssues, fieldLinks, fieldNamed } from './forms'
@@ -25,7 +25,7 @@ const look = recipe({
   },
 })
 
-const { label, name, issue, hint, required = false, group = false, size = 'md', action } = props<{
+const { label, name, issue, hint, required = false, group = false, size = 'md', action, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   label: string
   // The field the control posts as: inside a FormDialog, the message its call was refused with for that field shows here.
   name?: string | undefined
@@ -50,7 +50,7 @@ const links = fieldLinks(group, () => hint !== undefined && hint !== '', message
 // The control, as children, takes the `kui-field-input` look with no class of its own.
 // The hint and the messages sit outside the label, so the control is named by its label alone; the action too, since a button inside a label would take the label from the control.
 if group
-  fieldset.kui-form-field-group(part="root" data-kui-field={links.frame} aria-describedby={links.described().join(' ') || undefined} data-compact={small() ? '' : undefined})
+  fieldset.kui-form-field-group(part="root" {...rest as Record<string, never>} data-kui-field={links.frame} aria-describedby={links.described().join(' ') || undefined} data-compact={small() ? '' : undefined})
     legend(part="head")
       span(part="text")
         | {label}
@@ -67,7 +67,7 @@ if group
         for message, index of messages() key={index}
           span(part="issue") {message}
 else
-  div(part="root" data-kui-field={links.frame} data-compact={small() ? '' : undefined})
+  div(part="root" {...rest} data-kui-field={links.frame} data-compact={small() ? '' : undefined})
     label(part="label")
       span(part="head")
         span(part="text")

@@ -2,7 +2,7 @@
 
 ## Common tasks
 
-Each component spreads the other attributes it is given onto its root element, `id`, `aria-*` and `data-*` included. The exceptions: Toggle and Checkbox spread them on their checkbox, Popover on its panel, Menu, AppSwitcher and ConfirmDelete on their trigger, CommandPalette on its dialog and Toaster on its root; FormField, FormDialog, SaveForm, TooltipHost (its `id` is the one tooltips point at), LoadMore and WhenVisible take none.
+Each component spreads the other attributes it is given onto its root element, `id`, `aria-*` and `data-*` included. The exceptions: Toggle and Checkbox spread them on their checkbox, Popover on its panel, Menu, AppSwitcher and ConfirmDelete on their trigger, CommandPalette on its dialog and Toaster on its root; FormDialog on its Dialog (its `id` pairs the footer's submit with the form, so it goes on the form), Bell on the BellInbox it draws and TooltipHost on its panel (its `id` is the one tooltips point at, so it stays). `tests/contract-rest.test.ts` fails for a component with no rest spread.
 
 ### Icon, Button, IconButton
 

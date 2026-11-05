@@ -1,5 +1,5 @@
 --- <Output>
-import type { Action, Answer, FailureData, Success } from 'kay'
+import type { Action, Answer, FailureData, JSX, Success } from 'kay'
 import { effect, guardLeave, onCleanup, onMount, recipe, shortcut, signal } from 'kay'
 import Button from './button.kay'
 import { callAction, formIssues } from './forms'
@@ -9,7 +9,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-save-form', grid: 'kui-form-grid', bar: 'kui-save-bar', status: 'kui-save-bar-status', actions: 'kui-save-bar-actions', confirm: '' } })
 
-const { action, refused, saved, onSaved, onError, onDiscard, dirty, onSave, status, failure = wording('ui.saveForm.failure', 'Could not save.'), dirtyLabel = wording('ui.saveForm.dirty', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.clean', 'No unsaved change.'), savingLabel = wording('ui.saveForm.saving', 'Saving…'), saveLabel = wording('ui.saveForm.save', 'Save'), discardLabel = wording('ui.saveForm.discard', 'Discard'), cancelLabel = wording('ui.saveForm.cancel', 'Cancel'), cancelHref, confirm, confirmLabel, saveDisabled, shortcut: saveKeys = 'mod+s' } = props<{
+const { action, refused, saved, onSaved, onError, onDiscard, dirty, onSave, status, failure = wording('ui.saveForm.failure', 'Could not save.'), dirtyLabel = wording('ui.saveForm.dirty', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.clean', 'No unsaved change.'), savingLabel = wording('ui.saveForm.saving', 'Saving…'), saveLabel = wording('ui.saveForm.save', 'Save'), discardLabel = wording('ui.saveForm.discard', 'Discard'), cancelLabel = wording('ui.saveForm.cancel', 'Cancel'), cancelHref, confirm, confirmLabel, saveDisabled, shortcut: saveKeys = 'mod+s', ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'children' | 'onSubmit' | 'onInput' | 'onChange'> & {
   // The page's action the form calls with its fields, as FormDialog does. An editor whose state is signals gives `dirty` and `onSave` instead.
   action?: Action<never, Output> | undefined
   // Toasted when the call fails other than on a field, or when `onSave` rejects.
@@ -269,7 +269,7 @@ function discard() {
 // Ctrl or Cmd with S saves unless `shortcut` says otherwise, the browser's own save dialog kept away even when there is nothing to save.
 shortcut(() => saveKeys || null, requestSubmit, { on: () => form })
 ---
-form(part="root" ref={element => form = element} onSubmit={submit} onInput={checkSoon} onChange={checkSoon})
+form(part="root" {...rest} ref={element => form = element} onSubmit={submit} onInput={checkSoon} onChange={checkSoon})
   div(part="grid")
     slot
   div(part="bar")

@@ -1,6 +1,6 @@
 ---
 import { recipe } from 'kay'
-import type { Action, FormFailure, Snippet } from 'kay'
+import type { Action, FormFailure, JSX, Snippet } from 'kay'
 import { wording } from 'kay/words'
 import Button from './button.kay'
 import { FIELD_MESSAGE } from './field-look'
@@ -10,7 +10,7 @@ import Notice from './notice.kay'
 
 const look = recipe({ parts: { root: 'kui-subscribe-form', notice: FIELD_MESSAGE.hint } })
 
-const { action, noticeText, label = wording('ui.subscribeForm.email', wording('ui.subscribeForm.label', wording('mail.list.form.email', 'Email'))), submitLabel = wording('ui.subscribeForm.submit', wording('mail.list.form.submit', 'Subscribe')), sentLabel = wording('ui.subscribeForm.sent', wording('mail.list.form.sent', 'Almost done: open the mail we just sent you and confirm your address.')), privacyLabel = wording('ui.subscribeForm.privacy', wording('mail.list.form.privacy', 'Privacy policy')), privacy, wordingId, onSent, onError, sent } = props<{
+const { action, noticeText, label = wording('ui.subscribeForm.email', wording('ui.subscribeForm.label', wording('mail.list.form.email', 'Email'))), submitLabel = wording('ui.subscribeForm.submit', wording('mail.list.form.submit', 'Subscribe')), sentLabel = wording('ui.subscribeForm.sent', wording('mail.list.form.sent', 'Almost done: open the mail we just sent you and confirm your address.')), privacyLabel = wording('ui.subscribeForm.privacy', wording('mail.list.form.privacy', 'Privacy policy')), privacy, wordingId, onSent, onError, sent, ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'novalidate' | 'children' | 'onError'> & {
   // The action `mail.list().form()` from kayjs-mail gives, or any with an `email` field.
   action: Action<never, unknown>
   // The labels read the `ui.subscribeForm.*` messages, then kayjs-mail's `mail.list.form` ones in the page's language, English and French, which these replace.
@@ -39,7 +39,7 @@ const policy = () => privacy ?? (action as { schema?: { 'x-privacy'?: string } }
 const shownWording = () => wordingId ?? (noticeText === undefined ? 'stock' : 'custom')
 ---
 // Posts without JavaScript; the honeypot, the time stamp and the refused email's message come from the action.
-form(part="root" action={action} novalidate)
+form(part="root" {...rest} action={action} novalidate)
   FormField(label={label} required issue={action.error('email')})
     input(field="email" type="email" autocomplete="email")
   // Fields beyond the email, between it and the notice.

@@ -1,5 +1,5 @@
 ---
-import type { Duration } from 'kay'
+import type { Duration, JSX } from 'kay'
 import { durationMs, effect, recipe, untrack } from 'kay'
 import { wording } from 'kay/words'
 import Button from './button.kay'
@@ -26,7 +26,7 @@ const look = recipe({
   defaults: { variant: 'solid', tone: 'neutral', size: 'md' },
 })
 
-const { onRecord, onStart, onStop, onCancel, onError, recording, onRecordingChange, label = wording('ui.recordButton.label', 'Record'), failure = wording('ui.recordButton.failure', 'The recording could not be sent.'), maxDuration = RECORD_LIMIT, variant = 'solid', tone = 'neutral', size = 'md' } = props<{
+const { onRecord, onStart, onStop, onCancel, onError, recording, onRecordingChange, label = wording('ui.recordButton.label', 'Record'), failure = wording('ui.recordButton.failure', 'The recording could not be sent.'), maxDuration = RECORD_LIMIT, variant = 'solid', tone = 'neutral', size = 'md', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
   // Takes what was said as a `File`, `recording.webm` (`recording.m4a` in Safari), which an action's `s.File()` field takes as it is. A promise it returns holds the button busy until it settles, and a rejection says `failure`.
   onRecord: (audio: File) => unknown
   // Called once the microphone is open and the recording runs: to dim the page, stop a player.
@@ -72,7 +72,7 @@ function key(event: KeyboardEvent) {
     event.preventDefault()
 }
 ---
-div(part="root")
+div(part="root" {...rest})
   Button(part="button" variant={variant} tone={tone} size={size} icon={voice.state() === 'recording' ? 'stop' : 'microphone'} label={label} pressed={voice.state() === 'recording'} busy={voice.state() === 'asking' || voice.state() === 'sending'} onClick={voice.press} onKeyDown={key})
   // The time ticks every second, so it is shown and not read; the status region says when recording starts and stops.
   if voice.state() === 'recording'

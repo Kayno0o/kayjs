@@ -1,5 +1,5 @@
 --- <Output>
-import type { Action, Answer, FailureData, Snippet, Success } from 'kay'
+import type { Action, Answer, FailureData, JSX, Snippet, Success } from 'kay'
 import { effect, recipe, signal, uid } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
@@ -10,7 +10,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: '', footer: 'flex w-full flex-wrap items-center gap-2', actions: 'ml-auto flex flex-wrap justify-end gap-2', form: 'kui-form-grid' } })
 
-const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failure, refused, onSaved, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel } = props<{
+const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failure, refused, onSaved, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'id' | 'onClose' | 'onInput' | 'closedby' | 'closedBy' | 'children'> & {
   // Shows the dialog; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -87,7 +87,7 @@ function submitOnCtrlEnter(event: KeyboardEvent) {
 }
 ---
 // Only a click outside or Escape closes the dialog while `open` is still true; every other way has already closed it.
-Dialog(open={open} title={title} heading={heading} size={size} level={level} actions={actions} header={header} close={close} closeHref={closeHref} modal={modal} closeLabel={closeLabel} dirty={action.pending()} part="root" onOpenChange={shown => !shown && open && onOpenChange(false)})
+Dialog({...rest} open={open} title={title} heading={heading} size={size} level={level} actions={actions} header={header} close={close} closeHref={closeHref} modal={modal} closeLabel={closeLabel} dirty={action.pending()} part="root" onOpenChange={shown => !shown && open && onOpenChange(false)})
   @footer
     div(part="footer")
       | {extra}
