@@ -853,10 +853,13 @@ class Validator {
     if (file === undefined)
       return
 
+    // A rename is left to the app when the new name is already written, as it would repeat it.
     if (file === WIDGET_TAG) {
+      const named = element.children.some(child => child.kind === 'slot' && this.text(child.name) === 'emptyState')
+
       for (const child of element.children) {
         if (child.kind === 'slot' && this.text(child.name) === 'empty')
-          this.lint(child.name, 'deprecated-ui-props', '`@empty` on `Widget` is `@emptyState` since kayjs-ui 1.89, so `empty` alone is the boolean', { help: 'Write `@emptyState`', fixes: [{ title: 'Write `@emptyState`', edits: [{ start: child.name.start, end: child.name.end, text: 'emptyState' }], safe: true }] })
+          this.lint(child.name, 'deprecated-ui-props', '`@empty` on `Widget` is `@emptyState` since kayjs-ui 1.89, so `empty` alone is the boolean', named ? { help: 'Drop `@empty`, `@emptyState` is there' } : { help: 'Write `@emptyState`', fixes: [{ title: 'Write `@emptyState`', edits: [{ start: child.name.start, end: child.name.end, text: 'emptyState' }], safe: true }] })
       }
     }
 
@@ -869,7 +872,9 @@ class Validator {
       if (file === WIDGET_TAG && name === 'isEmpty') {
         const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'empty={isEmpty}' } : { start: attribute.name.start, end: attribute.name.end, text: 'empty' }
 
-        this.lint(attribute.name, 'deprecated-ui-props', '`isEmpty` on `Widget` is `empty` since kayjs-ui 1.89, the bare-adjective boolean', { help: 'Write `empty`', fixes: [{ title: 'Write `empty`', edits: [edit], safe: true }] })
+        const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'empty')
+
+        this.lint(attribute.name, 'deprecated-ui-props', '`isEmpty` on `Widget` is `empty` since kayjs-ui 1.89, the bare-adjective boolean', named ? { help: 'Drop `isEmpty`, `empty` is there' } : { help: 'Write `empty`', fixes: [{ title: 'Write `empty`', edits: [edit], safe: true }] })
 
         continue
       }
