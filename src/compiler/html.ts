@@ -58,6 +58,8 @@ export interface HtmlOptions {
   errors?: ErrorMessages | undefined
   // Development: the source position each element carries for `kay dev`'s inspector.
   located?: ((element: ElementNode) => string | undefined) | undefined
+  // A refresh asking for some of the page's loads leaves an element reading none of them to the page as it is: the table of the loads, and the group of each such element by where it starts.
+  kept?: { table: string, groups: ReadonlyMap<number, number> } | undefined
 }
 
 // Static parts gather into one string literal; each dynamic part is an expression of the markup it renders.
@@ -460,6 +462,28 @@ export class HtmlTemplate extends TemplateWriter {
   }
 
   private element(element: ElementNode, markup: Markup): void {
+    const { kept } = this.options
+    const group = kept?.groups.get(element.start)
+
+    if (kept === undefined || group === undefined) {
+      this.written(element, markup)
+
+      return
+    }
+
+    const { b } = this
+
+    markup.dynamic(() => {
+      const shown = new Markup(b)
+
+      b.add(`(${helperName('kept')}(${kept.table}, ${group}) ? ${JSON.stringify(`<${element.name} data-kay-kept>${VOID_ELEMENTS.has(element.name) ? '' : `</${element.name}>`}`)} : `)
+      this.written(element, shown)
+      shown.end()
+      b.add(')')
+    })
+  }
+
+  private written(element: ElementNode, markup: Markup): void {
     const { b } = this
 
     if (element.attributes.some(attribute => attribute.kind === 'spread')) {

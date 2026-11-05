@@ -185,6 +185,16 @@ const reviews = await cached('reviews', '1d', fetchReviews, { store: disk })
 - `CacheStore` is the shape of a store, synchronous for a file (`sqliteCache`) so that `invalidate` is done when it returns, any call answering with a promise for a network one (`pgData(db).cache`), whose `invalidate` drops the stored rows in the background, a `cached` read waiting for them: `get(key)` giving `{ text, freshUntil }`, `set(key, text, freshUntil)`, `delete(key)` and `keys()`, plus, optionally, `publish(message)` and `subscribe(listener)` carrying invalidations between processes, as a Redis channel would (a message may also carry the clock of the sender, so replicas on machines whose clocks differ still date a live page's invalidation after its read; relay every message as it is, never to its sender), and `dependencies()` giving a `Map` of the keys a stored value was built from, so `invalidate` reads those and calls `get` for no row it holds nowhere in memory (`sqliteCache` keeps them in a table of their own); `text` is opaque, to be given back as `set` received it (a value built from a collection or another key starts with a line naming them).
 - In the `server` and `app` templates' image the app runs as `nobody`, so the store's directory is a mounted volume it can write.
 
+### Refreshing some loads
+
+A load is a top-level `const cart = await ...` in a page's or a layout's server fence, named by its binding (`const { user, prefs } = await ...` names both). A refresh can run some of them alone: `refresh: 'cart'` on an action call, or `refresh('cart')` from `kay`. Nothing is declared in the fence.
+
+- The swap asks the page with `x-kay-loads: cart` (at most 32 names of letters, digits, `_` and `$`; anything else is dropped), and answers `cache-control: private, no-store` with `vary: x-kay-loads`. Without the header the page renders whole, as it does for a visitor without JavaScript, a form post, or a navigation.
+- An element whose markup reads only loads the refresh does not run is sent as an empty `<tag data-kay-kept>`, which the swap leaves exactly as it is in the page, its islands, focus, scroll and typed text included. Its loads are never called.
+- A load runs too when a refreshed one needs it: another load or a statement of the fence reading it, an element reading both it and a refreshed load, or markup outside any element (the page root, `head`, a script fence) reading it. Put the markup of a load in an element for it to be left alone.
+- A name derived from a load (`const total = cart.total * 2`) names the load it reads. A name matching no load refreshes nothing, and `kay dev` logs it. A statement that declares several names in one declaration (`const a = await x, b = await y`) is no load: it runs, and so does what it reads.
+- Kept elements are matched with the page by their place among their siblings, so a page whose structure changed since asks the server for the whole page.
+
 ### Streaming
 
 A load waits for every `await` in its server fence before the page renders. A value the page can show later is left unawaited instead, and rendered by an `await` block:

@@ -1,0 +1,11 @@
+--- server
+import { run } from '../calls'
+
+const cart = await run('cart', n => ({ n }))
+const user = await run('user', n => ({ n }))
+---
+if user.n
+  p.signed Signed in
+main
+  section.cart
+    p.cart {cart.n}

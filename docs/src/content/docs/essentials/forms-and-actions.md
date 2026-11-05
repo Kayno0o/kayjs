@@ -376,6 +376,8 @@ ul
 
 Pass a `resource()`, or a list of them, as `refresh` to refresh those and leave the rest of the page alone: `add({ title }, { refresh: [cart, count] })`. It works where the page swap does not run too.
 
+A string names a load of the page instead, the binding of a top-level `const cart = await getCart()` in its server fence: `add({ title }, { refresh: 'cart' })` runs that load again and leaves what shows the others as it is. Mix them freely: `refresh: ['cart', count]`. `refresh('cart')` from `kay` does the same from anywhere in an island.
+
 ### Waiting, trying again and knowing how it went
 
 - `timeout: '5s'` aborts a post the server has not answered in that time. The call rejects with a `TimeoutError` and `pending()` clears. The time counts from the post, not from the wait in a queue.

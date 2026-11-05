@@ -77,8 +77,9 @@ export async function navigateTo(to: string | { query: QueryChanges }, options: 
 }
 
 // Runs the page's loads again and shows what they return, keeping scroll, focus and every island whose props did not change.
+// Named loads, the bindings of `const cart = await ...` in the page's or a layout's fence, run alone: the rest of the page stays as it is, unless it shows them.
 // kept: free
-export async function refresh(): Promise<void> {
+export async function refresh(loads?: string | readonly string[]): Promise<void> {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return
 
@@ -89,5 +90,5 @@ export async function refresh(): Promise<void> {
   }
 
   prefetched.clear()
-  await follow(new URL(location.href), { intent: 'refresh', focused: document.activeElement })
+  await follow(new URL(location.href), { intent: 'refresh', focused: document.activeElement, loads: typeof loads === 'string' ? [loads] : loads })
 }

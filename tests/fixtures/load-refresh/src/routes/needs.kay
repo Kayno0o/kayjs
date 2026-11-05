@@ -1,0 +1,11 @@
+--- server
+import { run } from '../calls'
+
+const cart = await run('cart', n => ({ n }))
+const items = await run('items', n => ({ n, of: cart.n }))
+const user = await run('user', n => ({ n }))
+---
+main
+  p.items {items.n} of {items.of}
+  p.cart {cart.n}
+  p.user {user.n}

@@ -14,7 +14,9 @@ import type { ServedPaths } from './served-paths'
 import { join } from 'node:path'
 import { pageRoutes } from '../runtime/counters'
 import { localePath, splitLocale, untranslatedPath } from '../runtime/i18n'
+import { requestedLoads } from '../runtime/load-scope'
 import { localeState, runInLocale } from '../runtime/locale-state'
+import { LOADS_HEADER } from '../runtime/swap'
 import { PRERENDERED_DIR } from './client'
 import { encodedCopies, encodedPath, filesUnder } from './compress'
 import { noteRedirect } from './dev-notes'
@@ -104,6 +106,15 @@ async function forVisitor(render: () => Promise<Response>): Promise<Response> {
   return response
 }
 
+// A refresh of some of the page's loads, answered for that request alone: its markup leaves the rest of the page to the browser, so no cache may keep or serve it.
+async function forLoads(render: () => Promise<Response>): Promise<Response> {
+  const response = await forVisitor(render)
+
+  response.headers.append('vary', LOADS_HEADER)
+
+  return response
+}
+
 // How a page answers one request: rendered afresh, or the copy `kay build` rendered, revalidated, with its server islands filled in.
 export function pageResponder({ client, renderOptions, prerendered, settings, transforms, served: servedHooks, pageFile, pageSizes, writes }: ResponderOptions): PageResponder {
   // The locale the request is answered in, read where the page is rendered.
@@ -112,9 +123,10 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
   const prerender = async (route: ServedRoute, params: Record<string, unknown>, url: URL, key: string) => hookedResponse(await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true, guarded: route.guards.length > 0 }), transforms, key, localeOf(), pageFile, pageSizes)
 
   return async (route, params, context, url) => {
-    const render = servedHooks.length === 0
+    const rendered = servedHooks.length === 0
       ? async () => renderPage(route, context, params, client, renderOptions)
       : async () => hookedServed(await renderPage(route, context, params, client, renderOptions), servedHooks, url.pathname, localeOf(), pageFile, pageSizes)
+    const render = requestedLoads(context.request) === undefined ? rendered : async () => forLoads(rendered)
 
     const preview = previewRequested(context.request)
 

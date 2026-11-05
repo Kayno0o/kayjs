@@ -1,11 +1,13 @@
 import type { Statement } from 'oxc-parser'
 import type { Diagnostic, Span } from './ast'
 import type { Node, NodeOfType, Program } from './estree'
+import type { BodyFact } from './load-facts'
 import type { PageSettingName } from './page-settings'
 import type { Path } from './scope'
 import type { ImportBinding, ParsedFence } from './script-shared'
 import { eachNode } from './each-node'
 import { isPlainProperty } from './estree'
+import { bodyFact } from './load-facts'
 import { PAGE, PAGE_SETTINGS, unreadSettingReport } from './page-settings'
 import { declaredIdentifiers, keyName, LITERAL_SETTING, plainNames } from './script-shared'
 import { splitFence } from './script-split'
@@ -60,6 +62,8 @@ export interface ServerAnalysis {
   page?: PageSettings | undefined
   // Statements that run per request, inside `load(ctx)`.
   body: Span[]
+  // What a refresh of some of the page's loads needs to know of each statement of `body`.
+  facts: Map<Span, BodyFact>
   // What the fence reads of kay's values without declaring or importing it.
   implicit: string[]
   // Names declared at the top of the fence: `load` returns them and the template reads them.
@@ -80,7 +84,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
   if (!server)
     return undefined
 
-  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], actionCallees: [], toolActions: [], body: [], broken: [], brokenModule: [], implicit: [], data: [], plain: [], separate: [], diagnostics: [] }
+  const analysis: ServerAnalysis = { hoisted: [], imports: [], specifiers: [], exports: [], exportNames: [], actionNames: [], actionCallees: [], toolActions: [], body: [], facts: new Map(), broken: [], brokenModule: [], implicit: [], data: [], plain: [], separate: [], diagnostics: [] }
   const split = splitFence(source, server, [], analysis)
 
   if (!split)
@@ -134,6 +138,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
       }
       else {
         analysis.body.push(...gap, span)
+        analysis.facts.set(span, bodyFact(statement, shift, range => source.slice(range.start, range.end)))
       }
 
       analysis.plain.push(...plainNames(statement))

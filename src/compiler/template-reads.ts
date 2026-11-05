@@ -96,7 +96,7 @@ function declaredIn(value: unknown): string[] {
 }
 
 // The names an expression reads: not a member after a dot, an object key, a type, or a name a function in it declares inside that function. Every word of the code when it does not parse.
-function readNames(code: string): Set<string> {
+export function readNames(code: string): Set<string> {
   let expression: Expression
 
   try {

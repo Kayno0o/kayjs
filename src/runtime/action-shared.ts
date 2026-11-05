@@ -320,7 +320,8 @@ export type CallQueue = 'parallel' | 'serial' | 'latest'
 export interface CallOptions<Output = unknown> {
   // Whether the page shows what the call changed once it succeeded, its loads run again as `refresh()` runs them; on unless `false`, and only where the page swap runs.
   // A `resource()`, or a list of them, refreshes those alone and leaves the page, whether or not the page swap runs: `refresh: cart`.
-  refresh?: boolean | Refreshable | readonly Refreshable[] | undefined
+  // A string names a load of the page's or a layout's fence, the binding of its `const cart = await ...`, which runs again alone while the rest of the page stays as it is: `refresh: 'cart'`, or `refresh: ['cart', wishlist]` beside a `resource()`. It needs the page swap.
+  refresh?: boolean | string | Refreshable | readonly (string | Refreshable)[] | undefined
   // How calls over the same action, or the same `track()` handle, queue.
   queue?: CallQueue | undefined
   // Aborts the post once it waited this long for the answer (not while it queues), rejecting with a `TimeoutError`; the change `optimistic` showed goes back.

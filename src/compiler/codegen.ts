@@ -2,6 +2,7 @@ import type { ClassTable } from '../runtime/class-table'
 import type { UiEntry } from '../runtime/ui'
 import type { ConstNode, ElementNode, ErrorMessages, KayFile, Node, SlotNode, Span, TemplateFacts, TemplateHelper } from './ast'
 import type { IslandCause } from './island-cause'
+import type { LoadPlan } from './load-plan'
 import type { Rewrite } from './mapping'
 import type { ImportedSignals } from './module-signals'
 import type { WRITE_HELPERS } from './names'
@@ -16,9 +17,10 @@ import { htmlHelperImport, HtmlTemplate } from './html'
 import { sourceLocator } from './inspect'
 import { constDeclaration } from './items'
 import { JsxTemplate } from './jsx'
+import { planLoads } from './load-plan'
 import { CodeBuilder, DYNAMIC_TAG } from './mapping'
 import { helperName } from './markup'
-import { defaultName, LOAD, PROPS, VALUES } from './names'
+import { defaultName, LOAD, LOAD_RUN, LOAD_TABLE, PROPS, VALUES } from './names'
 import { PAGE, PAGE_SETTINGS } from './page-settings'
 import { codeOf, reactiveValue } from './script'
 import { shadowedBinds } from './template-reads'
@@ -197,6 +199,8 @@ class ModuleShell {
   private readonly facts: TemplateFacts
   // Server values an `await` block renders by name: `load` defers each where it is declared, so the template changes how the server fence runs.
   private readonly deferred: Set<string>
+  // The loads of the fence a refresh may run alone, and the elements it may leave as the page shows them: server markup only.
+  private readonly loadPlan: LoadPlan | undefined
   private jsxTemplate: JsxTemplate | undefined
   // Whether `src/ui.ts` sets variants for this component, which its parts read at runtime.
   private readonly styled: boolean
@@ -218,6 +222,7 @@ class ModuleShell {
     this.facts = options.ui !== undefined && owned.parts?.merges === true ? { ...owned, ui: options.ui } : owned
     this.styled = this.facts.ui !== undefined && uiHasVariants(this.facts.ui)
     this.deferred = deferredData(this.facts, this.fence)
+    this.loadPlan = this.mode === 'html' && this.fence !== undefined && options.pageFile === true ? planLoads(this.file, this.fence) : undefined
     this.params = paramsType(options)
     this.actionsTyped = this.mode === 'check' && (options.params !== undefined || (options.layoutFile === true && this.guardValues() !== undefined)) && (server?.actionCallees.length ?? 0) > 0
   }
@@ -460,6 +465,9 @@ class ModuleShell {
     if (mode === 'html')
       b.add(htmlHelperImport())
 
+    if (this.loadPlan)
+      b.add(`import { kept as ${helperName('kept')}, loadScope as ${helperName('loadScope')} } from 'kay/html'\n`)
+
     if (mode === 'dom')
       b.add(domHelperImport())
 
@@ -616,7 +624,7 @@ class ModuleShell {
     const located = this.options.inspect === true ? sourceLocator(this.options.inspectSource?.text ?? src, this.options.moduleId, this.options.inspectSource?.real) : undefined
 
     if (mode === 'html') {
-      new HtmlTemplate(b, src, this.facts, { classMerge: this.options.classMerge, hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located }).value(visible)
+      new HtmlTemplate(b, src, this.facts, { classMerge: this.options.classMerge, hydratable: this.options.hydratable, accessorLoops: !this.staticLoops, errors, located, kept: this.loadPlan && { table: LOAD_TABLE, groups: this.loadPlan.groups } }).value(visible)
       b.add('\n}\n')
     }
     else if (mode === 'dom') {
@@ -855,18 +863,25 @@ class ModuleShell {
     const params = this.params
 
     // An unused parameter would trip `noUnusedParameters` in the user's tsconfig, so it is named `_ctx` when the fence never reads it.
-    const ctx = server.body.some(span => CTX_REFERENCE.test(this.text(span))) ? 'ctx' : '_ctx'
+    const ctx = this.loadPlan || server.body.some(span => CTX_REFERENCE.test(this.text(span))) ? 'ctx' : '_ctx'
 
     const guards = this.guardValues()
     const context = `KayPageContext<${params}${query !== undefined || guards !== undefined ? `, ${query ?? 'Readonly<Record<string, unknown>>'}` : ''}${guards !== undefined ? `, ${guards}` : ''}>`
     const prerender = this.settingType(PRERENDER)
 
+    if (this.loadPlan)
+      b.add(`\nconst ${LOAD_TABLE} = ${this.loadPlan.table}\n`)
+
     b.add(`\nexport async function ${LOAD}(${ctx}: ${prerender !== undefined ? `KayPrerenderedContext<${prerender}, ${context}>` : context}) {\n`)
+
+    if (this.loadPlan)
+      b.add(`const ${LOAD_RUN} = ${helperName('loadScope')}(${ctx}.request, ${LOAD_TABLE})\n`)
+
     for (const span of server.body) {
       if (this.leftOut(server, span))
         continue
 
-      b.addBody(span)
+      this.bodyStatement(server, span)
 
       this.deferDeclared(server, span)
     }
@@ -875,6 +890,31 @@ class ModuleShell {
     b.add('\n')
     this.sites.handOver = { start: b.code.length, end: b.code.length + handOver.length }
     b.add(`${handOver}\n}\n`)
+  }
+
+  // A statement of the fence, left out when the refresh running the load does not need what it makes: the names it declares then stay undefined.
+  private bodyStatement(server: ServerAnalysis, span: Span) {
+    const { b } = this
+    const ids = this.loadPlan?.needs.get(span)
+    const guard = server.facts.get(span)?.guard
+
+    if (ids === undefined || guard === undefined) {
+      b.addBody(span)
+
+      return
+    }
+
+    const run = `${LOAD_RUN}(${ids.join(', ')})`
+
+    if (guard.kind === 'statement') {
+      b.add(`if (${run}) {\n`).addBody(span).add('\n}')
+
+      return
+    }
+
+    const names = server.facts.get(span)!.declared
+
+    b.add(`let ${names.join(', ')}\nif (${run}) ${guard.destructures ? '(' : ''}`).addSource(guard.name).add(' = ').addBody(guard.init).add(guard.destructures ? ');' : ';')
   }
 
   // Right where a deferred value is declared, so a promise rejecting while a later statement awaits crashes nothing; a statement an export reads runs at module level.

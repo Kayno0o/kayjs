@@ -1,0 +1,19 @@
+--- server
+import { run } from '../calls'
+
+const cart = await run('cart', n => ({ n, items: ['apple'] }))
+const wishlist = await run('wishlist', n => ({ n, items: ['book'] }))
+const user = await run('user', n => ({ n, name: 'Ada' }))
+const label = `cart ${cart.n}`
+---
+head
+  title Shop
+main
+  h1 Hi {user.name} {user.n}
+  section.cart
+    p.count {label}
+    ul
+      for item of cart.items
+        li {item}
+  section.wishlist
+    p.wish {wishlist.n}

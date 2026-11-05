@@ -33,6 +33,8 @@ export interface Swap {
   transition?: boolean | undefined
   // The link followed, whose `data-keep-scroll` and `data-no-transition` the lazy swap reads, so the eager click handler stays small.
   link?: Element | undefined
+  // The page loads a refresh runs again, by name; the others are left as the page shows them. Without it, every load runs.
+  loads?: readonly string[] | undefined
   // The position a traversal's entry saved.
   saved?: [number, number] | undefined
   // The element focused before, found again by id or name once swapped: a traversal sets it between entries of one path, which keep the focus.

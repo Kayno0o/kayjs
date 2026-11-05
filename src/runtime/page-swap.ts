@@ -9,6 +9,7 @@ import { bounded, CHUNK_TIMEOUT_MS, inFlight, LATE, policyOf } from './swap-flig
 import { moveFocus } from './swap-focus'
 import { mergeHead, swapRoot } from './swap-head'
 import { heldLate, holding, swapBody } from './swap-kept'
+import { MISSING } from './swap-morph'
 import { transitioned, viewTransitions } from './swap-transition'
 import { addressChanged } from './with-query'
 
@@ -66,6 +67,10 @@ export async function go(url: URL, swap: Swap): Promise<void> {
   }
 }
 
+function joinedLoads(running: readonly string[] | undefined, asked: readonly string[] | undefined): readonly string[] | undefined {
+  return running && asked ? [...new Set([...running, ...asked])] : undefined
+}
+
 // Whether the swap asks for exactly what the one fetching its page does, so joining it changes nothing the visitor asked for.
 function joins(url: URL, swap: Swap): boolean {
   const flight = inFlight.fetch
@@ -99,8 +104,14 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
     running?.controller.abort()
 
   const controller = reused?.controller ?? new AbortController()
-  const pending = reused?.page ?? pageFor(url, controller.signal)
-  const flight = { controller, key, page: pending, href: url.href, intent: swap.intent, replace: swap.replace, scroll: swap.scroll, transition: swap.transition }
+  // The refresh that this one cancels asked for its loads too, which this page then shows as well; one asking for the whole page makes the whole page.
+  let loads = swap.intent === 'refresh' ? swap.loads : undefined
+
+  if (swap.intent === 'refresh' && running?.intent === 'refresh' && running.key === key && !reused)
+    loads = joinedLoads(running.loads, swap.loads)
+
+  const pending = reused?.page ?? pageFor(url, controller.signal, loads)
+  const flight = { controller, key, page: pending, href: url.href, intent: swap.intent, loads, replace: swap.replace, scroll: swap.scroll, transition: swap.transition }
 
   inFlight.fetch = flight
   void holding()
@@ -174,6 +185,14 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
       await show(page, url.hash, swap, isCurrent)
     }
     catch (error) {
+      // The loads asked for left parts of the page to itself that it no longer has: nothing changed yet, so the whole page is asked for.
+      if (error === MISSING) {
+        if (isCurrent())
+          await swapTo(url, { ...swap, loads: undefined })
+
+        return
+      }
+
       // A page the swap could not put in place is loaded instead, as following the link would have.
       console.error(error)
 

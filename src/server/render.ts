@@ -33,6 +33,7 @@ import { child, component, html, newServerIslands, withinComponent, withServerIs
 import { localePath, textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
 import { unrevivableAction } from '../runtime/island.server'
+import { unansweredLoads } from '../runtime/load-scope'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { NAVIGATION_ENTRY } from '../runtime/navigation-entry'
@@ -463,6 +464,11 @@ async function loadChainAsync(route: ServedRoute, files: string[], rendering: Re
     const loadsStarted = performance.now()
     const loading = runLoads(files, modules, rendering.ctx, loaded, timings)
     const data = loading instanceof Promise ? await againstDeadline(rendering.ctx.request, loading) : loading
+
+    if (options.dev) {
+      for (const name of unansweredLoads(rendering.ctx.request))
+        kayLog('warn', `a refresh asked for the load \`${name}\`, which no page or layout of this route declares as a top-level \`const ${name} = await ...\` in its server fence: nothing was refreshed for it`)
+    }
 
     return { files, modules, data, loaded, timings, phases: timing ? { guards, imports, loads: performance.now() - loadsStarted } : undefined, head: editing() ? undefined : await entryHeadOf(modules.at(-1)!, route, rendering.ctx) }
   }

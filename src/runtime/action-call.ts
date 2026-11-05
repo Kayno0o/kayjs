@@ -249,7 +249,13 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
           void refreshed()
       }
       else {
-        void refreshedIn([scope].flat())
+        const asked = [scope].flat()
+        const names = asked.filter(source => typeof source === 'string')
+
+        if (names.length > 0 && navigation.hooks)
+          void refreshed(names)
+
+        void refreshedIn(asked.filter(source => typeof source !== 'string'))
       }
     }
     const later = mode === 'latest' ? new AbortController() : undefined
@@ -529,7 +535,7 @@ async function navigateApi(): Promise<typeof import('./navigate-api') | undefine
 
 // The page's loads again through the swap, unless the visitor or the app went elsewhere while its code loaded, as a refresh started before them would have given way to them.
 // Without the swap's code the page reloads, as a deploy's would, so an action's effect still shows; a reload that would lose what was typed, or came within the minute, leaves the page and the next link loads in full.
-async function refreshed(): Promise<void> {
+async function refreshed(loads?: readonly string[]): Promise<void> {
   const [navigations, visits] = [navigation.navigations, navigation.visits]
   const api = await navigateApi()
 
@@ -537,7 +543,7 @@ async function refreshed(): Promise<void> {
     return
 
   if (api)
-    await api.refresh()
+    await api.refresh(loads)
   else
     reload()
 }

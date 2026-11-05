@@ -28,6 +28,7 @@ import { attributeName, attributeValue, classText, eachChild, elementName, handl
 
 export { escape, escapeAttribute } from './escape'
 export { head } from './head'
+export { kept, loadScope } from './load-scope'
 export { memo, untrack } from './reactive'
 export { html, isRendered } from './rendered'
 

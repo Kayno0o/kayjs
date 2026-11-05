@@ -1,0 +1,10 @@
+---
+import type { Action } from 'kay'
+
+const { run, loads } = props<{ run: Action<Record<string, never>, string>, loads: string }>()
+
+async function bump() {
+  await run({}, { refresh: loads.split(',') })
+}
+---
+button.bump(type="button" onClick={bump}) Bump

@@ -508,11 +508,17 @@ function innerMarkup(value: unknown): string
 [./html] isRendered
 function isRendered(value: object): value is Html
 
+[./html] kept
+function kept(table: LoadTable, group: number): boolean
+
 [./html] leadingNewline
 function leadingNewline(markup: string): string
 
 [./html] linkHref
 function linkHref(href: unknown, localize: boolean, ownRel: boolean): string
+
+[./html] loadScope
+function loadScope(request: Request | undefined, table: LoadTable): (...ids: number[]) => boolean
 
 [./html] localHref
 function localHref(href: unknown): unknown

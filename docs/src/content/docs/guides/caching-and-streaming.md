@@ -201,6 +201,28 @@ Status, headers and cookies are sent before the first block, so a streamed block
 
 </Callout>
 
+## Refreshing some loads
+
+An action call refreshes the whole page by default: every load in the server fence runs again. When only one of them changed, name it:
+
+```kay
+--- server
+const cart = await getCart()
+const user = await getUser()
+---
+main
+  h1 Hello {user.name}
+  p {cart.items.length} items
+```
+
+```ts
+await addToCart({ id }, { refresh: 'cart' })
+```
+
+The name is the binding of the load, so there is nothing to declare. Only `getCart()` runs again. The browser asks the page for that load alone, and the server sends an empty placeholder for each element that reads only loads it did not run, which the browser leaves exactly as it is, islands, focus and typed text included.
+
+A load runs anyway when something that is refreshed also needs it: another load that reads it, an element that shows both, or markup outside any element, such as at the root of the page or in `head`. Put the markup of a load in an element, and the page stays calm.
+
 ## Rendering to a string
 
 `renderToString` renders a component outside a page, for a mail or a file.

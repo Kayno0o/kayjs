@@ -212,7 +212,7 @@ interface CallOptions<Output = unknown>
   onSuccess?: ((event: { data: Output; }) => unknown) | undefined
   optimistic?: (() => void) | undefined
   queue?: CallQueue | undefined
-  refresh?: Refreshable | boolean | readonly Refreshable[] | undefined
+  refresh?: Refreshable | boolean | readonly (Refreshable | string)[] | string | undefined
   retry?: RetryOptions | number | undefined
   signal?: AbortSignal | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
@@ -921,7 +921,7 @@ type Redirect = <const Location extends string>(location: Location & CheckedHref
 function reducedMotion(fallback?: boolean): () => boolean
 
 [.] refresh
-function refresh(): Promise<void>
+function refresh(loads?: readonly string[] | string | undefined): Promise<void>
 
 [.] Refreshable
 interface Refreshable

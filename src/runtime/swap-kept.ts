@@ -3,7 +3,7 @@ import { ISLAND } from './markers'
 import { moves, place } from './move'
 import { navigation } from './navigation'
 import { runnable, scriptMarkup } from './swap-head'
-import { morphChildren } from './swap-morph'
+import { KEPT, keptPairs, MISSING, morphChildren } from './swap-morph'
 import { decodeServerValue } from './wire'
 
 const PERSISTENT = 'slot[data-persist]'
@@ -54,13 +54,22 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined)
   const focused = heldFocus()
 
   const kept = new Set<Element>()
+  // What the server left to the page as it is, found before anything moves.
+  const left = body.querySelector(`[${KEPT}]`) ? keptPairs(old, body, new Set(old.querySelectorAll(LASTING))) : undefined
+
+  // A refresh of some of the page's loads whose markup the page cannot take, as it changed since: the whole page is asked for instead.
+  const lives = left ? [...left.values()].filter(live => live !== undefined) : []
+
+  if (left && lives.length !== left.size)
+    throw MISSING
+
   // The scroll of each element an island kept holds, which a move resets in a browser without `moveBefore`, and Chrome's swap loses with it too (a bare pair of moves keeps it, the swap's does not), so a restore puts back the ones the swap kept either way.
   const scrolls = new Map<Element, readonly [left: number, top: number]>()
 
   // Read before the first move, and only when the next page has an island to keep, so every read shares one layout instead of forcing one after each move.
   const candidates = policy.islands === 'unchanged' ? `${PERSISTENT},${ISLAND}` : PERSISTENT
 
-  for (const root of body.querySelector(candidates) ? old.querySelectorAll(candidates) : []) {
+  for (const root of [...body.querySelector(candidates) ? old.querySelectorAll(candidates) : [], ...lives]) {
     for (const element of [root, ...root.querySelectorAll('*')]) {
       const { scrollLeft, scrollTop } = element
 
@@ -87,6 +96,9 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined)
     placeholder.replaceChildren()
     standIns.set(placeholder, live)
   }
+
+  for (const [placeholder, live] of left ?? [])
+    keep(placeholder, live!)
 
   for (const placeholder of body.querySelectorAll<HTMLElement>(PERSISTENT)) {
     const live = old.querySelector<KeptIsland>(`${PERSISTENT}[data-persist="${CSS.escape(placeholder.dataset.persist!)}"]`)

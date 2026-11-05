@@ -1,6 +1,6 @@
 import type { FetchedPage } from './navigation'
 import { pageKey, prefetched } from './navigation'
-import { NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
+import { LOADS_HEADER, NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
 import { inFlight } from './swap-flight'
 
 const PREFETCH_TTL_MS = 30_000
@@ -50,8 +50,9 @@ async function forgetFailed(key: string, page: Promise<FetchedPage>): Promise<vo
   }
 }
 
-async function fetchPage(url: URL, signal?: AbortSignal): Promise<FetchedPage> {
-  const response = await fetch(pageKey(url), { headers: { accept: 'text/html', [NAVIGATE_HEADER]: '1' }, signal: signal ?? null })
+async function fetchPage(url: URL, signal?: AbortSignal, loads?: readonly string[]): Promise<FetchedPage> {
+  // The page asked for some of its loads is not the page: the browser's cache neither serves nor keeps it.
+  const response = await fetch(pageKey(url), { headers: { accept: 'text/html', [NAVIGATE_HEADER]: '1', ...loads && { [LOADS_HEADER]: loads.join(',') } }, signal: signal ?? null, ...loads && { cache: 'no-store' } })
   const type = response.headers.get('content-type') ?? ''
 
   const full = response.headers.has(RELOAD_HEADER) || (isSecureContext && isolated(response.headers) !== crossOriginIsolated)
@@ -78,7 +79,10 @@ function isolated(headers: Headers): boolean {
 }
 
 // The page a navigation shows: one prefetched in the last few seconds, else fetched now.
-export async function pageFor(url: URL, signal: AbortSignal): Promise<FetchedPage> {
+export async function pageFor(url: URL, signal: AbortSignal, loads?: readonly string[]): Promise<FetchedPage> {
+  if (loads)
+    return fetchPage(url, signal, loads)
+
   const key = pageKey(url)
   const held = prefetched.get(key)
 
