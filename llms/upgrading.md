@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.90.0
+
+### One name, one meaning
+
+- kayjs-mail's `cssColours` is `cssColors`, the spelling `colorField` and the `color` props use. The old name works until 1.93, and `kay check` flags an import of it as `deprecated-export-names`, with a safe fix that `kay upgrade` applies.
+
 ## 1.89.0
 
 ### Defaults that fit production

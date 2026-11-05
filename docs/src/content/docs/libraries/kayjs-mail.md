@@ -98,13 +98,13 @@ A `@header` replaces it for one mail, and an empty one shows nothing. The text p
 
 It also ships `Code`, `Divider`, `Fields`, `Image`, `Link`, `Quote`, and `Row` with `Column` for columns that stack on a phone. `Fields` lays out a form's answers as label and value pairs, and `Quote` sets a visitor's message apart. They hold in Outlook for Windows.
 
-Mail clients read no CSS custom properties, so the settings need real colours. To take them from the site's stylesheet instead of typing them again, use `cssColours`. It gives a function that turns a custom property into its colour, as hex, following any `var()`.
+Mail clients read no CSS custom properties, so the settings need real colours. To take them from the site's stylesheet instead of typing them again, use `cssColors`. It gives a function that turns a custom property into its colour, as hex, following any `var()`.
 
 ```ts
-import { cssColours, mailDefaults } from '@kaynooo/kayjs-mail'
+import { cssColors, mailDefaults } from '@kaynooo/kayjs-mail'
 import stylesheet from './styles/global.css' with { type: 'text' }
 
-const colour = cssColours(stylesheet, 'styles/global.css')
+const colour = cssColors(stylesheet, 'styles/global.css')
 
 export default { ...mailDefaults, text: colour('--color-ink'), accent: colour('--color-wine') }
 ```

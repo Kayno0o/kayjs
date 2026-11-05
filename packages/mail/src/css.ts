@@ -20,7 +20,7 @@ function read(path: string): string {
 }
 
 // The colours of a stylesheet's custom properties, given its text, `import css from './global.css' with { type: 'text' }`, or a URL to read it from: `colour('--brand')` gives the property's first declaration, its `var()`s followed, as hex. A file that cannot be read, or a property missing or no opaque colour, throws naming the stylesheet, as `name` calls a text.
-export function cssColours(stylesheet: string | URL, name = 'the stylesheet'): (property: string) => string {
+export function cssColors(stylesheet: string | URL, name = 'the stylesheet'): (property: string) => string {
   const named = stylesheet instanceof URL ? fileURLToPath(stylesheet) : name
   const css = stylesheet instanceof URL ? read(named) : stylesheet
 
@@ -65,3 +65,6 @@ export function cssColours(stylesheet: string | URL, name = 'the stylesheet'): (
     return Bun.color(value, 'hex')!
   }
 }
+
+/** @deprecated Renamed `cssColors` in 1.90, the spelling `colorField` and the `color` props use; the old name works until 1.93. */
+export const cssColours = cssColors

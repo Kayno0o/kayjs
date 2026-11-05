@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { durationSeconds } from '../src/check/duration-seconds'
 import { applySafeFixes } from '../src/check/fixes'
-import { roomTypes, sourceTypes } from '../src/check/renamed-exports'
+import { exportNames, roomTypes, sourceTypes } from '../src/check/renamed-exports'
 import { scratchDir } from './scratch'
 
 async function project(files: Record<string, string>): Promise<string> {
@@ -128,6 +128,25 @@ describe('deprecated-duration-seconds', () => {
       expect(await read(root, 'src/a.ts')).toBe(source.replace('lifetime(86400', 'lifetime(\'86400s\'').replace('words(3600', 'words(\'3600s\''))
       expect(await read(root, 'src/b.ts')).toContain('lifetime(5')
       expect(await durationSeconds(root, { lints: { 'deprecated-duration-seconds': 'allow' } })).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('deprecated-export-names', () => {
+  it('renames an export of the module it is imported from with its uses, and leaves the same name of another module', async () => {
+    const root = await project({ 'src/a.ts': 'import { cssColours } from \'@kaynooo/kayjs-mail\'\n\nexport const a = cssColours(\'\')\n', 'src/b.ts': 'import { cssColours } from \'./mine\'\n\nexport const b = cssColours\n' })
+
+    try {
+      const found = await exportNames(root, {})
+
+      expect(found).toHaveLength(1)
+      expect(found[0]?.fixes?.[0]?.safe).toBe(true)
+      await applySafeFixes(root, found)
+      expect(await read(root, 'src/a.ts')).toBe('import { cssColors } from \'@kaynooo/kayjs-mail\'\n\nexport const a = cssColors(\'\')\n')
+      expect(await read(root, 'src/b.ts')).toContain('cssColours')
     }
     finally {
       await rm(root, { recursive: true, force: true })

@@ -800,6 +800,15 @@ export const LINTS = {
     wrong: '--- server\nimport { lifetime } from \'@kaynooo/kayjs-auth\'\n\nexport const words = (locale: string) => lifetime(86400, locale)\n---\np x',
     right: '--- server\nimport { lifetime } from \'@kaynooo/kayjs-auth\'\n\nexport const words = (locale: string) => lifetime(\'86400s\', locale)\n---\np x',
   },
+  'deprecated-export-names': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.90',
+    site: true,
+    summary: 'An import of an export under the name it had before 1.90, when each name came to mean one thing across kay and its libraries: kayjs-mail\'s `cssColours` is `cssColors`, the one British spelling of the API. The old names work until 1.93. The names are listed per module in `llms/upgrading.md`. Found in the TypeScript files and `.kay` fences of the project; the fix renames the import and every use of it. An aliased import is renamed without its uses, and a file where the new name is already taken, or the old one is declared again, exported or read in a template, is reported with no fix. A re-export (`export { X } from \'pkg\'`), `import(\'pkg\').X` and a namespace use are not found.',
+    wrong: '--- server\nimport { cssColours } from \'@kaynooo/kayjs-mail\'\n\nexport const colour = cssColours(\'a { --brand: #0047ff }\')\n---\np x',
+    right: '--- server\nimport { cssColors } from \'@kaynooo/kayjs-mail\'\n\nexport const colour = cssColors(\'a { --brand: #0047ff }\')\n---\np x',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS
@@ -856,6 +865,7 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.87' },
   { since: '1.88' },
   { since: '1.89' },
+  { since: '1.90' },
 ]
 
 // The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.

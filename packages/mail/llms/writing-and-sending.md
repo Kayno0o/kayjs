@@ -86,15 +86,15 @@ Layout(preheader="Your account is ready")
 - `Fields(fields)` lays out a form's answers as label and value pairs, `fields` a list of `{ label, value?, href? }` (the `MailField` type): a long value wraps, its line breaks kept, `href` links it, a `mailto:` or `tel:` say, and a value blank or left out shows `empty`, `-` by default. The text part writes each as `Label: value`, one to a line.
 - `Quote(text)` sets a block of text a visitor wrote apart, its line breaks kept in the html and the text part alike.
 - Their colours, fonts, radius and width come from the library's settings, which the app replaces in `kay.config.ts` as with any kay library: `librarySettings: { '@kaynooo/kayjs-mail': './src/mail-settings.ts' }`, a module default-exporting `{ ...mailDefaults, accent: '#0047ff' }`, `mailDefaults` and the `MailSettings` type imported from `@kaynooo/kayjs-mail`.
-- Mail clients read no CSS custom properties, so rather than typing the site's palette again, the settings take it from the site's stylesheet: `cssColours(css, name)` takes the stylesheet's text, imported with `with { type: 'text' }`, which works in a server built with `kay build --compile` too, and gives a function turning a custom property into its colour, its first declaration in the stylesheet, `var()`s and their fallbacks followed, as hex, from which the dark colours derive as from any other. A property missing, no colour or seen through stops the boot naming it and the stylesheet, `name`, else `the stylesheet`. `cssColours(new URL('./styles/global.css', import.meta.url))` reads the file instead, as the server boots, which a compiled server, carrying no source file, cannot.
+- Mail clients read no CSS custom properties, so rather than typing the site's palette again, the settings take it from the site's stylesheet: `cssColors(css, name)` takes the stylesheet's text, imported with `with { type: 'text' }`, which works in a server built with `kay build --compile` too, and gives a function turning a custom property into its colour, its first declaration in the stylesheet, `var()`s and their fallbacks followed, as hex, from which the dark colours derive as from any other. A property missing, no colour or seen through stops the boot naming it and the stylesheet, `name`, else `the stylesheet`. `cssColors(new URL('./styles/global.css', import.meta.url))` reads the file instead, as the server boots, which a compiled server, carrying no source file, cannot.
 
 ```ts
 // src/mail-settings.ts
 import type { MailSettings } from '@kaynooo/kayjs-mail'
-import { cssColours, mailDefaults } from '@kaynooo/kayjs-mail'
+import { cssColors, mailDefaults } from '@kaynooo/kayjs-mail'
 import stylesheet from './styles/global.css' with { type: 'text' }
 
-const colour = cssColours(stylesheet, 'styles/global.css')
+const colour = cssColors(stylesheet, 'styles/global.css')
 
 export default { ...mailDefaults, text: colour('--color-ink'), surface: colour('--color-paper'), accent: colour('--color-wine') } satisfies MailSettings
 ```

@@ -48,7 +48,7 @@ import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
-import { roomTypes, sourceTypes } from './renamed-exports'
+import { exportNames, roomTypes, sourceTypes } from './renamed-exports'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { unknownToolLabels } from './tool-labels'
@@ -145,6 +145,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => authMethods(root, options),
   async ({ root, options }) => sourceTypes(root, options),
   async ({ root, options }) => roomTypes(root, options),
+  async ({ root, options }) => exportNames(root, options),
   async ({ root, options }) => durationSeconds(root, options),
   async ({ root, options }) => apiErrorAnswers(root, options),
   async ({ root, options }) => refusalMessages(root, options),

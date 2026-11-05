@@ -199,9 +199,8 @@ const OLD_ROOM_TYPE = /AsyncRoomStore|AsyncRooms|StoreRooms/
 
 interface RenamedTypes {
   lint: LintName
-  // The module the old names are imported from.
-  module: string
-  names: Readonly<Record<string, string>>
+  // The old names and their new ones, per module they are imported from.
+  modules: Readonly<Record<string, Readonly<Record<string, string>>>>
   needle: RegExp
   // The release that renamed them and the one that drops the old names.
   since: string
@@ -210,7 +209,7 @@ interface RenamedTypes {
   safe: (old: string) => boolean
 }
 
-// A type imported from `config.module` under an old name, as a type or a value import: the fix renames the import and every use of it.
+// A name imported from one of `config.modules` under an old name, as a type or a value import: the fix renames the import and every use of it.
 // A file where the new name is taken, the old one is declared again, exported or read in a template, or an aliased import, gets the report with no fix beyond the import itself.
 async function renamedTypes(root: string, options: CheckOptions, config: RenamedTypes): Promise<CheckDiagnostic[]> {
   if (lintLevel(config.lint, options.lints) === 'allow')
@@ -219,15 +218,17 @@ async function renamedTypes(root: string, options: CheckOptions, config: Renamed
   return scan(root, options, config.lint, config.needle, ({ parsed, unparsed, report }) => {
     for (const { ast, base } of parsed) {
       for (const statement of ast.body) {
-        if (statement.type !== 'ImportDeclaration' || statement.source.value !== config.module)
+        if (statement.type !== 'ImportDeclaration' || !Object.hasOwn(config.modules, statement.source.value))
           continue
 
+        const names = config.modules[statement.source.value]!
+
         for (const specifier of statement.specifiers) {
-          if (specifier.type !== 'ImportSpecifier' || !Object.hasOwn(config.names, importedName(specifier)))
+          if (specifier.type !== 'ImportSpecifier' || !Object.hasOwn(names, importedName(specifier)))
             continue
 
           const old = importedName(specifier)
-          const next = config.names[old]!
+          const next = names[old]!
           const aliased = specifier.local.name !== old || specifier.imported.start !== specifier.local.start
           const message = `\`${old}\` is renamed \`${next}\` since ${config.since}, and the old name works until ${config.until}`
           const help = `rename it to \`${next}\``
@@ -252,10 +253,22 @@ async function renamedTypes(root: string, options: CheckOptions, config: Renamed
 // `StreamStatus`, `ResourceStatus` and `ResourceFailure` imported from `kay`.
 // `LoadStatus` also has `idle` and `ApiError` is a class with more members, so those two renames can need a code change.
 export async function sourceTypes(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-source-types', module: 'kay', names: SOURCE_TYPES, needle: OLD_TYPE, since: '1.87', until: '1.90', safe: old => old === 'StreamStatus' })
+  return renamedTypes(root, options, { lint: 'deprecated-source-types', modules: { kay: SOURCE_TYPES }, needle: OLD_TYPE, since: '1.87', until: '1.90', safe: old => old === 'StreamStatus' })
 }
 
 // `AsyncRoomStore`, `AsyncRooms` and `StoreRooms` imported from `kay/server`: the same types under the names every store kind shares.
 export async function roomTypes(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-room-types', module: 'kay/server', names: ROOM_TYPES, needle: OLD_ROOM_TYPE, since: '1.88', until: '1.91', safe: () => true })
+  return renamedTypes(root, options, { lint: 'deprecated-room-types', modules: { 'kay/server': ROOM_TYPES }, needle: OLD_ROOM_TYPE, since: '1.88', until: '1.91', safe: () => true })
+}
+
+// The exports renamed in 1.90 so no two packages export one name for two things, per module they are imported from, and the name each has now.
+export const EXPORT_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  '@kaynooo/kayjs-mail': { cssColours: 'cssColors' },
+}
+
+const OLD_EXPORT = new RegExp(`\\b(?:${[...new Set(Object.values(EXPORT_NAMES).flatMap(names => Object.keys(names)))].join('|')})\\b`)
+
+// An export imported under the name it had before 1.90 (`EXPORT_NAMES`): the fix renames the import and every use of it.
+export async function exportNames(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+  return renamedTypes(root, options, { lint: 'deprecated-export-names', modules: EXPORT_NAMES, needle: OLD_EXPORT, since: '1.90', until: '1.93', safe: () => true })
 }
