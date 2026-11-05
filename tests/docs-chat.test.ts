@@ -29,7 +29,7 @@ const question = (content: string) => ({ messages: [{ role: 'user', content }] }
 
 // The settings docs/kay.config.ts gives `ai()`, read where the library keeps them.
 interface Counted {
-  settings: { budget?: { tokens: number, total: number | undefined, ms: number, counting: Limiter }, limit?: { max: number, ms: number, counting: Limiter } }
+  settings: { budget?: { tokens: number, total: number | undefined, ms: number, counting: Limiter }, limit: { max: number, ms: number, counting: Limiter }[] }
 }
 
 const counted = () => (globalThis as Record<symbol, Counted | undefined>)[Symbol.for('kayjs-ai.limits')]!.settings
@@ -37,13 +37,14 @@ const counted = () => (globalThis as Record<symbol, Counted | undefined>)[Symbol
 const budgetCounting = (store: ReturnType<typeof memoryRates>) => limiter({ max: counted().budget!.tokens, window: '1d', store, name: 'ai:budget', failure: 'refuse' })
 // The config keeps the counts in a file that outlives a run, which every test here would meet again: they count in memory instead.
 const kept = counted()
-const configured = { limit: kept.limit!.counting, budget: kept.budget!.counting }
+const keptLimit = kept.limit[0]!
+const configured = { limit: keptLimit.counting, budget: kept.budget!.counting }
 
-kept.limit!.counting = limiter({ max: kept.limit!.max, window: '1m', store: memoryRates(), name: 'ai:limit', failure: 'refuse' })
+keptLimit.counting = limiter({ max: keptLimit.max, window: '1m', store: memoryRates(), name: 'ai:limit', failure: 'refuse' })
 kept.budget!.counting = budgetCounting(memoryRates())
 
 afterAll(async () => {
-  kept.limit!.counting = configured.limit
+  keptLimit.counting = configured.limit
   kept.budget!.counting = configured.budget
   await site.close()
   await release()
@@ -266,7 +267,7 @@ describe('the caps set in docs/kay.config.ts', () => {
     const { budget, limit } = counted()
 
     expect(budget).toMatchObject({ tokens: TOKENS, total: TOTAL, ms: DAY })
-    expect(limit).toMatchObject({ max: 4, ms: 60_000 })
+    expect(limit).toMatchObject([{ max: 4, ms: 60_000 }])
   })
 
   it('refuses a visitor who used the daily tokens and lets another visitor ask', async () => {
