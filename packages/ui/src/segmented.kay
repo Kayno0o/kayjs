@@ -27,7 +27,7 @@ const look = recipe({
 const { options, value, label, showLabel = false, name, invalid, param, paramDefault, disabled = false, orientation = 'horizontal', onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that option from being picked.
   options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[] & NullOption<Value, Held>
-  // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it. Left out, the first option that is not disabled starts picked, which a form reset goes back to.
+  // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it. Left out, the first option that is not disabled when the group is drawn starts picked, which a form reset goes back to.
   value?: Held | undefined
   // Names the group for screen readers.
   label: string

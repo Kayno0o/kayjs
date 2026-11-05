@@ -1,0 +1,23 @@
+---
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
+import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import { signal } from 'kay'
+
+// Controls left without a `value`, or switched between holding one and not, with the callbacks the tests listen to.
+const { onHear } = props<{ onHear: (what: string, value: unknown) => unknown }>()
+const choices = [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }, { value: 'c', label: 'C' }]
+const later = async () => choices
+const held = signal<string | undefined>(undefined)
+---
+form#form
+  RadioGroup#none(name="none" label="None" options={choices} value={null})
+  Select#switching(name="switching" options={choices} value={held()})
+  RadioGroup#switching-radios(name="switching-radios" label="Switching" options={choices} value={held()})
+  Select#async(name="async" options={later} onChange={value => onHear('async', value)})
+  Select#refused(name="refused" options={choices} param="refused" onChange={() => false})
+  Rating#stars(name="stars" label="Stars" onChange={value => onHear('stars', value)})
+  ChipGroup#chips(name="chips" label="Chips" options={choices} onChange={value => onHear('chips', value)})
+  button#hold(type="button" onClick={() => held = 'c'}) Hold
+  button#reset(type="reset") Reset

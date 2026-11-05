@@ -1,0 +1,6 @@
+---
+import NoValue from '../components/no-value.kay'
+import '../app.css'
+---
+main
+  NoValue

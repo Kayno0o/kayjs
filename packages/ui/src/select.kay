@@ -46,7 +46,8 @@ const { size = 'md', invalid, value, options, onChange, param, paramDefault, nam
 
 // A select with no callback is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
 const sent = onChange || param !== undefined ? undefined : postedValue(name, value)
-const wanted = () => sent ?? (value === undefined ? undefined : String(value))
+const current = () => value === undefined ? undefined : String(value)
+const wanted = () => sent ?? current()
 
 interface SelectOption<Choice> { value: Choice, label: string, disabled?: boolean | undefined }
 
@@ -91,17 +92,31 @@ effect(() => {
 })
 
 // The options carry the value to the select, so only what the app last handed is kept; a reset that changes the select has the app's `onChange` told, without submitting.
-const controlled = controlledValue({ box: () => box, value: () => value === undefined ? undefined : String(value), write: false, report: select => report(select) })
+const controlled = controlledValue({ box: () => box, value: current, write: false, report: select => report(select) })
 
-// What the select was last told of, which a refused move puts back when the app holds no `value`.
-let known = ''
+const heard = controlled.heard
 
-function heard(text: string) {
-  known = text
-  controlled.heard(text)
+// What the select last had accepted while the app holds no `value`: the browser's pick once the options are drawn, then each pick reported or accepted, which a refused move puts back.
+let accepted = ''
+let touched = false
+
+// The options arrive after the select with an async source, so the start is read again once they are drawn, until a pick is made.
+function seed() {
+  if (box && !touched) {
+    accepted = box.value
+    heard(box.value)
+  }
 }
 
+effect(() => {
+  list()
+  asking()
+  queueMicrotask(seed)
+})
+
 function report(select: HTMLSelectElement) {
+  touched = true
+  accepted = select.value
   heard(select.value)
 
   const choice = list().find(option => String(option.value) === select.value)
@@ -115,15 +130,18 @@ const moving = signal(false)
 
 async function move(select: HTMLSelectElement) {
   const choice = list().find(option => String(option.value) === select.value)
-  const before = known
 
+  touched = true
   heard(select.value)
 
-  if (await changeAccepted('Select', () => paramChange(param, paramDefault, onChange)?.(choice === undefined ? '' as never : choice.value), moving.set))
+  if (await changeAccepted('Select', () => paramChange(param, paramDefault, onChange)?.(choice === undefined ? '' as never : choice.value), moving.set)) {
+    accepted = select.value
+
     return
+  }
 
   // What the app renders now, which it may have changed while the move was under way.
-  const kept = value === undefined ? before : String(value)
+  const kept = current() ?? accepted
 
   select.value = kept
   heard(kept)
@@ -183,8 +201,7 @@ function left(event: FocusEvent & { currentTarget: HTMLSelectElement }) {
 
 const ref = startRef<HTMLSelectElement>((element) => {
   box = element
-  // Without a `value` the select starts on the browser's pick, the first option, which a reset goes back to.
-  heard(element.value)
+  seed()
   keepInvalid(element, () => invalid)
 }, rest.ref)
 ---

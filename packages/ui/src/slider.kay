@@ -20,7 +20,7 @@ const { size = 'md', invalid, value, min = 0, max = 100, step, label, showValue 
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
-  // The value to start with, `min` when left out; a slider whose parent passes another follows it.
+  // The value to start with, `min` as it is drawn when left out, not following a later `min`; a slider whose parent passes another follows it.
   value?: number | undefined
   // The bounds, 0 and 100 by default.
   min?: number | undefined
