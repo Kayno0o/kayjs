@@ -153,3 +153,39 @@ describe('deprecated-export-names', () => {
     }
   })
 })
+
+describe('deprecated-export-names', () => {
+  it('renames an export of the module it is imported from with its uses, and leaves the same name of another module', async () => {
+    const source = 'import { cssColours } from \'@kaynooo/kayjs-mail\'\nimport { EveryOptions, jobTables } from \'kay/server\'\nimport { jobTables as definitions } from \'kay/pg-orm\'\n\nexport const a = [cssColours(\'\'), jobTables, definitions] as [unknown, unknown, unknown]\nexport type B = EveryOptions\n'
+    const root = await project({ 'src/a.ts': source, 'src/b.ts': 'import { cssColours } from \'./mine\'\nimport { EveryOptions } from \'kay\'\n\nexport const b = [cssColours, {} as EveryOptions]\n' })
+
+    try {
+      const found = await exportNames(root, {})
+
+      expect(found).toHaveLength(3)
+      expect(found.every(diagnostic => diagnostic.fixes?.[0]?.safe)).toBe(true)
+      await applySafeFixes(root, found)
+      expect(await read(root, 'src/a.ts')).toBe('import { cssColors } from \'@kaynooo/kayjs-mail\'\nimport { ScheduleEveryOptions, jobTableNames } from \'kay/server\'\nimport { jobTables as definitions } from \'kay/pg-orm\'\n\nexport const a = [cssColors(\'\'), jobTableNames, definitions] as [unknown, unknown, unknown]\nexport type B = ScheduleEveryOptions\n')
+      expect(await read(root, 'src/b.ts')).toContain('cssColours')
+      expect(await read(root, 'src/b.ts')).toContain('EveryOptions')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports with no fix when the new name is already taken, and honours the level', async () => {
+    const root = await project({ 'src/taken.ts': 'import { cssColors, cssColours } from \'@kaynooo/kayjs-mail\'\n\nexport const a = [cssColors, cssColours]\n' })
+
+    try {
+      const found = await exportNames(root, {})
+
+      expect(found).toHaveLength(1)
+      expect(found[0]?.fixes).toBeUndefined()
+      expect(await exportNames(root, { lints: { 'deprecated-export-names': 'allow' } })).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})

@@ -263,6 +263,7 @@ export async function roomTypes(root: string, options: CheckOptions): Promise<Ch
 
 // The exports renamed in 1.90 so no two packages export one name for two things, per module they are imported from, and the name each has now.
 export const EXPORT_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  'kay/server': { EveryOptions: 'ScheduleEveryOptions', jobTables: 'jobTableNames', dataTables: 'dataTableNames' },
   '@kaynooo/kayjs-mail': { cssColours: 'cssColors' },
 }
 

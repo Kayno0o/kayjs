@@ -11,7 +11,7 @@ import { live, liveSlot, setLiveStore, watchSlot } from '../src/runtime/live-val
 import { delayAfter, MAX_IDLE_MS, QUIET_POLLS } from '../src/runtime/poll-backoff'
 import { setupStore } from '../src/server/app-store'
 import { pgCache } from '../src/server/pg-cache'
-import { dataTables, pgHandle } from '../src/server/pg-data'
+import { dataTableNames, pgHandle } from '../src/server/pg-data'
 import { pgLive } from '../src/server/pg-live'
 import { NOW } from '../src/server/pg-sql'
 import { disposeOwned } from '../src/server/reload'
@@ -270,7 +270,7 @@ describe('the memory stores', () => {
 async function freshTables() {
   const { sql } = await postgres()
 
-  for (const table of dataTables)
+  for (const table of dataTableNames)
     await sql.unsafe(`DROP TABLE IF EXISTS ${table}`)
 }
 

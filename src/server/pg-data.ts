@@ -6,7 +6,7 @@ import type { DeletableSessionStore } from './session'
 import { kayLog } from '../runtime/log'
 import { appName, claimDatabase } from './app-identity'
 import { pgCache } from './pg-cache'
-import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobsAfter, jobTables, missingRelations, privilegeRefused, relationsMissing, withMissingIndexes } from './pg-jobs'
+import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobsAfter, jobTableNames, missingRelations, privilegeRefused, relationsMissing, withMissingIndexes } from './pg-jobs'
 import { pgLive } from './pg-live'
 import { pgRooms } from './pg-rooms'
 import { query } from './pg-sql'
@@ -33,7 +33,10 @@ const OWN_INDEXES: readonly PgIndex[] = [
 ]
 
 // The names of the tables `pgData` keeps its data in, the jobs' included, for a pg-orm `ignoreTables` of an app that creates them with `createDataTables`.
-export const dataTables = [...jobTables, ...OWN_TABLES] as readonly string[]
+export const dataTableNames = [...jobTableNames, ...OWN_TABLES] as readonly string[]
+
+/** @deprecated Renamed `dataTableNames` in 1.90, with `jobTableNames`; the old name works until 1.93. */
+export const dataTables = dataTableNames
 
 // What a Postgres store reaches its database through: the connection, once the tables are in place.
 export interface PgHandle {
@@ -141,7 +144,7 @@ export function pgHandle(db: SQL): PgHandle & { close: () => Promise<void> } {
     }
     catch (error) {
       if (privilegeRefused(error))
-        throw new Error(`kay: pgData needs ${await missingTables(db)}, and its role may not create them: run \`await createDataTables(db)\` from kay/server as the database's owner, and list \`dataTables\` from kay/server in pg-orm's \`ignoreTables\``, { cause: error })
+        throw new Error(`kay: pgData needs ${await missingTables(db)}, and its role may not create them: run \`await createDataTables(db)\` from kay/server as the database's owner, and list \`dataTableNames\` from kay/server in pg-orm's \`ignoreTables\``, { cause: error })
 
       throw error
     }

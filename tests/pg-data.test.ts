@@ -10,7 +10,7 @@ import { rateLimit, rooms } from '../src/server'
 import { appName, claimDatabase } from '../src/server/app-identity'
 import { appStore, setupStore } from '../src/server/app-store'
 import { registerBundle } from '../src/server/bundle'
-import { createDataTables, dataTables, pgData as openPgData, pgHandle } from '../src/server/pg-data'
+import { createDataTables, dataTableNames, pgData as openPgData, pgHandle } from '../src/server/pg-data'
 import { createMissingIndexes, indexStatement, pgJobs } from '../src/server/pg-jobs'
 import { pgRooms } from '../src/server/pg-rooms'
 import { pgRates, pgSessions, pgVitals } from '../src/server/pg-stores'
@@ -43,7 +43,7 @@ async function fresh(): Promise<SQL> {
   const { sql } = await postgres()
 
   // One table per statement, as one DROP of them all holds locks on the first while it waits for the next, which a poller still reading two of them deadlocks with.
-  for (const table of dataTables)
+  for (const table of dataTableNames)
     await sql.unsafe(`DROP TABLE IF EXISTS ${table}`)
 
   return sql
@@ -128,9 +128,9 @@ pgDescribe('pgData', () => {
 
     await pgData(sql).sessions.set('a', { user: 1 }, 3_600_000)
 
-    const present = await rows<{ found: number }>(sql, `SELECT count(*)::int AS found FROM unnest(ARRAY[${dataTables.map(name => `'${name}'`).join(',')}]) AS name WHERE to_regclass(name) IS NOT NULL`)
+    const present = await rows<{ found: number }>(sql, `SELECT count(*)::int AS found FROM unnest(ARRAY[${dataTableNames.map(name => `'${name}'`).join(',')}]) AS name WHERE to_regclass(name) IS NOT NULL`)
 
-    expect(present[0]!.found).toBe(dataTables.length)
+    expect(present[0]!.found).toBe(dataTableNames.length)
     await createDataTables(url)
     await createDataTables({ sql })
     expect(await pgData(sql).sessions.get('a')).toEqual({ user: 1 })

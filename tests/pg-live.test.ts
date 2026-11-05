@@ -3,7 +3,7 @@ import type { LiveStore } from '../src/runtime/live-value'
 import { afterEach, expect, setSystemTime } from 'bun:test'
 import { live, liveSlot, liveStoreReady, setLiveStore } from '../src/runtime/live-value'
 import { setupStore } from '../src/server/app-store'
-import { createDataTables, dataTables, pgData as openPgData, pgHandle as openPgHandle } from '../src/server/pg-data'
+import { createDataTables, dataTableNames, pgData as openPgData, pgHandle as openPgHandle } from '../src/server/pg-data'
 import { pgLive } from '../src/server/pg-live'
 import { NOW, unescaped } from '../src/server/pg-sql'
 import { cleanUpAfterFile, pgDescribe, pgIt, postgres, replicas } from './job-stores'
@@ -31,7 +31,7 @@ async function fresh() {
   const { sql } = await postgres()
 
   // One table per statement, as one DROP of them all holds locks on the first while it waits for the next, which a poller still reading two of them deadlocks with.
-  for (const table of dataTables)
+  for (const table of dataTableNames)
     await sql.unsafe(`DROP TABLE IF EXISTS ${table}`)
 
   return sql

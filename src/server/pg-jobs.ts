@@ -35,7 +35,10 @@ const INDEX_POLL_MS = 200
 const CONNECTION = { connectionTimeout: 10, idleTimeout: 60, maxLifetime: 1800 }
 
 // The names of the tables a store keeps its jobs and schedule locks in, for a pg-orm `ignoreTables` of an app that creates them with `createJobTables`: one that lists the table definitions of `jobTables` from `kay/pg-orm` has no use for it.
-export const jobTables = ['kay_jobs', 'kay_locks'] as const
+export const jobTableNames = ['kay_jobs', 'kay_locks'] as const
+
+/** @deprecated Renamed `jobTableNames` in 1.90, as `jobTables` of `kay/pg-orm` is the table definitions; the old name works until 1.93. */
+export const jobTables = jobTableNames
 
 // An index a kay table keeps, created with its table or, on a table already there, on its own.
 export interface PgIndex { name: string, on: string, unique?: boolean }
@@ -237,7 +240,7 @@ export async function createJobTables(source: PgJobsSource): Promise<void> {
   const db = connectionOf(source)
 
   try {
-    if (await relationsMissing(db, jobTables)) {
+    if (await relationsMissing(db, jobTableNames)) {
       await db.begin(async (tx) => {
         await tx`SELECT pg_advisory_xact_lock(hashtext(${MIGRATION_LOCK}))`
         await tx`CREATE TABLE IF NOT EXISTS kay_jobs (id text PRIMARY KEY, queue text NOT NULL, payload text NOT NULL, attempts integer NOT NULL, run_at bigint NOT NULL, held_until bigint, failed boolean NOT NULL DEFAULT false, error text, job_key text, progress text)`
@@ -291,7 +294,7 @@ export function jobsAfter(source: PgJobsSource, before?: () => Promise<unknown>)
   const create = async (db: SQL): Promise<SQL> => {
     await before?.()
 
-    if (!await relationsMissing(db, jobTables))
+    if (!await relationsMissing(db, jobTableNames))
       return withMissingIndexes(db, JOB_INDEXES)
 
     try {

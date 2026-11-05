@@ -7,6 +7,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### One name, one meaning
 
 - kayjs-mail's `cssColours` is `cssColors`, the spelling `colorField` and the `color` props use. The old name works until 1.93, and `kay check` flags an import of it as `deprecated-export-names`, with a safe fix that `kay upgrade` applies.
+- `kay/server` has three names that `kay` and `kay/pg-orm` give another meaning: `EveryOptions` of `schedule()` is `ScheduleEveryOptions` (`EveryOptions` of `kay` is the client timer's), and the lists of table names for pg-orm's `ignoreTables`, `import { jobTables, dataTables } from 'kay/server'`, are `jobTableNames` and `dataTableNames` (`jobTables` of `kay/pg-orm` stays the table definitions). The old names work until 1.93, and `deprecated-export-names` renames an import from `kay/server`, with its uses.
 
 ## 1.89.0
 

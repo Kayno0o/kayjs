@@ -225,7 +225,7 @@ kay lists pg-orm as an optional peer, so an app without it installs and builds a
 
 Without pg-orm migrations, `pgJobs` creates the tables when they are missing and its role may. If the role may not, the owner creates them once, in a boot script, with `await createJobTables(db)`. It is safe to run again, and from several replicas at once.
 
-When an index is missing, one replica builds it and the others wait until the unique ones are valid before they go on. That lock is a Postgres session lock, so run it on a direct or session-mode connection, not behind a transaction-mode pooler such as pgbouncer's. pg-orm does not know tables made that way, so tell it to leave them alone with `ignoreTables: [...jobTables]`, where `jobTables` comes from `kay/server` and lists their names.
+When an index is missing, one replica builds it and the others wait until the unique ones are valid before they go on. That lock is a Postgres session lock, so run it on a direct or session-mode connection, not behind a transaction-mode pooler such as pgbouncer's. pg-orm does not know tables made that way, so tell it to leave them alone with `ignoreTables: [...jobTableNames]`, where `jobTableNames` comes from `kay/server` and lists their names.
 
 A claim and its hold use the database's clock, so replicas need not keep their clocks in agreement.
 
@@ -241,7 +241,7 @@ export default defineConfig({
 })
 ```
 
-It takes what `pgJobs` takes, and creates its tables when they are missing and its role may. If the role may not, the owner runs `await createDataTables(db)` once in a boot script, and pg-orm's `ignoreTables` lists `dataTables` from `kay/server`.
+It takes what `pgJobs` takes, and creates its tables when they are missing and its role may. If the role may not, the owner runs `await createDataTables(db)` once in a boot script, and pg-orm's `ignoreTables` lists `dataTableNames` from `kay/server`.
 
 Replicas learn of each other's invalidations, live values and room messages by polling, within about half a second (5 seconds on an idle server), so nothing needs LISTEN and a pooler in front of Postgres works, except for building a missing index, which needs a session connection.
 
