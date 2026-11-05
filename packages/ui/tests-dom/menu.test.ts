@@ -142,9 +142,9 @@ test('a Menu link takes Space as Enter, and arrows move across links and buttons
 })
 
 test('a Menu link opens in a new tab for an absolute or protocol-relative address alone', async () => {
-  const { opensOutside } = await import('../src/menu')
+  const { isExternal } = await import('../src/outside')
 
-  expect(['/a', 'a/b', '?q=1', '#x', 'https://x.org', 'http://x.org', '//x.org/a'].map(opensOutside)).toEqual([false, false, false, false, true, true, true])
+  expect(['/a', 'a/b', '?q=1', '#x', 'https://x.org', 'http://x.org', '//x.org/a'].map(href => isExternal(href))).toEqual([false, false, false, false, true, true, true])
 })
 
 test('a Menu @trigger replaces the icon button with a labelled button or an avatar, keeping popovertarget, aria-haspopup and aria-expanded', async () => {
