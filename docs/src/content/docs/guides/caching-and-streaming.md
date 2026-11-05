@@ -225,7 +225,9 @@ A load runs anyway when something that is refreshed also needs it: another load 
 
 An `if` or a `for` is part of the element around it, so that element is kept or rendered whole. A layout is never left alone around its page: the element holding the `slot` is rendered, and so are the loads it reads. When the browser cannot put the answer in place, because the page moved on, the answer is a redirect, or the rendered part reads a `live()` value, it asks for the whole page instead.
 
-The browser moves a kept element in the page. Where the browser has no `moveBefore`, an iframe or a video inside it starts again.
+Only an element that stands on its own in the template is kept alone: never a component's children, a slot fill, an element with a spread or an element holding the `slot`, and never what is inside an `if` or a `for`. A statement in the fence that can end or change the response, such as a guard that redirects or throws, runs on every refresh, and so does a load that uses `ctx` beyond its params, query, url, locale and request, so a refresh never skips a check.
+
+The browser moves a kept element in the page. Where the browser has no `moveBefore`, an iframe or a video inside it starts again. A kept element stays as it was, so what it shows of the time or of `ctx` is stale until the next whole render.
 
 ## Rendering to a string
 

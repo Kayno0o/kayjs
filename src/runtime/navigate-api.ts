@@ -2,6 +2,7 @@ import type { CheckedHref } from './checks'
 import { withBase } from './base'
 import { follow } from './navigate'
 import { leave, loadAgain, mayLeave, navigation, prefetched, swappable } from './navigation'
+import { LOAD_NAME } from './swap'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
 declare const KAY_BROWSER: true | undefined
@@ -76,14 +77,21 @@ export async function navigateTo(to: string | { query: QueryChanges }, options: 
   return true
 }
 
-const LOAD_NAME = /^[\w$]{1,64}$/
+const warned = new Set<string>()
 
 // Development: warns of a name the server would drop and of an empty list, which both ask for the whole page.
 function checkedLoads(asked: readonly string[]): readonly string[] {
   const valid = asked.filter(name => LOAD_NAME.test(name))
 
-  if (asked.length === 0 || valid.length !== asked.length)
-    console.warn(asked.length === 0 ? 'kay: refresh() was given no load names, so it refreshes the whole page.' : `kay: refresh() was given load names that are not bindings (${asked.filter(name => !valid.includes(name)).map(name => JSON.stringify(name)).join(', ')}): they are left out.`)
+  if (asked.length === 0 || valid.length !== asked.length) {
+    const message = asked.length === 0 ? 'kay: refresh() was given no load names, so it refreshes the whole page.' : `kay: refresh() was given load names that are not bindings (${asked.filter(name => !valid.includes(name)).map(name => JSON.stringify(name)).join(', ')}): they are left out.`
+
+    // Once for each distinct mistake, as a call site repeats it on every click.
+    if (!warned.has(message)) {
+      warned.add(message)
+      console.warn(message)
+    }
+  }
 
   return valid
 }

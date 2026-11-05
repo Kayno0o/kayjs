@@ -1,0 +1,9 @@
+--- server
+import { requireAdmin, run } from '../calls'
+
+const admin = await requireAdmin(ctx)
+const stats = await run('stats', n => ({ n }))
+---
+main
+  p.stats {stats.n}
+  p.admin {admin}

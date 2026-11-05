@@ -11,3 +11,7 @@ export function reset(): void {
   for (const name of Object.keys(counts))
     delete counts[name]
 }
+
+export function requireAdmin(ctx: { redirect: (to: string) => never }): never {
+  return ctx.redirect('/login')
+}

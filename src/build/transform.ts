@@ -19,6 +19,7 @@ import { projectPaths } from '../project'
 import { countCache, pruneCache, readCacheEntry, writeCacheEntry } from './cache'
 import { compilerFingerprint } from './fingerprint'
 import { throughLinks } from './links'
+import { namedRefresh } from './named-refresh'
 import { anyBrowserOnly, mayImportPackage, packagesToProbe } from './probe'
 import { importedSignals, keepImportedSignals } from './signals'
 import { embeddedMap, registerSourceMap } from './sourcemap'
@@ -118,7 +119,7 @@ export async function transformKayCached(source: string, filename: string, given
   const signals = importedSignals(withoutTwin(filename), source)
   const hydratable = options.hydratable ?? false
   const root = options.root ?? process.cwd()
-  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.pages?.join(',')}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${classMerge === true}\0${root}\0${throughLinks(root, filename)}\0${uiKeyOf(root, withoutTwin(filename))}\0${JSON.stringify(signals)}\0${iconSetsKey(source, root)}\0${source}`)
+  const entry = cacheEntry(options.cacheDir, filename, `${options.target}${hydratable ? '-hydratable' : ''}${options.inspect === true ? '-inspect' : ''}`, `${options.target}\0${hydratable}\0${options.pages?.join(',')}\0${options.clientOnly === true}\0${options.inspect === true}\0${tableFingerprint(options.classTable)}\0${classMerge === true}\0${root}\0${throughLinks(root, filename)}\0${uiKeyOf(root, withoutTwin(filename))}\0${JSON.stringify(signals)}\0${iconSetsKey(source, root)}\0${options.target === 'ssr' && namedRefresh(filename)}\0${source}`)
   const cached = await readCacheEntry<string>(entry)
 
   countCache('components', cached !== undefined)
@@ -276,7 +277,7 @@ function compile(source: string, filename: string, options: TransformOptions, si
   const root = options.root ?? process.cwd()
   // A page of the routes directory, whose root `@failed` fills a layout outlet rather than being a component's own block.
   const page = inPages(file, options.pages ?? [projectPaths(root).routes]) ? true : undefined
-  const { tsx, map, diagnostics } = compileKay(source, throughLinks(root, file), { root: options.root, page, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, classMerge: server ? options.classMerge : undefined, importedSignals: signals, ui: uiEntryOf(options.root ?? process.cwd(), file) })
+  const { tsx, map, diagnostics } = compileKay(source, throughLinks(root, file), { root: options.root, page, includeServer: server, output: server ? 'html' : 'dom', hydratable, twinBuild: isTwin, clientOnly: options.clientOnly, inspect: options.inspect, classTable: options.target === 'dom' ? options.classTable : undefined, classMerge: server ? options.classMerge : undefined, importedSignals: signals, namedRefresh: server && namedRefresh(file), ui: uiEntryOf(options.root ?? process.cwd(), file) })
 
   if (diagnostics.length > 0)
     throw new KayCompileError(diagnostics.map(diagnostic => ({ ...diagnostic, file, source })))

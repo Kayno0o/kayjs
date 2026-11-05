@@ -2,6 +2,7 @@ import type { ElementNode, KayFile, Node, Span } from './ast'
 import type { BodyFact } from './load-facts'
 import type { ServerAnalysis } from './script-server'
 import { isHead, nodeExpressions } from './ast'
+import { hash } from './host'
 import { WORD } from './load-facts'
 import { codeOf } from './script'
 import { binders, bindingNames, readNames, scopedBlocks } from './template-reads'
@@ -26,15 +27,8 @@ interface Unit {
   subtree: Set<number>
 }
 
-// A short tag of the file, so the ids of the units of a page and of its layouts never meet.
-function fileTag(text: string): string {
-  let hash = 0
-
-  for (const char of text)
-    hash = Math.imul(hash, 31) + char.charCodeAt(0) | 0
-
-  return (hash >>> 0).toString(36)
-}
+// A value that throws, or uses the context beyond reading what the request carries, may end or change the response: a refresh never leaves it out.
+const ALTERS = /\bthrow\b|\bctx\b(?!\.(?:params|query|url|locale|request)\b)/
 
 const holdsOutlets = new WeakMap<Node, boolean>()
 
@@ -69,6 +63,7 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
   const loads: { words: string[] }[] = []
   const guarded: { span: Span, words: string[], load?: number }[] = []
   const unguarded: string[][] = []
+  const effectful: number[] = []
 
   const link = (name: string, words: readonly string[]) => {
     const set = edges.get(name) ?? new Set<string>()
@@ -87,6 +82,9 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
     if (fact === undefined)
       continue
 
+    // Only a declaration whose value alters nothing of the response may be left out; any other statement runs for every refresh, as does a declaration that throws or uses `ctx` beyond reading its request, and the loads they read.
+    const altering = fact.guard?.kind === 'declaration' && ALTERS.test(text(fact.guard.init))
+
     if (fact.guard?.kind === 'declaration' && fact.awaits) {
       const id = loads.push({ words: fact.words }) - 1
 
@@ -94,19 +92,13 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
         base.set(name, [id])
 
       guarded.push({ span, words: fact.words, load: id })
+
+      if (altering)
+        effectful.push(id)
     }
-    else if (fact.guard?.kind === 'declaration') {
+    else if (fact.guard?.kind === 'declaration' && !altering) {
       for (const name of fact.declared)
         link(name, fact.words)
-
-      guarded.push({ span, words: fact.words })
-    }
-    else if (fact.guard !== undefined) {
-      // A statement changes whatever it mentions: those names then depend on what the statement reads.
-      for (const word of fact.words) {
-        if (declared.has(word))
-          link(word, fact.words)
-      }
 
       guarded.push({ span, words: fact.words })
     }
@@ -149,7 +141,7 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
 
   const needed = loads.map(load => readIds(load.words))
   // A statement that cannot be left out runs for every refresh, and so does what it reads.
-  const pinned = new Set<number>(unguarded.flatMap(words => [...readIds(words)]))
+  const pinned = new Set<number>([...effectful, ...unguarded.flatMap(words => [...readIds(words)])])
 
   // A script reads the fence's values as it renders.
   for (const fence of [file.script, file.module]) {
@@ -211,8 +203,13 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
       const read = new Set<number>()
 
       for (const span of nodeExpressions(node)) {
-        if (own.includes(span))
+        if (own.includes(span)) {
+          // A default in a pattern reads names too.
+          for (const id of idsOf(text(span).match(WORD) ?? [], here))
+            read.add(id)
+
           continue
+        }
 
         for (const id of idsOf(readNames(codeOf(text(span))), here))
           read.add(id)
@@ -242,7 +239,7 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
 
   walk(file.template, new Map(), undefined, false)
 
-  const prefix = fileTag(moduleId)
+  const prefix = hash(moduleId).slice(-6)
   const groups = new Map<number, { group: number, id: string }>()
   const listed: [number[], number[]][] = []
   const known = new Map<string, number>()
@@ -260,7 +257,7 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
       known.set(key, group)
     }
 
-    groups.set(unit.element.start, { group, id: `${prefix}${groups.size}` })
+    groups.set(unit.element.start, { group, id: `${prefix}-${groups.size}` })
   }
 
   const names = [...declared].filter(name => server.data.some(data => data.name === name)).map(name => [name, [...new Set(closure(name))]])

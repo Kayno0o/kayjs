@@ -1,4 +1,4 @@
-import { LOADS_HEADER } from './swap'
+import { LOAD_NAME, LOADS_HEADER } from './swap'
 
 // What the compiler writes next to a page's or a layout's loads: the loads (`names`, each name with the ids of the loads it stands for), what each load reads of another (`needs`), the loads read outside any element (`pinned`), and each element reading loads as the ids its whole markup reads and the ids its own attributes and text read.
 export interface LoadTable {
@@ -15,7 +15,7 @@ export interface LoadRun {
 }
 
 const MAX_NAMES = 32
-const NAME = /^[\w$]{1,64}$/
+
 const MAX_HEADER = 2048
 
 // The names a request's refresh asked for, read once; undefined for a request asking for the whole page.
@@ -38,7 +38,7 @@ export function requestedLoads(request: Request): ReadonlySet<string> | undefine
     for (const name of value.split(',')) {
       const trimmed = name.trim()
 
-      if (NAME.test(trimmed) && names.size < MAX_NAMES)
+      if (LOAD_NAME.test(trimmed) && names.size < MAX_NAMES)
         names.add(trimmed)
     }
   }

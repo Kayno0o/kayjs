@@ -182,19 +182,11 @@ describe('a refresh asking for some of the page loads', () => {
     expect(html).toMatch(/class="all"[^>]*>2</)
   })
 
-  it('gives a name a statement changes the loads the statement reads', async () => {
-    const left = await asked('/mutate', 'wishlist')
+  it('runs a statement of the fence for every refresh, and the loads it reads', async () => {
+    const { html } = await asked('/mutate', 'wishlist')
 
-    expect(counts).toEqual({ wishlist: 1 })
-    expect(placeholders(left.html)).toEqual(['p'])
-    expect(left.html).not.toMatch(/class="totals"/)
-
-    reset()
-
-    const run = await asked('/mutate', 'cart')
-
-    expect(counts).toEqual({ cart: 1 })
-    expect(run.html).toMatch(/class="totals"[^>]*>2</)
+    expect(counts).toEqual({ cart: 1, wishlist: 1 })
+    expect(html).toMatch(/class="totals"[^>]*>2</)
   })
 
   it('gives every element left to the page an id of its own, and the element it stands for the same one', async () => {
@@ -208,6 +200,26 @@ describe('a refresh asking for some of the page loads', () => {
 
     for (const [, id] of html.matchAll(/data-kay-kept data-kay-u="([\w-]+)"/g))
       expect(ids).toContain(id!)
+  })
+
+  it('answers a refresh with the redirect or the error the whole page answers, for a guard in the fence', async () => {
+    for (const [path, loads] of [['/guard-redirect', 'secret'], ['/guard-throw', 'secret'], ['/guard-load', 'stats']] as const) {
+      const whole = await site.fetch(path, { redirect: 'manual' })
+      const scoped = await site.fetch(path, { redirect: 'manual', headers: { [LOADS]: loads } })
+
+      expect(whole.status).not.toBe(200)
+      expect(scoped.status).toBe(whole.status)
+      expect(scoped.headers.get('location')).toBe(whole.headers.get('location'))
+      expect(await scoped.text()).not.toContain('class="secret"')
+    }
+  })
+
+  it('reads the defaults of a pattern and the names a statement changes', async () => {
+    const { html } = await asked('/defaults', 'wishlist')
+
+    expect(counts).toEqual({ stats: 1, wishlist: 1 })
+    expect(html).toMatch(/class="alias"[^>]*>2</)
+    expect(html).toMatch(/class="name"[^>]*>x</)
   })
 
   it('answers a special page rendered for a refresh as a refresh, uncached', async () => {

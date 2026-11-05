@@ -1,0 +1,15 @@
+--- server
+import { run } from '../calls'
+
+const stats = await run('stats', n => ({ n, fallback: 'x' }))
+const wishlist = await run('wishlist', n => ({ n }))
+const item = { name: undefined }
+const { name = stats.fallback } = item
+const first = [wishlist.n]
+const alias = first
+alias.push(stats.n)
+---
+main
+  p.name {name}
+  p.alias {alias.length}
+  p.wish {wishlist.n}

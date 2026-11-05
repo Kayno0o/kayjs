@@ -1,0 +1,12 @@
+--- server
+import { run } from '../calls'
+
+const user = await run('user', () => undefined)
+
+if (!user)
+  throw new Error('denied')
+
+const secret = await run('secret', n => ({ n }))
+---
+main
+  p.secret {secret.n}

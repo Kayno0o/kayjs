@@ -62,6 +62,7 @@ export interface GenerateOptions {
   component?: boolean | undefined
   // A page, a layout or a special page: it has no `class` prop for its parts to take.
   pageFile?: boolean | undefined
+  namedRefresh?: boolean | undefined
   // Type checking a page, a layout or a special page, which render once on the server, whether or not they carry a server fence.
   route?: boolean | undefined
   // Type-checking output: adds assertions on links, form fields and island props through globals `kay check` declares.
@@ -222,7 +223,7 @@ class ModuleShell {
     this.facts = options.ui !== undefined && owned.parts?.merges === true ? { ...owned, ui: options.ui } : owned
     this.styled = this.facts.ui !== undefined && uiHasVariants(this.facts.ui)
     this.deferred = deferredData(this.facts, this.fence)
-    this.loadPlan = this.mode === 'html' && this.fence !== undefined && options.pageFile === true ? planLoads(this.file, this.fence, options.moduleId) : undefined
+    this.loadPlan = this.mode === 'html' && this.fence !== undefined && options.pageFile === true && options.namedRefresh === true ? planLoads(this.file, this.fence, options.moduleId) : undefined
     this.params = paramsType(options)
     this.actionsTyped = this.mode === 'check' && (options.params !== undefined || (options.layoutFile === true && this.guardValues() !== undefined)) && (server?.actionCallees.length ?? 0) > 0
   }

@@ -166,8 +166,8 @@ export function swapBody(next: Document, policy: Policy, held: Held | undefined)
   // Every island left is taken away, as the morph never keeps one.
   navigation.hooks!.dispose(old)
 
-  // A browser without popovers throws on the selector. One open in an island kept closes too, as it did when moving the island hid it.
-  const opened = 'popover' in HTMLElement.prototype ? [old, ...kept].flatMap(root => [...root.querySelectorAll(':popover-open')]) : []
+  // A browser without popovers throws on the selector. One open in an island kept closes too, as it did when moving the island hid it; an element a refresh kept keeps its own open.
+  const opened = 'popover' in HTMLElement.prototype ? [old, ...[...kept].filter(element => !lives.includes(element))].flatMap(root => [...root.querySelectorAll(':popover-open')]) : []
 
   held?.holdFetched(old, body)
 

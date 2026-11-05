@@ -1581,6 +1581,7 @@ interface CompileOptions
   insideIsland?: boolean | undefined
   inspect?: boolean | undefined
   lints?: LintLevels | undefined
+  namedRefresh?: boolean | undefined
   outerGuards?: string[] | undefined
   outerQueries?: string[] | undefined
   outerSlots?: string[] | undefined

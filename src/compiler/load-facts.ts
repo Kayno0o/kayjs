@@ -59,7 +59,7 @@ export function bodyFact(statement: Statement, shift: (node: Node) => Span, text
       const at = shift(id)
       const name = id.type === 'Identifier' ? { start: at.start, end: at.start + id.name.length } : at
 
-      return { declared, awaits, words: words(text(init)), guard: { kind: 'declaration', name, init, destructures: pattern } }
+      return { declared, awaits, words: words(pattern ? whole : text(init)), guard: { kind: 'declaration', name, init, destructures: pattern } }
     }
 
     return { declared, awaits: false, words: words(whole) }
