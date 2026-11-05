@@ -1,5 +1,5 @@
-import { chmod, rm } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { chmod, rm, symlink } from 'node:fs/promises'
+import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { version } from '../package.json'
@@ -22,9 +22,12 @@ async function scratch(prefix: string): Promise<string> {
 }
 
 // A PATH holding only the named programs, each a script appending its arguments to `calls` (and failing when `failing` names it), so the real config of the machine and its editors are never touched.
+// A PATH holding the given programs and bun alone, so a `kay` installed beside bun on the host does not answer for the project's.
 async function fakePath(programs: string[], failing: string[] = []): Promise<{ path: string, calls: string }> {
   const bin = await scratch('editor-bin-')
   const calls = join(bin, 'calls')
+
+  await symlink(process.execPath, join(bin, 'bun'))
 
   for (const name of programs) {
     await Bun.write(join(bin, name), `#!/bin/sh\necho "${name} $@" >> ${calls}\n${failing.includes(name) ? 'echo broken >&2; exit 3\n' : ''}`)
@@ -206,8 +209,7 @@ describe('kay editor install', () => {
     const home = await scratch('editor-home-')
     const root = await scratch('editor-root-')
     const { path, calls } = await fakePath(['hx', 'zed', 'rustup'])
-    const bun = dirname(process.execPath)
-    const { stdout, stderr, code } = await kay(['editor', 'install'], { PATH: `${path}:${bun}`, XDG_CONFIG_HOME: home }, root)
+    const { stdout, stderr, code } = await kay(['editor', 'install'], { PATH: path, XDG_CONFIG_HOME: home }, root)
 
     expect({ code, stderr: stderr.includes('install dev extension') }).toEqual({ code: 0, stderr: true })
     expect(stdout.trim().split('\n').map(line => line.slice(0, line.indexOf(':')))).toEqual(['Helix', 'Zed'])
@@ -219,7 +221,7 @@ describe('kay editor install', () => {
   it('names the editor asked for, fails with none on the PATH, and refuses an unknown one', async () => {
     const home = await scratch('editor-home-')
     const root = await scratch('editor-root-')
-    const env = { PATH: `${(await fakePath([])).path}:${dirname(process.execPath)}`, XDG_CONFIG_HOME: home }
+    const env = { PATH: (await fakePath([])).path, XDG_CONFIG_HOME: home }
     const none = await kay(['editor', 'install'], env, root)
     const named = await kay(['editor', 'install', 'helix', '--format', 'json'], env, root)
     const unknown = await kay(['editor', 'install', 'vim'], env, root)
@@ -237,7 +239,7 @@ describe('kay new', () => {
     const home = await scratch('editor-home-')
     const parent = await scratch('editor-new-')
     const { path } = await fakePath(['hx'])
-    const { code, stdout } = await kay(['new', 'app', '--template', 'blank', '--editor', 'helix'], { PATH: `${path}:${dirname(process.execPath)}`, XDG_CONFIG_HOME: home }, parent)
+    const { code, stdout } = await kay(['new', 'app', '--template', 'blank', '--editor', 'helix'], { PATH: path, XDG_CONFIG_HOME: home }, parent)
 
     expect(code).toBe(0)
     expect(stdout).toContain('Helix:')
@@ -247,7 +249,7 @@ describe('kay new', () => {
   it('sets nothing up with no flag outside a terminal, and refuses an unknown editor before writing', async () => {
     const home = await scratch('editor-home-')
     const parent = await scratch('editor-new-')
-    const env = { PATH: `${(await fakePath(['hx'])).path}:${dirname(process.execPath)}`, XDG_CONFIG_HOME: home }
+    const env = { PATH: (await fakePath(['hx'])).path, XDG_CONFIG_HOME: home }
     const plain = await kay(['new', 'plain', '--template', 'blank'], env, parent)
     const bad = await kay(['new', 'bad', '--template', 'blank', '--editor', 'vim'], env, parent)
 
