@@ -1,7 +1,7 @@
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { breakingRefused } from '../scripts/breaking'
-import { archiveOldest, capNewest, capPage, capUnreleased, failedPageTests, indexArchive, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, relinkMoved, restoreTree, stampUnreleased, trimArchive } from '../scripts/whats-new'
+import { archiveOldest, capNewest, capPage, capUnreleased, failedPageTests, indexArchive, lateLines, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, relinkMoved, restoreTree, stampUnreleased, trimArchive } from '../scripts/whats-new'
 import { scratchDir } from './scratch'
 
 interface Manifest {
@@ -101,6 +101,14 @@ describe('what\'s new', () => {
     expect(stampUnreleased('# What\'s new\n\n## Unreleased\n\n- a\n\n## 1.43.0\n\n- b\n', '1.44.0')).toBe('# What\'s new\n\n## 1.44.0\n\n- a\n\n## 1.43.0\n\n- b\n')
     expect(stampUnreleased('# What\'s new\n\n## Unreleased\n\n- c\n\n## 1.44.0\n\n- a\n\n## 1.43.0\n\n- b\n', '1.44.0')).toBe('# What\'s new\n\n## 1.44.0\n\n- c\n- a\n\n## 1.43.0\n\n- b\n')
     expect(stampUnreleased('# What\'s new\n\nNothing is ## Unreleased here.\n\n### Unreleased\n\n## 1.43.0\n', '1.44.0')).toBe('# What\'s new\n\nNothing is ## Unreleased here.\n\n### Unreleased\n\n## 1.43.0\n')
+  })
+
+  it('names the lines of the newest release its tag did not ship, and none under Unreleased or an older release', () => {
+    const page = '# What\'s new\n\n## Unreleased\n\n- u\n\n## 1.44.0\n\n- shipped\n- late\n\n## 1.43.0\n\n- old\n'
+
+    expect(lateLines(page, '## 1.44.0\n\n- shipped\n')).toEqual(['- late'])
+    expect(lateLines(page, '## 1.44.0\n\n- shipped\n- late\n')).toEqual([])
+    expect(lateLines('# What\'s new\n\n## Unreleased\n\n- u\n', '')).toEqual([])
   })
 
   it('moves the oldest releases to the archive while the page is over its limit, and the "before" version with them', () => {

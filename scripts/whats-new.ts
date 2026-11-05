@@ -268,6 +268,13 @@ export function capPage(page: string, text: string, archive: string): { page: st
   return Buffer.byteLength(cut.page) > CAP_DUE ? archiveOldest(cut.page, cut.archive, whatsNew ? WHATS_NEW_LIMIT : PAGE_LIMIT) : cut
 }
 
+// The lines of the newest released section of What's new that its release did not ship, which `tagged` (the page and its archive at the release's tag) lacks: a line written there after the release misses the next release's notes, which stamp `## Unreleased` alone.
+export function lateLines(page: string, tagged: string): string[] {
+  const newest = page.split(SECTION).find(section => VERSION_HEADING.test(section))
+
+  return newest === undefined ? [] : newest.split('\n').filter(line => line.startsWith('- ') && !tagged.includes(line))
+}
+
 // Runs the tests a release's rewritten pages must keep green, returning their output when one fails: moving and trimming releases can drop a line a test reads, which only a run after the move shows.
 export async function failedPageTests(tests: readonly string[] = ['tests/llms.test.ts']): Promise<string | undefined> {
   const run = Bun.spawn([process.execPath, 'test', ...tests], { stdout: 'pipe', stderr: 'pipe' })
@@ -324,6 +331,19 @@ if (import.meta.main) {
     for (const [path, text] of await relinkMoved(texts, page, pageText, capped.page, archive)) {
       texts.set(path, text)
       writes.set(path, text)
+    }
+  }
+
+  const released = VERSION_HEADING.exec(texts.get(WHATS_NEW[0]!)!.split(SECTION).find(section => VERSION_HEADING.test(section)) ?? '')?.[1]
+  const tagged = released === undefined ? undefined : await Promise.all(ARCHIVES[0].map(async path => Bun.$`git show v${released}:${path}`.quiet().nothrow().text()))
+
+  // A shallow clone without the tag has nothing to compare with.
+  if (check && tagged !== undefined && tagged[0] !== '') {
+    const late = lateLines(texts.get(WHATS_NEW[0]!)!, tagged.join('\n'))
+
+    if (late.length > 0) {
+      console.error(`${WHATS_NEW[0]}: ${late.length} line(s) under ## ${released} came after v${released} was released, so the next notes would miss them: move them under ## Unreleased\n${late.map(line => `  ${line.slice(0, 100)}`).join('\n')}`)
+      process.exit(1)
     }
   }
 
