@@ -7,7 +7,7 @@ const periods = ['24h', '7d', '30d'].map(value => ({ value, label: value }))
 // Writing the param in place ends where a swap or a Back step does, on the address changing under the controls.
 const period = queryParam('period')
 ---
-button#go(type="button" onClick={() => period.set('24h')}) Go
+button#go(type="button" onClick={() => { period = '24h' }}) Go
 Segmented#segmented(options={periods} param="period" paramDefault="7d" label="Period")
 Segmented#segmented-bare(options={periods} param="range" label="Range")
 Select#select(options={periods} param="period" paramDefault="7d")
