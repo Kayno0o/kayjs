@@ -224,6 +224,7 @@ export function createChatSession(options: ChatSessionOptions) {
   let mounted = false
   // Counts the loads, so only the latest one shows, and names the conversation the last one asked for, so the address naming it loads it once.
   let loads = 0
+  let reading: Promise<void> | undefined
   let asked = options.conversation === undefined ? undefined : named(untrack(options.conversation))
   const holding = () => options.conversation !== undefined && owned() !== false
 
@@ -234,7 +235,13 @@ export function createChatSession(options: ChatSessionOptions) {
 
   // Shows the conversation `id`, or a new one; a visitor the server cannot keep one for gets the tab's history back, as without `keepOnServer`.
   // `resume` is false once a resume came back empty, so a reply the server still names but no longer keeps is not asked for again and again.
-  async function load(id: string | undefined, resume = true) {
+  async function load(id: string | undefined, resume = true): Promise<void> {
+    reading = read(id, resume)
+
+    return reading
+  }
+
+  async function read(id: string | undefined, resume: boolean) {
     const turn = ++loads
     let replying: string | undefined
 
@@ -512,6 +519,10 @@ export function createChatSession(options: ChatSessionOptions) {
 
   // A fresh send adds the visitor's message; `again` posts the history as it is, for Try again, a regenerate, an edit or a resume.
   async function post(again: boolean, question?: string, resuming?: string) {
+    // A message sent while the conversation is still being read waits for the read, which would otherwise replace the history under it.
+    for (let pending = reading; loading() && pending !== undefined; pending = reading)
+      await pending
+
     const text = question ?? draft().trim()
     const sent = question === undefined ? attachments.attached() : []
 

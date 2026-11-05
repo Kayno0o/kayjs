@@ -90,6 +90,31 @@ it('lists the conversations, follows a link of the list, renames one and deletes
   expect(page.errors).toEqual([])
 }, 120_000)
 
+it('sends a message sent while a new conversation is still being read, once the read lands', async () => {
+  await using page = await site.open('/keeping')
+
+  await send(page, 'about trains', 'read 1 after about trains')
+  await named(page)
+  // The read the new conversation's island makes as it hydrates answers late, as under load.
+  await page.evaluate(() => {
+    const fetched = window.fetch.bind(window)
+
+    window.fetch = Object.assign(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const header = new Headers(init?.headers).get('x-kai-conversation') ?? ''
+
+      if (header.startsWith('load'))
+        await new Promise(resolve => setTimeout(resolve, 1500))
+
+      return fetched(input, init)
+    }, { preconnect: fetched.preconnect })
+  })
+  await page.click('.kai-chat-conversation-new')
+  await page.waitUntil(() => document.querySelectorAll('.kai-chat-turn').length === 0)
+  await send(page, 'about boats', 'read 1 after about boats')
+  expect(await log(page)).toEqual(['u:about boats', 'a:read 1 after about boats'])
+  expect(page.errors).toEqual([])
+}, 120_000)
+
 // The launcher's chat is an island of its own, marked `_$k` once hydrated, which reads its conversation then.
 async function openLauncher(page: Page) {
   await page.click('.kai-launcher-button')

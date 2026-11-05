@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ai: a Chat message sent while the conversation is still being read (right after New conversation, or on a slow page) waits for the read and goes, where it used to be dropped with the text left in the field.
 - kayjs-ui: Carousel (`autoplay`), VirtualList (`estimate`, `overscan`), FormField (`group`) and ContactForm (`consent`, `action`) follow a prop the parent changes after render, as [components](components.md#props) says of a read at the top of the script.
 - `kay check` warns of `invalid-nesting`, markup the HTML parser rewrites so the server and an island disagree (`p > div`, `form > form`, `table > tr`, an `li` outside a list); a parent holding a component or a slot is left alone: [lints](lints.md).
 - `kay check` warns of `invalid-nesting`, markup HTML forbids or the parser rewrites so the server and an island may disagree (`p > div`, `form > form`, `table > tr`, an `li` outside a list, an `option` outside a `select`); a parent holding a component or a slot is left alone, and kayjs-mail's Layout, Button, Code, Divider, Fields and Quote now emit `<tbody>`: [lints](lints.md).
