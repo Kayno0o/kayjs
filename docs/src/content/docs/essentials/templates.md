@@ -52,6 +52,10 @@ div(
 
 Attributes sit in one pair of parentheses, separated by spaces. A value is a quoted string or `{expression}`. A bare name is a boolean attribute.
 
+`kay check` knows the values HTML allows for an attribute that takes a short list of keywords, such as `type` on a `button`, `loading` on an `img` or `scope` on a `th`: a mistyped `loading="lazyy"` is an error naming the keywords. Keywords are written in lowercase. The states ARIA limits the same way, such as `aria-expanded`, are checked by the `invalid-aria-value` lint when written as text.
+
+An SVG element takes the SVG attributes, spelled as SVG does (`viewBox`, `stroke-width`), and `kay check` suggests the nearest one for `viewbox` or `strokeWidth`. A custom element takes any attribute.
+
 When a variable has the name of the attribute, write the name alone in braces: `{title}` is `title={title}`. It works on elements and on components, and it keeps its place among spreads, so a later one overrides it.
 
 ```kay

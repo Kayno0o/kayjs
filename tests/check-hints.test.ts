@@ -77,6 +77,35 @@ describe('hints for the first template mistakes', () => {
     expect(errors(found).map(error => error[3])).toEqual([expect.stringContaining('`data-tooltip="..."`')])
   })
 
+  it('rejects a value an enumerated attribute does not take and names the ones it does', async () => {
+    const found = await report('---\n---\nimg(src="https://x.test/a.png" alt="" width="1" height="1" loading="soon")\nimg(src="https://x.test/a.png" alt="" width="1" height="1" loading="lazy" decoding="async" crossorigin="anonymous" referrerpolicy="no-referrer")\nbutton(type="buton") go\ninput(type="txt")\nth(scope="colum") head\nform(method="put")\np(dir="sideways") text\n')
+
+    expect(errors(found).map(error => [error[0], error[3]])).toEqual([
+      [3, '`loading` takes `"eager"` or `"lazy"`, not `"soon"`'],
+      [5, '`type` takes `"button"`, `"reset"` or `"submit"`, not `"buton"`'],
+      [6, '`type` does not take `"txt"`: did you mean `"text"`?'],
+      [7, '`scope` takes `"col"`, `"colgroup"`, `"row"` or `"rowgroup"`, not `"colum"`'],
+      [8, '`method` takes `"dialog"`, `"get"` or `"post"`, not `"put"`'],
+      [9, '`dir` takes `"auto"`, `"ltr"` or `"rtl"`, not `"sideways"`'],
+    ])
+  })
+
+  it('takes every value HTML allows on the enumerated attributes, and an open one where HTML is open', async () => {
+    const found = await report('---\nconst kind = "text" as const\nconst wide = "a-frame"\n---\ninput(type={kind} inputmode="numeric" enterkeyhint="done")\nbutton(type="reset" aria-pressed="mixed" aria-expanded={true} aria-current="page" aria-live="polite") go\na(href="/" target="_blank" rel="noopener x-custom" referrerpolicy="origin") go\na(href="/" target={wide}) go\nscript(type="module")\nscript(type="importmap")\ndiv(dir="rtl" aria-label="x" aria-hidden="true" aria-busy={false})\nmy-element(anything="x" other={1})\nform(method="POST")\n')
+
+    expect(errors(found)).toEqual([])
+  })
+
+  it('names the SVG attribute a typo or a React spelling stands for', async () => {
+    const found = await report('---\n---\nsvg(viewbox="0 0 1 1" width="1")\n  path(d="M0 0" strokeWidth="2" stroke-linecap="round")\n  circle(cx="1" cy="1" r="1" fill="red" stroke-width="1" xlink:href="#a" data-x="1" aria-hidden="true")\n  rect(x="1" y="1" widht="2")\n')
+
+    expect(errors(found).map(error => [error[0], error[3]])).toEqual([
+      [3, '`viewbox` is no SVG attribute: did you mean `viewBox`?'],
+      [4, '`strokeWidth` is no SVG attribute: did you mean `stroke-width`?'],
+      [6, '`widht` is no SVG attribute: did you mean `width`?'],
+    ])
+  })
+
   it('reports each unknown element once, nearest HTML element suggested', async () => {
     const typos = errors(await report('---\n---\ndiv\n  p a\n  lii b\n  p c\n  spann d\n  zzzzz e\n'))
 

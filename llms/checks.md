@@ -79,6 +79,7 @@ kay lint --cache
 - These are reported by `kay check`, the editor and `kay build`, and in `kay dev`'s dev tool, the page still running meanwhile.
 - ARIA and HTML as their specs define them:
   - An `aria-*` attribute ARIA has, the quick fix writing the closest for a misspelt one (`unknown-aria`).
+  - An ARIA state written as text with a value ARIA defines, the quick fix writing the closest (`invalid-aria-value`).
   - A `role` it defines and no abstract one, a list of fallback roles taken (`unknown-role`).
   - A role with the state it needs, such as `aria-checked` on a `switch`, a native `input` excepted (`missing-state`).
   - Nothing the keyboard reaches under `aria-hidden="true"`, `tabindex="-1"` taking a field out of reach (`hidden-focusable`).

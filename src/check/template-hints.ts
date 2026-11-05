@@ -3,11 +3,14 @@
 import type { Span } from '../compiler/ast'
 import type { TsgoDiagnostic } from './diagnose'
 import { HTML_ELEMENTS } from '../compiler/lints'
+import { INPUT_TYPES } from '../input-types'
 import { nearest } from '../nearest'
+import { SVG_ATTRIBUTE_NAMES } from '../svg-attributes'
 
 const ASSIGNABILITY = 2322
 const MISSING_PROPERTY = 2339
 const ARGUMENT = 2345
+const DID_YOU_MEAN = 2820
 
 export interface TemplateHint {
   // Where the mistake is, narrowed to the attribute at fault when the source shows it.
@@ -30,7 +33,12 @@ const VOID_HANDLER = /^Type 'void' is not assignable to type 'EventHandler</
 const BIND_ARGUMENT = /^Argument of type '([^']+)' is not assignable to parameter of type '(.+?) \| \(\(current: /
 const BIND_ATTRIBUTE = /(?<![\w:$-])bind:value=\{/
 const UNKNOWN_ELEMENT = /^Property '([\w$-]+)' does not exist on type 'JSX\.IntrinsicElements'/
-const UNKNOWN_ATTRIBUTE = /Property '(\w+)' does not exist on type 'HtmlAttributes</
+const UNKNOWN_ATTRIBUTE = /Property '(\w+)' does not exist on type '(?:Html|Svg)Attributes</
+const UNKNOWN_SVG_ATTRIBUTE = /Property '([^']+)' does not exist on type 'SvgAttributes</
+const KEYWORD_MISMATCH = /^Type '"([^']*)"' is not assignable to type '(.+?)'\./
+const ARIA_STATE = /Types of property ''(aria-[\w-]+)'' are incompatible\.\s+Type '"([^']*)"' is not assignable to type '(.+?)'\.?$/
+const KEYWORD_ALIAS = /^\w+<(.*)>$/
+const NAME_AT = /^[\w:-]+(?==)/
 const TAG_NAME = /^[\w$.:-]+$/
 const UNDECLARED_PROP = /^Type '[\s\S]*?' is not assignable to type '([\s\S]*)'\.\n\s*Property '([\w$-]+)' does not exist on type '[\s\S]*'\.?$/
 const PROP_MEMBER = /^\s*([\w$]+)\??:([\s\S]*)$/
@@ -294,6 +302,48 @@ const tooltipName: Row = (diagnostic, source, span) => {
   return attribute && { span: attribute, help: 'a tooltip is `data-tooltip="..."` on an element the keyboard reaches (a `button`, a link, or one with `tabindex="0"`), or `data-hint="..."` for text only the pointer adds' }
 }
 
+// An attribute that takes a list of keywords, given another: the keywords it takes, from the type TypeScript names, and the one written.
+// Reported at the attribute for an HTML attribute (`loading="soon"`) and at the tag for an ARIA state, which is checked through its own type.
+const enumeratedValue: Row = (diagnostic, source, span) => {
+  if (diagnostic.code !== ASSIGNABILITY && diagnostic.code !== DID_YOU_MEAN)
+    return undefined
+
+  const aria = ARIA_STATE.exec(diagnostic.message)
+  const direct = aria === null ? KEYWORD_MISMATCH.exec(diagnostic.message) : null
+  const name = aria?.[1] ?? NAME_AT.exec(source.slice(span.start))?.[0]
+  const given = aria?.[2] ?? direct?.[1]
+  const allowed = aria?.[3] ?? direct?.[2]
+
+  if (name === undefined || given === undefined || allowed === undefined)
+    return undefined
+
+  const listed = allowed.replace(KEYWORD_ALIAS, '$1')
+  const words = listed.includes('...') ? INPUT_TYPES.map(word => `"${word}"`) : listed.split(' | ').filter(word => word.startsWith('"') && word === word.toLowerCase())
+
+  if (words.length === 0)
+    return undefined
+
+  const near = words.length > 6 ? nearest(`"${given}"`, words) : undefined
+
+  const attribute = aria === null ? span : attributeNamed(source, attributeList(source, span), name)
+  const list = words.length === 1 ? `\`${words[0]}\`` : `${words.slice(0, -1).map(word => `\`${word}\``).join(', ')} or \`${words.at(-1)}\``
+
+  return attribute && { span: attribute, help: near === undefined ? `\`${name}\` takes ${list}, not \`"${given}"\`` : `\`${name}\` does not take \`"${given}"\`: did you mean \`${near}\`?` }
+}
+
+// A name outside the SVG attributes: the nearest one, which also answers the React spelling (`strokeWidth`) and the lowercased one (`viewbox`).
+const svgAttributeName: Row = (diagnostic, source, span) => {
+  const name = diagnostic.code === ASSIGNABILITY ? UNKNOWN_SVG_ATTRIBUTE.exec(diagnostic.message)?.[1] : undefined
+
+  if (name === undefined || REACT_NAMES[name] !== undefined)
+    return undefined
+
+  const attribute = attributeNamed(source, attributeList(source, span), name)
+  const near = nearest(name, SVG_ATTRIBUTE_NAMES)
+
+  return attribute && { span: attribute, help: `\`${name}\` is no SVG attribute${near === undefined ? '' : `: did you mean \`${near}\`?`}` }
+}
+
 // The first object type of the props a component call is checked against, split at its top-level `;` into `[name, type]` pairs.
 function declaredProps(type: string): [string, string][] {
   const props: [string, string][] = []
@@ -398,7 +448,7 @@ const undeclaredProp: Row = (diagnostic, source, span) => {
   return { message, span: where, help: `${named} has no \`${name}\` prop${listed(takes, ' and takes no props', ', it takes', '')}: declare it in its \`props<{ ... }>()\`` }
 }
 
-const ROWS: Row[] = [calledHandler, mistypedBind, unknownElement, undeclaredProp, reactNames, tooltipName]
+const ROWS: Row[] = [calledHandler, mistypedBind, unknownElement, undeclaredProp, reactNames, tooltipName, svgAttributeName, enumeratedValue]
 
 export function templateHint(diagnostic: TsgoDiagnostic, source: string, span: Span | undefined, tsx: string): TemplateHint | 'duplicate' | undefined {
   if (span === undefined)

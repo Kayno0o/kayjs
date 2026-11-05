@@ -135,6 +135,8 @@ function buttonOf(attributes: TagAttributes): undefined | {
   slot?: Value;
   style?: StyleValue;
   title?: Value;
+  href?: undefined;
+  name?: Value;
   children?: Element;
   onChange?: EventHandler<HTMLButtonElement, Event> | undefined;
   onFocus?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
@@ -144,6 +146,9 @@ function buttonOf(attributes: TagAttributes): undefined | {
   onPause?: EventHandler<HTMLButtonElement, Event> | undefined;
   onPlay?: EventHandler<HTMLButtonElement, Event> | undefined;
   onError?: EventHandler<HTMLButtonElement, ErrorEvent> | undefined;
+  "onKay:action-start"?: EventHandler<HTMLButtonElement, CustomEvent<ActionStartDetail>> | undefined;
+  "onKay:action-success"?: EventHandler<HTMLButtonElement, CustomEvent<ActionSuccessDetail>> | undefined;
+  "onKay:action-error"?: EventHandler<HTMLButtonElement, CustomEvent<ActionErrorDetail>> | undefined;
   onFullscreenchange?: EventHandler<HTMLButtonElement, Event> | undefined;
   onFullscreenerror?: EventHandler<HTMLButtonElement, Event> | undefined;
   onAbort?: EventHandler<HTMLButtonElement, UIEvent> | undefined;
@@ -244,11 +249,8 @@ function buttonOf(attributes: TagAttributes): undefined | {
   onWebkitanimationstart?: EventHandler<HTMLButtonElement, Event> | undefined;
   onWebkittransitionend?: EventHandler<HTMLButtonElement, Event> | undefined;
   onWheel?: EventHandler<HTMLButtonElement, WheelEvent> | undefined;
-  "onKay:action-start"?: EventHandler<HTMLButtonElement, CustomEvent<ActionStartDetail>> | undefined;
-  "onKay:action-success"?: EventHandler<HTMLButtonElement, CustomEvent<ActionSuccessDetail>> | undefined;
-  "onKay:action-error"?: EventHandler<HTMLButtonElement, CustomEvent<ActionErrorDetail>> | undefined;
   autocapitalize?: Value;
-  dir?: Value;
+  dir?: Keyword<"auto" | "ltr" | "rtl">;
   draggable?: Value;
   hidden?: Value;
   inert?: Value;
@@ -262,6 +264,8 @@ function buttonOf(attributes: TagAttributes): undefined | {
   part?: Value;
   textContent?: string | undefined;
   role?: Value;
+  enterKeyHint?: Keyword<"done" | "enter" | "go" | "next" | "previous" | "search" | "send">;
+  inputMode?: Keyword<"decimal" | "email" | "none" | "numeric" | "search" | "tel" | "text" | "url">;
   autofocus?: Value;
   nonce?: Value;
   ref?: ((element: HTMLButtonElement) => unknown) | undefined;
@@ -270,8 +274,8 @@ function buttonOf(attributes: TagAttributes): undefined | {
   is?: Value;
   contenteditable?: Value;
   accesskey?: Value;
-  enterkeyhint?: Value;
-  inputmode?: Value;
+  enterkeyhint?: Keyword<"done" | "enter" | "go" | "next" | "previous" | "search" | "send">;
+  inputmode?: Keyword<"decimal" | "email" | "none" | "numeric" | "search" | "tel" | "text" | "url">;
   itemid?: Value;
   itemprop?: Value;
   itemref?: Value;
@@ -287,12 +291,11 @@ function buttonOf(attributes: TagAttributes): undefined | {
   'transition:leave-to'?: string | undefined;
   commandForElement?: Value;
   formAction?: Value;
-  formEnctype?: Value;
-  formMethod?: Value;
+  formEnctype?: "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain" | null | undefined;
+  formMethod?: "DIALOG" | "GET" | "POST" | "dialog" | "get" | "post" | null | undefined;
   formNoValidate?: Value;
-  formTarget?: Value;
+  formTarget?: null | string | undefined;
   labels?: Value;
-  name?: Value;
   validationMessage?: Value;
   validity?: Value;
   value?: Value;
@@ -301,17 +304,16 @@ function buttonOf(attributes: TagAttributes): undefined | {
   popoverTargetElement?: Value;
   commandforelement?: Value;
   formaction?: Value;
-  formenctype?: Value;
-  formmethod?: Value;
+  formenctype?: "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain" | null | undefined;
+  formmethod?: "DIALOG" | "GET" | "POST" | "dialog" | "get" | "post" | null | undefined;
   formnovalidate?: Value;
-  formtarget?: Value;
+  formtarget?: null | string | undefined;
   validationmessage?: Value;
   willvalidate?: Value;
   popovertargetaction?: Value;
   popovertargetelement?: Value;
   popovertarget?: Value;
-  commandfor?: Value;
-  href?: undefined; ...#cb681d97 (2 lines)
+  commandfor?: Value; ...#b9afcdae (2 lines)
   disabled: undefined;
   'aria-pressed'?: string;
   'aria-expanded'?: string;
@@ -320,6 +322,8 @@ function buttonOf(attributes: TagAttributes): undefined | {
   slot?: Value;
   style?: StyleValue;
   title?: Value;
+  href?: undefined;
+  name?: Value;
   children?: Element;
   onChange?: EventHandler<HTMLButtonElement, Event> | undefined;
   onFocus?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
@@ -329,6 +333,9 @@ function buttonOf(attributes: TagAttributes): undefined | {
   onPause?: EventHandler<HTMLButtonElement, Event> | undefined;
   onPlay?: EventHandler<HTMLButtonElement, Event> | undefined;
   onError?: EventHandler<HTMLButtonElement, ErrorEvent> | undefined;
+  "onKay:action-start"?: EventHandler<HTMLButtonElement, CustomEvent<ActionStartDetail>> | undefined;
+  "onKay:action-success"?: EventHandler<HTMLButtonElement, CustomEvent<ActionSuccessDetail>> | undefined;
+  "onKay:action-error"?: EventHandler<HTMLButtonElement, CustomEvent<ActionErrorDetail>> | undefined;
   onFullscreenchange?: EventHandler<HTMLButtonElement, Event> | undefined;
   onFullscreenerror?: EventHandler<HTMLButtonElement, Event> | undefined;
   onAbort?: EventHandler<HTMLButtonElement, UIEvent> | undefined;
@@ -429,11 +436,8 @@ function buttonOf(attributes: TagAttributes): undefined | {
   onWebkitanimationstart?: EventHandler<HTMLButtonElement, Event> | undefined;
   onWebkittransitionend?: EventHandler<HTMLButtonElement, Event> | undefined;
   onWheel?: EventHandler<HTMLButtonElement, WheelEvent> | undefined;
-  "onKay:action-start"?: EventHandler<HTMLButtonElement, CustomEvent<ActionStartDetail>> | undefined;
-  "onKay:action-success"?: EventHandler<HTMLButtonElement, CustomEvent<ActionSuccessDetail>> | undefined;
-  "onKay:action-error"?: EventHandler<HTMLButtonElement, CustomEvent<ActionErrorDetail>> | undefined;
   autocapitalize?: Value;
-  dir?: Value;
+  dir?: Keyword<"auto" | "ltr" | "rtl">;
   draggable?: Value;
   hidden?: Value;
   inert?: Value;
@@ -447,6 +451,8 @@ function buttonOf(attributes: TagAttributes): undefined | {
   part?: Value;
   textContent?: string | undefined;
   role?: Value;
+  enterKeyHint?: Keyword<"done" | "enter" | "go" | "next" | "previous" | "search" | "send">;
+  inputMode?: Keyword<"decimal" | "email" | "none" | "numeric" | "search" | "tel" | "text" | "url">;
   autofocus?: Value;
   nonce?: Value;
   ref?: ((element: HTMLButtonElement) => unknown) | undefined;
@@ -455,8 +461,8 @@ function buttonOf(attributes: TagAttributes): undefined | {
   is?: Value;
   contenteditable?: Value;
   accesskey?: Value;
-  enterkeyhint?: Value;
-  inputmode?: Value;
+  enterkeyhint?: Keyword<"done" | "enter" | "go" | "next" | "previous" | "search" | "send">;
+  inputmode?: Keyword<"decimal" | "email" | "none" | "numeric" | "search" | "tel" | "text" | "url">;
   itemid?: Value;
   itemprop?: Value;
   itemref?: Value;
@@ -472,12 +478,11 @@ function buttonOf(attributes: TagAttributes): undefined | {
   'transition:leave-to'?: string | undefined;
   commandForElement?: Value;
   formAction?: Value;
-  formEnctype?: Value;
-  formMethod?: Value;
+  formEnctype?: "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain" | null | undefined;
+  formMethod?: "DIALOG" | "GET" | "POST" | "dialog" | "get" | "post" | null | undefined;
   formNoValidate?: Value;
-  formTarget?: Value;
+  formTarget?: null | string | undefined;
   labels?: Value;
-  name?: Value;
   validationMessage?: Value;
   validity?: Value;
   value?: Value;
@@ -486,17 +491,16 @@ function buttonOf(attributes: TagAttributes): undefined | {
   popoverTargetElement?: Value;
   commandforelement?: Value;
   formaction?: Value;
-  formenctype?: Value;
-  formmethod?: Value;
+  formenctype?: "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain" | null | undefined;
+  formmethod?: "DIALOG" | "GET" | "POST" | "dialog" | "get" | "post" | null | undefined;
   formnovalidate?: Value;
-  formtarget?: Value;
+  formtarget?: null | string | undefined;
   validationmessage?: Value;
   willvalidate?: Value;
   popovertargetaction?: Value;
   popovertargetelement?: Value;
   popovertarget?: Value;
   commandfor?: Value;
-  href?: undefined;
   type: "button";
   'aria-disabled': "true"; ...#36d9e3c0 (2 lines)
 

@@ -47,6 +47,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unreachable-click` | deny | a11y | An `onClick` on an element no keyboard reaches |
 | `empty-control` | deny | a11y | A button or link with nothing to announce |
 | `unknown-aria` | deny | a11y | An `aria-*` attribute ARIA does not define |
+| `invalid-aria-value` | deny | a11y | An ARIA state written as text with a value ARIA does not define |
 | `unknown-role` | deny | a11y | A `role` ARIA does not define |
 | `missing-state` | deny | a11y | A `role` missing the state it needs, such as a `switch` with no `aria-checked` |
 | `hidden-focusable` | deny | a11y | A focusable element under `aria-hidden` |

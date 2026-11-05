@@ -57,6 +57,32 @@ export const ARIA_ATTRIBUTES: ReadonlySet<string> = new Set([
 ])
 
 // The roles an element may take, those of the Digital Publishing and Graphics modules included.
+const TRUE_FALSE = ['true', 'false']
+
+// The keywords ARIA gives the states that take a list of them, for a value written as text: `kay check` holds a static `aria-expanded="yes"` to them.
+export const ARIA_STATE_VALUES: ReadonlyMap<string, ReadonlySet<string>> = new Map(Object.entries({
+  'aria-atomic': TRUE_FALSE,
+  'aria-autocomplete': ['none', 'inline', 'list', 'both'],
+  'aria-busy': TRUE_FALSE,
+  'aria-checked': [...TRUE_FALSE, 'mixed', 'undefined'],
+  'aria-current': [...TRUE_FALSE, 'page', 'step', 'location', 'date', 'time'],
+  'aria-disabled': TRUE_FALSE,
+  'aria-expanded': [...TRUE_FALSE, 'undefined'],
+  'aria-haspopup': [...TRUE_FALSE, 'menu', 'listbox', 'tree', 'grid', 'dialog'],
+  'aria-hidden': [...TRUE_FALSE, 'undefined'],
+  'aria-invalid': [...TRUE_FALSE, 'grammar', 'spelling'],
+  'aria-live': ['off', 'polite', 'assertive'],
+  'aria-modal': TRUE_FALSE,
+  'aria-multiline': TRUE_FALSE,
+  'aria-multiselectable': TRUE_FALSE,
+  'aria-orientation': ['horizontal', 'vertical', 'undefined'],
+  'aria-pressed': [...TRUE_FALSE, 'mixed', 'undefined'],
+  'aria-readonly': TRUE_FALSE,
+  'aria-required': TRUE_FALSE,
+  'aria-selected': [...TRUE_FALSE, 'undefined'],
+  'aria-sort': ['none', 'ascending', 'descending', 'other'],
+}).map(([name, values]) => [name, new Set(values)]))
+
 export const ROLES: ReadonlySet<string> = new Set([
   'alert',
   'alertdialog',

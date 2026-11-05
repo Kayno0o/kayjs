@@ -1,3 +1,5 @@
+import type { INPUT_TYPES } from '../input-types'
+import type { SVG_ATTRIBUTE_NAMES } from '../svg-attributes'
 import type { Range } from './dom'
 import type { Html } from './html'
 import type { TransitionClasses } from './transition'
@@ -9,6 +11,12 @@ type Value = string | number | bigint | boolean | null | undefined
 
 // What an attribute takes: a template writes them as text, so any value that renders as text goes.
 type AttributeValue = Value
+
+// An attribute HTML limits to a list of keywords, written lowercase as the specification does, or left out.
+// `OpenKeyword` lists the keywords of an attribute whose values HTML leaves open, so an editor still offers them.
+type Keyword<Words extends string> = Words | null | undefined
+
+type OpenKeyword<Words extends string> = Words | (string & {}) | null | undefined
 
 type ClassValue = Value | Record<string, unknown> | readonly ClassValue[]
 
@@ -98,7 +106,7 @@ interface CommonAttributes<Target> {
   'id'?: AttributeValue
   'title'?: AttributeValue
   'lang'?: AttributeValue
-  'dir'?: AttributeValue
+  'dir'?: Keyword<'ltr' | 'rtl' | 'auto'>
   'hidden'?: AttributeValue
   'inert'?: AttributeValue
   'tabindex'?: AttributeValue
@@ -114,8 +122,10 @@ interface CommonAttributes<Target> {
   'autofocus'?: AttributeValue
   'autocapitalize'?: AttributeValue
   'accesskey'?: AttributeValue
-  'enterkeyhint'?: AttributeValue
-  'inputmode'?: AttributeValue
+  'enterkeyhint'?: Keyword<'enter' | 'done' | 'go' | 'next' | 'previous' | 'search' | 'send'>
+  'enterKeyHint'?: Keyword<'enter' | 'done' | 'go' | 'next' | 'previous' | 'search' | 'send'>
+  'inputmode'?: Keyword<'none' | 'text' | 'decimal' | 'numeric' | 'tel' | 'search' | 'email' | 'url'>
+  'inputMode'?: Keyword<'none' | 'text' | 'decimal' | 'numeric' | 'tel' | 'search' | 'email' | 'url'>
   'nonce'?: AttributeValue
   'popover'?: AttributeValue
   'itemid'?: AttributeValue
@@ -159,6 +169,35 @@ interface SpelledAttributes {
   output: { for?: AttributeValue }
 }
 
+type BrowsingContext = OpenKeyword<'_self' | '_blank' | '_parent' | '_top'>
+
+type ReferrerPolicy = Keyword<'' | 'no-referrer' | 'no-referrer-when-downgrade' | 'origin' | 'origin-when-cross-origin' | 'same-origin' | 'strict-origin' | 'strict-origin-when-cross-origin' | 'unsafe-url'>
+
+type CrossOrigin = Keyword<'' | 'anonymous' | 'use-credentials'>
+
+// HTML reads the method case-insensitively and templates habitually write it in capitals, so both spellings go.
+type FormMethod = Keyword<'get' | 'post' | 'dialog' | 'GET' | 'POST' | 'DIALOG'>
+
+type FormEncoding = Keyword<'application/x-www-form-urlencoded' | 'multipart/form-data' | 'text/plain'>
+
+// The attributes HTML limits to keywords, by tag, spelled as the attribute and as the property.
+interface EnumeratedAttributes {
+  a: { target?: BrowsingContext, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
+  area: { target?: BrowsingContext, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
+  audio: { crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin }
+  base: { target?: BrowsingContext }
+  button: { type?: Keyword<'button' | 'submit' | 'reset'>, formmethod?: FormMethod, formMethod?: FormMethod, formenctype?: FormEncoding, formEnctype?: FormEncoding, formtarget?: BrowsingContext, formTarget?: BrowsingContext }
+  form: { method?: FormMethod, enctype?: FormEncoding, encoding?: FormEncoding, target?: BrowsingContext }
+  iframe: { loading?: Keyword<'lazy' | 'eager'>, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
+  img: { loading?: Keyword<'lazy' | 'eager'>, decoding?: Keyword<'sync' | 'async' | 'auto'>, crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
+  input: { type?: Keyword<typeof INPUT_TYPES[number]>, formmethod?: FormMethod, formMethod?: FormMethod, formenctype?: FormEncoding, formEnctype?: FormEncoding, formtarget?: BrowsingContext, formTarget?: BrowsingContext }
+  link: { crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
+  ol: { type?: Keyword<'1' | 'a' | 'A' | 'i' | 'I'> }
+  script: { crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin, referrerpolicy?: ReferrerPolicy, referrerPolicy?: ReferrerPolicy }
+  th: { scope?: Keyword<'row' | 'col' | 'rowgroup' | 'colgroup'> }
+  video: { crossorigin?: CrossOrigin, crossOrigin?: CrossOrigin }
+}
+
 // kay's own, never written out: a `head` title marked `raw` is left out of `seo.titleTemplate`, and a link marked `section` is also current on the pages below it.
 interface KayAttributes {
   title: { raw?: boolean | undefined }
@@ -169,10 +208,16 @@ type HtmlAttributes<Tag extends keyof HTMLElementTagNameMap> = CommonAttributes<
   & Handlers<HTMLElementTagNameMap[Tag], HTMLElementEventMap>
   & OwnAttributes<HTMLElementTagNameMap[Tag]>
   & (Tag extends keyof SpelledAttributes ? SpelledAttributes[Tag] : unknown)
+  & (Tag extends keyof EnumeratedAttributes ? EnumeratedAttributes[Tag] : unknown)
   & (Tag extends keyof KayAttributes ? KayAttributes[Tag] : unknown)
 
-// SVG attributes are no DOM properties to read them off, so an SVG element takes any.
-type SvgAttributes<Target> = CommonAttributes<Target> & Handlers<Target, SVGElementEventMap> & Record<string, unknown>
+// SVG attributes are no DOM properties to read them off: they come from a list, and a name outside it is answered by `kay check` with the nearest one.
+type SvgAttributeName = typeof SVG_ATTRIBUTE_NAMES[number]
+
+type SvgAttributes<Target> = CommonAttributes<Target> & Handlers<Target, SVGElementEventMap> & Partial<Record<SvgAttributeName, AttributeValue>> & Record<`${string}:${string}`, AttributeValue>
+
+// A custom element takes any attribute.
+type AnyAttributes<Target> = CommonAttributes<Target> & Handlers<Target, HTMLElementEventMap> & Record<string, unknown>
 
 type HtmlElements = { [Tag in keyof HTMLElementTagNameMap]: HtmlAttributes<Tag> }
 
@@ -196,6 +241,6 @@ export namespace JSX {
   // eslint-disable-next-line ts/consistent-indexed-object-style -- an interface, to extend the element maps
   export interface IntrinsicElements extends HtmlElements, SvgElements {
     // A custom element takes any attribute.
-    [tag: `${string}-${string}`]: SvgAttributes<HTMLElement>
+    [tag: `${string}-${string}`]: AnyAttributes<HTMLElement>
   }
 }

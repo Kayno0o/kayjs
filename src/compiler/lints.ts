@@ -98,6 +98,13 @@ export const LINTS = {
     wrong: 'nav(aria-labeledby="menu-title")\n  h2#menu-title Menu',
     right: 'nav(aria-labelledby="menu-title")\n  h2#menu-title Menu',
   },
+  'invalid-aria-value': {
+    level: 'deny',
+    group: 'a11y',
+    summary: 'An ARIA state written as text with a value ARIA does not define, `aria-expanded="yes"` for one: a screen reader ignores it. `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`, `aria-hidden`, `aria-disabled`, `aria-live`, `aria-current` and the like take `true`, `false` or their own keywords. The quick fix writes the closest value; an expression is not read.',
+    wrong: 'button(aria-expanded="yes" onClick={toggle}) Menu',
+    right: 'button(aria-expanded="true" onClick={toggle}) Menu',
+  },
   'unknown-role': {
     level: 'deny',
     group: 'a11y',

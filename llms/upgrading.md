@@ -34,6 +34,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### One name for a size limit
 
 - A size limit is `maxSize`, bytes or a size such as `'5mb'`, and a map of limits by path is `maxSizeByPath`. kayjs-ai's `ask({ maxAttachmentBytes })` is `maxSize` and its `Chat` prop `maxFileSize` is `maxSize` (a number of bytes is a size, so the value stays as it is). An extension's `maxSize: { '/auth/upload': '8mb' }` is `maxSizeByPath`, as the config's `limits.byPath` is. The old names work until 1.93, `deprecated-size-limits` flags them and `kay upgrade` renames each.
+### Attributes typed by what HTML and SVG allow
+
+- `kay check` types the attributes HTML limits to keywords: `type` on `button`, `input` and `ol`, `loading` and `decoding` on `img`, `crossorigin`, `referrerpolicy`, `scope` on `th`, `dir`, `inputmode`, `enterkeyhint`, `method`, `enctype`, `formmethod`, `formenctype`, and `target` (a keyword or a named browsing context), so a typo (`loading="lazyy"`) or a value held in a `string` (`type={kind}` with `kind: string`) is an error: write the keyword in lowercase, or type the value as the union (`'button' | 'submit' | 'reset'`).
+- The new `invalid-aria-value` lint (a11y, deny) reports an ARIA state written as text with a value ARIA does not define, `aria-expanded="yes"` for one, its quick fix writing the closest value; an expression is not read, and other `aria-*` stay free text.
+- An SVG element takes the SVG attributes, spelled as SVG does (`viewBox`, `stroke-width`), prefixed names (`xlink:href`), `data-*` and `aria-*`, where it took any name: `viewbox` or `strokeWidth` is an error naming the nearest attribute. A custom element still takes any.
 
 ## 1.89.0
 

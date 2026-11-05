@@ -1,0 +1,2 @@
+// The values of `type` on an `input`, which `kay check` types and names in the hint for a mistyped one: TypeScript cuts a list this long short in its own message.
+export const INPUT_TYPES = ['button', 'checkbox', 'color', 'date', 'datetime-local', 'email', 'file', 'hidden', 'image', 'month', 'number', 'password', 'radio', 'range', 'reset', 'search', 'submit', 'tel', 'text', 'time', 'url', 'week'] as const

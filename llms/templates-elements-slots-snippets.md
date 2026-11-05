@@ -20,6 +20,7 @@
 - Attributes are separated by spaces, inside one pair of parentheses that may span lines: `a(href="/x" target="_blank")`.
 - A value is a quoted string or `{expression}`.
 - A name alone is a boolean attribute.
+- `kay check` types the attributes HTML limits to keywords as those keywords, written lowercase: `type` on `button`, `input` and `ol`, `loading`, `decoding`, `crossorigin`, `referrerpolicy` and `scope` where they exist, `dir`, `inputmode`, `enterkeyhint`, `method`, `enctype` and the `form*` ones, and `target` (which also takes a named browsing context). The ARIA states (`aria-expanded`, `aria-pressed`, `aria-live` and the like) are held to their values by the `invalid-aria-value` lint, for a value written as text. An SVG element takes the SVG attributes (`viewBox`, `stroke-width`), `xlink:href`-style prefixed names, `data-*` and `aria-*`, and a name outside them is answered with the nearest one; a custom element takes any attribute.
 - `{title}` alone in the list is `title={title}`, on elements and components, and keeps its place among spreads. Only a bare name fits: `{post.title}`, `{x()}`, `{aria-label}` and `{class}` (a reserved word) are errors naming the written-out form. `kay fmt` keeps it as written.
 - A boolean bound to an attribute, `disabled={busy}`, writes it or leaves it out, but an `aria-*` one renders `"true"` or `"false"`, as ARIA states read: `aria-expanded={open}`.
 - `null` and `undefined` leave any attribute out.

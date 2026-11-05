@@ -89,6 +89,7 @@ kay check --only seo
 | `unreachable-click` | deny | a11y | An `onClick` on an element no keyboard reaches, with no `role`. |
 | `empty-control` | deny | a11y | A `button`, or an `a` with an `href`, with nothing for a screen reader to announce: no text, no value, no `aria-label`, an icon alone. |
 | `unknown-aria` | deny | a11y | An `aria-*` attribute ARIA does not define, such as `aria-labeledby`. The quick fix writes the closest one. |
+| `invalid-aria-value` | deny | a11y | An ARIA state written as text with a value ARIA does not define, such as `aria-expanded="yes"`. The quick fix writes the closest value. |
 | `unknown-role` | deny | a11y | A `role` ARIA does not define, or an abstract one such as `widget`. |
 | `missing-state` | deny | a11y | A `role` with no state it needs, such as a `switch` with no `aria-checked`. |
 | `hidden-focusable` | deny | a11y | An element the keyboard reaches on or inside `aria-hidden="true"`. |

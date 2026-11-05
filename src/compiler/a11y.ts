@@ -1,5 +1,5 @@
 import type { Diagnostic, ElementNode, KayFile, NamedAttribute, Node, SnippetNode } from './ast'
-import { ABSTRACT_ROLES, ARIA_ATTRIBUTES, closest, REQUIRED_STATES, ROLES, validAutocomplete } from './aria'
+import { ABSTRACT_ROLES, ARIA_ATTRIBUTES, ARIA_STATE_VALUES, closest, REQUIRED_STATES, ROLES, validAutocomplete } from './aria'
 import { childBlocks, nodeExpressions, sectionOf, visitNodes } from './ast'
 
 // Controls a person fills in, which a screen reader announces by their label.
@@ -393,6 +393,19 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
           note: 'browsers and screen readers ignore an attribute ARIA does not define',
           help: meant !== undefined ? `write \`${meant}\`` : 'see the WAI-ARIA spec for the attributes there are',
           fixes: meant !== undefined ? [{ title: `Write \`${meant}\``, edits: [{ ...attribute.name, text: meant }] }] : undefined,
+        })
+      }
+
+      const states = attribute.kind === 'static' ? ARIA_STATE_VALUES.get(name) : undefined
+
+      if (states && attribute.kind === 'static' && !states.has(attribute.text)) {
+        const meant = closest(attribute.text, states)
+        const values = [...states].map(value => `\`${value}\``).join(', ')
+
+        lint(attribute.value, 'invalid-aria-value', `\`${attribute.text}\` is no value of \`${name}\``, {
+          note: 'a screen reader ignores a state whose value ARIA does not define',
+          help: meant !== undefined ? `write \`${meant}\`` : `it takes ${values}`,
+          fixes: meant !== undefined ? [{ title: `Write \`${meant}\``, edits: [{ ...attribute.value, text: meant }] }] : undefined,
         })
       }
     }

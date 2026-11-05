@@ -794,10 +794,15 @@ describe('literal-tag', () => {
 })
 
 describe('a11y lints', () => {
-  const A11Y = new Set(['unknown-aria', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete', 'dangling-aria', 'unannounced-click', 'unreachable-tooltip', 'hand-tooltip', 'meta-refresh', 'ungrouped-radios', 'section-not-a-link', 'table-without-header', 'fieldset-without-legend', 'mouse-only-event', 'missing-autocomplete'])
+  const A11Y = new Set(['unknown-aria', 'invalid-aria-value', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete', 'dangling-aria', 'unannounced-click', 'unreachable-tooltip', 'hand-tooltip', 'meta-refresh', 'ungrouped-radios', 'section-not-a-link', 'table-without-header', 'fieldset-without-legend', 'mouse-only-event', 'missing-autocomplete'])
   const a11y = (source: string) => lints(source).filter(d => A11Y.has(d.code ?? '')).map(d => `${d.code} ${d.at}`)
   // One lint alone, for those the other examples here would trip.
   const only = (code: string, source: string) => lints(source).filter(d => d.code === code).map(d => `${d.code} ${d.at}`)
+
+  it('reports an ARIA state written with a value ARIA does not define, fixing it to the closest one, and reads no expression', () => {
+    expect(a11y('button(aria-expanded="yes" aria-pressed="mixed" aria-live={mode} aria-current="page" aria-label="anything") Menu\ndiv(aria-hidden="tru" aria-sort="sideways" aria-live="loud") x\n')).toEqual(['invalid-aria-value yes', 'invalid-aria-value tru', 'invalid-aria-value sideways', 'invalid-aria-value loud'])
+    expect(fixed('div(aria-hidden="tru") x\n')).toEqual(['div(aria-hidden="true") x\n'])
+  })
 
   it('reports an aria attribute ARIA does not define, fixing it to the closest one, whatever the value', () => {
     expect(a11y('div(aria-labeledby="t" aria-live={mode} aria-label="Menu") Menu\np(aria-zzzz="1") x\n')).toEqual(['unknown-aria aria-labeledby', 'unknown-aria aria-zzzz'])
