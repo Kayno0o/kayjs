@@ -41,7 +41,8 @@ const { options, value = NONE, label, showLabel = false, name, invalid, disabled
   // Gets every picked option, in the order of `options`.
   // A promise holds the group busy until it settles, and puts the previous pick back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
-  onChange?: ((value: Value[]) => unknown) | undefined
+  // Gets the picked options as a second argument, in the same order.
+  onChange?: ((value: Value[], options: { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]) => unknown) | undefined
   // Draws each option in place of its label (and icon): `@option(option)`. The input stays named by the option's `label`, and keeps its checked and disabled state.
   option?: Snippet<[option: { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }]> | undefined
 }>()
@@ -92,7 +93,7 @@ async function pick(next: Value[]) {
   picked = next
 
   // Put back unless the parent set `value` meanwhile, which has the last word.
-  if (!(await changeAccepted('ChipGroup', () => onChange?.(next), busy.set)) && synced === syncedBefore) {
+  if (!(await changeAccepted('ChipGroup', () => onChange?.(next, options.filter(one => next.includes(one.value))), busy.set)) && synced === syncedBefore) {
     picked = before
     check(before)
   }

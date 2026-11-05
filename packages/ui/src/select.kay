@@ -25,8 +25,8 @@ const { size = 'md', invalid, value, options, onChange, param, paramDefault, nam
   // `disabled` keeps that option from being picked. A native option draws no icon, so it has none.
   // A list, or a function answering it, such as an action or a wrapped API call: asked once, with an empty `q`, when the select is drawn in the browser, the select busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected.
   options: readonly SelectOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly SelectOption<Value>[]>)
-  // Handed the option's own value, a number for a number option, or the empty string for the `emptyOption`.
-  onChange?: ((value: Value | (Empty extends string | true ? '' : never)) => unknown) | undefined
+  // Handed the option's own value, a number for a number option, or the empty string for the `emptyOption`, and the option itself as a second argument, `undefined` for the empty one.
+  onChange?: ((value: Value | (Empty extends string | true ? '' : never), option: SelectOption<Value> | undefined) => unknown) | undefined
   // Holds a query param of the page instead of, or besides, `onChange`: a pick goes to the current page with `param` set to the option, or left out for the empty option, and every other param kept. Give `value` the param as the page read it. The select takes it as its name, so a GET form around it sends it without JavaScript.
   param?: string | undefined
   // The value the page shows while `param` is left out: picking it leaves the param out.
@@ -122,7 +122,7 @@ function report(select: HTMLSelectElement) {
   const choice = list().find(option => String(option.value) === select.value)
 
   // No option matches only the empty one, which the type allows exactly when there is one.
-  onChange?.(choice === undefined ? '' as never : choice.value)
+  onChange?.(choice === undefined ? '' as never : choice.value, choice)
 }
 
 // Holding a query param: a pick goes through the move, the select busy meanwhile and put back where the page is when the move is refused, as Segmented is.
@@ -134,7 +134,7 @@ async function move(select: HTMLSelectElement) {
   touched = true
   heard(select.value)
 
-  if (await changeAccepted('Select', () => paramChange(param, paramDefault, onChange)?.(choice === undefined ? '' as never : choice.value), moving.set)) {
+  if (await changeAccepted('Select', () => paramChange(param, paramDefault, onChange)?.(choice === undefined ? '' as never : choice.value, choice), moving.set)) {
     accepted = select.value
 
     return

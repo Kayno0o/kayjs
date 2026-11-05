@@ -2029,7 +2029,7 @@ function splitMatches(matches: PaletteEntry[], query: string): { strong: Palette
 function withRecent(recent: string[], href: string, limit?: number): string[]
 
 [./lib/param-change] paramChange
-function paramChange<Value extends string | null | number>(param: string | undefined, paramDefault: number | string | undefined, onChange: ((value: Value) => unknown) | undefined): ((value: Value) => unknown) | undefined
+function paramChange<Value extends string | null | number, Option = never>(param: string | undefined, paramDefault: number | string | undefined, onChange: ((value: Value, option: Option) => unknown) | undefined): ((value: Value, option: Option) => unknown) | undefined
 
 [./lib/plot] axisExtent
 function axisExtent(values: readonly number[], axis: ScatterAxis): [number, number]

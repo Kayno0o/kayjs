@@ -6,19 +6,21 @@ import TextInput from './text-input.kay'
 
 const look = recipe({ parts: { root: 'kui-time-input' } })
 
-const { value, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange' | 'size'> & {
+const { value, onInput, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange' | 'size'> & {
   // The box's size: `md` by default, `sm` and `lg` change its padding and type.
   size?: FieldSize | undefined
   // Marks the control as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
   // The time as `HH:MM`, or `HH:MM:SS` with a `step` under a minute, and `''` for none. Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
+  // Called with the box's time on every edit, `''` and a half-typed one included: the live value.
+  onInput?: ((value: string) => unknown) | undefined
   // Called with the new time, or `''` once emptied, as soon as the box holds a whole time. With `required` it never hears `''`: the box goes back to the last time when it is left empty.
   onChange?: ((value: string) => unknown) | undefined
 }>()
 
 // A box with no callback is plain: a refused post of its form, which the server renders it for, gives its time back in place of its own.
-const sent = onChange ? undefined : postedValue(rest.name, value)
+const sent = onInput || onChange ? undefined : postedValue(rest.name, value)
 
 // The last whole time the box held, which a required box goes back to once left empty.
 let last = ''
@@ -30,6 +32,8 @@ effect(() => {
 })
 
 function heard(next: string) {
+  onInput?.(next)
+
   if (next !== '')
     last = next
   else if (rest.required)

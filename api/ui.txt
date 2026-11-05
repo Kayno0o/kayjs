@@ -922,7 +922,7 @@ component default
   invalid?: boolean | undefined
   label: string
   name?: string | undefined
-  onChange?: ((value: Value[]) => unknown) | undefined
+  onChange?: ((value: Value[], options: { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[]) => unknown) | undefined
   option?: ((option: { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[]
   showLabel?: boolean | undefined
@@ -955,6 +955,7 @@ component default
   invalid?: boolean | undefined
   label: string
   onChange?: ((value: string) => unknown) | undefined
+  onInput?: ((value: string) => unknown) | undefined
   value?: string | undefined
 
 [./combobox.kay] default
@@ -1185,6 +1186,7 @@ component default
   min?: string | undefined
   nextLabel?: string | undefined
   onChange?: ((value: string) => unknown) | undefined
+  onInput?: ((value: string) => unknown) | undefined
   onMonthChange?: ((month: string) => unknown) | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
@@ -1498,7 +1500,7 @@ component default
   invalid?: boolean | undefined
   moreLabel?: string | undefined
   name?: string | undefined
-  onChange?: ((name: string) => unknown) | undefined
+  onChange?: ((name: string, choice: IconChoice | undefined) => unknown) | undefined
   onError?: ((failure: { error: unknown; }) => unknown) | undefined
   onSearch?: ((query: string) => unknown) | undefined
   placeholder?: string | undefined
@@ -1644,6 +1646,7 @@ component default
 }
   invalid?: boolean | undefined
   keysHint?: string | undefined
+  onChange?: ((value: string) => unknown) | undefined
   onImage?: ((file: File) => Promise<string>) | undefined
   onImageError?: ((file: File, error: unknown) => unknown) | undefined
   onInput?: ((value: string) => unknown) | undefined
@@ -1800,7 +1803,7 @@ component default
   minLength?: number | undefined
   name?: string | undefined
   noneLabel?: string | undefined
-  onChange?: ((value: Value[]) => unknown) | undefined
+  onChange?: ((value: Value[], options: MultiSelectOption<Value>[]) => unknown) | undefined
   onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
   onLoad?: ((options: readonly MultiSelectOption<Value>[], query: string) => unknown) | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
@@ -1927,7 +1930,12 @@ component default
   invalid?: boolean | undefined
   label?: string | undefined
   name?: string | undefined
-  onChange?: ((value: (null extends Held ? Held & null : never) | Value) => unknown) | undefined
+  onChange?: ((value: (null extends Held ? Held & null : never) | Value, option: undefined | {
+  value: Value;
+  label: string;
+  description?: string | undefined;
+  disabled?: boolean | undefined;
+}) => unknown) | undefined
   option?: ((option: { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: readonly { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }[] & NullOption<Value, Held>
   value?: Held | undefined
@@ -2154,7 +2162,12 @@ component default
   invalid?: boolean | undefined
   label: string
   name?: string | undefined
-  onChange?: ((value: (null extends Held ? Held & null : never) | Value) => unknown) | undefined
+  onChange?: ((value: (null extends Held ? Held & null : never) | Value, option: undefined | {
+  value: Value;
+  label: string;
+  icon?: IconProps | IconSlot | undefined;
+  disabled?: boolean | undefined;
+}) => unknown) | undefined
   option?: ((option: { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }) => Element) | undefined
   options: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[] & NullOption<Value, Held>
   orientation?: "horizontal" | "vertical" | undefined
@@ -2171,7 +2184,7 @@ component default
   failureLabel?: string | undefined
   invalid?: boolean | undefined
   loadingLabel?: string | undefined
-  onChange?: ((value: (Empty extends string | true ? "" : never) | Value) => unknown) | undefined
+  onChange?: ((value: (Empty extends string | true ? "" : never) | Value, option: SelectOption<Value> | undefined) => unknown) | undefined
   onError?: ((failure: { error: unknown; }) => unknown) | undefined
   onLoad?: ((options: readonly SelectOption<Value>[]) => unknown) | undefined
   options: ((input: ComboboxQuery) => PromiseLike<readonly SelectOption<Value>[]>) | readonly SelectOption<Value>[]
@@ -2573,6 +2586,7 @@ component default
   class?: string | undefined | { root?: string | undefined | { root?: string | undefined; }; }
   invalid?: boolean | undefined
   onChange?: ((value: string) => unknown) | undefined
+  onInput?: ((value: string) => unknown) | undefined
   size?: FieldSize | undefined
   value?: string | undefined
 

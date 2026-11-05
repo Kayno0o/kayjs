@@ -4,6 +4,7 @@
 
 ### TextInput, Textarea, Select
 
+- One convention for every field: `onInput(value)` is the live value, on each edit, and `onChange(value)` the committed one (blur or Enter for text, the pick for a choice). A choice control (Select, RadioGroup, Segmented, Combobox, IconPicker) passes the picked option as a second argument, `onChange(value, option)`, and ChipGroup and MultiSelect `onChange(values, options)`. TextInput, Textarea, MarkdownEditor (`onChange` once left), DateInput, TimeInput and ColorInput (shades dragged over) and Slider have both.
 - `TextInput(value={title()} onInput={title.set} onChange={save})`:
   - `onInput(value)` runs on each keystroke, and `onChange(value)` once the value is committed, on blur or Enter. `onBlur(event)` gets the box's own blur, as on an `input`.
   - `type="number"` hands back a number, or `null` once emptied, to both callbacks, and takes a number, `null` or a string as `value`: `TextInput(type="number" value={count()} onInput={count.set})` with `signal<number | null>(1)`. A box partway through a number, such as `1,`, reports nothing until it parses. A parent writing back its own spelling of the same number leaves the caret alone.

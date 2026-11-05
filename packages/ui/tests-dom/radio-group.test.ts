@@ -92,3 +92,16 @@ test('an option with value null is checked while the group holds null, and picki
 
   expect([away().map(radio => radio.checked), root.querySelector('#away')?.textContent]).toEqual([[true, false], 'null'])
 })
+
+test('hands onChange the picked option as a second argument', async () => {
+  const options: unknown[] = []
+
+  mounted = await mountComponent(RadioGroup, { onChange: (_value: number, option: unknown) => {
+    options.push(option)
+  } })
+
+  click(mounted.root.querySelectorAll<HTMLInputElement>('input[name="plan"]')[2]!)
+  await settle()
+
+  expect(options).toEqual([expect.objectContaining({ value: 3 })])
+})

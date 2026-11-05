@@ -405,3 +405,19 @@ describe('MarkdownEditor preview', () => {
     expect(state.root.querySelector('.kui-markdown-preview-failed')?.textContent).toBe('The preview could not be shown')
   })
 })
+
+describe('MarkdownEditor onChange', () => {
+  test('hears the text once the field is left, while onInput hears each edit', async () => {
+    const committed: string[] = []
+    const state = await editor('a', undefined, { plain: true, onChange: (next: string) => committed.push(next) })
+
+    state.area.value = 'ab'
+    state.area.dispatchEvent(new Event('input', { bubbles: true }))
+
+    expect([state.value, committed]).toEqual(['ab', []])
+
+    state.area.dispatchEvent(new Event('change', { bubbles: true }))
+
+    expect(committed).toEqual(['ab'])
+  })
+})

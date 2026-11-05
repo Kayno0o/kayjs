@@ -34,7 +34,8 @@ const { options, value, label, name, invalid, disabled = false, onChange, option
   // A promise holds the group busy until it settles, and puts the previous option back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
   // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
   // Hears `null` as well, for a reset to none, only when `value` is typed nullable.
-  onChange?: ((value: Value | (null extends Held ? null : never)) => unknown) | undefined
+  // Gets the option picked as a second argument, `undefined` for a reset to none with no null option.
+  onChange?: ((value: Value | (null extends Held ? null : never), option: { value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined } | undefined) => unknown) | undefined
   // Draws each option in place of its label (and icon): `@option(option)`. The input stays named by the option's `label`, and keeps its checked and disabled state. The description stays under it as the quiet line.
   option?: Snippet<[option: { value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }]> | undefined
 }>()
@@ -50,7 +51,7 @@ const { group, picked, busy, ref, pick } = controlledRadios({
   options: () => options,
   value: () => sentOption(sent, options, value === undefined ? first : value),
   name: () => name,
-  onChange: () => onChange as ((value: string | number | null) => unknown) | undefined,
+  onChange: () => onChange as ((value: string | number | null, option: unknown) => unknown) | undefined,
   appRef: rest.ref,
 })
 

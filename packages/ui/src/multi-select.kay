@@ -94,7 +94,8 @@ const { size = 'md', invalid, id, options, value = [], label, placeholder = word
   // Shows the panel when the page sets it; the trigger, a click outside and Escape open and close it on their own, and `onOpenChange` reports each change so a page driving `open` can set it back.
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
-  onChange?: ((value: Value[]) => unknown) | undefined
+  // Gets the picked options as a second argument, among the ones loaded so far.
+  onChange?: ((value: Value[], options: MultiSelectOption<Value>[]) => unknown) | undefined
 }>()
 
 // A control with no callback is plain: a refused post of its form, which the server renders it for, gives its choices back in place of its own; a function of options leaves them as the text they were posted as.
@@ -222,7 +223,7 @@ effect(() => {
 
 function set(next: Value[]) {
   picked = next
-  onChange?.(next)
+  onChange?.(next, pool().filter(option => next.includes(option.value)))
 }
 
 // What a reset goes back to: the values it started with, or the ones last saved by a SaveForm.

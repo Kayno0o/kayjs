@@ -24,13 +24,15 @@ const EDITS: Record<ToolbarAction, (text: string, start: number, end: number) =>
 
 const look = recipe({ parts: { wrap: 'kui-markdown', grid: 'kui-markdown-grid', root: 'kui-markdown-editor', bar: 'kui-markdown-bar', barFailed: 'kui-markdown-bar-failed', extra: 'kui-markdown-extra flex flex-wrap items-center gap-0.5' } })
 
-const { value = '', invalid, onInput, onImage, onImageError, toolbar = true, actions, toolbarExtra, preview, previewing, onPreviewChange, previewTrusted = false, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
+const { value = '', invalid, onInput, onChange, onImage, onImageError, toolbar = true, actions, toolbarExtra, preview, previewing, onPreviewChange, previewTrusted = false, previewClass, uploadFailure = wording('ui.markdownEditor.uploadFailure', 'Could not upload the image'), placeholder = wording('ui.markdownEditor.placeholder', 'Write markdown…'), keysHint = wording('ui.markdownEditor.keysHint', 'Tab indents a list item; Escape then Tab leaves the field.'), ...rest } = props<Omit<JSX.IntrinsicElements['textarea'], 'value' | 'class' | 'children' | 'onInput' | 'onChange' | 'onKeyDown' | 'onPaste' | 'onDrop'> & {
   // Marks the editor as refused, in the danger colour with `aria-invalid`. A FormField marks its control on its own while it shows a message.
   invalid?: boolean | undefined
   // The text to start with; an editor whose parent passes other text follows it.
   value?: string | undefined
-  // The text after every change, typed or applied by a shortcut, a paste or an upload.
+  // The text after every change, typed or applied by a shortcut, a paste or an upload: the live value.
   onInput?: ((value: string) => unknown) | undefined
+  // The text once the field is left after being edited by the user, the commit a draft saves on.
+  onChange?: ((value: string) => unknown) | undefined
   // Uploads a pasted or dropped image and returns the url to embed it by. Without it, images are left to the browser.
   onImage?: ((file: File) => Promise<string>) | undefined
   // Toasted when an upload throws.
@@ -402,7 +404,7 @@ const previewParts = () => previewClass === undefined ? undefined : { body: prev
 // The textarea comes first in the document, so the label a form field puts around the editor names it and not the first button; the bar is placed above it by the grid.
 div(part="wrap")
   div(part="grid" data-preview={previewShown() ? '' : undefined})
-    textarea.kui-field-input(part="root" {...rest} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} onInput={event => { heard(event.currentTarget.value); text = event.currentTarget.value; onInput?.(event.currentTarget.value) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
+    textarea.kui-field-input(part="root" {...rest} aria-invalid={fieldInvalid(() => invalid) ?? rest['aria-invalid']} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} onInput={event => { heard(event.currentTarget.value); text = event.currentTarget.value; onInput?.(event.currentTarget.value) }} onChange={event => onChange?.(event.currentTarget.value)} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
     if builtIn().length > 0 || preview || own()
       div(part="bar" role="toolbar" aria-label={wording('ui.markdownEditor.toolbar', 'Formatting')})
         if toolbarFailed()

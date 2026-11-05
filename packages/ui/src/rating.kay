@@ -61,7 +61,7 @@ const { group, picked, busy, ref, pick } = controlledRadios({
   options: () => places().map(place => ({ value: place + 1 })),
   value: whole,
   name: () => name,
-  onChange: () => onChange as ((value: string | number | null) => unknown) | undefined,
+  onChange: () => onChange && ((next: string | number | null) => onChange?.(next as number | null)),
   appRef: rest.ref,
 })
 

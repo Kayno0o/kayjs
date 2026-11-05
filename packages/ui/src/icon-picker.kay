@@ -27,8 +27,8 @@ const { search, icons: given, value = '', name, invalid, disabled = false, onCha
   invalid?: boolean | undefined
   // Keeps the picker from changing: the search box, the icons and the buttons are disabled, and a form posts nothing for it.
   disabled?: boolean | undefined
-  // Hands over a pick, or an empty string for a cleared one.
-  onChange?: ((name: string) => unknown) | undefined
+  // Hands over a pick, or an empty string for a cleared one, with the icon's choice as a second argument, `undefined` when cleared.
+  onChange?: ((name: string, choice: IconChoice | undefined) => unknown) | undefined
   // Called with the query each time a new search starts, the first one included, not for a page added by Show more.
   onSearch?: ((query: string) => unknown) | undefined
   // Called with `{ error }`, what `search` rejected with, for the latest search or page only; the grid keeps its icons under `failureLabel`.
@@ -149,7 +149,7 @@ const chosen = () => icons().find(choice => choice.name === picked())?.icon ?? (
 
 function pick(next: string) {
   picked = next
-  onChange?.(next)
+  onChange?.(next, next === '' ? undefined : icons().find(choice => choice.name === next) ?? (last()?.name === next ? last() : undefined))
 
   if (!hidden)
     return

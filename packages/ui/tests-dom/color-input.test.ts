@@ -251,3 +251,23 @@ test('a form reset meeting a change under way waits for it, then goes back', asy
 
   expect([told, input.value]).toEqual([['#abcdef', '#ff8800'], '#ff8800'])
 })
+
+test('onInput hears each shade dragged over, and onChange only the commit', async () => {
+  const heard: string[] = []
+  const committed: string[] = []
+
+  mounted = await mountComponent(ColorInput, { onInput: (value: string) => heard.push(value), onChange: (value: string) => committed.push(value) })
+
+  const input = mounted.root.querySelector<HTMLInputElement>('input[name="light"]')!
+
+  for (const shade of ['#111111', '#222222']) {
+    input.value = shade
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+
+  await settle()
+  input.dispatchEvent(new Event('change', { bubbles: true }))
+  await settle()
+
+  expect([heard, committed]).toEqual([['#111111', '#222222'], ['#222222']])
+})
