@@ -28,7 +28,7 @@ import { configLocator, readConfigSource } from './config-keys'
 import { dockerfileProblems } from './dockerfile'
 import { CONTENT_CHECK, contentPropsCheck } from './generated'
 import { browserModules, islandEdges } from './island-modules'
-import { islandOnlyComponents, renderedInIslands } from './island-only'
+import { componentImporters, islandOnlyComponents, renderedInIslands } from './island-only'
 import { FILES_MARKER, stampOf } from './loaded'
 import { configSeoLints } from './seo'
 import { serverOnlyInIsland } from './server-only-reads'
@@ -165,8 +165,10 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
   // A component the compile does not read as an island's: one a page or a static component also renders, and one the build promotes.
   const componentFiles = [...componentTexts.keys()]
   const routes = projectPaths(root, options).routes
-  const browserRun = islands.length > 0 || promoted.size > 0 ? await renderedInIslands(root, componentFiles, componentTexts, [...islands, ...promoted], file => roles.get(file) === 'island') : new Set<string>()
-  const readByCompile = browserRun.size > 0 ? await islandOnlyComponents(root, routes, componentFiles, componentTexts, file => roles.get(file) === 'island') : new Set<string>()
+  const isIsland = (file: string) => roles.get(file) === 'island'
+  const graph = islands.length > 0 || promoted.size > 0 ? await componentImporters(root, componentFiles, componentTexts) : undefined
+  const browserRun = graph ? renderedInIslands(componentFiles, graph, [...islands, ...promoted], isIsland) : new Set<string>()
+  const readByCompile = graph && browserRun.size > 0 ? await islandOnlyComponents(root, routes, componentFiles, componentTexts, isIsland, graph) : new Set<string>()
   const onceRead = [...new Set([...browserRun, ...promoted])].filter(file => roles.get(file) !== 'island' && !readByCompile.has(file) && !file.startsWith(routes + sep))
   const found = [
     ...files.flatMap((file) => {

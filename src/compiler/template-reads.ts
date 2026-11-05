@@ -199,7 +199,7 @@ export function bindingNames(pattern: string): string[] {
   return parsedBindingNames(pattern) ?? pattern.match(WORD) ?? []
 }
 
-// Every word the template's expressions write, which the names it reads are among.
+// Every word the template's expressions write, which the names it reads are among: it over-approximates on purpose, as any word counts, so a check using it can only over-report.
 export function templateWords(file: KayFile): string[] {
   const words = new Set<string>()
 

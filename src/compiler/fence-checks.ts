@@ -659,6 +659,7 @@ export function onceReadProps(fence: ParsedFence, props: PropsDeclaration | unde
     return []
 
   const isDeclaration = (node: Node) => node.type === 'VariableDeclaration' && fence.shift(node).start === props.statement.start
+  // Every name a function mentions, a property or a key too: it over-approximates on purpose, so only more is reported.
   const closureReads = new Set(templateNames)
 
   eachNode(fence.ast, (node) => {
