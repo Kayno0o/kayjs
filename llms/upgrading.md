@@ -25,6 +25,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - The per-day predicate keeps the bare-adjective `disabled` for the boolean that disables the whole input. `isDisabled={iso => closed.has(iso)}` is `disabledDay={iso => closed.has(iso)}`; the old name works until 1.92 and `kay check` flags it as `deprecated-ui-props`, with a safe fix that `kay upgrade` applies.
 
+### kayjs-ui: Widget `isEmpty` is `empty`, its `@empty` block `@emptyState`
+
+- `empty` is the bare-adjective boolean and the block is named apart, so a block present never reads as "always empty". `Widget(isEmpty)` with `@empty` is `Widget(empty)` with `@emptyState`; the old names work until 1.92 and `kay check` flags them as `deprecated-ui-props`, with a safe fix that `kay upgrade` applies.
+
 ## 1.88.0
 
 ### The names of 1.84 are gone

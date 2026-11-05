@@ -588,6 +588,8 @@ describe('layout', () => {
     expect((await one('/layout', '#widget p')).text).toBe('42')
     expect(await head('empty-widget')).toEqual(['h2'])
     expect((await find('/layout', '#empty-widget p')).map(found => found.text)).toEqual(['No visits yet'])
+    expect(await head('old-empty-widget')).toEqual(['h2'])
+    expect((await find('/layout', '#old-empty-widget p')).map(found => found.text)).toEqual(['No visits yet'])
     expect((await one('/layout', '#hidden-widget')).html).toBe('')
   })
 

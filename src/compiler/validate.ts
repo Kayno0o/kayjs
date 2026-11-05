@@ -18,6 +18,8 @@ const MUTED_TONE = /(\btone['"]?\s*:\s*)(['"])muted\2/g
 const SELECTED_TAGS = new Set(['table', 'tree-view', 'timeline'])
 // The kayjs-ui tags whose per-day predicate `isDisabled` is `disabledDay` since 1.89.
 const DATE_TAGS = new Set(['date-input', 'date-range-input'])
+// Widget's `isEmpty` is `empty` and its `@empty` block `@emptyState` since 1.89.
+const WIDGET_TAG = 'widget'
 // The kayjs-ui field tags that took the native `size` before 1.87, when `size` became `sm`, `md` or `lg`.
 const FIELD_TAGS = new Set(['text-input', 'select', 'combobox', 'date-input', 'time-input', 'date-time-input'])
 const NUMBER = /^\s*\d+\s*$/
@@ -851,11 +853,26 @@ class Validator {
     if (file === undefined)
       return
 
+    if (file === WIDGET_TAG) {
+      for (const child of element.children) {
+        if (child.kind === 'slot' && this.text(child.name) === 'empty')
+          this.lint(child.name, 'deprecated-ui-props', '`@empty` on `Widget` is `@emptyState` since kayjs-ui 1.89, so `empty` alone is the boolean', { help: 'Write `@emptyState`', fixes: [{ title: 'Write `@emptyState`', edits: [{ start: child.name.start, end: child.name.end, text: 'emptyState' }], safe: true }] })
+      }
+    }
+
     for (const attribute of element.attributes) {
       if (attribute.kind === 'spread')
         continue
 
       const name = this.text(attribute.name)
+
+      if (file === WIDGET_TAG && name === 'isEmpty') {
+        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'empty={isEmpty}' } : { start: attribute.name.start, end: attribute.name.end, text: 'empty' }
+
+        this.lint(attribute.name, 'deprecated-ui-props', '`isEmpty` on `Widget` is `empty` since kayjs-ui 1.89, the bare-adjective boolean', { help: 'Write `empty`', fixes: [{ title: 'Write `empty`', edits: [edit], safe: true }] })
+
+        continue
+      }
 
       if (SELECTED_TAGS.has(file) && name === 'onSelect') {
         const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'onSelectedChange={onSelect}' } : { start: attribute.name.start, end: attribute.name.end, text: 'onSelectedChange' }

@@ -1227,6 +1227,19 @@ describe('deprecated-ui-props', () => {
     expect(found('DateInput(aria-label="x" {isDisabled})')).toEqual([{ at: 'isDisabled', fix: ['{isDisabled}->disabledDay={isDisabled}'] }])
   })
 
+  it('renames the isEmpty and the @empty block of a Widget', () => {
+    const widget = (template: string) => {
+      const source = `---\nimport Widget from '@kaynooo/kayjs-ui/widget.kay'\n---\n${template}\n`
+      const result = compileKay(source, 'widget.kay', { check: true })
+
+      return result.diagnostics.filter(d => d.code === 'deprecated-ui-props').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
+    }
+
+    expect(widget('Widget(title="x" isEmpty)\n  @empty\n    p none')).toEqual([{ at: 'isEmpty', fix: ['isEmpty->empty'] }, { at: 'empty', fix: ['empty->emptyState'] }])
+    expect(widget('Widget(title="x" {isEmpty})')).toEqual([{ at: 'isEmpty', fix: ['{isEmpty}->empty={isEmpty}'] }])
+    expect(widget('Widget(title="x" empty)\n  @emptyState\n    p none')).toEqual([])
+  })
+
   it('leaves the new name, the boolean and other tags alone', () => {
     expect(found('DateInput(aria-label="x" disabledDay={closed} disabled)')).toEqual([])
     expect(found('Other(isDisabled={closed})')).toEqual([])
