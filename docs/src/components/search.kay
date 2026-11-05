@@ -2,17 +2,17 @@
 import type { PaletteEntry } from '@kaynooo/kayjs-ui'
 import type { Navigation } from '../pages'
 import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
-import { onMount, shortcut, signal } from 'kay'
+import { memo, onMount, shortcut, signal } from 'kay'
 import SearchIcon from '~icons/tabler/search'
 
 const { groups, structure, components } = props<Pick<Navigation, 'groups' | 'structure' | 'components'>>()
 
 // Every page by its title, so an empty query lists the docs as the sidebar does, and the site search finds the sections inside them.
-const entries: PaletteEntry[] = [
+const entries = memo((): PaletteEntry[] => [
   ...groups.flatMap(group => group.links.map(link => ({ label: link.title, group: group.title, href: link.href }))),
   ...structure.map(link => ({ label: link.title, group: 'Structure', href: link.href })),
   ...components.map(link => ({ label: link.title, group: 'UI components', href: link.href })),
-]
+])
 
 const open = signal(false)
 const hint = signal('Ctrl K')
@@ -29,4 +29,4 @@ button.search-trigger(type="button" aria-haspopup="dialog" onClick={() => open =
   SearchIcon
   span Search
   kbd {hint()}
-CommandPalette(entries={entries} open={open()} onOpenChange={open.set} siteSearch={{ limit: 40 }} label="Search the documentation" placeholder="Search the docs")
+CommandPalette(entries={entries()} open={open()} onOpenChange={open.set} siteSearch={{ limit: 40 }} label="Search the documentation" placeholder="Search the docs")
