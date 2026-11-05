@@ -257,6 +257,14 @@ export async function releasePages(read: (path: string) => string, version: stri
   return pages
 }
 
+// What `--cap` makes of `page` and its archive: its newest section cut to its cap, then, while the page still nears the wall, its oldest releases moved to the archive as a release moves them, as three minors kept side by side between two releases outgrow the page with no section over its cap.
+export function capPage(page: string, text: string, archive: string): { page: string, archive: string } {
+  const whatsNew = WHATS_NEW.includes(page)
+  const cut = whatsNew ? capUnreleased(text, archive) : capNewest(text, archive, UPGRADING_CAP, '### ')
+
+  return Buffer.byteLength(cut.page) > CAP_DUE ? archiveOldest(cut.page, cut.archive, whatsNew ? WHATS_NEW_LIMIT : PAGE_LIMIT) : cut
+}
+
 // Runs the tests a release's rewritten pages must keep green, returning their output when one fails: moving and trimming releases can drop a line a test reads, which only a run after the move shows.
 export async function failedPageTests(tests: readonly string[] = ['tests/llms.test.ts']): Promise<string | undefined> {
   const run = Bun.spawn([process.execPath, 'test', ...tests], { stdout: 'pipe', stderr: 'pipe' })
@@ -295,7 +303,7 @@ if (import.meta.main) {
     if (check && Buffer.byteLength(pageText) <= CAP_DUE)
       continue
 
-    const capped = WHATS_NEW.includes(page) ? capUnreleased(pageText, archiveText) : capNewest(pageText, archiveText, UPGRADING_CAP, '### ')
+    const capped = capPage(page, pageText, archiveText)
 
     if (capped.page === pageText)
       continue
@@ -305,6 +313,9 @@ if (import.meta.main) {
     texts.set(archive, trimArchive(capped.archive, ARCHIVE_LIMIT, true))
     writes.set(page, capped.page)
     writes.set(archive, texts.get(archive)!)
+    // llms.txt names the release each archive starts before, which moving releases into it changes.
+    texts.set(INDEX, indexArchive(texts.get(INDEX)!, archive, texts.get(archive)!))
+    writes.set(INDEX, texts.get(INDEX)!)
 
     // The lines of a page that link a section the cap moved to its archive, on this page or another, follow it.
     for (const [path, text] of await relinkMoved(texts, page, pageText, capped.page, archive)) {

@@ -1,7 +1,7 @@
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { breakingRefused } from '../scripts/breaking'
-import { archiveOldest, capNewest, capUnreleased, failedPageTests, indexArchive, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, relinkMoved, restoreTree, stampUnreleased, trimArchive } from '../scripts/whats-new'
+import { archiveOldest, capNewest, capPage, capUnreleased, failedPageTests, indexArchive, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, relinkMoved, restoreTree, stampUnreleased, trimArchive } from '../scripts/whats-new'
 import { scratchDir } from './scratch'
 
 interface Manifest {
@@ -106,6 +106,19 @@ describe('what\'s new', () => {
     expect(archiveOldest(page, archive, 1).page).toContain('## 1.46.0')
     expect(archiveOldest(page, archive, 1).page).not.toContain('## 1.45.0')
     expect(archiveOldest(page.replace(/Releases before.*\n/, ''), archive, 1)).toEqual({ page: page.replace(/Releases before.*\n/, ''), archive })
+  })
+
+  it('moves the oldest releases on --cap once three minors with no section over its cap near the wall, and leaves a page short of it alone', () => {
+    const lines = (n: number) => Array.from({ length: n }, (_, i) => `- line ${i} ${'y'.repeat(80)}`).join('\n')
+    const page = `# Upgrading\n\nIntro.\n\n## 1.90.0\n\n### A\n\n${lines(120)}\n\n## 1.89.0\n\n### B\n\n${lines(40)}\n\n## 1.88.0\n\n### C\n\n${lines(90)}\n\nReleases before 1.88 are in [Old](upgrading-archive.md).\n`
+    const archive = '# Old\n\nWhat each minor release before 1.88 broke.\n\n## 1.87.0\n\n- z\n'
+    const capped = capPage('llms/upgrading.md', page, archive)
+
+    expect(capped.page).toContain('## 1.89.0')
+    expect(capped.page).not.toContain('## 1.88.0')
+    expect(capped.page).toEndWith('Releases before 1.89 are in [Old](upgrading-archive.md).\n')
+    expect(capped.archive).toContain('## 1.88.0\n\n### C')
+    expect(capPage('llms/upgrading.md', page.replace(lines(90), '- c'), archive)).toEqual({ page: page.replace(lines(90), '- c'), archive })
   })
 
   it('moves the oldest releases while Unreleased alone is over the limit, keeping the newest release, and names a patch boundary in full', () => {
