@@ -908,20 +908,29 @@ describe('the content a component gives a form', () => {
 describe('the content of a component given an action', () => {
   const source = '---\nimport Form from \'./form.kay\'\nimport Field from \'./field.kay\'\nimport { add } from \'./page.kay\'\n---\nForm(action={add})\n  Field(name="title")\n  input(name="title")\nForm(action="/plain")\n  Field(name="other")\n'
 
-  it('renders inside the action\'s scope on the server and in the browser, a plain URL leaving it out', () => {
+  it('renders inside the action\'s scope on the server and in the browser, reading the action the component got and only when it is one', () => {
     const html = compileKay(source, 'page.kay', { output: 'html' }).tsx
     const dom = compileKay(source, 'page.kay', { output: 'dom' }).tsx
 
-    expect(html).toMatch(/get children\(\) \{ return KayFormScope\(\(add\), \(\) => \(/)
-    expect(html.match(/KayFormScope\(/g)).toHaveLength(1)
-    expect(dom).toMatch(/get children\(\) \{ return \(\) => \(KayErrorScope\(\(add\), \(\) => \(/)
-    expect(dom.match(/KayErrorScope\(\(add\)/g)).toBeTruthy()
+    expect(html).toMatch(/get children\(\) \{ return KayFormScope\(this\.action, \(\) => \(.*\), true\) \}/)
+    expect(dom).toMatch(/get children\(\) \{ return \(\) => \(KayErrorScope\(this\.action, \(\) => \(.*\), true\)\) \}/)
   })
 
-  it('leaves the fields written inside to the page, as the action\'s input types only the fields of a form', () => {
+  it('refills and marks the fields written inside on the server, and leaves them to the component in the browser', () => {
     const html = compileKay(source, 'page.kay', { output: 'html' }).tsx
+    const dom = compileKay(source, 'page.kay', { output: 'dom' }).tsx
 
-    expect(html).not.toContain('KayFormValue')
-    expect(html).not.toContain('KayFormInvalid(')
+    expect(html).toContain('KayFormValue')
+    expect(html).toContain('KayFormInvalid((add), "title")')
+    expect(dom).not.toContain('KayFormMarked(')
+    expect(dom).not.toContain('KayFormValue(')
+  })
+})
+
+describe('the content of an await in a form', () => {
+  it('renders in the form\'s scope once the value settles, every branch', () => {
+    const html = compileKay('---\nimport { add } from \'./page.kay\'\nconst later = Promise.resolve(1)\n---\nform(action={add})\n  await later\n    p Waiting\n  then value\n    p {value}\n  catch\n    p Failed\n', 'page.kay', { output: 'html' }).tsx
+
+    expect(html.match(/KayFormScope\(\(add\), \(\) =>/g)?.length).toBeGreaterThanOrEqual(4)
   })
 })

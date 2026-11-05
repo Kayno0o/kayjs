@@ -408,6 +408,21 @@ export class HtmlTemplate extends TemplateWriter {
     })
   }
 
+  // A branch rendered once its value settles, after the form around it has popped its scope, so it renders in that form's again.
+  private scoped(node: Node, render: () => void): void {
+    const form = this.facts.forms.get(node)
+
+    if (!form) {
+      render()
+
+      return
+    }
+
+    this.b.add(`${helperName('formScope')}((`).addSource(form).add('), () => ')
+    render()
+    this.b.add(')')
+  }
+
   private await(node: AwaitNode): void {
     const { b } = this
 
@@ -418,7 +433,7 @@ export class HtmlTemplate extends TemplateWriter {
 
       if (node.pending.length > 0) {
         b.add(', pending: () => ')
-        this.value(node.pending)
+        this.scoped(node, () => this.value(node.pending))
       }
 
       for (const [prop, branch] of [['ready', node.resolved], ['failed', node.rejected]] as const) {
@@ -432,7 +447,7 @@ export class HtmlTemplate extends TemplateWriter {
             b.addSource(branch.alias)
 
           b.add(') => ')
-          this.value(branch.children)
+          this.scoped(node, () => this.value(branch.children))
         })
       }
 

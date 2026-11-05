@@ -39,6 +39,8 @@ type Binding = (variable: (node: TemplateNode) => string) => void
 export class DomTemplate extends TemplateWriter {
   protected override readonly scoping = 'errorScope'
 
+  protected override readonly wiresLoose = false
+
   protected override readonly lazySlots = true
   private readonly templates: string[] = []
   private counter = 0
@@ -126,7 +128,7 @@ export class DomTemplate extends TemplateWriter {
         break
       case 'slot':
         b.wrap(item.node, () => {
-          const form = this.facts.forms.get(item.node)
+          const form = this.formOf(item.node)
 
           b.add(`KayInsert(${at}, () => `)
 
@@ -180,8 +182,8 @@ export class DomTemplate extends TemplateWriter {
 
         break
       case 'error':
-        if (this.facts.forms.has(item.node)) {
-          const target = this.facts.forms.get(item.node)!
+        if (this.formOf(item.node)) {
+          const target = this.formOf(item.node)!
 
           b.wrap(item.node, () => {
             b.add(`KayInsert(${at}, () => ${helperName('errorParagraph')}(KayFormError((`).addSource(target).add(`), ${JSON.stringify(item.node.name)}), ${errorParagraphArguments(item.node, this.src, this.errors?.lines.get(item.node))}));`)
@@ -431,7 +433,7 @@ export class DomTemplate extends TemplateWriter {
     else {
       const plan = this.plan(element, this.errors)
       const { target, field, action, described } = plan
-      const followed = element.pendingOf && this.facts.forms.get(element.pendingOf)
+      const followed = element.pendingOf && this.formOf(element.pendingOf)
 
       // An island's block shows while a call of its form's action is in flight, however the handler made it.
       if (followed)
@@ -746,7 +748,7 @@ export class DomTemplate extends TemplateWriter {
     // A tag read at runtime may name a form, whose `submit` handler, written or spread, is held as a written form's is.
     const holds = dynamic && element.attributes.some(attribute => attribute.kind === 'spread' || this.source(attribute.name).toLowerCase() === 'onsubmit')
 
-    const form = this.facts.forms.get(element)
+    const form = this.formOf(element)
 
     if (holds)
       b.add(`(${helperName('holdSubmits')}(), `)

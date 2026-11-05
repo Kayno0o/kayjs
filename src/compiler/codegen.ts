@@ -426,7 +426,7 @@ class ModuleShell {
       kayHelpers.push(WRITE_NAMES[write])
 
     // What fills a form's fields back in once a post was refused.
-    if (runs && facts.actionForm)
+    if (runs && (facts.actionForm || (mode === 'html' && facts.scopedForm)))
       kayHelpers.push('formValue', 'formChecked', mode === 'dom' ? 'formMarked' : 'formInvalid', 'formError')
 
     // An island toggles a refused field's message in its description, beside the ids a component wrote there.
@@ -437,7 +437,7 @@ class ModuleShell {
       kayHelpers.push('formProtection')
 
     // A component inside a form, or inside a component given an `action`, reads the action as it renders, in the browser as on the server.
-    if (facts.scopedForm || (mode === 'html' ? facts.actionForm : [...facts.forms.keys()].some(node => node.kind === 'element' && (node.component || isSlot(node)))))
+    if (facts.scopedForm || (mode === 'html' ? facts.actionForm : [...facts.forms.keys()].some(node => node.kind === 'element' && (node.component || isSlot(node)) && !facts.loose.has(node))))
       kayHelpers.push(mode === 'dom' ? 'errorScope' : 'formScope')
 
     if (fence ? fence.exportNames.length > 0 : actions.length > 0)

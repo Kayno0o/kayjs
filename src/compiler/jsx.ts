@@ -192,7 +192,8 @@ export class JsxTemplate {
     const { b } = this
     const target = this.facts.forms.get(node)
 
-    if (!target || !this.options.check)
+    // A component's action is typed by its own props, not by a field name written in its content.
+    if (!target || !this.options.check || this.facts.loose.has(node))
       return
 
     b.wrap(node, () => {
@@ -746,7 +747,8 @@ export class JsxTemplate {
       return false
 
     const name = this.text(attribute.name)
-    const target = this.facts.forms.get(element)
+    // The names written in a component's content are not checked against its action's input.
+    const target = name === 'name' && this.facts.loose.has(element) ? undefined : this.facts.forms.get(element)
 
     if (name === FIELD_ATTRIBUTE ? !FIELD_ELEMENTS.has(element.name) : name !== 'name' || !FORM_FIELDS.has(element.name))
       return false

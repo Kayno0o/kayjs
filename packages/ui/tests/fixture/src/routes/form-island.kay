@@ -1,0 +1,16 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const claim = action(t.Object({ handle: t.String({ minLength: 3, maxLength: 40, error: 'Three letters at least' }) }), () => undefined)
+---
+---
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import FormIsland from '../components/form-island.kay'
+---
+main
+  form#claim(action={claim})
+    FormField(label="Handle" name="handle")
+      input(name="handle")
+    FormIsland
+    button(formnovalidate) Claim

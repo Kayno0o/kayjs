@@ -214,24 +214,21 @@ export function modifiersOf(attribute: Attribute, source: string): string[] {
 
 export type NamedAttribute = Exclude<Attribute, { kind: 'spread' }>
 
-// `form(action={add})`: the attribute naming the action a form posts to.
-export function actionOf(element: ElementNode, source: string): Extract<Attribute, { kind: 'expression' }> | undefined {
-  if (element.component || element.name !== 'form')
-    return undefined
-
+// The `action={...}` an element is written with.
+function actionAttribute(element: ElementNode, source: string): Extract<Attribute, { kind: 'expression' }> | undefined {
   const attribute = element.attributes.find(candidate => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === 'action')
 
   return attribute?.kind === 'expression' ? attribute : undefined
 }
 
+// `form(action={add})`: the attribute naming the action a form posts to.
+export function actionOf(element: ElementNode, source: string): Extract<Attribute, { kind: 'expression' }> | undefined {
+  return element.component || element.name !== 'form' ? undefined : actionAttribute(element, source)
+}
+
 // The `action={add}` a component is given, such as a Form: the fields in its content read that action's messages as the ones in a `form(action={add})` do.
 export function componentAction(element: ElementNode, source: string): Extract<Attribute, { kind: 'expression' }> | undefined {
-  if (!element.component)
-    return undefined
-
-  const attribute = element.attributes.find(candidate => candidate.kind !== 'spread' && source.slice(candidate.name.start, candidate.name.end) === 'action')
-
-  return attribute?.kind === 'expression' ? attribute : undefined
+  return element.component ? actionAttribute(element, source) : undefined
 }
 
 // `a(href="/docs" section)` or `section={active}`: kay's own attribute marking a link current on the pages below it, read by the server markup and never written out.
@@ -563,6 +560,8 @@ export interface TemplateFacts {
   ui?: UiEntry | undefined
   // The action of the form each node sits in, from `formTargets`.
   forms: Map<Node, Span>
+  // The nodes of `forms` whose form is a component given an `action`.
+  loose: Set<Node>
   // Whether each attribute expression asked about, by where it starts, is a function: filled as the passes ask, each parsed once.
   functions: Map<number, boolean>
   // How the template names each prop the script types `Bindable<T>`, to its key, which only the script tells: set where the code is generated.
@@ -662,17 +661,33 @@ export function walkNodes<C>(nodes: readonly Node[], context: C, each: (node: No
 }
 
 // The action of the innermost `form(action={...})` each node sits in; a node outside every such form has none.
-export function formTargets(nodes: readonly Node[], source: string): Map<Node, Span> {
+// `loose` lists the nodes whose innermost form is a component given an `action` instead, whose input type `kay check` leaves alone and which an island does not wire.
+export function formTargets(nodes: readonly Node[], source: string): { targets: Map<Node, Span>, loose: Set<Node> } {
   const targets = new Map<Node, Span>()
+  const loose = new Set<Node>()
 
-  walkNodes<Span | undefined>(nodes, undefined, (node, target) => {
-    if (target)
-      targets.set(node, target)
+  walkNodes<{ target: Span, loose: boolean } | undefined>(nodes, undefined, (node, found) => {
+    if (found) {
+      targets.set(node, found.target)
 
-    return node.kind === 'element' ? actionOf(node, source)?.expression ?? target : target
+      if (found.loose)
+        loose.add(node)
+    }
+
+    if (node.kind !== 'element')
+      return found
+
+    const form = actionOf(node, source)
+
+    if (form)
+      return { target: form.expression, loose: false }
+
+    const component = componentAction(node, source)
+
+    return component ? { target: component.expression, loose: true } : found
   })
 
-  return targets
+  return { targets, loose }
 }
 
 // Whether `found` holds for a node of the template, nested ones included.
@@ -780,7 +795,8 @@ function addRecipe(facts: TemplateFacts, file: KayFile, recipe: string): void {
 }
 
 function factsOf(file: KayFile): TemplateFacts {
-  const facts: TemplateFacts = { interactive: false, actionForm: false, scopedForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: formTargets(file.template, file.source), functions: new Map(), bindables: new Map(), shadowedBinds: new WeakSet() }
+  const { targets, loose } = formTargets(file.template, file.source)
+  const facts: TemplateFacts = { interactive: false, actionForm: false, scopedForm: false, helpers: new Set(), awaited: new Set(), slot: false, childrenSlot: false, snippet: false, await: false, try: false, classes: [], parts: undefined, forms: targets, loose, functions: new Map(), bindables: new Map(), shadowedBinds: new WeakSet() }
   const text = (span: Span) => file.source.slice(span.start, span.end)
 
   visitNodes(file.template, (node) => {

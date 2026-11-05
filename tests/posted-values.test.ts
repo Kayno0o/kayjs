@@ -1,7 +1,7 @@
 import type { Action } from '../src/runtime/action'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { formChecked, formErrors, formScope, postedChecked, postedValue, postedValues } from '../src/runtime/action'
+import { errorScope, formChecked, formErrors, formScope, postedChecked, postedValue, postedValues } from '../src/runtime/action'
 import { ACTION } from '../src/runtime/action-shared'
 import { submittedValues } from '../src/server/flash'
 import { testSite } from '../src/test'
@@ -189,5 +189,40 @@ describe('formErrors', () => {
     inner.error = () => 'inner'
     expect(inside(outer, () => inside(inner, () => formErrors()('x')))).toBe('inner')
     expect(inside(outer, () => inside('/plain', () => formErrors()('x')))).toBeUndefined()
+  })
+
+  it('leaves a form in place for a component given a value that is no action, where a plain URL form shadows it', () => {
+    const outer = refused(undefined) as unknown as Record<string, unknown>
+    const read = (target: unknown, only: boolean) => formScope(outer, () => formScope(target, () => formErrors()('x'), only), false)
+
+    outer.error = () => 'outer'
+
+    expect(read({ label: 'Undo' }, true)).toBe('outer')
+    expect(read('/plain', true)).toBe('outer')
+    expect(read('/plain', false)).toBeUndefined()
+  })
+
+  it('pops the scope when the render throws', () => {
+    const target = refused(undefined) as unknown as Record<string, unknown>
+
+    target.error = () => 'kept'
+
+    expect(() => formScope(target, () => {
+      throw new Error('boom')
+    })).toThrow('boom')
+    expect(formErrors()('x')).toBeUndefined()
+    expect(() => errorScope(target, () => {
+      throw new Error('boom')
+    })).toThrow('boom')
+    expect(formErrors()('x')).toBeUndefined()
+  })
+
+  it('answers nothing inside an island\'s own template, though a page form encloses it', () => {
+    const target = refused(undefined) as unknown as Record<string, unknown>
+
+    target.error = () => 'page'
+
+    expect(inside(target, () => errorScope(undefined, () => formErrors()('x')))).toBeUndefined()
+    expect(inside(target, () => formErrors()('x'))).toBe('page')
   })
 })

@@ -21,7 +21,7 @@ Form(action={add} saved="Added.")
   Button(type="submit" tone="accent" label="Add")
 ```
 
-Without JavaScript the form posts to the action as any `form(action={add})` does, and the page comes back with the messages in place. With JavaScript it calls the action, so the page does not reload.
+Without JavaScript the form posts to the action as any `form(action={add})` does, and the page comes back with the messages in place. With JavaScript it calls the action, so the page does not reload. The fields must be in the template of a component with state or handlers (an island) to show the message of a call made with JavaScript: fields a static page hands Form as children are static markup, which the browser cannot update, so there the message is toasted.
 
 ## Saving
 
@@ -31,4 +31,4 @@ A call that goes through toasts `saved` when given and calls `onSaved` with what
 
 ## A form of your own
 
-A `form(action={add})` written in a template needs none of this to show messages. A FormField, Checkbox or Toggle inside it with a `name` shows `add.error('name')`, with and without JavaScript. Use Form when you want the call, the toast and the focus.
+A `form(action={add})` written in a template needs none of this to show messages. A FormField, Checkbox or Toggle inside it with a `name` shows `add.error('name')`, with and without JavaScript. Use Form when you want the call, the toast and the focus. An empty message is dropped. An island's own template does not know a `form(action)` of the page around it, so inside an island use Form or the `issue` prop.

@@ -94,6 +94,21 @@ describe('FormDialog', () => {
     expect(root.querySelector('#name')?.getAttribute('aria-describedby')).toBe(`name-note ${root.querySelector('[data-part="hint"]')!.id}`)
   })
 
+  test('shows no message of an earlier refusal once closed and reopened, though the action keeps it', async () => {
+    const root = await formDialog(async () => ({ errors: { name: 'Taken' } }))
+
+    submit(root)
+    await settle()
+    expect(root.querySelector('[data-part="issue"]')?.textContent).toBe('Taken')
+
+    click(root.querySelector('#hide'))
+    await settle()
+    click(root.querySelector('#open'))
+    await settle()
+
+    expect(root.querySelector('[data-part="issue"]')).toBeNull()
+  })
+
   test('marks every field of a group refused through its name, focusing the first, and clears them once refused for another field', async () => {
     let answer: Answer = { errors: { access: 'Pick one' } }
     const root = await formDialog(async () => answer)

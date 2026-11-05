@@ -53,7 +53,8 @@ form(part="root" {...rest} action={action} novalidate)
     textarea(field="message" rows={rows})
   if asksConsent()
     div(part="consent")
-      Checkbox(part="consentBox issues issue" name="consent" label={consentLabel})
+      // The Checkbox renders as an island of its own, which does not know this form, so its message is handed over.
+      Checkbox(part="consentBox issues issue" name="consent" label={consentLabel} issue={action.error('consent')})
       if privacy
         a(part="link" href={privacy} {...OUTSIDE}) {privacyLabel}
   else if privacy

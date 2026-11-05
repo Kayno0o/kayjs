@@ -206,6 +206,14 @@ export abstract class TemplateWriter {
   // The helper scoping a form's content: the server's also lets the fields in it refill, the browser's only gives them the form's messages.
   protected readonly scoping: 'formScope' | 'errorScope' = 'formScope'
 
+  // Whether the browser leaves the fields of a component given an `action` to the component, which does not wire them to the action.
+  protected readonly wiresLoose: boolean = true
+
+  // The action of the form a node sits in, as this twin wires it.
+  protected formOf(node: Node): Span | undefined {
+    return !this.wiresLoose && this.facts.loose.has(node) ? undefined : this.facts.forms.get(node)
+  }
+
   // Children rendered as the template renders them: markup on the server, a block in the browser.
   protected abstract rendered(nodes: Node[]): void
 
@@ -214,7 +222,7 @@ export abstract class TemplateWriter {
 
   protected plan(element: ElementNode, errors: ErrorMessages | undefined): ElementPlan {
     const name = element.name
-    const target = this.facts.forms.get(element)
+    const target = this.formOf(element)
     const classAttribute = this.classAttribute(element)
     const sizes = this.imageSizes(element)
     const field = target && formFieldOf(element, this.src)
@@ -400,7 +408,7 @@ export abstract class TemplateWriter {
       b.add(`${helperName('merge')}(`)
 
     const props = this.sources(element, getters, true)
-    const scope = componentAction(element, this.src)?.expression
+    const scope = componentAction(element, this.src) !== undefined
 
     for (const slot of element.children.filter((child): child is SlotNode => child.kind === 'slot' && child !== except)) {
       props.separate()
@@ -804,8 +812,8 @@ export abstract class TemplateWriter {
 
   // What a component receives as `children` or a slot: a lone line of text as its string or values, as JSX passes it, anything else rendered.
   // With `lazy`, rendered children are a function building them, which `eachChild` calls where they are put.
-  // With `scope`, the expression of the `action` the component is given, the content renders as that action's form's does.
-  protected childrenValue(nodes: Node[], lazy = false, scope?: Span): void {
+  // With `scope`, the component is given an `action` and the content renders as that action's form's does, once it is read as the action the component got.
+  protected childrenValue(nodes: Node[], lazy = false, scope = false): void {
     const { b } = this
     const lone = nodes.length === 1 && nodes[0]!.kind === 'text' ? nodes[0] : undefined
 
@@ -814,12 +822,12 @@ export abstract class TemplateWriter {
         b.add('() => (')
 
       if (scope)
-        b.add(`${helperName(this.scoping)}((`).addSource(scope).add('), () => (')
+        b.add(`${helperName(this.scoping)}(this.action, () => (`)
 
       this.rendered(nodes)
 
       if (scope)
-        b.add('))')
+        b.add('), true)')
 
       if (lazy)
         b.add(')')

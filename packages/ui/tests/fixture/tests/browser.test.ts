@@ -1803,3 +1803,19 @@ inBrowser('a form nested in an island with a honeypot', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 })
+
+inBrowser('a Form calling an action in the browser', () => {
+  test('shows the message the action refused a FormField with, with no issue prop, and keeps what was typed', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/form-own-fields')
+
+    await page.fill('input[name="handle"]', 'ab')
+    await page.click('#count')
+    await page.waitFor('#count', { text: '1' })
+    await page.click('#claim-submit')
+    await page.waitFor('[data-part="issue"]', { text: 'Three letters at least' })
+    expect(await page.evaluate(() => (document.querySelector('input[name="handle"]') as HTMLInputElement).value)).toBe('ab')
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})

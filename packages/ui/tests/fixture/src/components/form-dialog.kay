@@ -17,6 +17,8 @@ const { save, onSaved, onError, plain = false } = props<{ onError?: ((failure: {
 
 const open = signal(true)
 const pending = signal(false)
+// Like a real action, it keeps its last refusal until a call goes through.
+const last = signal<ActionError | undefined>(undefined)
 
 // What a page's action is to an island: a call that answers or throws ActionError, its `pending()` and its `url`.
 const rename = Object.assign(async (form: FormData) => {
@@ -28,12 +30,19 @@ const rename = Object.assign(async (form: FormData) => {
     if (typeof answer !== 'string')
       throw 'fail' in answer ? new ActionError(400, '', {}, answer.fail) : new ActionError(422, '', answer.errors)
 
+    last = undefined
+
     return answer
+  }
+  catch (error) {
+    last = error instanceof ActionError ? error : undefined
+
+    throw error
   }
   finally {
     pending = false
   }
-}, { pending, url: '/_kay/action/form/rename' }) as unknown as Action<{ name: string }, string | Failure<Refusal>>
+}, { [Symbol.for('kay.action')]: true, pending, url: '/_kay/action/form/rename', failed: () => last() ? { status: last()!.status, errors: last()!.errors } : undefined, error: (field = '') => last()?.errors[field] }) as unknown as Action<{ name: string }, string | Failure<Refusal>>
 
 function said(refusal: Refusal) {
   return refusal.field ? { [refusal.field]: refusal.error } : refusal.error

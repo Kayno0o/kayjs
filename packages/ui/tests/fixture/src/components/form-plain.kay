@@ -1,0 +1,44 @@
+---
+import type { Action, Failure } from 'kay'
+import { ActionError, signal } from 'kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+// `call` stands in for the server; the action keeps its last refusal as a real one does, until a call goes through.
+const { call } = props<{ call: (input: { title: string }) => Promise<string | { errors: Record<string, string> }> }>()
+
+const last = signal<ActionError | undefined>(undefined)
+
+const add = Object.assign(async (form: FormData) => {
+  const answer = await call({ title: String(form.get('title')) })
+
+  if (typeof answer !== 'string') {
+    last = new ActionError(422, '', answer.errors)
+    throw last()
+  }
+
+  last = undefined
+
+  return answer
+}, {
+  [Symbol.for('kay.action')]: true,
+  pending: () => false,
+  url: '/_kay/action/form/add',
+  failed: () => last() ? { status: last()!.status, errors: last()!.errors } : undefined,
+  error: (field = '') => last()?.errors[field],
+}) as unknown as Action<{ title: string }, string | Failure<never>>
+
+async function submit(event: SubmitEvent) {
+  event.preventDefault()
+
+  try {
+    await add(new FormData(event.currentTarget as HTMLFormElement))
+  }
+  catch {
+    // The refusal shows through add.error.
+  }
+}
+---
+form(action={add} onSubmit={submit})
+  FormField(label="Title" name="title")
+    input#title(name="title")
+  button#submit(type="submit") Add

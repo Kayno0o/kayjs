@@ -1,0 +1,16 @@
+---
+import type { Action } from 'kay'
+import { signal } from 'kay'
+import Form from '@kaynooo/kayjs-ui/form.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+// The fields are in this island's own template, as a FormField needs to show a message the browser got; the counter is what makes it one.
+const { claim } = props<{ claim: Action<never, string> }>()
+
+const count = signal(0)
+---
+button#count(type="button" onClick={() => count++}) {count()}
+Form(action={claim} id="claim")
+  FormField(label="Handle" name="handle")
+    input(name="handle")
+  button#claim-submit(formnovalidate) Claim

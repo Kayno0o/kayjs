@@ -187,15 +187,17 @@ export async function callAction<Output>(form: HTMLFormElement, action: Action<n
   }
 }
 
-// The messages shown for one field: those its form's last call was refused with under `name`, the one its `form(action)` holds for it, then the page's own `issue`, none twice. Read in a component's script, where the form's context is.
+// The messages shown for one field: those its form's last call was refused with under `name`, else the one its `form(action)` holds for it, then the page's own `issue`, none twice and none empty. Read in a component's script, where the form's context is.
+// A Form, FormDialog or SaveForm gives `formIssues` and clears it itself, so the action's own error, which stays until a call succeeds, is not read beside it.
 export function fieldIssues(name: () => string | undefined, issue: () => string | undefined): () => string[] {
   const refused = formIssues.use()
   const held = formErrors()
+  const read = (field: string) => refused ? refused()[field] : held(field)
 
   return () => {
     const field = name()
 
-    const messages = [field === undefined ? undefined : refused?.()[field], field === undefined ? undefined : held(field), issue()]
+    const messages = [field === undefined ? undefined : read(field), issue()]
 
     return [...new Set(messages.filter((message): message is string => message !== undefined && message !== ''))]
   }

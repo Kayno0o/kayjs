@@ -1448,4 +1448,22 @@ describe('FormField in a form calling an action', () => {
     expect(refused.html).toContain('Three letters at least')
     expect(refused.html).toMatch(/<input name="handle"[^>]*aria-describedby="[\w-]+"/)
   })
+
+  test('puts the posted value back and marks a raw input invalid inside Form', async () => {
+    const { claim } = await import('../src/routes/form-component.kay')
+
+    const refused = await site.submit(claim, { handle: 'ab' }, { from: '/form-component' })
+
+    expect(refused.html).toMatch(/<input[^>]*name="handle"[^>]*value="ab"|<input[^>]*value="ab"[^>]*name="handle"/)
+    expect(refused.html).toMatch(/<input[^>]*aria-invalid="true"/)
+  })
+
+  test('shows the message on the page-level field only, not on a field inside an island', async () => {
+    const { claim } = await import('../src/routes/form-island.kay')
+
+    const refused = await site.submit(claim, { handle: 'ab' }, { from: '/form-island' })
+
+    expect(refused.html.split('Three letters at least')).toHaveLength(2)
+    expect(refused.find('#island-handle')[0]?.attributes['aria-describedby']).toBeUndefined()
+  })
 })

@@ -9,6 +9,8 @@ import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 const { save, onSaved, onError, onDiscard, shortcut, confirm } = props<{ onError?: ((failure: { error: unknown }) => unknown) | undefined, confirm?: string | undefined, save: (input: { name: string }) => Promise<string | { errors: Record<string, string> }>, onSaved: (name: string) => void, onDiscard: () => void, shortcut?: string | false | undefined }>()
 
 const pending = signal(false)
+// Like a real action, it keeps its last refusal until a call goes through.
+const last = signal<ActionError | undefined>(undefined)
 const extra = signal(false)
 
 const rename = Object.assign(async (form: FormData) => {
@@ -20,12 +22,19 @@ const rename = Object.assign(async (form: FormData) => {
     if (typeof answer !== 'string')
       throw new ActionError(422, '', answer.errors)
 
+    last = undefined
+
     return answer
+  }
+  catch (error) {
+    last = error instanceof ActionError ? error : undefined
+
+    throw error
   }
   finally {
     pending = false
   }
-}, { pending, url: '/_kay/action/form/rename' }) as unknown as Action<{ name: string }, string | Failure<never>>
+}, { [Symbol.for('kay.action')]: true, pending, url: '/_kay/action/form/rename', failed: () => last() ? { status: last()!.status, errors: last()!.errors } : undefined, error: (field = '') => last()?.errors[field] }) as unknown as Action<{ name: string }, string | Failure<never>>
 ---
 button#more(onClick={() => extra = true}) More
 SaveForm(action={rename} failureLabel="Could not save" saved="Saved." onSaved={onSaved} onError={onError} onDiscard={onDiscard} shortcut={shortcut} confirm={confirm})

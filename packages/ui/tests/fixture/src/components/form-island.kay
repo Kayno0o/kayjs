@@ -1,0 +1,9 @@
+---
+import { signal } from 'kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+
+const count = signal(0)
+---
+FormField(label="Island handle" name="handle")
+  input#island-handle(name="handle")
+button#count(type="button" onClick={() => count++}) {count()}

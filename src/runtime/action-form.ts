@@ -92,7 +92,11 @@ export function formValue(target: unknown, name: string): string | undefined {
 const enclosing: unknown[] = []
 
 // Renders a form's content with the form's action as the one `postedValue`, `postedChecked` and `formErrors` read.
-export function formScope<Result>(target: unknown, render: () => Result): Result {
+// `only` is for a component given an `action`: a value that is no action (a snippet, a toast's action object) leaves the form around it in place, where a form's plain URL shadows it.
+export function formScope<Result>(target: unknown, render: () => Result, only = false): Result {
+  if (only && !isAction(target))
+    return render()
+
   enclosing.push(target)
 
   try {
@@ -106,8 +110,12 @@ export function formScope<Result>(target: unknown, render: () => Result): Result
 // The actions of the forms being rendered in the browser, whose messages `formErrors` reads: a component of an island's template knows its form by this, where `postedValue` keeps reading the server's markup.
 const reading: unknown[] = []
 
-// Renders a form's content with the form's action as the one `formErrors` reads.
-export function errorScope<Result>(target: unknown, render: () => Result): Result {
+// Renders a form's content with the form's action as the one `formErrors` reads, `only` as `formScope` takes it.
+// An island's own template on the server renders with none, as in the browser a page's form is not known to it.
+export function errorScope<Result>(target: unknown, render: () => Result, only = false): Result {
+  if (only && !isAction(target))
+    return render()
+
   reading.push(target)
 
   try {
