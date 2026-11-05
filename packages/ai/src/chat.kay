@@ -2,7 +2,7 @@
 import type { Action, Component, Failure, SanitizeOptions, Snippet } from 'kay'
 import type { Turn } from './chat-session'
 import type { ByteSize } from 'kay/library'
-import type { AiToolCall, ChatFailure, ChatMessage, ChatTurn, ChatTurnView, CodeBlock, Progress, Source } from './types'
+import type { AiToolCall, ChatFailure, ChatIconName, ChatIcons, ChatMessage, ChatTurn, ChatTurnView, CodeBlock, Progress, Source } from './types'
 import { durationMs, effect, escapeHtml, followLog, onCleanup, onMount, persisted, queryParam, recipe, sanitizeHtml, signal, trustHtml, untrack, withQuery } from 'kay'
 import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
@@ -41,6 +41,8 @@ const look = recipe({
 // What a reply keeps of markdown: no image, which a model reading a hostile page could point at a URL carrying the conversation, unless it sits under a path of `images`, and no task checkbox. Tables stay.
 // What `Icon` takes as its `icon`: a slot of the app's settings, or an icon imported from `~icons/<prefix>/<name>`.
 type IconValue = typeof Icon extends Component<infer Props> ? Props extends { icon: infer Value } ? Value : never : never
+
+const iconOf = (name: ChatIconName, fallback: string) => (icons?.[name] ?? fallback) as IconValue
 
 const TABLE_TAGS = ['table', 'thead', 'tbody', 'tr', 'th', 'td']
 const REPLY: SanitizeOptions = { tags: TABLE_TAGS }
@@ -104,7 +106,7 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   // What the tools of a reply are called in the one line they fold into, by tool name such as `{ search_docs: 'Searched the docs' }`; a tool without one shows its own name, and a tool called more than once adds `x2`.
   toolLabels?: Record<string, string> | undefined
   // What the round buttons draw, by name, in place of the library's own: an icon of the app's set or one imported from `~icons/<prefix>/<name>`, as `Icon` takes it. Only the names given change.
-  icons?: Partial<Record<'send' | 'stop' | 'new' | 'attach' | 'regenerate' | 'edit' | 'record', IconValue>> | undefined
+  icons?: ChatIcons | undefined
   // Before 1.90 each icon was a block of its own; they work until 1.93 and win over `icons` (`deprecated-chat-icons`).
   sendIcon?: Snippet
   stopIcon?: Snippet
@@ -827,11 +829,11 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
                 if canEdit(turn)
                   BareIconButton(part="edit" variant="inline" size="xs" label={editName(turn)} ref={element => takeFocus(element, turn)} onClick={() => startEdit(turn)})
                     slot editIcon
-                      Icon(icon={icons?.edit ?? 'edit'})
+                      Icon(icon={iconOf('edit', 'edit')})
               else if canRegenerate(turn)
                 BareIconButton(part="regenerate" variant="inline" size="xs" label={regenerateLabel} onClick={session.regenerate})
                   slot regenerateIcon
-                    Icon(icon={icons?.regenerate ?? 'refresh'})
+                    Icon(icon={iconOf('regenerate', 'refresh')})
               slot actions(viewOf(turn))
     if busy()
       article(part="turn" data-role="assistant" data-pending="" aria-hidden="true")
@@ -879,12 +881,12 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
     if newButton && history().length > 0
       BareIconButton(part="new" variant="inline" label={newLabel} onClick={startOver})
         slot newIcon
-          Icon(icon={icons?.new ?? 'plus'})
+          Icon(icon={iconOf('new', 'plus')})
     if attach
       input(type="file" hidden tabindex="-1" aria-hidden="true" accept={accept} multiple disabled={busy()} ref={element => { picker = element }} onChange={picked})
       BareIconButton(part="attach" variant="inline" label={attachLabel} onClick={() => picker?.click()})
         slot attachIcon
-          Icon(icon={icons?.attach ?? 'plus'})
+          Icon(icon={iconOf('attach', 'plus')})
     Textarea(part="field" writeFocused ref={element => { field = element }} value={draft()} onInput={draft.set} rows="1" onPaste={pasted} aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
     if voice
       BareIconButton(part="record" variant="inline" label={recordLabel} aria-pressed={voice.state() === 'recording' ? 'true' : 'false'} aria-busy={voiceBusy() ? 'true' : undefined} onClick={() => { void voice.press() }} onKeyDown={recordKey})
@@ -892,17 +894,17 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
           Icon(part="recordSpinner" icon="spinner")
         else if voice.state() === 'recording'
           slot stopIcon
-            Icon(icon={icons?.stop ?? 'stop'})
+            Icon(icon={iconOf('stop', 'stop')})
         else
           slot recordIcon
-            Icon(icon={icons?.record ?? 'microphone'})
+            Icon(icon={iconOf('record', 'microphone')})
     if busy()
       BareIconButton(part="send" variant="inline" label={stopLabel} onClick={stop})
         slot stopIcon
-          Icon(icon={icons?.stop ?? 'stop'})
+          Icon(icon={iconOf('stop', 'stop')})
     else
       BareIconButton(part="send" variant="inline" type="submit" label={sendLabel})
         slot sendIcon
-          Icon(icon={icons?.send ?? 'send'})
+          Icon(icon={iconOf('send', 'send')})
   if footer
     | {footer}

@@ -1,6 +1,19 @@
 import type { Action, Duration, Static } from 'kay'
+import type { IconProps } from 'kay/icons'
 import type { ByteSize, TSchema } from 'kay/library'
 import type { StoredFile } from './attachments'
+
+// The round buttons of a `Chat` an app draws its own icon on, by `icons`.
+export type ChatIconName = 'send' | 'stop' | 'new' | 'attach' | 'regenerate' | 'edit' | 'record'
+
+// An icon of the app's settings, by its slot name, or one imported from `~icons/<prefix>/<name>`, as kayjs-ui's `Icon` takes it.
+export type ChatIconValue = IconProps | (string & {})
+
+// The icons a `Chat` draws in place of its own, by button; a name left out keeps the default.
+export type ChatIcons = Partial<Record<ChatIconName, ChatIconValue>>
+
+// A `ChatLauncher` adds the icons of its button and its panel's header.
+export type ChatLauncherIcons = ChatIcons & Partial<Record<'open' | 'close' | 'expand' | 'collapse', ChatIconValue>>
 
 // A file the model is shown: bytes or a `Blob` (a `File` from an `s.File()` field is one), or a file kay stored (`storedFile(key)`, never a key a visitor chose). What it is comes from its bytes, not its name or declared type: a PNG, JPEG, GIF or WebP image, or a PDF.
 export type AiAttachment = Blob | Uint8Array | ArrayBuffer | StoredFile

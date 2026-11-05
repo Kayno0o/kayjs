@@ -158,6 +158,18 @@ interface ChatFailure
   message: string
   status: number | undefined
 
+[.] ChatIconName
+type ChatIconName = 'send' | 'stop' | 'new' | 'attach' | 'regenerate' | 'edit' | 'record'
+
+[.] ChatIcons
+type ChatIcons = Partial<Record<ChatIconName, ChatIconValue>>
+
+[.] ChatIconValue
+type ChatIconValue = IconProps | (string & {})
+
+[.] ChatLauncherIcons
+type ChatLauncherIcons = ChatIcons & Partial<Record<'open' | 'close' | 'expand' | 'collapse', ChatIconValue>>
+
 [.] ChatMessage
 interface ChatMessage
   attachments?: File[]
@@ -729,7 +741,7 @@ component default
   hash?: false | string | undefined
   history?: number | undefined
   icon?: Element
-  icons?: (Partial<Record<"attach" | "edit" | "new" | "record" | "regenerate" | "send" | "stop", IconProps | IconSlot>> & Partial<Record<"close" | "collapse" | "expand" | "open", IconProps | IconSlot | undefined>>) | undefined
+  icons?: (Partial<Record<ChatIconName, ChatIconValue>> & Partial<Record<"close" | "collapse" | "expand" | "open", ChatIconValue>>) | undefined
   images?: string | string[] | undefined
   initial?: ChatTurn[] | undefined
   keep?: number | undefined
@@ -944,7 +956,7 @@ component default
   footer?: Element
   greeting?: string | undefined
   history?: number | undefined
-  icons?: Partial<Record<"attach" | "edit" | "new" | "record" | "regenerate" | "send" | "stop", IconProps | IconSlot>> | undefined
+  icons?: Partial<Record<ChatIconName, ChatIconValue>> | undefined
   images?: string | string[] | undefined
   initial?: ChatTurn[] | undefined
   keep?: number | undefined

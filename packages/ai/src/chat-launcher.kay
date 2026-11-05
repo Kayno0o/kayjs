@@ -1,10 +1,12 @@
 ---
 import type { Component, Snippet } from 'kay'
+import type { ChatLauncherIcons } from './types'
 import Chat from './chat.kay'
 import Panel from './chat-panel.kay'
 
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 
+type IconValue = typeof Icon extends Component<infer Props> ? Props extends { icon: infer Value } ? Value : never : never
 type ChatProps = typeof Chat extends Component<infer Props> ? Props : never
 
 const { icons, icon, closeIcon, turn, actions, call, source, empty, footer, sendIcon, stopIcon, attachIcon, newIcon, expandIcon, collapseIcon, note, openLabel, closeLabel, open, onOpenChange, hash, onSend, onReply, onStop, onError, onToolCall, onRegenerate, onEdit, onSuggestion, suggestions, newLabel, expandLabel, collapseLabel, remember, class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember' | 'conversationIn' | 'newButton' | 'sendIcon' | 'stopIcon' | 'attachIcon' | 'onSend' | 'onReply' | 'onStop' | 'onError' | 'onToolCall' | 'onRegenerate' | 'onEdit' | 'onSuggestion' | 'suggestions' | 'turn' | 'actions' | 'call' | 'source' | 'empty' | 'footer'> & {
@@ -19,7 +21,7 @@ const { icons, icon, closeIcon, turn, actions, call, source, empty, footer, send
   // The tab's session storage key the conversation is kept under, so a reload finds it; none by default, as the next visitor to use the tab would read it. A site with sign-in gives one per visitor.
   remember?: string | undefined
   // What the round buttons draw, by name, in place of the library's own, as `Chat` takes them, with the panel's `open`, `close`, `expand` and `collapse` besides.
-  icons?: (ChatProps['icons'] & Partial<Record<'open' | 'close' | 'expand' | 'collapse', NonNullable<ChatProps['icons']>['send']>>) | undefined
+  icons?: ChatLauncherIcons | undefined
   // Before 1.90 each icon was a block of its own; they work until 1.93 and win over `icons` (`deprecated-chat-icons`). These two draw the button and the panel's close button, in place of a chat bubble and a cross.
   icon?: Snippet
   closeIcon?: Snippet
@@ -57,6 +59,8 @@ const { icons, icon, closeIcon, turn, actions, call, source, empty, footer, send
   // On the button and panel's wrapper.
   class?: string | undefined
 }>()
+
+const iconOf = (name: keyof ChatLauncherIcons, fallback: string) => (icons?.[name] ?? fallback) as IconValue
 
 // The blocks the app gave, passed on to the chat. A function passed to the chat island makes this component render as an island when the app gives one, and only then.
 function forwarded() {
@@ -97,43 +101,43 @@ Panel(persist {...opening()} label={chat.label} openLabel={openLabel} closeLabel
     if icon
       | {icon}
     else
-      Icon(icon={icons?.open ?? 'chat'})
+      Icon(icon={iconOf('open', 'chat')})
   @closeIcon
     if closeIcon
       | {closeIcon}
     else
-      Icon(icon={icons?.close ?? 'close'})
+      Icon(icon={iconOf('close', 'close')})
   @newIcon
     if newIcon
       | {newIcon}
     else
-      Icon(icon={icons?.new ?? 'plus'})
+      Icon(icon={iconOf('new', 'plus')})
   @expandIcon
     if expandIcon
       | {expandIcon}
     else
-      Icon(icon={icons?.expand ?? 'expand'})
+      Icon(icon={iconOf('expand', 'expand')})
   @collapseIcon
     if collapseIcon
       | {collapseIcon}
     else
-      Icon(icon={icons?.collapse ?? 'collapse'})
+      Icon(icon={iconOf('collapse', 'collapse')})
   Chat(hydrate="visible" {...chat} {...forwarded()} icons={icons} remember={remember} links="here" conversationIn="browser")
     @sendIcon
       if sendIcon
         | {sendIcon}
       else
-        Icon(icon={icons?.send ?? 'send'})
+        Icon(icon={iconOf('send', 'send')})
     @stopIcon
       if stopIcon
         | {stopIcon}
       else
-        Icon(icon={icons?.stop ?? 'stop'})
+        Icon(icon={iconOf('stop', 'stop')})
     @attachIcon
       if attachIcon
         | {attachIcon}
       else
-        Icon(icon={icons?.attach ?? 'plus'})
+        Icon(icon={iconOf('attach', 'plus')})
   if note
     .kai-launcher-note
       | {note}
