@@ -5,6 +5,7 @@ import { focusInvalid } from './focus'
 import { formInput, NUMERIC_FORMATS } from './form'
 import { controlsOf } from './form-controls'
 import { markInvalid } from './invalid'
+import { ISLAND } from './markers'
 import { uid } from './uid'
 import { wording } from './words.client'
 
@@ -80,7 +81,7 @@ export function validateForm(form: HTMLFormElement, action: string, only?: strin
   for (const box of form.querySelectorAll<HTMLElement>('[data-field]')) {
     const name = box.getAttribute('data-field') ?? ''
 
-    if (name === '' || (only !== undefined && only !== name) || box.closest('form') !== form || box.closest('slot[data-component]'))
+    if (name === '' || (only !== undefined && only !== name) || box.closest('form') !== form || box.closest(ISLAND))
       continue
 
     paintMessage(form, box, name, messages[name])
