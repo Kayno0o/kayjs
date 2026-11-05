@@ -6,7 +6,7 @@ const SIZE_TEXT = /^(\d+(?:\.\d+)?)(b|kb|mb)$/i
 const UNIT_BYTES = { b: 1, kb: 1024, mb: 1024 * 1024 }
 
 // The bytes a `maxSize` stands for, 5 MB when none is given: bytes or `'2mb'`, parsed here as the browser cannot load kay's own parser.
-export function fileSizeLimit(size: ByteSize | undefined): number {
+export function fileSizeLimit(size: ByteSize | undefined, key = 'maxSize'): number {
   if (size === undefined)
     return DEFAULT_MAX_SIZE
 
@@ -15,7 +15,7 @@ export function fileSizeLimit(size: ByteSize | undefined): number {
   const bytes = typeof size === 'number' ? size : fromText
 
   if (!Number.isFinite(bytes) || bytes <= 0)
-    throw new Error(`kay: the maxSize of Chat is ${JSON.stringify(size)}; it takes a positive size, bytes or a string such as '2mb'`)
+    throw new Error(`kay: the ${key} of Chat is ${JSON.stringify(size)}; it takes a positive size, bytes or a string such as '2mb'`)
 
   return bytes
 }

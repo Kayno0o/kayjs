@@ -202,7 +202,7 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
 }>()
 
 // A size that is none fails as the chat renders, not at the first file attached.
-fileSizeLimit(maxSize ?? maxFileSize)
+fileSizeLimit(maxSize ?? maxFileSize, maxSize === undefined ? 'maxFileSize' : 'maxSize')
 
 // The props they read are getters, so each read stays a live read of the prop.
 const statuses = { get running() { return runningLabel }, get done() { return doneLabel }, get failed() { return failedLabel } }
