@@ -1028,6 +1028,12 @@ const RADIO_INVALID: "aria-invalid:accent-danger aria-invalid:outline aria-inval
 [./lib/field-look] SLIDER_STATE
 const SLIDER_STATE: "aria-invalid:[&::-webkit-slider-thumb]:bg-danger aria-invalid:[&::-moz-range-thumb]:bg-danger data-[size=sm]:h-3 data-[size=sm]:[&::-webkit-slider-thumb]:-mt-1 data-[size=sm]:[&::-webkit-slider-thumb]:size-3 data-[size=sm]:[&::-moz-range-thumb]:size-3 data-[size=lg]:h-5 data-[size=lg]:[&::-webkit-slider-thumb]:-mt-2 data-[size=lg]:[&::-webkit-slider-thumb]:size-5 data-[size=lg]:[&::-moz-range-thumb]:size-5"
 
+[./lib/file-size] fileSizeLimit
+function fileSizeLimit(size: ByteSize | undefined): number
+
+[./lib/file-size] fileSizeText
+function fileSizeText(bytes: number): string
+
 [./lib/form-reset] defaultKept
 function defaultKept<Value>(element: () => Element | undefined, current: () => Value, start: Value): () => Value
 

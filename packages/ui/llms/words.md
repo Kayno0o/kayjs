@@ -51,6 +51,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.descriptionList.*`: `empty` (`No details.`)
 - `ui.dialog.*`: `close` (`Close`)
 - `ui.dnd.*`: `handleItem` (`Reorder {item}`), `handle` (`Reorder`), `moved` (`Moved to {position} of {count}`)
+- `ui.fileDrop.*`: `choose` (`Choose files`), `drop` (`or drop them here`), `remove` (`Remove {file}`)
 - `ui.formDialog.*`: `cancel` (`Cancel`), `failure` (`Could not save.`), `saving` (`Saving…`)
 - `ui.iconPicker.*`: `clear` (`Clear icon selection`), `empty` (`No icons found.`), `error` (`The icons could not be loaded.`), `grid` (`Icons`), `more` (`Show more`), `placeholder` (`Search icons…`), `search` (`Search icons`), `searching` (`Searching…`)
 - `ui.imageCropper.*`: `crop` (`Crop area: arrows move it, Shift and the arrows resize it`), `cropText` (`{w} by {h} pixels at {x}, {y}`), `error` (`The image could not be loaded.`)

@@ -1,0 +1,11 @@
+---
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+
+// A zone keeping its files for a form, reporting what it left out and what it keeps.
+const { onReject, onChange, issue, plain = false } = props<{ onReject: (reason: string, names: string[]) => void, onChange: (names: string[]) => void, issue?: string | undefined, plain?: boolean }>()
+---
+form#form
+  if plain
+    FileDrop#drop(name="photo")
+  else
+    FileDrop#drop(name="photos" multiple list maxSize="1kb" maxFiles={3} issue={issue} onChange={files => onChange(files.map(file => file.name))} onReject={(files, reason) => onReject(reason, files.map(file => file.name))})

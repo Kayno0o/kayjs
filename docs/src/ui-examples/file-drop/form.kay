@@ -1,0 +1,18 @@
+---
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
+
+const rejected = signal('')
+---
+form(method="post" enctype="multipart/form-data")
+  FileDrop(
+    name="photos"
+    accept="image/*"
+    multiple
+    list
+    maxSize="2mb"
+    maxFiles={4}
+    onReject={(files, reason) => rejected = `${files.length} left out: ${reason}`}
+  )
+  if rejected()
+    p.text-danger {rejected()}
+  button(type="submit") Upload

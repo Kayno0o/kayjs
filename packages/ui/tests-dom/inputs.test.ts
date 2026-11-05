@@ -1,7 +1,9 @@
 import type { Mounted } from 'kay/test'
 import type { RangeValue } from '../src/range'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
+import { File as DomFile } from 'happy-dom'
 import { mountComponent, settle } from 'kay/test'
+import KeepingDrop from '../tests/fixture/src/components/file-drop-keep.kay'
 import Inputs from '../tests/fixture/src/components/inputs.kay'
 import { click } from './dom'
 
@@ -221,7 +223,7 @@ describe('FileDrop', () => {
     await settle()
 
     expect(seen.files).toEqual([['moon.png']])
-    expect(seen.rejected).toEqual([['notes.txt', 'logo.svg']])
+    expect(seen.rejected).toEqual([['notes.txt'], ['logo.svg']])
   })
 
   test('stays lit while the files move onto its own content, and goes dark once they leave it', async () => {
@@ -313,5 +315,85 @@ describe('Menu', () => {
     key(document.activeElement, 'Tab')
 
     expect(menu.matches(':popover-open')).toBe(false)
+  })
+})
+
+describe('FileDrop as a form control', () => {
+  const rejected: [string, string[]][] = []
+  const kept: string[][] = []
+
+  afterEach(() => {
+    rejected.length = 0
+    kept.length = 0
+  })
+
+  async function keeping(props: Record<string, unknown> = {}) {
+    mounted = await mountComponent(KeepingDrop, { onReject: (reason: string, names: string[]) => rejected.push([reason, names]), onChange: (names: string[]) => kept.push(names), ...props })
+
+    return mounted.root
+  }
+
+  const dropped = (zone: Element, ...picked: File[]) => zone.dispatchEvent(Object.assign(new Event('drop', { bubbles: true, cancelable: true }), { dataTransfer: { types: ['Files'], files: picked } }))
+  // happy-dom's own File, the only kind its DataTransfer takes.
+  const sized = (name: string, bytes: number, type = 'text/plain') => new DomFile(['x'.repeat(bytes)], name, { type }) as unknown as File
+
+  test('reports each reason apart: type, size and count', async () => {
+    const root = await keeping()
+    const zone = root.querySelector('#drop')!
+
+    dropped(zone, sized('a.txt', 10), sized('big.txt', 2000), sized('b.txt', 10), sized('c.txt', 10), sized('d.txt', 10))
+    await settle()
+
+    expect(rejected).toEqual([['size', ['big.txt']], ['count', ['d.txt']]])
+    expect(kept).toEqual([['a.txt', 'b.txt', 'c.txt']])
+  })
+
+  test('lists the kept files, adds to them, skips a repeat, and removes one', async () => {
+    const root = await keeping()
+    const zone = root.querySelector('#drop')!
+    const names = () => [...root.querySelectorAll('[data-part=fileName]')].map(item => item.textContent)
+
+    const first = sized('a.txt', 10)
+
+    dropped(zone, first)
+    dropped(zone, first, sized('b.txt', 10))
+    await settle()
+
+    expect(names()).toEqual(['a.txt', 'b.txt'])
+
+    click(root.querySelector('[data-part=file] button'))
+    await settle()
+
+    expect(names()).toEqual(['b.txt'])
+    expect(kept.at(-1)).toEqual(['b.txt'])
+  })
+
+  test('puts the kept files on the named input, so the form posts them', async () => {
+    const root = await keeping()
+    const input = root.querySelector<HTMLInputElement>('input[type=file]')!
+
+    expect(input.name).toBe('photos')
+
+    dropped(root.querySelector('#drop')!, sized('a.txt', 10), sized('b.txt', 10))
+    await settle()
+
+    expect([...input.files!].map(file => file.name)).toEqual(['a.txt', 'b.txt'])
+  })
+
+  test('shows the page issue under the zone and marks it invalid', async () => {
+    const root = await keeping({ issue: 'Too heavy' })
+
+    expect(root.querySelector('[data-part=issues]')?.textContent).toBe('Too heavy')
+    expect(root.querySelector('#drop')?.getAttribute('aria-invalid')).toBe('true')
+  })
+
+  test('shows a button opening the picker when it has no content', async () => {
+    const root = await keeping({ plain: true })
+    let opened = 0
+
+    root.querySelector('input[type=file]')!.addEventListener('click', () => opened++)
+    click(root.querySelector('#drop button'))
+
+    expect(opened).toBe(1)
   })
 })

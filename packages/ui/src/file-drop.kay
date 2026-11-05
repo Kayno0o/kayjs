@@ -1,38 +1,80 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { listen, recipe, signal } from 'kay'
+import type { ByteSize } from 'kay/library'
+import { listen, recipe, signal, uid } from 'kay'
+import { wording } from 'kay/words'
 import { acceptsFile } from './accept'
-import { GROUP_INVALID } from './field-look'
+import { FIELD_MESSAGE, GROUP_INVALID } from './field-look'
+import { fileSizeLimit, fileSizeText } from './file-size'
+import { onFormReset } from './form-reset'
+import { fieldIssues, fieldNamed } from './forms'
+import IconButton from './icon-button.kay'
 
 // 'kui-file-drop' stays as the component's name for an app's CSS and the skins; the border colour reads --_control-line, which a skin sets.
 const look = recipe({
   parts: {
     root: `kui-file-drop flex flex-col items-center justify-center gap-3 border-dashed border-[length:var(--border-width)] p-6 text-center transition-colors [border-color:var(--_control-line,var(--color-border))] data-compact:flex-row data-compact:justify-start data-compact:p-3 data-compact:text-left aria-disabled:opacity-50 data-dragging:border-accent data-dragging:bg-accent/10 ${GROUP_INVALID}`,
     input: 'hidden',
+    field: 'flex flex-col gap-2',
+    choose: 'cursor-pointer underline underline-offset-2 hover:no-underline',
+    drop: '',
+    files: 'm-0 flex list-none flex-col gap-1 p-0',
+    file: 'flex items-center gap-2 text-sm',
+    fileName: 'min-w-0 flex-1 truncate',
+    fileSize: 'text-muted',
+    issues: FIELD_MESSAGE.issues,
+    issue: FIELD_MESSAGE.issue,
   },
 })
 
-const { accept, multiple = false, paste = false, disabled = false, invalid, size = 'md', onFiles, onReject, content, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+type Reason = 'type' | 'size' | 'count'
+
+const { accept, multiple = false, paste = false, disabled = false, invalid, name, issue, size = 'md', maxSize, maxFiles, list = false, onFiles, onChange, onReject, content, chooseLabel = wording('ui.fileDrop.choose', 'Choose files'), dropLabel = wording('ui.fileDrop.drop', 'or drop them here'), removeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // The files the zone takes, as an `accept` attribute: the picker filters on it, and dropped or pasted files that miss it are ignored.
   accept?: string | undefined
   multiple?: boolean | undefined
   // Also takes files pasted anywhere on the page, unless the paste lands in a text field.
   paste?: boolean | undefined
   disabled?: boolean | undefined
-  // Marks the zone as refused, its keyline in the danger colour, with `aria-invalid`.
+  // Marks the zone as refused, its keyline in the danger colour, with `aria-invalid`. A message shown for the zone marks it on its own.
   invalid?: boolean | undefined
+  // The field the files post as: the zone keeps what is picked, dropped or pasted on its input, so a form posts them as a plain file field would, to an `s.File()` or `s.Files()` of an action. Inside a FormDialog, the message its call was refused with for that field shows under the zone, as a FormField shows it.
+  name?: string | undefined
+  // A message of the page's own, such as `add.error('photo')` after a plain form post, shown under the zone.
+  issue?: string | undefined
   // `sm` is a slim row, its content from the left, to sit inline beside other fields rather than as a large target of its own.
   size?: 'sm' | 'md' | undefined
-  // The files picked, dropped or pasted: one unless `multiple`, and never an empty list.
-  onFiles: (files: File[]) => unknown
-  // The files dropped or picked that were left out, those missing `accept` and, without `multiple`, the matching ones beyond the first, so the page can say why; never called for pasted files, which may be anything on the clipboard.
-  onReject?: ((files: File[]) => unknown) | undefined
-  // What the zone shows: `@content(zone)`, where `zone.open()` opens the picker and `zone.dragging()` reads whether files hover the zone.
-  content: Snippet<[zone: { open: () => void, dragging: () => boolean }]>
+  // The largest file the zone takes: bytes or a string such as `'2mb'`. A larger file goes to `onReject` with the reason `size`.
+  maxSize?: ByteSize | undefined
+  // The most files the zone takes, counting the ones it already keeps; one without `multiple`. The files beyond go to `onReject` with the reason `count`.
+  maxFiles?: number | undefined
+  // Lists the files kept under the zone, each with a button removing it. A zone with a `name` or a `list` keeps its files: `multiple` adds to them, where a single zone replaces them.
+  list?: boolean | undefined
+  // The files picked, dropped or pasted: one unless `multiple`, and never an empty list. Optional, as a form posting the files by `name` needs no callback.
+  onFiles?: ((files: File[]) => unknown) | undefined
+  // The files the zone keeps, after a pick, a removal or a form reset; only a zone that keeps its files calls it.
+  onChange?: ((files: File[]) => unknown) | undefined
+  // The files dropped or picked that were left out, with why: `type` for those missing `accept`, `size` for those past `maxSize`, `count` for the matching ones beyond `maxFiles` or, without `multiple`, the first. One call per reason; never called for pasted files, which may be anything on the clipboard.
+  onReject?: ((files: File[], reason: Reason) => unknown) | undefined
+  // What the zone shows: `@content(zone)`, where `zone.open()` opens the picker and `zone.dragging()` reads whether files hover the zone. Left out, the zone shows a button opening the picker beside a line about dropping.
+  content?: Snippet<[zone: { open: () => void, dragging: () => boolean }]> | undefined
+  chooseLabel?: string | undefined
+  dropLabel?: string | undefined
+  // The label of a kept file's remove button, from the file: `removeLabel={file => `Drop ${file.name}`}`.
+  removeLabel?: ((file: File) => string) | undefined
 }>()
 
 const dragging = signal(false)
+const chosen = signal<File[]>([])
 let input: HTMLInputElement | undefined
+
+// A FormField naming the same field shows its messages itself.
+const framed = fieldNamed.use()
+const messages = fieldIssues(() => framed?.() === name ? undefined : name, () => issue)
+const issuesId = uid()
+const keeping = () => name !== undefined || list
+const reporting = () => name !== undefined || issue !== undefined
+const marked = () => invalid === true || messages().length > 0
 
 function open() {
   input?.click()
@@ -41,23 +83,63 @@ function open() {
 // Built in the script, where `dragging` is still the signal: the template would hand the slot its value.
 const zone = { open, dragging }
 
-function take(files: Iterable<File>, reporting = true): boolean {
-  const all = [...files]
-  const matching = all.filter(file => acceptsFile(accept, file))
-  const taken = multiple ? matching : matching.slice(0, 1)
+// The kept files go back on the input, which is what a form posts.
+function sync() {
+  if (!input || typeof DataTransfer === 'undefined')
+    return
 
+  const transfer = new DataTransfer()
+
+  for (const file of chosen())
+    transfer.items.add(file)
+
+  input.files = transfer.files
+}
+
+function keep(next: File[]) {
+  chosen = next
+  sync()
+  onChange?.(next)
+}
+
+function sameFile(a: File, b: File): boolean {
+  return a.name === b.name && a.size === b.size && a.lastModified === b.lastModified
+}
+
+function take(files: Iterable<File>, reporting = true): boolean {
   if (disabled)
     return false
 
-  if (reporting && taken.length < all.length)
-    onReject?.(all.filter(file => !taken.includes(file)))
+  const limit = fileSizeLimit(maxSize)
+  const all = [...files]
+  const wrongType = all.filter(file => !acceptsFile(accept, file))
+  const typed = all.filter(file => !wrongType.includes(file))
+  const tooBig = typed.filter(file => file.size > limit)
+  // A file already kept is not added twice.
+  const fitting = typed.filter(file => file.size <= limit && !(multiple && keeping() && chosen().some(kept => sameFile(kept, file))))
+  const room = Math.max(0, (multiple ? maxFiles ?? Number.POSITIVE_INFINITY : 1) - (multiple && keeping() ? chosen().length : 0))
+  const taken = fitting.slice(0, room)
+
+  if (reporting) {
+    for (const [group, reason] of [[wrongType, 'type'], [tooBig, 'size'], [fitting.slice(room), 'count']] as [File[], Reason][]) {
+      if (group.length > 0)
+        onReject?.(group, reason)
+    }
+  }
 
   if (taken.length === 0)
     return false
 
-  onFiles(taken)
+  if (keeping())
+    keep(multiple ? [...chosen(), ...taken] : taken)
+
+  onFiles?.(taken)
 
   return true
+}
+
+function remove(file: File) {
+  keep(chosen().filter(kept => kept !== file))
 }
 
 function carriesFiles(event: DragEvent): boolean {
@@ -94,8 +176,12 @@ function picked(event: Event) {
   const picker = event.currentTarget as HTMLInputElement
 
   take(picker.files ?? [])
-  // Cleared, so picking the same file again still reports it.
-  picker.value = ''
+
+  // The picker holds what the zone keeps, else it is cleared so picking the same file again still reports it.
+  if (keeping())
+    sync()
+  else
+    picker.value = ''
 }
 
 function pasted(event: ClipboardEvent) {
@@ -109,7 +195,34 @@ function pasted(event: ClipboardEvent) {
 }
 
 listen(() => paste ? window : undefined, 'paste', pasted)
+
+// The browser empties the input on a reset, and the kept files follow.
+onFormReset(() => input, () => {
+  if (keeping() && chosen().length > 0)
+    keep([])
+})
 ---
-div(part="root" {...rest} role="group" data-compact={size === 'sm' || undefined} data-dragging={dragging() || undefined} aria-disabled={disabled ? 'true' : undefined} aria-invalid={invalid ? 'true' : rest['aria-invalid']} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
-  input(part="input" ref={element => input = element} type="file" tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})
-  | {content(zone)}
+snippet zoneView()
+  div(part="root" {...rest} role="group" data-compact={size === 'sm' || undefined} data-dragging={dragging() || undefined} aria-disabled={disabled ? 'true' : undefined} aria-invalid={marked() ? 'true' : rest['aria-invalid']} aria-describedby={[rest['aria-describedby'], messages().length > 0 ? issuesId : undefined].filter(id => id).join(' ') || undefined} onDragOver={dragOver} onDragLeave={dragLeave} onDrop={drop})
+    input(part="input" ref={element => input = element} type="file" name={name} tabindex="-1" aria-hidden="true" accept={accept} multiple={multiple} disabled={disabled} onChange={picked})
+    if content
+      | {content(zone)}
+    else
+      button(part="choose" type="button" disabled={disabled} onClick={open}) {chooseLabel}
+      span(part="drop") {dropLabel}
+if list || reporting()
+  div(part="field")
+    {zoneView()}
+    if list && chosen().length > 0
+      ul(part="files")
+        for file of chosen() key={`${file.name}\n${file.size}\n${file.lastModified}`}
+          li(part="file")
+            span(part="fileName") {file.name}
+            span(part="fileSize") {fileSizeText(file.size)}
+            IconButton(icon="close" size="xs" variant="ghost" label={removeLabel ? removeLabel(file) : wording('ui.fileDrop.remove', 'Remove {file}', { file: file.name })} disabled={disabled} onClick={() => remove(file)})
+    if reporting()
+      span(part="issues" id={messages().length > 0 ? issuesId : undefined} aria-live="polite" data-field={name})
+        for message, index of messages() key={index}
+          span(part="issue") {message}
+else
+  {zoneView()}

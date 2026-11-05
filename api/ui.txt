@@ -1376,14 +1376,35 @@ function ui(): KayExtension<AnyElysia>
 [./file-drop.kay] default
 component default
   accept?: string | undefined
-  class?: string | undefined | { root?: string | undefined; input?: string | undefined; }
-  content: (zone: { open: () => void; dragging: () => boolean; }) => Element
+  chooseLabel?: string | undefined
+  class?: string | undefined | {
+  root?: string | undefined;
+  input?: string | undefined;
+  choose?: string | undefined;
+  drop?: string | undefined;
+  field?: string | undefined;
+  files?: string | undefined;
+  file?: string | undefined;
+  fileName?: string | undefined;
+  fileSize?: string | undefined;
+  issues?: string | undefined;
+  issue?: string | undefined;
+}
+  content?: ((zone: { open: () => void; dragging: () => boolean; }) => Element) | undefined
   disabled?: boolean | undefined
+  dropLabel?: string | undefined
   invalid?: boolean | undefined
+  issue?: string | undefined
+  list?: boolean | undefined
+  maxFiles?: number | undefined
+  maxSize?: ByteSize | undefined
   multiple?: boolean | undefined
-  onFiles: (files: File[]) => unknown
-  onReject?: ((files: File[]) => unknown) | undefined
+  name?: string | undefined
+  onChange?: ((files: File[]) => unknown) | undefined
+  onFiles?: ((files: File[]) => unknown) | undefined
+  onReject?: ((files: File[], reason: Reason) => unknown) | undefined
   paste?: boolean | undefined
+  removeLabel?: ((file: File) => string) | undefined
   size?: "md" | "sm" | undefined
 
 [./form-dialog.kay] default
