@@ -21,6 +21,7 @@ const DEFAULT_SHOT_MS = 30_000
 let shotMs = DEFAULT_SHOT_MS
 const SETTLE_MS = 15_000
 const POLL_MS = 50
+const STABLE_MS = 100
 // The page runs no script of its own and timers and frames do not run in it, so this only waits on the fonts and images, and sets a flag the card's shot polls: a lazy image would otherwise never start loading outside the first frame, and one decoded off the main thread may be loaded and still undrawn.
 const PAINT = `(() => {
   window.__kayPainted = false
@@ -213,7 +214,21 @@ async function draw(clientDir: string, quality: number, render: (origin: string)
           await Bun.sleep(POLL_MS)
         }
 
-        const { data } = await page.view.cdp<{ data: string }>('Page.captureScreenshot', { format: 'jpeg', quality, clip: { x: 0, y: 0, width: CARD.width, height: CARD.height, scale: 1 } })
+        const capture = async () => (await page.view.cdp<{ data: string }>('Page.captureScreenshot', { format: 'jpeg', quality, clip: { x: 0, y: 0, width: CARD.width, height: CARD.height, scale: 1 } })).data
+        let data = await capture()
+
+        // A decoded image may not be rasterized yet under load, so the shot is taken again until two in a row agree.
+        for (const until = Date.now() + SETTLE_MS; Date.now() < until;) {
+          await Bun.sleep(STABLE_MS)
+
+          const next = await capture()
+          const stable = next === data
+
+          data = next
+
+          if (stable)
+            break
+        }
 
         return Uint8Array.fromBase64(data)
       }
