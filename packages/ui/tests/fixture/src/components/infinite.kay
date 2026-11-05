@@ -14,8 +14,10 @@ const { first = [{ id: 1 }, { id: 2 }, { id: 3 }], size, onLoad, loadingLabel, f
   expose?: (list: ReturnType<typeof infiniteList<{ id: number }>>) => void
 }>()
 
+// kay-allow once-read-prop
 const feed = infiniteList(first, { pageSize: size, key: row => row.id, load: ({ offset }) => onLoad(offset) })
 
+// kay-allow once-read-prop
 expose?.(feed)
 ---
 for row of feed.rows() key={row.id}

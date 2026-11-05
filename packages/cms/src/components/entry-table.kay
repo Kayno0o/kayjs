@@ -33,7 +33,9 @@ const { prefix, collection, rows, searched, sort, denied = {} } = props<{ denied
 shipWords()
 
 // The columns and row actions the collection's layout names, all actions by default.
+// kay-allow once-read-prop
 const shown = listColumns(fieldsOf(collection.schema), collection.layout?.list)
+// kay-allow once-read-prop
 const actions = rowActions(collection.layout?.list)
 
 // What names the row whose delete confirmation was opened last, read then so it is never older than the click.
@@ -62,8 +64,11 @@ const sortKey = (kind: string, text = ''): string | number => kind === 'number' 
 const columns: Column<EntryRow>[] = [
   { key: 'title', header: wording('cms.table.title', 'Title'), sortValue: true, defaultDirection: 'asc', cell: true },
   ...shown.map(field => ({ key: cellKey(field.key), header: field.label, sortValue: (row: EntryRow) => sortKey(field.kind, row.cells?.[field.key]), cell: true }) satisfies Column<EntryRow>),
+  // kay-allow once-read-prop
   ...(collection.localized ? [{ key: 'locale', header: wording('cms.table.locale', 'Locale'), sortValue: true, cell: true } satisfies Column<EntryRow>] : []),
+  // kay-allow once-read-prop
   ...(collection.draftField === undefined && collection.publishField === undefined && collection.unpublishField === undefined ? [] : [{ key: 'draft', header: wording('cms.table.status', 'Status'), sortValue: (row: EntryRow) => ['draft', 'scheduled', 'published'].indexOf(statusOf(row)), cell: true } satisfies Column<EntryRow>]),
+  // kay-allow once-read-prop
   ...(collection.kind === 'folder' ? [{ key: 'modified', header: wording('cms.table.modified', 'Last modified'), sortValue: true, defaultDirection: 'desc', cell: true } satisfies Column<EntryRow>, { key: 'author', header: wording('cms.table.author', 'Author'), sortValue: true, cell: true } satisfies Column<EntryRow>] : []),
   ...(actions.size === 0 ? [] : [{ key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true } satisfies Column<EntryRow>]),
 ]

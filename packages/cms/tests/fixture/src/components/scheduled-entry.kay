@@ -7,6 +7,7 @@ import { createEntryForm } from '@kaynooo/kayjs-cms/form'
 // The date field and the badge of an entry screen, mounted with `mountComponent`.
 const { collection, entry } = props<{ collection: ScreenCollection, entry: StoredEntry }>()
 
+// kay-allow once-read-prop
 const form = createEntryForm({ prefix: '/admin', collection, entry })
 ---
 EntryActions(form={form})

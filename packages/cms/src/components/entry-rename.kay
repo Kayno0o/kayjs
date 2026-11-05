@@ -12,6 +12,7 @@ import RenameDialog from './rename-dialog.kay'
 const { form, denied = {} } = props<{ form: EntryForm, denied?: Denials }>()
 
 const open = signal(false)
+// kay-allow once-read-prop
 const entry = form.stored
 const dirtyReason = () => form.dirty() ? wording('cms.entry.renameDirty', 'Save or reset your edits first') : undefined
 

@@ -15,6 +15,7 @@ const drafts = createDrafts({ show: async () => ({}) })
 drafts.open({ ...entry, data: {}, body: '' })
 
 const can = resource(editorApi, '/can')
+// kay-allow once-read-prop
 const form = Object.defineProperty(formScope(drafts, entry, collection), 'denied', { get: () => can.value()?.denied }) as unknown as Input['form']
 ---
 EntryBody(form={form})

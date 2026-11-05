@@ -51,9 +51,11 @@ const { label = wording('ui.bell.label', 'Notifications'), placement = 'bottom-e
 // The routes answer a path of the site or an http(s) URL only; checked again here, as the link is drawn.
 const LINKED = /^(?:\/(?![/\\])|https?:\/\/)/
 const WEB = /^https?:\/\//
+// kay-allow once-read-prop
 const custom = source !== undefined
 const inbox = custom ? undefined : resource(inboxApi, '/')
 // A function source is asked once the Bell is in the page, again when a signal it reads changes and after a read.
+// kay-allow once-read-prop
 const load = typeof source === 'function' ? source : undefined
 const asked = load ? resource(async () => await load()) : undefined
 

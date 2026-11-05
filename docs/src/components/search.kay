@@ -9,8 +9,11 @@ const { groups, structure, components } = props<Pick<Navigation, 'groups' | 'str
 
 // Every page by its title, so an empty query lists the docs as the sidebar does, and the site search finds the sections inside them.
 const entries: PaletteEntry[] = [
+  // kay-allow once-read-prop
   ...groups.flatMap(group => group.links.map(link => ({ label: link.title, group: group.title, href: link.href }))),
+  // kay-allow once-read-prop
   ...structure.map(link => ({ label: link.title, group: 'Structure', href: link.href })),
+  // kay-allow once-read-prop
   ...components.map(link => ({ label: link.title, group: 'UI components', href: link.href })),
 ]
 

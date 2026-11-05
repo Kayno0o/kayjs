@@ -37,6 +37,7 @@ type AsNumber = Field & {
 const { size = 'md', invalid, value, onInput, onChange, onBlur, type = 'text', ...rest } = props<AsText | AsNumber>()
 
 // A field with no callback is plain: a refused post of its form, which the server renders it for, gives its value back in place of its own, a password excepted.
+// kay-allow once-read-prop
 const sent = onInput || onChange || type === 'password' ? undefined : postedValue(rest.name, value)
 
 let box: HTMLInputElement | undefined

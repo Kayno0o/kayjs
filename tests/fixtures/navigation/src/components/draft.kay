@@ -11,6 +11,7 @@ async function ask(to: URL): Promise<boolean> {
   return confirm(`Leave for ${to.pathname}?`)
 }
 
+// kay-allow once-read-prop
 guardLeave(() => text() !== '', asks ? { confirm: ask } : {})
 ---
 input.draft(bind:value={text})

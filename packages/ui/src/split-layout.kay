@@ -35,6 +35,7 @@ const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOp
 }>()
 
 // 0 stands for no width kept yet.
+// kay-allow once-read-prop
 const kept = listWidthKey ? persisted<number>(listWidthKey, 0) : undefined
 const listWidth = signal(clampWidth(untrack(() => kept?.()) || WIDTH.default))
 const narrow = mediaQuery(NARROW)

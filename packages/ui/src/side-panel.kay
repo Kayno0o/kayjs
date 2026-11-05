@@ -76,6 +76,7 @@ const DOCKS = { right: { min: 280, page: 352, step: 24, fallback: 384 }, bottom:
 const LAUNCHER_GAP = 16
 
 // Read once: the open attribute is what the server renders, and the client opens and closes the panel by its methods.
+// kay-allow once-read-prop
 const serverOpen = renderedOpen(open, modal, closeHref)
 // Set by any typing inside, and cleared however the panel closes or opens.
 const edited = signal(false)
@@ -90,6 +91,7 @@ const room = signal({ width: 0, height: 0, right: 0, bottom: 0 })
 const reached = signal<number>()
 const launching = signal<HTMLElement>()
 // 0 stands for no size kept yet.
+// kay-allow once-read-prop
 const kept = sizeKey === undefined ? undefined : persisted<number>(sizeKey, 0)
 let body: HTMLElement | undefined
 const dragging = signal(false)

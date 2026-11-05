@@ -198,6 +198,7 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   footer?: Snippet | undefined
 }>()
 
+// kay-allow once-read-prop
 const statuses = { running: runningLabel, done: doneLabel, failed: failedLabel }
 // The props they read are getters, so each read stays a live read of the prop.
 const attachments = createAttachments({ accepts: file => acceptsFile(accept, file), get maxFiles() { return maxFiles }, get maxFileSize() { return maxFileSize }, get tooBigLabel() { return attachTooBigLabel }, get fullLabel() { return attachFullLabel }, get refusedLabel() { return attachRefusedLabel } })
@@ -206,7 +207,9 @@ let log: HTMLElement | undefined
 // Keeps the newest text in view unless the visitor scrolled up to read, a finished turn formatted late and a panel reopened included.
 const following = followLog(() => log, { threshold: PINNED_PX })
 // The conversation held on the server that the page shows, named by its address, or by this browser for a chat on every page.
+// kay-allow once-read-prop
 const inBrowser = conversationIn === 'browser'
+// kay-allow once-read-prop
 const shownParam = !keepOnServer && !conversations ? undefined : inBrowser ? persisted<string | undefined>(`kai-chat-conversation:${action.url}`, undefined, { storage: 'local' }) : queryParam<string | undefined>('conversation')
 const session = createChatSession({
   get action() { return action },
@@ -219,8 +222,10 @@ const session = createChatSession({
   say: call => `${call.name}: ${call.approval === undefined ? statuses[call.status] : approvalLabel}`,
   focus: () => field?.focus(),
   follow: following.toBottom,
+  // kay-allow once-read-prop
   voice: transcribe === undefined ? undefined : { get transcribe() { return transcribe! }, get unheardLabel() { return unheardLabel }, get failedLabel() { return transcribeFailedLabel } },
   conversation: shownParam,
+  // kay-allow once-read-prop
   listed: conversations,
   get conflictMessage() { return conflictLabel },
   get loadFailedMessage() { return loadFailedLabel },
@@ -365,6 +370,7 @@ function sendFrom(event: Event) {
 }
 
 // The microphone of `transcribe`, which is only created for a chat taking one: the recorder's own chunk loads only then.
+// kay-allow once-read-prop
 const voice = transcribe === undefined ? undefined : recorder({ onAudio: heard, words: recordWords(), failure: transcribeFailedLabel, sending: transcribingLabel, maxMs: durationMs(RECORD_LIMIT) })
 const voiceBusy = () => voice?.state() === 'asking' || voice?.state() === 'sending'
 

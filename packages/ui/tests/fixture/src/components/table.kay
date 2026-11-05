@@ -12,6 +12,7 @@ const { rows, serverSort = false, sortable, sort, numericMoons = false, onSort }
 
 const columns: Column<Planet>[] = [
   { key: 'name', header: 'Name', sortValue: planet => planet.name, defaultDirection: 'asc', cell: true },
+  // kay-allow once-read-prop
   numericMoons ? { key: 'moons', header: 'Moons', numeric: true } : { key: 'moons', header: 'Moons', sortValue: true, align: 'end' },
   { key: 'id', header: 'Id' },
 ]

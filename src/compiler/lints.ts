@@ -365,6 +365,13 @@ export const LINTS = {
     wrong: 'await comments\n  p Loading comments\nthen list\n  p {list.length} comments',
     right: 'await comments\n  p Loading comments\nthen list\n  p {list.length} comments\ncatch\n  p Comments are unavailable',
   },
+  'once-read-prop': {
+    level: 'warn',
+    group: 'code',
+    summary: 'A destructured prop read at the top of the script of a component that runs in the browser, outside a function, `memo` or `effect`: that code runs once, when the component is created, so the value keeps the prop\'s first value after the parent changes it, where the template and a function read it live. The first value of a `signal(...)`, `persisted(...)` or `posted...(...)` call, `id ?? uid()`, a callback prop (`onChange`) and a prop named `initial*` or `default*` are meant to be read once and left alone; for another, read the prop where it is used or in a `memo`, or allow it with `// kay-allow once-read-prop`.',
+    wrong: '---\nimport { signal } from \'kay\'\n\nconst { items } = props<{ items: string[] }>()\nconst last = items.length - 1\nconst open = signal(false)\n---\nbutton(onClick={() => open(!open())}) {last}',
+    right: '---\nimport { memo, signal } from \'kay\'\n\nconst { items } = props<{ items: string[] }>()\nconst last = memo(() => items.length - 1)\nconst open = signal(false)\n---\nbutton(onClick={() => open(!open())}) {last()}',
+  },
   'literal-tag': {
     level: 'warn',
     group: 'code',

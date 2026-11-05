@@ -10,6 +10,7 @@ import { createEntryForm } from '@kaynooo/kayjs-cms/form'
 // The app's own entry screen for the shop: the photo above the name, the price and the stock side by side, no sku.
 const { prefix, collection, entry } = props<{ prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined }>()
 
+// kay-allow once-read-prop
 const form = createEntryForm({ prefix, collection, entry })
 ---
 form.shop-entry(novalidate onSubmit={event => { event.preventDefault(); void form.save() }})

@@ -12,7 +12,7 @@ import { basename, relative } from 'node:path'
 import { actionOf, drawIcons, elementsIn, INTERACTIVE_ATTRIBUTE, SERVER_IN_ISLAND, serverIslandOf, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandCause, islandMessages, lineOf, promotionSite } from './codegen'
-import { asyncReplies, cssImportsWithoutText, missingCaptchas, openRedirects, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
+import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, openRedirects, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
 import { cwd, iconSetsOf, scopeStorage } from './host'
 import { causeSummary, describeCause } from './island-cause'
 import { islandMarker, markerMismatch } from './island-marker'
@@ -237,7 +237,7 @@ export function promotedChecks(original: string, root?: string, imported?: Impor
   const announced = site === undefined || marker !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${describeCause(site)}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `// kay-island` in it to say so, or pass the island what can be serialized', checkOnly: true }]
   const contradicted = marker?.kind === 'static' && site !== undefined ? [{ start: marker.start, end: marker.end, code: 'island-marker', message: `This component renders as an island, and \`// kay-static\` says it does not: ${describeCause(site)}`, note: 'it passes an island what only an island can send', help: 'delete the marker, or pass the island what can be serialized', checkOnly: true }] : []
 
-  return [...scriptFences(script).flatMap(fence => serverOnlyImports(fence)), ...announced, ...contradicted]
+  return [...scriptFences(script).flatMap(fence => [...serverOnlyImports(fence), ...fence === script.fence ? onceReadProps(fence, script.props) : []]), ...announced, ...contradicted]
 }
 
 const FAILED_FUNCTION = /^function KayFailed\(/m
@@ -316,7 +316,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const browserScript = (island !== undefined || options.insideIsland === true) && !routeFile ? scriptFences(script) : []
     const unusedLints = broken ? [] : [...unreadNames(source, file.template, script, server, found.findings), ...constantSignals(source, [file.script, file.module], found.findings)]
 
-    diagnostics.push(...unboundedFields(server), ...fenceLints, ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...unusedLints, ...templateLints(file))
+    diagnostics.push(...unboundedFields(server), ...fenceLints, ...browserScript.flatMap(fence => [...serverOnlyImports(fence), ...fence === script.fence ? onceReadProps(fence, script.props) : []]), ...unusedLints, ...templateLints(file))
   }
 
   const marker = checked ? islandMarker(source) : undefined

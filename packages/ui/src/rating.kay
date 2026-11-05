@@ -42,6 +42,7 @@ const { value, max = 5, label, onChange, name, invalid, icon = 'star', allowClea
 // One place per star; a value that is no number fills none.
 const places = () => Array.from({ length: Math.max(Math.floor(max), 0) }, (_, place) => place)
 const filled = () => max > 0 && Number.isFinite(value) ? Math.min(Math.max(value / max, 0), 1) * 100 : 0
+// kay-allow once-read-prop
 const picker = onChange !== undefined || name !== undefined
 
 // A picker with no callback is plain: a refused post of its form, which the server renders it for, gives its stars back in place of its own.

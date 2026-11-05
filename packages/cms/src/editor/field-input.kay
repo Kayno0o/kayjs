@@ -47,10 +47,12 @@ const development = process.env.NODE_ENV === 'development'
 
 // What a box with limits has been left once: its limits are checked from then on, as it is typed, not while the editor is still on the first letters.
 // An image dropped or pasted into a Markdown box is an upload the page must not be left over.
+// kay-allow once-read-prop
 if (field.kind === 'markdown')
   guardLeave(uploading)
 
 // Whether the role may upload an image dropped or pasted into a Markdown box.
+// kay-allow once-read-prop
 const uploadRefused = field.kind === 'markdown' ? uploadRefusal() : () => undefined
 const markdown = markdownOptions.use()
 
@@ -132,6 +134,7 @@ function set(next: unknown, typing = false): void {
 }
 
 // What an emptied control stores: nothing, or `null` for a field the schema lists as required but allows to be null, which a missing key would break.
+// kay-allow once-read-prop
 const cleared = field.nullable === true ? null : undefined
 
 // Emptying an optional text unsets it, as emptying a number does, instead of storing an empty string.
@@ -147,6 +150,7 @@ function typedLines(next: string): void {
 }
 
 // A field waiting for a sibling shows once that holds a value.
+// kay-allow once-read-prop
 const parent = path.includes('.') ? path.slice(0, path.lastIndexOf('.')) : ''
 const filled = (found: unknown) => found !== undefined && found !== null && found !== '' && found !== false && !(Array.isArray(found) && found.length === 0)
 // A field the schema refused, or one of its children, is shown whatever its sibling holds, and stays so while it is edited: a save cannot be fixed through a field that stays hidden, and an edit drops the issue that surfaced it.
@@ -196,6 +200,7 @@ function digits(event: KeyboardEvent): void {
     event.preventDefault()
 }
 
+// kay-allow once-read-prop
 const list = field.kind === 'list' ? field : undefined
 const count = () => items().length
 // An upload into a list item holds the list still, as it does the page's bars, so it lands in its item.

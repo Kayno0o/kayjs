@@ -45,6 +45,7 @@ const { size = 'md', invalid, value, options, onChange, param, paramDefault, nam
 }>()
 
 // A select with no callback is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
+// kay-allow once-read-prop
 const sent = onChange || param !== undefined ? undefined : postedValue(name, value)
 const wanted = () => String(sent ?? value)
 

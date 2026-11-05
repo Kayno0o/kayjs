@@ -158,6 +158,7 @@ function pick(next: string) {
 const ref = rest.ref
 
 // What a reset goes back to: the icon it started with, or the one last saved by a SaveForm.
+// kay-allow once-read-prop
 const initial = defaultKept(() => searchBox, picked, value)
 
 // The hidden input is no default of its own to reset to, so a reset sends the picker back to `initial`, and empties the search the browser emptied.

@@ -34,6 +34,7 @@ const { size = 'md', invalid, value = [null, null], min, max, step, label, fromL
 
 let low: HTMLInputElement | undefined
 let high: HTMLInputElement | undefined
+// kay-allow once-read-prop
 let last: RangeValue = value
 
 effect(() => {

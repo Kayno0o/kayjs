@@ -15,6 +15,7 @@ const { form } = props<{ form: EntryForm }>()
 const issueOf = (key: 'slug' | 'locale') => form.drafts.issues(form.entry, '').find(issue => issue.key === key)?.message
 
 // A folder entry's slug can be written from the title, a text field the collection has.
+// kay-allow once-read-prop
 const writable = form.collection.kind === 'folder' && fieldsOf(form.collection.schema).some(field => field.kind === 'text')
 
 // What the slug typed says of the folders it names, else the standing hint.

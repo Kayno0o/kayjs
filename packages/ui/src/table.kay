@@ -160,6 +160,7 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   openRowLabel?: ((row: Row) => string) | undefined
 } & ({ rows: RowsSource<Row>, list?: undefined } | { rows?: undefined, list: InfiniteList<Row> })>()
 
+// kay-allow once-read-prop
 if (expandable && virtual)
   throw new Error('kayjs-ui: a Table cannot be both expandable and virtual, a detail row breaks the single row height a virtual table measures by')
 
@@ -167,15 +168,20 @@ const tableId = uid()
 const source = asyncRows<Row>(() => passed, { onLoad: loaded => onLoad?.(loaded), onError: error => onError?.(error) })
 const rows = () => list ? list.rows() : source.rows()
 const columns = memo(() => given.map(column => resolvedColumn(column, sortable)))
+// kay-allow once-read-prop
 const keptKey = sortParam === undefined ? undefined : persisted(sortParam, '', { storage: 'query' })
+// kay-allow once-read-prop
 const directionParam = sortParam === undefined ? undefined : sortParam === 'sort' ? 'direction' : `${sortParam}Direction`
 const keptDirection = directionParam === undefined ? undefined : persisted(directionParam, '', { storage: 'query' })
 const restored = restoredSort(columns(), keptKey?.(), keptDirection?.())
 const current = signal(restored ?? sort)
 let following = restored === undefined
+// kay-allow once-read-prop
 const typed = filterParam === undefined ? signal('') : persisted(filterParam, '', { storage: 'query' })
+// kay-allow once-read-prop
 const extra = fields ?? []
 // The query names the table writes itself, which a field's own would overwrite: the sort's, the search's, and those of the export address.
+// kay-allow once-read-prop
 const taken = new Set(['sort', 'direction', filterParam ?? 'q', sortParam, directionParam])
 
 for (const field of extra) {
@@ -239,7 +245,7 @@ effect(() => {
 
 // The rows the filter keeps, all of them without one.
 const kept = memo(() => filter === undefined || list ? rows() : rowsMatching(rows(), filter, typed()))
-const counted = countLabel ?? ((count: number) => wording('ui.table.rowCount', count === 1 ? '1 row' : '{count} rows', { count }))
+const counted = (count: number) => countLabel ? countLabel(count) : wording('ui.table.rowCount', count === 1 ? '1 row' : '{count} rows', { count })
 const none: RowKeyValue<Row, Key>[] = []
 const picked = signal(selected ?? none)
 
@@ -263,7 +269,7 @@ effect(() => opened = expanded ?? noneOpen)
 const openSet = memo(() => new Set(opened()))
 const detailId = (row: Row) => `${tableId}-detail-${String(rowKeyOf(row, rowKey)).replace(/\s/g, '_')}`
 const columnCount = () => given.length + (selectable ? 1 : 0) + (expandable ? 1 : 0)
-const countChosen = selectedLabel ?? ((count: number) => wording('ui.table.selected', '{count} selected', { count }))
+const countChosen = (count: number) => selectedLabel ? selectedLabel(count) : wording('ui.table.selected', '{count} selected', { count })
 
 // A row that left `rows` leaves the selection for good, so it is not picked again if it comes back.
 effect(() => {

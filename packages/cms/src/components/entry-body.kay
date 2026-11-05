@@ -17,6 +17,7 @@ guardLeave(uploading)
 
 // Read from the form as it changes: a screen holds it from the server, the on-page editor once its own question is answered.
 const uploadRefused = () => form.denied?.upload
+// kay-allow once-read-prop
 const layout = form.collection.layout?.form
 
 effect(() => {
