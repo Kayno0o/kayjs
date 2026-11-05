@@ -1,6 +1,62 @@
 # Upgrading, older releases
 
-What each minor release before 1.88 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+What each minor release before 1.89 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+
+## 1.88.0
+
+### The names of 1.84 are gone
+
+- `routes`, `api`, `content`, `storage`, `maxSizes` and `settings` are no longer read in `kay.config.ts`, in the options of `pages()` and `testSite()` or in an extension's `config`: a config still naming one stops every command with the unknown key, naming its replacement (`dirs.routes`, `dirs.api`, `contentConfig`, `store.files`, `limits.byPath`, `librarySettings`). `deprecated-config-keys` is gone with them.
+- `memoryStore()` and `sqliteStore(path)` of `kay/server` are gone: `memorySessions()` and `sqliteSessions(path)` (`deprecated-session-stores` is gone).
+- kayjs-auth's `safeRedirect(path, fallback?)` is gone: kay's `localPath(path, fallback)`, with `'/'` as the fallback `safeRedirect` defaulted to (`deprecated-safe-redirect` is gone). An app on 1.83 or older runs `kay upgrade`, which installs the last release that still rewrites them.
+
+### The config keys are grouped by concern
+
+- Twenty-one top-level keys of `kay.config.ts` (and of the options of `pages()` and `testSite()` and of an extension's `config`) move into five bags: `dirs: { routes, api, public }` (was `routesDir`, `apiDir`, `publicDir`), `limits: { body, byPath }` (was `maxSize`, `maxSizeByPath`), `serve: { apiPath, compress, compressionDictionary, shutdownTimeout }`, `observe: { log, serverTiming, requestIdHeader, tracer, onError }` and `client: { navigation, inlineStyles, lateStyles, typography, hydration, prefetch, saveData }`. The flat keys work until 1.91, a key written in its bag winning over the same flat key; `kay check` reports them as `deprecated-config-groups` and `kay upgrade` writes the bags, unless the object has a bag of that name already or a spread, where the keys move by hand. `publicCache`, `images`, `seo`, `store`, `live`, `links`, `base` and `trailingSlash` stay where they are.
+- The options of `pages()` and `testSite()` merge into the config one bag deep: `testSite({ client: { navigation: false } })` keeps the config's other `client` keys, where a flat `navigation: false` and the config's `prefetch` were separate keys anyway.
+- Code reading the config in an extension or a test (`config.maxSize`, `options.apiPath`) reads `config.limits?.body` and `config.serve?.apiPath`. `CheckOptions`, `ClientOptions` and `RenderOptions` carry the bags (`dirs`, `serve`, `client`, `observe`) where they carried the flat keys.
+### A production site with `site` set answers only its own hosts
+
+- In production with `site` (or `SITE_URL`) set, a request whose `Host` is neither the site's, a locale host of `i18n.domains` nor listed in `security.hosts` is now refused with 421, as `security: { hosts: true }` did, so `ctx.url` and `request.url` can no longer be poisoned by the header. Localhost and IP addresses still pass, so a health check by address works. An app reached by other names (`www`, a tunnel, a CDN host) lists them, `security: { hosts: ['www.example.com', '*.preview.example.com'] }` (a `*.` entry answers one label under the domain, never the bare domain), or turns the check off with `security: { hosts: false }`. Look for what rewrites `Host`: nginx's default `proxy_pass` sends `Host: app:3000` (add `proxy_set_header Host $host;`), and a container health check or another service reaching the app by its service name or a `HOST=<hostname>` with `--health` (`probeHost`) is refused too, except the health route itself, which is let through. A refused host gets a 421 naming the fix and a warning in the log, once per host. `kay check` cannot see which names a deployment is reached by, so no lint ships with this.
+
+### `prefetch: 'eager'` fetches the links in view
+
+- On a page running kay's script, `prefetch: 'eager'` fetched on hover with no delay and never on load; it now fetches the links scrolled into view, three at a time, as the setting says elsewhere. An app that wants the old timing sets `'moderate'`. `kay check` cannot see which timing an app meant, so no lint ships with this.
+
+### `rooms()` state and `update` always resolve
+
+- `rooms()`'s `state(room)` and `update(room, change)` return promises whatever the store, as every other store answers: `await` them (a `coalesce` `read` that reads `state` is `async`). A hand-written `RoomStore` makes `state` and `update` `async`. `AsyncRoomStore`, `AsyncRooms` and `StoreRooms` stay as deprecated names until 1.91, and `kay upgrade` renames them to `RoomStore` and `Rooms` (`deprecated-room-types`). A refused room name now rejects instead of throwing; TypeScript and `no-floating-promises` find a call that ignores the promise.
+
+### Checkbox and Toggle with a `name` or an `issue` sit in a wrapper
+
+- A root `class`, `style` or layout given to one now lands one level up from the input: style the wrapper with `class.field`. One declaring neither renders as before.
+- No lint can recognise it: the change is in the markup a component renders.
+### A store receives durations as milliseconds
+
+- `SessionStore.set(id, data, maxAge)` and `RateStore.hit(key, window, weight)` are given `maxAge` and `window` in milliseconds, a number, where they were `Duration` strings: a store of your own drops its `durationMs(...)` call and uses the number (`redis.pexpire(key, window)`), and a test calling a kay store passes `60_000` where it passed `'60s'`. TypeScript finds a store written by hand; options an app writes stay `Duration`s.
+
+### Stores name their verbs alike
+
+- `FileStore.delete(key)` resolves with whether there was a file, `PushStore.remove` is `delete`, `JobStore.purge` is `prune` and kayjs-ai's `ConversationStore.remove` is `delete`: a store of your own renames them.
+- kayjs-auth's `AuthStore`: `users.delete` and `identities.delete` answer a boolean, every `deleteForUser` is `erase` and `audit.forget` is `audit.erase`, answering counts.
+
+### Signed-out cookies and approval tickets move to `store.kv`
+
+- kayjs-cms's signed-out cookies and kayjs-ai's spent approval tickets are kept in `store.kv` (filled by `sqliteData` and `pgData`, else the process's memory, with a logged warning), not `store.rates`: `passwordGuard({ kv })` names the cookies' store. An app on a hand-written `store.rates` shared between processes adds a `kv`.
+- `pgData` keeps `store.kv` in a new `kay_kv` table: on a Postgres whose app role may not create tables, the owner runs `await createDataTables(db)` once (idempotent) before the app starts ([Queues](queues.md)), else `pgData` throws naming `kay_kv`.
+
+### Library data follows the app's store
+
+- kayjs-mail lists and suppressions, kayjs-ai conversations and kayjs-cms loaders given no `database`/`sql` default to the database of the app's `store` (`pgData(url)`, `sqliteData(path)`) where they used `data/mail-list.sqlite`, `data/ai-conversations.sqlite` or nothing: an existing default file keeps being read, so nothing moves by itself, and to move onto the app's database copy the `kay_mail_*`, `kay_ai_conversations` or `kay_content` tables over and delete the file. A SQLite file `kai_conversations` becomes `kay_ai_conversations` when kayjs-ai opens it, so SQL erasing a user's conversations names the new table.
+- `pgLists`, `pgSuppressions`, `sqliteSuppressions` and `sqliteConversations` are imported from `@kaynooo/kayjs-mail/pg`, `@kaynooo/kayjs-mail/sqlite`, `@kaynooo/kayjs-ai/sqlite` (with the new `pgConversations` in `/pg`); the root keeps the old names until 1.91. `kay check` cannot tell an import it should move, so no lint ships: change the import path.
+- New apps default to `data/auth.sqlite` and `data/content.sqlite` where it was `.db`; a `data/auth.db` or `data/content.db` that exists is still used.
+- kayjs-cms keeps its history sweep marks in the app store's `kv`: the `\u0002sweep` row of each history store is removed by the first full sweep. An app with no `store.kv` sweeps in full at every restart.
+- The libraries follow `pgData(db)` through the connection it was given, kayjs-auth apart (its pg-orm database cannot use it: name `auth({ store: pgStore(db) })` or `KAYJS_AUTH_DATABASE_URL`). `appDatabase()` answers `{ kind: 'pg', source }` with `source` that connection or the url.
+
+### Durations and dates where a number stood
+
+- kayjs-auth's mail `maxAge` is `{ link: '24h', code: '10m' }`: `lifetime(value, locale)` and `durationWords(value, locale)` take both until 1.91, and `kay upgrade` writes a number literal as `'86400s'` (`deprecated-duration-seconds`). OAuth `expiresAt` (`OAuthTokens`, `StoredCredential`, the `exchange` result) is a `Date`: a custom provider returns `new Date(...)`.
+- kayjs-ai's provider `embed`, `speak` and `transcribe` get `timeout` as a `Duration`, not milliseconds.
 
 ## 1.87.0
 
@@ -97,106 +153,4 @@ What each minor release before 1.88 broke, and what an app changed to move to it
 
 - The `attempts` counter a store gave before 1.81 is no longer read, and `deprecated-auth-attempts` is gone with it: a store literal typed `AuthStore` still holding one gets a type error from `kay check`. Drop it, attempts then counting in the app's `store.rates`, else in memory, or give `rates`, a kay `RateStore` with `peek` and `reset` over the store's own database. `kay upgrade` on 1.84 drops `attempts: memoryAuthStore().attempts`.
 
-## 1.84.0
-
-### kayjs-ui's `LineChart` needs chartist 2
-
-- The `chartist` peer is `^2.0.0` (was `^1.5.0`): `bun add chartist@^2` before upgrading kayjs-ui. `LineChart` draws through chartist 2's `lineChart()` with `chartist/compat`, which 1.x has not, so 1.x no longer works.
-- A `LineChart`'s `options` prop is chartist's `LineChartPresetOptions`: the 1.x options, plus `plugins`, `layers` and axis factories. An `options.axisX.type: FixedScaleAxis` (the 1.x class) still works, and `fixedScaleAxis()` replaces it. `kay check` cannot recognise a chartist version, so there is no deprecated lint.
-
-### A kayjs-ui `Rating` needs its `label`
-
-- `Rating(value={4.6})` fails `kay check`: give it the text screen readers read, as `Meter` and `Progress` already need, `Rating(value={4.6} label="Rated 4.6 out of 5")`. The `ui.rating.label` message (`{value} out of {max}`) that stood in for a missing one is gone.
-
-### kayjs-ui: `Meter`'s `fillClass` is deprecated
-
-- `Meter(fillClass="bg-warning")` becomes `Meter(class={{ fill: 'bg-warning' }})`, which replaces the fill's accent the same way. `fillClass` still works until 2.0.0 (`@deprecated`). No lint carries it: `kay check` does not resolve a library component's props in a template.
-
-### kayjs-ui: `MenuAction.danger` and `Toast.type` are deprecated
-
-- A `MenuAction` with `danger: true` becomes `tone: 'danger'`, which wins when both are given. Both still work until 2.0.0, and the editor strikes them out (`@deprecated`).
-- A read of `toasts()[n].type`, or of the `ToastType` type, becomes `tone`, where the old `'error'` is `'danger'`. 2.0.0 makes a toast `{ id, message, tone }`; `toast.error()` stays the method for a failure and pushes a `danger` toast.
-
-### kayjs-ai: a key over plain http, and `AI_PROVIDER=openai` without a key
-
-- A key sent to a plain `http://` API root that is not loopback, such as `AI_BASE_URL=http://ollama:11434/v1` on a compose network with `OPENAI_API_KEY` set, now throws until `AI_INSECURE=true` (or `insecure: true` on `openai()` and `anthropic()`) says the network is trusted; `https://` and `localhost` are unchanged, and a root with no scheme throws naming its variable.
-- `AI_PROVIDER=openai` without `OPENAI_API_KEY` throws unless `AI_BASE_URL` names a server. `kay check` cannot recognise either, as both depend on the environment, so there is no deprecated lint.
-
-### A string field of an action is bounded to 10,000 characters
-
-- A string field of an action's schema with no `maxLength` is now refused past 10,000 characters: declare a `maxLength` on a field that takes more, a long text or a pasted document say. `unbounded-string` is a warning now, so a `// kay-allow` or a level it was given stays valid.
-- A string in the `body` of an API route (a websocket's messages excepted) takes the same bound: declare a `maxLength` on one that takes more.
-
-### The `island-action` lint is gone
-
-- An island no longer needs `Action` imported to be handed an action, so `island-action` is removed: delete a `// kay-allow island-action` comment or a `lints` entry naming it, which `kay check` now reports as an unknown lint; no `deprecated` lint announces it, as an island still importing `Action` compiles and works as before. `island()` and `promote()` from `kay/island`, which compiled components call, lose their trailing `takesActions` argument, and the `PlainIslandProp` type lets an island's prop hold an action without a type for it.
-
-### `session.settings` holds durations
-
-- `session.settings.maxAge`, `absoluteMaxAge` and `browserMaxAge` are durations in whole seconds such as `'2592000s'`, where they were bare numbers of seconds. Code reading one as a number gets a type error from `kay check`; `durationMs(settings.maxAge)` from `kay` gives milliseconds. No `deprecated` lint can carry a type change.
-
-### A session sealed before kay 1.72.0 signs its visitor out once
-
-- `session()` opens a cookie with the key derived for it only, no longer with the bare SHA-256 of the secret that kay sealed under before v1.72.0. A visitor whose cookie was last written by such a kay, and never since by a later one, is signed out once. Nothing changes in the app, and no lint can carry it as it is cookie data.
-
-### A misspelled config key is refused
-
-- A key kay does not know in `kay.config.ts` (or in an extension's `config`), at its top level or in `security`, `i18n`, `seo`, `offline`, `health` and `proxy`, now stops every command with the nearest known name, where it used to leave kay's default in place. An app whose config already carries a typo starts failing: correct the key, or drop it.
-
-## 1.82.0
-
-### An `ActionStream` has `ended()`
-
-- An object the app builds as an `ActionStream`, a test's fake stream say, gets a type error from `kay check` until it has `ended: () => Promise<T | undefined>`, resolving with its last value once it ran to its end and rejecting when it failed or was closed ([streaming actions](actions-from-islands.md)). A stream a call resolves with already has it.
-
-### kayjs-auth: the methods of a feature are grouped under it
-
-- `auth.listUsers()` is `auth.admin.listUsers()`, `auth.signInWithPassword(input)` is `auth.password.signIn(input)`, and so on for `password`, `email`, `magicLink`, `twoFactor`, `passkeys`, `sessions`, `tokens`, `oauthServer`, `admin` and `organizations` ([the table](../packages/auth/llms/grouped-methods.md)). The flat names work until 1.85 and are removed in 1.86; `kay upgrade` renames the calls on `auth` and `ctx.locals.auth` (`deprecated-auth-methods`), and a flat method read without a call, destructured, under `typeof` or in a template expression is renamed by hand.
-
-## 1.81.0
-
-### kayjs-auth: a store counts attempts in `rates`, and `DEFAULT_LIMITS` windows are durations
-
-- `attempts` left the `AuthStore` contract. A store of the app's own drops it, attempts then counting in the app's `store.rates` from kay.config.ts, else in memory, or gives `rates`, a kay `RateStore` with `peek` and `reset` over its own database. The old counter is still read, in place of `rates`, until 1.84, and `kay upgrade` (`deprecated-auth-attempts`) drops `attempts: memoryAuthStore().attempts`. `pgStore` keeps its `kay_attempts` table, so its counts survive; a counter the app drops starts its open windows over, a day at most.
-- `DEFAULT_LIMITS` and the `Limit` type write a window as a duration, `{ max: 40, window: '15m' }`, where they held seconds (`900`): code reading one as a number gets a type error from `kay check`, and reads it with `durationSeconds`. A `rateLimit` option already took durations and is unchanged.
-
-### `s.UnionEnum` and `s.UnionKeys` no longer default to their first value
-
-- An enum field left out used to read as its first value. An optional one now reads `undefined`; a required one is refused: an action answers 422, a page's `query` schema answers 400 on a visit without the parameter, a `defineEnv` variable left unset stops the boot, and a content field left out fails the build. An app relying on the fill writes `s.UnionEnum(['a', 'b'], { default: 'a' })`, which also keeps the old error body of an `api` route. No lint can recognise it, as the old form is valid and only its result changed.
-
-### kayjs-auth: a `forwardAuth` session cookie is no longer `__Host-` prefixed
-
-- An app with `forwardAuth` and a `session()` naming no `domain` now shares its session cookie under the `forwardAuth` domains, named `kay_session` (or your `cookie`) instead of `__Host-kay_session`, so every signed-in visitor is signed out once and signs in again. The old `__Host-` cookie cannot be shared across hosts, and `auth({ cookie })` only renames the new one, so nothing keeps the old sessions.
-
-### kayjs-ui: a Table over a `list` no longer filters the loaded rows
-
-- Its `filter` search box now hands the typed text to the list's `load` as `filter.text`, the list starting over from offset 0 after a pause in typing, and the loaded rows are not matched against `filter` again. A `load` that ignored the text used to see the box narrow the rows loaded so far; it now has to narrow its pages itself, as it does for `sort` ([Infinite lists](../packages/ui/llms/infinite-list.md)). `kay check` cannot tell what a `load` reads, so there is no lint for it.
-- The `filter` part of a Table with a search box is now a `div` holding one `label` per field, drawn by the new `field` part, where it was the `label` itself: a stylesheet or a `src/ui.ts` restyling `filter` moves its label rules to `field` ([Restyle a component](../packages/ui/llms/restyle.md)).
-
-## 1.80.0
-
-### A Button that is disabled with a `data-tooltip` is `aria-disabled`, not `disabled`
-
-- So its reason reaches the keyboard, the button no longer matches `:disabled`: a stylesheet or a test reading `button:disabled` or `toBeDisabled()` on it reads `[aria-disabled='true']` instead, and a locked `type="submit"` button turns `type="button"`. A hand `span(data-tooltip tabindex="0")` wrapped around such a button can go, or become kayjs-ui's `Tooltip`, which `kay check --fix` writes (`hand-tooltip`). No lint can recognise the old form, as `disabled` with a tooltip is valid markup.
-
-## 1.78.0
-
-### A stylesheet setting a Button's shell variables renames them
-
-- `--_shell-line` and `--_shell-fill`, the private variables a stylesheet set to restyle a Button, a framed IconButton or a stat badge, are `--shell-line` and `--shell-fill`, now documented ([Setup](../packages/ui/llms/setup.md)). Set them as utilities on the part in `src/ui.ts`, such as `Button: { parts: { root: '[--shell-line:var(--color-accent)]' } }`. `kay check` cannot tell a private name written in a stylesheet from any other custom property, so no lint reports the old one.
-
-### A form calling kayjs-auth itself carries the proof of work
-
-- Since 1.44, `createAuth` asks a proof of work for registering, resets and magic links, so an app's own form answers `{ ok: false, error: 'captcha' }` until it holds `input(type="hidden" name="captcha" data-kay-work={await auth.captchaChallenge('register')})` (`'reset'`, `'magic-link'` or `'sign-in'` for the others) and its action passes the field on as `{ captcha: input.captcha }`. `kay check` now reports a call with no `captcha` option (`missing-captcha`); `captcha: false` on `createAuth` turns the proof off ([Bots](../packages/auth/llms/hardening-and-testing.md)).
-
-## 1.77.0
-
-### kayjs-auth renames the `auth_*` tables again
-
-- A database still on the pre-1.71 `auth_*` tables moves straight here: the migration `db.sync()` or `bunx pg-orm generate` writes renames them with their rows and adds the columns since, where 1.74 to 1.76 created empty `kay_*` tables beside them.
-
-### kayjs-ui: stepDraft's maxAge is a duration only
-
-- `stepDraft(..., { maxAge: 3600 })` is a type error now: write `maxAge: '1h'`. The deprecated `deprecated-step-draft-max-age` lint is gone with the number form, so run `kay check --fix` on 1.74 to 1.76 before moving.
-
-Releases before 1.77 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+Releases before 1.85 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.

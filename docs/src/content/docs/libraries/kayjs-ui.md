@@ -298,6 +298,7 @@ Topics of the kayjs-ui reference the sections above do not link:
 - [Restyle a component](/llms/kayjs-ui-restyle)
 - [Icons, buttons, toasts, dialogs, cards, popovers and stats](/llms/kayjs-ui-basics)
 - [Inputs, selects, editors and forms](/llms/kayjs-ui-forms)
+- [Sliders, pickers, file drops and menus](/llms/kayjs-ui-pickers)
 - [MarkdownEditor](/llms/kayjs-ui-markdown-editor)
 - [Forms, FormDialog and Steps](/llms/kayjs-ui-forms-and-steps)
 - [Tables, tabs and pagination](/llms/kayjs-ui-tables-navigation-and-layout)
