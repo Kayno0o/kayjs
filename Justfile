@@ -15,6 +15,8 @@ release level:
 	[ "$(git branch --show-current)" = main ] || { echo "release runs on main, not $(git branch --show-current)" >&2; exit 1; }
 	git fetch -q origin main
 	[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "main differs from origin/main: pull or land first" >&2; exit 1; }
+	# The tests of the commit released pass first, so a red run stops the release before version.ts commits and tags a bump that `ft release --tagged` would leave behind.
+	ft ci "$(git rev-parse HEAD)" --workflow test.yml --job test
 	# The apps on kay run against this commit first, dispatching the Apps workflow when no run covers it; KAY_SKIP_APPS_CI=1 skips it.
 	bun scripts/release-apps.ts
 	# The tag version.ts made, named by its output, so a failure below deletes that one and no other tag on HEAD.
@@ -25,7 +27,14 @@ release level:
 	  git reset --keep HEAD~1
 	  exit 1
 	fi
-	ft release --tagged
+	# A release refused before its push leaves the bump and its tag to us, so they go and a retry starts clean; once origin has the tag, they stay.
+	if ! ft release --tagged; then
+	  if [ -z "$(git ls-remote --tags origin "refs/tags/$tag")" ]; then
+	    git tag -d "$tag"
+	    git reset --keep HEAD~1
+	  fi
+	  exit 1
+	fi
 
 # land this branch on main: rebased on origin's, checked, the tests its changes reach, pushed; landings verify side by side and take turns only to push, one that finds main moved verifying again; one line per step, their output in the git folder's land.log
 land:
