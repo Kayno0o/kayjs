@@ -2,9 +2,9 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
-## 1.91.0
+## 1.92.0
 
-### The root of kayjs-mail and kayjs-ai stops exporting the store names that moved in 1.88
+### The root of kayjs-mail and kayjs-ai stops exporting the store names that moved in 1.88, which 1.91 still exports
 
 `pgLists`, `createMailListTables`, `mailListTables`, `pgSuppressions`, `createMailSuppressionTable` and `sqliteSuppressions` are imported from `@kaynooo/kayjs-mail/pg` and `@kaynooo/kayjs-mail/sqlite`, and `sqliteConversations` from `@kaynooo/kayjs-ai/sqlite` (`pgConversations` is in `/pg`). `kay check` cannot tell an import it should move, so no lint ships: change the import path.
 
