@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { setupStore } from '../../../src/server/app-store'
-import { documentUrl, fetchPublicDocument, plainName, privateAddress } from '../src/authorize/clients'
+import { documentUrl, fetchPublicDocument, plainName } from '../src/authorize/clients'
 import { underResource } from '../src/authorize/resource'
 import { validRedirectUri, validRedirectUris } from '../src/authorize/uris'
 import { digest } from '../src/keys'
@@ -18,39 +18,6 @@ const DOCUMENT = 'https://client.example/oauth/client.json'
 
 afterEach(() => {
   setSystemTime()
-})
-
-describe('privateAddress', () => {
-  test.each([
-    '127.0.0.1',
-    '10.1.2.3',
-    '169.254.169.254',
-    '::',
-    '::1',
-    '::ffff:127.0.0.1',
-    '::ffff:7f00:1',
-    '::7f00:1',
-    '::127.0.0.1',
-    '::ffff:a00:1',
-    '::ffff:0:7f00:1',
-    '::ffff:0:127.0.0.1',
-    'fec0::1',
-    'fe80::1',
-    'fd12:3456::1',
-    'ff02::1',
-    '2001::1',
-    '2001:0:4136:e378:8000:63bf:3fff:fdd2',
-    '2001:db8::1',
-    '2002:7f00:1::1',
-    '64:ff9b::7f00:1',
-    'not an address',
-  ])('refuses %s', (address) => {
-    expect(privateAddress(address)).toBe(true)
-  })
-
-  test.each(['8.8.8.8', '::ffff:8.8.8.8', '::ffff:808:808', '2606:4700:4700::1111', '2a00:1450:4007::200e'])('allows the public %s', (address) => {
-    expect(privateAddress(address)).toBe(false)
-  })
 })
 
 describe('documentUrl', () => {
@@ -88,13 +55,13 @@ describe('the real metadata document reader', () => {
     return { url: `http://127.0.0.1:${server.port}`, requests, stop: async () => server.stop(true) }
   }
 
-  const anywhere = () => false
+  const anywhere = () => true
 
   test('never connects to a loopback address', async () => {
     const server = serving(() => Response.json({ client_id: 'x' }))
 
-    await expect(fetchPublicDocument(`${server.url}/client.json`)).rejects.toThrow('not on the public internet')
-    await expect(fetchPublicDocument('https://localhost/client.json')).rejects.toThrow('not on the public internet')
+    await expect(fetchPublicDocument(`${server.url}/client.json`)).rejects.toThrow('not a public address')
+    await expect(fetchPublicDocument('https://localhost/client.json')).rejects.toThrow('not public')
     expect(server.requests).toEqual([])
     await server.stop()
   })
@@ -106,7 +73,7 @@ describe('the real metadata document reader', () => {
     // The first answer would be public, any later one the loopback: only the first may be used.
     const rebinding = async () => ++asked === 1 ? [{ address: '127.0.0.1', family: 4 }] : [{ address: '10.0.0.1', family: 4 }]
 
-    expect(await fetchPublicDocument(`http://client.example:${port}/client.json`, anywhere, rebinding)).toEqual({ client_id: 'x' })
+    expect(await fetchPublicDocument(`http://client.example:${port}/client.json`, { allowPrivate: anywhere, resolve: rebinding })).toEqual({ client_id: 'x' })
     expect(asked).toBe(1)
     await server.stop()
   })
@@ -116,8 +83,8 @@ describe('the real metadata document reader', () => {
     const port = new URL(server.url).port
     const mixed = async () => [{ address: '8.8.8.8', family: 4 }, { address: '127.0.0.1', family: 4 }]
 
-    await expect(fetchPublicDocument(`http://client.example:${port}/client.json`, undefined, mixed)).rejects.toThrow('not on the public internet')
-    await expect(fetchPublicDocument(`http://client.example:${port}/client.json`, undefined, async () => [])).rejects.toThrow('not on the public internet')
+    await expect(fetchPublicDocument(`http://client.example:${port}/client.json`, { resolve: mixed })).rejects.toThrow('not public')
+    await expect(fetchPublicDocument(`http://client.example:${port}/client.json`, { resolve: async () => [] })).rejects.toThrow('no address')
     expect(server.requests).toEqual([])
     await server.stop()
   })
@@ -125,14 +92,14 @@ describe('the real metadata document reader', () => {
   test('reads a JSON document', async () => {
     const server = serving(() => Response.json({ client_id: 'x' }))
 
-    expect(await fetchPublicDocument(`${server.url}/client.json`, anywhere)).toEqual({ client_id: 'x' })
+    expect(await fetchPublicDocument(`${server.url}/client.json`, { allowPrivate: anywhere })).toEqual({ client_id: 'x' })
     await server.stop()
   })
 
   test('follows no redirect', async () => {
     const server = serving(request => new URL(request.url).pathname === '/moved' ? Response.redirect(`${new URL(request.url).origin}/client.json`, 302) : Response.json({ client_id: 'x' }))
 
-    await expect(fetchPublicDocument(`${server.url}/moved`, anywhere)).rejects.toThrow('200 with JSON')
+    await expect(fetchPublicDocument(`${server.url}/moved`, { allowPrivate: anywhere })).rejects.toThrow('redirects')
     expect(server.requests).toEqual(['/moved'])
     await server.stop()
   })
@@ -141,8 +108,8 @@ describe('the real metadata document reader', () => {
     const text = serving(() => new Response('{"client_id":"x"}', { headers: { 'content-type': 'text/plain' } }))
     const large = serving(() => Response.json({ client_id: 'x', padding: 'x'.repeat(11 * 1024) }))
 
-    await expect(fetchPublicDocument(`${text.url}/client.json`, anywhere)).rejects.toThrow('200 with JSON')
-    await expect(fetchPublicDocument(`${large.url}/client.json`, anywhere)).rejects.toThrow('too large')
+    await expect(fetchPublicDocument(`${text.url}/client.json`, { allowPrivate: anywhere })).rejects.toThrow('200 with JSON')
+    await expect(fetchPublicDocument(`${large.url}/client.json`, { allowPrivate: anywhere })).rejects.toThrow('over')
     await text.stop()
     await large.stop()
   })

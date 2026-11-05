@@ -3,8 +3,9 @@ import type { RemoteLimits } from './config-limits'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { JSON_FILE, writeAtomically } from '../build/files'
-import { ipVersion, isPublicAddress, pinnedLookup, PrivateAddressError, resolveHost } from './address'
+import { ipVersion, PrivateAddressError, resolveHost } from './address'
 import { FETCH_TIMEOUT_MS, MAX_REMOTE_BYTES } from './config-limits'
+import { pinnedGet } from './fetch-public'
 import { overLimit } from './protection'
 
 export type { Resolver } from './address'
@@ -231,7 +232,7 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
       for (let hops = 0; ; hops++) {
         const target = new URL(url)
 
-        response = await pinnedGet(target, headers, signal, resolve, patterns.some(pattern => pattern.private && covers(pattern, target)))
+        response = await pinnedGet(target, { accept: 'image/*', ...headers }, signal, resolve, patterns.some(pattern => pattern.private && covers(pattern, target)))
 
         const location = response.headers.get('location')
 
@@ -285,49 +286,6 @@ export function remoteImages(dir: string, patterns: readonly RemotePattern[], va
 
     return { etag: response.headers.get('etag') ?? undefined, lastModified: response.headers.get('last-modified') ?? undefined, freshUntil: freshUntil(response.headers) }
   }
-}
-
-// One GET that resolves the host itself and connects to the address it checked, never one `fetch` would resolve again after the check. A literal address is checked as it stands.
-async function pinnedGet(url: URL, headers: Record<string, string>, signal: AbortSignal, resolve: Resolver, allowPrivate: boolean): Promise<Response> {
-  const hostname = url.hostname.replace(BRACKETS, '')
-
-  if (!allowPrivate && ipVersion(hostname) !== 0 && !isPublicAddress(hostname))
-    throw new PrivateAddressError(`${hostname} is not a public address`)
-
-  // Loaded here, so an executable that downloads no remote image never loads them.
-  const [{ request: httpRequest }, { request: httpsRequest }, { Readable }] = await Promise.all([import('node:http'), import('node:https'), import('node:stream')])
-  const send = url.protocol === 'https:' ? httpsRequest : httpRequest
-
-  return new Promise((done, fail) => {
-    const request = send(url, { method: 'GET', headers: { 'user-agent': 'kay', 'accept': 'image/*', ...headers, 'accept-encoding': 'identity' }, signal, lookup: pinnedLookup(resolve, allowPrivate) as never }, (incoming) => {
-      try {
-        const answer = new Headers()
-
-        for (const [name, value] of Object.entries(incoming.headers)) {
-          for (const each of Array.isArray(value) ? value : [value]) {
-            if (each !== undefined)
-              answer.append(name, each)
-          }
-        }
-
-        const status = incoming.statusCode ?? 502
-        const empty = status === 204 || status === 205 || status === 304
-
-        if (empty)
-          incoming.resume()
-
-        done(new Response(empty ? null : Readable.toWeb(incoming) as unknown as ReadableStream, { status, headers: answer }))
-      }
-      catch (error) {
-        // A status `Response` refuses, such as 999, would otherwise throw inside the event and leave the promise pending.
-        incoming.destroy()
-        fail(error)
-      }
-    })
-
-    request.on('error', fail)
-    request.end()
-  })
 }
 
 // False once the body passed the cap, leaving no file behind.

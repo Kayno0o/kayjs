@@ -50,6 +50,8 @@ export { asConfigError, configError, durationSeconds, optionMs } from './config-
 export { sourceHash } from './csp'
 export { RESTART_RELOAD } from './dev'
 export type { LocalizedEntry } from './entry-drafts'
+export { fetchPublic } from './fetch-public'
+export type { FetchPublicOptions } from './fetch-public'
 export { decide, hookContext, notify } from './hooks'
 export type { BeforeHook, Hook, HookContext, NotifyOptions } from './hooks'
 export type { Kv, KvStore } from './kv'

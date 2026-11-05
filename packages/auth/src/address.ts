@@ -25,7 +25,7 @@ export function truncatedAddress(address: string): string {
 }
 
 // The 16 bytes of an IPv6 address, an embedded dotted IPv4 tail included.
-export function v6Bytes(address: string): number[] | undefined {
+function v6Bytes(address: string): number[] | undefined {
   let text = address.toLowerCase()
   const zone = text.indexOf('%')
 

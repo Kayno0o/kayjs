@@ -892,6 +892,18 @@ interface FallbackMemory
   refund?: ((key: string, resetAt: number) => void) | undefined
   reset?: ((key: string) => void) | undefined
 
+[./library] fetchPublic
+function fetchPublic(url: URL | string, options?: FetchPublicOptions): Promise<Response>
+
+[./library] FetchPublicOptions
+interface FetchPublicOptions
+  allowPrivate?: ((host: string) => boolean) | undefined
+  headers?: Record<string, string> | undefined
+  maxBytes?: number | undefined
+  redirect?: "error" | number | undefined
+  resolve?: Resolver | undefined
+  timeout?: number | undefined
+
 [./library] GENERATE_SECRET
 const GENERATE_SECRET: "`bun -e \"console.log(crypto.randomUUID() + crypto.randomUUID())\"`"
 
