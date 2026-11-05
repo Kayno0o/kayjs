@@ -66,5 +66,5 @@ function authCall(name: string, ownDatabase: boolean): string {
 
 // The root guard: every page below needs a signed-in visitor; the sign-in and register pages stay open.
 function authGuard(): string {
-  return 'import { guard } from \'@kaynooo/kayjs-auth\'\n\n// Every page below needs a signed-in visitor; the sign-in and register pages stay open. Delete this file for a public site, or move it into the folder to protect.\nexport default guard()\n'
+  return 'import { authGuard } from \'@kaynooo/kayjs-auth\'\n\n// Every page below needs a signed-in visitor; the sign-in and register pages stay open. Delete this file for a public site, or move it into the folder to protect.\nexport default authGuard()\n'
 }

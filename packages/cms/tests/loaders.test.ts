@@ -1,5 +1,5 @@
 import type { ContentLoader } from 'kay/content'
-import type { SeedEntry } from '../src/loaders/shared'
+import type { CmsSeedEntry } from '../src/loaders/shared'
 import { join } from 'node:path'
 import { SQL } from 'bun'
 import { Database } from 'bun:sqlite'
@@ -10,7 +10,7 @@ import { scratchDir } from 'kay/test'
 import { pgLoader } from '../src/loaders/pg'
 import { sqliteLoader } from '../src/loaders/sqlite'
 
-const seed: SeedEntry[] = [
+const seed: CmsSeedEntry[] = [
   { slug: 'a', data: { title: 'A', order: 1 }, body: 'about a' },
   { slug: 'b', data: { title: 'B', order: 2 } },
   { slug: 'x', locale: 'fr', data: { title: 'X' } },
@@ -23,7 +23,7 @@ const database = `kay_cms_loaders_${process.pid}`
 let shared: SQL | undefined
 
 // Each loader kind runs the same cases: `make` gives a loader on a fresh table, and a second one on the same table, as another process would.
-function contract(label: string, make: (options: { name: string, seed?: SeedEntry[] | (() => SeedEntry[]) | undefined, table?: string | undefined }) => ContentLoader, test2: typeof test) {
+function contract(label: string, make: (options: { name: string, seed?: CmsSeedEntry[] | (() => CmsSeedEntry[]) | undefined, table?: string | undefined }) => ContentLoader, test2: typeof test) {
   describe(label, () => {
     test2('seeds the first read and gives the entries by place', async () => {
       const loader = make({ name: 'posts', seed, table: 'seeded' })

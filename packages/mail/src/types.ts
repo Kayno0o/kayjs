@@ -3,7 +3,7 @@ import type { JSX } from 'kay'
 // `'Name <name@example.com>'`, a bare address, or both parts apart, which needs no quoting of a name holding a comma.
 export type Address = string | { name: string, address: string }
 
-export interface Attachment {
+export interface MailAttachment {
   filename: string
   content: string | Uint8Array
   contentType?: string | undefined
@@ -23,7 +23,7 @@ export interface Envelope {
   // The locale the mail is written in, the mailer's `locale` unless given: its component renders `t()` in it, which must be one of the site's, and its `<html lang>` follows.
   locale?: string | undefined
   headers?: Record<string, string> | undefined
-  attachments?: Attachment[] | undefined
+  attachments?: MailAttachment[] | undefined
   // Where the recipient unsubscribes in one click, written as `List-Unsubscribe` and `List-Unsubscribe-Post`: an https URL answering a POST, and an address to write to as well.
   unsubscribe?: string | { url: string, address: string } | undefined
 }
@@ -56,7 +56,7 @@ export interface Mail {
   html?: string | undefined
   text: string
   headers: Record<string, string>
-  attachments: Attachment[]
+  attachments: MailAttachment[]
 }
 
 // What the server answered: the addresses it took and refused, and its last reply.

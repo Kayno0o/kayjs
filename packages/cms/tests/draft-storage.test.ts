@@ -1,11 +1,11 @@
-import type { DraftEntry } from '../src/kay/contract'
+import type { CmsDraftEntry } from '../src/kay/contract'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { browserKeeper, KEEP_FOR } from '../src/draft-storage'
 import { createDrafts } from '../src/drafts'
 import { BODY } from '../src/markers'
 import { until } from './until'
 
-const post: DraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello' }, body: '# Hello' }
+const post: CmsDraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello' }, body: '# Hello' }
 
 function memoryStorage(): Storage {
   const items = new Map<string, string>()
@@ -139,7 +139,7 @@ describe('drafts kept in the browser', () => {
   it('forgets every draft when edits are discarded', () => {
     const storage = memoryStorage()
     const drafts = pageOf(storage)
-    const other: DraftEntry = { collection: 'posts', slug: 'other', data: { title: 'Other' } }
+    const other: CmsDraftEntry = { collection: 'posts', slug: 'other', data: { title: 'Other' } }
 
     storage.setItem('unrelated', 'kept')
     drafts.open(post, 'v1')
@@ -282,7 +282,7 @@ describe('writing the kept draft', () => {
     // A deliberate wait for nothing more to happen: a second write would come within a few of the 10 ms pauses.
     await Bun.sleep(40)
     expect(writes).toHaveBeenCalledTimes(1)
-    expect((JSON.parse(storage.getItem('kcms:draft:posts:hello')!) as { entry: DraftEntry }).entry.data.title).toBe('Hel')
+    expect((JSON.parse(storage.getItem('kcms:draft:posts:hello')!) as { entry: CmsDraftEntry }).entry.data.title).toBe('Hel')
   })
 })
 

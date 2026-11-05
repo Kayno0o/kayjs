@@ -2,7 +2,7 @@ import type { Duration, Guard, GuardContext } from 'kay'
 import type { ByteSize, LazyGuard, Logo } from 'kay/library'
 import type { Commit, FileSaver, Identity } from './files'
 import type { GivenLayout, StoredEntry } from './kay/contract'
-import type { Action } from './roles'
+import type { CmsAction } from './roles'
 import { asConfigError, byteSize, configError, lazily, optionMs } from 'kay/library'
 import { roleGuard } from './auth-like'
 import { workingTree } from './files'
@@ -76,7 +76,7 @@ export interface CmsOptions {
   // The collections whose entries an editor can send to a mailing list, by name: `{ posts: { list: mail.list('news'), message: entry => ({ subject: String(entry.data?.title), view: Post, props: { entry } }) } }`. The entry screen then offers a preview of the mail, a test send to the editor's own address (the signed-in person's email, or `testTo`) and the send itself, which needs the `publish` action of `roles`.
   newsletter?: Record<string, NewsletterOptions> | undefined
   // What each role may do beyond editing: `{ editor: [], publisher: ['publish'], admin: ['publish', 'delete', 'upload', 'redirects'] }`. A signed-in editor whose roles are not listed only edits. The roles are kayjs-auth's, else `passwordGuard()`'s; without this option everyone the guard admits may do all of it.
-  roles?: Record<string, readonly Action[]> | undefined
+  roles?: Record<string, readonly CmsAction[]> | undefined
   // Who the guard let in, for a custom guard that is neither kayjs-auth nor `passwordGuard()`: `({ locals }) => ({ name: locals.user.email, roles: locals.user.roles })`. The admin header names `name`, `email` is where a newsletter test goes, and `roles` are matched against `roles`; without it such a guard holds no role.
   member?: ((ctx: GuardContext) => MemberInfo | undefined | Promise<MemberInfo | undefined>) | undefined
   // Who a save the guard let through is committed as, from the guard's context: `async ({ locals }) => ...` reading the signed-in user.
@@ -115,7 +115,7 @@ export interface CmsSettings {
   // Whether editors' browsers get the hint cookie and the "Edit this page" link.
   pageLink: boolean
   // The actions each role may do, or undefined when every editor the guard admits may do all of them.
-  roles: ReadonlyMap<string, ReadonlySet<Action>> | undefined
+  roles: ReadonlyMap<string, ReadonlySet<CmsAction>> | undefined
   layouts: ReadonlyMap<string, GivenLayout>
   history: HistorySettings | undefined
   newsletter: ReadonlyMap<string, NewsletterOptions>

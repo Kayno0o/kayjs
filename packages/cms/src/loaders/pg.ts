@@ -1,9 +1,9 @@
 import type { ContentLoader } from 'kay/content'
-import type { LoaderOptions, Row, SavedEntry } from './shared'
+import type { CmsSeedEntry, LoaderOptions, Row, SavedEntry } from './shared'
 import { SQL } from 'bun'
 import { contentSource, existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
 
-export type { LoaderOptions, SeedEntry } from './shared'
+export type { CmsSeedEntry, LoaderOptions }
 
 export interface PgLoaderOptions extends LoaderOptions {
   // A connection URL, or the Bun `SQL` the app already has: a pg-orm app passes `db.sql`. The app's `store: pgData(url)` when left out.
@@ -157,3 +157,6 @@ export function pgLoader(options: PgLoaderOptions): ContentLoader {
     },
   }
 }
+
+/** @deprecated Renamed `CmsSeedEntry` in 1.90, as `kay/test` has a `SeedEntry` of its own; the old name works until 1.93. */
+export type SeedEntry = CmsSeedEntry

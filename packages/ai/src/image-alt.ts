@@ -1,7 +1,7 @@
 import type { CacheSlot } from 'kay/library'
 import type { ExtensionProblem, PageHook, RenderedPage } from 'kay/server'
 // Alt text drafted for the imported images of a page: one model call per image file and locale, kept under `.kay/cache`, written into the HTML as a page is built or served.
-import type { Attachment, Message } from './types'
+import type { AiAttachment, AiMessage } from './types'
 import { readdir } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import process from 'node:process'
@@ -36,8 +36,8 @@ function systemPrompt(language: string | undefined): string {
 }
 
 // One short alt text for an image, over `ask` with a `schema`: the fake answers under `bun test`, and a provider that does not see images fails the call.
-export async function describeImage(image: Attachment, options: DescribeImageOptions = {}): Promise<string> {
-  const messages: Message[] = [{ role: 'user', content: 'Write the alt text of this image.', attachments: [image] }]
+export async function describeImage(image: AiAttachment, options: DescribeImageOptions = {}): Promise<string> {
+  const messages: AiMessage[] = [{ role: 'user', content: 'Write the alt text of this image.', attachments: [image] }]
   const { alt } = await ask(messages, { schema: ALT, system: systemPrompt(options.language), maxTokens: 300, temperature: 0, ...options.signal === undefined ? {} : { signal: options.signal } })
 
   return alt.trim()

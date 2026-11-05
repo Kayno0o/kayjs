@@ -1,5 +1,5 @@
 import type { TSchema } from 'kay/library'
-import type { Reply, StructuredReply } from './types'
+import type { AiReply, StructuredReply } from './types'
 import { checkAnswer } from 'kay/library'
 import { AiError } from './errors'
 import { partialParser } from './partial-json'
@@ -42,7 +42,7 @@ function valueOf(schema: TSchema, text: string, finish: string | undefined): unk
 }
 
 // A reply read as the object it answers: `await` checks the whole text once it ended, `for await` gives the object so far, and the last value it gives is the checked one.
-export function structured<Value>(base: Reply, schema: TSchema): StructuredReply<Value, unknown> {
+export function structured<Value>(base: AiReply, schema: TSchema): StructuredReply<Value, unknown> {
   let answered: Promise<Value> | undefined
 
   const answer = async (): Promise<Value> => {

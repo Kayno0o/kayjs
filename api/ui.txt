@@ -115,16 +115,10 @@ interface DescriptionItem
 function dismissToast(id: number): void
 
 [.] editing
-function editing<Row, Draft = void>(): Editing<Row, Draft>
+function editing<Row, Draft = void>(): RowEditing<Row, Draft>
 
 [.] Editing
-interface Editing<Row, Draft = void>
-  close: () => void
-  create: (draft: Draft) => void
-  draft: () => Draft | undefined
-  edit: (row: Row) => void
-  open: () => boolean
-  row: () => Row | undefined
+type Editing<Row, Draft = void> = RowEditing<Row, Draft>
 
 [.] FieldSize
 type FieldSize = 'sm' | 'md' | 'lg'
@@ -304,6 +298,18 @@ type RangeValue = [number | null, number | null]
 
 [.] RowChange
 type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
+
+[.] rowEditing
+function rowEditing<Row, Draft = void>(): RowEditing<Row, Draft>
+
+[.] RowEditing
+interface RowEditing<Row, Draft = void>
+  close: () => void
+  create: (draft: Draft) => void
+  draft: () => Draft | undefined
+  edit: (row: Row) => void
+  open: () => boolean
+  row: () => Row | undefined
 
 [.] RowFilter
 type RowFilter<Row> = readonly (keyof Row & string)[] | ((row: Row) => (string | number | null | undefined)[])

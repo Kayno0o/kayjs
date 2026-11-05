@@ -1,4 +1,4 @@
-import type { AiError, Reply } from '../src'
+import type { AiError, AiReply } from '../src'
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
 import { s } from 'kay'
 import { files } from 'kay/server'
@@ -184,7 +184,7 @@ describe('attachments to the fake', () => {
   })
 
   it('reports tokens for the files it was shown', async () => {
-    const reply: Reply = ask([{ role: 'user', content: '', attachments: [PNG] }], { provider: fakeAi })
+    const reply: AiReply = ask([{ role: 'user', content: '', attachments: [PNG] }], { provider: fakeAi })
 
     expect((await reply.usage)!.inputTokens).toBe(1000)
   })

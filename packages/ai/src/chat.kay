@@ -1,7 +1,7 @@
 ---
 import type { Action, Failure, SanitizeOptions, Snippet } from 'kay'
 import type { Turn } from './chat-session'
-import type { ChatFailure, ChatMessage, ChatTurn, ChatTurnView, CodeBlock, Progress, Source, ToolCall } from './types'
+import type { AiToolCall, ChatFailure, ChatMessage, ChatTurn, ChatTurnView, CodeBlock, Progress, Source } from './types'
 import { durationMs, effect, escapeHtml, followLog, onCleanup, onMount, persisted, queryParam, recipe, sanitizeHtml, signal, trustHtml, untrack, withQuery } from 'kay'
 import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
@@ -93,7 +93,7 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   onReply?: ((turn: ChatTurnView) => unknown) | undefined
   onStop?: (() => unknown) | undefined
   onError?: ((failure: ChatFailure) => unknown) | undefined
-  onToolCall?: ((call: ToolCall) => unknown) | undefined
+  onToolCall?: ((call: AiToolCall) => unknown) | undefined
   onRegenerate?: (() => unknown) | undefined
   onEdit?: ((text: string) => unknown) | undefined
   onSuggestion?: ((text: string) => unknown) | undefined
@@ -189,7 +189,7 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   // Adds markup to the row of buttons under a turn, after the regenerate and edit buttons, such as a copy button or thumbs; given a finished turn.
   actions?: Snippet<[turn: ChatTurnView]> | undefined
   // Replaces how one tool call is drawn, instead of the folded list of the turn's calls, such as a card showing an order a tool returned: given the name, input, status and result.
-  call?: Snippet<[call: ToolCall]> | undefined
+  call?: Snippet<[call: AiToolCall]> | undefined
   // Replaces how one cited source is drawn in the list under a reply; given the source and its number, which the list keeps.
   source?: Snippet<[source: Source, n: number]> | undefined
   // Replaces the greeting and suggestions of the empty chat; `send` posts a message as a clicked suggestion does.
@@ -398,7 +398,7 @@ function reset() {
 }
 
 // The visitor's answer to a held tool call is their next message: the allowance carries the ticket the server issued for that very call.
-function decide(call: ToolCall, allowed: boolean) {
+function decide(call: AiToolCall, allowed: boolean) {
   if (!allowed)
     void send(`${deniedLabel} ${call.name}`)
   else if (call.approval !== undefined)
@@ -519,10 +519,10 @@ function actionsKey(event: KeyboardEvent, id: number) {
 // The turn as a block gets it: plain data, not the session's own record.
 const viewOf = (turn: Turn): ChatTurnView => ({ role: turn.role, content: withoutApproval(turn.content), sources: turn.sources, calls: turn.calls ?? [], stopped: turn.stopped === true, pending: false })
 
-const callKey = (call: ToolCall) => `${call.name}\n${JSON.stringify(call.input)}`
+const callKey = (call: AiToolCall) => `${call.name}\n${JSON.stringify(call.input)}`
 
 // Only the calls of the last turn can still be allowed: a later message has moved on.
-function waitingFor(turn: Turn): ToolCall[] {
+function waitingFor(turn: Turn): AiToolCall[] {
   if (busy() || history().at(-1)?.id !== turn.id)
     return []
 

@@ -711,8 +711,8 @@ it('adds kayjs-auth as the one line auth() in the config, with the guard and the
 
     expect(result.written).toEqual(['.env.example', 'kay.config.ts', 'src/routes/_guard.ts'])
     expect(existsSync(join(dir, 'src/auth.ts'))).toBe(false)
-    expect(await Bun.file(join(dir, 'src/routes/_guard.ts')).text()).toContain('import { guard } from \'@kaynooo/kayjs-auth\'\n')
-    expect(await Bun.file(join(dir, 'src/routes/_guard.ts')).text()).toContain('export default guard()')
+    expect(await Bun.file(join(dir, 'src/routes/_guard.ts')).text()).toContain('import { authGuard } from \'@kaynooo/kayjs-auth\'\n')
+    expect(await Bun.file(join(dir, 'src/routes/_guard.ts')).text()).toContain('export default authGuard()')
 
     const config = await Bun.file(join(dir, 'kay.config.ts')).text()
 

@@ -137,25 +137,6 @@ describe('deprecated-duration-seconds', () => {
 
 describe('deprecated-export-names', () => {
   it('renames an export of the module it is imported from with its uses, and leaves the same name of another module', async () => {
-    const root = await project({ 'src/a.ts': 'import { cssColours } from \'@kaynooo/kayjs-mail\'\n\nexport const a = cssColours(\'\')\n', 'src/b.ts': 'import { cssColours } from \'./mine\'\n\nexport const b = cssColours\n' })
-
-    try {
-      const found = await exportNames(root, {})
-
-      expect(found).toHaveLength(1)
-      expect(found[0]?.fixes?.[0]?.safe).toBe(true)
-      await applySafeFixes(root, found)
-      expect(await read(root, 'src/a.ts')).toBe('import { cssColors } from \'@kaynooo/kayjs-mail\'\n\nexport const a = cssColors(\'\')\n')
-      expect(await read(root, 'src/b.ts')).toContain('cssColours')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-})
-
-describe('deprecated-export-names', () => {
-  it('renames an export of the module it is imported from with its uses, and leaves the same name of another module', async () => {
     const source = 'import { cssColours } from \'@kaynooo/kayjs-mail\'\nimport { EveryOptions, jobTables } from \'kay/server\'\nimport { jobTables as definitions } from \'kay/pg-orm\'\n\nexport const a = [cssColours(\'\'), jobTables, definitions] as [unknown, unknown, unknown]\nexport type B = EveryOptions\n'
     const root = await project({ 'src/a.ts': source, 'src/b.ts': 'import { cssColours } from \'./mine\'\nimport { EveryOptions } from \'kay\'\n\nexport const b = [cssColours, {} as EveryOptions]\n' })
 
@@ -168,6 +149,28 @@ describe('deprecated-export-names', () => {
       expect(await read(root, 'src/a.ts')).toBe('import { cssColors } from \'@kaynooo/kayjs-mail\'\nimport { ScheduleEveryOptions, jobTableNames } from \'kay/server\'\nimport { jobTables as definitions } from \'kay/pg-orm\'\n\nexport const a = [cssColors(\'\'), jobTableNames, definitions] as [unknown, unknown, unknown]\nexport type B = ScheduleEveryOptions\n')
       expect(await read(root, 'src/b.ts')).toContain('cssColours')
       expect(await read(root, 'src/b.ts')).toContain('EveryOptions')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('renames the library types and functions by the module they come from', async () => {
+    const files = {
+      'src/_guard.ts': 'import { guard } from \'@kaynooo/kayjs-auth\'\n\nexport default guard({ redirect: \'/login\' })\n',
+      'src/ai.ts': 'import type { Message, Reply } from \'@kaynooo/kayjs-ai\'\n\nexport const a = (reply: Reply, history: Message[]) => [reply, history]\n',
+      'src/mail.ts': 'import type { Reply } from \'@kaynooo/kayjs-mail\'\nimport type { Member } from \'@kaynooo/kayjs-cms/room\'\nimport type { SeedEntry } from \'@kaynooo/kayjs-cms/pg\'\n\nexport const m = (reply: Reply, member: Member, seed: SeedEntry) => [reply, member, seed]\n',
+    }
+    const root = await project(files)
+
+    try {
+      const found = await exportNames(root, {})
+
+      expect(found).toHaveLength(6)
+      await applySafeFixes(root, found)
+      expect(await read(root, 'src/_guard.ts')).toBe(files['src/_guard.ts'].replaceAll('guard', 'authGuard'))
+      expect(await read(root, 'src/ai.ts')).toContain('(reply: AiReply, history: AiMessage[])')
+      expect(await read(root, 'src/mail.ts')).toContain('(reply: MailReply, member: CmsMember, seed: CmsSeedEntry)')
     }
     finally {
       await rm(root, { recursive: true, force: true })

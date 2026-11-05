@@ -1,9 +1,9 @@
-import type { Reply } from '@kaynooo/kayjs-mail'
+import type { MailReply } from '@kaynooo/kayjs-mail'
 import { mailer } from '@kaynooo/kayjs-mail'
 import Plain from './mails/plain.kay'
 
 // The replies handed to the inbound route, which a test reads.
-export const replies: Reply[] = []
+export const replies: MailReply[] = []
 
 export const mail = mailer({ from: 'Fixture <hello@fixture.test>', locale: 'fr', inbound: (reply) => {
   replies.push(reply)

@@ -1,11 +1,11 @@
 import type { ContentLoader } from 'kay/content'
-import type { LoaderOptions, Row, SavedEntry } from './shared'
+import type { CmsSeedEntry, LoaderOptions, Row, SavedEntry } from './shared'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { Database } from 'bun:sqlite'
 import { contentFile, existsError, loadedOf, placeOf, scopeOf, seededKey, seedEntries, siblingName, swappedData, tableOf, watcher } from './shared'
 
-export type { LoaderOptions, SeedEntry } from './shared'
+export type { CmsSeedEntry, LoaderOptions }
 
 export interface SqliteLoaderOptions extends LoaderOptions {
   // The database file, created with its folder when missing, or a `bun:sqlite` `Database` the app opened. The file of the app's `store: sqliteData(path)` when left out, else `data/content.sqlite`.
@@ -184,3 +184,6 @@ function connect(path: string): Database {
 
   return db
 }
+
+/** @deprecated Renamed `CmsSeedEntry` in 1.90, as `kay/test` has a `SeedEntry` of its own; the old name works until 1.93. */
+export type SeedEntry = CmsSeedEntry

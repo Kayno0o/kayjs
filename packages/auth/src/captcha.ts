@@ -37,7 +37,7 @@ export interface CaptchaCheck {
   widget?: CaptchaWidget | undefined
 }
 
-export interface ProofOfWorkOptions {
+export interface AuthProofOfWorkOptions {
   // The highest number the browser may hash up to past the threshold, 100,000 by default, doubled with each attempt after up to 16 times.
   difficulty?: number | undefined
   // How long a challenge stays good, an hour by default.
@@ -71,7 +71,7 @@ const COUNTED: Record<CaptchaAction, { key: string, limit: keyof typeof DEFAULT_
 }
 
 // A challenge kay's script solves in the browser, with no third party, no widget and no cookie: it costs a bot CPU per request rather than proving a human.
-export function proofOfWork(options: ProofOfWorkOptions = {}): ProofOfWorkCaptcha {
+export function proofOfWork(options: AuthProofOfWorkOptions = {}): ProofOfWorkCaptcha {
   const difficulty = options.difficulty ?? 100_000
 
   // kay takes up to 1,000,000,000, which the difficulty reaches doubled to its most.

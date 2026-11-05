@@ -1,6 +1,6 @@
 import type { GuardContext } from 'kay'
 import type { Passwords } from './password'
-import type { Action } from './roles'
+import type { CmsAction } from './roles'
 import { localPath } from 'kay'
 import { keyedDigest, READ_METHODS } from 'kay/library'
 import { wording } from 'kay/words'
@@ -34,7 +34,7 @@ export function refusalStatus(error: unknown): number | undefined {
 const REPEATED_SLASHES = /\/{2,}/g
 
 // The name of each action in a refusal.
-const ACTION_NAMES: Record<Action, () => string> = {
+const ACTION_NAMES: Record<CmsAction, () => string> = {
   publish: () => wording('cms.role.publish', 'publish or unpublish'),
   review: () => wording('cms.role.review', 'approve or send back an entry in review'),
   delete: () => wording('cms.role.delete', 'delete'),
@@ -95,7 +95,7 @@ export async function whoOf(ctx: GuardContext): Promise<string> {
 }
 
 // The actions the signed-in person may not do, each with the reason a disabled control gives; empty when the app lists no roles.
-export type Denials = Partial<Record<Action, string>>
+export type Denials = Partial<Record<CmsAction, string>>
 
 function deniedTo(member: Member | undefined): Denials {
   const { roles } = settings()
@@ -126,12 +126,12 @@ export async function memberOfRequest(request: Request): Promise<Member | undefi
   return members.get(request)
 }
 
-function refusal(action: Action): string {
+function refusal(action: CmsAction): string {
   return wording('cms.guard.forbidden', 'Your role may not do this: {action}', { action: ACTION_NAMES[action]() })
 }
 
 // Whether the signed-in person may do an action: everyone the guard admits may when the app lists no roles, and nobody may when it lists some and none of the person's roles allows it.
-export async function may(ctx: GuardContext, action: Action): Promise<boolean> {
+export async function may(ctx: GuardContext, action: CmsAction): Promise<boolean> {
   const { roles } = settings()
 
   if (roles === undefined)
@@ -142,7 +142,7 @@ export async function may(ctx: GuardContext, action: Action): Promise<boolean> {
   return member?.held.some(role => roles.get(role)?.has(action)) ?? false
 }
 
-export function forbidden(ctx: GuardContext, action: Action): never {
+export function forbidden(ctx: GuardContext, action: CmsAction): never {
   return ctx.deny(403, refusal(action))
 }
 

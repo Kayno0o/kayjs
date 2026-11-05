@@ -1,16 +1,16 @@
 import type { Action } from 'kay'
-import type { ToolAction, ToolCall } from '../../src'
+import type { AiToolCall, ToolAction } from '../../src'
 
 export interface Outcome {
   text: string
-  calls: ToolCall[]
+  calls: AiToolCall[]
   finish: string | undefined
   usage: { inputTokens: number, outputTokens: number } | undefined
 }
 
 export interface Step {
   text: string
-  calls: ToolCall[]
+  calls: AiToolCall[]
 }
 
 // The actions of the fixture's tools page, as the tests reach them.

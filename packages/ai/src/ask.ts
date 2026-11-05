@@ -2,7 +2,7 @@ import type { TSchema } from 'kay/library'
 import type { HeldCall } from './conversation'
 import type { Offered } from './loop'
 import type { Replaces } from './resume'
-import type { AskOptions, FunctionTool, Message, Piece, Provider, ProviderMessage, ProviderRequest, Reply, ReplyOf, StructuredAskOptions, Timeouts, ToolAction } from './types'
+import type { AiMessage, AiReply, AskOptions, FunctionTool, Piece, Provider, ProviderMessage, ProviderRequest, ReplyOf, StructuredAskOptions, Timeouts, ToolAction } from './types'
 import { actionTool, configError, currentRequest, durationSeconds, jsonSchemaOf, refundRateLimit } from 'kay/library'
 import { attachmentsOf, checkAccepted, DEFAULT_MAX_ATTACHMENT_BYTES, estimatedChars, mediaChars, readAttachments, toolChars } from './attachments'
 import { choose, given } from './config'
@@ -28,7 +28,7 @@ const DEFAULT_IDLE_TIMEOUT = '60s'
 const ROLES = new Set(['user', 'assistant'])
 
 // `replayed` keeps the calls and results of messages the library built from a stored conversation; a prompt the app gives holds none.
-function messagesOf(prompt: string | Message[], replayed = false): Message[] {
+function messagesOf(prompt: string | AiMessage[], replayed = false): AiMessage[] {
   if (typeof prompt === 'string')
     return [{ role: 'user', content: prompt }]
 
@@ -79,7 +79,7 @@ function tooManyChars(chars: number, max: number): AiError {
 
 // Runs a stream over a request whose attachments are read once it is first read, so `ask` itself stays synchronous; they are read at most once however many steps a tool loop takes.
 // `priced` is told once what the files really cost beyond the guess made before they were read, which a reply reporting no usage is counted by.
-function reading(request: ProviderRequest, messages: readonly Message[], maxBytes: number, maxChars: number, provider: Provider, priced: (extra: number) => void): Via {
+function reading(request: ProviderRequest, messages: readonly AiMessage[], maxBytes: number, maxChars: number, provider: Provider, priced: (extra: number) => void): Via {
   let ready: Promise<ProviderMessage[]> | undefined
   let counted = false
 
@@ -179,9 +179,9 @@ export function replaces(request: Request | undefined = currentRequest()): Repla
 // The reply stops, and the provider request with it, when the request being answered is aborted, when `options.signal` is, or when a reader leaves early; with `outlive` only `options.signal` and `reply.stop()` stop it.
 // A call a Chat sends to resume or stop a reply that outlived its page gets that reply, or an empty one, and asks no provider.
 // With a `schema` the reply is the object it describes instead: `await` gives it checked and typed, `for await` the object so far.
-export function ask<const Schema extends TSchema>(prompt: string | Message[], options: StructuredAskOptions<Schema>): ReplyOf<Schema>
-export function ask(prompt: string | Message[], options?: AskOptions): Reply
-export function ask(prompt: string | Message[], options: AskOptions | StructuredAskOptions = {}): Reply | ReplyOf<TSchema> {
+export function ask<const Schema extends TSchema>(prompt: string | AiMessage[], options: StructuredAskOptions<Schema>): ReplyOf<Schema>
+export function ask(prompt: string | AiMessage[], options?: AskOptions): AiReply
+export function ask(prompt: string | AiMessage[], options: AskOptions | StructuredAskOptions = {}): AiReply | ReplyOf<TSchema> {
   const schema = 'schema' in options ? options.schema : undefined
   const call = replyCall()
   const held = heldCall()
@@ -191,7 +191,7 @@ export function ask(prompt: string | Message[], options: AskOptions | Structured
 }
 
 // A Chat with `keepOnServer` posts its new message alone, and the conversation it holds on the server is asked with it.
-function asked(prompt: string | Message[], options: AskOptions, schema: TSchema | undefined, call: ReplyCall | undefined, held: HeldCall | undefined): Reply {
+function asked(prompt: string | AiMessage[], options: AskOptions, schema: TSchema | undefined, call: ReplyCall | undefined, held: HeldCall | undefined): AiReply {
   if (held === undefined)
     return reply(prompt, options, schema, call)
 
@@ -254,7 +254,7 @@ async function ownerOf(request: Request): Promise<string | undefined> {
 }
 
 // The reply a Chat resumes or stops by the id it sent, or an empty one when none is kept for it: such a call never asks a provider, nor counts against `ai({ budget, rateLimit })`, and one that finds the reply its visitor kept gives back the attempt the action's own `protect.rateLimit` counted.
-function resumed(call: ReplyCall | undefined): Reply | undefined {
+function resumed(call: ReplyCall | undefined): AiReply | undefined {
   if (call === undefined || call.op === 'start')
     return undefined
 
@@ -273,14 +273,14 @@ function resumed(call: ReplyCall | undefined): Reply | undefined {
 }
 
 // A reply that outlives its request is kept under the id its Chat named, for the Chat to find after a reload.
-function remembered(made: Reply, options: AskOptions, call: ReplyCall | undefined): Reply {
+function remembered(made: AiReply, options: AskOptions, call: ReplyCall | undefined): AiReply {
   if (options.outlive === true && call?.op === 'start' && call.key !== undefined)
     keep(call.key, made, call.owner())
 
   return made
 }
 
-function reply(prompt: string | Message[], options: AskOptions, answer: TSchema | undefined, call: ReplyCall | undefined, replayed = false): Reply {
+function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchema | undefined, call: ReplyCall | undefined, replayed = false): AiReply {
   const messages = messagesOf(prompt, replayed)
   const { provider, model: configured } = options.provider === undefined ? choose() : { provider: given(options.provider), model: options.provider.model }
   const model = options.model ?? configured ?? options.provider?.model
@@ -313,7 +313,7 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
   let maxSteps = DEFAULT_MAX_STEPS
 
   // What goes to the provider for these messages and this system prompt; `onRequest` may change both, so it is built again for what it returns.
-  const plan = (current: Message[], system: string | undefined) => {
+  const plan = (current: AiMessage[], system: string | undefined) => {
     const attached = current.some(message => message.attachments !== undefined)
     // Without attachments the messages are a provider's as they are; with them the request is completed once they are read.
     const request: ProviderRequest = { messages: attached ? [] : current as ProviderMessage[], system, model, maxTokens, temperature: options.temperature, reasoning: options.reasoning, cache: options.cache, body: extraBody(options.body, 'ask({ body })'), timeouts: timeoutsOf(options.timeout), schema }

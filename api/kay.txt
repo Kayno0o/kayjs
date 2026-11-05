@@ -2121,7 +2121,7 @@ interface EditorProps
 [./edit] EntryRef
 interface EntryRef
   collection: string
-  locale?: string
+  locale?: string | undefined
   slug: string
 
 [./edit] showDraft
@@ -2131,7 +2131,7 @@ function showDraft(entries: DraftEntry[]): Promise<{ issues?: DraftIssue[]; }>
 interface Unclickable extends EntryRef
   collection: string
   frozen?: true
-  locale?: string
+  locale?: string | undefined
   path: string
   slug: string
 
@@ -2546,6 +2546,9 @@ class CspViolationError
   source?: string | undefined
   url: string
 
+[./server] dataTableNames
+const dataTableNames: readonly string[]
+
 [./server] dataTables
 const dataTables: readonly string[]
 
@@ -2596,7 +2599,7 @@ function enterPreview(ctx: { cookies: CookieMap; request: Request; }, options?: 
 function eventStream<T>(source: Source<T>): EventStream<T>
 
 [./server] EveryOptions
-type EveryOptions = Omit<ScheduleOptions, 'tz'>
+type EveryOptions = ScheduleEveryOptions
 
 [./server] exitPreview
 function exitPreview(ctx: { cookies: CookieMap; }): void
@@ -2727,6 +2730,9 @@ interface JobStore extends StoreBase
 } | {
   until: number;
 }) => MaybePromise<boolean>) | undefined
+
+[./server] jobTableNames
+const jobTableNames: readonly ["kay_jobs", "kay_locks"]
 
 [./server] jobTables
 const jobTables: readonly ["kay_jobs", "kay_locks"]
@@ -3399,7 +3405,7 @@ function s3Files(options?: S3Options & { publicUrl?: string | undefined; }): Fil
 function safePath(root: string, name: string): string | undefined
 
 [./server] schedule
-function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: EveryOptions | undefined): Elysia<"", {
+function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: ScheduleEveryOptions | undefined): Elysia<"", {
   decorator: {};
   store: {};
   derive: {};
@@ -3485,6 +3491,9 @@ function schedule<const Table extends Record<string, Jobs>>(table: Table & {
   standaloneSchema: {};
   response: {};
 }>
+
+[./server] ScheduleEveryOptions
+type ScheduleEveryOptions = Omit<ScheduleOptions, 'tz'>
 
 [./server] ScheduleOptions
 interface ScheduleOptions

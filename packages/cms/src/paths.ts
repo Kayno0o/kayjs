@@ -1,4 +1,4 @@
-import type { DraftEntry, EntryRef } from './kay/contract'
+import type { CmsDraftEntry, EntryRef } from './kay/contract'
 import type { FieldPath } from './markers'
 import { BODY } from './markers'
 // Field paths as kay's markers write them: dotted keys, list indexes as numbers, `sections.1.heading`.
@@ -78,7 +78,7 @@ export function prefixes(path: string): string[] {
 }
 
 // The paths where two entries' data differ, down to the leaves, then `BODY` when their Markdown bodies do.
-export function differing(a: DraftEntry, b: DraftEntry): FieldPath[] {
+export function differing(a: CmsDraftEntry, b: CmsDraftEntry): FieldPath[] {
   const paths: FieldPath[] = []
 
   function walk(path: string, left: unknown, right: unknown): void {

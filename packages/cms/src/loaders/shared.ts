@@ -45,7 +45,7 @@ export function contentSource(): SQL | string {
 }
 
 // An entry a loader holds from its first start: the app's initial content.
-export interface SeedEntry {
+export interface CmsSeedEntry {
   slug: string
   // In a localized collection, the locale whose folder holds the entry.
   locale?: string | undefined
@@ -57,7 +57,7 @@ export interface LoaderOptions {
   // The collection's name in the loader, keying its rows: any name unique among the collections sharing the table.
   name: string
   // The entries written once per collection, never again, so an entry an editor deleted stays deleted: a list, or a function returning it. Processes starting together may each run the function, one writing its result.
-  seed?: readonly SeedEntry[] | (() => readonly SeedEntry[] | Promise<readonly SeedEntry[]>) | undefined
+  seed?: readonly CmsSeedEntry[] | (() => readonly CmsSeedEntry[] | Promise<readonly CmsSeedEntry[]>) | undefined
   // The table holding every collection's entries, `kay_content` by default.
   table?: string | undefined
   // How long the entries are served before the next read refreshes them, as `collection()` loaders keep them.
@@ -113,7 +113,7 @@ export function loadedOf(row: Row): LoadedEntry {
   return row.body === null ? { slug: row.place, data: JSON.parse(row.data) as unknown } : { slug: row.place, data: JSON.parse(row.data) as unknown, body: row.body }
 }
 
-export async function seedEntries(seed: LoaderOptions['seed']): Promise<readonly SeedEntry[]> {
+export async function seedEntries(seed: LoaderOptions['seed']): Promise<readonly CmsSeedEntry[]> {
   return typeof seed === 'function' ? seed() : seed ?? []
 }
 

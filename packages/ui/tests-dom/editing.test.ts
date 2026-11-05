@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
-import { editing } from '../src/editing'
+import { rowEditing } from '../src/editing'
 import Editing from '../tests/fixture/src/components/editing.kay'
 import { click } from './dom'
 
@@ -35,7 +35,7 @@ test('editing opens one dialog on a row or a draft, and forgets it once the dial
 })
 
 test('editing opens on nothing to start from when the draft is left out, and holds a function row as it is', () => {
-  const blank = editing<() => string>()
+  const blank = rowEditing<() => string>()
   const greet = () => 'hi'
 
   blank.create()

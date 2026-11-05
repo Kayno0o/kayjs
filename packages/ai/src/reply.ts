@@ -1,4 +1,4 @@
-import type { AskHooks, CodeBlock, DeltasOptions, Finish, Piece, Progress, Reply, Source, Step, ToolCall, Usage } from './types'
+import type { AiReply, AiToolCall, AskHooks, CodeBlock, DeltasOptions, Finish, Piece, Progress, Source, Step, Usage } from './types'
 import { logFrom } from 'kay'
 import { AiError } from './errors'
 import { highlighting } from './highlight'
@@ -6,13 +6,13 @@ import { tell } from './hooks'
 
 const log = logFrom('kayjs-ai')
 
-function snapshot(call: ToolCall): ToolCall {
+function snapshot(call: AiToolCall): AiToolCall {
   return { ...call, input: { ...call.input } }
 }
 
 // A reply over what `open` yields once first read, with `signals` stopping it when any aborts.
 // The text is kept as it comes, so any number of readers (`await`, `for await`, `usage`) share one provider request.
-export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting, outlive = false, onEnd?: () => void, { resumed = false, sources = [], hooks = {} }: { resumed?: boolean | undefined, sources?: readonly Source[] | undefined, hooks?: AskHooks | undefined } = {}): Reply {
+export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting, outlive = false, onEnd?: () => void, { resumed = false, sources = [], hooks = {} }: { resumed?: boolean | undefined, sources?: readonly Source[] | undefined, hooks?: AskHooks | undefined } = {}): AiReply {
   const controller = new AbortController()
   const deltas: string[] = []
   // Appended to as it streams, so a snapshot reads it without joining the pieces again.
@@ -21,7 +21,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
   const counted = Promise.withResolvers<Usage | undefined>()
   const ending = Promise.withResolvers<Finish | undefined>()
   const total: Partial<Usage> = {}
-  const calls: ToolCall[] = []
+  const calls: AiToolCall[] = []
   const steps: Step[] = []
   // Counts each change to the text, to a call or to the reasoning, which `progress()` reads from.
   let version = 0

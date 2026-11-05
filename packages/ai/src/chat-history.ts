@@ -1,4 +1,4 @@
-import type { ChatMessage, Message } from './types'
+import type { AiMessage, ChatMessage } from './types'
 import { usableSources } from './chat-sources'
 
 // The most characters a send posts unless the chat is told otherwise, under the 50,000 `ask` takes by default.
@@ -13,16 +13,16 @@ const POSTED_FILE_BYTES = 24 * 1024 * 1024
 // The bytes of files of earlier messages a send posts again, so a long conversation of screenshots does not upload them all at every send; the last message's files are always posted.
 export const HISTORY_FILE_BYTES = 8 * 1024 * 1024
 
-const cost = ({ content, attachments }: Pick<Message, 'attachments' | 'content'>) => content.length + (attachments?.length ?? 0) * FILE_CHARACTERS
+const cost = ({ content, attachments }: Pick<AiMessage, 'attachments' | 'content'>) => content.length + (attachments?.length ?? 0) * FILE_CHARACTERS
 
 // The files a turn was sent with: those the visitor attached in this page, which a restored turn no longer has.
-export function filesOf(turn: Pick<Message, 'attachments'>): File[] {
+export function filesOf(turn: Pick<AiMessage, 'attachments'>): File[] {
   return (turn.attachments ?? []).filter(attachment => attachment instanceof File)
 }
 
 const bytesOf = (files: readonly File[]) => files.reduce((sum, file) => sum + file.size, 0)
 
-function said(turns: readonly Message[]): ChatMessage[] {
+function said(turns: readonly AiMessage[]): ChatMessage[] {
   return turns.flatMap(({ role, content, attachments }) => {
     const sent = filesOf({ attachments })
 
@@ -54,7 +54,7 @@ function withinBudget(turns: ChatMessage[], budget: number): ChatMessage[] {
 }
 
 // What a send posts: the latest `keep` messages that have text or files, from the first user message on, since a provider refuses a history opening on the assistant. The last message is the visitor's, so one is always posted. The files of the messages before it are posted again only up to `fileBytes` together, the newest first.
-export function posted(turns: readonly Message[], keep: number, maxChars = POSTED_CHARACTERS, fileBytes = HISTORY_FILE_BYTES): ChatMessage[] {
+export function posted(turns: readonly AiMessage[], keep: number, maxChars = POSTED_CHARACTERS, fileBytes = HISTORY_FILE_BYTES): ChatMessage[] {
   let latest = withinBudget(said(turns).slice(-Math.max(1, keep)), fileBytes)
   let size = latest.reduce((sum, turn) => sum + cost(turn), 0)
 
@@ -70,14 +70,14 @@ export function posted(turns: readonly Message[], keep: number, maxChars = POSTE
 }
 
 // The cap to post under after a 413 for `sent`: half what it held, so a few refusals reach any cap.
-export function shrunk(sent: readonly Pick<Message, 'attachments' | 'content'>[]): number {
+export function shrunk(sent: readonly Pick<AiMessage, 'attachments' | 'content'>[]): number {
   return Math.floor(sent.reduce((sum, turn) => sum + cost(turn), 0) / 2)
 }
 
 // What a stopped or finished conversation keeps in session storage: the text of each turn and the sources it cites, not the tool calls, whose arguments and results may be large.
 const KEPT_CHARACTERS = 200_000
 
-interface KeptTurn extends Message {
+interface KeptTurn extends AiMessage {
   stopped?: boolean | undefined
 }
 

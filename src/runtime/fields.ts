@@ -8,7 +8,7 @@ import { html } from './rendered'
 export interface EntryRef {
   collection: string
   slug: string
-  locale?: string
+  locale?: string | undefined
 }
 
 // What one request in edit mode read of the entries: each field by an index the markers carry, the fields whose text was read and not rendered yet, by that text and in the order read, the numbers read since anything unrelated to a field rendered, how many fields rendered so far (what tells a read made before a render from one made after it), and every entry read.

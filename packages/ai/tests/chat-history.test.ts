@@ -1,10 +1,10 @@
-import type { Message } from '../src/types'
+import type { AiMessage } from '../src/types'
 import { expect, test } from 'bun:test'
 import { posted, restored, shrunk, stored } from '../src/chat-history'
 
-const user = (content: string): Message => ({ role: 'user', content })
-const assistant = (content: string): Message => ({ role: 'assistant', content })
-const roles = (turns: Message[]) => turns.map(({ role, content }) => `${role[0]}:${content}`)
+const user = (content: string): AiMessage => ({ role: 'user', content })
+const assistant = (content: string): AiMessage => ({ role: 'assistant', content })
+const roles = (turns: AiMessage[]) => turns.map(({ role, content }) => `${role[0]}:${content}`)
 
 test('the history posted never starts on an assistant message, whatever keep is', () => {
   const turns = [assistant('hi'), user('a'), assistant('b'), user('c'), assistant('d'), user('e')]

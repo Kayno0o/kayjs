@@ -1,5 +1,5 @@
 import type { Action } from 'kay'
-import type { DeepPartial, ToolCall } from '../../src'
+import type { AiToolCall, DeepPartial } from '../../src'
 
 export interface Verdict {
   title: string
@@ -13,5 +13,5 @@ export interface Verdicts {
   summarize: Action<{ prompt: string }, DeepPartial<Verdict>[]>
   triage: Action<{ prompt: string }, DeepPartial<Verdict>[]>
   whole: Action<{ prompt: string }, Verdict>
-  outcome: Action<{ prompt: string, maxSteps?: number }, { value: Verdict, calls: ToolCall[], finish: string | undefined, usage: { inputTokens: number, outputTokens: number } | undefined }>
+  outcome: Action<{ prompt: string, maxSteps?: number }, { value: Verdict, calls: AiToolCall[], finish: string | undefined, usage: { inputTokens: number, outputTokens: number } | undefined }>
 }

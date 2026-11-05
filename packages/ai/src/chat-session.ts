@@ -1,7 +1,7 @@
 import type { Action, ActionStream, Failure, Signal } from 'kay'
 import type { Attachments } from './chat-attachments'
 import type { ConversationAnswer, ConversationSummary } from './conversation-title'
-import type { ChatFailure, ChatMessage, ChatTurn, CodeBlock, Message, Progress, Source, ToolCall } from './types'
+import type { AiMessage, AiToolCall, ChatFailure, ChatMessage, ChatTurn, CodeBlock, Progress, Source } from './types'
 import { ActionError, effect, onMount, signal, untrack } from 'kay'
 import { markdownReady } from 'kay/markdown'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, restored, shrunk, stored } from './chat-history'
@@ -9,12 +9,12 @@ import { sameSources, usableSources } from './chat-sources'
 import { renamedTitle, titleOf } from './conversation-title'
 import { CONVERSATION_HEADER, CONVERSATION_ID, REPLACES_HEADER, REPLY_HEADER } from './resume'
 
-export interface Turn extends Message {
+export interface Turn extends AiMessage {
   id: number
   // A reply the visitor stopped, or one whose stream broke off, cut where it was.
   stopped?: boolean | undefined
   // The tools the reply called, when the action streams `reply.progress()`.
-  calls?: ToolCall[] | undefined
+  calls?: AiToolCall[] | undefined
   // The reply's code blocks the server highlighted.
   code?: CodeBlock[] | undefined
   // What the model thought before answering, when the action streams `reply.progress()` and the provider sends it.
@@ -35,7 +35,7 @@ export interface ChatSessionOptions {
   readonly errorMessage: string
   readonly attachments: Attachments
   // The status line of a call whose status changed.
-  readonly say: (call: ToolCall) => string
+  readonly say: (call: AiToolCall) => string
   // Puts the cursor back in the field.
   readonly focus: () => void
   // Takes the log back to its newest turn, as a reply starts.
@@ -55,7 +55,7 @@ export interface ChatSessionOptions {
   readonly onReply?: ((turn: Turn) => unknown) | undefined
   readonly onStop?: (() => unknown) | undefined
   readonly onError?: ((failure: ChatFailure) => unknown) | undefined
-  readonly onToolCall?: ((call: ToolCall) => unknown) | undefined
+  readonly onToolCall?: ((call: AiToolCall) => unknown) | undefined
   readonly onRegenerate?: (() => unknown) | undefined
   readonly onEdit?: ((text: string) => unknown) | undefined
 }
@@ -156,7 +156,7 @@ export function createChatSession(options: ChatSessionOptions) {
   const partial = signal('')
   const thought = signal('')
   const thoughtOpen = signal(false)
-  const calls = signal<ToolCall[]>([])
+  const calls = signal<AiToolCall[]>([])
   const code = signal<CodeBlock[]>([])
   const found = signal<Source[]>([])
   // What the status line said of the calls, one line each and added to it, since a line replaced before the screen reader reads it is lost.
@@ -361,7 +361,7 @@ export function createChatSession(options: ChatSessionOptions) {
   }
 
   // Says the calls whose status changed since the last snapshot.
-  function announce(next: ToolCall[]) {
+  function announce(next: AiToolCall[]) {
     const said: { id: number, text: string }[] = []
 
     for (const call of next) {

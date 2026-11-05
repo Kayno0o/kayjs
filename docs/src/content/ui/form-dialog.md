@@ -81,11 +81,11 @@ FormDialog(
 
 ## Adding and editing rows
 
-A list adding and editing its rows through one dialog keeps which row is open with `editing()`, from the package: `edit(row)` opens the dialog on a row, `create(draft)` on what a new row starts from, and `close` shuts it, forgetting both.
+A list adding and editing its rows through one dialog keeps which row is open with `rowEditing()`, from the package: `edit(row)` opens the dialog on a row, `create(draft)` on what a new row starts from, and `close` shuts it, forgetting both.
 
 ```kay
 ---
-import { editing } from '@kaynooo/kayjs-ui'
+import { rowEditing } from '@kaynooo/kayjs-ui'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
 import FormField from '@kaynooo/kayjs-ui/form-field.kay'
@@ -93,7 +93,7 @@ import { save } from '../routes/friends.kay'
 
 const { friends } = props<{ friends: Friend[] }>()
 
-const friend = editing<Friend, { name: string }>()
+const friend = rowEditing<Friend, { name: string }>()
 ---
 Button(label="Add" onClick={() => friend.create({ name: '' })})
 for one of friends key={one.id}
@@ -111,7 +111,7 @@ FormDialog(
     input.kui-field-input(name="name" value={friend.row()?.name ?? friend.draft()?.name})
 ```
 
-`row()` and `draft()` read undefined while the other is open, and both while it is closed. Leave the draft's type out, `editing<Friend>()`, and `create()` takes nothing.
+`row()` and `draft()` read undefined while the other is open, and both while it is closed. Leave the draft's type out, `rowEditing<Friend>()`, and `create()` takes nothing.
 
 ## Labels
 

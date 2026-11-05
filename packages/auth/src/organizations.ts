@@ -31,7 +31,7 @@ export interface Membership<Role extends string = string> {
   joinedAt: Date
 }
 
-export interface Member<Role extends string = string> {
+export interface AuthMember<Role extends string = string> {
   user: { id: string, email: string | null, username: string | null }
   roles: Role[]
   joinedAt: Date
@@ -59,7 +59,7 @@ export type MemberResult = { ok: true } | { ok: false, error: OrganizationFailur
 
 export type InviteResult<Role extends string = string> = { ok: true, invitation: Invitation<Role> } | { ok: false, error: OrganizationFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable' }
 
-export type ListMembersResult<Role extends string = string> = { ok: true, members: Member<Role>[] } | { ok: false, error: OrganizationFailure }
+export type ListMembersResult<Role extends string = string> = { ok: true, members: AuthMember<Role>[] } | { ok: false, error: OrganizationFailure }
 
 export type ListInvitationsResult<Role extends string = string> = { ok: true, invitations: Invitation<Role>[] } | { ok: false, error: OrganizationFailure }
 
@@ -236,7 +236,7 @@ export async function listMembers(state: RequestState, ref: string): Promise<Lis
   if (!found.ok)
     return found
 
-  const members: Member[] = []
+  const members: AuthMember[] = []
 
   const held = await store.members.listByOrganization(found.organization.id)
   const users = await usersById(state.core.store, held.map(member => member.userId))

@@ -4,12 +4,12 @@
 
 ### Guards and gates
 
-A `_guard.ts` default-exports kayjs-auth's guard, `guard({ redirect, require, scope })` from the package, which asks the request's `auth`, so imports no module (`auth.guard()` is the same):
+A `_guard.ts` default-exports kayjs-auth's guard, `authGuard({ redirect, require, scope })` from the package, which asks the request's `auth`, so imports no module (`auth.guard()` is the same):
 
 ```ts
-import { guard } from '@kaynooo/kayjs-auth'
+import { authGuard } from '@kaynooo/kayjs-auth'
 
-export default guard({ redirect: '/login', require: 'editor' })
+export default authGuard({ redirect: '/login', require: 'editor' })
 ```
 
 Plain Elysia routes, such as an API, close behind a gate:

@@ -1,6 +1,9 @@
 [.] ai
 function ai(options?: AiOptions): KayExtension<AnyElysia>
 
+[.] AiAttachment
+type AiAttachment = Blob | Uint8Array | ArrayBuffer | StoredFile
+
 [.] AiError
 class AiError
   new (kind: AiErrorKind, message: string, { status, retryAfter, partial, limit, fields, cause }?: AiErrorDetails): AiError
@@ -19,6 +22,13 @@ type AiErrorKind = | 'auth' // Too many requests (429): `retryAfter` is the seco
 [.] AiLimit
 type AiLimit = 'asks' | 'budget' | 'total'
 
+[.] AiMessage
+interface AiMessage
+  attachments?: readonly AiAttachment[] | undefined
+  content: string
+  role: "assistant" | "user"
+  sources?: readonly Source[] | undefined
+
 [.] AiOptions
 interface AiOptions extends AskHooks
   budget?: BudgetOptions | false | undefined
@@ -29,8 +39,31 @@ interface AiOptions extends AskHooks
   onFinish?: ((done: FinishHookCall) => unknown) | undefined
   onRequest?: ((call: RequestHookCall) => Promise<RequestHookChange | undefined | void> | RequestHookChange | undefined | void) | undefined
   onStep?: ((step: Step) => unknown) | undefined
-  onToolCall?: ((call: ToolCall) => unknown) | undefined
+  onToolCall?: ((call: AiToolCall) => unknown) | undefined
   rateLimit?: LimitOptions | false | undefined
+
+[.] AiReply
+interface AiReply extends PromiseLike<string>, AsyncIterable<string>
+  calls: Promise<AiToolCall[]>
+  deltas: (options?: DeltasOptions | undefined) => AsyncIterable<string>
+  finish: Promise<Finish | undefined>
+  progress: () => AsyncIterable<Progress>
+  resumed: boolean
+  steps: Promise<Step[]>
+  stop: () => void
+  stream: () => AsyncIterable<string>
+  usage: Promise<Usage | undefined>
+
+[.] AiToolCall
+interface AiToolCall
+  approval?: string | undefined
+  id: string
+  input: Record<string, unknown>
+  label?: string | undefined
+  ms?: number | undefined
+  name: string
+  result?: string | undefined
+  status: "done" | "failed" | "running"
 
 [.] anthropic
 function anthropic(options: AnthropicOptions): Provider
@@ -44,8 +77,8 @@ interface AnthropicOptions
   model?: string | undefined
 
 [.] ask
-function ask<const Schema extends TSchema>(prompt: Message[] | string, options: StructuredAskOptions<Schema>): ReplyOf<Schema>
-function ask(prompt: Message[] | string, options?: AskOptions | undefined): Reply
+function ask<const Schema extends TSchema>(prompt: AiMessage[] | string, options: StructuredAskOptions<Schema>): ReplyOf<Schema>
+function ask(prompt: AiMessage[] | string, options?: AskOptions | undefined): AiReply
 
 [.] Asked
 interface Asked
@@ -65,7 +98,7 @@ interface AskHooks
   onFinish?: ((done: FinishHookCall) => unknown) | undefined
   onRequest?: ((call: RequestHookCall) => Promise<RequestHookChange | undefined | void> | RequestHookChange | undefined | void) | undefined
   onStep?: ((step: Step) => unknown) | undefined
-  onToolCall?: ((call: ToolCall) => unknown) | undefined
+  onToolCall?: ((call: AiToolCall) => unknown) | undefined
 
 [.] AskOptions
 interface AskOptions extends AskHooks
@@ -82,7 +115,7 @@ interface AskOptions extends AskHooks
   onFinish?: ((done: FinishHookCall) => unknown) | undefined
   onRequest?: ((call: RequestHookCall) => Promise<RequestHookChange | undefined | void> | RequestHookChange | undefined | void) | undefined
   onStep?: ((step: Step) => unknown) | undefined
-  onToolCall?: ((call: ToolCall) => unknown) | undefined
+  onToolCall?: ((call: AiToolCall) => unknown) | undefined
   outlive?: boolean | undefined
   provider?: Provider | undefined
   reasoning?: Reasoning | undefined
@@ -97,7 +130,7 @@ interface AskOptions extends AskHooks
   tools?: readonly (FunctionTool | ToolAction)[] | undefined
 
 [.] Attachment
-type Attachment = Blob | Uint8Array | ArrayBuffer | StoredFile
+type Attachment = AiAttachment
 
 [.] AudioFormat
 type AudioFormat = 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm'
@@ -140,11 +173,11 @@ interface ChatMessagesOptions
   maxLength?: number | undefined
 
 [.] ChatTurn
-type ChatTurn = Pick<Message, 'role' | 'content' | 'sources'>
+type ChatTurn = Pick<AiMessage, 'role' | 'content' | 'sources'>
 
 [.] ChatTurnView
 interface ChatTurnView extends ChatTurn
-  calls: readonly ToolCall[]
+  calls: readonly AiToolCall[]
   content: string
   pending: boolean
   role: "assistant" | "user"
@@ -195,7 +228,7 @@ interface DeltasOptions
   onRestart?: (() => void) | undefined
 
 [.] describeImage
-function describeImage(image: Attachment, options?: DescribeImageOptions): Promise<string>
+function describeImage(image: AiAttachment, options?: DescribeImageOptions): Promise<string>
 
 [.] DescribeImageOptions
 interface DescribeImageOptions
@@ -318,11 +351,7 @@ interface Media
   type: string
 
 [.] Message
-interface Message
-  attachments?: readonly Attachment[] | undefined
-  content: string
-  role: "assistant" | "user"
-  sources?: readonly Source[] | undefined
+type Message = AiMessage
 
 [.] mocked
 function mocked<const Schema extends TSchema, const Honeypot extends string = never>(action: ServerAction<Schema, unknown, Honeypot>, run: (input: (Schema & {
@@ -361,7 +390,7 @@ type Piece = {
 } | {
   toolUse: ToolUse
 } | {
-  tool: ToolCall
+  tool: AiToolCall
 } | {
   step: Step
 } | {
@@ -370,7 +399,7 @@ type Piece = {
 
 [.] Progress
 interface Progress
-  calls: ToolCall[]
+  calls: AiToolCall[]
   code?: CodeBlock[] | undefined
   outlives?: true | undefined
   reasoning?: string | undefined
@@ -388,7 +417,7 @@ interface Provider
   transcribe?: ((request: TranscribeRequest, signal: AbortSignal) => Promise<string>) | undefined
 
 [.] ProviderMessage
-interface ProviderMessage extends Omit<Message, 'attachments'>
+interface ProviderMessage extends Omit<AiMessage, 'attachments'>
   attachments?: Media[] | undefined
   calls?: ToolUse[] | undefined
   content: string
@@ -423,30 +452,21 @@ interface Replaces
   turns: number
 
 [.] Reply
-interface Reply extends PromiseLike<string>, AsyncIterable<string>
-  calls: Promise<ToolCall[]>
-  deltas: (options?: DeltasOptions | undefined) => AsyncIterable<string>
-  finish: Promise<Finish | undefined>
-  progress: () => AsyncIterable<Progress>
-  resumed: boolean
-  steps: Promise<Step[]>
-  stop: () => void
-  stream: () => AsyncIterable<string>
-  usage: Promise<Usage | undefined>
+type Reply = AiReply
 
 [.] ReplyOf
 type ReplyOf<Schema extends TSchema> = StructuredReply<Static<Schema>>
 
 [.] RequestHookCall
 interface RequestHookCall
-  messages: Message[]
+  messages: AiMessage[]
   model: string
   options: AskOptions
   system: string | undefined
 
 [.] RequestHookChange
 interface RequestHookChange
-  messages?: Message[] | undefined
+  messages?: AiMessage[] | undefined
   system?: string | undefined
 
 [.] resuming
@@ -497,7 +517,7 @@ function sqliteConversations(path?: string): ConversationStore
 
 [.] Step
 interface Step
-  calls: ToolCall[]
+  calls: AiToolCall[]
   finish: Finish | undefined
   firstTokenMs: number | undefined
   ms: number
@@ -538,7 +558,7 @@ interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOpti
   onFinish?: ((done: FinishHookCall) => unknown) | undefined
   onRequest?: ((call: RequestHookCall) => Promise<RequestHookChange | undefined | void> | RequestHookChange | undefined | void) | undefined
   onStep?: ((step: Step) => unknown) | undefined
-  onToolCall?: ((call: ToolCall) => unknown) | undefined
+  onToolCall?: ((call: AiToolCall) => unknown) | undefined
   outlive?: boolean | undefined
   provider?: Provider | undefined
   reasoning?: Reasoning | undefined
@@ -555,7 +575,7 @@ interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOpti
 
 [.] StructuredReply
 interface StructuredReply<Value, Snapshot = DeepPartial<Value>> extends PromiseLike<Value>, AsyncIterable<Snapshot>
-  calls: Promise<ToolCall[]>
+  calls: Promise<AiToolCall[]>
   deltas: (options?: DeltasOptions | undefined) => AsyncIterable<string>
   finish: Promise<Finish | undefined>
   resumed: boolean
@@ -576,15 +596,7 @@ function tool<const Schema extends TSchema>(options: FunctionToolOptions<Schema>
 type ToolAction = Action<never, unknown>
 
 [.] ToolCall
-interface ToolCall
-  approval?: string | undefined
-  id: string
-  input: Record<string, unknown>
-  label?: string | undefined
-  ms?: number | undefined
-  name: string
-  result?: string | undefined
-  status: "done" | "failed" | "running"
+type ToolCall = AiToolCall
 
 [.] ToolOutcome
 interface ToolOutcome
@@ -645,8 +657,8 @@ const default: { description: string; extension: { import: string; expression: s
 component default
   approvalLabel: string
   argumentsLabel: string
-  block?: ((call: ToolCall) => Element) | undefined
-  calls: ToolCall[]
+  block?: ((call: AiToolCall) => Element) | undefined
+  calls: AiToolCall[]
   class?: string | undefined | {
   root?: string | undefined;
   list?: string | undefined;
@@ -680,7 +692,7 @@ component default
   attachLabel?: string | undefined
   attachRefusedLabel?: string | undefined
   attachTooBigLabel?: string | undefined
-  call?: ((call: ToolCall) => Element) | undefined
+  call?: ((call: AiToolCall) => Element) | undefined
   cancelLabel?: string | undefined
   changeFailedLabel?: string | undefined
   class?: string | undefined
@@ -733,7 +745,7 @@ component default
   onSend?: ((sent: { messages: ChatMessage[]; }) => unknown) | undefined
   onStop?: (() => unknown) | undefined
   onSuggestion?: ((text: string) => unknown) | undefined
-  onToolCall?: ((call: ToolCall) => unknown) | undefined
+  onToolCall?: ((call: AiToolCall) => unknown) | undefined
   open?: boolean | undefined
   openLabel?: string | undefined
   placeholder?: string | undefined
@@ -827,7 +839,7 @@ component default
   attachLabel?: string | undefined
   attachRefusedLabel?: string | undefined
   attachTooBigLabel?: string | undefined
-  call?: ((call: ToolCall) => Element) | undefined
+  call?: ((call: AiToolCall) => Element) | undefined
   cancelLabel?: string | undefined
   changeFailedLabel?: string | undefined
   class?: string | undefined | {
@@ -945,7 +957,7 @@ component default
   onSend?: ((sent: { messages: ChatMessage[]; }) => unknown) | undefined
   onStop?: (() => unknown) | undefined
   onSuggestion?: ((text: string) => unknown) | undefined
-  onToolCall?: ((call: ToolCall) => unknown) | undefined
+  onToolCall?: ((call: AiToolCall) => unknown) | undefined
   placeholder?: string | undefined
   reasoning?: boolean | undefined
   reasoningLabel?: string | undefined

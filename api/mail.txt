@@ -2,11 +2,7 @@
 type Address = string | { name: string, address: string }
 
 [.] Attachment
-interface Attachment
-  cid?: string | undefined
-  content: Uint8Array<ArrayBufferLike> | string
-  contentType?: string | undefined
-  filename: string
+type Attachment = MailAttachment
 
 [.] AuthKind
 type AuthKind = AuthMailKind
@@ -114,6 +110,9 @@ function createMailListTables(source: PgJobsSource): Promise<void>
 [.] createMailSuppressionTable
 function createMailSuppressionTable(source: PgJobsSource): Promise<void>
 
+[.] cssColors
+function cssColors(stylesheet: URL | string, name?: string): (property: string) => string
+
 [.] cssColours
 function cssColours(stylesheet: URL | string, name?: string): (property: string) => string
 
@@ -132,7 +131,7 @@ function enqueue<P extends object>(message: MailMessage<P>, options?: EnqueueOpt
 
 [.] Envelope
 interface Envelope
-  attachments?: Attachment[] | undefined
+  attachments?: MailAttachment[] | undefined
   bcc?: Address | Address[] | undefined
   cc?: Address | Address[] | undefined
   from?: Address | undefined
@@ -214,7 +213,7 @@ function mail(options?: MailExtensionOptions): KayExtension<Mailer>
 
 [.] Mail
 interface Mail
-  attachments: Attachment[]
+  attachments: MailAttachment[]
   bcc: Address[]
   cc: Address[]
   from: Address
@@ -224,6 +223,13 @@ interface Mail
   subject: string
   text: string
   to: Address[]
+
+[.] MailAttachment
+interface MailAttachment
+  cid?: string | undefined
+  content: Uint8Array<ArrayBufferLike> | string
+  contentType?: string | undefined
+  filename: string
 
 [.] mailDefaults
 const mailDefaults: MailSettings
@@ -241,7 +247,7 @@ interface MailerOptions
   events?: EventSecrets | undefined
   from?: Address | undefined
   fromName?: string | undefined
-  inbound?: ((reply: Reply) => Promise<void> | void) | undefined
+  inbound?: ((reply: MailReply) => Promise<void> | void) | undefined
   listStore?: ListStore | undefined
   locale?: string | undefined
   logRecipients?: boolean | undefined
@@ -258,7 +264,7 @@ interface MailExtensionOptions extends MailerOptions
   events?: EventSecrets | undefined
   from?: Address | undefined
   fromName?: string | undefined
-  inbound?: ((reply: Reply) => Promise<void> | void) | undefined
+  inbound?: ((reply: MailReply) => Promise<void> | void) | undefined
   listStore?: ListStore | undefined
   locale?: string | undefined
   logRecipients?: boolean | undefined
@@ -306,6 +312,21 @@ class MailNotConfiguredError
   missing: string[]
   name: "MailNotConfiguredError"
 
+[.] MailReply
+interface MailReply
+  attachments: Attachment[]
+  date: Date | undefined
+  from: string
+  fromName: string
+  headers: Record<string, string>
+  html: string | undefined
+  inReplyTo: string | undefined
+  messageId: string | undefined
+  references: string[]
+  subject: string
+  text: string
+  to: string[]
+
 [.] MailSettings
 interface MailSettings extends Palette
   accent: string
@@ -321,6 +342,12 @@ interface MailSettings extends Palette
   surface: string
   text: string
   width: number
+
+[.] MailWaitOptions
+interface MailWaitOptions
+  find?: ((mail: SentMail) => boolean) | undefined
+  site?: undefined | { runJobs: () => Promise<number>; }
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [.] outbox
 const outbox: Outbox
@@ -338,7 +365,7 @@ interface Outbox extends Transport
   to: (address: string) => SentMail[]
   token: (mail: Mail, match?: RegExp | string | undefined) => string
   verify?: (() => Promise<void>) | undefined
-  waitFor: (address: string, options?: WaitOptions | undefined) => Promise<SentMail>
+  waitFor: (address: string, options?: MailWaitOptions | undefined) => Promise<SentMail>
   watch: (listener: (mail: SentMail) => void) => () => void
 
 [.] Palette
@@ -361,19 +388,7 @@ function pgSuppressions(source: PgJobsSource): SuppressionStore & { close: () =>
 function registeredMailer(): Promise<Mailer | undefined>
 
 [.] Reply
-interface Reply
-  attachments: Attachment[]
-  date: Date | undefined
-  from: string
-  fromName: string
-  headers: Record<string, string>
-  html: string | undefined
-  inReplyTo: string | undefined
-  messageId: string | undefined
-  references: string[]
-  subject: string
-  text: string
-  to: string[]
+type Reply = MailReply
 
 [.] ReplyAttachment
 interface ReplyAttachment
@@ -386,7 +401,7 @@ function send<P extends object>(message: MailMessage<P>): Promise<Delivery>
 
 [.] SentMail
 interface SentMail extends Mail
-  attachments: Attachment[]
+  attachments: MailAttachment[]
   bcc: Address[]
   cc: Address[]
   from: Address
@@ -470,10 +485,7 @@ interface Transport
 type ViewContent<P extends object> = { view: (props: P) => JSX.Element, text?: string, html?: never } & (object extends P ? { props?: P } : { props: P })
 
 [.] WaitOptions
-interface WaitOptions
-  find?: ((mail: SentMail) => boolean) | undefined
-  site?: undefined | { runJobs: () => Promise<number>; }
-  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+type WaitOptions = MailWaitOptions
 
 [./add] default
 const default: { description: string; files: {}; extension: { import: string; expression: string; }; notes: string[]; }
@@ -659,4 +671,4 @@ interface MailTest extends Pick<Outbox, 'last' | 'to' | 'find' | 'links' | 'link
   mails: readonly SentMail[]
   to: (address: string) => SentMail[]
   token: (mail: Mail, match?: RegExp | string | undefined) => string
-  waitFor: (address: string, options?: Omit<WaitOptions, "site"> | undefined) => Promise<SentMail>
+  waitFor: (address: string, options?: Omit<MailWaitOptions, "site"> | undefined) => Promise<SentMail>

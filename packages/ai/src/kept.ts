@@ -1,4 +1,4 @@
-import type { Reply } from './types'
+import type { AiReply } from './types'
 import { deferredReply } from './deferred'
 
 const KEPT_MS = 30 * 60_000
@@ -7,7 +7,7 @@ const MOST_KEPT = 200
 const MOST_REFUNDS = 3
 
 interface Entry {
-  reply: Reply
+  reply: AiReply
   at: number
   // Who asked and from which action, which a resume or a stop must match.
   owner: Promise<string | undefined>
@@ -63,7 +63,7 @@ function sweep(now: number): void {
 }
 
 // Keeps a reply that outlives its request under the key its Chat named, so the Chat finds it after a reload: for half an hour, 200 at most, in this process's memory.
-export function keep(key: string, reply: Reply, owner: Promise<string | undefined>): void {
+export function keep(key: string, reply: AiReply, owner: Promise<string | undefined>): void {
   const now = Date.now()
   const { replies, stopped } = slot()
 
@@ -127,7 +127,7 @@ export function stopKept(key: string, owner: Promise<string | undefined>, owned?
 
 // The reply kept under `key` for `owner`, as a reply that answers like an empty one if the owner is not the one who kept it.
 // `owned` is called once, as soon as the reply found is the owner's and has refunds left, whether it is read or not, and is not waited for.
-export function keptFor(key: string, owner: Promise<string | undefined>, empty: Reply, owned?: () => Promise<void>): Reply | undefined {
+export function keptFor(key: string, owner: Promise<string | undefined>, empty: AiReply, owned?: () => Promise<void>): AiReply | undefined {
   sweep(Date.now())
 
   const entry = slot().replies.get(key)
@@ -135,7 +135,7 @@ export function keptFor(key: string, owner: Promise<string | undefined>, empty: 
   if (entry === undefined)
     return undefined
 
-  return deferredReply((async (): Promise<{ reply: Reply }> => {
+  return deferredReply((async (): Promise<{ reply: AiReply }> => {
     if (!same(await entry.owner, await owner))
       return { reply: empty }
 

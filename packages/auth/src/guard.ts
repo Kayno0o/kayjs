@@ -1,7 +1,7 @@
 import type { Auth, AuthRequirement } from './auth'
 import { guard as kayGuard } from 'kay'
 
-/** What `guard()` takes, as `auth.guard()` does: where an anonymous visitor goes, the requirement a user meets and the scope a token holds, and whether two-factor is asked of the user (see `twoFactor.require`). */
+/** What `authGuard()` takes, as `auth.guard()` does: where an anonymous visitor goes, the requirement a user meets and the scope a token holds, and whether two-factor is asked of the user (see `twoFactor.require`). */
 export interface GuardOptions {
   redirect?: string | undefined
   require?: AuthRequirement<string> | undefined
@@ -9,8 +9,8 @@ export interface GuardOptions {
   twoFactor?: true | undefined
 }
 
-// The `auth.guard()` of the app's `auth()`, for a `_guard.ts` with no module to import it from: `export default guard()`. It asks the `auth` of the request, so it works with a `createAuth` of the app's own too.
-export function guard(options: GuardOptions = {}) {
+// The `auth.guard()` of the app's `auth()`, for a `_guard.ts` with no module to import it from: `export default authGuard()`. It asks the `auth` of the request, so it works with a `createAuth` of the app's own too.
+export function authGuard(options: GuardOptions = {}) {
   return kayGuard<{ auth: Auth }>(async (ctx) => {
     const { auth } = ctx.locals
 

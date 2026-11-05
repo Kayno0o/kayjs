@@ -1,7 +1,9 @@
 // The shapes kayjs-cms passes around: kay's own from kay/content, and the entry references and issues its forms and API share.
 import type { CollectionInfo, SourceEntry } from 'kay/content'
+import type { EntryRef } from 'kay/edit'
 import type { IconProps } from 'kay/icons'
 
+export type { EntryRef }
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, FieldHint, FieldInputOptions, JsonSchema, SourceEntry, TranslationIndex } from 'kay/content'
 
 // The buttons of a Markdown box's toolbar, as kayjs-ui's MarkdownEditor names them; declared here so the config types do not import its components (tests/layout.test.ts holds the two lists equal).
@@ -44,12 +46,6 @@ export type GivenLayout = CollectionLayout & { icon?: IconProps | undefined, his
 // `history` is set for a collection that keeps its entries' revisions, and `trash` for one that keeps its deleted entries, which the screens then link to; `newsletter` for one whose entries an editor can send to a list, and `review` for one whose drafts an editor can send for review.
 export type ScreenCollection = CollectionInfo & { layout?: CollectionLayout | undefined, history?: true | undefined, trash?: true | undefined, newsletter?: true | undefined, review?: true | undefined }
 
-export interface EntryRef {
-  collection: string
-  slug: string
-  locale?: string | undefined
-}
-
 export interface Issue extends EntryRef {
   // Dotted, relative to the data; `''` for the entry as a whole, or its body when `body` is set.
   path: string
@@ -59,7 +55,7 @@ export interface Issue extends EntryRef {
   message: string
 }
 
-export interface DraftEntry extends EntryRef {
+export interface CmsDraftEntry extends EntryRef {
   data: Record<string, unknown>
   body?: string | undefined
 }

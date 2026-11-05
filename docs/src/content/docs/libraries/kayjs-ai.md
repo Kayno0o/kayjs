@@ -472,14 +472,14 @@ A failed or stopped reply lists the requests that ended before it. A reply stopp
 When you change a prompt or swap a model, you want to know the model still calls the right tool. A script outside the server can ask the real model with your own actions as tools, if their `run` is a mock. `mocked(action, run)` keeps the action's name, description and input schema, so nothing is copied by hand and nothing drifts:
 
 ```ts
-import type { Message } from '@kaynooo/kayjs-ai'
+import type { AiMessage } from '@kaynooo/kayjs-ai'
 import { ask, mocked, openai } from '@kaynooo/kayjs-ai'
 import { systemPrompt } from '../src/assistant'
 import { forecast, route } from '../src/routes/_actions.kay'
 
 const provider = openai({ baseUrl: 'http://localhost:11434/v1', model: 'gemma4:12b' })
 const tools = [mocked(forecast, () => ({ days: [] })), mocked(route, ({ to }) => ({ to, km: 3.4, minutes: 21 }))]
-const history: Message[] = []
+const history: AiMessage[] = []
 
 for (const turn of [{ ask: 'Will it rain tomorrow?', expect: 'forecast' }, { ask: 'And by bike to the station?', expect: 'route' }]) {
   const reply = ask([...history, { role: 'user', content: turn.ask }], { provider, system: systemPrompt(new Date()), tools })

@@ -1,14 +1,14 @@
 ---
 import type { Snippet } from 'kay'
-import type { ToolCall } from './types'
+import type { AiToolCall } from './types'
 import { recipe } from 'kay'
 
 const look = recipe({ parts: { root: 'kai-chat-calls', summary: 'kai-chat-calls-summary', list: 'kai-chat-calls-list', call: 'kai-chat-call', name: 'kai-chat-call-name', status: 'kai-chat-call-status', title: 'kai-chat-call-title', code: 'kai-chat-call-code' } })
 
 const { calls, block, pending = false, labels, details, runningLabel, doneLabel, failedLabel, argumentsLabel, resultLabel, approvalLabel } = props<{
-  calls: ToolCall[]
+  calls: AiToolCall[]
   // The app's own drawing of one call, which replaces the folded list.
-  block?: Snippet<[call: ToolCall]> | undefined
+  block?: Snippet<[call: AiToolCall]> | undefined
   // Set in the turn being written, which is hidden from assistive technology: nothing in it takes focus.
   pending?: boolean
   // The phrase for a tool by its name, in the folded line.
@@ -26,7 +26,7 @@ const { calls, block, pending = false, labels, details, runningLabel, doneLabel,
 
 const LABELS = { running: runningLabel, done: doneLabel, failed: failedLabel }
 
-function status(call: ToolCall) {
+function status(call: AiToolCall) {
   return call.approval === undefined ? LABELS[call.status] : approvalLabel
 }
 

@@ -1,5 +1,5 @@
 import type { TestSite } from 'kay/test'
-import type { Outbox, SentMail, WaitOptions } from './outbox'
+import type { MailWaitOptions, Outbox, SentMail } from './outbox'
 import { afterEach, beforeEach } from 'bun:test'
 import { outbox } from './outbox'
 
@@ -8,7 +8,7 @@ export interface MailTest extends Pick<Outbox, 'last' | 'to' | 'find' | 'links' 
   // Oldest first.
   readonly mails: readonly SentMail[]
   // The newest mail to this address, once there is one: the site's queues run first, so a mail the app enqueued is delivered.
-  waitFor: (address: string, options?: Omit<WaitOptions, 'site'>) => Promise<SentMail>
+  waitFor: (address: string, options?: Omit<MailWaitOptions, 'site'>) => Promise<SentMail>
 }
 
 // Reads the mails a test site sent, from an outbox that is empty at the start of every test, so no test clears it by hand.

@@ -1,9 +1,9 @@
-import type { DraftEntry } from './kay/contract'
+import type { CmsDraftEntry } from './kay/contract'
 import { EDITOR_COOKIE } from './page-link'
 
 // What the browser keeps of an entry's unsaved edits: the entry as typed, the version of the file it was edited from, and when.
 export interface KeptDraft {
-  entry: DraftEntry
+  entry: CmsDraftEntry
   version: string | undefined
   at: number
   // A hash of the saved copy the edits were made from, kept for an entry with no version, which cannot tell by it that the entry was saved since.
@@ -51,7 +51,7 @@ function isKept(value: unknown): value is KeptDraft {
 
   const { entry, version, at, base } = value as Record<string, unknown>
 
-  return typeof at === 'number' && (base === undefined || typeof base === 'string') && (version === undefined || typeof version === 'string') && typeof entry === 'object' && entry !== null && typeof (entry as DraftEntry).collection === 'string' && typeof (entry as DraftEntry).slug === 'string' && typeof (entry as DraftEntry).data === 'object' && (entry as DraftEntry).data !== null
+  return typeof at === 'number' && (base === undefined || typeof base === 'string') && (version === undefined || typeof version === 'string') && typeof entry === 'object' && entry !== null && typeof (entry as CmsDraftEntry).collection === 'string' && typeof (entry as CmsDraftEntry).slug === 'string' && typeof (entry as CmsDraftEntry).data === 'object' && (entry as CmsDraftEntry).data !== null
 }
 
 // Keeps drafts in the browser's `localStorage`, one item per entry. `get` and `now` are for a test to give. With `who`, the person the drafts belong to, they are kept under that name and none is read or written while it is undefined, so a draft is never offered to another person.

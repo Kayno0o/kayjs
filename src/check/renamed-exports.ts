@@ -264,7 +264,14 @@ export async function roomTypes(root: string, options: CheckOptions): Promise<Ch
 // The exports renamed in 1.90 so no two packages export one name for two things, per module they are imported from, and the name each has now.
 export const EXPORT_NAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   'kay/server': { EveryOptions: 'ScheduleEveryOptions', jobTables: 'jobTableNames', dataTables: 'dataTableNames' },
-  '@kaynooo/kayjs-mail': { cssColours: 'cssColors' },
+  '@kaynooo/kayjs-mail': { cssColours: 'cssColors', Reply: 'MailReply', Attachment: 'MailAttachment', WaitOptions: 'MailWaitOptions' },
+  '@kaynooo/kayjs-ai': { Reply: 'AiReply', Attachment: 'AiAttachment', ToolCall: 'AiToolCall', Message: 'AiMessage' },
+  '@kaynooo/kayjs-cms': { Action: 'CmsAction', DraftEntry: 'CmsDraftEntry' },
+  '@kaynooo/kayjs-cms/room': { Member: 'CmsMember' },
+  '@kaynooo/kayjs-cms/pg': { SeedEntry: 'CmsSeedEntry' },
+  '@kaynooo/kayjs-cms/sqlite': { SeedEntry: 'CmsSeedEntry' },
+  '@kaynooo/kayjs-auth': { guard: 'authGuard', Member: 'AuthMember', ProofOfWorkOptions: 'AuthProofOfWorkOptions' },
+  '@kaynooo/kayjs-ui': { editing: 'rowEditing', Editing: 'RowEditing' },
 }
 
 const OLD_EXPORT = new RegExp(`\\b(?:${[...new Set(Object.values(EXPORT_NAMES).flatMap(names => Object.keys(names)))].join('|')})\\b`)

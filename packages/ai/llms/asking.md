@@ -22,7 +22,7 @@ ask('Why is the sky blue?')
 ask([{ role: 'user', content: 'Hi' }, { role: 'assistant', content: 'Hello' }, { role: 'user', content: 'Again' }], { system: 'Answer in French', maxTokens: 500 })
 ```
 
-`ask(prompt | messages, options?)` returns a `Reply` at once. A prompt is one user message; messages are `{ role: 'user' | 'assistant', content: string }`, other fields dropped.  A user message may also hold `attachments`, images and PDFs ([Images and PDFs](attachments.md)).
+`ask(prompt | messages, options?)` returns an `AiReply` at once. A prompt is one user message; messages are `{ role: 'user' | 'assistant', content: string }`, other fields dropped.  A user message may also hold `attachments`, images and PDFs ([Images and PDFs](attachments.md)).
 
 ### An object instead of text
 
@@ -34,7 +34,7 @@ const review = s.Object({ title: s.String(), score: s.Integer({ minimum: 1, maxi
 const verdict = await ask('Review the film Alien', { schema: review })
 ```
 
-`ask(messages, { schema })` takes an object schema (`s.Object`; anything else throws a `config-invalid` `KayError`, an `s.Record` or `s.Intersect` field too, as a model cannot be held to free keys: name the fields) and returns a `StructuredReply` instead of a `Reply`: `await` is the value the schema describes, `Static<typeof review>`, with no cast, and `for await` gives the object so far, a `DeepPartial` of it. Nothing is sent until it is first read, and readers share one request, as with text.
+`ask(messages, { schema })` takes an object schema (`s.Object`; anything else throws a `config-invalid` `KayError`, an `s.Record` or `s.Intersect` field too, as a model cannot be held to free keys: name the fields) and returns a `StructuredReply` instead of a `AiReply`: `await` is the value the schema describes, `Static<typeof review>`, with no cast, and `for await` gives the object so far, a `DeepPartial` of it. Nothing is sent until it is first read, and readers share one request, as with text.
 
 ### In a page
 
@@ -138,7 +138,7 @@ On by default, so a chat does not pay full price for its system prompt, tools an
 - `await reply` is the full text; it throws the `AiError` the provider failed with.
 - `for await (const text of reply)` yields snapshots, each the text so far; `reply.deltas()` yields the pieces alone; `reply.stream()` yields the snapshots in an object that is no thenable, for an `async` handler to return.
 - `await reply.usage` is `{ inputTokens, outputTokens }`, plus `cacheReadTokens` and `cacheWriteTokens` when the provider reported a cache, or undefined when the provider gave none or the reply failed; it never rejects, and reading it starts the reply.
-- `await reply.steps` lists the requests made to the model, one per round of a tool loop (one for a reply without tools): `{ ms, firstTokenMs, usage, finish, calls }`, `ms` from sent to the end of the model's answer (the tools it called not counted), `firstTokenMs` the wait for its first text, reasoning or call (undefined when it said nothing), `usage` that request's tokens (estimated in a tool loop when the provider gave none) and `calls` the tool calls it made. It holds the requests that ended, so a failed or stopped reply lists the ones before it, and one stopped while its tools ran ends on that request with the calls that ran; it never rejects, and reading it starts the reply. Each `ToolCall` has its `ms`, how long the call took (a `confirm` the app awaits counts), once it is done: read both to tell a slow model from a slow tool.
+- `await reply.steps` lists the requests made to the model, one per round of a tool loop (one for a reply without tools): `{ ms, firstTokenMs, usage, finish, calls }`, `ms` from sent to the end of the model's answer (the tools it called not counted), `firstTokenMs` the wait for its first text, reasoning or call (undefined when it said nothing), `usage` that request's tokens (estimated in a tool loop when the provider gave none) and `calls` the tool calls it made. It holds the requests that ended, so a failed or stopped reply lists the ones before it, and one stopped while its tools ran ends on that request with the calls that ran; it never rejects, and reading it starts the reply. Each `AiToolCall` has its `ms`, how long the call took (a `confirm` the app awaits counts), once it is done: read both to tell a slow model from a slow tool.
 - `await reply.finish` is why it ended: `stop`, `length` (the `maxTokens` cap, the text returned as it is), `filtered` (the provider's filter or refusal) or `steps` (the tool loop ran out of `maxSteps` with the model still calling tools); undefined when it failed. Check it when a long answer matters.
 - `reply.stop()` aborts the provider request, what came staying the text of `await`. A stop is not an error: `await` resolves to the partial text.
 - A provider that stalls fails the reply with an `AiError` of kind `timeout`: after 30 s without an answer (`timeout.connect`), or 60 s without a chunk of the stream once it began (`timeout.idle`; `partial` holds what came). Both take a duration (`'10s'`, `'500ms'`), at most about 24 days; each step of a tool loop counts anew.

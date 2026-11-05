@@ -1,5 +1,5 @@
 [./room] editorsOf
-function editorsOf(others: readonly Member[], count: number, own: Member): { names: string[]; unnamed: number; }
+function editorsOf(others: readonly CmsMember[], count: number, own: CmsMember): { names: string[]; unnamed: number; }
 
 [./room] hashOf
 function hashOf(text: string): string

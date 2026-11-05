@@ -109,7 +109,7 @@ A page that uses the components renders them in `testSite()` like the app's own.
 
 ## Reference
 
-- Import each component by its `.kay` path: `import Button from '@kaynooo/kayjs-ui/button.kay'`. Types, `toast`, `attempt`, `messageOf`, `editing`, `infiniteList` and the defaults come from the package itself: `import { toast } from '@kaynooo/kayjs-ui'`, and the drag and drop controllers from `@kaynooo/kayjs-ui/dnd`.
+- Import each component by its `.kay` path: `import Button from '@kaynooo/kayjs-ui/button.kay'`. Types, `toast`, `attempt`, `messageOf`, `rowEditing`, `infiniteList` and the defaults come from the package itself: `import { toast } from '@kaynooo/kayjs-ui'`, and the drag and drop controllers from `@kaynooo/kayjs-ui/dnd`.
 - The theme reads the app's own names (`--color-background`, `--color-foreground`, `--color-accent`, `--color-muted`, `--color-border`, `--radius-lg`, `--border-width`, `--density`...), so one `@theme` feeds the app and the library. The `kui-` names it used before 1.72 are gone since 1.75: [upgrading](../../../llms/upgrading.md) pairs each with its new name.
 
 Components write no Tailwind utility, only the classes of `theme.css`, every one prefixed `kui-`, so a site's own `btn` or `card` never meets them, while the theme's tokens carry the app's own names (`--color-accent`, `--color-background`), so one theme feeds the app and the library. A rule of the app's on one of those classes restyles every instance, and `--border-width` sets the keyline of every framed box; utilities passed through a component's `class` prop restyle one, and `src/ui.ts` restyles the parts of a component with some, see [Restyle a component](#restyle-a-component).

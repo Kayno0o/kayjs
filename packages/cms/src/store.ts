@@ -1,5 +1,5 @@
 import type { Commit, FileChange, FileMove, Identity } from './files'
-import type { CollectionInfo, DraftEntry, EntryRef, Issue, JsonSchema, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
+import type { CmsDraftEntry, CollectionInfo, EntryRef, Issue, JsonSchema, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { SaveEvent } from './settings'
 import { redirectMovedPage, RedirectRefusedError } from 'kay/library'
 import { previewUrl } from 'kay/server'
@@ -170,7 +170,7 @@ export function refused(ref: EntryRef, message: string, key?: Issue['key'] | 'bo
 }
 
 // What a new entry of a single collection is refused for: the collection holds its entry already, or the slug is not the one the first is written under.
-async function singleRefusal(entry: DraftEntry, collection: CollectionInfo): Promise<{ issues: Issue[] } | undefined> {
+async function singleRefusal(entry: CmsDraftEntry, collection: CollectionInfo): Promise<{ issues: Issue[] } | undefined> {
   if (!collection.single)
     return undefined
 
@@ -226,7 +226,7 @@ async function saved(event: SaveEvent): Promise<void> {
 
 // Saves an entry where its collection keeps it: a loaded one through its loader, a folder one as a file through the configured saver.
 // `version` is the one the editor opened, so a save made over someone else's is refused; a new entry's file must not exist yet.
-export async function saveEntry(entry: DraftEntry, options: SaveOptions = {}): Promise<SaveOutcome> {
+export async function saveEntry(entry: CmsDraftEntry, options: SaveOptions = {}): Promise<SaveOutcome> {
   let outcome: SaveOutcome
 
   try {
@@ -246,7 +246,7 @@ export async function saveEntry(entry: DraftEntry, options: SaveOptions = {}): P
 }
 
 // An entry saved published while it waited for review is no longer waiting.
-async function settlePublished(entry: DraftEntry, author: Identity | undefined): Promise<void> {
+async function settlePublished(entry: CmsDraftEntry, author: Identity | undefined): Promise<void> {
   if (await readReview(entry) === undefined)
     return
 
@@ -269,7 +269,7 @@ interface SaveOptions extends VersionRule {
   reviewed?: boolean | undefined
 }
 
-async function writeEntry(entry: DraftEntry, { create = false, version, required = false, verb, author, bodyKept = false, heldData, revived = false }: SaveOptions): Promise<SaveOutcome> {
+async function writeEntry(entry: CmsDraftEntry, { create = false, version, required = false, verb, author, bodyKept = false, heldData, revived = false }: SaveOptions): Promise<SaveOutcome> {
   const collection = await collectionNamed(entry.collection)
 
   // A loader's body is sanitized on the page unless the collection is `trusted`, so nothing in it runs as the site and there is nothing to refuse.

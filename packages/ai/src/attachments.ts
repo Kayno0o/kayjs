@@ -1,4 +1,4 @@
-import type { Attachment, Media, Message, ProviderMessage } from './types'
+import type { AiAttachment, AiMessage, Media, ProviderMessage } from './types'
 import { files, holdsType, SNIFFED_BYTES } from 'kay/server'
 import { AiError } from './errors'
 
@@ -33,7 +33,7 @@ function isBytes(value: unknown): value is Uint8Array | ArrayBuffer {
 }
 
 // The attachments of a message, each checked to be something `ask` can read.
-export function attachmentsOf(value: unknown): readonly Attachment[] {
+export function attachmentsOf(value: unknown): readonly AiAttachment[] {
   if (value === undefined)
     return []
 
@@ -45,7 +45,7 @@ export function attachmentsOf(value: unknown): readonly Attachment[] {
       throw new AiError('unsupported', 'an attachment is a Blob, File, Uint8Array, ArrayBuffer or storedFile(key)')
   }
 
-  return value as Attachment[]
+  return value as AiAttachment[]
 }
 
 export function charsOfMedia(kind: Media['kind'], bytes: number): number {
@@ -53,7 +53,7 @@ export function charsOfMedia(kind: Media['kind'], bytes: number): number {
 }
 
 // The price of an attachment before it is read: its size when known, else (a stored file) an image.
-function estimate(attachment: Attachment): number {
+function estimate(attachment: AiAttachment): number {
   if (attachment instanceof Blob)
     return charsOfMedia(attachment.type === 'application/pdf' ? 'pdf' : 'image', attachment.size)
 
@@ -67,7 +67,7 @@ function estimate(attachment: Attachment): number {
 }
 
 // What a message's attachments are estimated to cost in characters, before they are read.
-export function estimatedChars(message: Pick<Message, 'attachments'>): number {
+export function estimatedChars(message: Pick<AiMessage, 'attachments'>): number {
   return (message.attachments ?? []).reduce((sum, attachment) => sum + estimate(attachment), 0)
 }
 
@@ -109,7 +109,7 @@ async function stored(key: string): Promise<Blob | undefined> {
   }
 }
 
-async function read(attachment: Attachment, place: string, max: number): Promise<Media> {
+async function read(attachment: AiAttachment, place: string, max: number): Promise<Media> {
   let bytes: Uint8Array
   let name: string | undefined
 
@@ -141,7 +141,7 @@ async function read(attachment: Attachment, place: string, max: number): Promise
 }
 
 // The messages with their attachments read and typed from their bytes, one after the other and stopping when the ask is aborted; fails with `too-long` past `max` bytes a file or the total an ask takes, and `unsupported` for a file that is none of the kinds a model is shown.
-export async function readAttachments(messages: readonly Message[], max: number, signal: AbortSignal): Promise<ProviderMessage[]> {
+export async function readAttachments(messages: readonly AiMessage[], max: number, signal: AbortSignal): Promise<ProviderMessage[]> {
   const room = Math.max(max, TOTAL_BYTES)
   const result: ProviderMessage[] = []
   let total = 0

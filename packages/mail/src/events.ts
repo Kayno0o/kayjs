@@ -1,5 +1,5 @@
 import type { Elysia } from 'elysia'
-import type { Reply } from './mime'
+import type { MailReply } from './mime'
 import { createHmac, createPublicKey, verify } from 'node:crypto'
 import process from 'node:process'
 import { sameText } from 'kay/library'
@@ -52,7 +52,7 @@ export interface EventHost {
   secrets: () => EventSecrets
   suppress: (found: Found, source: string) => Promise<void>
   // Undefined when the mailer was given no `inbound`.
-  reply: ((reply: Reply) => Promise<void> | void) | undefined
+  reply: ((reply: MailReply) => Promise<void> | void) | undefined
 }
 
 const BODY_MAX = 1_048_576

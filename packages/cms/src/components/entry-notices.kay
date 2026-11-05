@@ -1,6 +1,6 @@
 ---
 import type { FormScope } from '../form'
-import type { DraftEntry, Issue } from '../kay/contract'
+import type { CmsDraftEntry, Issue } from '../kay/contract'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import { attempt } from '@kaynooo/kayjs-ui'
 import { call } from 'kay'
@@ -13,13 +13,13 @@ import { fieldId, prefixes } from '../paths'
 // What went wrong with the entry as a whole: edits brought back from an earlier visit, its file not parsing, a save refused (after a conflict, the fields both sides changed, with Keep my edits and Take their version), issues on the entry, and issues on a field or the body that nothing renders.
 const { form } = props<{ form: FormScope }>()
 
-const theirs = signal<DraftEntry>()
+const theirs = signal<CmsDraftEntry>()
 const taking = signal(false)
 
 const label = (path: string | typeof BODY) => path === BODY ? wording('cms.entry.body', 'Body') : path
 
 // The entry as the other save left it, with the version a save would name.
-async function fetchTheirs(quiet = false): Promise<{ entry: DraftEntry, version: string | undefined } | undefined> {
+async function fetchTheirs(quiet = false): Promise<{ entry: CmsDraftEntry, version: string | undefined } | undefined> {
   const { collection, slug, locale } = form.entry
   const read = async () => call(entriesApi, '/:collection/:slug', { params: { collection, slug }, query: locale === undefined ? {} : { locale } })
   let answer: Awaited<ReturnType<typeof read>> | undefined

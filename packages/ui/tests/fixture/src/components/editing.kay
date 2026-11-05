@@ -1,9 +1,9 @@
 ---
-import { editing } from '@kaynooo/kayjs-ui'
+import { rowEditing } from '@kaynooo/kayjs-ui'
 import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 
 const friends = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Grace' }]
-const friend = editing<{ id: number, name: string }, { name: string }>()
+const friend = rowEditing<{ id: number, name: string }, { name: string }>()
 ---
 for one of friends key={one.id}
   button(id={`edit-${one.id}`} type="button" onClick={() => friend.edit(one)}) Edit {one.name}

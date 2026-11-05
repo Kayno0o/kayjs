@@ -1,5 +1,5 @@
 import type { Duration } from 'kay'
-import type { Address, Attachment, Delivery, Mail, Transport } from './types'
+import type { Address, Delivery, Mail, MailAttachment, Transport } from './types'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { durationSeconds } from 'kay/library'
@@ -28,7 +28,7 @@ export interface SentMail extends Mail {
   relayed?: Relayed | undefined
 }
 
-export interface WaitOptions {
+export interface MailWaitOptions {
   timeout?: Duration | undefined
   // Keeps the mails it answers true for.
   find?: ((mail: SentMail) => boolean) | undefined
@@ -54,7 +54,7 @@ export interface Outbox extends Transport {
   // The `token` query parameter of that link, as a confirmation, magic link or reset mail carries it.
   token: (mail: Mail, match?: string | RegExp) => string
   // The newest mail to this address, and `find` when given, once there is one, failing after `timeout`, 5 seconds by default, with the mails the outbox holds. With a `site` from `kay/test`, its queues run first and then until the mail is delivered, for one the app enqueues.
-  waitFor: (address: string, options?: WaitOptions) => Promise<SentMail>
+  waitFor: (address: string, options?: MailWaitOptions) => Promise<SentMail>
   // Calls `listener` with each mail sent from now on, until the function it returns is called.
   watch: (listener: (mail: SentMail) => void) => () => void
 }
@@ -86,7 +86,7 @@ function sentTo(mail: Mail, wanted: string): boolean {
 // A mail as the file holds it: its date as text and an attachment's bytes as base64.
 interface StoredMail extends Omit<SentMail, 'sentAt' | 'attachments'> {
   sentAt: string
-  attachments: (Omit<Attachment, 'content'> & { content: string, base64?: true })[]
+  attachments: (Omit<MailAttachment, 'content'> & { content: string, base64?: true })[]
 }
 
 function stored(mail: SentMail): StoredMail {

@@ -1,5 +1,5 @@
 import type { Guard, GuardContext } from 'kay'
-import type { Action } from '../roles'
+import type { CmsAction } from '../roles'
 import { apiUrl, guard } from 'kay'
 import { editSessionAdmitted, READ_METHODS, underKayDev } from 'kay/library'
 import { editedEntry, editRequested } from 'kay/server'
@@ -93,7 +93,7 @@ const UNUSED_UPLOADS = /^\/files\/unused\/delete$/
 const ERASE = /^\/history\/(?:[^/]+\/[^/]+\/erase|forget-editor)$/
 
 // Which action of `cms({ roles })` a request needs, from its method and path as the router reads them.
-function actionOf(method: string, path: string): Action | undefined {
+function actionOf(method: string, path: string): CmsAction | undefined {
   if (REDIRECTS.test(path) || (method === 'POST' && ENTRY_RENAME.test(path)))
     return 'redirects'
 

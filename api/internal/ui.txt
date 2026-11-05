@@ -878,10 +878,16 @@ interface SortableOptions
   onReorder: (from: number, to: number) => unknown
 
 [./lib/editing] editing
-function editing<Row, Draft = void>(): Editing<Row, Draft>
+function editing<Row, Draft = void>(): RowEditing<Row, Draft>
 
 [./lib/editing] Editing
-interface Editing<Row, Draft = void>
+type Editing<Row, Draft = void> = RowEditing<Row, Draft>
+
+[./lib/editing] rowEditing
+function rowEditing<Row, Draft = void>(): RowEditing<Row, Draft>
+
+[./lib/editing] RowEditing
+interface RowEditing<Row, Draft = void>
   close: () => void
   create: (draft: Draft) => void
   draft: () => Draft | undefined
@@ -1179,16 +1185,10 @@ interface DescriptionItem
 function dismissToast(id: number): void
 
 [./lib/index] editing
-function editing<Row, Draft = void>(): Editing<Row, Draft>
+function editing<Row, Draft = void>(): RowEditing<Row, Draft>
 
 [./lib/index] Editing
-interface Editing<Row, Draft = void>
-  close: () => void
-  create: (draft: Draft) => void
-  draft: () => Draft | undefined
-  edit: (row: Row) => void
-  open: () => boolean
-  row: () => Row | undefined
+type Editing<Row, Draft = void> = RowEditing<Row, Draft>
 
 [./lib/index] FieldSize
 type FieldSize = 'sm' | 'md' | 'lg'
@@ -1368,6 +1368,18 @@ type RangeValue = [number | null, number | null]
 
 [./lib/index] RowChange
 type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
+
+[./lib/index] rowEditing
+function rowEditing<Row, Draft = void>(): RowEditing<Row, Draft>
+
+[./lib/index] RowEditing
+interface RowEditing<Row, Draft = void>
+  close: () => void
+  create: (draft: Draft) => void
+  draft: () => Draft | undefined
+  edit: (row: Row) => void
+  open: () => boolean
+  row: () => Row | undefined
 
 [./lib/index] RowFilter
 type RowFilter<Row> = readonly (keyof Row & string)[] | ((row: Row) => (string | number | null | undefined)[])

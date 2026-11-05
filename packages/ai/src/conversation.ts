@@ -1,7 +1,7 @@
 import type { ConversationKey, StoredCall, StoredTurn } from './conversation-store'
 import type { ConversationAnswer } from './conversation-title'
 import type { ConversationCall } from './resume'
-import type { AskOptions, Message, ProviderMessage, Reply, ToolCall } from './types'
+import type { AiMessage, AiReply, AiToolCall, AskOptions, ProviderMessage } from './types'
 import { logFrom } from 'kay'
 import { currentRequest, refundRateLimit } from 'kay/library'
 import { estimatedChars, toolChars } from './attachments'
@@ -77,7 +77,7 @@ const scopeOf = (request: Request) => new URL(request.url).pathname
 // What stands for the answer of a reply that called tools and said nothing, as a provider needs an assistant turn after the results.
 const NO_ANSWER = '(no answer was given)'
 
-type Replayed = Message & Pick<ProviderMessage, 'calls' | 'results'>
+type Replayed = AiMessage & Pick<ProviderMessage, 'calls' | 'results'>
 
 // A turn as the model read it: the user's text, or for a reply each request's calls and their results, then its text.
 // A turn of no text and no calls, a message of files alone, is kept so the turns line up with the Chat's, and left out of what the model reads, as a provider refuses an empty message.
@@ -99,7 +99,7 @@ function replayed({ role, content, steps, stopped }: StoredTurn, shortened: bool
 const charsOf = (messages: readonly Replayed[]) => messages.reduce((sum, message) => sum + message.content.length + toolChars(message), 0)
 
 // Two turns of one role in a row, left once an empty turn between them is, are read as one, as a provider takes the roles in turn; a message of calls or results stands alone.
-function fitted(kept: readonly StoredTurn[], posted: readonly Message[], maxInputChars: number): Replayed[] {
+function fitted(kept: readonly StoredTurn[], posted: readonly AiMessage[], maxInputChars: number): Replayed[] {
   const room = maxInputChars - posted.reduce((sum, message) => sum + message.content.length + estimatedChars(message), 0)
   const turns = kept.map((turn, at) => ({ turn, at })).filter(({ turn, at }) => replayed(turn, false, at).length > 0)
   const cost = ({ turn, at }: (typeof turns)[number], shortened: boolean) => charsOf(replayed(turn, shortened, at))
@@ -170,11 +170,11 @@ async function written(key: string): Promise<void> {
 }
 
 // Asks with the conversation the Chat posts to: its stored turns, less those a regenerate or an edit replaces, then the posted messages. Once the reply ends the posted messages and the reply are stored, before the reader is told it ended; a revision that moved since the Chat read it is refused with 409, nothing asked.
-export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions, maxInputChars: number, make: (messages: Message[]) => Reply): Reply {
+export function heldReply(call: HeldCall, prompt: AiMessage[], options: AskOptions, maxInputChars: number, make: (messages: AiMessage[]) => AiReply): AiReply {
   const store = conversationStore()
-  let write: ((reply: Reply) => Promise<void>) | undefined
+  let write: ((reply: AiReply) => Promise<void>) | undefined
 
-  const target = (async (): Promise<{ reply: Reply }> => {
+  const target = (async (): Promise<{ reply: AiReply }> => {
     const owner = await namedVisitor(call.request, options.key)
 
     // A Chat that was told the visitor keeps conversations posts its last message alone; with no one named any more, a lapsed session, asking with it alone would drop the conversation, so the Chat is refused and reads that it holds its history again.
@@ -235,15 +235,15 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
 }
 
 // A call still running when the reply ended has no result to replay.
-const isAnswered = (call: ToolCall) => call.status !== 'running' && call.result !== undefined
+const isAnswered = (call: AiToolCall) => call.status !== 'running' && call.result !== undefined
 
 // A result is kept to this many characters, as the replay of an older one is shortened anyway, and a conversation keeps `MOST_STORED_RESULTS` of them in all.
 const MOST_STORED_RESULT = 4000
 
-const storedCall = ({ id, name, input, result, status }: ToolCall): StoredCall => ({ id, name, arguments: JSON.stringify(input), result: clip(result ?? '', MOST_STORED_RESULT), ok: status === 'done' })
+const storedCall = ({ id, name, input, result, status }: AiToolCall): StoredCall => ({ id, name, arguments: JSON.stringify(input), result: clip(result ?? '', MOST_STORED_RESULT), ok: status === 'done' })
 
 // The calls a reply made, request by request, and how it finished, none for one that broke off before telling.
-async function ending(reply: Reply): Promise<[calls: readonly unknown[], finish: unknown, steps: StoredCall[][]]> {
+async function ending(reply: AiReply): Promise<[calls: readonly unknown[], finish: unknown, steps: StoredCall[][]]> {
   try {
     const [calls, finish, steps] = await Promise.all([reply.calls, reply.finish, reply.steps])
 
@@ -256,7 +256,7 @@ async function ending(reply: Reply): Promise<[calls: readonly unknown[], finish:
 
 // Stores the exchange as the Chat shows it: the posted message, and the reply when it said or called anything, a reply cut off by a failure as one stopped. A reply that failed or was stopped before its first word, which the Chat takes back, stores nothing.
 // Each turn it adds names the reply that wrote it, which the next send of that Chat names back.
-async function kept(reply: Reply, key: ConversationKey, revision: number, drop: number, prompt: readonly Message[], options: AskOptions, writer: string | undefined): Promise<void> {
+async function kept(reply: AiReply, key: ConversationKey, revision: number, drop: number, prompt: readonly AiMessage[], options: AskOptions, writer: string | undefined): Promise<void> {
   let text = ''
   let failed = false
 
@@ -288,14 +288,14 @@ async function kept(reply: Reply, key: ConversationKey, revision: number, drop: 
 }
 
 // The answer of a load, a list, a rename or a remove, as one snapshot holding its JSON, which asks no provider and counts nothing in `ai()`'s limits.
-export function conversationReply(call: HeldCall, prompt: readonly Message[], named: string | undefined): Reply {
+export function conversationReply(call: HeldCall, prompt: readonly AiMessage[], named: string | undefined): AiReply {
   return createReply(async function* answering() {
     yield { text: JSON.stringify(await answerOf(call, prompt, named)) }
     yield { finish: 'stop' }
   }, [], () => async () => Promise.resolve([]), false, undefined, { resumed: true })
 }
 
-async function answerOf(call: HeldCall, prompt: readonly Message[], named: string | undefined): Promise<ConversationAnswer> {
+async function answerOf(call: HeldCall, prompt: readonly AiMessage[], named: string | undefined): Promise<ConversationAnswer> {
   const owner = await namedVisitor(call.request, named)
 
   if (owner === undefined)

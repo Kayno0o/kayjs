@@ -3,7 +3,7 @@ import type { GuardContext } from 'kay'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { Elysia } from 'elysia'
 import { setSite } from '../../../src/runtime/site'
-import { guard } from '../src/guard'
+import { authGuard } from '../src/guard'
 import { memoryAuthStore } from '../src/memoryStore'
 import { testApp, userRecord } from './helpers/app'
 
@@ -11,9 +11,9 @@ afterEach(() => {
   setSite(undefined)
 })
 
-async function run(ctx: GuardContext, options?: Parameters<typeof guard>[0]): Promise<string> {
+async function run(ctx: GuardContext, options?: Parameters<typeof authGuard>[0]): Promise<string> {
   try {
-    await guard(options)(ctx)
+    await authGuard(options)(ctx)
 
     return 'passed'
   }
@@ -50,7 +50,7 @@ function guardContext(locals: object, path = '/', method = 'GET'): GuardContext 
   } as unknown as GuardContext
 }
 
-describe('guard() from kayjs-auth', () => {
+describe('authGuard() from kayjs-auth', () => {
   test('names the missing plugin when the request has no auth', async () => {
     expect(await run(guardContext({}))).toContain('no `auth` in this context')
   })

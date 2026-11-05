@@ -1,7 +1,7 @@
 import { signal } from 'kay'
 
 // The add-or-edit dialog a list page has open.
-export interface Editing<Row, Draft = void> {
+export interface RowEditing<Row, Draft = void> {
   // The row being edited; undefined while adding or closed.
   row: () => Row | undefined
   // What the new row starts from; undefined while editing or closed.
@@ -17,7 +17,7 @@ export interface Editing<Row, Draft = void> {
 
 // One dialog adding and editing the rows of a list: `edit(row)` opens it on a row, `create(draft)` on what a new row starts from, `close` shuts it, and `open()` says whether it shows.
 // Wrapped in an object, a row held is the very one the page handed over, a function row included.
-export function editing<Row, Draft = void>(): Editing<Row, Draft> {
+export function rowEditing<Row, Draft = void>(): RowEditing<Row, Draft> {
   const session = signal<{ row: Row } | { draft: Draft } | null>(null)
   const row = () => {
     const current = session()
@@ -39,3 +39,9 @@ export function editing<Row, Draft = void>(): Editing<Row, Draft> {
     close: () => session.set(null),
   }
 }
+
+/** @deprecated Renamed `rowEditing` in 1.90, as `editing()` of `kay` says whether the server renders for an editor; the old name works until 1.93. */
+export const editing = rowEditing
+
+/** @deprecated Renamed `RowEditing` in 1.90, with `rowEditing`; the old name works until 1.93. */
+export type Editing<Row, Draft = void> = RowEditing<Row, Draft>

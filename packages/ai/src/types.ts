@@ -3,7 +3,7 @@ import type { TSchema } from 'kay/library'
 import type { StoredFile } from './attachments'
 
 // A file the model is shown: bytes or a `Blob` (a `File` from an `s.File()` field is one), or a file kay stored (`storedFile(key)`, never a key a visitor chose). What it is comes from its bytes, not its name or declared type: a PNG, JPEG, GIF or WebP image, or a PDF.
-export type Attachment = Blob | Uint8Array | ArrayBuffer | StoredFile
+export type AiAttachment = Blob | Uint8Array | ArrayBuffer | StoredFile
 
 // A message as `Chat` posts it to its action: the files a visitor attached are `File`s, which a schema takes as `attachments: s.Optional(s.Array(s.File({ ... })))`.
 export interface ChatMessage {
@@ -29,23 +29,23 @@ export interface Source {
   href: string
 }
 
-export interface Message {
+export interface AiMessage {
   // `system` is not a role here: the prompt that frames the reply goes in `options.system`, so a history posted by a visitor cannot carry one.
   role: 'user' | 'assistant'
   content: string
   // What an assistant message cites, for a `Chat`'s `initial` to show again; `ask` leaves it out of the request.
   sources?: readonly Source[] | undefined
   // Images and PDFs shown to the model beside the text, on a user message; they count toward `maxInputChars` as `ask` estimates and each is under `maxAttachmentBytes`.
-  attachments?: readonly Attachment[] | undefined
+  attachments?: readonly AiAttachment[] | undefined
 }
 
 // A message a `Chat` shows to start with, through `initial`: an island prop carries no `Blob`, so it has no attachments.
-export type ChatTurn = Pick<Message, 'role' | 'content' | 'sources'>
+export type ChatTurn = Pick<AiMessage, 'role' | 'content' | 'sources'>
 
 // A turn as `Chat`'s `@turn` and `@actions` blocks receive it: plain data, the turn being written included (`pending`).
 export interface ChatTurnView extends ChatTurn {
   // The tools the reply called, when the action streams `reply.progress()`.
-  calls: readonly ToolCall[]
+  calls: readonly AiToolCall[]
   // A reply the visitor stopped, or one whose stream broke off.
   stopped: boolean
   // The reply still streaming in, whose `content` grows.
@@ -92,7 +92,7 @@ export interface ToolOutcome {
 export type Thinking = { text: string, signature: string } | { redacted: string }
 
 // A message as a provider is sent it: the assistant's turn that called tools carries `calls`, and the turn answering them, from the user's side, `results`.
-export interface ProviderMessage extends Omit<Message, 'attachments'> {
+export interface ProviderMessage extends Omit<AiMessage, 'attachments'> {
   // The thinking that came before the calls, which Anthropic requires back unchanged in the turn that called tools.
   thinking?: Thinking[] | undefined
   attachments?: Media[] | undefined
@@ -135,7 +135,7 @@ export type Finish = 'stop' | 'length' | 'filtered' | 'steps'
 // `toolUse` is a provider's finished tool call, which the loop answers and the reply never shows; `tool` is a call as the reply shows it, sent again as its status changes; `step` is a request to the model that ended, which `reply.steps` lists.
 // `restart` drops the text so far: the tool loop sends it for a `schema` reply when a step that wrote some went on to call tools, as only the text of the last step is the object.
 // `reasoning` is a part of the model's thinking as it streams, never mixed into `text`; `thinking` is a finished block of it, which the loop sends back with the calls and the reply never shows.
-export type Piece = { text: string } | { reasoning: string } | { thinking: Thinking } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: ToolCall } | { step: Step } | { restart: true }
+export type Piece = { text: string } | { reasoning: string } | { thinking: Thinking } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: AiToolCall } | { step: Step } | { restart: true }
 
 export interface Provider {
   readonly name: string
@@ -227,7 +227,7 @@ export type Confirm = (call: ToolRequest) => boolean | Promise<boolean>
 
 // What `onRequest` is given before the provider is called: the messages (with their attachments) and the system prompt as the ask has them, the model chosen, and the options of the ask.
 export interface RequestHookCall {
-  messages: Message[]
+  messages: AiMessage[]
   system: string | undefined
   model: string
   options: AskOptions
@@ -235,7 +235,7 @@ export interface RequestHookCall {
 
 // What `onRequest` returns to change the request: the messages and system prompt to send instead; a field left out stays as it was, and `system: undefined` sends none.
 export interface RequestHookChange {
-  messages?: Message[] | undefined
+  messages?: AiMessage[] | undefined
   system?: string | undefined
 }
 
@@ -255,7 +255,7 @@ export interface AskHooks {
   // Called after each request of the reply to the provider, a tool loop making one per round.
   onStep?: ((step: Step) => unknown) | undefined
   // Called as each tool call starts (`running`) and again as it ends (`done` or `failed`).
-  onToolCall?: ((call: ToolCall) => unknown) | undefined
+  onToolCall?: ((call: AiToolCall) => unknown) | undefined
   // Called once the reply ended, finished, cut short or stopped (`stopped`).
   onFinish?: ((done: FinishHookCall) => unknown) | undefined
   // Called when the reply fails, with the error its readers get.
@@ -309,7 +309,7 @@ export interface StructuredAskOptions<Schema extends TSchema = TSchema> extends 
 }
 
 // A tool call as the reply shows it, plain data a chat renders: `running` until the action answers, then `done` or `failed`.
-export interface ToolCall {
+export interface AiToolCall {
   id: string
   name: string
   // The words for the call, from the `label` of the action's `tool` or of a function tool, which a chat shows in place of the name unless its `toolLabels` names the tool.
@@ -336,13 +336,13 @@ export interface Step {
   // Why the model stopped, undefined when the provider said nothing.
   finish: Finish | undefined
   // The tool calls the model made in this request, run, with their `ms`.
-  calls: ToolCall[]
+  calls: AiToolCall[]
 }
 
 // The reply so far, for a chat to show: the text of all steps and every call, each as last seen, and the code blocks that were finished since the previous snapshot.
 export interface Progress {
   text: string
-  calls: ToolCall[]
+  calls: AiToolCall[]
   // The code blocks of the text closed since the previous snapshot, highlighted with the app's own highlighter (`markdown.highlight` in `kay.config.ts`) and sanitized; absent when there are none or the app has no highlighter.
   code?: CodeBlock[] | undefined
   // What the model has thought so far, when the provider streams it (Anthropic's thinking, an OpenAI-compatible server's `reasoning_content`); absent when it did not. The text of `await` never holds it.
@@ -366,7 +366,7 @@ export interface DeltasOptions {
 
 // A reply: `await` gives its whole text, `for await` its snapshots, each the text so far, which an `await` block and a streaming action take as they are.
 // It is no Promise, which an `await` block would read as one value; it sends nothing until it is first read.
-export interface Reply extends PromiseLike<string>, AsyncIterable<string> {
+export interface AiReply extends PromiseLike<string>, AsyncIterable<string> {
   // The snapshots, as `for await` gives them, in an object that is no thenable: an `async` function returns it as it is, where it would await the reply itself and lose the streaming.
   stream: () => AsyncIterable<string>
   // The pieces as they came, not the text so far.
@@ -378,7 +378,7 @@ export interface Reply extends PromiseLike<string>, AsyncIterable<string> {
   // Every change to the text or to a tool call, as a snapshot; an action returning it streams both to a chat. Empty replies yield nothing.
   progress: () => AsyncIterable<Progress>
   // The tool calls once the reply ended, in the order they were made; never rejects, and reading it starts the reply.
-  readonly calls: Promise<ToolCall[]>
+  readonly calls: Promise<AiToolCall[]>
   // One entry per request made to the model, in order, with how long it took, how long until it first spoke, its tokens, why it stopped and the tool calls it made (each with its `ms`): a tool loop makes one per round. The requests that ended when the reply failed or was stopped; never rejects, and reading it starts the reply.
   readonly steps: Promise<Step[]>
   // True for the reply a Chat's resume or stop call gets, which is the kept reply of an `outlive` ask or an empty one, so an action reading the reply on the server does it on the start alone: `if (!answer.resumed) void speak(answer)`.
@@ -405,7 +405,7 @@ export interface StructuredReply<Value, Snapshot = DeepPartial<Value>> extends P
   deltas: (options?: DeltasOptions) => AsyncIterable<string>
   readonly usage: Promise<Usage | undefined>
   readonly finish: Promise<Finish | undefined>
-  readonly calls: Promise<ToolCall[]>
+  readonly calls: Promise<AiToolCall[]>
   // The requests made to the model, as on `Reply`.
   readonly steps: Promise<Step[]>
   // True for the reply a Chat's resume or stop call gets, as on `Reply`.

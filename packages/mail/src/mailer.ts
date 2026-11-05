@@ -3,7 +3,7 @@ import type { EnqueueOptions, FailedJob, KayExtension, QueueOptions } from 'kay/
 import type { EventSecrets, Found, Suppression, SuppressionReason } from './events'
 import type { ListOptions, ListRun, ListsHandle, MailingList, Subscription } from './list'
 import type { ListStore } from './list-store'
-import type { Reply } from './mime'
+import type { MailReply } from './mime'
 import type { Relayed } from './outbox'
 import type { Relay } from './preview'
 import type { SmtpOverrides } from './smtp'
@@ -85,7 +85,7 @@ export interface MailerOptions {
   // The secrets of the routes where a provider reports bounces and complaints (`/_kay/mail/events/<provider>`) and a mail server hands over delivery reports and replies (`/_kay/mail/inbound`), `MAIL_EVENTS_<PROVIDER>` and `MAIL_INBOUND_SECRET` in the environment unless given here. A route without its secret answers 404.
   events?: EventSecrets | undefined
   // Called with each reply handed to `/_kay/mail/inbound` (anything but a delivery report, which suppresses its failed recipients instead). A reply carries the `Message-ID` of the mail it answers as `inReplyTo`.
-  inbound?: ((reply: Reply) => Promise<void> | void) | undefined
+  inbound?: ((reply: MailReply) => Promise<void> | void) | undefined
   // Lets a server lacking `MAIL_URL` or a sender boot anyway, each send then throwing `MailNotConfiguredError`, for a site whose mail can wait to be set up.
   optional?: boolean | undefined
 }

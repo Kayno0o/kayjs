@@ -49,7 +49,7 @@ export default defineConfig({
 
 Every page, action and guard can now read `ctx.locals.auth`, typed. A file of yours at a page's path, such as `src/routes/auth/sign-in.kay`, replaces that page.
 
-`kay add auth` writes the one-line setup for a project with a server and Tailwind: `auth({ name })` in `kay.config.ts` with kayjs-ui's `ui()`, a `store` loading your pg-orm `Database` when the project has one (with `...authTables` added to its tables), a root `src/routes/_guard.ts` exporting `guard()`, and the session secret and `SITE_URL` in `.env.example` (`KAYJS_AUTH_DATABASE_URL` too without a project `Database`). There is no `src/auth.ts`.
+`kay add auth` writes the one-line setup for a project with a server and Tailwind: `auth({ name })` in `kay.config.ts` with kayjs-ui's `ui()`, a `store` loading your pg-orm `Database` when the project has one (with `...authTables` added to its tables), a root `src/routes/_guard.ts` exporting `authGuard()`, and the session secret and `SITE_URL` in `.env.example` (`KAYJS_AUTH_DATABASE_URL` too without a project `Database`). There is no `src/auth.ts`.
 
 ### The createAuth form
 
@@ -170,7 +170,7 @@ It is read for `user()` and `requireUser()` and for the hooks (`onSignUp`, `prof
 
 `pgStore` adds the `data` column when you run `db.sync()`, and older rows read as `{}`. A store of your own keeps `UserRecord.data` as JSON.
 
-With no prebuilt pages, `requireUser({ redirect: '/login' })` names your sign-in page. A bearer token limited to scopes is refused with a 403 unless `requireUser({ scope })` names one it holds. `requireUser({ require: 'editor' })` refuses with a 403 a user who does not meet it, through your `authorize` as `guard()` does. Add `bare: true` to get the user without `providers` and skip that read, when you only want the checks.
+With no prebuilt pages, `requireUser({ redirect: '/login' })` names your sign-in page. A bearer token limited to scopes is refused with a 403 unless `requireUser({ scope })` names one it holds. `requireUser({ require: 'editor' })` refuses with a 403 a user who does not meet it, through your `authorize` as `authGuard()` does. Add `bare: true` to get the user without `providers` and skip that read, when you only want the checks.
 
 Each prebuilt page writes its content in a `main`, so a screen reader can jump to it. If your layout already wraps pages in a `main`, set `pages: { main: false }` in `createAuth` (or `auth({ pages: { main: false } })`) and the pages write a `div` instead, so yours stays the one landmark.
 
@@ -423,7 +423,7 @@ Turning `twoFactor` off only stops new users from setting it up. A user who alre
 
 To make it a must, give `twoFactor: { require: ['admin'] }`, which takes what a guard's `require` takes.
 
-A user it names who has not turned it on is sent to the security page by `guard()` and `requireAdmin()`, and comes back once it is on. Anything that is not a page gets a 403, and a gate only ever answers 403.
+A user it names who has not turned it on is sent to the security page by `authGuard()` and `requireAdmin()`, and comes back once it is on. Anything that is not a page gets a 403, and a gate only ever answers 403.
 
 Every `auth.admin` method answers `{ ok: false, error: 'two-factor-required' }`, and OAuth consent answers `access_denied`. The security page and the second-factor page are never held back, and `securityPage` names your own.
 

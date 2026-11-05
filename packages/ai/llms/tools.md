@@ -20,7 +20,7 @@ p Assistant
 
 ### Allowing a write
 
-An action that changes something waits for the visitor by default (a function tool does not). The call does not run: the model is told it needs the visitor's approval, the reply's `ToolCall` carries an `approval` ticket, and `Chat` draws Allow and Deny under the turn. Allow posts the visitor's next message, `Allowed: add_note {"title":"Milk"}` with the ticket on a last line the chat does not show, and the model calls the tool again: the ticket lets that very call run once, and no other tool, arguments or later message. Deny posts `Denied: add_note`. A ticket is signed with the app secret (set `KAY_SECRET`, or it works in one process only), expires after 10 minutes, is spent by its first use (in the app's `store.rates` when it has one; a store that fails or takes over 5 s runs no call, as the limits refuse an ask they cannot read) and counts only in the visitor's last message, so text a tool returned or the model wrote cannot allow anything, and posting the same message again holds the call again.
+An action that changes something waits for the visitor by default (a function tool does not). The call does not run: the model is told it needs the visitor's approval, the reply's `AiToolCall` carries an `approval` ticket, and `Chat` draws Allow and Deny under the turn. Allow posts the visitor's next message, `Allowed: add_note {"title":"Milk"}` with the ticket on a last line the chat does not show, and the model calls the tool again: the ticket lets that very call run once, and no other tool, arguments or later message. Deny posts `Denied: add_note`. A ticket is signed with the app secret (set `KAY_SECRET`, or it works in one process only), expires after 10 minutes, is spent by its first use (in the app's `store.rates` when it has one; a store that fails or takes over 5 s runs no call, as the limits refuse an ask they cannot read) and counts only in the visitor's last message, so text a tool returned or the model wrote cannot allow anything, and posting the same message again holds the call again.
 
 `tool: { label: 'Read the home' }` words the tool's calls in `Chat` (and `label` on a `tool()`), which the model never sees. A tool that only reads says so and runs unasked: `action(schema, handler, { tool: { description: 'Looks a note up', readOnly: true } })`. `confirm: false` in `ask` runs every tool unasked, for an app asking elsewhere. The arguments are part of the message the action receives, so a schema bounding `content` leaves room for them (4,000 characters is plenty for a note, not for a long text argument).
 
@@ -59,14 +59,14 @@ const outcome = await site.call(assistant, { messages })
 `mocked(action, run)` (from `@kaynooo/kayjs-ai`) makes a function tool of an action with the action's own name, description, label and input schema and a `run` of yours, so a script outside the server asks the real model with the tools the app offers, answered by mocks. It throws for an action that cannot be a tool (one taking a file, or `tool: false`; a page with params is refused once the app serves it, not in a script). The input is checked against the action's schema before `run`, as for `tool()`.
 
 ```ts
-import type { Message } from '@kaynooo/kayjs-ai'
+import type { AiMessage } from '@kaynooo/kayjs-ai'
 import { ask, mocked, openai } from '@kaynooo/kayjs-ai'
 import { systemPrompt } from '../src/assistant'
 import { forecast, route } from '../src/routes/_actions.kay'
 
 const provider = openai({ baseUrl: 'http://localhost:11434/v1', model: 'gemma4:12b' })
 const tools = [mocked(forecast, () => ({ days: [] })), mocked(route, ({ to }) => ({ to, km: 3.4, minutes: 21 }))]
-const history: Message[] = []
+const history: AiMessage[] = []
 
 for (const turn of [{ ask: 'Will it rain tomorrow?', expect: 'forecast' }, { ask: 'And by bike to the station?', expect: 'route' }]) {
   const reply = ask([...history, { role: 'user', content: turn.ask }], { provider, system: systemPrompt(new Date()), tools })
@@ -139,8 +139,8 @@ A model reads text an attacker may have written (a page, an email, a visitor's m
 ### The calls shown
 
 - `reply.progress()` is an async iterable of `{ text, calls, code?, reasoning? }`, the text so far and every call as last seen, one snapshot per change; `code` lists the blocks highlighted since the previous snapshot ([Chat island](chat.md)). It is plain data: an action returning it streams both to the island (`last()` is the latest), which is what a chat renders. `code` holds only the blocks closed since the previous snapshot, so `last()` is not the whole list.
-- `await reply.calls` is the final `ToolCall[]`, never rejects; reading it starts the reply.
-- `ToolCall` is `{ id, name, input, status, result? }`: `input` the parsed arguments (`{}` when they were not an object), `status` `running`, then `done` or `failed`, `result` the text the model was given. A call stopped while running stays `running`.
+- `await reply.calls` is the final `AiToolCall[]`, never rejects; reading it starts the reply.
+- `AiToolCall` is `{ id, name, input, status, result? }`: `input` the parsed arguments (`{}` when they were not an object), `status` `running`, then `done` or `failed`, `result` the text the model was given. A call stopped while running stays `running`.
 - Results are the visitor's own data, run as them, but shown as is: a chat decides how much of `result` to render.
 
 ### Both providers

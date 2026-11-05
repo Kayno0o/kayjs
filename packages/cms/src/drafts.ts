@@ -1,6 +1,6 @@
 import type { Duration } from 'kay'
 import type { DraftKeeper } from './draft-storage'
-import type { DraftEntry, DraftResult, EntryRef, Issue } from './kay/contract'
+import type { CmsDraftEntry, DraftResult, EntryRef, Issue } from './kay/contract'
 import type { FieldPath } from './markers'
 import { durationMs, signal } from 'kay'
 import { BODY, entryKey } from './markers'
@@ -9,7 +9,7 @@ import { hashOf } from './room'
 
 export interface DraftsOptions {
   // Renders the page with these entries in place of the saved ones: kay's `showDraft`.
-  show: (entries: DraftEntry[]) => Promise<DraftResult>
+  show: (entries: CmsDraftEntry[]) => Promise<DraftResult>
   // How long typing pauses before the page renders again, `'150ms'` by default.
   delay?: Duration | undefined
   // Where unsaved edits are kept across a reload, a crash and a second tab: `browserKeeper()`. None keeps them in memory only.
@@ -17,7 +17,7 @@ export interface DraftsOptions {
 }
 
 // What a kept draft names the saved copy it was made from by, as the copy itself would double a Markdown body in the browser's storage.
-function fingerprint(entry: DraftEntry): string {
+function fingerprint(entry: CmsDraftEntry): string {
   return hashOf(JSON.stringify([entry.data, entry.body ?? '']))
 }
 
@@ -38,7 +38,7 @@ export interface Recovery {
 // The unsaved edits of the entries a page renders, rendering the page with them shortly after each change.
 export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
   const wait = durationMs(delay)
-  const saved = new Map<string, DraftEntry>()
+  const saved = new Map<string, CmsDraftEntry>()
   // What `open` was last given for each entry, so being given it again changes nothing.
   const offered = new Map<string, string>()
   // Each saved entry as text, so an edit is compared with it by stringifying the edited entry alone.
@@ -47,7 +47,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
   const versions = new Map<string, string | undefined>()
   // The entries whose file the other side deleted and whose edits were kept: their next save creates the file, and is refused if one was made meanwhile.
   const recreated = new Set<string>()
-  const current = signal<ReadonlyMap<string, DraftEntry>>(new Map())
+  const current = signal<ReadonlyMap<string, CmsDraftEntry>>(new Map())
   const issues = signal<readonly Issue[]>([])
   // The fields whose text cannot be turned into a value yet, by entry then field path: what the editor typed in a JSON box that does not parse. A save refuses until they are fixed, as the entry holds the last text that parsed.
   const unparsed = signal<ReadonlyMap<string, ReadonlyMap<string, string>>>(new Map())
@@ -64,12 +64,12 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
   // Set by a save's refusal, so a render scheduled before it leaves those issues be; the next edit clears it.
   let reported = false
 
-  function keepSaved(key: string, entry: DraftEntry): void {
+  function keepSaved(key: string, entry: CmsDraftEntry): void {
     saved.set(key, entry)
     savedText.set(key, JSON.stringify(entry))
   }
 
-  function changed(): DraftEntry[] {
+  function changed(): CmsDraftEntry[] {
     return [...current().entries()].filter(([key, entry]) => entry !== saved.get(key)).map(([, entry]) => entry)
   }
 
@@ -134,7 +134,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       keep.remove(key)
   }
 
-  function recover(key: string, entry: DraftEntry, version: string | undefined): DraftEntry {
+  function recover(key: string, entry: CmsDraftEntry, version: string | undefined): CmsDraftEntry {
     const kept = keep?.read(key)
 
     if (!kept)
@@ -211,14 +211,14 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
     refusals.set(next)
   }
 
-  function update(ref: EntryRef, change: (entry: DraftEntry) => DraftEntry | undefined): void {
+  function update(ref: EntryRef, change: (entry: CmsDraftEntry) => CmsDraftEntry | undefined): void {
     const key = entryKey(ref)
     const entry = current().get(key)
 
     if (!entry)
       throw new Error(`${key} was never opened`)
 
-    const original = saved.get(key) as DraftEntry
+    const original = saved.get(key) as CmsDraftEntry
     const next = change(entry)
     // An edit typed back to the saved text leaves the entry unchanged.
     const same = next === undefined || JSON.stringify(next) === savedText.get(key)
@@ -245,7 +245,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
 
   return {
     // Starts from the saved entry, unless it already has a draft.
-    open(entry: DraftEntry, version?: string | undefined): void {
+    open(entry: CmsDraftEntry, version?: string | undefined): void {
       const key = entryKey(entry)
 
       const offer = `${version ?? ''}\n${JSON.stringify(entry)}`
@@ -274,7 +274,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       if (start !== entry)
         schedule()
     },
-    entry(ref: EntryRef): DraftEntry | undefined {
+    entry(ref: EntryRef): CmsDraftEntry | undefined {
       return current().get(entryKey(ref))
     },
     // Whether the browser keeps edits of the entry from an earlier visit, which opening it brings back.
@@ -309,7 +309,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       update(ref, () => undefined)
     },
     // Takes the entry as it was sent for its saved state, once a save went through: an edit made while it was on its way stays unsaved.
-    markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void {
+    markSaved(ref: EntryRef, sent: CmsDraftEntry, version?: string | undefined): void {
       const key = entryKey(ref)
 
       keepSaved(key, sent)
@@ -341,7 +341,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       refuse(ref, undefined)
     },
     // After a conflict, takes the entry as the other save left it, dropping the edits: its copy and version become the saved state.
-    adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void {
+    adopt(ref: EntryRef, entry: CmsDraftEntry, version: string | undefined): void {
       const key = entryKey(ref)
 
       forget(key)
@@ -355,7 +355,7 @@ export function createDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       schedule()
     },
     // The fields both the entry's edits and `other` changed from the copy the edits were made from, a data field by its path and the body as `BODY`.
-    differences(ref: EntryRef, other: DraftEntry): FieldPath[] {
+    differences(ref: EntryRef, other: CmsDraftEntry): FieldPath[] {
       const key = entryKey(ref)
       const mine = current().get(key)
       const base = saved.get(key)

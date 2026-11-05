@@ -282,6 +282,9 @@ interface AuthFeatures
   signUp: boolean
   twoFactor: boolean
 
+[.] authGuard
+function authGuard(options?: GuardOptions): Guard<void>
+
 [.] AuthHooks
 type AuthHooks = Partial<Pick<AuthOptions<AuthSessionData, string>, 'allow' | 'authorize' | 'exportData' | 'locate' | 'onAuthEvent' | 'onDelete' | 'onSignUp' | 'profileFields'>>
 
@@ -307,6 +310,12 @@ interface AuthMailMessage extends MailContent
   text: string
   to: string
   url?: string
+
+[.] AuthMember
+interface AuthMember<Role extends string = string>
+  joinedAt: Date
+  roles: Role[]
+  user: { id: string; email: null | string; username: null | string; }
 
 [.] AuthModule
 type AuthModule = { auth: { plugin: AnyElysia } } | { default: { plugin: AnyElysia } }
@@ -399,6 +408,13 @@ interface AuthPagesConfig extends AuthPagesOptions
 interface AuthPagesOptions
   home?: string | undefined
   prefix?: string | undefined
+
+[.] AuthProofOfWorkOptions
+interface AuthProofOfWorkOptions
+  difficulty?: number | undefined
+  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  on?: Partial<Record<CaptchaAction, "always" | false | number>> | undefined
+  store?: RateStore | undefined
 
 [.] AuthRates
 type AuthRates = RateStore
@@ -1186,7 +1202,7 @@ type LinkType = 'verify-email' | 'reset-password' | 'magic-link' | 'change-email
 type ListInvitationsResult<Role extends string = string> = { ok: true, invitations: Invitation<Role>[] } | { ok: false, error: OrganizationFailure }
 
 [.] ListMembersResult
-type ListMembersResult<Role extends string = string> = { ok: true, members: Member<Role>[] } | { ok: false, error: OrganizationFailure }
+type ListMembersResult<Role extends string = string> = { ok: true, members: AuthMember<Role>[] } | { ok: false, error: OrganizationFailure }
 
 [.] ListUsersResult
 type ListUsersResult = { ok: true, users: ManagedUser[], total: number } | { ok: false, error: 'forbidden' | 'two-factor-required' }
@@ -1232,10 +1248,7 @@ interface ManagedUser extends BareUser
 type MaybePromise<T> = T | Promise<T>
 
 [.] Member
-interface Member<Role extends string = string>
-  joinedAt: Date
-  roles: Role[]
-  user: { id: string; email: null | string; username: null | string; }
+type Member<Role extends string = string> = AuthMember<Role>
 
 [.] MemberRecord
 interface MemberRecord
@@ -1665,7 +1678,7 @@ interface Proof
 type ProofFailure = 'signed-out' | 'proof' | 'stale' | 'limited' | 'impersonating'
 
 [.] proofOfWork
-function proofOfWork(options?: ProofOfWorkOptions): ProofOfWorkCaptcha
+function proofOfWork(options?: AuthProofOfWorkOptions): ProofOfWorkCaptcha
 
 [.] ProofOfWorkCaptcha
 interface ProofOfWorkCaptcha
@@ -1673,11 +1686,7 @@ interface ProofOfWorkCaptcha
   proofOfWork: { difficulty: number; maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; store: RateStore | undefined; }
 
 [.] ProofOfWorkOptions
-interface ProofOfWorkOptions
-  difficulty?: number | undefined
-  maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
-  on?: Partial<Record<CaptchaAction, "always" | false | number>> | undefined
-  store?: RateStore | undefined
+type ProofOfWorkOptions = AuthProofOfWorkOptions
 
 [.] ProviderOptions
 interface ProviderOptions

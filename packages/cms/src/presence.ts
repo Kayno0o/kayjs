@@ -1,5 +1,5 @@
 import type { GuardContext } from 'kay'
-import type { Member } from './room'
+import type { CmsMember } from './room'
 import { log } from './log'
 import { entryRoom } from './room'
 import { settings } from './settings'
@@ -8,7 +8,7 @@ const MAX_NAME = 60
 
 export interface EntryPresence {
   room: string
-  member: Member
+  member: CmsMember
 }
 
 // The room editors of one entry share, and who the visitor is listed as in it: the name `cms({ author })` gives, none when the app names no author, so its editors are only counted.

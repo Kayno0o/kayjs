@@ -1,6 +1,6 @@
 import type { AuthKind } from './auth'
 import type { Relayed, SentMail } from './outbox'
-import type { Address, Attachment, Delivery, Mail, MailMessage, ViewContent } from './types'
+import type { Address, Delivery, Mail, MailAttachment, MailMessage, ViewContent } from './types'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -246,7 +246,7 @@ async function samplePage(file: string, phone: boolean, render: (message: MailMe
 }
 
 // An attachment's bytes as base64, which JSON can carry.
-function jsonAttachment({ content, ...rest }: Attachment): object {
+function jsonAttachment({ content, ...rest }: MailAttachment): object {
   return typeof content === 'string' ? { ...rest, content } : { ...rest, content: Buffer.from(content).toString('base64'), encoding: 'base64' }
 }
 

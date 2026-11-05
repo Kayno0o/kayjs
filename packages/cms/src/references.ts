@@ -1,5 +1,5 @@
 import type { Field } from './fields'
-import type { CollectionInfo, DraftEntry, Issue, SourceEntry } from './kay/contract'
+import type { CmsDraftEntry, CollectionInfo, Issue, SourceEntry } from './kay/contract'
 import { wording } from 'kay/words'
 import { fieldsOf, itemFields, itemOf } from './fields'
 import { collections, entries } from './kay/content'
@@ -208,7 +208,7 @@ function valueAt(data: Record<string, unknown> | undefined, path: string): unkno
 }
 
 // The references of an entry about to be saved that name an entry the target collection lacks, as the issues a save is refused for. A reference the stored entry already held is left alone without reading its target, so publishing, unpublishing or moving an entry never stops on an old one; a collection that cannot be read tells nothing, and its references pass.
-export async function missingReferences(collection: CollectionInfo, entry: DraftEntry, stored: () => Promise<Record<string, unknown> | undefined>): Promise<Issue[]> {
+export async function missingReferences(collection: CollectionInfo, entry: CmsDraftEntry, stored: () => Promise<Record<string, unknown> | undefined>): Promise<Issue[]> {
   const found: Named[] = []
 
   for (const field of fieldsOf(collection.schema))

@@ -1,4 +1,4 @@
-import type { DraftEntry } from '../src/kay/contract'
+import type { CmsDraftEntry } from '../src/kay/contract'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { until } from './until'
@@ -20,7 +20,7 @@ const { uploadFile, uploading } = await import('../src/editor/upload')
 Object.assign(entriesApi, { [Symbol.for('kay.api')]: '/_kay/cms/entries' })
 Object.assign(filesApi, { [Symbol.for('kay.api')]: '/_kay/cms/files' })
 
-const post: DraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello' } }
+const post: CmsDraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello' } }
 
 interface Sent { method: string, url: string, body: { data: Record<string, unknown>, version?: string, create?: boolean } }
 

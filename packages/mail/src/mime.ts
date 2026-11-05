@@ -308,7 +308,7 @@ export interface Attachment {
   content: Uint8Array
 }
 
-export interface Reply {
+export interface MailReply {
   // The sender's bare address, lower case, empty when the message names none.
   from: string
   fromName: string
@@ -347,7 +347,7 @@ function filenameOf(part: Part): string | undefined {
 }
 
 // The message as an app function reads it: bodies decoded, encoded headers read, parts that carry a file separated.
-export function replyOf(root: Part): Reply {
+export function replyOf(root: Part): MailReply {
   const { headers } = root
   const [from] = addressesOf(headers.from)
   const all = partsOf(root).filter(part => part.parts.length === 0)

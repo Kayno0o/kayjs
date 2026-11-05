@@ -1,5 +1,5 @@
 import type { LibraryTool } from 'kay/library'
-import type { Confirm, Finish, Piece, Provider, ProviderMessage, ProviderRequest, Step, Thinking, ToolCall, ToolOutcome, ToolUse, Usage } from './types'
+import type { AiToolCall, Confirm, Finish, Piece, Provider, ProviderMessage, ProviderRequest, Step, Thinking, ToolOutcome, ToolUse, Usage } from './types'
 import { logFrom } from 'kay'
 import { spend, ticketAllows, ticketFor } from './approval'
 import { ticketsIn } from './approval-marker'
@@ -138,7 +138,7 @@ async function run(tools: Map<string, Offered>, use: ToolUse, input: Record<stri
   }
 }
 
-function stepOf(began: number, ended: number, first: number | undefined, used: Partial<Usage>, finish: Finish | undefined, calls: ToolCall[]): Step {
+function stepOf(began: number, ended: number, first: number | undefined, used: Partial<Usage>, finish: Finish | undefined, calls: AiToolCall[]): Step {
   const { inputTokens, outputTokens } = used
 
   return {
@@ -259,7 +259,7 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       used.outputTokens = Math.ceil(received / CHARS_PER_TOKEN)
     }
 
-    const stepped = (calls: ToolCall[]): Step => stepOf(began, requested, first, used, finish !== undefined && 'finish' in finish ? finish.finish : undefined, calls)
+    const stepped = (calls: AiToolCall[]): Step => stepOf(began, requested, first, used, finish !== undefined && 'finish' in finish ? finish.finish : undefined, calls)
 
     for (const field of USAGE_FIELDS) {
       if (used[field] !== undefined)
@@ -299,11 +299,11 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
 
     const results: ToolOutcome[] = []
     const sent = new Map<string, Record<string, unknown>>()
-    const made: ToolCall[] = []
+    const made: AiToolCall[] = []
 
     for (const [index, use] of uses.entries()) {
       const label = tools.get(use.name)?.label
-      const call: ToolCall = { id: use.id, name: use.name, ...label !== undefined && { label }, input: {}, status: 'running' }
+      const call: AiToolCall = { id: use.id, name: use.name, ...label !== undefined && { label }, input: {}, status: 'running' }
       const parsed = parseInput(use.arguments)
 
       if ('input' in parsed) {
@@ -323,7 +323,7 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       else
         ran = await run(tools, use, parsed.input, request, confirm, tickets, signal)
 
-      const done: ToolCall = { ...call, ...ran, ms: Math.round(performance.now() - ranFrom) }
+      const done: AiToolCall = { ...call, ...ran, ms: Math.round(performance.now() - ranFrom) }
 
       made.push(done)
 

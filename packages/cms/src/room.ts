@@ -11,7 +11,7 @@ const MEMBER_ROOM = 80
 export const WATCHED_ROWS = 50
 
 // An editor, by the name `cms({ author })` gives. `watching` marks a list showing the entry, which is no editor of it, and `page` the on-page editor, whose visitor the guard may not have admitted: it asks no author and is listed with no name, and the server sends the names of a room to the visitors the guard admitted alone.
-export interface Member {
+export interface CmsMember {
   name: string
   watching?: true | undefined
   page?: true | undefined
@@ -40,7 +40,7 @@ export function hashOf(text: string): string {
   return first.toString(36) + second.toString(36)
 }
 
-export function entryRoom(collection: string, entry: { slug: string, locale?: string | undefined }, listed: Member): { room: string, member: Member } {
+export function entryRoom(collection: string, entry: { slug: string, locale?: string | undefined }, listed: CmsMember): { room: string, member: CmsMember } {
   const full = `cms:${collection}:${entry.slug}${entry.locale === undefined ? '' : `@${entry.locale}`}`
   const member = { ...listed }
   let room = full
@@ -57,7 +57,7 @@ export function entryRoom(collection: string, entry: { slug: string, locale?: st
 }
 
 // Who `others` and `count` of a presence() say has the entry open, besides the member `own`: their names, or how many are there with none. A list watching through `watchRoom` is `own.watching`, and learns only that someone edits.
-export function editorsOf(others: readonly Member[], count: number, own: Member): { names: string[], unnamed: number } {
+export function editorsOf(others: readonly CmsMember[], count: number, own: CmsMember): { names: string[], unnamed: number } {
   const names = others.map(member => member.name).filter(name => name !== '')
 
   if (names.length > 0)
@@ -69,3 +69,6 @@ export function editorsOf(others: readonly Member[], count: number, own: Member)
 
   return { names: [], unnamed: others.length > 0 ? 1 : 0 }
 }
+
+/** @deprecated Renamed `CmsMember` in 1.90, as kayjs-auth has a `Member` of its own; the old name works until 1.93. */
+export type Member = CmsMember

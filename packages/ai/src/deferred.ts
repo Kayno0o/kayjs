@@ -1,14 +1,14 @@
-import type { Reply } from './types'
+import type { AiReply } from './types'
 
 export interface DeferredOptions {
   resumed?: boolean | undefined
   // Runs once the reply is first read, for as long as it takes to end, and the reply is read as ended only once this has: a write of what it said, which the next call must find. It handles its own errors.
-  ended?: ((reply: Reply) => Promise<void>) | undefined
+  ended?: ((reply: AiReply) => Promise<void>) | undefined
 }
 
 // A reply known once `target` settles: every read waits for it, and a target that fails fails the read, as a refused ask does.
 // The reply travels wrapped, since a promise resolving to a thenable would wait for its text instead.
-export function deferredReply(target: Promise<{ reply: Reply }>, { resumed = false, ended }: DeferredOptions = {}): Reply {
+export function deferredReply(target: Promise<{ reply: AiReply }>, { resumed = false, ended }: DeferredOptions = {}): AiReply {
   let ending: Promise<void> | undefined
 
   // A target no one reads must not fail unheard.
@@ -19,7 +19,7 @@ export function deferredReply(target: Promise<{ reply: Reply }>, { resumed = fal
     catch {}
   })()
 
-  const got = async (): Promise<{ reply: Reply }> => {
+  const got = async (): Promise<{ reply: AiReply }> => {
     const { reply } = await target
 
     ending ??= ended?.(reply) ?? Promise.resolve()
@@ -27,7 +27,7 @@ export function deferredReply(target: Promise<{ reply: Reply }>, { resumed = fal
     return { reply }
   }
 
-  const ahead = <Value>(pick: (reply: Reply) => AsyncIterable<Value>): AsyncIterable<Value> => ({
+  const ahead = <Value>(pick: (reply: AiReply) => AsyncIterable<Value>): AsyncIterable<Value> => ({
     [Symbol.asyncIterator]: () => {
       let source: AsyncIterator<Value> | undefined
 

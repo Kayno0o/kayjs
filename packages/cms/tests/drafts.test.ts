@@ -1,14 +1,14 @@
 import type { Duration } from 'kay'
-import type { DraftEntry, DraftResult } from '../src/kay/contract'
+import type { CmsDraftEntry, DraftResult } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
 import { createDrafts } from '../src/drafts'
 import { BODY } from '../src/markers'
 import { until } from './until'
 
-const post: DraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello', tags: ['a'] }, body: '# Hello' }
+const post: CmsDraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello', tags: ['a'] }, body: '# Hello' }
 
-function setup(answer: (entries: DraftEntry[]) => Promise<DraftResult> = async () => ({}), delay: Duration = '5ms') {
-  const calls: DraftEntry[][] = []
+function setup(answer: (entries: CmsDraftEntry[]) => Promise<DraftResult> = async () => ({}), delay: Duration = '5ms') {
+  const calls: CmsDraftEntry[][] = []
   const drafts = createDrafts({
     delay,
     show: async (entries) => {
@@ -427,7 +427,7 @@ describe('the issues of a refused save', () => {
     const { drafts } = setup()
 
     drafts.set(post, 'title', 'Saved')
-    drafts.markSaved(post, drafts.entry(post) as DraftEntry)
+    drafts.markSaved(post, drafts.entry(post) as CmsDraftEntry)
     expect(drafts.changed(post)).toBe(false)
     drafts.set(post, 'title', 'Hello')
     expect(drafts.changed(post)).toBe(true)
