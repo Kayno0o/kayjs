@@ -26,7 +26,7 @@ const look = recipe({
   defaults: { variant: 'solid', tone: 'neutral', size: 'md' },
 })
 
-const { onRecord, onStart, onStop, onCancel, onError, recording, onRecordingChange, label = wording('ui.recordButton.label', 'Record'), failure = wording('ui.recordButton.failure', 'The recording could not be sent.'), maxDuration = RECORD_LIMIT, variant = 'solid', tone = 'neutral', size = 'md', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
+const { onRecord, onStart, onStop, onCancel, onError, recording, onRecordingChange, label = wording('ui.recordButton.label', 'Record'), failure = wording('ui.recordButton.failure', 'The recording could not be sent.'), maxDuration = RECORD_LIMIT, variant = 'solid', tone = 'neutral', size = 'md', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onCancel' | 'onError'> & {
   // Takes what was said as a `File`, `recording.webm` (`recording.m4a` in Safari), which an action's `s.File()` field takes as it is. A promise it returns holds the button busy until it settles, and a rejection says `failure`.
   onRecord: (audio: File) => unknown
   // Called once the microphone is open and the recording runs: to dim the page, stop a player.

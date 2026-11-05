@@ -10,7 +10,7 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: '', footer: 'flex w-full flex-wrap items-center gap-2', actions: 'ml-auto flex flex-wrap justify-end gap-2', form: 'kui-form-grid' } })
 
-const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failure, refused, onSaved, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'id' | 'onClose' | 'onInput' | 'closedby' | 'closedBy' | 'children'> & {
+const { open, title, heading, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failure, refused, onSaved, onError, onOpenChange, extra, id, size, level, actions, header, close, closeHref, modal, closeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'id' | 'onClose' | 'onInput' | 'onError' | 'closedby' | 'closedBy' | 'children'> & {
   // Shows the dialog; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
