@@ -4876,31 +4876,40 @@ describe.concurrent('kay check, s.Public fields', () => {
 })
 
 describe('kay check, the forms 1.87 deprecated and 1.91 dropped', () => {
-  it('reports each as a type error, not a silent change', async () => {
+  it('reports each at its own line as a type error, not a silent change', async () => {
     const root = await scratchProject({
       'src/old.ts': [
         'import type { ResourceFailure, ResourceStatus, StreamStatus } from \'kay\'',
         'import { ApiError, refusalMessage } from \'kay\'',
-        'import { notify, queue, workflow } from \'kay/server\'',
+        'import { api, notify, queue, workflow } from \'kay/server\'',
+        'import { testSite } from \'kay/test\'',
         '',
         'export const a = queue(\'a\', () => undefined, { onFailed: () => undefined })',
         'export const e = queue(\'e\', () => undefined, { keepFailed: \'1d\' })',
         'export const b = workflow(\'b\', () => undefined, { onFailed: () => undefined })',
         'export const c = notify(\'ada\', { title: \'x\', keep: \'1h\' })',
         'export const d = (error: ApiError, types: [ResourceFailure, ResourceStatus, StreamStatus]) => [error.answer, refusalMessage(error, \'x\'), types]',
+        'export const f = api({ errorShape: \'elysia\' })',
+        'export const g = testSite({ fileStore: undefined })',
         '',
       ].join('\n'),
       'src/routes/index.kay': '--- server\nexport const page = { prerender: true, revalidate: \'1h\' }\n---\nh1 Home\n',
     })
 
     try {
-      const messages = (await check(root)).map(found => found.message)
+      const found = await check(root)
+      const at = (file: string, line: number) => found.filter(one => one.file.endsWith(file) && one.line === line).map(one => one.message).join('\n')
 
-      for (const name of ['revalidate', 'onFailed', 'keepFailed', 'keep', 'answer'])
-        expect(messages.some(message => message.includes(`'${name}' does not exist`))).toBe(true)
-
-      for (const name of ['ResourceFailure', 'ResourceStatus', 'StreamStatus', 'refusalMessage'])
-        expect(messages.some(message => message.includes(`'${name}'`))).toBe(true)
+      expect(at('src/old.ts', 1)).toContain('ResourceFailure')
+      expect(at('src/old.ts', 2)).toContain('refusalMessage')
+      expect(at('src/old.ts', 6)).toContain('onFailed')
+      expect(at('src/old.ts', 7)).toContain('keepFailed')
+      expect(at('src/old.ts', 8)).toContain('onFailed')
+      expect(at('src/old.ts', 9)).toContain('keep')
+      expect(at('src/old.ts', 10)).toContain('answer')
+      expect(at('src/old.ts', 11)).toContain('errorShape')
+      expect(at('src/old.ts', 12)).toContain('fileStore')
+      expect(at('src/routes/index.kay', 2)).toContain('revalidate')
     }
     finally {
       await rm(root, { recursive: true, force: true })

@@ -106,7 +106,6 @@ export interface QueueOptions<Payload> {
   idlePoll?: Duration | undefined
   // How long a failed job is kept, its payload included, from when its last attempt was due: 30 days by default, `false` until removed.
   failedTtl?: Duration | false | undefined
-
   // What a failed job keeps in place of its payload, such as a mail without its body: applied once it is given up, so a failed job holds no more than the app needs to see what went wrong. The payload is kept whole when it throws.
   redact?: ((payload: Payload) => Payload) | undefined
   // Told before each run of a job, once its worker has taken it: `attempts` counts this run.
@@ -117,7 +116,6 @@ export interface QueueOptions<Payload> {
   onRetry?: Hook<{ id: string, payload: Payload, attempts: number, error: unknown, wait: number }> | undefined
   // Told when the last attempt failed, once the job is kept as failed.
   onError?: Hook<{ id: string, payload: Payload, attempts: number, error: unknown }> | undefined
-
   // Starts no worker with the server: the first `activate()` or `enqueue` does, so a queue an app may never use costs it no idle poll. A job already stored waits until then.
   lazy?: boolean | undefined
   // Shows the queue's waiting and running jobs to islands, which read them with `jobs(name)` from `kay` and follow them as they change, in every process: `true` sends each job whole, its key, payload, progress and last error; a function sends each job's id, status, attempts and due time, and as its payload what the function gives of the payload and of `{ key, error, progress }`, so nothing else leaves the server. Whoever may render a page reading them may follow them.
@@ -586,6 +584,8 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
   return jobQueue<Payload, Progress>(name, (payload, signal, job) => handler(payload, signal, job), options).queued
 }
 
+const REMOVED_OPTIONS = { onFailed: '`onError`, which also gets `id` and `attempts`', keepFailed: '`failedTtl`' }
+
 // `queue` for `workflow`: its handler also gets the hold of its run, and the admin it returns is what the workflow wakes its own queue and attaches its calls with.
 export function jobQueue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>, run: RunHold) => unknown, options: QueueOptions<Payload> = {}, kind: 'queue' | 'workflow' = 'queue'): { queued: Queue<Payload, Progress>, admin: QueueAdmin } {
   const attempts = options.attempts ?? DEFAULT_ATTEMPTS
@@ -594,6 +594,12 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
   const concurrency = options.concurrency ?? 1
   const idlePoll = durationSeconds(options.idlePoll ?? DEFAULT_IDLE_POLL, `queue('${name}')'s idlePoll`) * 1000
   const keepFailed = options.failedTtl === false ? undefined : durationSeconds(options.failedTtl ?? DEFAULT_KEEP_FAILED, `queue('${name}')'s failedTtl`) * 1000
+
+  // Options 1.91 dropped: ignored, a failure alert or a retention set through them would be lost without a word.
+  for (const [old, now] of Object.entries(REMOVED_OPTIONS)) {
+    if (old in options)
+      throw new KayError('config-invalid', `kay: queue('${name}')'s ${old} is gone; use ${now}`)
+  }
 
   if (!Number.isInteger(attempts) || attempts < 1)
     throw new KayError('config-invalid', `kay: queue('${name}')'s attempts is ${attempts}; it takes a whole number of at least 1`)

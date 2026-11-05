@@ -41,7 +41,6 @@ export interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store
   onRetry?: Hook<{ id: string, input: Input, attempts: number, error: unknown, wait: number }> | undefined
   // Told when the last attempt failed, once the run is kept as failed.
   onError?: Hook<{ id: string, input: Input, attempts: number, error: unknown }> | undefined
-
 }
 
 export interface StartOptions {

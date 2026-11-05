@@ -9,7 +9,6 @@ import { NON_ROOT_TRAILING_SLASH } from '../runtime/base'
 import { escape } from '../runtime/escape'
 import { inLocale, passGuards } from './actions'
 import { API_PREFIX, KAY_PREFIX, openApiPaths } from './api-modules'
-
 import { sharedContext } from './render'
 import { apiRoutePath } from './routes'
 import { markPrivate } from './scope'

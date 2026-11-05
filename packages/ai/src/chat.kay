@@ -77,7 +77,6 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   stoppedLabel?: string | undefined
   // How many of the latest messages each send posts, so the history never outgrows the action's `maxItems`; the history posted opens on a user message, so an assistant one at its start is left out.
   history?: number | undefined
-
   // The most characters each send posts, the oldest messages leaving first; the chat lowers it by itself when the action answers 413, so it is only set to avoid that first refusal.
   maxChars?: number | undefined
   // Names a table of a reply, which scrolls sideways inside its bubble when it is wider; a reply with several numbers them, `Table 1`, `Table 2`.

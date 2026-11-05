@@ -113,7 +113,6 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   selected?: RowKeyValue<Row, Key>[] | undefined
   // Called with the keys picked, as `selected` takes them, and the rows they stand for, both in the rows' order, each time the selection changes, a row leaving `rows` included.
   onSelectedChange?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined
-
   // Drawn beside the count while something is picked, with the keys and a function emptying the selection: the page's bulk actions.
   bulk?: Snippet<[keys: RowKeyValue<Row, Key>[], clear: () => void]> | undefined
   // Names the select-all box, and the column's header for screen readers.
@@ -162,6 +161,9 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   // Names a row's link or button: `Open <first column's text>`.
   openRowLabel?: ((row: Row) => string) | undefined
 } & ({ rows: RowsSource<Row>, list?: undefined } | { rows?: undefined, list: InfiniteList<Row> })>()
+
+if ('onSelect' in rest)
+  throw new Error('kayjs-ui: a Table has no onSelect since 1.91; use onSelectedChange')
 
 if (expandable && virtual)
   throw new Error('kayjs-ui: a Table cannot be both expandable and virtual, a detail row breaks the single row height a virtual table measures by')

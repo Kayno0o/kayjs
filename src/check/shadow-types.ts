@@ -31,18 +31,13 @@ import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
-
 import { deprecatedAuthOptions } from './deprecated-auth-options'
-
 import { deprecatedConfigKeys } from './deprecated-config-keys'
-
 import { ownFile } from './diagnose'
 import { durationSeconds } from './duration-seconds'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
-
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
-
 import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
 import { mcpRoutes } from './mcp-routes'
@@ -145,13 +140,10 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => removedUiTokens(root, options),
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
-
   async ({ root, options }) => roomTypes(root, options),
   async ({ root, options }) => exportNames(root, options),
   async ({ root, options }) => durationSeconds(root, options),
-
   async ({ root, options }) => deprecatedConfigKeys(root, options),
-
   async ({ root, options }) => contextName(root, options),
   async ({ root, options }) => movedImports(root, options),
   async ({ root, options }) => deprecatedAuthOptions(root, options),

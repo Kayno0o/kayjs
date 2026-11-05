@@ -56,7 +56,6 @@ export interface NotifyOptions {
   url?: string | undefined
   // How long it is kept, `'90d'` by default.
   ttl?: Duration | undefined
-
   // `false` keeps the notification in the inbox alone, without the push a person who opted in would get with `push()` listed.
   push?: boolean | undefined
 }

@@ -580,11 +580,14 @@ export function stream(module: unknown, path?: string, options?: UrlInput & { me
   return run
 }
 
-export interface Resource<T> extends Source<Exclude<LoadStatus, 'idle'>> {
+// What a resource's status can be: it starts loading, so never idle.
+type ResourceState = Exclude<LoadStatus, 'idle'>
+
+export interface Resource<T> extends Source<ResourceState> {
   // What the route last answered, kept while it is asked again; undefined before the first answer.
   value: () => T | undefined
   // `loading` until the route answers, and again each time it is asked anew; `pending()` also reads a quiet reload that keeps `ready`.
-  status: () => Exclude<LoadStatus, 'idle'>
+  status: () => ResourceState
   // Why the last request failed as an `ApiError`, kept while the route is asked again until it answers. `retry()` asks again after a failure only.
   error: () => ApiError | undefined
   // Asks the route again with the same options, until the component that read it is gone, even when it is ready.
@@ -644,7 +647,7 @@ export function resource<Module, const Path extends ResourcePath<Module>>(module
 export function resource<T>(load: (signal: AbortSignal) => T | PromiseLike<T>): Resource<Awaited<T>>
 export function resource(module: unknown, path?: string, options?: UrlInput | (() => UrlInput)): Resource<unknown> {
   const [value, setValue] = ownSignal<unknown>(undefined, { equals: false })
-  const [status, setStatus] = ownSignal<Exclude<LoadStatus, 'idle'>>('loading')
+  const [status, setStatus] = ownSignal<ResourceState>('loading')
   const [error, setError] = ownSignal<ApiError | undefined>(undefined)
   const [busy, setBusy] = ownSignal(true)
   let current: AbortController | undefined

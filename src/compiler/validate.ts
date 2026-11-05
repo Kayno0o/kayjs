@@ -214,7 +214,7 @@ class Validator {
   private foreign = false
   // The names bound to an imported PNG, JPEG, WebP, GIF or AVIF, whose size kay writes on the `img` showing them.
   private sizedImports = new Set<string>()
-  // The names bound to a kayjs-ui component, by the component's file, for `deprecated-ui-tone`.
+  // The names bound to a kayjs-ui component, by the component's file, for `deprecatedUiNames`.
   private uiComponents = new Map<string, string>()
   // The name of the props the script left out of its destructuring: a plain object, whose members are values.
   private restName: string | undefined

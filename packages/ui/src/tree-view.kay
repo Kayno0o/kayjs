@@ -29,7 +29,6 @@ const { nodes, label, selected, expanded = [], onSelectedChange, onOpenChange, o
   retryLabel?: string | undefined
   // Runs on a click on a row, or Enter or Space on the focused one, with the id `selected` takes and the node picked.
   onSelectedChange?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
-
   // Controls at the end of a row, such as a star or a count, dimmed away until the row is hovered or holds focus: `@actions(node)`.
   actions?: Snippet<[TreeNode<Id>]> | undefined
   // Before 1.90 `actions` was called `trailing`; both work until 1.93 (`deprecated-ui-actions`).
@@ -40,6 +39,9 @@ const { nodes, label, selected, expanded = [], onSelectedChange, onOpenChange, o
 }>()
 
 // The empty text is a div, not the list's own element, so it takes the attributes as a div does.
+if ('onSelect' in rest)
+  throw new Error('kayjs-ui: a TreeView has no onSelect since 1.91; use onSelectedChange')
+
 const loose = rest as unknown as JSX.IntrinsicElements['div']
 
 // The page's address, which a page rendered once at build time does not have.

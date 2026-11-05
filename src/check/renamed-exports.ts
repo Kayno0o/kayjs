@@ -75,17 +75,6 @@ export async function scan(root: string, options: CheckOptions, lint: LintName, 
   return found
 }
 
-// The specifier out of its import, the whole import when it was alone.
-export function dropSpecifier(declaration: ImportDeclaration, specifier: ImportSpecifier, text: string): Edit {
-  if (declaration.specifiers.length === 1)
-    return { start: declaration.start, end: declaration.end + (NEWLINE.exec(text.slice(declaration.end))?.[0].length ?? 0), text: '' }
-
-  const index = declaration.specifiers.indexOf(specifier)
-  const next = declaration.specifiers[index + 1]
-
-  return next ? { start: specifier.start, end: next.start, text: '' } : { start: declaration.specifiers[index - 1]!.end, end: specifier.end, text: '' }
-}
-
 // Whether `name` is an identifier anywhere under the nodes, as a binding, an import, a key or a read.
 export function mentions(nodes: Node[], name: string): boolean {
   let seen = false
@@ -200,8 +189,6 @@ interface RenamedTypes {
   // The release that renamed them and the one that drops the old names.
   since: string
   until: string
-  // Whether the rename of an old name is safe to apply.
-  safe: (old: string) => boolean
   // Modules exporting the same thing under the same new name as a module of `modules`: a file already importing the new name from one of them has the old import dropped instead of renamed. The new name taken in the same module stays a report with no fix.
   same?: Readonly<Record<string, readonly string[]>>
 }
@@ -249,7 +236,7 @@ async function renamedTypes(root: string, options: CheckOptions, config: Renamed
             const next = names[old]!
             const plain = specifier.exported.start === specifier.local.start
 
-            report(base + specifier.local.start, base + specifier.local.end, `\`${old}\` is renamed \`${next}\` since ${config.since}, and the old name works until ${config.until}`, `rename it to \`${next}\``, [{ start: base + specifier.local.start, end: base + specifier.local.end, text: plain ? `${next} as ${old}` : next }], config.safe(old))
+            report(base + specifier.local.start, base + specifier.local.end, `\`${old}\` is renamed \`${next}\` since ${config.since}, and the old name works until ${config.until}`, `rename it to \`${next}\``, [{ start: base + specifier.local.start, end: base + specifier.local.end, text: plain ? `${next} as ${old}` : next }])
           }
 
           continue
@@ -270,10 +257,9 @@ async function renamedTypes(root: string, options: CheckOptions, config: Renamed
           const message = `\`${old}\` is renamed \`${next}\` since ${config.since}, and the old name works until ${config.until}`
           const help = `rename it to \`${next}\``
           const importEdit = { start: base + specifier.imported.start, end: base + specifier.imported.start + old.length, text: next }
-          const safe = config.safe(old)
 
           if (aliased) {
-            report(importEdit.start, importEdit.end, message, help, [importEdit], safe)
+            report(importEdit.start, importEdit.end, message, help, [importEdit])
 
             continue
           }
@@ -281,14 +267,14 @@ async function renamedTypes(root: string, options: CheckOptions, config: Renamed
           if (importedFrom(ast, next, config.same?.[statement.source.value] ?? []) && !new RegExp(`\\b${old}\\b`).test(unparsed)) {
             const reads = uses(ast, old, next)
 
-            report(importEdit.start, importEdit.end, message, help, reads ? [withoutSpecifier(statement, specifier, base, text), ...reads.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))] : null, safe)
+            report(importEdit.start, importEdit.end, message, help, reads ? [withoutSpecifier(statement, specifier, base, text), ...reads.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))] : null)
 
             continue
           }
 
           const edits = mentions(parsed.map(one => one.ast), next) || new RegExp(`\\b${old}\\b`).test(unparsed) ? undefined : uses(ast, old, next)
 
-          report(importEdit.start, importEdit.end, message, help, edits ? [importEdit, ...edits.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))] : null, safe)
+          report(importEdit.start, importEdit.end, message, help, edits ? [importEdit, ...edits.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))] : null)
         }
       }
     }
@@ -297,7 +283,7 @@ async function renamedTypes(root: string, options: CheckOptions, config: Renamed
 
 // `AsyncRoomStore`, `AsyncRooms` and `StoreRooms` imported from `kay/server`: the same types under the names every store kind shares.
 export async function roomTypes(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-room-types', modules: { 'kay/server': ROOM_TYPES }, needle: OLD_ROOM_TYPE, since: '1.88', until: '1.91', safe: () => true })
+  return renamedTypes(root, options, { lint: 'deprecated-room-types', modules: { 'kay/server': ROOM_TYPES }, needle: OLD_ROOM_TYPE, since: '1.88', until: '1.91' })
 }
 
 // The exports renamed in 1.90 so no two packages export one name for two things, per module they are imported from, and the name each has now.
@@ -317,12 +303,12 @@ const OLD_EXPORT = new RegExp(`\\b(?:${[...new Set(Object.values(EXPORT_NAMES).f
 
 // An export imported under the name it had before 1.90 (`EXPORT_NAMES`): the fix renames the import and every use of it.
 export async function exportNames(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-export-names', modules: EXPORT_NAMES, needle: OLD_EXPORT, since: '1.90', until: '1.93', safe: () => true, same: { 'kay/server': ['kay'] } })
+  return renamedTypes(root, options, { lint: 'deprecated-export-names', modules: EXPORT_NAMES, needle: OLD_EXPORT, since: '1.90', until: '1.93', same: { 'kay/server': ['kay'] } })
 }
 
 const OLD_CONTEXT = /\bcontext\b/
 
 // `context` imported from `kay`: the `createContext` it was renamed to in 1.90, so it does not read as `ctx` or `defineContext`.
 export async function contextName(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-context-name', modules: { kay: { context: 'createContext' } }, needle: OLD_CONTEXT, since: '1.90', until: '1.93', safe: () => true })
+  return renamedTypes(root, options, { lint: 'deprecated-context-name', modules: { kay: { context: 'createContext' } }, needle: OLD_CONTEXT, since: '1.90', until: '1.93' })
 }

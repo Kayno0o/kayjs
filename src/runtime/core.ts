@@ -399,7 +399,6 @@ export interface PageSettings {
   ttl?: Duration
   // What the prerendered page sends as `cache-control` to everyone, in place of the one `ttl` derives or `public, max-age=0, must-revalidate`; `false` sends the default whatever the `ttl`. A page behind a guard, or rendered for one visitor, is `private` whatever this says.
   cacheControl?: string | false
-
   // `false` renders the page, or the layouts below this one, without the layouts above.
   layouts?: false
   // `false` runs none of the `_guard.ts` files above the page, nor above its actions or a layout's: a sign-in page under a guard asking for a session.

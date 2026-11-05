@@ -971,12 +971,12 @@ function resource<Module, const Path extends ResourcePath<Module>>(module: Modul
 function resource<T>(load: (signal: AbortSignal) => PromiseLike<T> | T): Resource<Awaited<T>>
 
 [.] Resource
-interface Resource<T> extends Source<Exclude<LoadStatus, 'idle'>>
+interface Resource<T> extends Source<ResourceState>
   error: () => ApiError<unknown> | undefined
   pending: () => boolean
   refresh: () => void
   retry: () => void
-  status: () => "failed" | "loading" | "ready"
+  status: () => ResourceState
   value: () => T | undefined
 
 [.] ResourcePath

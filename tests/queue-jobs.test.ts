@@ -561,3 +561,12 @@ describe('a running queue', () => {
     }
   })
 })
+
+describe('the options 1.91 dropped', () => {
+  it.each([
+    ['onFailed', 'onError'],
+    ['keepFailed', 'failedTtl'],
+  ])('refuses %s, naming %s, rather than losing it', (option, replacement) => {
+    expect(() => makeQueue('dropped', () => undefined, { [option]: option === 'onFailed' ? () => undefined : '1d' })).toThrow(`queue('dropped')'s ${option} is gone; use \`${replacement}\``)
+  })
+})
