@@ -16,7 +16,7 @@ const MUTED = /(^\s*|[[,?:]\s*)(['"])muted\2(?=\s*([\]),:}]|$))/g
 const MUTED_TONE = /(\btone['"]?\s*:\s*)(['"])muted\2/g
 // The kayjs-ui tags whose `selected` prop reports through `onSelectedChange` since 1.87, the callback named `onSelect` before.
 const SELECTED_TAGS = new Set(['table', 'tree-view', 'timeline'])
-// The kayjs-ui tags whose `onToggle` is `onOpenChange` since 1.89, as every show and hide state reports.
+// The kayjs-ui tags whose `onToggle` is `onOpenChange` since 1.90, as every show and hide state reports.
 const TOGGLE_TAGS = new Set(['table', 'tree-view'])
 // The kayjs-ui tags whose per-day predicate `isDisabled` is `disabledDay` since 1.89.
 const DATE_TAGS = new Set(['date-input', 'date-range-input'])
@@ -894,7 +894,7 @@ class Validator {
 
         const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'onOpenChange')
 
-        this.lint(attribute.name, 'deprecated-ui-callbacks', `\`onToggle\` on \`${element.name}\` is \`onOpenChange\` since kayjs-ui 1.89, as every show and hide state reports`, named ? { help: 'Drop `onToggle`, `onOpenChange` is there' } : { help: 'Write `onOpenChange`', fixes: [{ title: 'Write `onOpenChange`', edits: [edit], safe: true }] })
+        this.lint(attribute.name, 'deprecated-open-change', `\`onToggle\` on \`${element.name}\` is \`onOpenChange\` since kayjs-ui 1.90, as every show and hide state reports`, named ? { help: 'Drop `onToggle`, `onOpenChange` is there' } : { help: 'Write `onOpenChange`', fixes: [{ title: 'Write `onOpenChange`', edits: [edit], safe: true }] })
 
         continue
       }

@@ -768,7 +768,7 @@ export const LINTS = {
     level: 'warn',
     group: 'deprecated',
     since: '1.87',
-    summary: 'A kayjs-ui callback under its name before 1.87: `onSelect` on a Table, TreeView or Timeline, the components with a `selected` prop, is `onSelectedChange` now, so state a prop can hold reports through `on<Prop>Change` and `onSelect` stays a press of an item. The old name still works until 1.90. A Table\'s or TreeView\'s `onToggle` is `onOpenChange` since 1.89, as every show and hide state reports, and works until 1.92. The fix renames the attribute.',
+    summary: 'A kayjs-ui callback under its name before 1.87: `onSelect` on a Table, TreeView or Timeline, the components with a `selected` prop, is `onSelectedChange` now, so state a prop can hold reports through `on<Prop>Change` and `onSelect` stays a press of an item. The old name still works until 1.90. The fix renames the attribute.',
     wrong: '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n---\nTimeline(label="Day" entries={entries} selected={picked()} onSelect={picked.set})',
     right: '---\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n---\nTimeline(label="Day" entries={entries} selected={picked()} onSelectedChange={picked.set})',
   },
@@ -779,6 +779,14 @@ export const LINTS = {
     summary: 'A kayjs-ui prop under its name before 1.89: `isDisabled` on a DateInput or DateRangeInput, the per-day predicate, is `disabledDay` now, so `disabled` alone is the boolean every other control takes, and a Widget\'s `isEmpty` is `empty` with its `@empty` block `@emptyState`. The old names work until 1.92. The fix renames the attribute or the block.',
     wrong: '---\nimport DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\n---\nDateInput(aria-label="Day" isDisabled={iso => iso.endsWith("-25")})',
     right: '---\nimport DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\n---\nDateInput(aria-label="Day" disabledDay={iso => iso.endsWith("-25")})',
+  },
+  'deprecated-open-change': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.90',
+    summary: 'A kayjs-ui show and hide callback under its name before 1.90: `onToggle` on a Table or TreeView is `onOpenChange` now, as every show and hide state reports. The old name works until 1.93. The fix renames the attribute.',
+    wrong: '---\nimport Table from \'@kaynooo/kayjs-ui/table.kay\'\n---\nTable(columns={[]} rows={[]} rowKey="id" expandable onToggle={(key, open) => keep(key, open)})',
+    right: '---\nimport Table from \'@kaynooo/kayjs-ui/table.kay\'\n---\nTable(columns={[]} rows={[]} rowKey="id" expandable onOpenChange={(key, open) => keep(key, open)})',
   },
   'deprecated-hook-names': {
     level: 'warn',

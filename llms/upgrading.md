@@ -20,6 +20,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### The root of kayjs-auth and kayjs-cms stops repeating their browser entries
 
 - `normalizeEmail`, `normalizeUsername`, `emailProblem`, `usernameProblem`, `passwordProblem`, `resolveRules`, `DEFAULT_RULES`, `mixesConfusableScripts`, the length constants and their types are imported from `@kaynooo/kayjs-auth/rules`, no longer from `@kaynooo/kayjs-auth`; `EntryForm` and `FormScope` from `@kaynooo/kayjs-cms/form`, no longer from `@kaynooo/kayjs-cms`. `deprecated-import-path` rewrites the import, and a re-export from the root. A namespace import (`import * as auth from '@kaynooo/kayjs-auth'`) or a dynamic `import()` of a moved name is left to the type check.
+### kayjs-ui: show and hide state is `open`, `onOpenChange` and `false`
+
+- A Table's and a TreeView's `onToggle(key, open)` and `onToggle(id, open, node)` are `onOpenChange` with the same arguments; the old name works until 1.93 and `kay check` flags it as `deprecated-open-change`, with a safe fix that `kay upgrade` applies.
+- `CollapsibleSection` starts folded and `Accordion` draws plain headings, as every `open` and `boxed` defaults to `false`: `kay check` cannot see a default, so write `CollapsibleSection(title="Active" open)` where the section starts unfolded, and `Accordion(items boxed)` where the cards are wanted.
 
 ## 1.89.0
 
@@ -47,11 +51,6 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-ui: Widget `isEmpty` is `empty`, its `@empty` block `@emptyState`
 
 - `empty` is the bare-adjective boolean and the block is named apart, so a block present never reads as "always empty". `Widget(isEmpty)` with `@empty` is `Widget(empty)` with `@emptyState`; the old names work until 1.92 and `kay check` flags them as `deprecated-ui-props`, with a safe fix that `kay upgrade` applies.
-
-### kayjs-ui: show and hide state is `open`, `onOpenChange` and `false`
-
-- A Table's and a TreeView's `onToggle(key, open)` and `onToggle(id, open, node)` are `onOpenChange` with the same arguments; the old name works until 1.92 and `kay check` flags it as `deprecated-ui-callbacks`, with a safe fix that `kay upgrade` applies.
-- `CollapsibleSection` starts folded and `Accordion` draws plain headings, as every `open` and `boxed` defaults to `false`: `kay check` cannot see a default, so write `CollapsibleSection(title="Active" open)` where the section starts unfolded, and `Accordion(items boxed)` where the cards are wanted.
 
 ## 1.88.0
 

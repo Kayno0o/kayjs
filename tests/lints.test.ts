@@ -1183,6 +1183,24 @@ describe('deprecated-ui-tone', () => {
   })
 })
 
+describe('deprecated-open-change', () => {
+  const imports = 'import Table from \'@kaynooo/kayjs-ui/table.kay\'\nimport TreeView from \'@kaynooo/kayjs-ui/tree-view.kay\'\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\n'
+  const found = (template: string) => {
+    const source = `---\n${imports}---\n${template}\n`
+    const result = compileKay(source, 'open-change.kay', { check: true })
+
+    return result.diagnostics.filter(d => d.code === 'deprecated-open-change').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
+  }
+
+  it('renames onToggle on a Table and a TreeView, unless onOpenChange is written', () => {
+    expect(found('Table(columns={[]} rows={[]} rowKey="id" expandable onToggle={open})')).toEqual([{ at: 'onToggle', fix: ['onToggle->onOpenChange'] }])
+    expect(found('TreeView(nodes={[]} label="x" {onToggle})')).toEqual([{ at: 'onToggle', fix: ['{onToggle}->onOpenChange={onToggle}'] }])
+    expect(found('Table(columns={[]} rows={[]} rowKey="id" expandable onToggle={a} onOpenChange={b})')).toEqual([{ at: 'onToggle', fix: undefined }])
+    expect(found('Timeline(label="x" entries={[]} onToggle={b})')).toEqual([])
+    expect(found('TreeView(nodes={[]} label="x" onOpenChange={b})')).toEqual([])
+  })
+})
+
 describe('deprecated-ui-callbacks', () => {
   const imports = 'import Table from \'@kaynooo/kayjs-ui/table.kay\'\nimport TreeView from \'@kaynooo/kayjs-ui/tree-view.kay\'\nimport Timeline from \'@kaynooo/kayjs-ui/timeline.kay\'\nimport BarList from \'@kaynooo/kayjs-ui/bar-list.kay\'\n'
   const found = (template: string) => {
@@ -1200,14 +1218,6 @@ describe('deprecated-ui-callbacks', () => {
 
   it('writes the shorthand as onSelectedChange={onSelect}', () => {
     expect(found('Table(columns={[]} rows={[]} rowKey="id" {onSelect})')).toEqual([{ at: 'onSelect', fix: ['{onSelect}->onSelectedChange={onSelect}'] }])
-  })
-
-  it('renames onToggle on a Table and a TreeView, unless onOpenChange is written', () => {
-    expect(found('Table(columns={[]} rows={[]} rowKey="id" expandable onToggle={open})')).toEqual([{ at: 'onToggle', fix: ['onToggle->onOpenChange'] }])
-    expect(found('TreeView(nodes={[]} label="x" {onToggle})')).toEqual([{ at: 'onToggle', fix: ['{onToggle}->onOpenChange={onToggle}'] }])
-    expect(found('Table(columns={[]} rows={[]} rowKey="id" expandable onToggle={a} onOpenChange={b})')).toEqual([{ at: 'onToggle', fix: undefined }])
-    expect(found('Timeline(label="x" entries={[]} onToggle={b})')).toEqual([])
-    expect(found('TreeView(nodes={[]} label="x" onOpenChange={b})')).toEqual([])
   })
 
   it('leaves a press, the new name and other tags alone', () => {

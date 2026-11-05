@@ -135,7 +135,7 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   expanded?: RowKeyValue<Row, Key>[] | undefined
   // Called with a row's key and whether it is now open, each time a toggle is used.
   onOpenChange?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined
-  // Before 1.89 `onOpenChange` was called `onToggle`; both work until 1.92 (`deprecated-ui-callbacks`).
+  // Before 1.90 `onOpenChange` was called `onToggle`; both work until 1.93 (`deprecated-open-change`).
   onToggle?: ((key: RowKeyValue<Row, Key>, open: boolean) => unknown) | undefined
   // What an open row shows under it.
   detail?: Snippet<[row: Row]> | undefined

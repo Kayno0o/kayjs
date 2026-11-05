@@ -22,7 +22,7 @@ const { nodes, label, selected, expanded = [], onSelectedChange, onSelect, onOpe
   expanded?: readonly Id[] | undefined
   // Called with the branch's id, whether it is now open and the node, whenever the reader opens or closes a branch, by a click or a key.
   onOpenChange?: ((id: Id, open: boolean, node: TreeNode<Id>) => unknown) | undefined
-  // Before 1.89 `onOpenChange` was called `onToggle`; both work until 1.92 (`deprecated-ui-callbacks`).
+  // Before 1.90 `onOpenChange` was called `onToggle`; both work until 1.93 (`deprecated-open-change`).
   onToggle?: ((id: Id, open: boolean, node: TreeNode<Id>) => unknown) | undefined
   // What a branch whose children failed to load says, beside a button that tries again.
   failureLabel?: string | undefined
