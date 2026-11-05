@@ -7,6 +7,9 @@ import { isolatedRun } from './isolation'
 
 type Seed = (db: Database) => Promise<void> | void
 
+// Postgres checkpoints and waits on the other backends of the server when it drops a database, so a drop on a host busy with other test runs can outlast the 20 s a hook gets by default (CI run 4986, #3100).
+const DROP_TIMEOUT_MS = 90_000
+
 // An app with a `pg-orm.config.ts` and a `DATABASE_URL` gets a database of its own for each test file: a copy of the one its migrations build, seeded by the default export of `tests/seed.ts` when there is one, with `DATABASE_URL` pointing at the copy and the copy dropped once the file is done.
 // Run before the app's modules, which read `DATABASE_URL` as they load, and importing only the config and the seed, which name the tables.
 export async function copyTestDatabase(root: string): Promise<void> {
@@ -50,5 +53,5 @@ export async function copyTestDatabase(root: string): Promise<void> {
 
   afterAll(async () => {
     await database.drop()
-  })
+  }, DROP_TIMEOUT_MS)
 }
