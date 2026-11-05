@@ -16,6 +16,10 @@ import { onReload } from './reload'
 // What replicas starting together take turns on while one creates the tables.
 const MIGRATION_LOCK = 'kay_data'
 
+// How long a close waits for the stores to end what they run (a room leaving) before it goes on, and then for the statements in flight on a pool it opened, so a database that stopped answering never holds an app's shutdown.
+const CLOSE_MS = 3_000
+const POOL_CLOSE_SECONDS = 2
+
 // The tables `pgData` creates besides the jobs' ones.
 const OWN_TABLES = ['kay_sessions', 'kay_cache', 'kay_events', 'kay_rates', 'kay_meta', 'kay_vitals', 'kay_room_members', 'kay_room_processes', 'kay_room_messages', 'kay_room_state', 'kay_live', 'kay_live_events', 'kay_notifications', 'kay_push_subscriptions', 'kay_kv'] as const
 
@@ -173,7 +177,17 @@ export function pgHandle(db: SQL): PgHandle & { close: () => Promise<void> } {
 
   const close = async () => {
     closing ??= (async () => {
-      await Promise.all(disposers.splice(0).map(run))
+      const ending = Promise.all(disposers.splice(0).map(run))
+      let timer: ReturnType<typeof setTimeout> | undefined
+
+      try {
+        await Promise.race([ending, new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, CLOSE_MS)
+        })])
+      }
+      finally {
+        clearTimeout(timer)
+      }
     })()
 
     return closing
@@ -226,7 +240,7 @@ export function pgData(source: PgSource) {
       await handle.close()
 
       if (typeof source === 'string')
-        await db.close()
+        await db.close({ timeout: POOL_CLOSE_SECONDS })
     })()
 
     return closing

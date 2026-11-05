@@ -249,7 +249,7 @@ A database belongs to one app. The first app to start on it records its `package
 
 Two apps with the same `package.json` name count as one, and `pgJobs(db)` used on its own, without `pgData`, claims nothing. A database made before this check belongs to the first app that starts on it.
 
-A store you open yourself, in a script or a test, is closed with `await store.close()`, or by `await using store = pgData(url)`. That stops its polling and timers, takes this process out of the presence rooms and closes the pool when you gave a URL. A connection you passed in stays open, since it is yours to close. A `kay dev` reload closes the store of the module that ran again by itself.
+A store you open yourself, in a script or a test, is closed with `await store.close()`, or by `await using store = pgData(url)`. That stops its polling and timers, takes this process out of the presence rooms and closes the pool when you gave a URL. It settles within a few seconds even when the database is slow to answer: a statement still running is cancelled. A connection you passed in stays open, since it is yours to close. A `kay dev` reload closes the store of the module that ran again by itself.
 
 A server reads the live values when it starts; `kay build --static` and `kay check` read none. A room shares its members and messages, which reach the other replicas in the order one published them, and `rooms({ store: pgData(db).rooms, state })` keeps its state there too.
 

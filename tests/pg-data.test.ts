@@ -1107,3 +1107,70 @@ pgDescribe('pgData app name', () => {
     }
   })
 })
+
+pgDescribe('closing pgData', () => {
+  pgIt('settles within a bound while a query of its own pool is in flight', async () => {
+    const { url } = await postgres()
+    const data = pgData(url)
+
+    await data.ping()
+
+    const running = (async () => {
+      try {
+        await data.sql.unsafe('SELECT pg_sleep(30)')
+
+        return 'finished'
+      }
+      catch {
+        return 'cancelled'
+      }
+    })()
+    const began = Date.now()
+
+    await Bun.sleep(100)
+    await data.close()
+    expect(Date.now() - began).toBeLessThan(8_000)
+    expect(await running).toBe('cancelled')
+  })
+
+  pgIt('settles within a bound while the rooms store waits on a locked table', async () => {
+    const sql = await fresh()
+    const handle = pgHandle(sql)
+    const store = pgRooms(handle, { poll: '20ms' })
+
+    opened.push(handle)
+    await handle.db()
+    store.add('lobby', 'c1', '"ada"')
+    await waitFor(async () => (await rows(sql, 'SELECT 1 FROM kay_room_members')).length === 1, 'the row')
+
+    let release!: () => void
+    const held = Promise.withResolvers<void>()
+    const locked = sql.begin(async (tx) => {
+      await tx.unsafe('LOCK TABLE kay_room_members IN ACCESS EXCLUSIVE MODE')
+      held.resolve()
+      await new Promise<void>(resolve => release = resolve)
+    })
+
+    try {
+      await held.promise
+
+      const began = Date.now()
+
+      await handle.close()
+      expect(Date.now() - began).toBeLessThan(6_000)
+    }
+    finally {
+      release()
+      await locked
+    }
+  })
+
+  pgIt('closing twice is the same as once, even after a bounded close', async () => {
+    const { url } = await postgres()
+    const data = pgData(url)
+
+    await data.ping()
+    await data.close()
+    await data.close()
+  })
+})
