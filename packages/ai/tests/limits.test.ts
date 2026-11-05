@@ -104,6 +104,15 @@ describe('ai({ rateLimit })', () => {
     expect(fakeAi.asked).toHaveLength(2)
   })
 
+  it('takes a list of limits, each counted apart and any refusing', async () => {
+    ai({ rateLimit: [{ max: 5, window: '1m' }, { max: 2, window: '1h' }] })
+    await ask('a', { key: 'v' })
+    await ask('b', { key: 'v' })
+
+    expect((await failure(ask('c', { key: 'v' }))).limit).toBe('asks')
+    expect(fakeAi.asked).toHaveLength(2)
+  })
+
   it('counts each visitor on its own', async () => {
     ai({ rateLimit: { max: 1, window: '1m' } })
     await ask('a', { key: 'one' })

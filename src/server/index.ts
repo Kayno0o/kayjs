@@ -15,6 +15,7 @@ import { shareThePort } from './workers'
 
 export type { ExtensionApp, ExtensionProblem, KayConfig, KayExtension } from '../config'
 export { defineConfig } from '../config'
+export type { RateLimit } from '../runtime/action'
 export { sqliteCache } from '../runtime/cache.server'
 export type { LiveEntry, LiveStore } from '../runtime/live-value'
 export type { PreviewScope } from '../runtime/preview'

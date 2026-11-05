@@ -40,7 +40,7 @@ interface AiOptions extends AskHooks
   onRequest?: ((call: RequestHookCall) => Promise<RequestHookChange | undefined | void> | RequestHookChange | undefined | void) | undefined
   onStep?: ((step: Step) => unknown) | undefined
   onToolCall?: ((call: AiToolCall) => unknown) | undefined
-  rateLimit?: LimitOptions | false | undefined
+  rateLimit?: AskLimit | AskLimit[] | false | undefined
 
 [.] AiReply
 interface AiReply extends PromiseLike<string>, AsyncIterable<string>
@@ -99,6 +99,9 @@ interface AskHooks
   onRequest?: ((call: RequestHookCall) => Promise<RequestHookChange | undefined | void> | RequestHookChange | undefined | void) | undefined
   onStep?: ((step: Step) => unknown) | undefined
   onToolCall?: ((call: AiToolCall) => unknown) | undefined
+
+[.] AskLimit
+type AskLimit = Omit<RateLimit, 'key'>
 
 [.] AskOptions
 interface AskOptions extends AskHooks
@@ -352,10 +355,7 @@ interface Heard
 function lastChatMessage<Messages extends readonly ChatMessage[]>(messages: Messages): Messages[number]
 
 [.] LimitOptions
-interface LimitOptions
-  max: number
-  store?: RateStore | undefined
-  window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+type LimitOptions = AskLimit
 
 [.] Media
 interface Media

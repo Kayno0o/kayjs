@@ -789,7 +789,7 @@ Attempts are counted where every process shares them: in the store (`memoryAuthS
 
 Give the app `sqliteRates` or `pgRates` as `store.rates` rather than `memoryRates`, which drops open windows past 10,000, so a flood of typed addresses could lift a lockout.
 
-`rateLimit` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` a string such as `'1h'`, as the defaults are written.
+`rateLimit` overrides any of `DEFAULT_LIMITS`, each `{ max, window, store? }` with `window` a string such as `'1h'`, as the defaults are written, or a list of them: each is counted apart and any can refuse. `store` counts that one in a store of its own.
 
 ```ts
 createAuth({

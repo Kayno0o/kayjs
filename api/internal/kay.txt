@@ -1191,6 +1191,13 @@ type PresenceView = (request: Request | undefined, room: string, members: string
 [./library] privilegeRefused
 function privilegeRefused(error: unknown): boolean
 
+[./library] RateLimit
+interface RateLimit
+  key?: RateKey | undefined
+  max: number
+  store?: RateStore | undefined
+  window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+
 [./library] ratesFallingBack
 function ratesFallingBack<Store extends RateStore>(name: string, store: Store, memory?: FallbackMemory): RateStore & Sure<Store>
 

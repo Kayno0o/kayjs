@@ -511,7 +511,7 @@ export default defineConfig({
 
 Those defaults count in the `store.rates` of your `kay.config.ts` when it has one, else in memory. A `budget` you set yourself without a `total` logs a warning at boot in production, since nothing then caps what many accounts spend together. Behind a reverse proxy, set kay's `proxy` option, or every visitor shares the proxy's address and the defaults cap the whole site.
 
-`rateLimit` caps how many questions one visitor asks in a window. `budget.tokens` caps the tokens the answers to one visitor may use, and `budget.total` the tokens used for everyone. `ask` reads these on its own, so nothing changes where you call it.
+`rateLimit` caps how many questions one visitor asks in a window; give a list of limits to cap several windows at once. `budget.tokens` caps the tokens the answers to one visitor may use, and `budget.total` the tokens used for everyone. `ask` reads these on its own, so nothing changes where you call it.
 
 A visitor is counted by address, or by user when kayjs-auth is in `extensions`: a signed-in user has their own quota wherever they connect from, with nothing to add. Behind a reverse proxy, set kay's `proxy` option, or every visitor shares the proxy's address and one quota.
 

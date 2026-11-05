@@ -177,7 +177,7 @@ kay and its libraries name the same idea the same way. A new option, export or f
 - A duration is a string with its unit, such as `'5m'` or `'250ms'`. Every option, store argument and test helper takes the same type, and `kay check --fix` rewrites an old bare number.
 - `maxAge` is how long something stays valid. `timeout` is how long to wait. `expires` is a date.
 - `maxSize` is one size limit and takes bytes or a string such as `'2mb'`; a map of limits by path is `maxSizeByPath`, as the extension's and the config's `limits.byPath` are.
-- `rateLimit` sets a rate limit with `max` and `window`. `key` says who is counted. A library with several limits nests them under `rateLimit`.
+- `rateLimit` sets a rate limit with `max` and `window`, or a list of them. `key` says who is counted, `store` where. A library with several limits nests them under `rateLimit`.
 - A list by page uses `page` and `pageSize`. A window onto a list uses `limit` and `offset`.
 - Look goes in the library's settings module. Behaviour goes in the call.
 

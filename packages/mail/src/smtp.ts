@@ -1,4 +1,4 @@
-import type { Duration } from 'kay'
+import type { Duration, RateLimit } from 'kay'
 import type { Delivery, Mail, Transport } from './types'
 import { createPrivateKey } from 'node:crypto'
 import { configError, durationSeconds } from 'kay/library'
@@ -28,8 +28,8 @@ export interface SmtpSettings {
   timeout?: Duration | undefined
   // How many connections send at once. 5 by default.
   maxConnections?: number | undefined
-  // The most mails sent in a window, for a provider capping the rate: `{ max: 5, window: '1s' }`. Unlimited by default.
-  rateLimit?: { max: number, window: Duration } | undefined
+  // The most mails sent in a window, for a provider capping the rate: `{ max: 5, window: '1s' }`. Unlimited by default. The pool throttles one window, in memory, so it takes kay's `max` and `window` alone: no list, `store` or `key`.
+  rateLimit?: Pick<RateLimit, 'max' | 'window'> | undefined
   dkim?: DkimSettings | undefined
 }
 

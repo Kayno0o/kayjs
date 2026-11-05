@@ -1,7 +1,7 @@
 import type { Context, TSchema, ValidationError } from 'elysia'
 import type { ExtensionApp } from '../config'
 import type { Locals } from '../runtime'
-import type { ActionTool } from '../runtime/action'
+import type { ActionTool, RateLimit } from '../runtime/action'
 import type { ByteSize } from '../runtime/byte-size'
 import type { Once } from '../runtime/core'
 import type { Duration } from '../runtime/duration'
@@ -11,7 +11,6 @@ import type { BodyLimit, RouteBodyLimit } from './body'
 import type { CorsOptions, CorsRule } from './cors'
 import type { LoadedGuard } from './guards'
 import type { MountedApi } from './openapi'
-import type { ApiRateLimit } from './protection'
 import type { SocketLimits } from './ws-limits'
 import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile, getSchemaValidator, StatusMap } from 'elysia'
 import { underKayDev } from '../build/assets'
@@ -104,12 +103,12 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
     limits.set(module.mount, { bytes: typeof bytes === 'function' ? bytes() : bytes, refuse })
 
-    const moduleLimits = rateLimitsOf((instance as { [RATE_LIMIT]?: ApiRateLimit | ApiRateLimit[] })[RATE_LIMIT], module.mount)
-    const routeRates = new Map<string, { name: string, limit: ApiRateLimit }[]>()
+    const moduleLimits = rateLimitsOf((instance as { [RATE_LIMIT]?: RateLimit | RateLimit[] })[RATE_LIMIT], module.mount)
+    const routeRates = new Map<string, { name: string, limit: RateLimit }[]>()
 
     // What a route sets for itself in its `detail`, by the method and path it answers.
     for (const route of instance.routes) {
-      const detail = (route.hooks as { detail?: { maxSize?: ByteSize, rateLimit?: ApiRateLimit | ApiRateLimit[] } } | undefined)?.detail
+      const detail = (route.hooks as { detail?: { maxSize?: ByteSize, rateLimit?: RateLimit | RateLimit[] } } | undefined)?.detail
       const method = route.method.toUpperCase()
       const path = withoutSlash(apiRoutePath(module.mount, route.path))
 
@@ -652,7 +651,7 @@ function holdsBigint(value: unknown, seen = new WeakSet<object>()): boolean {
 }
 
 // The limits of a module or a route, each counted under its own name: the first under the place's, the others under their place in the list.
-function rateLimitsOf(given: ApiRateLimit | ApiRateLimit[] | undefined, place: string): { name: string, limit: ApiRateLimit }[] {
+function rateLimitsOf(given: RateLimit | RateLimit[] | undefined, place: string): { name: string, limit: RateLimit }[] {
   return [given ?? []].flat().map((limit, index) => {
     const name = index === 0 ? place : `${place}#${index}`
 
@@ -717,7 +716,7 @@ declare module 'elysia' {
     // The longest this route may take, in place of the module's and the app's `timeout`: a string such as '30s', or `false` for none. Past it the request answers 504 and `request.signal` aborts.
     timeout?: Duration | false | undefined
     // At most `max` requests to this route from one client, or from whatever `key` names, every `window`; past that it answers 429 with `Retry-After`. Counted after the module's guards, beside the module's own `rateLimit`.
-    rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
+    rateLimit?: RateLimit | RateLimit[] | undefined
     // Offers the route to agents as an MCP tool when `mcp` is set in kay.config.ts: `true`, its description, or `{ name, description }`, as an action's `tool` is. A route without it is in the OpenAPI document and never offered.
     tool?: boolean | string | ActionTool | undefined
     // On a websocket route: the most one message may weigh (`maxSize`, 1 MB by default) and how many a socket may send in a window (`rateLimit`, 100 a second by default). A socket over either is closed, with 1009 or 1008.
@@ -737,7 +736,7 @@ export interface ApiOptions {
   // Lets other sites' pages call the module's routes from the browser: `cors: { origins: ['https://app.example.com'], credentials: true }`. `false` keeps the module to its own site where the app's `cors` in kay.config.ts opens the others.
   cors?: CorsOptions | false | undefined
   // At most `max` requests to any route of the module from one client, or from whatever `key` names, every `window`; past that they answer 429 with `Retry-After`. Counted after the module's guards.
-  rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
+  rateLimit?: RateLimit | RateLimit[] | undefined
   // Runs none of the guards above the module, as a page's `guards: false` does; read from the `api({ guards: false })` call as written.
   guards?: false | undefined
   // The body of a 422 for refused input: `'kay'` (the default) answers `{ errors, status }` as an action does, a message per field in the request's locale; `'elysia'` keeps Elysia's own body for clients still parsing it, and goes in 1.90.

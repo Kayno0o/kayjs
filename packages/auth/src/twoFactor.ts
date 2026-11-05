@@ -6,7 +6,7 @@ import { nanoid } from '@kaynooo/utils'
 import { report } from './events'
 import { secondFactorLimited } from './guesses'
 import { digest, totpContext } from './keys'
-import { spend } from './limits'
+import { forget, spend } from './limits'
 import { notify } from './notify'
 import { reprove } from './proof'
 import { endOtherSessions } from './sessions'
@@ -47,7 +47,7 @@ export async function verifyTwoFactor(state: RequestState, code: string, signIn:
     return { ok: false, error: 'invalid' }
   }
 
-  await state.core.rates(state.core.limits.twoFactorAccount).reset(`two-factor:${record.id}`)
+  await forget(state.core.rates, `two-factor:${record.id}`, state.core.limits.twoFactorAccount)
   await state.session.unset('authChallenge')
   await signIn(record, challenge.method ?? 'unknown')
 
@@ -100,7 +100,7 @@ export async function enableTwoFactor(state: RequestState, code: string): Promis
   if (step === undefined)
     return { ok: false, error: 'invalid' }
 
-  await state.core.rates(state.core.limits.twoFactorAccount).reset(`enable-two-factor:${record.id}`)
+  await forget(state.core.rates, `enable-two-factor:${record.id}`, state.core.limits.twoFactorAccount)
 
   const updated = await endOtherSessions(state, record, { totpEnabledAt: new Date(), totpLastStep: step })
 

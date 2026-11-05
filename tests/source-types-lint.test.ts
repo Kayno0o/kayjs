@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { durationSeconds } from '../src/check/duration-seconds'
 import { applySafeFixes } from '../src/check/fixes'
-import { exportNames, contextName, roomTypes, sourceTypes } from '../src/check/renamed-exports'
+import { contextName, exportNames, roomTypes, sourceTypes } from '../src/check/renamed-exports'
 import { scratchDir } from './scratch'
 
 async function project(files: Record<string, string>): Promise<string> {
@@ -173,6 +173,21 @@ describe('deprecated-export-names', () => {
       expect(await read(root, 'src/a.ts')).toBe('import { cssColors } from \'@kaynooo/kayjs-mail\'\nimport { ScheduleEveryOptions, jobTableNames } from \'kay/server\'\nimport { jobTables as definitions } from \'kay/pg-orm\'\n\nexport const a = [cssColors(\'\'), jobTableNames, definitions] as [unknown, unknown, unknown]\nexport type B = ScheduleEveryOptions\n')
       expect(await read(root, 'src/b.ts')).toContain('cssColours')
       expect(await read(root, 'src/b.ts')).toContain('EveryOptions')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('renames the rate limit types to the names that replace them', async () => {
+    const root = await project({ 'src/limits.ts': 'import type { ApiRateLimit } from \'kay/server\'\nimport type { Limit } from \'@kaynooo/kayjs-auth\'\nimport type { LimitOptions } from \'@kaynooo/kayjs-ai\'\n\nexport type All = [ApiRateLimit, Limit, LimitOptions]\n' })
+
+    try {
+      const found = await exportNames(root, {})
+
+      expect(found).toHaveLength(3)
+      await applySafeFixes(root, found)
+      expect(await read(root, 'src/limits.ts')).toContain('export type All = [RateLimit, AuthRateLimit, AskLimit]')
     }
     finally {
       await rm(root, { recursive: true, force: true })

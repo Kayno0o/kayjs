@@ -39,11 +39,14 @@ export interface RateWindow {
   resetAt: number
 }
 
+// `max` requests every `window`, the one shape of every rate limit option in kay and its libraries (an action's, an API route's, kayjs-auth's, kayjs-ai's): a place takes it alone or in a list, each counted apart.
 export interface RateLimit {
   max: number
   window: Duration
   // In this process's memory unless given.
   store?: RateStore | undefined
+  // What the limit counts a request under, in place of the client's address: `key: ctx => ctx.locals.user?.id`, so a person has their own allowance from any address and many of them behind one address do not share one. Without it, or when it gives `undefined`, the client's address. A library that counts under keys of its own, kayjs-auth and kayjs-ai, takes none.
+  key?: RateKey | undefined
 }
 
 // What a rate limit's `key` reads of the request it counts: the cookies, the app's `derive` values as `locals` and the client's address, which the count falls back to.
@@ -54,8 +57,6 @@ export type RateKeyContext = Pick<RequestContext, 'request' | 'locale' | 'cookie
 export type RateKey = (ctx: RateKeyContext) => string | undefined | Promise<string | undefined>
 
 export interface ActionRateLimit extends RateLimit {
-  // What the limit counts a post under, in place of the client's address: `key: ctx => ctx.locals.user?.id`, so a person has their own allowance from any address and many of them behind one address do not share one. Without it, or when it gives `undefined`, the client's address.
-  key?: RateKey | undefined
   // `'succeeded'` counts only the posts whose handler returned without `ctx.fail` or an error, so typos and a failing mail server lock no one out; every attempt counts unless given. Posts arriving together all read the count before any adds to it, so a burst may pass `max` by a few: pair it with a limit on every attempt.
   count?: 'succeeded' | undefined
 }

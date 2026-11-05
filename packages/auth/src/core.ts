@@ -7,7 +7,7 @@ import type { EmailCore, PendingCode } from './email'
 import type { AuthEventInfo } from './events'
 import type { ForwardAuthCore } from './forwardAuth'
 import type { Keys } from './keys'
-import type { Limits } from './limits'
+import type { ResolvedLimits } from './limits'
 import type { createOAuthClient } from './oauth/client'
 import type { OAuthFlow } from './oauth/flow'
 import type { createTokenRefresher, StoredCredential } from './oauth/refresher'
@@ -129,7 +129,7 @@ export interface Core {
   pages?: { prefix: string, home: string, remember: RememberMode, main: boolean, profile?: ProfileOptions | undefined } | undefined
   // The site's name, as mails and authenticators show it.
   name: string
-  limits: Limits
+  limits: ResolvedLimits
   // Seconds a session signed in with `remember: true` lives unseen.
   rememberMaxAge: number
   // The password and username rules, the defaults over the app's `rules`.

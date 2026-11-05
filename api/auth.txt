@@ -356,7 +356,7 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   [Field in keyof UserData]?: UserData[Field] | undefined;
 }) | undefined
   proxy?: ProxyConfig | boolean | number | undefined
-  rateLimit?: Partial<Record<"emailChange" | "emailChangeAccount" | "emailCode" | "emailCodeAccount" | "export" | "forgot" | "forgotAccount" | "invite" | "inviteAddress" | "link" | "magicLink" | "magicLinkAccount" | "oauthDocument" | "oauthRegister" | "oauthRegisterAll" | "oauthToken" | "organization" | "register" | "reprove" | "resend" | "resendAccount" | "signIn" | "signInAccount" | "signInAccountAll" | "twoFactor" | "twoFactorAccount", Limit>> | undefined
+  rateLimit?: Partial<Record<"emailChange" | "emailChangeAccount" | "emailCode" | "emailCodeAccount" | "export" | "forgot" | "forgotAccount" | "invite" | "inviteAddress" | "link" | "magicLink" | "magicLinkAccount" | "oauthDocument" | "oauthRegister" | "oauthRegisterAll" | "oauthToken" | "organization" | "register" | "reprove" | "resend" | "resendAccount" | "signIn" | "signInAccount" | "signInAccountAll" | "twoFactor" | "twoFactorAccount", LimitOption>> | undefined
   remember?: undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   roles?: Record<Role, NoInfer<Role>[]> | undefined
   rules?: CredentialRules | undefined
@@ -415,6 +415,9 @@ interface AuthProofOfWorkOptions
   maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   on?: Partial<Record<CaptchaAction, "always" | false | number>> | undefined
   store?: RateStore | undefined
+
+[.] AuthRateLimit
+type AuthRateLimit = Omit<RateLimit, 'key'>
 
 [.] AuthRates
 type AuthRates = RateStore
@@ -1133,15 +1136,13 @@ type Level = 'read' | 'write'
 function lifetime(duration: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number, locale: string): string
 
 [.] Limit
-interface Limit
-  max: number
-  window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`
+type Limit = AuthRateLimit
 
 [.] LimitOption
-type LimitOption = Limit
+type LimitOption = AuthRateLimit | AuthRateLimit[]
 
 [.] Limits
-type Limits = Record<keyof typeof DEFAULT_LIMITS, Limit> & { oauthRegisterAll?: Limit }
+type Limits = Record<keyof typeof DEFAULT_LIMITS, AuthRateLimit> & { oauthRegisterAll?: AuthRateLimit }
 
 [.] LimitsOption
 type LimitsOption = Partial<Record<keyof Limits, LimitOption>>
@@ -1446,7 +1447,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   [Field in keyof UserData]?: UserData[Field] | undefined;
 }) | undefined
   proxy?: ProxyConfig | boolean | number | undefined
-  rateLimit?: Partial<Record<"emailChange" | "emailChangeAccount" | "emailCode" | "emailCodeAccount" | "export" | "forgot" | "forgotAccount" | "invite" | "inviteAddress" | "link" | "magicLink" | "magicLinkAccount" | "oauthDocument" | "oauthRegister" | "oauthRegisterAll" | "oauthToken" | "organization" | "register" | "reprove" | "resend" | "resendAccount" | "signIn" | "signInAccount" | "signInAccountAll" | "twoFactor" | "twoFactorAccount", Limit>> | undefined
+  rateLimit?: Partial<Record<"emailChange" | "emailChangeAccount" | "emailCode" | "emailCodeAccount" | "export" | "forgot" | "forgotAccount" | "invite" | "inviteAddress" | "link" | "magicLink" | "magicLinkAccount" | "oauthDocument" | "oauthRegister" | "oauthRegisterAll" | "oauthToken" | "organization" | "register" | "reprove" | "resend" | "resendAccount" | "signIn" | "signInAccount" | "signInAccountAll" | "twoFactor" | "twoFactorAccount", LimitOption>> | undefined
   remember?: undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   roles?: Record<Role, NoInfer<Role>[]> | undefined
   rules?: CredentialRules | undefined

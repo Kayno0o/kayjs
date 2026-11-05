@@ -1,4 +1,4 @@
-import type { Duration, RateStore } from 'kay'
+import type { Duration, RateLimit, RateStore } from 'kay'
 import type { Limiter } from 'kay/library'
 import type { ConversationStore } from './conversation-store'
 import type { AiLimit } from './errors'
@@ -14,18 +14,17 @@ const SLOT = Symbol.for('kayjs-ai.limits')
 const CHARS_PER_TOKEN = 4
 const log = logFrom('kayjs-ai')
 // What a production app gets when it sets neither: a public chat is paid for by whoever runs it, so it is never unlimited by omission. `false` opts out.
-const DEFAULT_LIMIT: LimitOptions = { max: 20, window: '10m' }
+const DEFAULT_LIMIT: AskLimit = { max: 20, window: '10m' }
 const DEFAULT_BUDGET: BudgetOptions = { tokens: 100_000, total: 2_000_000, window: '1d' }
 // How long a store may take to answer before the ask is refused as `unavailable`, or the count given up on.
 let storeTimeoutMs = 5000
 
-// How many asks a visitor makes in a window.
-export interface LimitOptions {
-  max: number
-  window: Duration
-  // The app's `store.rates` unless given, else this process's memory: `sqliteRates(path)` or a store of the app's own keeps the count over a restart and shares it between processes.
-  store?: RateStore | undefined
-}
+// How many asks a visitor makes in a window: kay's `RateLimit` without its `key`, which `ai({ key })` names for the whole library.
+// The store is the app's `store.rates` unless given, else this process's memory: `sqliteRates(path)` or a store of the app's own keeps the count over a restart and shares it between processes.
+export type AskLimit = Omit<RateLimit, 'key'>
+
+/** @deprecated Use `AskLimit`. */
+export type LimitOptions = AskLimit
 
 // How many tokens, input and output, the replies to a visitor may use in a window, and to all visitors with `total`.
 export interface BudgetOptions {
@@ -37,8 +36,8 @@ export interface BudgetOptions {
 }
 
 export interface AiOptions extends AskHooks {
-  // In production 20 asks per visitor every 10 minutes unless set; `false` lifts it.
-  rateLimit?: LimitOptions | false | undefined
+  // In production 20 asks per visitor every 10 minutes unless set; `false` lifts it. A list is each counted apart, an ask refused past any of them.
+  rateLimit?: AskLimit | AskLimit[] | false | undefined
   // In production 100,000 tokens per visitor and 2,000,000 in all every day unless set; `false` lifts it. A budget set without a `total` logs a warning at boot in production.
   budget?: BudgetOptions | false | undefined
   // Who a signed-in visitor is, such as their id: counted in place of their address, and the owner of the conversations a `Chat` keeps on the server, and in place of the user a library such as kayjs-auth names. Left out, that user counts, else the address.
@@ -56,7 +55,7 @@ interface Counter {
 }
 
 interface Settings {
-  limit: (Counter & { max: number }) | undefined
+  limit: (Counter & { max: number })[]
   budget: (Counter & { tokens: number, total: number | undefined }) | undefined
   key: AiOptions['key']
 }
@@ -114,13 +113,19 @@ function wholeNumber(value: unknown, what: string): number {
 
 // The settings an app's options give, the production defaults filling what it left out.
 function settingsOf({ rateLimit, budget, key }: AiOptions, memories: Map<string, RateStore>): Settings {
-  const settings: Settings = { limit: undefined, budget: undefined, key }
+  const settings: Settings = { limit: [], budget: undefined, key }
   const production = process.env.NODE_ENV === 'production'
   const chosenLimit = rateLimit ?? (production ? DEFAULT_LIMIT : undefined)
   const chosenBudget = budget ?? (production ? DEFAULT_BUDGET : undefined)
 
-  if (chosenLimit !== undefined && chosenLimit !== false)
-    settings.limit = { max: wholeNumber(chosenLimit.max, 'ai({ rateLimit }).max'), ms: durationSeconds(chosenLimit.window, 'ai({ rateLimit }).window') * 1000, counting: counterOf('ai:limit', chosenLimit, memoryFor(memories, 'limit')) }
+  if (chosenLimit !== undefined && chosenLimit !== false) {
+    settings.limit = [chosenLimit].flat().map((own, index) => {
+      const what = Array.isArray(chosenLimit) ? `ai({ rateLimit })[${index}]` : 'ai({ rateLimit })'
+      const name = index === 0 ? 'ai:limit' : `ai:limit#${index}`
+
+      return { max: wholeNumber(own.max, `${what}.max`), ms: durationSeconds(own.window, `${what}.window`) * 1000, counting: counterOf(name, own, memoryFor(memories, index === 0 ? 'limit' : `limit#${index}`)) }
+    })
+  }
 
   if (chosenBudget !== undefined && chosenBudget !== false) {
     const tokens = wholeNumber(chosenBudget.tokens, 'ai({ budget }).tokens')
@@ -146,7 +151,7 @@ export function configureLimits(options: AiOptions): void {
 
 // The limit and budget `ai()` set, as the dev tool shows them; null where there is none.
 export function limitsInEffect(): { limit: { max: number, seconds: number } | null, budget: { tokens: number, total: number | null, seconds: number } | null } {
-  const { limit, budget } = slot().settings
+  const { limit: [limit], budget } = slot().settings
 
   return {
     limit: limit ? { max: limit.max, seconds: limit.ms / 1000 } : null,
@@ -263,11 +268,18 @@ async function admit(settings: Settings, asker: Asker): Promise<{ key: string | 
   try {
     const key = await visitorKey(settings.key, asker)
 
-    if (limit && key !== undefined) {
-      const window = checked(await bounded(async () => limit.counting.hit(key)))!
+    if (key !== undefined) {
+      let over: number | undefined
 
-      if (window.count > limit.max)
-        throw limited('asks', window.resetAt)
+      for (const own of limit) {
+        const window = checked(await bounded(async () => own.counting.hit(key)))!
+
+        if (window.count > own.max && (over === undefined || window.resetAt > over))
+          over = window.resetAt
+      }
+
+      if (over !== undefined)
+        throw limited('asks', over)
     }
 
     if (!budget)
@@ -345,7 +357,7 @@ export function tokensUsed(usage: Partial<Usage>, sent: number, received: number
 export async function* guarded(open: () => AsyncIterable<Piece>, asker: Asker, signal: AbortSignal): AsyncGenerator<Piece> {
   const { settings } = slot()
 
-  if (!settings.limit && !settings.budget) {
+  if (settings.limit.length === 0 && !settings.budget) {
     yield* open()
 
     return

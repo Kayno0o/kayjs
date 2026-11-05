@@ -447,13 +447,11 @@ function actionLimits(action: ServerAction<TSchema, unknown>): ActionLimit[] {
   return limits
 }
 
-// What an API module or route limits its requests by: `max` every `window` from one client, or from whatever `key` names.
-export interface ApiRateLimit extends RateLimit {
-  key?: RateKey | undefined
-}
+/** @deprecated Use `RateLimit`. */
+export type ApiRateLimit = RateLimit
 
 // The longest wait among the limits a request to an API route is over, counting it against each, or undefined while it is under all; under the key each gives, the client's address else.
-export async function apiLimitWait(limits: { name: string, limit: ApiRateLimit }[], request: Request, server: Server<unknown> | null | undefined, context: () => Omit<RateKeyContext, 'client'>): Promise<number | undefined> {
+export async function apiLimitWait(limits: { name: string, limit: RateLimit }[], request: Request, server: Server<unknown> | null | undefined, context: () => Omit<RateKeyContext, 'client'>): Promise<number | undefined> {
   if (limits.length === 0)
     return undefined
 
@@ -471,7 +469,7 @@ export async function apiLimitWait(limits: { name: string, limit: ApiRateLimit }
 }
 
 // Checks a limit declared on an API module or route, as `rateLimit()` checks its own.
-export function checkApiLimit(name: string, limit: ApiRateLimit): void {
+export function checkApiLimit(name: string, limit: RateLimit): void {
   if (!Number.isInteger(limit.max) || limit.max < 1)
     throw new KayError('config-invalid', `kay: the rateLimit of ${name} has a max of ${limit.max}; it takes a whole number of at least 1`)
 

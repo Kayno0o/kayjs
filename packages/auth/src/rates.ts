@@ -1,6 +1,6 @@
 import type { RateStore, RateWindow } from 'kay'
 import type { Limiter } from 'kay/library'
-import type { Limit } from './limits'
+import type { AuthRateLimit } from './limits'
 import type { AuthStore } from './store'
 import { limiter } from 'kay/library'
 
@@ -56,18 +56,26 @@ export function memoryAuthRates(): MemoryAuthRates {
 
 // The limiter of a limit, counted in the store's own `rates`, else the app's `store.rates` from kay.config.ts, else this process's memory, its keys apart from kay's own limits and other libraries'.
 // The app's store is read on each count, as kay sets it up after `createAuth` may have run. A store that fails or hangs counts in memory meanwhile, as kay's own limits do.
-export type AuthLimiters = (limit: Limit) => Limiter
+export type AuthLimiters = (limit: AuthRateLimit) => Limiter
 
 export function authLimiters(store: AuthStore): AuthLimiters {
   const made = new Map<string, Limiter>()
+  const ofStore = new WeakMap<RateStore, Map<string, Limiter>>()
   const memory = memoryAuthRates()
 
-  return ({ max, window }) => {
+  return ({ max, window, store: own }) => {
     const id = `${max} ${window}`
-    let found = made.get(id)
+    let cache = made
+
+    if (own) {
+      cache = ofStore.get(own) ?? new Map()
+      ofStore.set(own, cache)
+    }
+
+    let found = cache.get(id)
 
     if (!found)
-      made.set(id, found = limiter({ max, window, store: store.rates, name: 'kayjs-auth', memory }))
+      cache.set(id, found = limiter({ max, window, store: own ?? store.rates, name: 'kayjs-auth', memory }))
 
     return found
   }

@@ -3,7 +3,7 @@ import type { UserRecord } from './store'
 import type { AuthenticationResponseJSON } from './webauthn'
 import { comparePasswords } from '@kaynooo/utils'
 import { backOf, banned, withBack } from './core'
-import { spend } from './limits'
+import { forget, spend } from './limits'
 
 const CHALLENGE_MAX_AGE_MS = 10 * 60 * 1000
 // How long a sign-in or a re-proof counts as proved: for an account with neither a password nor a second factor, and for an admin's changes to other users.
@@ -90,7 +90,7 @@ export async function reprove(state: RequestState, proof: Proof, options: { seco
   if (!proved)
     return { ok: false, error: 'proof' }
 
-  await state.core.rates(state.core.limits.reprove).reset(`reprove:${record.id}`)
+  await forget(state.core.rates, `reprove:${record.id}`, state.core.limits.reprove)
 
   const signedIn = await state.session.get('auth')
 

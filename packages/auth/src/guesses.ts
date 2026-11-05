@@ -1,19 +1,19 @@
-import type { Limit } from './limits'
+import type { LimitSet } from './limits'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, hashPassword } from '@kaynooo/utils'
 import { afterResponse } from './events'
 import { randomToken } from './keys'
-import { counted, spend, windowOf } from './limits'
+import { counted, forget, spend, tally, windowOf } from './limits'
 import { notify } from './notify'
 
 // The counts one password guess is held to: a hard stop for this client on this account, and a looser ceiling for the account from every client together.
 export interface Guess {
   // Forgotten when the password proves right: this client's own failures and the guesses of this burst still in flight.
-  keys: { key: string, limit: Limit }[]
+  keys: { key: string, limit: LimitSet }[]
   // The wrong guesses of every client on the account, which a right password does not give back.
   failures: string
-  limit: Limit
+  limit: LimitSet
 }
 
 // Counts a guess at an account's password before the password is checked, so a burst of parallel guesses cannot all pass a count that only a failure would raise; `forgive` takes it back once the password proves right.
@@ -33,7 +33,7 @@ export async function startGuess(state: RequestState, record: UserRecord | undef
     return 'limited'
 
   // `pending` is every guess since the last right password, so a burst in parallel stops at the ceiling; `failures` is what the ceiling is spent on.
-  if (await spend(rates, pending, ceiling) || await counted(rates, failures, ceiling) >= ceiling.max) {
+  if (await spend(rates, pending, ceiling) || await counted(rates, failures, ceiling) >= ceiling[0].max) {
     if (record)
       await mailLockout(state, record)
 
@@ -45,13 +45,13 @@ export async function startGuess(state: RequestState, record: UserRecord | undef
 
 // Counts a wrong password against the account's ceiling, which no right password gives back.
 export async function failGuess(state: RequestState, guess: Guess): Promise<void> {
-  await state.core.rates(guess.limit).hit(guess.failures)
+  await tally(state.core.rates, guess.failures, guess.limit)
 }
 
 // A right password costs this client and the burst in flight nothing: the guesses they hold are forgotten, but not the failures of other clients, so signing in does not hand an attacker a fresh ceiling.
 export async function forgive(state: RequestState, guess: Guess): Promise<void> {
   for (const { key, limit } of guess.keys)
-    await state.core.rates(limit).reset(key)
+    await forget(state.core.rates, key, limit)
 }
 
 // Mails the holder that signing in is paused, at most once a day however often the lockout comes back, so guessing cannot flood their inbox.
@@ -81,12 +81,13 @@ export async function secondFactorLimited(state: RequestState, record: UserRecor
   if (await spend(rates, `two-factor:${state.client}`, limits.twoFactor))
     return true
 
-  const guesses = (await rates(limits.twoFactorAccount).hit(`two-factor:${record.id}`)).count
+  const { count: guesses, beside } = await tally(rates, `two-factor:${record.id}`, limits.twoFactorAccount)
+  const { max } = limits.twoFactorAccount[0]
 
-  if (guesses <= limits.twoFactorAccount.max)
-    return false
+  if (guesses <= max)
+    return beside
 
-  if (guesses === limits.twoFactorAccount.max + 1)
+  if (guesses === max + 1)
     await mailLockout(state, record)
 
   return true

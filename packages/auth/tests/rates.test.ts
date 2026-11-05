@@ -205,3 +205,30 @@ describe('two auth instances', () => {
     }
   })
 })
+
+describe('a bucket of rateLimit', () => {
+  test('takes a list, each limit counted apart and any refusing', async () => {
+    const app = testApp({ rateLimit: { register: [{ max: 5, window: '1h' }, { max: 2, window: '1d' }] } })
+    const answers: unknown[] = []
+
+    for (let n = 0; n < 3; n++)
+      answers.push(await app.browser().post('/register', { email: `ada${n}@example.com`, password: PASSWORD }))
+
+    expect(answers[2]).toEqual({ ok: false, error: 'limited' })
+  })
+
+  test('counts in the store of its own', async () => {
+    const own = memoryRates()
+    const hit = spyOn(own, 'hit')
+    const app = testApp({ rateLimit: { register: { max: 5, window: '1h', store: own } } })
+
+    await app.browser().post('/register', { email: 'ada@example.com', password: PASSWORD })
+
+    expect(hit).toHaveBeenCalled()
+  })
+
+  test('refuses an empty list and a store that cannot count', () => {
+    expect(() => testApp({ rateLimit: { register: [] } })).toThrow('empty list')
+    expect(() => testApp({ rateLimit: { register: { max: 1, window: '1h', store: {} as never } } })).toThrow('hit(key, window)')
+  })
+})

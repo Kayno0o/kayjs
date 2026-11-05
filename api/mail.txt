@@ -427,7 +427,7 @@ interface SmtpSettings
   name?: string | undefined
   pass?: string | undefined
   port?: number | undefined
-  rateLimit?: undefined | { max: number; window: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; }
+  rateLimit?: Pick<RateLimit, "max" | "window"> | undefined
   secure?: boolean | undefined
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   user?: string | undefined

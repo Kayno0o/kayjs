@@ -1,13 +1,16 @@
-import type { Duration } from 'kay'
+import type { RateLimit, RateWindow } from 'kay'
 import type { Core } from './core'
 import type { AuthLimiters } from './rates'
 import { durationSeconds } from 'kay/library'
 
-// `max` attempts every `window`, a string such as '15m', as in kay's own `rateLimit`.
-export interface Limit {
-  max: number
-  window: Duration
-}
+// `max` attempts every `window`, a string such as '15m', as in kay's own `rateLimit`, counted in `store` when given. kayjs-auth counts under keys of its own, so it takes no `key`.
+export type AuthRateLimit = Omit<RateLimit, 'key'>
+
+/** @deprecated Use `AuthRateLimit`. */
+export type Limit = AuthRateLimit
+
+// The limits of one bucket once resolved: the first, which the lockouts read `max` of, and the others counted beside it.
+export type LimitSet = [AuthRateLimit, ...AuthRateLimit[]]
 
 // Loose per client address, which an office or a carrier may share, and tight per account, which only one person guesses at.
 // Wrong passwords only count: `signInAccount` is tight per client and account, so it never keeps the holder out, and `signInAccountAll` is the looser ceiling on the account from every client together.
@@ -47,44 +50,90 @@ export const DEFAULT_LIMITS = {
   oauthToken: { max: 300, window: '15m' },
   // Guessing a token is hopeless; this keeps trying from being free.
   link: { max: 40, window: '1h' },
-} satisfies Record<string, Limit>
+} satisfies Record<string, AuthRateLimit>
 
 // `oauthRegisterAll` has no default: one address cannot use up a budget every other client shares, so it is a ceiling an app chooses to add on all addresses together.
-export type Limits = Record<keyof typeof DEFAULT_LIMITS, Limit> & { oauthRegisterAll?: Limit }
+export type Limits = Record<keyof typeof DEFAULT_LIMITS, AuthRateLimit> & { oauthRegisterAll?: AuthRateLimit }
 
-// A limit as the app writes it, which is the shape of every limit.
-export type LimitOption = Limit
+// A limit as the app writes it, alone or in a list that is each counted apart.
+export type LimitOption = AuthRateLimit | AuthRateLimit[]
 
 // The limits `rateLimit` overrides, the rest keeping their defaults.
 export type LimitsOption = Partial<Record<keyof Limits, LimitOption>>
 
-// The defaults over what the app set in `rateLimit`; a bad window throws naming its limit.
-export function resolveLimits(given: LimitsOption | undefined): Limits {
-  const limits: Limits = { ...DEFAULT_LIMITS }
+export type ResolvedLimits = Record<keyof typeof DEFAULT_LIMITS, LimitSet> & { oauthRegisterAll?: LimitSet }
 
-  for (const [name, limit] of Object.entries(given ?? {}) as [keyof Limits, LimitOption | undefined][]) {
-    if (!limit)
+// The defaults over what the app set in `rateLimit`; a bad limit throws naming it.
+export function resolveLimits(given: LimitsOption | undefined): ResolvedLimits {
+  const limits = Object.fromEntries(Object.entries(DEFAULT_LIMITS).map(([name, limit]) => [name, [limit]])) as unknown as ResolvedLimits
+
+  for (const [name, option] of Object.entries(given ?? {}) as [keyof Limits, LimitOption | undefined][]) {
+    if (!option)
       continue
 
-    durationSeconds(limit.window, `rateLimit.${name}.window`)
-    limits[name] = { max: limit.max, window: limit.window }
+    const list = [option].flat()
+
+    if (list.length === 0)
+      throw new Error(`kay: rateLimit.${name} is an empty list; give it a limit or leave it out`)
+
+    for (const [index, limit] of list.entries()) {
+      const place = list.length === 1 ? `rateLimit.${name}` : `rateLimit.${name}[${index}]`
+
+      durationSeconds(limit.window, `${place}.window`)
+
+      if (limit.store !== undefined && typeof limit.store?.hit !== 'function')
+        throw new Error(`kay: ${place}.store has no hit(key, window) method; give it a RateStore`)
+    }
+
+    limits[name] = list.map(({ max, window, store }) => ({ max, window, store })) as LimitSet
   }
 
   return limits
 }
 
-// Counts one attempt and answers whether it was over the limit.
-export async function spend(rates: AuthLimiters, key: string, limit: Limit): Promise<boolean> {
-  return await rates(limit).enforce(key) !== undefined
+// Counts one attempt against each limit of the bucket and answers whether any was over.
+export async function spend(rates: AuthLimiters, key: string, limits: LimitSet): Promise<boolean> {
+  let over = false
+
+  for (const [index, limit] of limits.entries()) {
+    if (await rates(limit).enforce(apart(key, index)) !== undefined)
+      over = true
+  }
+
+  return over
 }
 
-// The attempts counted under `key` in its open window, none once it ended.
-export async function counted(rates: AuthLimiters, key: string, limit: Limit): Promise<number> {
-  return (await rates(limit).peek(key))?.count ?? 0
+// The attempts counted under `key` in the first limit's open window, none once it ended.
+export async function counted(rates: AuthLimiters, key: string, limits: LimitSet): Promise<number> {
+  return (await rates(limits[0]).peek(key))?.count ?? 0
+}
+
+// Counts one attempt without refusing it, in each limit of the bucket: the first's window, which the caller compares to `max`, and whether any of the others is over.
+export async function tally(rates: AuthLimiters, key: string, limits: LimitSet): Promise<RateWindow & { beside: boolean }> {
+  const first = await rates(limits[0]).hit(key)
+  let beside = false
+
+  for (const [index, limit] of limits.entries()) {
+    if (index > 0 && (await rates(limit).hit(apart(key, index))).count > limit.max)
+      beside = true
+  }
+
+  return { ...first, beside }
+}
+
+// Forgets the count under `key` in each limit of the bucket.
+export async function forget(rates: AuthLimiters, key: string, limits: LimitSet): Promise<void> {
+  for (const [index, limit] of limits.entries())
+    await rates(limit).reset(apart(key, index))
+}
+
+// The first limit counts under the key itself, the others under their place in the list.
+function apart(key: string, index: number): string {
+  return index === 0 ? key : `${key}#${index}`
 }
 
 // A limit that only names a window in milliseconds, for a count nothing is refused by.
-export function windowOf(ms: number): Limit {
+export function windowOf(ms: number): AuthRateLimit {
   return { max: Number.MAX_SAFE_INTEGER, window: `${ms}ms` }
 }
 
