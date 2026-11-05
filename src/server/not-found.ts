@@ -3,8 +3,8 @@ import type { Elysia } from 'elysia'
 import type { TrailingSlash } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { RedirectSet } from './runtime-redirects'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, renameSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { localePath, splitLocale } from '../runtime/i18n'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
@@ -28,10 +28,57 @@ export function notFoundFile(database: string | undefined, root = ''): string {
   return shared === undefined || existsSync(local) ? local : shared
 }
 
+const LEGACY_TABLES = ['kay_missing', 'kay_missing_referrers', 'kay_redirects'] as const
+
+// Moves the rows of a `data/not-found.sqlite` into the SQLite file the app's `store` names, once, and renames the old file to `data/not-found.sqlite.migrated`, so the store's file is the one used from then on. A file that cannot be moved stays in use, as before.
+export function adoptLocalNotFound(database: string | undefined, root = ''): void {
+  const shared = sqlitePath(database)
+  const local = join(root, NOT_FOUND_FILE)
+
+  if (shared === undefined || !existsSync(local))
+    return
+
+  try {
+    // Opening the log creates its tables in the store's file, the redirects' included.
+    missingStore(shared, false).close()
+
+    const db = openSqlite(shared)
+
+    try {
+      db.run('ATTACH DATABASE ? AS legacy', [resolve(local)])
+
+      try {
+        db.transaction(() => {
+          for (const table of LEGACY_TABLES) {
+            if (db.query('SELECT 1 FROM legacy.sqlite_master WHERE name = ?').get(table) !== null)
+              db.run(`INSERT OR IGNORE INTO main.${table} SELECT * FROM legacy.${table}`)
+          }
+        })()
+      }
+      finally {
+        db.run('DETACH DATABASE legacy')
+      }
+    }
+    finally {
+      db.close()
+    }
+
+    for (const suffix of ['', '-wal', '-shm']) {
+      if (existsSync(`${local}${suffix}`))
+        renameSync(`${local}${suffix}`, `${local}.migrated${suffix}`)
+    }
+
+    kayLog('info', `the paths visitors found nothing at and the redirects added while the site runs moved from ${local} into ${shared}; the old file is kept as ${local}.migrated`)
+  }
+  catch (error) {
+    kayLog('warn', `${local} could not be moved into ${shared}, so it stays in use: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
 // What production warns of when the log is a file of this machine, worded as the libraries' warnings are.
 function localNotFoundSentence(database: string | undefined, file: string): string {
   if (sqlitePath(database) !== undefined)
-    return `the paths visitors found nothing at, and the redirects added while the site runs, are kept in ${file}, which exists, though the app's store names a SQLite file: to use that file, delete ${file} once it holds nothing you need`
+    return `the paths visitors found nothing at, and the redirects added while the site runs, are kept in ${file}, which could not be moved into the app's store file: move its rows by hand, or delete ${file} once it holds nothing you need`
 
   if (database !== undefined && database !== '')
     return `the paths visitors found nothing at, and the redirects added while the site runs, are kept in ${file}, a SQLite file of this machine, as they do not use the app's Postgres store yet`

@@ -1,8 +1,11 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import process from 'node:process'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { resetLocalFiles, warnOfLocalFiles } from '../src/server/local-files'
-import { missingStore, notFoundFile } from '../src/server/not-found'
+import { adoptLocalNotFound, missingStore, notFoundFile } from '../src/server/not-found'
 import { sharedStores } from '../src/server/workers'
+import { pgDescribe, pgIt, postgres } from './job-stores'
 import { scratchDir } from './scratch'
 
 const SINK = Symbol.for('kay.log')
@@ -52,8 +55,7 @@ describe('workers sharing what the store leaves out', () => {
     warnOfLocalFiles()
     warnOfLocalFiles()
 
-    expect(told).toHaveLength(1)
-    expect(told[0]).toContain('data/workers.sqlite')
+    expect(told).toEqual(['warn: what the 2 workers share is kept in data/workers.sqlite, a SQLite file of this machine, emptied at each start: set the app\'s `store` (`sqliteData` or `pgData`) in kay.config.ts to keep it with the rest of the app\'s data'])
   })
 
   it('leaves the warning to the first worker, and to production', async () => {
@@ -68,6 +70,52 @@ describe('workers sharing what the store leaves out', () => {
     warnOfLocalFiles()
 
     expect(told).toEqual([])
+  })
+})
+
+pgDescribe('workers over a Postgres store', () => {
+  pgIt('fill the kinds the store leaves out from its database, and close once', async () => {
+    const { sql } = await postgres()
+    let closed = 0
+
+    process.env.KAY_WORKERS = '2'
+    process.env.KAY_WORKER = '0'
+
+    const store = await sharedStores({ sql, close: () => closed++ })
+
+    expect(store?.kv).toBeDefined()
+    expect(store?.rooms).toBeDefined()
+    expect(store?.cache).toBeDefined()
+    await store?.kv?.set('workers-test', 'a', 60_000)
+    expect(await store?.kv?.get('workers-test')).toBe('a')
+
+    await store?.close?.()
+    await store?.close?.()
+    expect(closed).toBe(1)
+    warnOfLocalFiles()
+    expect(told).toEqual([])
+  })
+})
+
+describe('an old data/not-found.sqlite', () => {
+  it('moves into the store\'s file once, and is renamed aside', async () => {
+    const root = await scratchDir('not-found-adopt-')
+    const old = missingStore(join(root, 'data/not-found.sqlite'), false)
+
+    old.hit('/gone', 'example.org', () => undefined)
+    old.redirects.add('/old', '/new', undefined, { hosts: [], configured: {}, served: () => ['/new'], dryRun: false })
+    old.close()
+
+    adoptLocalNotFound(`sqlite://${root}/app.sqlite`, root)
+
+    const moved = missingStore(`${root}/app.sqlite`, false)
+
+    expect(moved.list().map(row => row.path)).toEqual(['/gone'])
+    expect(moved.redirects.list().map(row => row.from)).toEqual(['/old'])
+    moved.close()
+    expect(existsSync(join(root, 'data/not-found.sqlite'))).toBe(false)
+    expect(existsSync(join(root, 'data/not-found.sqlite.migrated'))).toBe(true)
+    expect(notFoundFile(`sqlite://${root}/app.sqlite`, root)).toBe(`${root}/app.sqlite`)
   })
 })
 

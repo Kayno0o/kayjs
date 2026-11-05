@@ -198,7 +198,11 @@ A route may set its own: `export const page = { timeout: '30s' }` on a page, `ap
 
 One Bun process uses one core. `kay start --workers 4` serves from four, all on the same port, and `--workers auto` takes one per core. The executable takes the same option: `./server --workers 4`, or `KAY_WORKERS=4` in its environment. The default is one worker. The option works on Linux, where the kernel shares connections between processes; elsewhere kay warns and runs one.
 
-You change nothing in the app. What would live in the memory of one process is kept in the database of your `store`, or in a SQLite file, `data/workers.sqlite`, that the workers share: cached values, live values, rate limits, presence rooms and the rest. It starts empty each time you start the workers.
+You change nothing in the app. What would live in the memory of one process is kept in the database of your `store`, or in a SQLite file, `data/workers.sqlite`, that the workers share: cached values, live values, rate limits, presence rooms, Web Vitals, notifications, push subscriptions and the small values libraries keep. `data/workers.sqlite` starts empty each time you start the workers. In your store's database they last as they do for a server with one worker: a presence room forgets a process that stopped answering, and a live value or cached value ends with its time to live.
+
+In production, kay warns once at boot when the 404 log (the paths visitors found nothing at, and the redirects added while the site runs) or `data/workers.sqlite` stays in a local file.
+
+Name `sqliteData` in `store` for them to live in the store's file; a `data/not-found.sqlite` from before is moved into it at the next start. The 404 log does not use Postgres yet, so a `pgData` store keeps the warning.
 
 A store you name in `kay.config.ts` is used as it is. A worker hears what another one wrote within about half a second, not at once. A store built in memory, such as `memorySessions()`, splits per worker, and the first worker logs a warning naming it. Sessions travel in their cookie, and jobs keep `data/jobs.sqlite`. Every worker runs the queue and the schedules, and each job runs once.
 

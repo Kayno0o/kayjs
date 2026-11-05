@@ -107,15 +107,20 @@ export async function sharedStores(store: AppStore | undefined): Promise<AppStor
 
   const kept = { ...store, cache: store?.cache ?? home.cache, live: store?.live ?? home.live, rates: store?.rates ?? home.rates, rooms: store?.rooms ?? home.rooms, vitals: store?.vitals ?? home.vitals, notifications: store?.notifications ?? home.notifications, push: store?.push ?? home.push, kv: store?.kv ?? home.kv }
 
-  // The connection the stores filled in opened is closed with the app's own.
+  // The stores and connection `pgData` opened for the kinds it filled in are closed with the app's own, once however many times the server asks.
   if (closeHome === undefined)
     return kept
 
   const own = store?.close
+  let closing: Promise<void> | undefined
 
   return { ...kept, close: async () => {
-    await own?.()
-    await closeHome()
+    closing ??= (async () => {
+      await own?.()
+      await closeHome()
+    })()
+
+    return closing
   } }
 }
 

@@ -30,6 +30,7 @@ import { appServesManifest } from './favicon'
 import { entryFilePaths, followEntryFiles, implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales, stateFor } from './i18n'
 import { applyImageConfig } from './image'
 import { linkSchemes } from './link-schemes'
+import { adoptLocalNotFound } from './not-found'
 import { loadMatchers } from './params'
 import { setupPreview } from './preview'
 import { dropOpenCache, privateDir } from './private-dir'
@@ -167,6 +168,10 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
     setAppRoot(root)
     // An export serves nobody, so it keeps only the database url libraries read and none of the stores: a pgData store would otherwise poll, open its connection and create its tables while the build runs, and a build with no database reachable still ends.
     setupStore(await sharedStores(exporting && config.store ? { database: config.store.database } : config.store))
+
+    if (!mode.dev && !exporting && process.env.NODE_ENV !== 'test')
+      adoptLocalNotFound(config.store?.database)
+
     await liveStoreReady()
     // A test's server restarts with its process and has no replica, so a key of the process is right there.
     warnOnStampKey(!mode.dev && process.env.NODE_ENV !== 'test')
