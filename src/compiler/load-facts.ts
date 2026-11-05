@@ -7,13 +7,6 @@ import { declaredIdentifiers } from './script-shared'
 // A name read: not a member after a dot, but a spread (`...name`) reads it.
 export const WORD = /(?<![\w$])(?<![^.]\.)[A-Z_$][\w$]*/gi
 const FUNCTIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'FunctionDeclaration', 'ClassDeclaration', 'ClassExpression'])
-// The statements that may run or not as a whole, with no name of their own for the rest of the fence.
-const GUARDABLE = new Set(['ExpressionStatement', 'IfStatement', 'TryStatement', 'ThrowStatement', 'ForStatement', 'ForInStatement', 'ForOfStatement', 'WhileStatement', 'DoWhileStatement', 'BlockStatement', 'SwitchStatement'])
-
-// How a refresh may leave a statement of the fence out: a declaration with one name or pattern and a value, which becomes a `let` assigned inside an `if`, or any other statement that declares nothing, which goes inside an `if`.
-export type Guard
-  = | { kind: 'declaration', name: Span, init: Span, destructures: boolean }
-    | { kind: 'statement' }
 
 // What a refresh needs to know of a statement of the fence that runs per request.
 export interface BodyFact {
@@ -22,7 +15,6 @@ export interface BodyFact {
   awaits: boolean
   // The names its value (or the whole statement, for any but a declaration) mentions.
   words: string[]
-  guard?: Guard | undefined
 }
 
 function awaitsHere(node: Node): boolean {
@@ -47,23 +39,13 @@ export function bodyFact(statement: Statement, shift: (node: Node) => Span, text
   if (statement.type === 'VariableDeclaration') {
     const [only] = statement.declarations
 
-    if (statement.declarations.length !== 1 || only === undefined || only.init === null || only.init === undefined || (statement.kind !== 'const' && statement.kind !== 'let' && statement.kind !== 'var') || statement.declare === true)
+    if (statement.declarations.length !== 1 || only === undefined || only.init === null || only.init === undefined || statement.declare === true)
       return { declared, awaits: false, words: words(whole) }
 
-    const init = shift(only.init)
-    const id = only.id
-    const awaits = awaitsHere(only.init)
-    const pattern = id.type === 'ObjectPattern' || id.type === 'ArrayPattern'
+    const pattern = only.id.type === 'ObjectPattern' || only.id.type === 'ArrayPattern'
 
-    if (id.type === 'Identifier' || (pattern && !('typeAnnotation' in id && id.typeAnnotation))) {
-      const at = shift(id)
-      const name = id.type === 'Identifier' ? { start: at.start, end: at.start + id.name.length } : at
-
-      return { declared, awaits, words: words(pattern ? whole : text(init)), guard: { kind: 'declaration', name, init, destructures: pattern } }
-    }
-
-    return { declared, awaits: false, words: words(whole) }
+    return { declared, awaits: awaitsHere(only.init), words: words(pattern ? whole : text(shift(only.init))) }
   }
 
-  return { declared, awaits: false, words: words(whole), guard: declared.length === 0 && GUARDABLE.has(statement.type) ? { kind: 'statement' } : undefined }
+  return { declared, awaits: false, words: words(whole) }
 }

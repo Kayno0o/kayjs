@@ -1,5 +1,4 @@
 import type { ElementNode, KayFile, Node, Span } from './ast'
-import type { BodyFact } from './load-facts'
 import type { ServerAnalysis } from './script-server'
 import { isHead, nodeExpressions } from './ast'
 import { hash } from './host'
@@ -10,8 +9,6 @@ import { binders, bindingNames, readNames, scopedBlocks } from './template-reads
 // The table the runtime reads (`LoadTable` in `src/runtime/load-scope.ts`), as written into the module.
 export interface LoadPlan {
   table: string
-  // How each guardable statement of the fence runs: the ids of the loads it needs.
-  needs: Map<Span, number[]>
   // The group of each element reading loads, by where it starts, with the id the element carries so a refresh finds it again.
   groups: Map<number, { group: number, id: string }>
 }
@@ -23,12 +20,8 @@ const TAG = /^[a-z][a-z0-9-]*$/i
 interface Unit {
   element: ElementNode
   parent: Unit | undefined
-  direct: Set<number>
   subtree: Set<number>
 }
-
-// A value that throws, or uses the context beyond reading what the request carries, may end or change the response: a refresh never leaves it out.
-const ALTERS = /\bthrow\b|\bctx\b(?!\.(?:params|query|url|locale|request)\b)/
 
 const holdsOutlets = new WeakMap<Node, boolean>()
 
@@ -46,8 +39,8 @@ function holdsOutlet(node: Node): boolean {
   return found
 }
 
-// Which loads of a fence a refresh can leave out, when the fence has any: a load is a top-level `const name = await ...` (or a pattern of names), named after the names it declares.
-// An element outside any block of the template, whose markup reads none of the loads a refresh runs, is left to the page as it is, so its loads are never called; what reads loads outside such an element, in `head`, or in a script makes them run.
+// The loads of a fence, for a refresh to name: a load is a top-level `const name = await ...` (or a pattern of names), named after the names it declares.
+// A refresh runs the whole fence, every statement and every load, as the whole page does, so a refusal or an error ends it the same way; it renders and sends only the elements outside any block of the template that read a load it names, and leaves the others to the page as they are.
 export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: string): LoadPlan | undefined {
   const text = (span: Span) => file.source.slice(span.start, span.end)
   const declared = new Set<string>()
@@ -57,60 +50,44 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
       declared.add(name)
   }
 
-  // What each name of the fence depends on: the loads that make it, and the names whose values it is made of or is changed with.
+  // What each name of the fence depends on: the loads that make it, and the names whose values it is made of.
   const base = new Map<string, number[]>()
   const edges = new Map<string, Set<string>>()
-  const loads: { words: string[] }[] = []
-  const guarded: { span: Span, words: string[], load?: number }[] = []
-  const unguarded: string[][] = []
-  const effectful: number[] = []
+  let count = 0
 
   const link = (name: string, words: readonly string[]) => {
     const set = edges.get(name) ?? new Set<string>()
 
     for (const word of words) {
-      if (declared.has(word))
+      if (declared.has(word) && word !== name)
         set.add(word)
     }
 
     edges.set(name, set)
   }
 
+  const statements: { words: string[], declares: boolean }[] = []
+
   for (const span of server.body) {
-    const fact: BodyFact | undefined = server.facts.get(span)
+    const fact = server.facts.get(span)
 
     if (fact === undefined)
       continue
 
-    // Only a declaration whose value alters nothing of the response may be left out; any other statement runs for every refresh, as does a declaration that throws or uses `ctx` beyond reading its request, and the loads they read.
-    const altering = fact.guard?.kind === 'declaration' && ALTERS.test(text(fact.guard.init))
-
-    if (fact.guard?.kind === 'declaration' && fact.awaits) {
-      const id = loads.push({ words: fact.words }) - 1
+    if (fact.awaits && fact.declared.length > 0) {
+      const id = count++
 
       for (const name of fact.declared)
         base.set(name, [id])
-
-      guarded.push({ span, words: fact.words, load: id })
-
-      if (altering)
-        effectful.push(id)
     }
-    else if (fact.guard?.kind === 'declaration' && !altering) {
-      for (const name of fact.declared)
-        link(name, fact.words)
 
-      guarded.push({ span, words: fact.words })
-    }
-    else {
-      for (const name of fact.declared)
-        link(name, fact.words)
+    for (const name of fact.declared)
+      link(name, fact.words)
 
-      unguarded.push(fact.words)
-    }
+    statements.push({ words: fact.words, declares: fact.declared.length > 0 })
   }
 
-  if (loads.length === 0)
+  if (count === 0)
     return undefined
 
   const closure = (name: string, seen = new Set<string>()): number[] => {
@@ -122,34 +99,26 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
     return [...base.get(name) ?? [], ...[...edges.get(name) ?? []].flatMap(next => closure(next, seen))]
   }
 
-  const readIds = (words: readonly string[]) => new Set(words.flatMap(word => closure(word)))
+  const reach = (name: string, seen = new Set<string>()): Set<string> => {
+    seen.add(name)
 
-  const needs = new Map<Span, number[]>()
-
-  for (const { span, words, load } of guarded) {
-    if (load !== undefined) {
-      needs.set(span, [load])
-
-      continue
+    for (const next of edges.get(name) ?? []) {
+      if (!seen.has(next))
+        reach(next, seen)
     }
 
-    const roots = readIds(words)
-
-    if (roots.size > 0)
-      needs.set(span, [...roots])
+    return seen
   }
 
-  const needed = loads.map(load => readIds(load.words))
-  // A statement that cannot be left out runs for every refresh, and so does what it reads.
-  const pinned = new Set<number>([...effectful, ...unguarded.flatMap(words => [...readIds(words)])])
-
-  // A script reads the fence's values as it renders.
-  for (const fence of [file.script, file.module]) {
-    if (fence === undefined)
+  // A statement that declares nothing may change any value it mentions, or a value one of them is made of (an alias): they now depend on each other.
+  for (const { words, declares } of statements) {
+    if (declares)
       continue
 
-    for (const id of readIds(text(fence).match(WORD) ?? []))
-      pinned.add(id)
+    const group = new Set([...new Set(words)].filter(word => declared.has(word)).flatMap(word => [...reach(word)]))
+
+    for (const name of group)
+      link(name, [...group])
   }
 
   const units: Unit[] = []
@@ -170,16 +139,11 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
   }
 
   const touch = (ids: ReadonlySet<number>, owner: Unit | 'page' | undefined) => {
-    for (const id of ids) {
-      if (owner === undefined || owner === 'page') {
-        pinned.add(id)
+    if (owner === undefined || owner === 'page')
+      return
 
-        continue
-      }
-
-      owner.direct.add(id)
-
-      for (let unit: Unit | undefined = owner; unit; unit = unit.parent)
+    for (let unit: Unit | undefined = owner; unit; unit = unit.parent) {
+      for (const id of ids)
         unit.subtree.add(id)
     }
   }
@@ -193,7 +157,7 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
       let inner = owner
 
       if (node.kind === 'element' && !sealed && owner !== 'page' && !node.component && !WHOLE_PAGE.has(node.name) && !isHead(node) && TAG.test(node.name) && node.outlet === undefined && node.fills === undefined && !node.attributes.some(attribute => attribute.kind === 'spread') && !holdsOutlet(node)) {
-        inner = { element: node, parent: owner, direct: new Set(), subtree: new Set() }
+        inner = { element: node, parent: owner, subtree: new Set() }
         units.push(inner)
       }
       else if (isHead(node)) {
@@ -241,19 +205,19 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
 
   const prefix = hash(moduleId).slice(-6)
   const groups = new Map<number, { group: number, id: string }>()
-  const listed: [number[], number[]][] = []
+  const listed: number[][] = []
   const known = new Map<string, number>()
 
   for (const unit of units) {
     if (unit.subtree.size === 0)
       continue
 
-    const entry: [number[], number[]] = [[...unit.subtree].toSorted((a, b) => a - b), [...unit.direct].toSorted((a, b) => a - b)]
-    const key = JSON.stringify(entry)
+    const ids = [...unit.subtree].toSorted((a, b) => a - b)
+    const key = ids.join(',')
     let group = known.get(key)
 
     if (group === undefined) {
-      group = listed.push(entry) - 1
+      group = listed.push(ids) - 1
       known.set(key, group)
     }
 
@@ -262,12 +226,5 @@ export function planLoads(file: KayFile, server: ServerAnalysis, moduleId: strin
 
   const names = [...declared].filter(name => server.data.some(data => data.name === name)).map(name => [name, [...new Set(closure(name))]])
 
-  const table = JSON.stringify({
-    names,
-    needs: needed.map((ids, id) => [...ids].filter(need => need !== id)),
-    pinned: [...pinned],
-    groups: listed,
-  })
-
-  return { table, needs, groups }
+  return { table: JSON.stringify({ names, groups: listed }), groups }
 }

@@ -882,7 +882,7 @@ class ModuleShell {
       if (this.leftOut(server, span))
         continue
 
-      this.bodyStatement(server, span)
+      b.addBody(span)
 
       this.deferDeclared(server, span)
     }
@@ -891,31 +891,6 @@ class ModuleShell {
     b.add('\n')
     this.sites.handOver = { start: b.code.length, end: b.code.length + handOver.length }
     b.add(`${handOver}\n}\n`)
-  }
-
-  // A statement of the fence, left out when the refresh running the load does not need what it makes: the names it declares then stay undefined.
-  private bodyStatement(server: ServerAnalysis, span: Span) {
-    const { b } = this
-    const ids = this.loadPlan?.needs.get(span)
-    const guard = server.facts.get(span)?.guard
-
-    if (ids === undefined || guard === undefined) {
-      b.addBody(span)
-
-      return
-    }
-
-    const run = `${LOAD_RUN}(${ids.join(', ')})`
-
-    if (guard.kind === 'statement') {
-      b.add(`if (${run}) {\n`).addBody(span).add('\n}')
-
-      return
-    }
-
-    const names = server.facts.get(span)!.declared
-
-    b.add(`let ${names.join(', ')}\nif (${run}) ${guard.destructures ? '(' : ''}`).addSource(guard.name).add(' = ').addBody(guard.init).add(guard.destructures ? ');' : ';')
   }
 
   // Right where a deferred value is declared, so a promise rejecting while a later statement awaits crashes nothing; a statement an export reads runs at module level.

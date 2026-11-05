@@ -15,3 +15,10 @@ export function reset(): void {
 export function requireAdmin(ctx: { redirect: (to: string) => never }): never {
   return ctx.redirect('/login')
 }
+
+// Throws a 403 for a page nobody owns: no `ctx` and no `throw` at the call site.
+export async function mustOwn(id: string): Promise<string> {
+  await Promise.resolve()
+
+  throw Object.assign(new Error(`not the owner of ${id}`), { status: 403 })
+}

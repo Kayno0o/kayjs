@@ -1,0 +1,9 @@
+--- server
+import { mustOwn, run } from '../calls'
+
+const owner = await mustOwn('doc')
+const doc = await run('doc', n => ({ n }))
+---
+main
+  p.doc {doc.n}
+  p.owner {owner}

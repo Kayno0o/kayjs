@@ -23,6 +23,18 @@ async function asked(path: string, loads: string, target = site): Promise<{ html
   return { html: await response.text(), response }
 }
 
+// The loads a whole render of the path runs: a refresh runs the same ones, whatever it names.
+async function wholeRun(path: string, target = site): Promise<Record<string, number>> {
+  reset()
+  await (await target.fetch(path)).text()
+
+  const ran = { ...counts }
+
+  reset()
+
+  return ran
+}
+
 function placeholders(html: string): string[] {
   return [...html.matchAll(/<([a-z0-9-]+) data-kay-kept data-kay-u="[\w-]+"><\/\1>/g)].map(match => match[1]!)
 }
@@ -38,10 +50,10 @@ describe('a refresh asking for some of the page loads', () => {
     expect(response.headers.get('vary') ?? '').not.toContain(LOADS)
   })
 
-  it('runs the named load alone and leaves the elements reading the others to the page', async () => {
+  it('sends the elements reading the named load and leaves the elements reading the others to the page', async () => {
     const { html, response } = await asked('/', 'cart')
 
-    expect(counts).toEqual({ cart: 1 })
+    expect({ ...counts }).toEqual(await wholeRun('/'))
     expect(placeholders(html)).toEqual(['h1', 'section'])
     expect(html).toContain('cart 1')
     expect(html).toContain('<li>apple</li>')
@@ -52,10 +64,10 @@ describe('a refresh asking for some of the page loads', () => {
     expect(response.headers.get('etag')).toBeNull()
   })
 
-  it('runs several loads named together, in any order and with spaces', async () => {
+  it('sends the elements of several loads named together, in any order and with spaces', async () => {
     const { html } = await asked('/', ' wishlist , user')
 
-    expect(counts).toEqual({ wishlist: 1, user: 1 })
+    expect({ ...counts }).toEqual(await wholeRun('/'))
     expect(placeholders(html)).toEqual(['section'])
     expect(html).toContain('Hi Ada 1')
   })
@@ -63,14 +75,14 @@ describe('a refresh asking for some of the page loads', () => {
   it('takes a name derived from a load for the load it reads', async () => {
     const { html } = await asked('/', 'label')
 
-    expect(counts).toEqual({ cart: 1 })
+    expect({ ...counts }).toEqual(await wholeRun('/'))
     expect(html).toContain('cart 1')
   })
 
-  it('refreshes nothing for a name that matches no load, and shows the page whole again afterwards', async () => {
+  it('sends nothing new for a name that matches no load, and shows the page whole again afterwards', async () => {
     const { html } = await asked('/', 'nothing')
 
-    expect(counts).toEqual({})
+    expect({ ...counts }).toEqual(await wholeRun('/'))
     expect(placeholders(html)).toEqual(['main'])
 
     const plain = await (await site.fetch('/')).text()
@@ -79,26 +91,26 @@ describe('a refresh asking for some of the page loads', () => {
     expect(counts).toEqual({ cart: 1, wishlist: 1, user: 1 })
   })
 
-  it('runs the loads an element reads together with the one named', async () => {
+  it('sends an element reading the named load and another, and leaves the one reading neither', async () => {
     const { html } = await asked('/both', 'cart')
 
-    expect(counts).toEqual({ cart: 1, wishlist: 1 })
-    expect(placeholders(html)).toEqual([])
+    expect({ ...counts }).toEqual(await wholeRun('/both'))
+    expect(placeholders(html)).toEqual(['section'])
     expect(html).toMatch(/<p [^>]*class="both"[^>]*>1 1<\/p>/)
   })
 
-  it('runs the loads a named load reads', async () => {
+  it('sends the elements of the loads a named load reads', async () => {
     const { html } = await asked('/needs', 'items')
 
-    expect(counts).toEqual({ items: 1, cart: 1 })
+    expect({ ...counts }).toEqual(await wholeRun('/needs'))
     expect(placeholders(html)).toEqual(['p'])
     expect(html).toMatch(/<p [^>]*class="items"[^>]*>1 of 1<\/p>/)
   })
 
-  it('runs a load read outside any element every time', async () => {
+  it('sends markup outside any element every time', async () => {
     const { html } = await asked('/root', 'cart')
 
-    expect(counts).toEqual({ cart: 1, user: 1 })
+    expect({ ...counts }).toEqual(await wholeRun('/root'))
     expect(html).toContain('Signed in')
     expect(placeholders(html)).toEqual([])
   })
@@ -114,15 +126,15 @@ describe('a refresh asking for some of the page loads', () => {
       expect(html).not.toContain('<script>alert')
     }
 
-    // Every value but `__proto__`, a well-formed name no load answers to, shows the page whole.
-    expect(counts.cart).toBe(hostile.length - 1)
+    // A value asking for no load shows the page whole, and the fence runs for every one.
+    expect(counts.cart).toBe(hostile.length)
   })
 
   it('reads at most 32 names', async () => {
     const names = [...Array.from({ length: 40 }, (_, index) => `n${index}`), 'cart']
     const { html } = await asked('/', names.join(','))
 
-    expect(counts).toEqual({})
+    expect({ ...counts }).toEqual(await wholeRun('/'))
     expect(placeholders(html)).toEqual(['main'])
   })
 
@@ -130,32 +142,32 @@ describe('a refresh asking for some of the page loads', () => {
     for (const name of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
       reset()
       await asked('/', name)
-      expect(counts).toEqual({})
+      expect({ ...counts }).toEqual(await wholeRun('/'))
     }
   })
 
   it('runs the loads a conditional and a loop show together with the one named, and keeps only what reads neither', async () => {
     const { html } = await asked('/cond', 'cart')
 
-    expect(counts).toEqual({ cart: 1, wishlist: 1 })
+    expect({ ...counts }).toEqual(await wholeRun('/cond'))
     expect(placeholders(html)).toEqual(['p'])
     expect(html).toMatch(/<p [^>]*class="a"[^>]*>1<\/p>/)
     expect(html).toContain('>a 1</li>')
     expect(html).toContain('>b 1</li>')
   })
 
-  it('runs a layout wrapping the page for its own loads and never leaves it to the browser', async () => {
+  it('sends the elements around the slot of a layout and never leaves the page to the browser', async () => {
     const { html } = await asked('/shell', 'cart')
 
-    expect(counts).toEqual({ user: 1, cart: 1 })
+    expect({ ...counts }).toEqual(await wholeRun('/shell'))
     expect(html).toContain('data-theme="dark"')
-    expect(placeholders(html)).toEqual([])
+    expect(placeholders(html)).toEqual(['header'])
 
     reset()
 
     const other = await asked('/shell', 'user')
 
-    expect(counts).toEqual({ user: 1 })
+    expect({ ...counts }).toEqual(await wholeRun('/shell'))
     expect(other.html).toContain('data-theme="dark"')
     expect(placeholders(other.html)).toEqual(['main'])
   })
@@ -163,7 +175,7 @@ describe('a refresh asking for some of the page loads', () => {
   it('maps a template constant back to the loads it reads, for the elements reading it', async () => {
     const { html } = await asked('/derived', 'wishlist')
 
-    expect(counts).toEqual({ wishlist: 1 })
+    expect({ ...counts }).toEqual(await wholeRun('/derived'))
     expect(placeholders(html)).toEqual(['section'])
     expect(html).not.toContain('NaN')
 
@@ -178,15 +190,19 @@ describe('a refresh asking for some of the page loads', () => {
     const { html, response } = await asked('/spread', 'wishlist')
 
     expect(response.status).toBe(200)
-    expect(counts).toEqual({ cart: 1, wishlist: 1 })
+    expect({ ...counts }).toEqual(await wholeRun('/spread'))
     expect(html).toMatch(/class="all"[^>]*>2</)
   })
 
-  it('runs a statement of the fence for every refresh, and the loads it reads', async () => {
+  it('runs a statement of the fence for every refresh, and sends what it changes', async () => {
     const { html } = await asked('/mutate', 'wishlist')
 
-    expect(counts).toEqual({ cart: 1, wishlist: 1 })
-    expect(html).toMatch(/class="totals"[^>]*>2</)
+    expect({ ...counts }).toEqual(await wholeRun('/mutate'))
+    expect(placeholders(html)).toEqual(['p'])
+
+    const own = await asked('/mutate', 'cart')
+
+    expect(own.html).toMatch(/class="totals"[^>]*>2</)
   })
 
   it('gives every element left to the page an id of its own, and the element it stands for the same one', async () => {
@@ -203,7 +219,7 @@ describe('a refresh asking for some of the page loads', () => {
   })
 
   it('answers a refresh with the redirect or the error the whole page answers, for a guard in the fence', async () => {
-    for (const [path, loads] of [['/guard-redirect', 'secret'], ['/guard-throw', 'secret'], ['/guard-load', 'stats']] as const) {
+    for (const [path, loads] of [['/guard-redirect', 'secret'], ['/guard-throw', 'secret'], ['/guard-load', 'stats'], ['/guard-owner', 'doc']] as const) {
       const whole = await site.fetch(path, { redirect: 'manual' })
       const scoped = await site.fetch(path, { redirect: 'manual', headers: { [LOADS]: loads } })
 
@@ -217,7 +233,7 @@ describe('a refresh asking for some of the page loads', () => {
   it('reads the defaults of a pattern and the names a statement changes', async () => {
     const { html } = await asked('/defaults', 'wishlist')
 
-    expect(counts).toEqual({ stats: 1, wishlist: 1 })
+    expect({ ...counts }).toEqual(await wholeRun('/defaults'))
     expect(html).toMatch(/class="alias"[^>]*>2</)
     expect(html).toMatch(/class="name"[^>]*>x</)
   })
@@ -260,7 +276,7 @@ describe('a refresh asking for some of the page loads', () => {
     const { html, response } = await asked('/shop/', 'wishlist', based)
 
     expect(response.status).toBe(200)
-    expect(counts).toEqual({ wishlist: 1 })
+    expect({ ...counts }).toEqual(await wholeRun('/shop/', based))
     expect(placeholders(html)).toEqual(['h1', 'section'])
     expect(response.headers.get('cache-control')).toBe('private, no-store')
 
