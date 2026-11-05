@@ -7,7 +7,7 @@ import { writeShadowTypes } from '../src/check/shadow-types'
 import { BREAKING_FILE } from './breaking'
 
 // `bun scripts/api.ts [--update [--breaking|--break=<key>...|--compatible]]`: the public surface of kay and of each library, every `exports` entry's names and their types, as the text files of `api/`.
-// Without a flag it prints the difference from the committed snapshot and exits 1 when there is one. `--update` writes the snapshot, and refuses a removed or changed export unless `--breaking` is given, which records every such difference in `api/breaking.txt` for the release to read, or `--break=<key>` (the key as the refusal prints it, `<package> [<entry>] <name>`, repeatable), which records that one and still refuses any other. `--compatible` accepts a changed export that stays compatible (an optional member added, a type widened) and records nothing. A removal always needs `--breaking` or its `--break=`.
+// Without a flag it prints the difference from the committed snapshot and exits 1 when there is one. `--update` writes the snapshot, and refuses a removed or changed export unless `--breaking` is given, which records every such difference in `api/breaking.txt` for the release to read, or `--break=<key>` (the key as the refusal prints it, `<package> [<entry>] <name>`, repeatable), which records that one and still refuses any other. `--compatible` accepts a changed export that stays compatible (an optional member added, a type widened) and records nothing, except the ones named with `--break=` in the same run. A removal always needs `--breaking` or its `--break=`.
 // What the docs call internal (`INTERNAL`) is written apart, in `api/internal/<package>.txt`, and changes without any flag.
 export const SNAPSHOT_DIR = 'api'
 export const INTERNAL_DIR = `${SNAPSHOT_DIR}/internal`
@@ -423,14 +423,14 @@ export interface ApiChange {
   changed: string[]
 }
 
-// The `<package> [entry] name` keys a change breaks: a removal always, a changed export unless the author says it stays compatible.
-export function breakingKeys(path: string, { removed, changed }: ApiChange, compatible: boolean): string[] {
+// The `<package> [entry] name` keys a change breaks: a removal always, a changed export unless the author says it stays compatible, and one named with `--break=` even then, so one run breaks some changes and accepts the rest.
+export function breakingKeys(path: string, { removed, changed }: ApiChange, compatible: boolean, named: string[] = []): string[] {
   if (isInternalPath(path))
     return []
 
   const name = path.slice(SNAPSHOT_DIR.length + 1, -'.txt'.length)
 
-  return [...removed, ...(compatible ? [] : changed)].map(key => `${name} ${key}`)
+  return [...removed, ...changed.filter(key => !compatible || named.includes(`${name} ${key}`))].map(key => `${name} ${key}`)
 }
 
 export function compare(committed: string, current: string): ApiChange {
@@ -496,7 +496,7 @@ if (import.meta.main) {
   for (const { path, change, before, after } of changesOf(root, current)) {
     const { added, removed, changed } = change
 
-    breaking.push(...breakingKeys(path, change, compatible))
+    breaking.push(...breakingKeys(path, change, compatible, named))
 
     for (const [label, keys] of [['added', added], ['removed', removed], ['changed', changed]] as const)
       report.push(...keys.map(key => [`${label} ${path} ${key}`, ...(label === 'changed' ? lineDiff(before.get(key)!, after.get(key)!).slice(0, 20) : [])].join('\n')))

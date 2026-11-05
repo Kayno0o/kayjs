@@ -1,10 +1,13 @@
 auth [.] CredentialRules
 auth [.] DEFAULT_RULES
 auth [.] EmailProblem
+auth [.] GuestSignInResult
 auth [.] PASSWORD_MAX_LENGTH
 auth [.] PASSWORD_MIN_LENGTH
 auth [.] PROFILE_MAX_LENGTH
 auth [.] PasswordProblem
+auth [.] RecoveryCodesResult
+auth [.] RegisterResult
 auth [.] ResolvedRules
 auth [.] USERNAME_MAX_LENGTH
 auth [.] USERNAME_MIN_LENGTH

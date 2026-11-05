@@ -32,6 +32,12 @@ it('counts a removal as breaking always and a change unless it is said to be com
   expect(breakingKeys('api/ai.txt', change, true)).toEqual(['ai [.] b'])
 })
 
+it('counts a change named with --break as breaking beside --compatible', () => {
+  const change = { added: [], removed: [], changed: ['[.] c', '[.] d'] }
+
+  expect(breakingKeys('api/ai.txt', change, true, ['ai [.] d'])).toEqual(['ai [.] d'])
+})
+
 it('never counts a change of an internal export as breaking', () => {
   expect(isInternalPath('api/internal/ui.txt')).toBe(true)
   expect(isInternalPath('api/ui.txt')).toBe(false)

@@ -155,15 +155,9 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => deprecatedCollectionLinks(root, options),
   async ({ root, options }) => hookNames(root, options),
   async ({ root, options }) => deprecatedLifetimes(root, options),
-  async ({ root, options }) => deprecatedAuthOptions(root, options),
->>>>>>> 751f32d (feat(auth)!: a switched-off feature answers off, a default-on feature is switched off with false)
-=======
   async ({ root, options }) => contextName(root, options),
   async ({ root, options }) => movedImports(root, options),
   async ({ root, options }) => deprecatedAuthOptions(root, options),
-=======
-  async ({ root, options }) => deprecatedAuthOptions(root, options),
->>>>>>> 751f32d (feat(auth)!: a switched-off feature answers off, a default-on feature is switched off with false)
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {
