@@ -113,6 +113,20 @@ describe('ai({ rateLimit })', () => {
     expect(fakeAi.asked).toHaveLength(2)
   })
 
+  it('tells the longest wait among the limits it is over', async () => {
+    ai({ rateLimit: [{ max: 1, window: '1m' }, { max: 1, window: '1h' }] })
+    await ask('a', { key: 'v' })
+
+    const refused = await failure(ask('b', { key: 'v' }))
+
+    expect(refused.retryAfter).toBeGreaterThan(60)
+    expect(refused.retryAfter).toBeLessThanOrEqual(3600)
+  })
+
+  it('refuses an empty list as it refuses a limit with no max', () => {
+    expect(() => ai({ rateLimit: [] })).toThrow('rateLimit')
+  })
+
   it('counts each visitor on its own', async () => {
     ai({ rateLimit: { max: 1, window: '1m' } })
     await ask('a', { key: 'one' })

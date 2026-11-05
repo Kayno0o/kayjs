@@ -118,6 +118,9 @@ function settingsOf({ rateLimit, budget, key }: AiOptions, memories: Map<string,
   const chosenLimit = rateLimit ?? (production ? DEFAULT_LIMIT : undefined)
   const chosenBudget = budget ?? (production ? DEFAULT_BUDGET : undefined)
 
+  if (Array.isArray(chosenLimit) && chosenLimit.length === 0)
+    throw configError('ai({ rateLimit })', chosenLimit, 'a limit, a list of at least one, or false')
+
   if (chosenLimit !== undefined && chosenLimit !== false) {
     settings.limit = [chosenLimit].flat().map((own, index) => {
       const what = Array.isArray(chosenLimit) ? `ai({ rateLimit })[${index}]` : 'ai({ rateLimit })'

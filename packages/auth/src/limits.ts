@@ -127,9 +127,19 @@ export async function forget(rates: AuthLimiters, key: string, limits: LimitSet)
     await rates(limit).reset(apart(key, index))
 }
 
-// The first limit counts under the key itself, the others under their place in the list.
+// The first limit counts under the key itself, the others under their place in the list, in front of it as no key of the library starts with `#`.
 function apart(key: string, index: number): string {
-  return index === 0 ? key : `${key}#${index}`
+  return index === 0 ? key : `#${index}:${key}`
+}
+
+// Whether the count under `key` has reached `max` in any limit of the bucket.
+export async function reached(rates: AuthLimiters, key: string, limits: LimitSet): Promise<boolean> {
+  for (const [index, limit] of limits.entries()) {
+    if (((await rates(limit).peek(apart(key, index)))?.count ?? 0) >= limit.max)
+      return true
+  }
+
+  return false
 }
 
 // A limit that only names a window in milliseconds, for a count nothing is refused by.

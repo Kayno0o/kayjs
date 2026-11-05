@@ -319,3 +319,33 @@ describe('rate limits', () => {
     expect(await attempt(limit.max + 1)).toEqual({ ok: false, error: 'limited' })
   })
 })
+
+describe('a list of limits in one bucket', () => {
+  const LIMITED = { ok: false, error: 'limited' } as const
+
+  test('the failures ceiling holds in every limit of signInAccountAll, so a right password in between does not escape a longer window', async () => {
+    const { ada } = await registered({ signInAccountAll: [{ max: 50, window: '15m' }, { max: 2, window: '1d' }] })
+    const signIn = async (password: string) => ada.post('/password', { identifier: 'ada@example.com', password })
+
+    expect(await signIn(WRONG)).not.toEqual(LIMITED)
+    expect(await signIn(PASSWORD)).not.toEqual(LIMITED)
+    expect(await signIn(WRONG)).not.toEqual(LIMITED)
+    expect(await signIn(PASSWORD)).toEqual(LIMITED)
+  })
+
+  test('a right password forgets the hard stop in every limit of signInAccount', async () => {
+    const { ada } = await registered({ signInAccount: [{ max: 6, window: '15m' }, { max: 2, window: '15m' }] })
+    const signIn = async (password: string) => ada.post('/password', { identifier: 'ada@example.com', password })
+
+    for (const password of [WRONG, PASSWORD, WRONG, PASSWORD])
+      expect(await signIn(password)).not.toEqual(LIMITED)
+  })
+
+  test('the second factor account cap refuses past any limit of the list', async () => {
+    const { visitor } = await pendingSignIn({ twoFactorAccount: [{ max: 50, window: '15m' }, { max: 2, window: '15m' }] })
+
+    expect(await visitor.call('twoFactor.verify', '000000')).toEqual({ ok: false, error: 'invalid' })
+    expect(await visitor.call('twoFactor.verify', '000000')).toEqual({ ok: false, error: 'invalid' })
+    expect(await visitor.call('twoFactor.verify', '000000')).toEqual(LIMITED)
+  })
+})

@@ -207,6 +207,29 @@ interface RenamedTypes {
   until: string
   // Whether the rename of an old name is safe to apply.
   safe: (old: string) => boolean
+  // Modules exporting the same thing under the same new name as a module of `modules`: a file already importing the new name from one of them has the old import dropped instead of renamed. The new name taken in the same module stays a report with no fix.
+  same?: Readonly<Record<string, readonly string[]>>
+}
+
+// Whether `name` is imported as itself from one of `modules`.
+function importedFrom(ast: Program, name: string, modules: readonly string[]): boolean {
+  return ast.body.some(statement => statement.type === 'ImportDeclaration' && modules.includes(statement.source.value) && statement.specifiers.some(specifier => specifier.type === 'ImportSpecifier' && importedName(specifier) === name && specifier.local.name === name))
+}
+
+// The edit removing one specifier of an import, or the whole import when it is the only one.
+function withoutSpecifier(statement: ImportDeclaration, specifier: ImportSpecifier, base: number, text: string): Edit {
+  const index = statement.specifiers.indexOf(specifier)
+
+  if (statement.specifiers.length === 1) {
+    const end = statement.end + (NEWLINE.exec(text.slice(statement.end))?.[0].length ?? 0)
+
+    return { start: base + statement.start, end: base + end, text: '' }
+  }
+
+  if (index < statement.specifiers.length - 1)
+    return { start: base + specifier.start, end: base + statement.specifiers[index + 1]!.start, text: '' }
+
+  return { start: base + statement.specifiers[index - 1]!.end, end: base + specifier.end, text: '' }
 }
 
 // A name imported from one of `config.modules` under an old name, as a type or a value import: the fix renames the import and every use of it.
@@ -216,7 +239,7 @@ async function renamedTypes(root: string, options: CheckOptions, config: Renamed
     return []
 
   return scan(root, options, config.lint, config.needle, ({ parsed, unparsed, report }) => {
-    for (const { ast, base } of parsed) {
+    for (const { ast, base, text } of parsed) {
       for (const statement of ast.body) {
         // A re-export keeps its public name: `export { context } from 'kay'` becomes `export { createContext as context } from 'kay'`.
         if (statement.type === 'ExportNamedDeclaration' && statement.source !== null && statement.source !== undefined && Object.hasOwn(config.modules, statement.source.value)) {
@@ -260,6 +283,14 @@ async function renamedTypes(root: string, options: CheckOptions, config: Renamed
             continue
           }
 
+          if (importedFrom(ast, next, config.same?.[statement.source.value] ?? []) && !new RegExp(`\\b${old}\\b`).test(unparsed)) {
+            const reads = uses(ast, old, next)
+
+            report(importEdit.start, importEdit.end, message, help, reads ? [withoutSpecifier(statement, specifier, base, text), ...reads.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))] : null, safe)
+
+            continue
+          }
+
           const edits = mentions(parsed.map(one => one.ast), next) || new RegExp(`\\b${old}\\b`).test(unparsed) ? undefined : uses(ast, old, next)
 
           report(importEdit.start, importEdit.end, message, help, edits ? [importEdit, ...edits.map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))] : null, safe)
@@ -297,7 +328,7 @@ const OLD_EXPORT = new RegExp(`\\b(?:${[...new Set(Object.values(EXPORT_NAMES).f
 
 // An export imported under the name it had before 1.90 (`EXPORT_NAMES`): the fix renames the import and every use of it.
 export async function exportNames(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-export-names', modules: EXPORT_NAMES, needle: OLD_EXPORT, since: '1.90', until: '1.93', safe: () => true })
+  return renamedTypes(root, options, { lint: 'deprecated-export-names', modules: EXPORT_NAMES, needle: OLD_EXPORT, since: '1.90', until: '1.93', safe: () => true, same: { 'kay/server': ['kay'] } })
 }
 
 const OLD_CONTEXT = /\bcontext\b/

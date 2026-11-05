@@ -4,7 +4,7 @@ import type { UserRecord } from './store'
 import { comparePasswords, hashPassword } from '@kaynooo/utils'
 import { afterResponse } from './events'
 import { randomToken } from './keys'
-import { counted, forget, spend, tally, windowOf } from './limits'
+import { forget, reached, spend, tally, windowOf } from './limits'
 import { notify } from './notify'
 
 // The counts one password guess is held to: a hard stop for this client on this account, and a looser ceiling for the account from every client together.
@@ -33,7 +33,7 @@ export async function startGuess(state: RequestState, record: UserRecord | undef
     return 'limited'
 
   // `pending` is every guess since the last right password, so a burst in parallel stops at the ceiling; `failures` is what the ceiling is spent on.
-  if (await spend(rates, pending, ceiling) || await counted(rates, failures, ceiling) >= ceiling[0].max) {
+  if (await spend(rates, pending, ceiling) || await reached(rates, failures, ceiling)) {
     if (record)
       await mailLockout(state, record)
 

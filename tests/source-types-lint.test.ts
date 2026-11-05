@@ -194,6 +194,22 @@ describe('deprecated-export-names', () => {
     }
   })
 
+  it('drops the old specifier when the new name is already imported from kay', async () => {
+    const root = await project({ 'src/other.ts': 'import type { RateLimit } from \'kay\'\nimport type { ApiRateLimit } from \'kay/server\'\n\nexport type All = [ApiRateLimit, RateLimit]\n', 'src/mixed.ts': 'import type { RateLimit } from \'kay\'\nimport type { ApiRateLimit, Limiter } from \'kay/server\'\n\nexport type All = [ApiRateLimit, RateLimit, Limiter]\n' })
+
+    try {
+      const found = await exportNames(root, {})
+
+      expect(found).toHaveLength(2)
+      await applySafeFixes(root, found)
+      expect(await read(root, 'src/mixed.ts')).toBe('import type { RateLimit } from \'kay\'\nimport type { Limiter } from \'kay/server\'\n\nexport type All = [RateLimit, RateLimit, Limiter]\n')
+      expect(await read(root, 'src/other.ts')).toBe('import type { RateLimit } from \'kay\'\n\nexport type All = [RateLimit, RateLimit]\n')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('renames the library types and functions by the module they come from', async () => {
     const files = {
       'src/_guard.ts': 'import { guard } from \'@kaynooo/kayjs-auth\'\n\nexport default guard({ redirect: \'/login\' })\n',
