@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.91.0
 
 - kayjs-ui and kayjs-auth depend on `@kaynooo/utils` 3.0.0, so kayjs-ui type-checks in an app that is on utils 3; an app still on utils 2 keeps it, as each package installs its own copy.
 - Every error kay and its libraries throw for an app to catch extends `KayError` (from `kay/library`) with `code`, `kind`, `status`, `cause` and `name`, its old class kept for `instanceof`, and `kay explain <code>` documents them in the new `runtime` and `library` groups: [Errors](errors.md). An uncaught `SaveConflictError` now answers 409 and an `UnknownCollectionError` 404, where both answered 500.
