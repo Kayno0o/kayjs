@@ -1,6 +1,7 @@
 import type { CheckDiagnostic } from '../check'
 import type { KayConfig, ProjectCheck, ProjectCheckContext } from '../config'
 import { join, resolve } from 'node:path'
+import { within } from '@kaynooo/utils/promise'
 import { CONFIG_FILE } from '../config'
 import { listRoutes } from './routes'
 
@@ -21,7 +22,6 @@ async function runCheck(root: string, check: ProjectCheck, name: string, timeout
   const found: CheckDiagnostic[] = []
   let closed = false
   const problem = (message: string, severity: 'error' | 'warning' = 'error', file = join(root, CONFIG_FILE), line = 1, column = 1, code?: string): CheckDiagnostic => ({ file, line, column, severity, message, code })
-  let timer: Timer | undefined
 
   try {
     if (typeof check !== 'function')
@@ -37,18 +37,14 @@ async function runCheck(root: string, check: ProjectCheck, name: string, timeout
         found.push(problem(finding.message, finding.level === 'warning' ? 'warning' : 'error', finding.file === undefined ? undefined : resolve(root, finding.file), finding.line, finding.column, finding.code))
       },
     }))()
-    const timedOut = new Promise<'timeout'>((resolve) => {
-      timer = setTimeout(resolve, timeout, 'timeout')
-    })
 
-    if (await Promise.race([finished, timedOut]) === 'timeout')
+    if (await within(finished, timeout, 'timeout' as const) === 'timeout')
       found.push(problem(`the check ${name} of ${CONFIG_FILE} did not finish within ${timeout / 1000} seconds`))
   }
   catch (error) {
     found.push(problem(`the check ${name} of ${CONFIG_FILE} threw: ${error instanceof Error ? error.message : String(error)}`))
   }
   finally {
-    clearTimeout(timer)
     closed = true
   }
 

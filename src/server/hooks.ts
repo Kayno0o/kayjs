@@ -1,4 +1,5 @@
 import type { ErrorShape } from '../runtime/api-error'
+import { within } from '@kaynooo/utils/promise'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { thrownRefusal } from '../runtime/refuse'
@@ -95,24 +96,14 @@ async function runHooks<E extends object>(source: string, hooks: readonly (Hook<
       continue
 
     const outcome = attempt(() => hook(told))
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const late = new Promise<'late'>((resolve) => {
-      timer = setTimeout(resolve, HOOK_TIMEOUT_MS, 'late')
-    })
+    const done = await within(outcome, HOOK_TIMEOUT_MS, 'late' as const)
 
-    try {
-      const done = await Promise.race([outcome, late])
-
-      if (done === 'late') {
-        await reportHookError(source, new Error(`${source} did not finish in ${HOOK_TIMEOUT_MS} ms, left running`), context.request)
-        trackDetached(reportLate(source, outcome, context))
-      }
-      else if (done.failed) {
-        await reportHookError(source, done.error, context.request)
-      }
+    if (done === 'late') {
+      await reportHookError(source, new Error(`${source} did not finish in ${HOOK_TIMEOUT_MS} ms, left running`), context.request)
+      trackDetached(reportLate(source, outcome, context))
     }
-    finally {
-      clearTimeout(timer)
+    else if (done.failed) {
+      await reportHookError(source, done.error, context.request)
     }
   }
 }

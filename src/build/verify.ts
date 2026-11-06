@@ -1,6 +1,7 @@
 import type { HealthConfig } from '../config'
 import { readdir, readlink } from 'node:fs/promises'
 import process from 'node:process'
+import { within } from '@kaynooo/utils/promise'
 import { KayError } from '../compiler/errors'
 import { healthTimeoutMs } from '../server/config-limits'
 import { HEALTH_PATH } from '../server/lifecycle'
@@ -97,13 +98,8 @@ export async function verifyExecutable(executable: string, root: string, health:
 
       live.add(probe)
 
-      let timer: ReturnType<typeof setTimeout> | undefined
-      const timeout = new Promise<'timeout'>((resolve) => {
-        timer = setTimeout(resolve, probeTimeoutMs, 'timeout')
-      })
-      const probed = await Promise.race([Promise.all([probe.exited, new Response(probe.stderr).text()]), timeout])
+      const probed = await within(Promise.all([probe.exited, new Response(probe.stderr).text()]), probeTimeoutMs, 'timeout' as const)
 
-      clearTimeout(timer)
       await stop(probe)
       live.delete(probe)
 
@@ -140,14 +136,9 @@ export async function loadExecutable(executable: string, root: string, options: 
   const child = Bun.spawn([executable, '--load'], { cwd: root, env: { ...process.env, NODE_ENV: 'production' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', detached: true })
   const printed = capture(child)
   const release = onInterrupt(new Set([child]))
-  let timer: ReturnType<typeof setTimeout> | undefined
 
   try {
-    const timeout = new Promise<'timeout'>((resolve) => {
-      timer = setTimeout(resolve, timeoutMs, 'timeout')
-    })
-
-    if (await Promise.race([child.exited, timeout]) === 'timeout') {
+    if (await within(child.exited, timeoutMs, 'timeout' as const) === 'timeout') {
       await stop(child)
 
       throw new KayError('executable-failed', `kay: the executable did not finish loading its modules within ${timeoutMs / 1000} s\n${tail(await printed.text())}`.trimEnd())
@@ -160,7 +151,6 @@ export async function loadExecutable(executable: string, root: string, options: 
     }
   }
   finally {
-    clearTimeout(timer)
     release()
     await stop(child)
     await printed.close()

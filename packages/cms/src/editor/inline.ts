@@ -3,6 +3,7 @@ import type { Field } from '../fields'
 import type { EntryRef, ScreenCollection } from '../kay/contract'
 import type { FieldMarker, FieldPath, MarkedField } from '../markers'
 import { announce } from '@kaynooo/kayjs-ui/announce'
+import { sleep } from '@kaynooo/utils/function'
 import { signal } from 'kay'
 import { wording } from 'kay/words'
 import { checkField, fieldsOf, itemAt } from '../fields'
@@ -306,7 +307,7 @@ function isSettled(marker: FieldMarker): boolean {
 // Waits for the entry's read to be over, loaded or failed, for fifty looks `every` ms apart (about five seconds), as long as `keepWaiting` says so.
 export async function untilSettled(marker: FieldMarker, keepWaiting: () => boolean = () => true, every = 100): Promise<void> {
   for (let tries = 0; tries < 50 && !isSettled(marker) && keepWaiting(); tries++)
-    await new Promise(resolve => setTimeout(resolve, every))
+    await sleep(every)
 }
 
 // The entries an upload into a list item is on its way for, in which no list changes meanwhile: the upload lands at the item's place, and a move or a removal would have it land in another.

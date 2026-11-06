@@ -1,5 +1,6 @@
 import type { Collection } from '../content'
 import type { ServedPage } from './render'
+import { within } from '@kaynooo/utils/promise'
 import { contentKey, PUBLISH_TIMES } from '../content'
 import { ALL_READS, onKeysInvalidated, refreshLocally } from '../runtime/cache'
 import { kayLog } from '../runtime/log'
@@ -151,12 +152,7 @@ export async function watchPublishing(collections: Collection<unknown>[]): Promi
   })
   let stopListening = listen()
 
-  let giveUp: ReturnType<typeof setTimeout> | undefined
-
-  await Promise.race([run(false), new Promise<void>((resolve) => {
-    giveUp = setTimeout(resolve, FIRST_READ_MS)
-  })])
-  clearTimeout(giveUp)
+  await within(run(false), FIRST_READ_MS)
 
   return {
     caughtUp: firstRead.promise,

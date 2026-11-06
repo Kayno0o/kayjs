@@ -62,6 +62,9 @@
     "packages/ai": {
       "name": "@kaynooo/kayjs-ai",
       "version": "1.91.0",
+      "dependencies": {
+        "@kaynooo/utils": "^3.0.0",
+      },
       "devDependencies": {
         "@kaynooo/eslint": "^7.1.4",
         "@kaynooo/kayjs-ui": "workspace:~",
@@ -105,6 +108,9 @@
     "packages/cms": {
       "name": "@kaynooo/kayjs-cms",
       "version": "1.91.0",
+      "dependencies": {
+        "@kaynooo/utils": "^3.0.0",
+      },
       "devDependencies": {
         "@happy-dom/global-registrator": "^21.0.4",
         "@kaynooo/eslint": "^7.1.4",
@@ -125,6 +131,7 @@
       "name": "@kaynooo/kayjs-mail",
       "version": "1.91.0",
       "dependencies": {
+        "@kaynooo/utils": "^3.0.0",
         "nodemailer": "^10.2.1",
       },
       "devDependencies": {

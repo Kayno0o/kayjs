@@ -2,6 +2,7 @@ import type { ConversationKey, StoredCall, StoredTurn } from './conversation-sto
 import type { ConversationAnswer } from './conversation-title'
 import type { ConversationCall } from './resume'
 import type { AiMessage, AiReply, AiToolCall, AskOptions, ProviderMessage } from './types'
+import { within } from '@kaynooo/utils/promise'
 import { logFrom } from 'kay'
 import { currentRequest, refundRateLimit } from 'kay/library'
 import { estimatedChars, toolChars } from './attachments'
@@ -157,16 +158,7 @@ async function written(key: string): Promise<void> {
   if (write === undefined)
     return
 
-  let timer: ReturnType<typeof setTimeout> | undefined
-
-  try {
-    await Promise.race([write, new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, WRITE_WAIT_MS)
-    })])
-  }
-  finally {
-    clearTimeout(timer)
-  }
+  await within(write, WRITE_WAIT_MS)
 }
 
 // Asks with the conversation the Chat posts to: its stored turns, less those a regenerate or an edit replaces, then the posted messages. Once the reply ends the posted messages and the reply are stored, before the reader is told it ended; a revision that moved since the Chat read it is refused with 409, nothing asked.
