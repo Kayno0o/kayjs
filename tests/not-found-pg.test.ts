@@ -80,6 +80,22 @@ pgDescribe('the 404 log in Postgres', () => {
     await store.close()
   })
 
+  pgIt('lists the most hit paths and referrers first by their count, 10 before 9', async () => {
+    const store = pgMissingStore(sql, false)
+
+    for (let index = 0; index < 9; index++)
+      store.hit('/nine', 'b.example', () => undefined)
+    for (let index = 0; index < 19; index++)
+      store.hit('/ten', index < 10 ? 'a.example' : 'b.example', () => undefined)
+
+    const listed = await store.list()
+
+    expect(listed.map(row => [row.path, row.hits])).toEqual([['/ten', 19], ['/nine', 9]])
+    expect(listed[0]!.referrers).toEqual([{ host: 'a.example', hits: 10 }, { host: 'b.example', hits: 9 }])
+    await store.clear()
+    await store.close()
+  })
+
   pgIt('keeps at most so many paths, forgetting the least hit', async () => {
     const store = pgMissingStore(sql, false)
 

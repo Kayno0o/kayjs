@@ -351,8 +351,8 @@ export function pgMissingStore(source: PgSource, closedByReload = true, readOnly
     },
     async list() {
       return reading([], async (connected) => {
-        const rows = await query<MissingRow>(connected, 'SELECT path, hits::text, first_at::text, last_at::text, target, reason FROM kay_missing ORDER BY hits DESC, last_at DESC')
-        const hosts = await query<{ path: string, host: string, hits: string }>(connected, 'SELECT path, host, hits::text FROM kay_missing_referrers ORDER BY hits DESC, host')
+        const rows = await query<MissingRow>(connected, 'SELECT path, hits::text, first_at::text, last_at::text, target, reason FROM kay_missing ORDER BY kay_missing.hits DESC, kay_missing.last_at DESC')
+        const hosts = await query<{ path: string, host: string, hits: string }>(connected, 'SELECT path, host, hits::text FROM kay_missing_referrers ORDER BY kay_missing_referrers.hits DESC, host')
         const byPath = new Map<string, MissingPath['referrers']>()
 
         for (const { path, host: key, hits } of hosts) {
