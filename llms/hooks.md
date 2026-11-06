@@ -30,7 +30,7 @@ A library's factory takes the hook keys in its options and runs them with the he
 
 ```ts
 import type { BeforeHook, Hook } from 'kay/library'
-import { decide, notify, refuse } from 'kay/library'
+import { decide, dispatch, refuse } from 'kay/library'
 
 interface NotesOptions {
   beforeSave?: BeforeHook<{ text: string }, { text: string }> | undefined
@@ -46,14 +46,14 @@ export function notes({ beforeSave, onSave }: NotesOptions) {
 
     const saved = { ...input, ...answer.change }
 
-    await notify('notes.onSave', [onSave], saved)
+    await dispatch('notes.onSave', [onSave], saved)
 
     return saved
   }
 }
 ```
 
-- `notify(source, hooks, event, { detached })` never rejects. `source` is `'<library>.<hook>'`, what `onError` receives. `undefined` entries are skipped, so options pass straight through. `detached: true` does not wait for the hooks.
+- `dispatch(source, hooks, event, { detached })` never rejects. `source` is `'<library>.<hook>'`, what `onError` receives. `undefined` entries are skipped, so options pass straight through. `detached: true` does not wait for the hooks.
 - `decide(source, hooks, event)` answers `{ change }` or `{ refused }`, the refusal as `ErrorShape`. A `false` is `{ status: 403, message: 'Refused' }`, a throw other than a refusal (`refuse()` or any error carrying `Symbol.for('kay.refused')`) is reported and answers 500.
 - Throw the refusal on with `refuse()`, or as the transition's own error where the library has one: `refused.status`, `.message`, `.errors`, `.data` and `.retryAfter` carry what to answer.
 
@@ -61,7 +61,7 @@ export function notes({ beforeSave, onSave }: NotesOptions) {
 
 ### What ships
 
-This release ships the helpers (`notify()`, `decide()`, `hookContext()`, `HookContext`, `Hook`, `BeforeHook`), `refuse()` and `ErrorShape` (from `kay` too), and `source` on `observe.onError` of `kay.config.ts`. The hooks that exist today keep their names (`onAuthEvent`, kayjs-ai's `onRequest` and `onFinish`, kayjs-ui's `onSaved`); queues, workflows and schedules already follow the rule (`onStart`, `onSuccess`, `onRetry`, `onError`). Later releases rename them to the rule and list each rename in [Upgrading](upgrading.md) with a `kay upgrade` fix. New hooks follow the rule from the start.\n
+This release ships the helpers (`dispatch()`, `decide()`, `hookContext()`, `HookContext`, `Hook`, `BeforeHook`), `refuse()` and `ErrorShape` (from `kay` too), and `source` on `observe.onError` of `kay.config.ts`. `dispatch()` was `notify()` before 1.92, which now names only the inbox of `kay/server`. The hooks that exist today keep their names (`onAuthEvent`, kayjs-ai's `onRequest` and `onFinish`, kayjs-ui's `onSaved`); queues, workflows and schedules already follow the rule (`onStart`, `onSuccess`, `onRetry`, `onError`). Later releases rename them to the rule and list each rename in [Upgrading](upgrading.md) with a `kay upgrade` fix. New hooks follow the rule from the start.\n
 ### The rule
 
 - `onX` runs after X happened and only observes: what it returns is ignored. X is the verb of the transition in its base form, as the DOM names events: `onSave`, `onSend`, `onDelete`, `onSubscribe`. Never a participle (`onSaved`, `onSent`, `onFailed`).
@@ -75,7 +75,7 @@ This release ships the helpers (`notify()`, `decide()`, `hookContext()`, `HookCo
 
 ### Errors in `onX`
 
-An `onX` hook run by `notify()` is awaited for up to 10 s, then left running. A throw, or a hook that finishes late, is logged and handed to the app's `onError({ error, request, source })` with `source` naming the hook (`'cms.onSave'`); it never undoes or fails the transition. In the browser a hook that throws is logged and the transition goes on.
+An `onX` hook run by `dispatch()` is awaited for up to 10 s, then left running. A throw, or a hook that finishes late, is logged and handed to the app's `onError({ error, request, source })` with `source` naming the hook (`'cms.onSave'`); it never undoes or fails the transition. In the browser a hook that throws is logged and the transition goes on.
 
 `detached` hooks (streaming paths, timing-sensitive paths) run off the response's path: not awaited, the same logging.
 

@@ -26,7 +26,7 @@ export type Hook<E> = (event: E & { context: HookContext }) => unknown
 // A `beforeX` hook: nothing goes on unchanged, an object lays the fields it may change over the input, `false` refuses, and throwing `refuse()` refuses with a message.
 export type BeforeHook<E, Change> = (event: E & { context: HookContext }) => void | false | Partial<Change> | Promise<void | false | Partial<Change>>
 
-export interface NotifyOptions {
+export interface DispatchOptions {
   // Runs the hooks off the caller's path: not awaited, for a streaming answer or a timing-sensitive one.
   detached?: boolean | undefined
   // The context to hand the hooks, for a caller that built it already; read from the request being answered otherwise.
@@ -110,7 +110,7 @@ async function runHooks<E extends object>(source: string, hooks: readonly (Hook<
 
 // Tells the `onX` hooks of one transition, in order: each is awaited for up to 10 s, a throw or a late finish is logged and handed to the app's `onError` with `source`, and the next hook still runs.
 // Never rejects.
-export async function notify<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E, { detached = false, context }: NotifyOptions = {}): Promise<void> {
+export async function dispatch<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E, { detached = false, context }: DispatchOptions = {}): Promise<void> {
   if (!hooks.some(hook => hook !== undefined))
     return
 

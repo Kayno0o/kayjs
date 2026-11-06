@@ -7,8 +7,8 @@ import { durationSeconds } from 'kay/library'
 import { siteBase, underResource } from './authorize/resource'
 import { banned, TOUCH_EVERY_MS } from './core'
 import { digest, randomToken } from './keys'
-import { notify } from './notify'
 import { reprove } from './proof'
+import { securityNotice } from './securityNotice'
 import { plainName } from './text'
 
 const LABEL_MAX_LENGTH = 64
@@ -114,7 +114,7 @@ export async function createToken(state: RequestState, proof: Proof, label: stri
   const token = newToken()
   const id = await storeToken(state.core, proved.record.id, name, options, token)
 
-  await notify(state, proved.record, 'token-created', name)
+  await securityNotice(state, proved.record, 'token-created', name)
 
   return { ok: true, token, id }
 }

@@ -8,9 +8,9 @@ import { newPasswordProblem } from './breached'
 import { publicUser } from './core'
 import { eraseLeavingUser, soleOwned } from './erase'
 import { validLocale } from './locale'
-import { notify } from './notify'
 import { reprove } from './proof'
 import { normalizeUsername, usernameProblem } from './rules'
+import { securityNotice } from './securityNotice'
 import { endOtherSessions } from './sessions'
 import { hasWayIn, putBack } from './wayIn'
 
@@ -38,7 +38,7 @@ export async function changePassword(state: RequestState, proof: Proof, password
   if (updated) {
     // Links mailed before, a reset among them, no longer outrank the password just set.
     await state.core.store.tokens.erase(updated.id)
-    await notify(state, updated, 'password-changed')
+    await securityNotice(state, updated, 'password-changed')
   }
 
   return { ok: true }
@@ -138,7 +138,7 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
 
   await (await import('./oauth/flow')).revokeUpstream(state.core, identity)
   await endOtherSessions(state, record)
-  await notify(state, record, 'provider-unlinked', provider)
+  await securityNotice(state, record, 'provider-unlinked', provider)
 
   return { ok: true }
 }

@@ -33,12 +33,12 @@ import { PasswordMethods } from './methods/password'
 import { SessionMethods } from './methods/sessions'
 import { TokenMethods } from './methods/tokens'
 import { TwoFactorMethods } from './methods/twoFactor'
-import { noteSignIn, notify } from './notify'
 import { featuresOf } from './pages'
 import { completeSignIn, provedLately, reprove } from './proof'
 import { pruneWhenDue } from './prune'
 import { sendToEnrolment } from './requiredTwoFactor'
 import { roleHierarchy } from './roles'
+import { noteSignIn, securityNotice } from './securityNotice'
 import { applyLifetime, chooseRemember, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { registerViewer } from './viewer'
 
@@ -424,7 +424,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     // A device token is a session too, and one minted from a stolen session would outlive it.
     await revokeBearerTokens(this.core, record.id)
 
-    await notify(this[STATE], record, 'signed-out-everywhere', options.keepThisOne ? 'this-one-kept' : undefined)
+    await securityNotice(this[STATE], record, 'signed-out-everywhere', options.keepThisOne ? 'this-one-kept' : undefined)
 
     if (updated && options.keepThisOne)
       await this[STATE].renew(updated)

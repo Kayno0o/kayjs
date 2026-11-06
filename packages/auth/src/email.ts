@@ -16,9 +16,9 @@ import { digest, randomToken } from './keys'
 import { spend, typedKey, windowOf } from './limits'
 import { log } from './log'
 import { sendAside, writing } from './mail'
-import { notify } from './notify'
 import { reprove } from './proof'
 import { emailProblem, normalizeEmail } from './rules'
+import { securityNotice } from './securityNotice'
 import { endOtherSessions, removeIdentities, revokeBearerTokens } from './sessions'
 
 const CODE_LENGTH = 6
@@ -213,7 +213,7 @@ export async function resetPassword(state: RequestState, token: string, password
   // Recovering an account ends every way into it the user did not just prove, devices included.
   await store.tokens.erase(record.id)
   await revokeBearerTokens(state.core, record.id)
-  await notify(state, record, 'password-changed')
+  await securityNotice(state, record, 'password-changed')
 
   return state.complete(record, spent.token.redirect ?? homeOf(state.core), 'reset-password')
 }
@@ -281,7 +281,7 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
 
   await store.tokens.erase(record.id)
   // To the address the account left, which is the one a thief would want silent.
-  await notify(state, record, 'email-changed', record.email!, spent.record.emailVerifiedAt === null ? null : spent.record.email)
+  await securityNotice(state, record, 'email-changed', record.email!, spent.record.emailVerifiedAt === null ? null : spent.record.email)
 
   return { ok: true, redirect: homeOf(state.core) }
 }

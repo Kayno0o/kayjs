@@ -789,6 +789,15 @@ export const LINTS = {
     wrong: '--- server\nimport { context } from \'kay\'\n\nexport const Theme = context(\'light\')\n---\np x',
     right: '--- server\nimport { createContext } from \'kay\'\n\nexport const Theme = createContext(\'light\')\n---\np x',
   },
+  'deprecated-hook-dispatch': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.92',
+    site: true,
+    summary: 'An import of `notify` or `NotifyOptions` from `kay/library`, `dispatch` and `DispatchOptions` since 1.92: `notify` now names only the inbox of `kay/server`. The old names work until 1.95. Found in the TypeScript files and `.kay` fences of the project; the fix renames the import and every use of it. An aliased import is renamed without its uses, and a file where the new name is already taken, or the old one is declared again, exported or read in a template, is reported with no fix.',
+    wrong: '--- server\nimport { notify } from \'kay/library\'\n\nexport const tell = () => notify(\'app.onSave\', [], {})\n---\np x',
+    right: '--- server\nimport { dispatch } from \'kay/library\'\n\nexport const tell = () => dispatch(\'app.onSave\', [], {})\n---\np x',
+  },
   'deprecated-import-path': {
     level: 'warn',
     group: 'deprecated',

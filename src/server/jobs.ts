@@ -11,7 +11,7 @@ import { timeZone } from '../runtime/i18n'
 import { kayLog } from '../runtime/log'
 import { MAX_TIMER_MS } from './config-limits'
 import { onDrain, stopGraceMs, STOPPED } from './drain'
-import { notify } from './hooks'
+import { dispatch } from './hooks'
 import { defaultJobStore } from './queue'
 import { reportBackgroundError } from './report'
 
@@ -290,14 +290,14 @@ export function scheduledRun(label: string, slotMs: number, job: Job, options: S
       })
 
       begun = true
-      await notify('schedule.onStart', [options.onStart], { schedule: label, boot })
+      await dispatch('schedule.onStart', [options.onStart], { schedule: label, boot })
       began = performance.now()
       await Promise.race([job(controller.signal), limit])
       // The run is over: its timeout and stop grace must not fire while the hook is told.
       clearTimeout(timer)
       clearTimeout(grace)
       countJobRun(label, 'ok')
-      await notify('schedule.onSuccess', [options.onSuccess], { schedule: label, boot, duration: Math.round(performance.now() - began) })
+      await dispatch('schedule.onSuccess', [options.onSuccess], { schedule: label, boot, duration: Math.round(performance.now() - began) })
     }
     catch (error) {
       // A run the stop cut short is no failure to report.
@@ -307,7 +307,7 @@ export function scheduledRun(label: string, slotMs: number, job: Job, options: S
 
         // A run that never began, its lock store failing say, has no start to match an error to.
         if (begun)
-          await notify('schedule.onError', [options.onError], { schedule: label, boot, duration: Math.round(performance.now() - began), error })
+          await dispatch('schedule.onError', [options.onError], { schedule: label, boot, duration: Math.round(performance.now() - began), error })
       }
     }
     finally {

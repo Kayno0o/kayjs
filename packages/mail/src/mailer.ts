@@ -14,7 +14,7 @@ import { splitList } from '@kaynooo/utils/text'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
 import { direction } from 'kay/i18n'
-import { checkOptionKeys, configError, escapeHtml as escape, inFlightWork, KayError, normalizeAddress, notify, underKayDev } from 'kay/library'
+import { checkOptionKeys, configError, dispatch, escapeHtml as escape, inFlightWork, KayError, normalizeAddress, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
@@ -695,7 +695,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     failed: (mail, error) => {
       log.error(`${described(mail)} to ${whom(recipientsOf(mail))} is given up after its last attempt`, error)
     },
-    told: async (hook, event) => notify(`mail.${hook}`, [({ onStart, onSuccess, onRetry, onError } as Record<typeof hook, Hook<QueueEvent> | undefined>)[hook]], event),
+    told: async (hook, event) => dispatch(`mail.${hook}`, [({ onStart, onSuccess, onRetry, onError } as Record<typeof hook, Hook<QueueEvent> | undefined>)[hook]], event),
   }
 
   agreeOnQueue(name, queueOptions.store, { attempts: queueOptions.attempts, backoff: queueOptions.backoff, failedTtl: queueOptions.failedTtl, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll, concurrency: queueOptions.concurrency }, owner)

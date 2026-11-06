@@ -5,6 +5,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ## 1.92.0
 
 ### The forms 1.88 deprecated are gone
+### `notify` and `NotifyOptions` of `kay/library` are `dispatch` and `DispatchOptions`
+
+`notify` names one thing, the inbox of `kay/server`; the helper a library runs its `onX` hooks with is `dispatch(source, hooks, event)` now. The old names work until 1.95, and `kay check` flags an import of them as `deprecated-hook-dispatch`, with a safe fix that `kay upgrade` applies.
 
 Their `deprecated-config-groups`, `deprecated-room-types` and `deprecated-duration-seconds` lints go with them: run `kay upgrade` on 1.91 first and it rewrites what it can; what `kay check` reported with no fix (a config with the bag already present or a spread, a `lifetime` or `durationWords` number that is no integer literal or is held in a variable) is changed by hand. On 1.92 a flat config key is refused as an unknown key naming its bag, and a bare number of seconds throws.
 

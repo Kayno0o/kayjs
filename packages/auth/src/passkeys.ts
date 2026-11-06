@@ -12,8 +12,8 @@ import { readDevice } from './device'
 import { report } from './events'
 import { secondFactorLimited } from './guesses'
 import { forget, spend, windowOf } from './limits'
-import { notify } from './notify'
 import { reprove } from './proof'
+import { securityNotice } from './securityNotice'
 import { endOtherSessions } from './sessions'
 import { plainName } from './text'
 import { hasWayIn, putBack } from './wayIn'
@@ -124,7 +124,7 @@ export async function registerPasskey(state: RequestState, response: Registratio
   }
 
   await core.store.passkeys.create(passkey)
-  await notify(state, record, 'passkey-added', passkey.name)
+  await securityNotice(state, record, 'passkey-added', passkey.name)
 
   return { ok: true, passkey: publicPasskey(passkey) }
 }
@@ -189,7 +189,7 @@ export async function removePasskey(state: RequestState, id: string, proof: Proo
   }
 
   await endOtherSessions(state, record)
-  await notify(state, record, 'passkey-removed', passkey.name)
+  await securityNotice(state, record, 'passkey-removed', passkey.name)
 
   return { ok: true }
 }

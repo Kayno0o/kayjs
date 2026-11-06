@@ -2,6 +2,7 @@ import type { Action, ActionStream, Failure, Signal } from 'kay'
 import type { Attachments } from './chat-attachments'
 import type { ConversationAnswer, ConversationSummary } from './conversation-title'
 import type { AiMessage, AiToolCall, ChatFailure, ChatMessage, ChatTurn, CodeBlock, Progress, Source } from './types'
+import { safely } from '@kaynooo/kayjs-ui/lib/safely'
 import { ActionError, effect, onMount, signal, untrack } from 'kay'
 import { markdownReady } from 'kay/markdown'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, restored, shrunk, stored } from './chat-history'
@@ -118,31 +119,6 @@ interface Replacement {
 }
 
 const MAX_RETRIES = 5
-
-async function logged(pending: Promise<unknown>): Promise<void> {
-  try {
-    await pending
-  }
-  catch (error) {
-    console.error(error)
-  }
-}
-
-// Tells the app, which a throw of its own, or a rejection of its promise, must not break the chat for.
-function notify<Args extends unknown[]>(listener: ((...args: Args) => unknown) | undefined, ...args: Args): void {
-  if (listener === undefined)
-    return
-
-  try {
-    const result = listener(...args)
-
-    if (result instanceof Promise)
-      void logged(result)
-  }
-  catch (error) {
-    console.error(error)
-  }
-}
 
 // The turns of a Chat and the reply under way, which is idle, waiting (the call is out, no word yet), streaming, then ended, when what arrived joins the history. Every transition is here, apart from the DOM: the component draws it and wires its events.
 export function createChatSession(options: ChatSessionOptions) {
@@ -369,7 +345,7 @@ export function createChatSession(options: ChatSessionOptions) {
         continue
 
       told.set(call.id, call.status)
-      notify(options.onToolCall, call)
+      safely(() => options.onToolCall?.(call), 'kayjs-ai: a Chat onToolCall')
       said.push({ id: nextId++, text: options.say(call) })
     }
 
@@ -494,9 +470,9 @@ export function createChatSession(options: ChatSessionOptions) {
       takeBack()
 
     if (state === 'failed')
-      notify(options.onError, { message: options.errorMessage, status: undefined })
+      safely(() => options.onError?.({ message: options.errorMessage, status: undefined }), 'kayjs-ai: a Chat onError')
     else if (state === 'done' && added !== undefined)
-      notify(options.onReply, added)
+      safely(() => options.onReply?.(added), 'kayjs-ai: a Chat onReply')
   }
 
   // Posts the history; a 413 halves what is posted, at most 5 times a send since each counts against the action's rate limit, until the action takes it or only the last message is left.
@@ -572,7 +548,7 @@ export function createChatSession(options: ChatSessionOptions) {
     waiting.set(true)
 
     if (resuming === undefined)
-      notify(options.onSend, { messages: posted(history(), held ? 1 : options.keep, Math.min(options.maxChars, learned)) })
+      safely(() => options.onSend?.({ messages: posted(history(), held ? 1 : options.keep, Math.min(options.maxChars, learned)) }), 'kayjs-ai: a Chat onSend')
 
     try {
       // A turn that only called tools has no text to post, which a provider refuses.
@@ -614,7 +590,7 @@ export function createChatSession(options: ChatSessionOptions) {
         const refusal = error instanceof ActionError && error.status < 500 ? error.errors[''] : undefined
 
         failure.set(refusal !== undefined && refusal !== '' ? refusal : options.errorMessage)
-        notify(options.onError, { message: failure() ?? options.errorMessage, status: error instanceof ActionError ? error.status : undefined, error })
+        safely(() => options.onError?.({ message: failure() ?? options.errorMessage, status: error instanceof ActionError ? error.status : undefined, error }), 'kayjs-ai: a Chat onError')
       }
     }
     finally {
@@ -639,7 +615,7 @@ export function createChatSession(options: ChatSessionOptions) {
   // The visitor's Stop, which the app hears of; the chat ends a reply the same way when it leaves the conversation.
   function stopped() {
     if (busy())
-      notify(options.onStop)
+      safely(() => options.onStop?.(), 'kayjs-ai: a Chat onStop')
 
     stop()
   }
@@ -799,7 +775,7 @@ export function createChatSession(options: ChatSessionOptions) {
       if (busy())
         return
 
-      notify(options.onRegenerate)
+      safely(() => options.onRegenerate?.(), 'kayjs-ai: a Chat onRegenerate')
       replacement = { header: 'regenerate:2', before: history() }
       history.set(history().slice(0, -1))
       void post(true)
@@ -824,7 +800,7 @@ export function createChatSession(options: ChatSessionOptions) {
 
       // The edit field is gone, and the edit button too while the reply is under way.
       options.focus()
-      notify(options.onEdit, content)
+      safely(() => options.onEdit?.(content), 'kayjs-ai: a Chat onEdit')
       replacement = { header: `edit:${turns.length - index}`, before: turns }
       history.set([...turns.slice(0, index), { id: nextId++, role: 'user', content, ...files.length > 0 && { attachments: files } }])
       void post(true)

@@ -12,6 +12,7 @@ import Icon from './icon.kay'
 import { pickedLabels, pickedShown, selectionSummary, toggledValue } from './multi-select'
 import Popover from './popover.kay'
 import { wording } from 'kay/words'
+import { safely } from './safely'
 import { labelText } from './label-text'
 
 // The checkbox's own ring is too small to find, so the row the keyboard stands on takes the menu's tint and accent bar; forced colours paint the transparent outline instead.
@@ -163,15 +164,6 @@ const status = () => {
   return shown().length === 0 ? emptyLabel : ''
 }
 
-// An app's callback that throws is logged, not taken for a failed load.
-function notify(call: () => unknown) {
-  try {
-    call()
-  }
-  catch (error) {
-    console.error('kayjs-ui: a MultiSelect callback threw', error)
-  }
-}
 
 // Only the latest question lands: an answer arriving after a newer key press is dropped.
 async function load(text: string) {
@@ -194,7 +186,7 @@ async function load(text: string) {
     seen = [...seen().filter(option => !answer.some(entry => entry.value === option.value)), ...answer]
     answered = text
     failed = false
-    notify(() => onLoad?.(answer, text))
+    safely(() => onLoad?.(answer, text), 'kayjs-ui: a MultiSelect onLoad')
   }
   catch (error) {
     if (mine === request) {
@@ -202,7 +194,7 @@ async function load(text: string) {
       found = []
       answered = text
       failed = true
-      notify(() => onError?.({ error, query: text }))
+      safely(() => onError?.({ error, query: text }), 'kayjs-ui: a MultiSelect onError')
     }
   }
 }

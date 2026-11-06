@@ -1,4 +1,5 @@
 import { effect, memo, signal, untrack } from 'kay'
+import { safely } from './safely'
 
 // What a Table or a VirtualList draws its rows from: the rows, a function returning them or a promise of them.
 export type RowsSource<Row> = Row[] | (() => Row[] | Promise<Row[]>) | Promise<Row[]>
@@ -19,16 +20,6 @@ export interface AsyncRows<Row> {
   retryable: () => boolean
   // Calls the function again.
   retry: () => void
-}
-
-// An app's callback that throws is logged, not taken for a failed load.
-function notify(call: () => unknown) {
-  try {
-    untrack(call)
-  }
-  catch (error) {
-    console.error('kayjs-ui: a rows callback threw', error)
-  }
 }
 
 const NONE: never[] = []
@@ -103,7 +94,7 @@ export function asyncRows<Row>(given: () => RowsSource<Row> | undefined, hooks: 
     if (Array.isArray(answer)) {
       loaded.set(answer)
       loading.set(false)
-      notify(() => hooks.onLoad?.(answer))
+      safely(() => untrack(() => hooks.onLoad?.(answer)), 'kayjs-ui: a rows onLoad')
 
       return
     }
@@ -118,7 +109,7 @@ export function asyncRows<Row>(given: () => RowsSource<Row> | undefined, hooks: 
 
       loaded.set(rows)
       loading.set(false)
-      notify(() => hooks.onLoad?.(rows))
+      safely(() => untrack(() => hooks.onLoad?.(rows)), 'kayjs-ui: a rows onLoad')
     }
     catch (error) {
       if (mine !== request)
@@ -127,7 +118,7 @@ export function asyncRows<Row>(given: () => RowsSource<Row> | undefined, hooks: 
       console.error('kayjs-ui: a rows source could not load', error)
       loading.set(false)
       failed.set(true)
-      notify(() => hooks.onError?.({ error }))
+      safely(() => untrack(() => hooks.onError?.({ error })), 'kayjs-ui: a rows onError')
     }
   }
 

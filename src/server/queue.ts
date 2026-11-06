@@ -17,7 +17,7 @@ import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { MAX_TIMER_MS } from './config-limits'
 import { stopGraceMs, STOPPED } from './drain'
-import { notify } from './hooks'
+import { dispatch } from './hooks'
 import { inMemory } from './memory-mark'
 import { forgetShownJobs, showJobs } from './queue-live'
 import { forgetDrain, inFlightWork, POLL_MS, Scheduler } from './queue-scheduler'
@@ -657,7 +657,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
     if (read === undefined)
       return
 
-    await notify(`${kind}.onError`, [options.onError], { id: job.id, payload: read.payload, attempts, error })
+    await dispatch(`${kind}.onError`, [options.onError], { id: job.id, payload: read.payload, attempts, error })
   }
 
   // The payload a failed job keeps, undefined to keep it whole.
@@ -811,7 +811,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
     const started = options.onStart === undefined ? undefined : payloadFor(job)
 
     if (started !== undefined)
-      await notify(`${kind}.onStart`, [options.onStart], { id: job.id, payload: started.payload, attempts: job.attempts })
+      await dispatch(`${kind}.onStart`, [options.onStart], { id: job.id, payload: started.payload, attempts: job.attempts })
 
     let succeeded = false
     // A handler may lower its own `attempts`: a workflow that kept a step starts its count again.
@@ -871,7 +871,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
           const read = options.onRetry === undefined ? undefined : payloadFor(job)
 
           if (read !== undefined)
-            await notify(`${kind}.onRetry`, [options.onRetry], { id: job.id, payload: read.payload, attempts: context.attempts, error, wait })
+            await dispatch(`${kind}.onRetry`, [options.onRetry], { id: job.id, payload: read.payload, attempts: context.attempts, error, wait })
         }
 
         return true
@@ -912,7 +912,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
       const read = options.onSuccess === undefined ? undefined : payloadFor(job)
 
       if (read !== undefined)
-        await notify(`${kind}.onSuccess`, [options.onSuccess], { id: job.id, payload: read.payload, attempts: context.attempts })
+        await dispatch(`${kind}.onSuccess`, [options.onSuccess], { id: job.id, payload: read.payload, attempts: context.attempts })
     }
 
     return true

@@ -4,7 +4,7 @@ import { notifications } from 'kay/server'
 import { linkedUser } from './core'
 import { reportFrom } from './events'
 import { log } from './log'
-import { mailNotice, notify } from './notify'
+import { mailNotice, securityNotice } from './securityNotice'
 
 type Core = RequestState['core']
 
@@ -82,7 +82,7 @@ export async function eraseLeavingUser(state: RequestState, record: UserRecord, 
         await store.invitations.delete(invitation.id)
     }
 
-    await notify(state, record, 'account-deleted', undefined, undefined, actor)
+    await securityNotice(state, record, 'account-deleted', undefined, undefined, actor)
   })
 }
 

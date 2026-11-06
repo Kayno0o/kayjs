@@ -296,6 +296,13 @@ export async function exportNames(root: string, options: CheckOptions): Promise<
   return renamedTypes(root, options, { lint: 'deprecated-export-names', modules: EXPORT_NAMES, needle: OLD_EXPORT, since: '1.90', until: '1.93', same: { 'kay/server': ['kay'] } })
 }
 
+const OLD_HOOK_HELPER = /\b(?:notify|NotifyOptions)\b/
+
+// `notify` and `NotifyOptions` imported from `kay/library`: `dispatch` and `DispatchOptions`, so `notify` names only the inbox of `kay/server`.
+export async function hookDispatch(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+  return renamedTypes(root, options, { lint: 'deprecated-hook-dispatch', modules: { 'kay/library': { notify: 'dispatch', NotifyOptions: 'DispatchOptions' } }, needle: OLD_HOOK_HELPER, since: '1.92', until: '1.95' })
+}
+
 const OLD_CONTEXT = /\bcontext\b/
 
 // `context` imported from `kay`: the `createContext` it was renamed to in 1.90, so it does not read as `ctx` or `defineContext`.

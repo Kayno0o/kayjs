@@ -45,7 +45,7 @@ import { movedImports } from './moved-imports'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
-import { contextName, exportNames } from './renamed-exports'
+import { contextName, exportNames, hookDispatch } from './renamed-exports'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { sizeLimits } from './size-limits'
 import { untypedSockets } from './socket-routes'
@@ -144,6 +144,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => libraryNames(root, options),
   async ({ root, options }) => pgLoaderSource(root, options),
   async ({ root, options }) => contextName(root, options),
+  async ({ root, options }) => hookDispatch(root, options),
   async ({ root, options }) => movedImports(root, options),
   async ({ root, options }) => deprecatedAuthOptions(root, options),
   async ({ root, options }) => deprecatedEscapeOption(root, options),

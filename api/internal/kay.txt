@@ -910,6 +910,14 @@ function defineContext<Loaders extends Record<string, (request: Request) => unkn
 function dismissMissing(path: string, file?: string | undefined): boolean
 function dismissMissing(paths: readonly string[], file?: string | undefined): number
 
+[./library] dispatch
+function dispatch<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E, { detached, context }?: DispatchOptions): Promise<void>
+
+[./library] DispatchOptions
+interface DispatchOptions
+  context?: HookContext | undefined
+  detached?: boolean | undefined
+
 [./library] drainQueues
 function drainQueues(): Promise<number>
 
@@ -1177,7 +1185,7 @@ function nameUser(request: Request, name: Namer): void
 function normalizeAddress(input: unknown): string | undefined
 
 [./library] notify
-function notify<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E, { detached, context }?: NotifyOptions): Promise<void>
+function notify<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E, { detached, context }?: DispatchOptions): Promise<void>
 
 [./library] NotifyOptions
 interface NotifyOptions

@@ -8,9 +8,9 @@ import { homeOf, linkedUser, newUserRecord, sameText } from '../core'
 import { report } from '../events'
 import { randomToken } from '../keys'
 import { log } from '../log'
-import { notify } from '../notify'
 import { reprove } from '../proof'
 import { normalizeEmail, normalizeUsername, usernameProblem } from '../rules'
+import { securityNotice } from '../securityNotice'
 import { chooseRemember } from '../sessions'
 import { mergedData } from '../userData'
 import { OAuthExchangeError } from './client'
@@ -171,7 +171,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
     const linked = await adoptEmail(core, current, profile)
 
     if (!identity)
-      await notify(state, current, 'provider-linked', provider)
+      await securityNotice(state, current, 'provider-linked', provider)
 
     await heardProfile(core, linked, profile)
 

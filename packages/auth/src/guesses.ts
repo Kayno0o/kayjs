@@ -5,7 +5,7 @@ import { comparePasswords, hashPassword } from '@kaynooo/utils'
 import { afterResponse } from './events'
 import { randomToken } from './keys'
 import { forget, reached, spend, tally, windowOf } from './limits'
-import { notify } from './notify'
+import { securityNotice } from './securityNotice'
 
 // The counts one password guess is held to: a hard stop for this client on this account, and a looser ceiling for the account from every client together.
 export interface Guess {
@@ -57,7 +57,7 @@ export async function forgive(state: RequestState, guess: Guess): Promise<void> 
 // Mails the holder that signing in is paused, at most once a day however often the lockout comes back, so guessing cannot flood their inbox.
 export async function mailLockout(state: RequestState, record: UserRecord): Promise<void> {
   if ((await state.core.rates(windowOf(86_400_000)).hit(`sign-in-locked-mail:${record.id}`)).count === 1)
-    await afterResponse('reporting a sign-in lockout', async () => notify(state, record, 'sign-in-locked'))
+    await afterResponse('reporting a sign-in lockout', async () => securityNotice(state, record, 'sign-in-locked'))
 }
 
 let decoy: Promise<string> | undefined

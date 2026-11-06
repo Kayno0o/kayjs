@@ -1,7 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { Locals } from '../runtime'
 import type { Hook, HookContext } from './hooks'
-import { decide, hookContext, notify } from './hooks'
+import { decide, dispatch, hookContext } from './hooks'
 import { answeringRequest, statusOf } from './log'
 import { stopMaintenance } from './maintenance'
 
@@ -74,7 +74,7 @@ export function hookRequests(app: Elysia, { beforeRequest, onResponse }: AppHook
 
       noted.delete(request)
 
-      await answeringRequest(request, async () => notify('onResponse', [onResponse], { request, url: new URL(request.url), locals: context as unknown as Locals, status: statusOf(responseValue, set), duration: started === undefined ? 0 : Math.round(performance.now() - started) }, { context: known }))
+      await answeringRequest(request, async () => dispatch('onResponse', [onResponse], { request, url: new URL(request.url), locals: context as unknown as Locals, status: statusOf(responseValue, set), duration: started === undefined ? 0 : Math.round(performance.now() - started) }, { context: known }))
     })
   }
 }
@@ -105,13 +105,13 @@ export function hookLifecycle(app: Elysia, { onStart, onStop }: AppHooks): void 
 
   if (onStart !== undefined) {
     app.onStart(async (root) => {
-      await notify('onStart', [onStart], { url: root.server?.url.href })
+      await dispatch('onStart', [onStart], { url: root.server?.url.href })
     })
   }
 
   if (onStop !== undefined) {
     app.onStop(async () => {
-      await notify('onStop', [onStop], {})
+      await dispatch('onStop', [onStop], {})
     })
   }
 }

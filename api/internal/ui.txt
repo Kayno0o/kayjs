@@ -2251,6 +2251,9 @@ function startRecording(options: RecordOptions): Promise<RecordProblem | Recordi
 [./lib/refill] sentOption
 function sentOption<Choice extends string | null | number, Held>(sent: string | undefined, options: readonly { value: Choice; }[], fallback: Held): Choice | Held
 
+[./lib/safely] safely
+function safely(call: () => unknown, label: string): void
+
 [./lib/settings] default
 const default: UiSettings
 

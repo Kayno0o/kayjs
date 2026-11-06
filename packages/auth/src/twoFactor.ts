@@ -7,8 +7,8 @@ import { report } from './events'
 import { secondFactorLimited } from './guesses'
 import { digest, totpContext } from './keys'
 import { forget, spend } from './limits'
-import { notify } from './notify'
 import { reprove } from './proof'
+import { securityNotice } from './securityNotice'
 import { endOtherSessions } from './sessions'
 import { generateTotpSecret, otpauthUri, totpCode, totpStep, verifyTotp } from './totp'
 
@@ -105,7 +105,7 @@ export async function enableTwoFactor(state: RequestState, code: string): Promis
   const updated = await endOtherSessions(state, record, { totpEnabledAt: new Date(), totpLastStep: step })
 
   if (updated)
-    await notify(state, updated, 'two-factor-enabled')
+    await securityNotice(state, updated, 'two-factor-enabled')
 
   return { ok: true, recoveryCodes: await issueRecoveryCodes(state.core, record.id) }
 }
@@ -144,7 +144,7 @@ export async function disableTwoFactor(state: RequestState, proof: Proof): Promi
 
   await state.core.store.recoveryCodes.replace(proved.record.id, [])
   await endOtherSessions(state, proved.record, { totpSecret: null, totpEnabledAt: null })
-  await notify(state, proved.record, 'two-factor-disabled')
+  await securityNotice(state, proved.record, 'two-factor-disabled')
 
   return { ok: true }
 }
@@ -164,7 +164,7 @@ export async function regenerateRecoveryCodes(state: RequestState, proof: Proof)
   const recoveryCodes = await issueRecoveryCodes(state.core, proved.record.id)
 
   await endOtherSessions(state, proved.record)
-  await notify(state, proved.record, 'recovery-codes-regenerated')
+  await securityNotice(state, proved.record, 'recovery-codes-regenerated')
 
   return { ok: true, recoveryCodes }
 }
@@ -183,7 +183,7 @@ export async function spendSecondFactor(state: RequestState, record: UserRecord,
   if (normalized.length !== RECOVERY_CODE_LENGTH || !(await core.store.recoveryCodes.consume(record.id, digest(normalized))))
     return undefined
 
-  await notify(state, record, 'recovery-code-used')
+  await securityNotice(state, record, 'recovery-code-used')
 
   return 'recovery'
 }

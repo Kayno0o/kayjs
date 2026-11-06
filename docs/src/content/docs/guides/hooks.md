@@ -73,4 +73,4 @@ The same names work in the browser. A hook that throws there is logged and the p
 
 ## Writing a library
 
-A library builds its hooks with `notify()` and `decide()` from `kay/library`, which give every hook the same order, timeout and error handling. `notify(source, hooks, event)` runs the `onX` hooks, and `decide(source, hooks, event)` runs the `beforeX` hooks and answers the change or the refusal.
+A library builds its hooks with `dispatch()` and `decide()` from `kay/library`, which give every hook the same order, timeout and error handling. `dispatch(source, hooks, event)` runs the `onX` hooks, and `decide(source, hooks, event)` runs the `beforeX` hooks and answers the change or the refusal.
