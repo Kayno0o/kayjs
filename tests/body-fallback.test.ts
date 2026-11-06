@@ -1,5 +1,5 @@
 import type { AnyElysia } from 'elysia'
-import type { KayExtension } from '../src/config'
+import type { KayConfig, KayExtension } from '../src/config'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
@@ -32,7 +32,7 @@ function plugin(): AnyElysia {
     .post('/auth/upload', reach('upload'))
 }
 
-async function app(options: { base?: string, trailingSlash?: 'always' | 'never', limits?: { body?: string, byPath?: Record<string, number | string> }, extension?: Partial<KayExtension> } = {}) {
+async function app(options: { base?: string, trailingSlash?: 'always' | 'never', limits?: KayConfig['limits'], extension?: Partial<KayExtension> } = {}) {
   const dir = await scratchDir('body-fallback-')
   const { extension, ...rest } = options
 
