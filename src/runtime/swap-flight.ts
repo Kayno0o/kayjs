@@ -1,5 +1,4 @@
 import type { FetchedPage, Intent, Swap } from './navigation'
-import { within } from '@kaynooo/utils/promise'
 
 // How a swap goes, read off its intent: the one place a swap decides it.
 export interface Policy {
@@ -65,7 +64,16 @@ export function policyOf(swap: Swap): Policy {
   return policy
 }
 
-// The work's result, or `LATE` once `ms` passed first.
+// The work's result, or `LATE` once `ms` passed first. Not utils' `within`: the page swap importing it would split it into a chunk of its own beside the entry (tests/build.test.ts).
 export async function bounded<T>(work: Promise<T>, ms: number): Promise<T | typeof LATE> {
-  return within(work, ms, LATE)
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    return await Promise.race([work, new Promise<typeof LATE>((resolve) => {
+      timer = setTimeout(resolve, ms, LATE)
+    })])
+  }
+  finally {
+    clearTimeout(timer)
+  }
 }
