@@ -1,10 +1,11 @@
-import type { MissingPath } from './not-found'
+import type { MissingPath, MissingStore, NotFoundHome } from './not-found'
 import { existsSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { isCrossSite } from './actions'
-import { appStore } from './app-store'
-import { answeredBy, missingStore, notFoundFile } from './not-found'
+import { appDatabase } from './app-database'
+import { answeredBy, notFoundHome, openMissing } from './not-found'
 import { addRedirect, checkRedirect } from './not-found-config'
+import { notFoundTablesExist } from './pg-not-found'
 
 const HEADER = 'x-kay-dev'
 
@@ -17,21 +18,32 @@ export interface DevNotFound {
   missing: MissingPath[]
 }
 
-export function devNotFound(root: string, redirects: string[]): DevNotFound {
-  const file = notFoundFile(appStore()?.database, root)
-  const shown = relative(root, file)
+const PG_TABLE = 'kay_missing'
 
-  if (!existsSync(file))
+// What the dev server opens: the log's SQLite file when it exists, or its Postgres tables when the database already holds them, as `kay dev` creates neither.
+async function recordedHome(root: string): Promise<{ home: NotFoundHome, shown: string } | { shown: string, home?: undefined }> {
+  const home = notFoundHome(appDatabase(), root)
+
+  if (home.kind === 'pg')
+    return await notFoundTablesExist(home.source) ? { home, shown: PG_TABLE } : { shown: PG_TABLE }
+
+  return existsSync(home.file) ? { home, shown: relative(root, home.file) } : { shown: relative(root, home.file) }
+}
+
+export async function devNotFound(root: string, redirects: string[]): Promise<DevNotFound> {
+  const { home, shown } = await recordedHome(root)
+
+  if (home === undefined)
     return { file: shown, recorded: false, missing: [] }
 
-  const store = missingStore(file, false)
+  const store = openMissing(home, false)
   const answered = answeredBy(redirects)
 
   try {
-    return { file: shown, recorded: true, missing: store.list().filter(row => !answered(row.path)) }
+    return { file: shown, recorded: true, missing: (await store.list()).filter(row => !answered(row.path)) }
   }
   finally {
-    store.close()
+    await store.close()
   }
 }
 
@@ -56,12 +68,12 @@ export async function devRedirect(root: string, request: Request, redirects: str
   if (typeof body.path !== 'string' || (body.to !== undefined && typeof body.to !== 'string'))
     return refused('path and to are texts')
 
-  const file = notFoundFile(appStore()?.database, root)
-  const store = existsSync(file) ? missingStore(file, false) : undefined
+  const { home } = await recordedHome(root)
+  const store: MissingStore | undefined = home === undefined ? undefined : openMissing(home, false)
 
   try {
     const redirect = body.path
-    const target = body.to ?? store?.list().find(row => row.path === redirect)?.target
+    const target = body.to ?? (await store?.list())?.find(row => row.path === redirect)?.target
 
     if (target === undefined)
       return refused(`${redirect} has no suggested target`)
@@ -71,7 +83,7 @@ export async function devRedirect(root: string, request: Request, redirects: str
     if (await addRedirect(join(root, 'kay.config.ts'), redirect, target) === 'by hand')
       return refused('kay.config.ts has no `redirects` object literal to add the redirect to: add it by hand')
 
-    store?.forget(redirect)
+    await store?.forget(redirect)
 
     return Response.json({ redirect: { from: redirect, to: target } })
   }
@@ -79,6 +91,6 @@ export async function devRedirect(root: string, request: Request, redirects: str
     return refused(error instanceof Error ? error.message : String(error))
   }
   finally {
-    store?.close()
+    await store?.close()
   }
 }

@@ -27,7 +27,7 @@ let restore: ReturnType<typeof registerCollections>
 let registered: Parameters<typeof registerCollections>[0]
 const original = contentPlace()
 
-const redirects = () => runtimeRedirects().filter(row => row.from.includes('rn-')).map(row => [row.from, row.to]).sort()
+const redirects = async () => (await runtimeRedirects()).filter(row => row.from.includes('rn-')).map(row => [row.from, row.to]).sort()
 
 beforeEach(async () => {
   dir = await scratchDir('rename-')
@@ -62,14 +62,14 @@ beforeEach(async () => {
   configure({ files: workingTree() })
 })
 
-afterEach(() => {
+afterEach(async () => {
   registerCollections(restore)
   setContentPlace(original.root, original.base)
   registerEditSite(undefined)
   knowRuntimeRules({ redirects: {} })
 
-  for (const row of redirects())
-    removeRuntimeRedirect(row[0]!)
+  for (const row of await redirects())
+    await removeRuntimeRedirect(row[0]!)
 })
 
 async function make(collectionName: string, slug: string, data: Record<string, unknown> = { title: slug }, locale?: string, body?: string) {
@@ -87,7 +87,7 @@ describe('renaming a folder entry', () => {
     expect(await Bun.file(join(dir, 'posts/first.md')).exists()).toBe(false)
     expect(await Bun.file(join(dir, 'posts/second.md')).text()).toContain('Hello.')
     expect(await entryOf({ collection: 'posts', slug: 'second' })).toMatchObject({ data: { title: 'First' } })
-    expect(redirects()).toEqual([['/rn-blog/first', '/rn-blog/second']])
+    expect(await redirects()).toEqual([['/rn-blog/first', '/rn-blog/second']])
     expect('version' in outcome && outcome.version).toBe(fileVersion(await Bun.file(join(dir, 'posts/second.md')).text()))
   })
 
@@ -98,7 +98,7 @@ describe('renaming a folder entry', () => {
     expect(await renameEntry({ collection: 'pages', slug: 'about', locale: 'en' }, 'about-us')).toMatchObject({ saved: true })
     expect(await Bun.file(join(dir, 'pages/en/about-us.md')).exists() || await Bun.file(join(dir, 'pages/en/about-us.json')).exists()).toBe(true)
     expect(await Bun.file(join(dir, 'pages/fr/a-propos.md')).exists() || await Bun.file(join(dir, 'pages/fr/a-propos.json')).exists()).toBe(true)
-    expect(redirects()).toEqual([['/en/rn-p/about', '/en/rn-p/about-us']])
+    expect(await redirects()).toEqual([['/en/rn-p/about', '/en/rn-p/about-us']])
   })
 
   test('takes the base off both pages, as the server routes know them', async () => {
@@ -107,7 +107,7 @@ describe('renaming a folder entry', () => {
     await make('posts', 'first')
     await renameEntry({ collection: 'posts', slug: 'first' }, 'second')
 
-    expect(redirects()).toEqual([['/rn-blog/first', '/rn-blog/second']])
+    expect(await redirects()).toEqual([['/rn-blog/first', '/rn-blog/second']])
   })
 
   test('refuses a taken slug, the same slug, a missing entry and a stale version, writing nothing', async () => {
@@ -121,7 +121,7 @@ describe('renaming a folder entry', () => {
     expect(await renameEntry({ collection: 'posts', slug: 'none' }, 'x')).toMatchObject({ issues: [{ key: 'slug' }] })
     expect(await renameEntry(ref, 'third', { version: 'stale' })).toMatchObject({ issues: expect.any(Array), conflict: { version: expect.any(String) } })
     expect(await Bun.file(join(dir, 'posts/first.md')).exists() || await Bun.file(join(dir, 'posts/first.json')).exists()).toBe(true)
-    expect(redirects()).toEqual([])
+    expect(await redirects()).toEqual([])
   })
 
   test('refuses a slug naming another place, and writes nothing outside the folder', async () => {
@@ -133,7 +133,7 @@ describe('renaming a folder entry', () => {
       expect(outcome, slug).toHaveProperty('issues')
     }
 
-    expect(redirects()).toEqual([])
+    expect(await redirects()).toEqual([])
     expect(await Bun.file(join(dir, 'escape.md')).exists()).toBe(false)
   })
 
@@ -142,7 +142,7 @@ describe('renaming a folder entry', () => {
 
     expect(await renameEntry({ collection: 'posts', slug: 'first' }, '%2e%2e')).toMatchObject({ saved: true })
     expect(await Bun.file(join(dir, 'posts/%2e%2e.json')).exists()).toBe(true)
-    expect(redirects().every(([, to]) => to!.startsWith('/'))).toBe(true)
+    expect((await redirects()).every(([, to]) => to!.startsWith('/'))).toBe(true)
   })
 
   test('does not count the entry\'s own unique value as taken by the old slug', async () => {
@@ -157,29 +157,29 @@ describe('renaming a folder entry', () => {
     await make('posts', 'first')
 
     expect(await renameEntry({ collection: 'posts', slug: 'first' }, 'second', { required: true })).toMatchObject({ issues: [{ message: expect.stringContaining('older than the server') }] })
-    expect(redirects()).toEqual([])
+    expect(await redirects()).toEqual([])
   })
 
   test('refuses a rename whose page no redirect can name, without losing the rename', async () => {
     await make('posts', 'first')
 
     expect(await renameEntry({ collection: 'posts', slug: 'first' }, '*')).toMatchObject({ saved: true })
-    expect(redirects()).toEqual([])
+    expect(await redirects()).toEqual([])
   })
 
   test('tells the caller the old address will not redirect when the set is full, the rename standing', async () => {
     await make('posts', 'first')
 
     for (let index = 0; index < 1000; index++)
-      addRuntimeRedirect(`/rn-full-${index}`, '/rn-target')
+      await addRuntimeRedirect(`/rn-full-${index}`, '/rn-target')
 
     try {
       expect(await renameEntry({ collection: 'posts', slug: 'first' }, 'second')).toMatchObject({ saved: true, slug: 'second', unredirected: { from: '/rn-blog/first', reason: expect.stringMatching(/1000/) } })
-      expect(redirects().filter(([from]) => from === '/rn-blog/first')).toEqual([])
+      expect((await redirects()).filter(([from]) => from === '/rn-blog/first')).toEqual([])
     }
     finally {
       for (let index = 0; index < 1000; index++)
-        removeRuntimeRedirect(`/rn-full-${index}`)
+        await removeRuntimeRedirect(`/rn-full-${index}`)
     }
   })
 
@@ -206,17 +206,17 @@ describe('renaming a folder entry', () => {
     await renameEntry({ collection: 'posts', slug: 'a' }, 'b')
     await renameEntry({ collection: 'posts', slug: 'b' }, 'c')
 
-    expect(redirects()).toEqual([['/rn-blog/a', '/rn-blog/c'], ['/rn-blog/b', '/rn-blog/c']])
+    expect(await redirects()).toEqual([['/rn-blog/a', '/rn-blog/c'], ['/rn-blog/b', '/rn-blog/c']])
   })
 
   test('an accented slug chains and goes back like any other', async () => {
     await make('posts', 'café')
     await renameEntry({ collection: 'posts', slug: 'café' }, 'thé')
     await renameEntry({ collection: 'posts', slug: 'thé' }, 'lait')
-    expect(redirects()).toEqual([['/rn-blog/caf%C3%A9', '/rn-blog/lait'], ['/rn-blog/th%C3%A9', '/rn-blog/lait']])
+    expect(await redirects()).toEqual([['/rn-blog/caf%C3%A9', '/rn-blog/lait'], ['/rn-blog/th%C3%A9', '/rn-blog/lait']])
 
     expect(await renameEntry({ collection: 'posts', slug: 'lait' }, 'café')).toMatchObject({ saved: true })
-    expect(redirects()).toEqual([['/rn-blog/lait', '/rn-blog/caf%C3%A9'], ['/rn-blog/th%C3%A9', '/rn-blog/caf%C3%A9']])
+    expect(await redirects()).toEqual([['/rn-blog/lait', '/rn-blog/caf%C3%A9'], ['/rn-blog/th%C3%A9', '/rn-blog/caf%C3%A9']])
   })
 
   test('a rename back to the old slug leaves no redirect loop', async () => {
@@ -224,7 +224,7 @@ describe('renaming a folder entry', () => {
     await renameEntry({ collection: 'posts', slug: 'a' }, 'b')
     expect(await renameEntry({ collection: 'posts', slug: 'b' }, 'a')).toMatchObject({ saved: true })
 
-    expect(redirects()).toEqual([['/rn-blog/b', '/rn-blog/a']])
+    expect(await redirects()).toEqual([['/rn-blog/b', '/rn-blog/a']])
   })
 
   test('tells onSave the rename with the slug it had', async () => {
@@ -253,7 +253,7 @@ describe('renaming a loaded entry', () => {
     expect((await revisionsOf({ collection: 'notes', slug: 'second' })).map(revision => [revision.at, revision.verb])).toEqual(before.map(revision => [revision.at, revision.verb]))
     expect(await revisionsOf({ collection: 'notes', slug: 'first' })).toEqual([])
     expect(await trashOf('notes')).toEqual([])
-    expect(redirects()).toEqual([['/rn-notes/first', '/rn-notes/second']])
+    expect(await redirects()).toEqual([['/rn-notes/first', '/rn-notes/second']])
   })
 
   test('a deletion after a rename trashes the entry under its new slug', async () => {
@@ -272,7 +272,7 @@ describe('renaming a loaded entry', () => {
     expect(await renameEntry({ collection: 'notes', slug: 'first' }, 'second')).toHaveProperty('issues')
     expect(await renameEntry({ collection: 'notes', slug: 'first' }, 'third', { version: 'stale' })).toHaveProperty('conflict')
     expect(await entryOf({ collection: 'notes', slug: 'first' })).toBeDefined()
-    expect(redirects()).toEqual([])
+    expect(await redirects()).toEqual([])
   })
 })
 
@@ -377,7 +377,7 @@ describe('renaming an entry other entries refer to', () => {
     expect(outcome).not.toHaveProperty('conflict')
     expect(await dataOf('authors', 'ada')).toBeDefined()
     expect(await dataOf('books', 'engine')).toMatchObject({ title: 'Edited', author: 'ada' })
-    expect(redirects()).toEqual([])
+    expect(await redirects()).toEqual([])
   })
 
   test('saves the entries one by one after the move for a saver that cannot commit them together', async () => {
@@ -430,7 +430,7 @@ describe('renaming an entry other entries refer to', () => {
       expect(outcome).toMatchObject({ issues: [{ key: 'slug', message: expect.stringContaining('Shelf') }] })
       expect(await dataOf('authors', 'ada')).toBeDefined()
       expect(await dataOf('authors', 'lovelace')).toBeUndefined()
-      expect(redirects()).toEqual([])
+      expect(await redirects()).toEqual([])
     }
     finally {
       registerCollections(registered)

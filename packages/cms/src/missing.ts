@@ -93,11 +93,11 @@ export function missingRows(paths: MissingPath[]): { rows: MissingRow[], total: 
 }
 
 // What the production server recorded, minus the paths a redirect answers; a store that cannot be read says so and logs why.
-export function readMissing(): MissingScreen {
+export async function readMissing(): Promise<MissingScreen> {
   try {
     return {
-      ...missingRows(unansweredPaths()),
-      added: runtimeRedirects().map(({ from, to, status, addedAt }: RuntimeRedirect) => ({ from, to, status, at: minute(addedAt) })),
+      ...missingRows(await unansweredPaths()),
+      added: (await runtimeRedirects()).map(({ from, to, status, addedAt }: RuntimeRedirect) => ({ from, to, status, at: minute(addedAt) })),
       configured: configuredRedirects(),
     }
   }
@@ -118,9 +118,9 @@ export function sitePathsLike(text: string): string[] {
 // Adds the redirect to the set the server reads while it runs, which forgets the path as missing; the reason it was refused, worded, or undefined once added.
 // A 307, which browsers do not keep, so the editor can still undo it; 308 is permanent, and 410 says the path is gone for good, with no target. A 301 or 302 stored before keeps its status when edited.
 // A path that has a redirect already takes the new target and status: that is how one is edited.
-export function addRedirect(from: string, to: string, status: RedirectStatus = 307): string | undefined {
+export async function addRedirect(from: string, to: string, status: RedirectStatus = 307): Promise<string | undefined> {
   try {
-    addRuntimeRedirect(from, to, { status })
+    await addRuntimeRedirect(from, to, { status })
 
     return undefined
   }
@@ -135,16 +135,23 @@ export function addRedirect(from: string, to: string, status: RedirectStatus = 3
 }
 
 // Removes the redirects, so their paths answer 404 again; how many there were.
-export function removeRedirects(froms: string[]): number {
-  return froms.filter(from => removeRuntimeRedirect(from)).length
+export async function removeRedirects(froms: string[]): Promise<number> {
+  let removed = 0
+
+  for (const from of froms) {
+    if (await removeRuntimeRedirect(from))
+      removed++
+  }
+
+  return removed
 }
 
 // Forgets the paths in the list, which come back if a visitor asks for them again; how many were listed.
-export function dismissPaths(paths: string[]): number {
+export async function dismissPaths(paths: string[]): Promise<number> {
   return dismissMissing(paths)
 }
 
 // Forgets every listed path; how many there were.
-export function clearPaths(): number {
+export async function clearPaths(): Promise<number> {
   return clearMissing()
 }

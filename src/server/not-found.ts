@@ -1,17 +1,23 @@
+import type { SQL } from 'bun'
 import type { Database } from 'bun:sqlite'
 import type { Elysia } from 'elysia'
 import type { TrailingSlash } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
-import type { RedirectSet } from './runtime-redirects'
+import type { MaybePromise } from '../runtime/store-base'
+import type { AppDatabase } from './app-database'
+import type { Pending } from './missing-hits'
+import type { LegacyRows } from './pg-not-found'
+import type { RedirectSet, SqliteRedirectSet } from './runtime-redirects'
 import { existsSync, renameSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { localePath, splitLocale } from '../runtime/i18n'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
-import { sqlitePath } from './app-database'
-import { appStore } from './app-store'
+import { appDatabase, sqlitePath } from './app-database'
 import { noteLocalFile } from './local-files'
 import { pathOf } from './log'
+import { FLUSH_MS, holdHit, HOUR_MS, MAX_AGE_MS, MAX_PATHS, MAX_PENDING, MAX_REFERRERS } from './missing-hits'
+import { importNotFoundRows, pgMissingStore } from './pg-not-found'
 import { onReload } from './reload'
 import { requestUrl } from './request-url'
 import { slashedPath, withoutSlash } from './routes'
@@ -30,13 +36,73 @@ export function notFoundFile(database: string | undefined, root = ''): string {
 
 const LEGACY_TABLES = ['kay_missing', 'kay_missing_referrers', 'kay_redirects'] as const
 
-// Moves the rows of a `data/not-found.sqlite` into the SQLite file the app's `store` names, once, and renames the old file to `data/not-found.sqlite.migrated`, so the store's file is the one used from then on. A file that cannot be moved stays in use, as before.
-export function adoptLocalNotFound(database: string | undefined, root = ''): void {
-  const shared = sqlitePath(database)
+// Where the 404 log and the redirects live: a SQLite file, or the Postgres database of the app's `store`.
+export type NotFoundHome = { kind: 'sqlite', file: string } | { kind: 'pg', source: SQL | string }
+
+// The home for an app's database: its Postgres, else `notFoundFile`'s answer.
+export function notFoundHome(database: AppDatabase | undefined, root = ''): NotFoundHome {
+  if (database?.kind === 'pg')
+    return { kind: 'pg', source: database.source }
+
   const local = join(root, NOT_FOUND_FILE)
 
-  if (shared === undefined || !existsSync(local))
+  return { kind: 'sqlite', file: database === undefined || existsSync(local) ? local : database.path }
+}
+
+function describeHome(home: NotFoundHome): string {
+  return home.kind === 'pg' ? 'the app\'s Postgres database' : home.file
+}
+
+export function openMissing(home: NotFoundHome, closedByReload = true): MissingStore {
+  return home.kind === 'pg' ? pgMissingStore(home.source, closedByReload) : missingStore(home.file, closedByReload)
+}
+
+// Reads what an old local log held, to move it into the Postgres store.
+function legacyRows(local: string): LegacyRows {
+  const db = openSqlite(local)
+
+  try {
+    const has = (table: string) => db.query('SELECT 1 FROM sqlite_master WHERE name = ?').get(table) !== null
+
+    return {
+      missing: has('kay_missing') ? db.query<LegacyRows['missing'][number], []>('SELECT path, hits, first_at, last_at, target, reason FROM kay_missing').all() : [],
+      referrers: has('kay_missing_referrers') ? db.query<LegacyRows['referrers'][number], []>('SELECT path, host, hits FROM kay_missing_referrers').all() : [],
+      redirects: has('kay_redirects') ? db.query<LegacyRows['redirects'][number], []>('SELECT path, target, status, pattern, added_at FROM kay_redirects').all() : [],
+    }
+  }
+  finally {
+    db.close()
+  }
+}
+
+function setAside(local: string): void {
+  for (const suffix of ['', '-wal', '-shm']) {
+    if (existsSync(`${local}${suffix}`))
+      renameSync(`${local}${suffix}`, `${local}.migrated${suffix}`)
+  }
+}
+
+// Moves the rows of a `data/not-found.sqlite` into the database the app's `store` names, SQLite file or Postgres, once, and renames the old file to `data/not-found.sqlite.migrated`, so the store's database is the one used from then on. A file that cannot be moved stays where it is, and a SQLite one stays in use.
+export async function adoptLocalNotFound(database: AppDatabase | undefined, root = ''): Promise<void> {
+  const local = join(root, NOT_FOUND_FILE)
+
+  if (database === undefined || !existsSync(local))
     return
+
+  if (database.kind === 'pg') {
+    try {
+      await importNotFoundRows(database.source, legacyRows(local))
+      setAside(local)
+      kayLog('info', `the paths visitors found nothing at and the redirects added while the site runs moved from ${local} into the app's Postgres database; the old file is kept as ${local}.migrated`)
+    }
+    catch (error) {
+      kayLog('warn', `${local} could not be moved into the app's Postgres database: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    return
+  }
+
+  const shared = database.path
 
   try {
     // Opening the log creates its tables in the store's file, the redirects' included.
@@ -63,10 +129,7 @@ export function adoptLocalNotFound(database: string | undefined, root = ''): voi
       db.close()
     }
 
-    for (const suffix of ['', '-wal', '-shm']) {
-      if (existsSync(`${local}${suffix}`))
-        renameSync(`${local}${suffix}`, `${local}.migrated${suffix}`)
-    }
+    setAside(local)
 
     kayLog('info', `the paths visitors found nothing at and the redirects added while the site runs moved from ${local} into ${shared}; the old file is kept as ${local}.migrated`)
   }
@@ -76,37 +139,26 @@ export function adoptLocalNotFound(database: string | undefined, root = ''): voi
 }
 
 // What production warns of when the log is a file of this machine, worded as the libraries' warnings are.
-function localNotFoundSentence(database: string | undefined, file: string): string {
-  if (sqlitePath(database) !== undefined)
+function localNotFoundSentence(database: AppDatabase | undefined, file: string): string {
+  if (database !== undefined)
     return `the paths visitors found nothing at, and the redirects added while the site runs, are kept in ${file}, which could not be moved into the app's store file: move its rows by hand, or delete ${file} once it holds nothing you need`
-
-  if (database !== undefined && database !== '')
-    return `the paths visitors found nothing at, and the redirects added while the site runs, are kept in ${file}, a SQLite file of this machine, as they do not use the app's Postgres store yet`
 
   return `the paths visitors found nothing at, and the redirects added while the site runs, are kept in ${file}, a SQLite file of this machine: set the app's \`store\` (\`sqliteData\`) in kay.config.ts for a file shared with the rest of the app`
 }
 
 // Whether the log goes to a file of the machine, which the app's `store` does not name.
-export function keepsNotFoundLocally(database: string | undefined, root = ''): boolean {
-  return notFoundFile(database, root) === join(root, NOT_FOUND_FILE)
+export function keepsNotFoundLocally(database: AppDatabase | undefined, root = ''): boolean {
+  const home = notFoundHome(database, root)
+
+  return home.kind === 'sqlite' && home.file === join(root, NOT_FOUND_FILE)
 }
 
-// Past this many distinct paths, the least hit and oldest is forgotten for a new one, so a flood of made-up paths never grows the file nor pushes out a path real visitors keep coming to.
-const MAX_PATHS = 1000
-const MAX_REFERRERS = 8
 const MAX_PATH_LENGTH = 512
 const MAX_HOST_LENGTH = 253
 // Fuzzy matching reads every known path, so only so many run a second.
 const FUZZY_PER_SECOND = 20
 const MAX_KNOWN = 5000
 const SECOND_MS = 1000
-const HOUR_MS = 3_600_000
-// Hits wait this long in memory, then reach the file in one transaction, so a flood of missing paths costs the event loop one write, not four per request.
-const FLUSH_MS = 1000
-// The most distinct paths held back, past which the next one writes them all at once.
-const MAX_PENDING = 256
-// A path nobody asked for in this long is dropped with its referrers, as a made-up path can hold a name or an address.
-const MAX_AGE_MS = 90 * 24 * HOUR_MS
 
 const CONTROL_CHARACTERS = /\p{Cc}/u
 const HTML_SUFFIX = /(?:\/index)?\.html?$/
@@ -138,25 +190,25 @@ export interface Suggestion {
   reason: Reason
 }
 
+// The log of missing paths and the redirects, in a SQLite file (answering at once) or in Postgres (by promises): `hit` counts in memory and never waits.
 export interface MissingStore {
   hit: (path: string, referrer: string | undefined, suggest: (path: string) => Suggestion | undefined) => void
-  list: () => MissingPath[]
+  list: () => MaybePromise<MissingPath[]>
   // Whether the path was listed.
-  forget: (path: string) => boolean
+  forget: (path: string) => MaybePromise<boolean>
   // Forgets every path, and says how many there were.
-  clear: () => number
-  // The redirects an editor added, which share the file.
+  clear: () => MaybePromise<number>
+  // The redirects an editor added, which share the database.
   redirects: RedirectSet
-  close: () => void
+  close: () => MaybePromise<void>
 }
 
-// What a store holds back of a path: its hits since the last write, when they came, and the hosts they came from.
-interface Pending {
-  hits: number
-  firstAt: number
-  lastAt: number
-  referrers: Map<string, number>
-  suggest: (path: string) => Suggestion | undefined
+export interface SqliteMissingStore extends MissingStore {
+  list: () => MissingPath[]
+  forget: (path: string) => boolean
+  clear: () => number
+  redirects: SqliteRedirectSet
+  close: () => void
 }
 
 // The writers of the stores open now, for the process to run as it exits and for a read of the file to run first.
@@ -384,7 +436,7 @@ function firstSegment(path: string): string {
 }
 
 // The store in a SQLite file, so a restart or a deploy keeps the counts and the command reading them needs no server.
-export function missingStore(path: string, closedByReload = true): MissingStore {
+export function missingStore(path: string, closedByReload = true): SqliteMissingStore {
   const db: Database = openSqlite(path)
 
   db.run('CREATE TABLE IF NOT EXISTS kay_missing (path TEXT PRIMARY KEY, hits INTEGER NOT NULL, first_at INTEGER NOT NULL, last_at INTEGER NOT NULL, target TEXT, reason TEXT)')
@@ -502,22 +554,7 @@ export function missingStore(path: string, closedByReload = true): MissingStore 
         throw error
       }
 
-      const now = Date.now()
-      const held = pending.get(path)
-
-      if (held) {
-        held.hits += 1
-        held.lastAt = now
-        held.suggest = suggest
-      }
-      else {
-        pending.set(path, { hits: 1, firstAt: now, lastAt: now, referrers: new Map(), suggest })
-      }
-
-      const hosts = pending.get(path)!.referrers
-
-      if (referrer !== undefined && (hosts.has(referrer) || hosts.size < MAX_REFERRERS))
-        hosts.set(referrer, (hosts.get(referrer) ?? 0) + 1)
+      holdHit(pending, path, referrer, suggest)
 
       if (pending.size >= MAX_PENDING) {
         flush()
@@ -577,34 +614,46 @@ export function pageRequested(request: Request): void {
   pageRequests.add(request)
 }
 
-// The store this process's server holds open, opened when `create` or the file exists: what a request for a missing path reads and counts in.
-export function sharedStore(file: string, create: boolean): MissingStore | undefined {
+// The store this process's server holds open, opened when `create` or its SQLite file exists (a Postgres store is always opened, its tables made by the first use): what a request for a missing path reads and counts in.
+export function sharedStore(home: NotFoundHome, create: boolean): MissingStore | undefined {
   if (current)
     return current
 
-  if (!create && file !== ':memory:' && !existsSync(file))
+  if (!create && home.kind === 'sqlite' && home.file !== ':memory:' && !existsSync(home.file))
     return undefined
 
-  current = missingStore(file)
+  current = openMissing(home)
 
   return current
 }
 
-// Closes the shared store after it failed, so the next request opens it again.
-export function dropStore(): void {
+async function closeQuietly(store: MissingStore): Promise<void> {
   try {
-    current?.close()
+    await store.close()
   }
   catch {
     // Closed already.
   }
-
-  current = undefined
 }
 
-// The file the server keeps its store in: memory under test.
-export function storeFile(file?: string): string {
-  return file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : notFoundFile(appStore()?.database))
+// Closes the shared store after it failed, so the next request opens it again.
+export function dropStore(): void {
+  const closing = current
+
+  current = undefined
+
+  if (closing)
+    void closeQuietly(closing)
+}
+
+// Where the server keeps its store: memory under test, unless the app's store is Postgres.
+export function storeHome(file?: string): NotFoundHome {
+  if (file !== undefined)
+    return { kind: 'sqlite', file }
+
+  const database = appDatabase()
+
+  return process.env.NODE_ENV === 'test' && database?.kind !== 'pg' ? { kind: 'sqlite', file: ':memory:' } : notFoundHome(database)
 }
 
 // The requests an editor's 410 answered, which are not counted again as a path nobody found.
@@ -619,8 +668,8 @@ export function isPageRequest(request: Request): boolean {
 }
 
 // The paths counted so far by this process's server, for the tests of the server.
-export function missingPaths(): MissingPath[] {
-  return current?.list() ?? []
+export async function missingPaths(): Promise<MissingPath[]> {
+  return await current?.list() ?? []
 }
 
 // Counts the pages a visitor asked for with a GET that answered 404, or 410 for an ended entry (an editor's redirect then wins over it), in production: the path without its query, the host of the referrer and, for a link on the site itself, its page, never an address, a query or a header.
@@ -628,13 +677,13 @@ export function missingPaths(): MissingPath[] {
 export function countMissing<App extends Elysia>(app: App, options: { known: () => Iterable<string>, settings?: LocaleSettings | undefined, trailingSlash?: TrailingSlash | undefined, file?: string | undefined }): App {
   let suggest: ReturnType<typeof suggester> | undefined
   let told = false
-  const file = storeFile(options.file)
+  const home = storeHome(options.file)
 
   if (options.file === undefined && process.env.NODE_ENV !== 'test') {
-    const database = appStore()?.database
+    const database = appDatabase()
 
     if (keepsNotFoundLocally(database))
-      noteLocalFile('not-found', localNotFoundSentence(database, file))
+      noteLocalFile('not-found', localNotFoundSentence(database, describeHome(home)))
   }
 
   // Global, as a plugin's hook reaches the routes the app adds after it too: only what no route took, or a page route, is counted.
@@ -651,7 +700,7 @@ export function countMissing<App extends Elysia>(app: App, options: { known: () 
       return
 
     try {
-      sharedStore(file, true)!.hit(path, referrerOf(request.headers.get('referer'), requestUrl(request).host), (missing) => {
+      sharedStore(home, true)!.hit(path, referrerOf(request.headers.get('referer'), requestUrl(request).host), (missing) => {
         suggest ??= suggester(options.known(), options.settings)
 
         const found = suggest(missing)
@@ -665,7 +714,7 @@ export function countMissing<App extends Elysia>(app: App, options: { known: () 
 
       if (!told) {
         told = true
-        kayLog('warn', `the paths visitors found nothing at cannot be recorded in ${file}: ${error instanceof Error ? error.message : String(error)}`)
+        kayLog('warn', `the paths visitors found nothing at cannot be recorded in ${describeHome(home)}: ${error instanceof Error ? error.message : String(error)}`)
       }
     }
   })
@@ -692,63 +741,57 @@ export function knowRedirects(redirects: string[]): void {
   redirected = redirects
 }
 
-// The paths visitors found nothing at that no `redirects` entry answers, most hit first, for a library's screen: this process's store while it has one open, else the file the production server keeps (or `file`), which asking never creates.
-export function unansweredPaths(file?: string): MissingPath[] {
+// The paths visitors found nothing at that no `redirects` entry answers, most hit first, for a library's screen: this process's store while it has one open, else the log the production server keeps (or the SQLite `file`), which asking never creates.
+export async function unansweredPaths(file?: string): Promise<MissingPath[]> {
   const answered = answeredBy(redirected)
 
-  if (file === undefined && current)
-    return current.list().filter(row => !answered(row.path))
-
-  file ??= notFoundFile(appStore()?.database)
-
-  if (!existsSync(file))
-    return []
-
-  flushStores()
-
-  const store = missingStore(file)
-
-  try {
-    return store.list().filter(row => !answered(row.path))
-  }
-  finally {
-    store.close()
-  }
+  return (await inMissing(file, async store => store.list()) ?? []).filter(row => !answered(row.path))
 }
 
-// Forgets one path in the list of missing ones, in this process's store while it has one open, else in the file (or `file`); false when it was not listed. It is listed again if a visitor asks for it again.
+// Forgets one path in the list of missing ones, in this process's store while it has one open, else in the log (or the SQLite `file`); false when it was not listed. It is listed again if a visitor asks for it again.
 // Several paths are forgotten in one open of the store, and the count of those that were listed comes back.
-export function dismissMissing(path: string, file?: string): boolean
-export function dismissMissing(paths: readonly string[], file?: string): number
-export function dismissMissing(paths: string | readonly string[], file?: string): boolean | number {
+export async function dismissMissing(path: string, file?: string): Promise<boolean>
+export async function dismissMissing(paths: readonly string[], file?: string): Promise<number>
+export async function dismissMissing(paths: string | readonly string[], file?: string): Promise<boolean | number> {
   if (typeof paths === 'string')
-    return inMissing(file, store => store.forget(paths)) ?? false
+    return await inMissing(file, async store => store.forget(paths)) ?? false
 
-  return inMissing(file, store => paths.filter(path => store.forget(path)).length) ?? 0
+  return await inMissing(file, async (store) => {
+    let forgotten = 0
+
+    for (const path of paths) {
+      if (await store.forget(path))
+        forgotten++
+    }
+
+    return forgotten
+  }) ?? 0
 }
 
 // Forgets every missing path, and says how many there were.
-export function clearMissing(file?: string): number {
-  return inMissing(file, store => store.clear()) ?? 0
+export async function clearMissing(file?: string): Promise<number> {
+  return await inMissing(file, async store => store.clear()) ?? 0
 }
 
-function inMissing<T>(file: string | undefined, use: (store: MissingStore) => T): T | undefined {
+async function inMissing<T>(file: string | undefined, use: (store: MissingStore) => Promise<T>): Promise<T | undefined> {
   if (file === undefined && current)
     return use(current)
 
-  file ??= notFoundFile(appStore()?.database)
+  const home = file === undefined ? notFoundHome(appDatabase()) : { kind: 'sqlite', file } as const
 
-  if (!existsSync(file))
-    return undefined
+  if (home.kind === 'sqlite') {
+    if (!existsSync(home.file))
+      return undefined
 
-  flushStores()
+    flushStores()
+  }
 
-  const store = missingStore(file)
+  const store = openMissing(home)
 
   try {
-    return use(store)
+    return await use(store)
   }
   finally {
-    store.close()
+    await store.close()
   }
 }

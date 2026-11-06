@@ -925,7 +925,7 @@ export interface Unredirected {
 // Redirects the page the entry had to the page it has, which a site without that page, or a redirect refused for its paths or because the set is full, goes without: the rename stays. Returns the refusal, for the editor to be told.
 async function pointRedirect(existing: StoredEntry, target: EntryRef, data: Record<string, unknown>): Promise<Unredirected | undefined> {
   try {
-    redirectMovedPage(existing.url, await entryPage(target.collection, { slug: target.slug, locale: target.locale, data }))
+    await redirectMovedPage(existing.url, await entryPage(target.collection, { slug: target.slug, locale: target.locale, data }))
 
     return undefined
   }

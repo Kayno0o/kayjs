@@ -7,8 +7,8 @@ void mock.module('kay/library', () => ({ ...library, unansweredPaths: () => {
 
 const { readMissing } = await import('../src/missing')
 
-test('a store that cannot be read is a worded failure, its path and error kept to the log', () => {
-  const screen = readMissing()
+test('a store that cannot be read is a worded failure, its path and error kept to the log', async () => {
+  const screen = await readMissing()
 
   expect(screen).toEqual({ failure: 'The recorded paths cannot be read: see the server\'s log.' })
   expect(JSON.stringify(screen)).not.toContain('/srv/app')

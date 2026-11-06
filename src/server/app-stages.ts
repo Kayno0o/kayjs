@@ -466,7 +466,7 @@ export async function serveDevRoutes(boot: Boot): Promise<void> {
   app.get(DEV_DATA, async ({ request }) => devData(request))
   app.get(DEV_DATA_ROWS, async ({ request }) => devRows(request))
   app.post(DEV_DATA_QUERY, async ({ request }) => devQuery(request))
-  app.get(DEV_NOT_FOUND, () => Response.json(devNotFound(root, redirected)))
+  app.get(DEV_NOT_FOUND, async () => Response.json(await devNotFound(root, redirected)))
   app.post(DEV_NOT_FOUND, async ({ request }) => devRedirect(root, request, redirected))
   app.get(DEV_ROUTES, () => {
     const own = { actions: registered.actions, publicEnv: Boolean(options.publicEnv), preview: hasPreview, cspReports: typeof options.security === 'object' && options.security.reports === true, buildFiles: filePaths, mounted: registered.extensions }

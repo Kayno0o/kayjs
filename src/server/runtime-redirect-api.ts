@@ -1,13 +1,14 @@
 import type { Elysia } from 'elysia'
 import type { TrailingSlash } from '../config'
+import type { MissingStore } from './not-found'
 import type { RedirectStatus } from './redirects'
 import type { RuntimeRedirect, RuntimeRules, RuntimeStatus } from './runtime-redirects'
 import { existsSync } from 'node:fs'
 import { joinBase } from '../runtime/base'
 import { kayLog } from '../runtime/log'
-import { appStore } from './app-store'
+import { appDatabase } from './app-database'
 import { pathOf } from './log'
-import { countedPath, dropStore, isPageRequest, markEditorGone, missingStore, notFoundFile, sharedStore, storeFile } from './not-found'
+import { countedPath, dropStore, isPageRequest, markEditorGone, notFoundHome, openMissing, sharedStore, storeHome } from './not-found'
 import { requestUrl } from './request-url'
 import { answerFor, plainPath, RedirectRefusedError } from './runtime-redirects'
 
@@ -55,41 +56,43 @@ export function sitePaths(): string[] {
 }
 
 // Runs `use` on the store of the running server, else on the file opened for the call.
-// A file that does not exist is created by a write and skipped by a read.
-function inStore<T>(file: string | undefined, write: boolean, use: (store: ReturnType<typeof missingStore>) => T): T | undefined {
-  if (file === undefined && sharedStore(storeFile(), false))
-    return use(sharedStore(storeFile(), false)!)
+// A SQLite file that does not exist is created by a write and skipped by a read.
+async function inStore<T>(file: string | undefined, write: boolean, use: (store: MissingStore) => Promise<T>): Promise<T | undefined> {
+  const shared = file === undefined ? sharedStore(storeHome(), false) : undefined
 
-  const path = file ?? notFoundFile(appStore()?.database)
+  if (shared)
+    return use(shared)
 
-  if (!write && !existsSync(path))
+  const home = file === undefined ? notFoundHome(appDatabase()) : { kind: 'sqlite', file } as const
+
+  if (!write && home.kind === 'sqlite' && !existsSync(home.file))
     return undefined
 
-  const store = missingStore(path, false)
+  const store = openMissing(home, false)
 
   try {
-    return use(store)
+    return await use(store)
   }
   finally {
-    store.close()
+    await store.close()
   }
 }
 
 // The redirects editors added, newest first, which the server answers a missing path with when `kay.config.ts` has none for it.
-export function runtimeRedirects(file?: string): RuntimeRedirect[] {
-  return inStore(file, false, store => store.redirects.list()) ?? []
+export async function runtimeRedirects(file?: string): Promise<RuntimeRedirect[]> {
+  return await inStore(file, false, async store => store.redirects.list()) ?? []
 }
 
 // Adds a redirect from a path nothing serves, to a path of this site (or a host `runtimeRedirects.hosts` allows), and forgets the path in the list of missing ones.
 // Throws, saying why, for a path or target it refuses: a loop, a target nothing serves, another site.
-export function addRuntimeRedirect(from: string, to: string, options: { status?: RuntimeStatus | undefined, file?: string | undefined } = {}): RuntimeRedirect {
-  return inStore(options.file, true, (store) => {
-    const added = store.redirects.add(from, to, options.status, rules)
+export async function addRuntimeRedirect(from: string, to: string, options: { status?: RuntimeStatus | undefined, file?: string | undefined } = {}): Promise<RuntimeRedirect> {
+  return (await inStore(options.file, true, async (store) => {
+    const added = await store.redirects.add(from, to, options.status, rules)
 
-    store.forget(added.from)
+    await store.forget(added.from)
 
     return added
-  })!
+  }))!
 }
 
 // The path of a page URL as the server's routes know it, the mount point taken off: undefined for another site's URL, or a path outside the mount point.
@@ -108,7 +111,7 @@ const UNMATCHABLE = /[?#*]|\/:/
 
 // Redirects the page an entry had to the one it has now, as `entries()` gives their `url`s, when an editor moves it (a CMS renaming a slug): the redirects that led to the old page lead to the new one, so a chain of moves stays one hop, and the one from the new page is removed, so moving back is no loop. All or nothing.
 // Does nothing for a page on another site or no page, or when the path stays; throws like `addRuntimeRedirect` for a path it refuses.
-export function redirectMovedPage(from: string | undefined, to: string | undefined): void {
+export async function redirectMovedPage(from: string | undefined, to: string | undefined): Promise<void> {
   const old = from === undefined ? undefined : sitePath(from)
   const now = to === undefined ? undefined : sitePath(to)
 
@@ -118,16 +121,16 @@ export function redirectMovedPage(from: string | undefined, to: string | undefin
   if (UNMATCHABLE.test(old) || UNMATCHABLE.test(now))
     throw new RedirectRefusedError(`${old} and ${now} are pages a redirect cannot name: no ?, # or * in them`)
 
-  inStore(undefined, true, (store) => {
-    const added = store.redirects.move(old, now, rules)
+  await inStore(undefined, true, async (store) => {
+    const added = await store.redirects.move(old, now, rules)
 
-    store.forget(added.from)
+    await store.forget(added.from)
   })
 }
 
 // Removes a redirect, and says whether there was one.
-export function removeRuntimeRedirect(from: string, file?: string): boolean {
-  return inStore(file, false, store => store.redirects.remove(from)) ?? false
+export async function removeRuntimeRedirect(from: string, file?: string): Promise<boolean> {
+  return await inStore(file, false, async store => store.redirects.remove(from)) ?? false
 }
 
 // The target as `trailingSlash` writes a page's path: with a slash under `always`, without under `never`, as written under `ignore`; a file's path, a target with a query and another site's keep theirs.
@@ -151,10 +154,10 @@ export interface MissingRedirector {
 // Answers a page request that found nothing with the redirect an editor added for its path, if there is one, in two hooks registered apart: the `mapResponse` ahead of compression, which would answer a 404 page first, and the `onError`, which reaches only the routes added after it.
 // Every other response costs one comparison of its status.
 export function missingRedirector(options: { file?: string | undefined, trailingSlash?: TrailingSlash | undefined, base?: string | undefined }): MissingRedirector {
-  const file = storeFile(options.file)
+  const home = storeHome(options.file)
   let told = false
 
-  const answer = (request: Request): Response | undefined => {
+  const answer = async (request: Request): Promise<Response | undefined> => {
     if (request.method !== 'GET' && request.method !== 'HEAD')
       return undefined
 
@@ -163,19 +166,19 @@ export function missingRedirector(options: { file?: string | undefined, trailing
     if (path === undefined)
       return undefined
 
-    let found: ReturnType<typeof answerFor>
+    let found: Awaited<ReturnType<typeof answerFor>>
 
     try {
-      const store = sharedStore(file, false)
+      const store = sharedStore(home, false)
 
-      found = store && answerFor(store.redirects, path, requestUrl(request).search, hosts)
+      found = store && await answerFor(store.redirects, path, requestUrl(request).search, hosts)
     }
     catch (error) {
       dropStore()
 
       if (!told) {
         told = true
-        kayLog('warn', `the redirects added while the site runs cannot be read from ${file}: ${error instanceof Error ? error.message : String(error)}`)
+        kayLog('warn', `the redirects added while the site runs cannot be read from ${home.kind === 'pg' ? 'the app\'s Postgres database' : home.file}: ${error instanceof Error ? error.message : String(error)}`)
       }
 
       return undefined
@@ -201,7 +204,7 @@ export function missingRedirector(options: { file?: string | undefined, trailing
 
   return {
     pages(app) {
-      app.mapResponse({ as: 'global' }, ({ request, set, responseValue, route }) => {
+      app.mapResponse({ as: 'global' }, async ({ request, set, responseValue, route }) => {
         const answered = responseValue instanceof Response ? responseValue : undefined
         const status = answered ? answered.status : set.status
 
@@ -214,7 +217,7 @@ export function missingRedirector(options: { file?: string | undefined, trailing
       return app
     },
     unrouted(app) {
-      app.onError({ as: 'global' }, ({ code, request }) => code === 'NOT_FOUND' ? answer(request) : undefined)
+      app.onError({ as: 'global' }, async ({ code, request }) => code === 'NOT_FOUND' ? answer(request) : undefined)
 
       return app
     },

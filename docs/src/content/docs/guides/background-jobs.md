@@ -241,7 +241,7 @@ export default defineConfig({
 })
 ```
 
-It takes what `pgJobs` takes, and creates its tables when they are missing and its role may. If the role may not, the owner runs `await createDataTables(db)` once in a boot script, and pg-orm's `ignoreTables` lists `dataTableNames` from `kay/server`.
+It takes what `pgJobs` takes, and creates its tables when they are missing and its role may. If the role may not, the owner runs `await createDataTables(db)` once in a boot script, and pg-orm's `ignoreTables` lists `dataTableNames` from `kay/server`. The tables include the ones of the 404 log and of the redirects added while the site runs.
 
 Replicas learn of each other's invalidations, live values and room messages by polling, within about half a second (5 seconds on an idle server), so nothing needs LISTEN and a pooler in front of Postgres works, except for building a missing index, which needs a session connection.
 

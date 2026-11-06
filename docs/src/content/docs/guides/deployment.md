@@ -204,7 +204,7 @@ You change nothing in the app. What would live in the memory of one process is k
 
 In production, kay warns once at boot when the 404 log (the paths visitors found nothing at, and the redirects added while the site runs) or `data/workers.sqlite` stays in a local file.
 
-Name `sqliteData` in `store` for them to live in the store's file; a `data/not-found.sqlite` from before is moved into it at the next start. The 404 log does not use Postgres yet, so a `pgData` store keeps the warning.
+Name `sqliteData` or `pgData` in `store` for them to live in the store's database; a `data/not-found.sqlite` from before is moved into it at the next start. With `pgData` the 404 log is in the `kay_missing`, `kay_missing_referrers` and `kay_redirects` tables, shared by every replica.
 
 A store you name in `kay.config.ts` is used as it is. A worker hears what another one wrote within about half a second, not at once. A store built in memory, such as `memorySessions()`, splits per worker, and the first worker logs a warning naming it. Sessions travel in their cookie, and jobs keep `data/jobs.sqlite`. Every worker runs the queue and the schedules, and each job runs once.
 

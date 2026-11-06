@@ -106,7 +106,7 @@ describe('an old data/not-found.sqlite', () => {
     old.redirects.add('/old', '/new', undefined, { hosts: [], configured: {}, served: () => ['/new'], dryRun: false })
     old.close()
 
-    adoptLocalNotFound(`sqlite://${root}/app.sqlite`, root)
+    await adoptLocalNotFound({ kind: 'sqlite', path: `${root}/app.sqlite` }, root)
 
     const moved = missingStore(`${root}/app.sqlite`, false)
 

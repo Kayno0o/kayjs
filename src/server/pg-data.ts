@@ -9,6 +9,7 @@ import { appName, claimDatabase } from './app-identity'
 import { pgCache } from './pg-cache'
 import { connectionOf, createJobTables, createMissingIndexes, indexStatement, jobsAfter, jobTableNames, missingRelations, privilegeRefused, relationsMissing, withMissingIndexes } from './pg-jobs'
 import { pgLive } from './pg-live'
+import { NOT_FOUND_TABLE_NAMES, NOT_FOUND_TABLES } from './pg-not-found'
 import { pgRooms } from './pg-rooms'
 import { query } from './pg-sql'
 import { pgKv, pgNotifications, pgPush, pgRates, pgSessions, pgVitals } from './pg-stores'
@@ -22,7 +23,7 @@ const CLOSE_MS = 3_000
 const POOL_CLOSE_SECONDS = 2
 
 // The tables `pgData` creates besides the jobs' ones.
-const OWN_TABLES = ['kay_sessions', 'kay_cache', 'kay_events', 'kay_rates', 'kay_meta', 'kay_vitals', 'kay_room_members', 'kay_room_processes', 'kay_room_messages', 'kay_room_state', 'kay_live', 'kay_live_events', 'kay_notifications', 'kay_push_subscriptions', 'kay_kv'] as const
+const OWN_TABLES = ['kay_sessions', 'kay_cache', 'kay_events', 'kay_rates', 'kay_meta', 'kay_vitals', 'kay_room_members', 'kay_room_processes', 'kay_room_messages', 'kay_room_state', 'kay_live', 'kay_live_events', 'kay_notifications', 'kay_push_subscriptions', 'kay_kv', ...NOT_FOUND_TABLE_NAMES] as const
 
 const OWN_INDEXES: readonly PgIndex[] = [
   { name: 'kay_sessions_expires', on: 'kay_sessions (expires)' },
@@ -84,6 +85,9 @@ export async function createDataTables(source: PgSource): Promise<void> {
       await tx`CREATE TABLE IF NOT EXISTS kay_notifications (seq bigserial PRIMARY KEY, id text NOT NULL UNIQUE, user_id text NOT NULL, title text NOT NULL, url text, at bigint NOT NULL, expires bigint NOT NULL, read_at bigint)`
       await tx`CREATE TABLE IF NOT EXISTS kay_kv (key text PRIMARY KEY, value text NOT NULL, expires_at bigint)`
       await tx`CREATE TABLE IF NOT EXISTS kay_push_subscriptions (endpoint text PRIMARY KEY, user_id text NOT NULL, p256dh text NOT NULL, auth text NOT NULL, at bigint NOT NULL)`
+
+      for (const statement of NOT_FOUND_TABLES)
+        await tx.unsafe(statement)
 
       for (const index of OWN_INDEXES)
         await tx.unsafe(indexStatement(index, false))

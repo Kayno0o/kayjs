@@ -30,7 +30,7 @@ describe('adding a runtime redirect refuses what could open a redirect', () => {
     })
   }
 
-  it('refuses a path that is no path, a kay path, a status that is none', () => {
+  it('refuses a path that is no path, a kay path, a status that is none', async () => {
     const set = setOf()
 
     for (const from of ['//evil.example', '/\\x', 'old', '', '/a\r\nb', '/_kay/island', `/${'a'.repeat(600)}`])
@@ -39,11 +39,11 @@ describe('adding a runtime redirect refuses what could open a redirect', () => {
     expect(() => set.add('/old', '/new', 200 as never, rules)).toThrow(/status/)
   })
 
-  it('refuses a target naming a param its path has none of', () => {
+  it('refuses a target naming a param its path has none of', async () => {
     expect(() => setOf().add('/old', '/new/:slug', undefined, rules)).toThrow(/slug/)
   })
 
-  it('allows another host only when the app lists it, without credentials', () => {
+  it('allows another host only when the app lists it, without credentials', async () => {
     const set = setOf()
     const allowed = { ...rules, hosts: ['example.org'] }
 
@@ -53,7 +53,7 @@ describe('adding a runtime redirect refuses what could open a redirect', () => {
     expect(() => set.add('/d', 'ftp://example.org/x', undefined, allowed)).toThrow()
   })
 
-  it('refuses a loop, direct, through the set or through the config', () => {
+  it('refuses a loop, direct, through the set or through the config', async () => {
     const set = setOf()
 
     expect(() => set.add('/a', '/a', undefined, rules)).toThrow(/loop/)
@@ -68,7 +68,7 @@ describe('adding a runtime redirect refuses what could open a redirect', () => {
     expect(() => set.add('/cfg', '/z', undefined, { ...rules, configured: { '/cfg': '/z' } })).toThrow(/kay\.config/)
   })
 
-  it('refuses a target no page serves when the server knows its pages', () => {
+  it('refuses a target no page serves when the server knows its pages', async () => {
     const set = setOf()
     const known = { ...rules, served: () => ['/about', '/blog/:slug', '/docs/*'] }
 
@@ -79,7 +79,7 @@ describe('adding a runtime redirect refuses what could open a redirect', () => {
     expect(set.add('/chain', '/old', undefined, known).to).toBe('/old')
   })
 
-  it('keeps at most so many', () => {
+  it('keeps at most so many', async () => {
     const set = setOf()
 
     for (let index = 0; index < 1000; index++)
@@ -91,45 +91,45 @@ describe('adding a runtime redirect refuses what could open a redirect', () => {
 })
 
 describe('answering a missing path', () => {
-  it('matches exact paths with or without a slash, and keeps the query', () => {
+  it('matches exact paths with or without a slash, and keeps the query', async () => {
     const set = setOf()
 
     set.add('/old', '/new', 301, rules)
 
-    expect(answerFor(set, '/old', '?a=1', [])).toEqual({ location: '/new?a=1', status: 301 })
-    expect(answerFor(set, '/old/', '', [])).toEqual({ location: '/new', status: 301 })
-    expect(answerFor(set, '/Old', '', [])).toBeUndefined()
-    expect(answerFor(set, '/other', '', [])).toBeUndefined()
+    expect(await answerFor(set, '/old', '?a=1', [])).toEqual({ location: '/new?a=1', status: 301 })
+    expect(await answerFor(set, '/old/', '', [])).toEqual({ location: '/new', status: 301 })
+    expect(await answerFor(set, '/Old', '', [])).toBeUndefined()
+    expect(await answerFor(set, '/other', '', [])).toBeUndefined()
   })
 
-  it('fills :params encoded and a final * as sent', () => {
+  it('fills :params encoded and a final * as sent', async () => {
     const set = setOf()
 
     set.add('/blog/:slug', '/posts/:slug', undefined, rules)
     set.add('/docs/*', '/guide/*', undefined, rules)
 
-    expect(answerFor(set, '/blog/caf%C3%A9', '', [])?.location).toBe('/posts/caf%C3%A9')
-    expect(answerFor(set, '/docs/a/b', '', [])?.location).toBe('/guide/a/b')
-    expect(answerFor(set, '/docs', '', [])?.location).toBe('/guide/')
-    expect(answerFor(set, '/blog/a/b', '', [])).toBeUndefined()
+    expect((await answerFor(set, '/blog/caf%C3%A9', '', []))?.location).toBe('/posts/caf%C3%A9')
+    expect((await answerFor(set, '/docs/a/b', '', []))?.location).toBe('/guide/a/b')
+    expect((await answerFor(set, '/docs', '', []))?.location).toBe('/guide/')
+    expect(await answerFor(set, '/blog/a/b', '', [])).toBeUndefined()
   })
 
-  it('never lets a star or a param carry the visitor to another host', () => {
+  it('never lets a star or a param carry the visitor to another host', async () => {
     const set = setOf()
 
     set.add('/go/*', '/*', undefined, rules)
     set.add('/p/:x', '/:x', undefined, rules)
 
-    expect(answerFor(set, '/go//evil.example', '', [])?.location).toBe('/evil.example')
+    expect((await answerFor(set, '/go//evil.example', '', []))?.location).toBe('/evil.example')
     // Encoded slashes are refused too: an app or proxy that decodes before it resolves would read them as a second slash.
-    expect(answerFor(set, '/go/%2Fevil.example', '', [])).toBeUndefined()
-    expect(answerFor(set, '/go/\\evil.example', '', [])).toBeUndefined()
-    expect(answerFor(set, '/go/%5Cevil.example', '', [])).toBeUndefined()
-    expect(answerFor(set, '/p/%2F%2Fevil.example', '', [])).toBeUndefined()
-    expect(answerFor(set, '/p/%E0%A4%A', '', [])).toBeUndefined()
+    expect(await answerFor(set, '/go/%2Fevil.example', '', [])).toBeUndefined()
+    expect(await answerFor(set, '/go/\\evil.example', '', [])).toBeUndefined()
+    expect(await answerFor(set, '/go/%5Cevil.example', '', [])).toBeUndefined()
+    expect(await answerFor(set, '/p/%2F%2Fevil.example', '', [])).toBeUndefined()
+    expect(await answerFor(set, '/p/%E0%A4%A', '', [])).toBeUndefined()
   })
 
-  it('answers nothing for a row written to the file by other means that leaves the site', () => {
+  it('answers nothing for a row written to the file by other means that leaves the site', async () => {
     const db = new Database(':memory:')
     const set = redirectSet(db)
 
@@ -137,46 +137,46 @@ describe('answering a missing path', () => {
       db.run('INSERT INTO kay_redirects (path, target, status, pattern, added_at) VALUES (?, ?, 308, 0, 0)', [from!, to!])
 
     for (const from of ['/a', '/b', '/c', '/d', '/e'])
-      expect(answerFor(set, from, '', [])).toBeUndefined()
+      expect(await answerFor(set, from, '', [])).toBeUndefined()
 
-    expect(answerFor(set, '/c', '', ['evil.example'])?.location).toBe('https://evil.example/')
+    expect((await answerFor(set, '/c', '', ['evil.example']))?.location).toBe('https://evil.example/')
   })
 
-  it('answers neither of two redirects that two editors added to each other at once', () => {
+  it('answers neither of two redirects that two editors added to each other at once', async () => {
     const db = new Database(':memory:')
     const set = redirectSet(db)
 
     for (const [from, to] of [['/a', '/b'], ['/b', '/a']])
       db.run('INSERT INTO kay_redirects (path, target, status, pattern, added_at) VALUES (?, ?, 308, 0, 0)', [from!, to!])
 
-    expect(answerFor(set, '/a', '', [])).toBeUndefined()
-    expect(answerFor(set, '/b', '', [])).toBeUndefined()
+    expect(await answerFor(set, '/a', '', [])).toBeUndefined()
+    expect(await answerFor(set, '/b', '', [])).toBeUndefined()
   })
 
-  it('removes a redirect', () => {
+  it('removes a redirect', async () => {
     const set = setOf()
 
     set.add('/old', '/new', undefined, rules)
 
     expect(set.remove('/old')).toBe(true)
     expect(set.remove('/old')).toBe(false)
-    expect(answerFor(set, '/old', '', [])).toBeUndefined()
+    expect(await answerFor(set, '/old', '', [])).toBeUndefined()
   })
 })
 
 describe('a path that is gone', () => {
-  it('answers 410 for an exact path and a pattern, with no target', () => {
+  it('answers 410 for an exact path and a pattern, with no target', async () => {
     const set = setOf()
 
     expect(set.add('/retired', '', 410, rules)).toMatchObject({ from: '/retired', to: '', status: 410 })
     set.add('/retired-docs/*', 'ignored', 410, rules)
 
-    expect(answerFor(set, '/retired/', '?x=1', [])).toEqual({ location: '', status: 410 })
-    expect(answerFor(set, '/retired-docs/a/b', '', [])).toEqual({ location: '', status: 410 })
+    expect(await answerFor(set, '/retired/', '?x=1', [])).toEqual({ location: '', status: 410 })
+    expect(await answerFor(set, '/retired-docs/a/b', '', [])).toEqual({ location: '', status: 410 })
     expect(set.find('/retired-docs/*')?.to).toBe('')
   })
 
-  it('is edited in place: the same path takes a new target and status', () => {
+  it('is edited in place: the same path takes a new target and status', async () => {
     const set = setOf()
 
     set.add('/old', '/a', 307, rules)
@@ -186,7 +186,7 @@ describe('a path that is gone', () => {
     expect(set.list().map(({ to, status }) => [to, status])).toEqual([['', 410]])
   })
 
-  it('refuses a target that is gone', () => {
+  it('refuses a target that is gone', async () => {
     const set = setOf()
 
     set.add('/retired', '', 410, rules)
@@ -194,7 +194,7 @@ describe('a path that is gone', () => {
     expect(() => set.add('/a', '/retired', undefined, rules)).toThrow(/gone/)
   })
 
-  it('still refuses a path that is not one, and a path of the config', () => {
+  it('still refuses a path that is not one, and a path of the config', async () => {
     const set = setOf()
 
     expect(() => set.add('//evil.example', '', 410, rules)).toThrow()
@@ -205,18 +205,18 @@ describe('a path that is gone', () => {
   it('answers 410 from a served app, under a base, without a location', async () => {
     const served = new Elysia().use(await pages({ root: 'tests/fixtures/routing', prebuilt: false, security: false, base: '/app' }))
 
-    addRuntimeRedirect('/rt-retired', '', { status: 410 })
+    await addRuntimeRedirect('/rt-retired', '', { status: 410 })
 
     const response = await served.handle(new Request('http://localhost/rt-retired'))
 
     expect([response.status, response.headers.get('location')]).toEqual([410, null])
-    expect(missingPaths().map(({ path }) => path)).not.toContain('/rt-retired')
-    removeRuntimeRedirect('/rt-retired')
+    expect((await missingPaths()).map(({ path }) => path)).not.toContain('/rt-retired')
+    await removeRuntimeRedirect('/rt-retired')
   })
 })
 
 describe('what the app tells the screens', () => {
-  it('lists the config\'s redirects with their status and the paths the site serves', () => {
+  it('lists the config\'s redirects with their status and the paths the site serves', async () => {
     knowRuntimeRules({ redirects: { '/a': '/b', '/c': '/d' }, statuses: { '/c': 301 }, served: () => ['/b', '/d', '/e', '/f.xml'], pages: () => ['/e', '/b', '/b'] })
 
     expect(configuredRedirects()).toEqual([{ from: '/a', to: '/b', status: 308 }, { from: '/c', to: '/d', status: 301 }])
@@ -225,7 +225,7 @@ describe('what the app tells the screens', () => {
     expect(sitePaths()).toEqual([])
   })
 
-  it('follows the pages when they change, and hands out a copy of the sorted answer', () => {
+  it('follows the pages when they change, and hands out a copy of the sorted answer', async () => {
     let pages = ['/b', '/a']
 
     knowRuntimeRules({ redirects: {}, pages: () => [...pages] })
@@ -250,22 +250,22 @@ describe('a served app', () => {
 
     expect((await served.handle(new Request('http://localhost/rt-gone'))).status).toBe(404)
 
-    addRuntimeRedirect('/rt-gone', '/bare', { status: 301 })
+    await addRuntimeRedirect('/rt-gone', '/bare', { status: 301 })
 
     const response = await served.handle(new Request('http://localhost/rt-gone/?utm=a'))
 
     expect(response.status).toBe(301)
     expect(response.headers.get('location')).toBe('/app/bare?utm=a')
-    expect(missingPaths().map(({ path }) => path)).not.toContain('/rt-gone')
+    expect((await missingPaths()).map(({ path }) => path)).not.toContain('/rt-gone')
 
-    removeRuntimeRedirect('/rt-gone')
+    await removeRuntimeRedirect('/rt-gone')
     expect((await served.handle(new Request('http://localhost/rt-gone'))).status).toBe(404)
   })
 
   it('answers a missing path with the redirect to a client taking compression, whatever the 404 page weighs', async () => {
     const served = new Elysia().use(await pages({ root: 'tests/fixtures/site', prebuilt: false, security: false, serve: { compress: true } }))
 
-    addRuntimeRedirect('/rt-zipped', '/about')
+    await addRuntimeRedirect('/rt-zipped', '/about')
 
     try {
       for (const accept of ['gzip', 'br', 'zstd, br, gzip', 'identity']) {
@@ -275,15 +275,15 @@ describe('a served app', () => {
       }
     }
     finally {
-      removeRuntimeRedirect('/rt-zipped')
+      await removeRuntimeRedirect('/rt-zipped')
     }
   })
 
   it('writes a target with a slash under trailingSlash always, and not a file\'s', async () => {
     const served = await app({ trailingSlash: 'always' })
 
-    addRuntimeRedirect('/rt-slash', '/bare/')
-    addRuntimeRedirect('/rt-slash2', '/bare')
+    await addRuntimeRedirect('/rt-slash', '/bare/')
+    await addRuntimeRedirect('/rt-slash2', '/bare')
 
     expect((await served.handle(new Request('http://localhost/rt-slash/'))).headers.get('location')).toBe('/bare/')
     expect((await served.handle(new Request('http://localhost/rt-slash2/'))).headers.get('location')).toBe('/bare/')
@@ -292,28 +292,28 @@ describe('a served app', () => {
   it('writes the target without its slash under never and as written under ignore', async () => {
     const never = await app({ trailingSlash: 'never' })
 
-    addRuntimeRedirect('/rt-never', '/bare/')
+    await addRuntimeRedirect('/rt-never', '/bare/')
     expect((await never.handle(new Request('http://localhost/rt-never'))).headers.get('location')).toBe('/bare')
 
     const ignore = await app({ trailingSlash: 'ignore' })
 
-    addRuntimeRedirect('/rt-ignore', '/bare/')
+    await addRuntimeRedirect('/rt-ignore', '/bare/')
     expect((await ignore.handle(new Request('http://localhost/rt-ignore'))).headers.get('location')).toBe('/bare/')
   })
 
   it('leaves a page that is served alone, whatever the set holds for its path', async () => {
     const served = await app()
 
-    addRuntimeRedirect('/bare', '/blog')
+    await addRuntimeRedirect('/bare', '/blog')
     expect((await served.handle(new Request('http://localhost/bare'))).status).toBe(200)
-    removeRuntimeRedirect('/bare')
+    await removeRuntimeRedirect('/bare')
   })
 
   it('answers a path under a locale prefix as the visitor asked for it', async () => {
     const served = new Elysia().use(await pages({ root: 'tests/fixtures/i18n', prebuilt: false, security: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } }))
 
-    addRuntimeRedirect('/en/rt-loc-old', '/en')
-    addRuntimeRedirect('/rt-loc-bare', '/en')
+    await addRuntimeRedirect('/en/rt-loc-old', '/en')
+    await addRuntimeRedirect('/rt-loc-bare', '/en')
 
     const prefixed = await served.handle(new Request('http://localhost/en/rt-loc-old'))
 
@@ -326,24 +326,24 @@ describe('a served app', () => {
 
     expect((await served.handle(new Request('http://localhost/rt-cfg'))).headers.get('location')).toBe('/bare')
     expect((await served.handle(new Request('http://localhost/bare'))).status).toBe(200)
-    expect(() => addRuntimeRedirect('/rt-cfg', '/bare')).toThrow(/kay\.config/)
+    await expect(addRuntimeRedirect('/rt-cfg', '/bare')).rejects.toThrow(/kay\.config/)
   })
 
   it('refuses a target no page serves, a loop and another site', async () => {
     await app()
 
-    expect(() => addRuntimeRedirect('/rt-x', '/rt-nothing')).toThrow(/nothing on the site serves/)
-    expect(() => addRuntimeRedirect('/rt-x', '//evil.example')).toThrow()
-    expect(() => addRuntimeRedirect('/rt-x', 'https://evil.example/')).toThrow()
-    expect(() => addRuntimeRedirect('/bare', '/bare')).toThrow(/loop/)
-    expect(runtimeRedirects().map(row => row.from)).not.toContain('/rt-x')
+    await expect(addRuntimeRedirect('/rt-x', '/rt-nothing')).rejects.toThrow(/nothing on the site serves/)
+    await expect(addRuntimeRedirect('/rt-x', '//evil.example')).rejects.toThrow()
+    await expect(addRuntimeRedirect('/rt-x', 'https://evil.example/')).rejects.toThrow()
+    await expect(addRuntimeRedirect('/bare', '/bare')).rejects.toThrow(/loop/)
+    expect((await runtimeRedirects()).map(row => row.from)).not.toContain('/rt-x')
   })
 
   it('does not answer a JSON 404, another method nor a path kay counts as a scanner\'s', async () => {
     const served = await app()
 
-    addRuntimeRedirect('/rt-post', '/bare')
-    addRuntimeRedirect('/rt-wp/wp-login.php', '/bare')
+    await addRuntimeRedirect('/rt-post', '/bare')
+    await addRuntimeRedirect('/rt-wp/wp-login.php', '/bare')
 
     expect((await served.handle(new Request('http://localhost/rt-post', { method: 'POST' }))).status).not.toBe(307)
     expect((await served.handle(new Request('http://localhost/rt-wp/wp-login.php'))).status).toBe(404)
@@ -352,10 +352,10 @@ describe('a served app', () => {
   it('allows another host only when the config lists it', async () => {
     const served = await app({ runtimeRedirects: { hosts: ['example.org'] } })
 
-    addRuntimeRedirect('/rt-out', 'https://example.org/page')
+    await addRuntimeRedirect('/rt-out', 'https://example.org/page')
 
     expect((await served.handle(new Request('http://localhost/rt-out'))).headers.get('location')).toBe('https://example.org/page')
-    expect(() => addRuntimeRedirect('/rt-out2', 'https://evil.example/')).toThrow()
+    await expect(addRuntimeRedirect('/rt-out2', 'https://evil.example/')).rejects.toThrow()
   })
 })
 
@@ -370,8 +370,8 @@ describe('a page that answers 404 itself', () => {
 
     const served = new Elysia().use(await pages({ dirs: { routes: join(root, 'src/routes') }, prebuilt: false, security: false, base: '/app' }))
 
-    addRuntimeRedirect('/post/old', '/new')
-    addRuntimeRedirect('/nowhere', '/new', { status: 302 })
+    await addRuntimeRedirect('/post/old', '/new')
+    await addRuntimeRedirect('/nowhere', '/new', { status: 302 })
 
     const post = await served.handle(new Request('http://localhost/post/old'))
     const fallback = await served.handle(new Request('http://localhost/nowhere'))
@@ -383,47 +383,47 @@ describe('a page that answers 404 itself', () => {
 })
 
 describe('what an editor types', () => {
-  it('percent-encodes non-ASCII text, so a header can carry it, and refuses broken characters', () => {
+  it('percent-encodes non-ASCII text, so a header can carry it, and refuses broken characters', async () => {
     const set = setOf()
 
     expect(set.add('/vieux-café', '/café/ça', undefined, rules)).toMatchObject({ from: '/vieux-caf%C3%A9', to: '/caf%C3%A9/%C3%A7a' })
     expect(() => set.add('/a', '/\uD800', undefined, rules)).toThrow()
-    expect(answerFor(set, '/vieux-caf%C3%A9', '', [])?.location).toBe('/caf%C3%A9/%C3%A7a')
+    expect((await answerFor(set, '/vieux-caf%C3%A9', '', []))?.location).toBe('/caf%C3%A9/%C3%A7a')
   })
 
-  it('answers 307 unless the editor picks 308 or another status', () => {
+  it('answers 307 unless the editor picks 308 or another status', async () => {
     const set = setOf()
 
     set.add('/a', '/new', undefined, rules)
     set.add('/b', '/new', 308, rules)
 
-    expect([answerFor(set, '/a', '', [])?.status, answerFor(set, '/b', '', [])?.status]).toEqual([307, 308])
+    expect([(await answerFor(set, '/a', '', []))?.status, (await answerFor(set, '/b', '', []))?.status]).toEqual([307, 308])
   })
 
-  it('writes the hex of a percent-escape in upper case, as a browser sends it', () => {
+  it('writes the hex of a percent-escape in upper case, as a browser sends it', async () => {
     const set = setOf()
 
     expect(set.add('/caf%c3%a9', '/ok%2f%c3%a9', undefined, rules)).toMatchObject({ from: '/caf%C3%A9', to: '/ok%2F%C3%A9' })
-    expect(answerFor(set, '/caf%C3%A9', '', [])?.location).toBe('/ok%2F%C3%A9')
+    expect((await answerFor(set, '/caf%C3%A9', '', []))?.location).toBe('/ok%2F%C3%A9')
   })
 
-  it('stores the path as a visit is looked up: no query, hash nor trailing slash', () => {
+  it('stores the path as a visit is looked up: no query, hash nor trailing slash', async () => {
     const set = setOf()
 
     expect(set.add('/old/', '/new', undefined, rules).from).toBe('/old')
     expect(set.add('/old2?x=1#y', '/new', undefined, rules).from).toBe('/old2')
-    expect(answerFor(set, '/old2', '', [])?.location).toBe('/new')
+    expect((await answerFor(set, '/old2', '', []))?.location).toBe('/new')
     expect(() => set.add('/cfg/', '/z', undefined, { ...rules, configured: { '/cfg': '/z' } })).toThrow(/kay\.config/)
   })
 
-  it('answers the most specific pattern first', () => {
+  it('answers the most specific pattern first', async () => {
     const set = setOf()
 
     set.add('/docs/*', '/guide/*', undefined, rules)
     set.add('/docs/old/*', '/archive/*', undefined, rules)
 
-    expect(answerFor(set, '/docs/old/a', '', [])?.location).toBe('/archive/a')
-    expect(answerFor(set, '/docs/new/a', '', [])?.location).toBe('/guide/new/a')
+    expect((await answerFor(set, '/docs/old/a', '', []))?.location).toBe('/archive/a')
+    expect((await answerFor(set, '/docs/new/a', '', []))?.location).toBe('/guide/new/a')
   })
 })
 
@@ -437,28 +437,28 @@ describe('the store on disk', () => {
     const root = await scratchDir('runtime-redirects-')
     const file = join(root, 'data/not-found.sqlite')
 
-    addRuntimeRedirect('/rt-w-a', '/rt-w-b', { file })
+    await addRuntimeRedirect('/rt-w-a', '/rt-w-b', { file })
 
-    expect(() => addRuntimeRedirect('/rt-w-b', '/rt-w-a', { file })).toThrow(/loop/)
-    expect(runtimeRedirects(file).map(row => row.from)).toEqual(['/rt-w-a'])
+    await expect(addRuntimeRedirect('/rt-w-b', '/rt-w-a', { file })).rejects.toThrow(/loop/)
+    expect((await runtimeRedirects(file)).map(row => row.from)).toEqual(['/rt-w-a'])
   })
 
   it('answers from memory yet follows what another connection adds or removes, and what its own does', async () => {
     const file = join(await scratchDir('runtime-redirects-'), 'data/not-found.sqlite')
     const [served, editor] = [redirectSet(openSqlite(file)), redirectSet(openSqlite(file))]
-    const asked = (path: string) => answerFor(served, path, '', [])?.location
+    const asked = async (path: string) => (await answerFor(served, path, '', []))?.location
 
-    expect(asked('/rt-m-a')).toBeUndefined()
+    expect(await asked('/rt-m-a')).toBeUndefined()
     editor.add('/rt-m-a', '/new', undefined, rules)
     editor.add('/rt-m/:x', '/dir/:x', undefined, rules)
-    expect(asked('/rt-m-a')).toBe('/new')
-    expect(asked('/rt-m/b')).toBe('/dir/b')
+    expect(await asked('/rt-m-a')).toBe('/new')
+    expect(await asked('/rt-m/b')).toBe('/dir/b')
     editor.remove('/rt-m-a')
-    expect(asked('/rt-m-a')).toBeUndefined()
+    expect(await asked('/rt-m-a')).toBeUndefined()
     served.add('/rt-m-c', '/other', undefined, rules)
-    expect(asked('/rt-m-c')).toBe('/other')
+    expect(await asked('/rt-m-c')).toBe('/other')
     served.remove('/rt-m-c')
-    expect(asked('/rt-m-c')).toBeUndefined()
+    expect(await asked('/rt-m-c')).toBeUndefined()
   })
 
   // Root writes through any mode, as in CI.
@@ -466,7 +466,7 @@ describe('the store on disk', () => {
     const root = await scratchDir('runtime-redirects-')
     const file = join(root, 'data/not-found.sqlite')
 
-    addRuntimeRedirect('/rt-ro', '/rt-ro2', { file })
+    await addRuntimeRedirect('/rt-ro', '/rt-ro2', { file })
     await chmod(file, 0o400)
     await chmod(join(root, 'data'), 0o500)
 
@@ -474,7 +474,7 @@ describe('the store on disk', () => {
       let thrown: unknown
 
       try {
-        addRuntimeRedirect('/rt-ro3', '/rt-ro4', { file })
+        await addRuntimeRedirect('/rt-ro3', '/rt-ro4', { file })
       }
       catch (error) {
         thrown = error
@@ -501,10 +501,10 @@ describe('the store on disk', () => {
       return new Response('gone', { status: 404, headers: { 'content-type': 'text/html' } })
     })
 
-    const store = sharedStore(file, true)!
+    const store = sharedStore({ kind: 'sqlite', file }, true)!
 
-    store.redirects.add('/rt-uni', '/ok', undefined, rules)
-    store.redirects.add('/rt-ok', '/rt-fine', undefined, rules)
+    await store.redirects.add('/rt-uni', '/ok', undefined, rules)
+    await store.redirects.add('/rt-ok', '/rt-fine', undefined, rules)
     // Written by other means, as a file edited by hand or an older kay could leave it.
     const other = openSqlite(file)
 

@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite'
 import type { KayErrorOptions } from '../compiler/errors'
+import type { MaybePromise } from '../runtime/store-base'
 import type { RedirectStatus } from './redirects'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
@@ -55,23 +56,47 @@ export interface RuntimeRules {
   dryRun?: boolean | undefined
 }
 
-export interface RedirectSet {
+// The redirects a check reads to refuse a loop or a chain: the ones already stored.
+export interface RedirectView {
   list: () => RuntimeRedirect[]
   find: (from: string) => RuntimeRedirect | undefined
+}
+
+export interface RedirectSnapshot { exact: ReadonlyMap<string, RuntimeRedirect>, patterns: readonly RuntimeRedirect[] }
+
+// The redirects an editor added, in the SQLite file or the Postgres database of the 404 log: a SQLite set answers at once, a Postgres one by a promise.
+export interface RedirectSet {
+  list: () => MaybePromise<RuntimeRedirect[]>
+  find: (from: string) => MaybePromise<RuntimeRedirect | undefined>
   // Those with a `:name` or a final `*`.
-  patterns: () => RuntimeRedirect[]
-  // Every redirect held in memory, read again only when the file changed, for the lookup a missing path makes.
-  snapshot: () => { exact: ReadonlyMap<string, RuntimeRedirect>, patterns: readonly RuntimeRedirect[] }
-  add: (from: string, to: string, status: RuntimeStatus | undefined, rules: RuntimeRules) => RuntimeRedirect
+  patterns: () => MaybePromise<RuntimeRedirect[]>
+  // Every redirect held in memory, read again only when the stored ones changed, for the lookup a missing path makes.
+  snapshot: () => MaybePromise<RedirectSnapshot>
+  add: (from: string, to: string, status: RuntimeStatus | undefined, rules: RuntimeRules) => MaybePromise<RuntimeRedirect>
   // Adds the redirect of a page that moved, as one write: the redirects leading to `from` lead to `to`, and the one from `to`, which exists again, is removed.
+  move: (from: string, to: string, rules: RuntimeRules) => MaybePromise<RuntimeRedirect>
+  remove: (from: string) => MaybePromise<boolean>
+}
+
+export interface SqliteRedirectSet extends RedirectSet {
+  list: () => RuntimeRedirect[]
+  find: (from: string) => RuntimeRedirect | undefined
+  patterns: () => RuntimeRedirect[]
+  snapshot: () => RedirectSnapshot
+  add: (from: string, to: string, status: RuntimeStatus | undefined, rules: RuntimeRules) => RuntimeRedirect
   move: (from: string, to: string, rules: RuntimeRules) => RuntimeRedirect
   remove: (from: string) => boolean
 }
 
-interface Row { path: string, target: string, status: number, added_at: number }
+interface Row { path: string, target: string, status: number, added_at: number | string }
 
-function entry(row: Row): RuntimeRedirect {
-  return { from: row.path, to: row.target, status: row.status as RuntimeStatus, addedAt: row.added_at }
+export function entry(row: Row): RuntimeRedirect {
+  return { from: row.path, to: row.target, status: row.status as RuntimeStatus, addedAt: Number(row.added_at) }
+}
+
+// The lookup tables of a lookup for a missing path: every redirect by its path, and those with a `:name` or a `*` the most specific first.
+export function snapshotOf(rows: RuntimeRedirect[]): { exact: Map<string, RuntimeRedirect>, patterns: RuntimeRedirect[] } {
+  return { exact: new Map(rows.map(row => [row.from, row])), patterns: rows.filter(row => isPattern(row.from)).sort((a, b) => b.from.length - a.from.length || (a.from < b.from ? -1 : 1)) }
 }
 
 // The path as it is compared: no query, hash nor trailing slash.
@@ -92,7 +117,7 @@ export function encoded(text: string): string {
   }
 }
 
-function isPattern(from: string): boolean {
+export function isPattern(from: string): boolean {
   return DYNAMIC.test(from)
 }
 
@@ -138,7 +163,7 @@ export function safeLocation(location: string, hosts: readonly string[]): boolea
 }
 
 // Throws, saying why, unless `from` and `to` make a redirect that cannot loop and cannot leave the site but where the app allows.
-function check(set: RedirectSet, from: string, to: string, status: number, rules: RuntimeRules): void {
+export function check(set: RedirectView, from: string, to: string, status: number, rules: RuntimeRules): void {
   if (status !== 301 && status !== 302 && status !== 307 && status !== 308 && status !== 410)
     throw new RedirectRefusedError(`status ${String(status)} is none of 301, 302, 307, 308 and 410`)
 
@@ -203,7 +228,7 @@ function check(set: RedirectSet, from: string, to: string, status: number, rules
   }
 }
 
-export function redirectSet(db: Database): RedirectSet {
+export function redirectSet(db: Database): SqliteRedirectSet {
   db.run('CREATE TABLE IF NOT EXISTS kay_redirects (path TEXT PRIMARY KEY, target TEXT NOT NULL, status INTEGER NOT NULL, pattern INTEGER NOT NULL, added_at INTEGER NOT NULL)')
 
   const all = db.query<Row, []>('SELECT path, target, status, added_at FROM kay_redirects ORDER BY added_at DESC, path')
@@ -215,9 +240,9 @@ export function redirectSet(db: Database): RedirectSet {
   const removed = db.query<{ path: string }, [string]>('DELETE FROM kay_redirects WHERE path = ? RETURNING path')
   // Changes when another connection commits, which is how an editor's `kay not-found` adding a redirect reaches a running server; this connection's own writes reset the copy.
   const version = db.query<{ data_version: number }, []>('PRAGMA data_version')
-  let held: { at: number, exact: Map<string, RuntimeRedirect>, patterns: RuntimeRedirect[] } | undefined
+  let held: ({ at: number } & ReturnType<typeof snapshotOf>) | undefined
 
-  const set: RedirectSet = {
+  const set: SqliteRedirectSet = {
     list: () => all.all().map(entry),
     find(from) {
       const row = one.get(from)
@@ -229,9 +254,7 @@ export function redirectSet(db: Database): RedirectSet {
       const at = version.get()!.data_version
 
       if (held?.at !== at) {
-        const rows = all.all().map(entry)
-
-        held = { at, exact: new Map(rows.map(row => [row.from, row])), patterns: rows.filter(row => isPattern(row.from)).sort((a, b) => b.from.length - a.from.length || (a.from < b.from ? -1 : 1)) }
+        held = { at, ...snapshotOf(all.all().map(entry)) }
       }
 
       return held
@@ -336,9 +359,9 @@ function matcherOf(from: string): Matcher {
 
 // Where an asked path goes, as `location`, when a redirect of the set answers it: an exact row first, then the first `:param` or `*` row it matches. Undefined when none does or the answer would leave where the rules allow, or send the visitor back to the path they asked.
 // A path that is gone answers with an empty location and 410.
-export function answerFor(set: RedirectSet, asked: string, search: string, hosts: readonly string[]): { location: string, status: RuntimeStatus } | undefined {
+export async function answerFor(set: RedirectSet, asked: string, search: string, hosts: readonly string[]): Promise<{ location: string, status: RuntimeStatus } | undefined> {
   const path = plainPath(asked)
-  const { exact: byPath, patterns } = set.snapshot()
+  const { exact: byPath, patterns } = await set.snapshot()
   const exact = byPath.get(path)
   let location: string | undefined
   let found = exact

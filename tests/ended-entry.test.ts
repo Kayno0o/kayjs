@@ -42,12 +42,12 @@ async function visit(app: { handle: (request: Request) => Response | Promise<Res
 
 // The count is written after the answer went out, so the paths are read once they have been, or once nothing more is coming.
 async function listed(expected: number): Promise<string[]> {
-  for (let attempt = 0; attempt < 100 && missingPaths().length < expected; attempt++)
+  for (let attempt = 0; attempt < 100 && (await missingPaths()).length < expected; attempt++)
     await Bun.sleep(10)
 
   await Bun.sleep(expected === 0 ? 100 : 0)
 
-  return missingPaths().map(row => row.path).toSorted()
+  return (await missingPaths()).map(row => row.path).toSorted()
 }
 
 afterEach(async () => {
@@ -91,13 +91,13 @@ describe.each(['', '/docs'])('an entry whose unpublishAt passed, under base %p',
   it('lets a redirect added while the site runs win over the 410', async () => {
     const { scratch, app } = await endedSite(base)
 
-    addRuntimeRedirect('/talks/ending', '/talks')
+    await addRuntimeRedirect('/talks/ending', '/talks')
 
     try {
       expect(await visit(app, `/talks/ending`)).toMatchObject({ status: 307, location: `${base}/talks` })
     }
     finally {
-      removeRuntimeRedirect('/talks/ending')
+      await removeRuntimeRedirect('/talks/ending')
       await scratch.remove()
     }
   })
@@ -119,7 +119,7 @@ describe('an ended entry\'s page', () => {
   it('answers 410 under trailingSlash always, the path counted without its slash', async () => {
     const { scratch, app } = await endedSite('', undefined, 'always')
 
-    clearMissing()
+    await clearMissing()
 
     try {
       expect((await visit(app, '/talks/ending/')).status).toBe(410)
@@ -134,19 +134,19 @@ describe('an ended entry\'s page', () => {
   it('lists a visit to it among the missing paths, an editor\'s 410 for the path answering without listing it again', async () => {
     const { scratch, app } = await endedSite('')
 
-    clearMissing()
+    await clearMissing()
 
     try {
       expect((await visit(app, '/talks/ending')).status).toBe(410)
       expect(await listed(1)).toEqual(['/talks/ending'])
 
-      addRuntimeRedirect('/talks/ending', '', { status: 410 })
+      await addRuntimeRedirect('/talks/ending', '', { status: 410 })
       expect(await listed(0)).toEqual([])
       expect((await visit(app, '/talks/ending')).status).toBe(410)
       expect(await listed(0)).toEqual([])
     }
     finally {
-      removeRuntimeRedirect('/talks/ending')
+      await removeRuntimeRedirect('/talks/ending')
       await scratch.remove()
     }
   })

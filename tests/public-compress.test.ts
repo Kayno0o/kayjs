@@ -442,7 +442,7 @@ describe('a deleted public file is a path nothing serves', () => {
 
   async function counted(path: string) {
     for (let attempt = 0; attempt < 100; attempt++) {
-      const found = missingPaths().find(row => row.path === path)
+      const found = (await missingPaths()).find(row => row.path === path)
 
       if (found)
         return found
@@ -457,7 +457,7 @@ describe('a deleted public file is a path nothing serves', () => {
     const app = await served('moved.json', MEDIUM)
 
     expect((await get(app, '/moved.json')).status).toBe(404)
-    addRuntimeRedirect('/moved.json', '/about', { status: 301 })
+    await addRuntimeRedirect('/moved.json', '/about', { status: 301 })
 
     try {
       for (const headers of [{}, { 'accept-encoding': 'gzip' }, { accept: 'text/html' }]) {
@@ -471,7 +471,7 @@ describe('a deleted public file is a path nothing serves', () => {
       expect(head.status).toBe(301)
     }
     finally {
-      removeRuntimeRedirect('/moved.json')
+      await removeRuntimeRedirect('/moved.json')
     }
 
     expect((await get(app, '/moved.json')).status).toBe(404)
@@ -480,7 +480,7 @@ describe('a deleted public file is a path nothing serves', () => {
   it('answers the redirect under a base', async () => {
     const app = await served('moved-base.json', MEDIUM, { base: '/docs' })
 
-    addRuntimeRedirect('/moved-base.json', '/about')
+    await addRuntimeRedirect('/moved-base.json', '/about')
 
     try {
       const response = await get(app, '/moved-base.json')
@@ -488,7 +488,7 @@ describe('a deleted public file is a path nothing serves', () => {
       expect([response.status, response.headers.get('location')]).toEqual([307, '/docs/about'])
     }
     finally {
-      removeRuntimeRedirect('/moved-base.json')
+      await removeRuntimeRedirect('/moved-base.json')
     }
   })
 
@@ -568,7 +568,7 @@ describe('a deleted public file is a path nothing serves', () => {
       expect((await get(app, `/${name}`)).status, name).toBe(200)
       await rm(path)
       expect((await get(app, `/${name}`)).status, name).toBe(404)
-      addRuntimeRedirect(`/${name}`, '/survey')
+      await addRuntimeRedirect(`/${name}`, '/survey')
 
       try {
         for (const method of ['GET', 'HEAD']) {
@@ -578,7 +578,7 @@ describe('a deleted public file is a path nothing serves', () => {
         }
       }
       finally {
-        removeRuntimeRedirect(`/${name}`)
+        await removeRuntimeRedirect(`/${name}`)
       }
     }
   })

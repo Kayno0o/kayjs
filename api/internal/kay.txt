@@ -796,7 +796,7 @@ function acceptedLocales(header: string): string[]
 function actionTool(action: ServerAction<TSchema, unknown, string>, taken?: Set<string> | undefined): LibraryTool | undefined
 
 [./library] addRuntimeRedirect
-function addRuntimeRedirect(from: string, to: string, options?: { status?: RuntimeStatus | undefined; file?: string | undefined; }): RuntimeRedirect
+function addRuntimeRedirect(from: string, to: string, options?: { status?: RuntimeStatus | undefined; file?: string | undefined; }): Promise<RuntimeRedirect>
 
 [./library] admitEditSession
 function admitEditSession(ctx: { cookies: CookieMap; request: Request; }, given?: string | undefined): void
@@ -848,7 +848,7 @@ type CheckedAnswer = { value: unknown } | { issues: AnswerIssue[] }
 function checkOptionKeys(what: string, options: object | undefined, known: Record<string, true>): void
 
 [./library] clearMissing
-function clearMissing(file?: string | undefined): number
+function clearMissing(file?: string | undefined): Promise<number>
 
 [./library] commandProject
 function commandProject(name: string, root: string, config: KayConfig, shared?: Partial<Pick<CommandProject, "dryRun" | "format" | "quiet">>): CommandProject
@@ -907,8 +907,8 @@ function defineContext<Loaders extends Record<string, (request: Request) => unkn
 }>
 
 [./library] dismissMissing
-function dismissMissing(path: string, file?: string | undefined): boolean
-function dismissMissing(paths: readonly string[], file?: string | undefined): number
+function dismissMissing(path: string, file?: string | undefined): Promise<boolean>
+function dismissMissing(paths: readonly string[], file?: string | undefined): Promise<number>
 
 [./library] dispatch
 function dispatch<E extends object>(source: string, hooks: readonly (Hook<E> | undefined)[], event: E, { detached, context }?: DispatchOptions): Promise<void>
@@ -1247,7 +1247,7 @@ const READ_METHODS: Set<string>
 function readCacheEntry<Value>(slot: CacheSlot): Promise<Value | undefined>
 
 [./library] redirectMovedPage
-function redirectMovedPage(from: string | undefined, to: string | undefined): void
+function redirectMovedPage(from: string | undefined, to: string | undefined): Promise<void>
 
 [./library] RedirectRefusedError
 class RedirectRefusedError
@@ -1273,7 +1273,7 @@ interface RefuseOptions
 function relationsMissing(db: SQL, names: readonly string[]): Promise<boolean>
 
 [./library] removeRuntimeRedirect
-function removeRuntimeRedirect(from: string, file?: string | undefined): boolean
+function removeRuntimeRedirect(from: string, file?: string | undefined): Promise<boolean>
 
 [./library] requestOfContext
 function requestOfContext(): Request | undefined
@@ -1289,7 +1289,7 @@ interface RuntimeRedirect
   to: string
 
 [./library] runtimeRedirects
-function runtimeRedirects(file?: string | undefined): RuntimeRedirect[]
+function runtimeRedirects(file?: string | undefined): Promise<RuntimeRedirect[]>
 
 [./library] safeCode
 function safeCode(markup: string): string
@@ -1343,7 +1343,7 @@ interface UiConfigEntry
   value: Span
 
 [./library] unansweredPaths
-function unansweredPaths(file?: string | undefined): MissingPath[]
+function unansweredPaths(file?: string | undefined): Promise<MissingPath[]>
 
 [./library] underKayDev
 function underKayDev(): boolean

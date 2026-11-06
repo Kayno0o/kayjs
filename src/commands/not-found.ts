@@ -5,14 +5,16 @@ import { existsSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 import { loadConfig } from '../config-loader'
+import { databaseOf } from '../server/app-database'
 import { buildingWithoutEnv } from '../server/env-state'
-import { answeredBy, missingStore, notFoundFile } from '../server/not-found'
+import { answeredBy, notFoundHome, openMissing } from '../server/not-found'
 import { addRedirect, checkRedirect, redirectEntry, withRedirect } from '../server/not-found-config'
+import { notFoundTablesExist } from '../server/pg-not-found'
 import { formatOption, printDocument, printFailure, projectRoot, shellQuote, withStdoutOnStderr } from './command'
 
 const REFERRER_LIMIT = 3
 
-// The paths visitors asked for and found nothing at, most hit first, read from the file the production server keeps.
+// The paths visitors asked for and found nothing at, most hit first, read from the database the production server keeps them in.
 // `--redirect <path>` turns one into a redirect in kay.config.ts, to `--to` or to the suggested target; with `--runtime` it goes in the file instead, which the running site reads with no deploy, answering 307.
 export const notFound: Command = {
   usage: 'not-found [dir] [--redirect <path> [--to <target>] [--runtime] [--dry-run]] [--file <database>] [--format text|json]',
@@ -48,15 +50,16 @@ export const notFound: Command = {
 
     try {
       const config = await withStdoutOnStderr(async () => loadConfig(root))
-      const file = typeof values.file === 'string' ? values.file : notFoundFile(config.store?.database, root)
+      const home = typeof values.file === 'string' ? { kind: 'sqlite', file: values.file } as const : notFoundHome(databaseOf(config.store), root)
+      const where = home.kind === 'pg' ? 'the app\'s Postgres database' : relative(process.cwd(), home.file) || home.file
       const redirects = Object.keys(config.redirects ?? {})
       const redirected = new Set(redirects)
-      // A dry run with no file keeps its store in memory, so it creates none.
-      const storeFile = existsSync(file) || !dryRun ? file : ':memory:'
-      const store = existsSync(file) || runtime ? missingStore(storeFile, false) : undefined
+      const recorded = home.kind === 'pg' ? await notFoundTablesExist(home.source) : existsSync(home.file)
+      // A dry run with nothing recorded keeps its store in memory, so it creates none.
+      const store = recorded || runtime ? openMissing(recorded || !dryRun ? home : { kind: 'sqlite', file: ':memory:' }, false) : undefined
 
       try {
-        const all = store?.list() ?? []
+        const all = await store?.list() ?? []
         const answered = answeredBy(redirects)
         const missing = all.filter(row => !answered(row.path))
 
@@ -69,7 +72,7 @@ export const notFound: Command = {
 
           if (dryRun) {
             if (runtime) {
-              store!.redirects.add(redirect, target, undefined, await runtimeRules(root, config, true))
+              await store!.redirects.add(redirect, target, undefined, await runtimeRules(root, config, true))
             }
             else {
               checkRedirect(redirect, target, redirected)
@@ -93,14 +96,14 @@ export const notFound: Command = {
           }
 
           if (runtime) {
-            const added = store!.redirects.add(redirect, target, undefined, await runtimeRules(root, config, false))
+            const added = await store!.redirects.add(redirect, target, undefined, await runtimeRules(root, config, false))
 
-            store!.forget(added.from)
+            await store!.forget(added.from)
 
             if (format === 'json')
               printDocument({ redirect: { from: added.from, to: added.to, runtime: true } })
             else
-              console.log(`Added to ${relative(process.cwd(), file) || file}, which the running site reads: ${added.from} -> ${added.to}`)
+              console.log(`Added to ${where}, which the running site reads: ${added.from} -> ${added.to}`)
 
             return 0
           }
@@ -115,7 +118,7 @@ export const notFound: Command = {
             return 1
           }
 
-          store?.forget(redirect)
+          await store?.forget(redirect)
 
           if (format === 'json')
             printDocument({ redirect: { from: redirect, to: target } })
@@ -136,7 +139,7 @@ export const notFound: Command = {
         return 0
       }
       finally {
-        store?.close()
+        await store?.close()
       }
     }
     catch (error) {
@@ -161,7 +164,7 @@ function formatListing(missing: MissingPath[], redirected: boolean): string {
     return 'Every recorded path has a redirect.'
 
   if (missing.length === 0)
-    return 'No missing path recorded: the production server records the pages visitors asked for and found nothing at in the SQLite file of the app\'s store, or data/not-found.sqlite.'
+    return 'No missing path recorded: the production server records the pages visitors asked for and found nothing at in the app\'s store (its SQLite file or its Postgres database), or data/not-found.sqlite.'
 
   return missing.map(({ path, hits, referrers, target, reason }) => {
     const hosts = [...new Set(referrers.map(({ host }) => host))]

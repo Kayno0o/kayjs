@@ -19,7 +19,7 @@ if (!await may(ctx, 'redirects'))
   forbidden(ctx, 'redirects')
 
 const { prefix } = settings()
-const screen = readMissing()
+const screen = await readMissing()
 const records = 'production server records the pages visitors asked for and found nothing at.'
 const hint = underKayDev() ? wording('cms.missing.devHint', `kay dev counts nothing: the ${records}`) : wording('cms.missing.emptyHint', `The ${records}`)
 ---

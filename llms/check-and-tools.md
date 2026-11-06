@@ -114,7 +114,7 @@ kay fmt --check
   - And kay's own routes the config turns on, such as `/_kay/health`, the favicons and the sitemap.
   - What the server entry adds, as a `.use(auth.plugin)`, and an extension's `server` given as a function are only known as the server starts: a last line names them, unlisted.
 - `kay not-found [dir] [--redirect <path> [--to <target>] [--runtime] [--dry-run]] [--format text|json]`:
-  - Lists the paths visitors asked for with a GET and found nothing at, most hit first, from the SQLite file of the app's `store`, else `data/not-found.sqlite` (or `--file`), with the hosts they came from and a suggested target; those a `redirects` entry answers already are left out ([Redirects](routing-endpoints-and-base.md#redirects));
+  - Lists the paths visitors asked for with a GET and found nothing at, most hit first, from the database of the app's `store` (its SQLite file or its Postgres), else `data/not-found.sqlite` (or the SQLite `--file`), with the hosts they came from and a suggested target; those a `redirects` entry answers already are left out ([Redirects](routing-endpoints-and-base.md#redirects));
   - `--redirect <path>` adds the redirect to `redirects` in kay.config.ts, to `--to` or to the suggested target, and drops the path from the list; a config with no object literal to add it to prints the line to add by hand;
   - `--runtime` writes it to the file instead, which the running site reads with no deploy and no change to kay.config.ts; the rules are those of [Redirects](routing-endpoints-and-base.md#redirects), and `kay check` reports such a target nothing serves.
 - `kay doctor [dir] [--port <port>] [--format text|json] [--quiet]`:

@@ -18,7 +18,7 @@ const known = ['/', '/about', '/blog/hello-world', '/blog/second-post', '/news/l
 // The count is written after the answer went out, so a test waits for what it expects to be listed.
 async function counted(path: string): Promise<MissingPath> {
   for (let attempt = 0; attempt < 100; attempt++) {
-    const found = missingPaths().find(row => row.path === path)
+    const found = (await missingPaths()).find(row => row.path === path)
 
     if (found)
       return found
@@ -281,7 +281,7 @@ describe('unansweredPaths', () => {
     const dir = await scratchDir('not-found-')
     const file = join(dir, 'missing.sqlite')
 
-    expect(unansweredPaths(file)).toEqual([])
+    expect(await unansweredPaths(file)).toEqual([])
     expect(await Bun.file(file).exists()).toBe(false)
 
     const store = missingStore(file)
@@ -293,9 +293,9 @@ describe('unansweredPaths', () => {
     knowRedirects(['/moved/*'])
 
     try {
-      expect(unansweredPaths(file).map(({ path, hits }) => [path, hits])).toEqual([['/blog/old', 3], ['/gone', 2]])
+      expect((await unansweredPaths(file)).map(({ path, hits }) => [path, hits])).toEqual([['/blog/old', 3], ['/gone', 2]])
       knowRedirects(['/blog/:slug', '/gone'])
-      expect(unansweredPaths(file).map(({ path }) => path)).toEqual(['/moved/x'])
+      expect((await unansweredPaths(file)).map(({ path }) => path)).toEqual(['/moved/x'])
     }
     finally {
       knowRedirects([])
@@ -334,12 +334,12 @@ describe('dismissing missing paths', () => {
     store.hit('/y', undefined, never)
     store.close()
 
-    expect(dismissMissing('/x', file)).toBe(true)
-    expect(dismissMissing('/x', file)).toBe(false)
-    expect(unansweredPaths(file).map(({ path }) => path)).toEqual(['/y'])
-    expect(clearMissing(file)).toBe(1)
-    expect(unansweredPaths(file)).toEqual([])
-    expect(dismissMissing('/x', join(await scratchDir('not-found-'), 'none.sqlite'))).toBe(false)
+    expect(await dismissMissing('/x', file)).toBe(true)
+    expect(await dismissMissing('/x', file)).toBe(false)
+    expect((await unansweredPaths(file)).map(({ path }) => path)).toEqual(['/y'])
+    expect(await clearMissing(file)).toBe(1)
+    expect(await unansweredPaths(file)).toEqual([])
+    expect(await dismissMissing('/x', join(await scratchDir('not-found-'), 'none.sqlite'))).toBe(false)
   })
 
   it('dismisses several paths in one open of the file, counting those that were listed', async () => {
@@ -351,9 +351,9 @@ describe('dismissing missing paths', () => {
 
     store.close()
 
-    expect(dismissMissing(['/a', '/c', '/zzz'], file)).toBe(2)
-    expect(unansweredPaths(file).map(({ path }) => path)).toEqual(['/b'])
-    expect(dismissMissing(['/a'], join(await scratchDir('not-found-'), 'none.sqlite'))).toBe(0)
+    expect(await dismissMissing(['/a', '/c', '/zzz'], file)).toBe(2)
+    expect((await unansweredPaths(file)).map(({ path }) => path)).toEqual(['/b'])
+    expect(await dismissMissing(['/a'], join(await scratchDir('not-found-'), 'none.sqlite'))).toBe(0)
   })
 })
 
@@ -384,7 +384,7 @@ describe('countMissing', () => {
     await counted('/nothing-registered')
 
     // Other files of the same run count into the same store.
-    const listed = missingPaths().filter(({ path }) => ['/gone', '/fine', '/api/user', '/wp-login.php', '/nothing-registered'].includes(path))
+    const listed = (await missingPaths()).filter(({ path }) => ['/gone', '/fine', '/api/user', '/wp-login.php', '/nothing-registered'].includes(path))
 
     expect(listed.map(({ path, hits }) => [path, hits]).sort()).toEqual([['/gone', 2], ['/nothing-registered', 1]])
     expect(listed.find(({ path }) => path === '/gone')!.referrers).toEqual([{ host: 'search.example', hits: 1 }])
@@ -396,7 +396,7 @@ describe('countMissing', () => {
 
     await counted('/gone')
     await eventually(async () => expect((await counted('/gone')).referrers).toContainEqual({ host: 'localhost', page: '/news/item', hits: 1 }))
-    expect(JSON.stringify(missingPaths())).not.toContain('private')
+    expect(JSON.stringify((await missingPaths()))).not.toContain('private')
   })
 })
 
@@ -416,7 +416,7 @@ describe('a served app', () => {
     await app.handle(new Request('http://localhost/a/../page-nobody-has-z'))
     expect((await counted('/en/page-nobody-has-y')).hits).toBe(1)
     await counted('/page-nobody-has-z')
-    expect(missingPaths().filter(({ path }) => path.includes('..'))).toEqual([])
+    expect((await missingPaths()).filter(({ path }) => path.includes('..'))).toEqual([])
   })
 
   it('records nothing in development, where only production counts', async () => {
@@ -426,7 +426,7 @@ describe('a served app', () => {
     await dev.handle(new Request('http://localhost/page-only-dev-sees'))
     await production.handle(new Request('http://localhost/page-only-production-sees'))
     await counted('/page-only-production-sees')
-    expect(missingPaths().map(({ path }) => path)).not.toContain('/page-only-dev-sees')
+    expect((await missingPaths()).map(({ path }) => path)).not.toContain('/page-only-dev-sees')
   })
 
   it('records nothing while a static export reads the site', async () => {
@@ -641,7 +641,7 @@ describe('routes the counter must not reach', () => {
 
     await counted('/page-nobody-has-x')
 
-    const paths = missingPaths().map(({ path }) => path)
+    const paths = (await missingPaths()).map(({ path }) => path)
 
     expect(paths).toContain('/page-nobody-has-x')
     expect(paths.filter(path => path.startsWith('/api/'))).toEqual([])
@@ -708,14 +708,14 @@ describe('the dev tool tab', () => {
   const post = (body: unknown, headers: Record<string, string> = { 'x-kay-dev': '1' }) => new Request('http://localhost/_kay/dev/not-found', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
 
   it('lists the recorded paths most hit first, without those a redirect answers', async () => {
-    const listed = devNotFound(await recorded(), ['/done'])
+    const listed = await devNotFound(await recorded(), ['/done'])
 
     expect(listed.recorded).toBe(true)
     expect(listed.missing.map(row => [row.path, row.hits, row.target, row.referrers])).toEqual([['/old', 3, '/new', [{ host: 'a.example', hits: 3 }]], ['/other', 1, undefined, []]])
   })
 
   it('says there is no file when production left none', async () => {
-    expect(devNotFound(await scratchDir('not-found-dev-'), [])).toEqual({ file: 'data/not-found.sqlite', recorded: false, missing: [] })
+    expect(await devNotFound(await scratchDir('not-found-dev-'), [])).toEqual({ file: 'data/not-found.sqlite', recorded: false, missing: [] })
   })
 
   it('writes the suggested redirect, or the one named, and forgets the path', async () => {
@@ -724,12 +724,12 @@ describe('the dev tool tab', () => {
 
     expect(await suggested.json()).toEqual({ redirect: { from: '/old', to: '/new' } })
     expect(await Bun.file(join(root, 'kay.config.ts')).text()).toContain('redirects: {\n    \'/old\': \'/new\',')
-    expect(devNotFound(root, ['/done']).missing.map(row => row.path)).toEqual(['/other'])
+    expect((await devNotFound(root, ['/done'])).missing.map(row => row.path)).toEqual(['/other'])
 
     const named = await devRedirect(root, post({ path: '/other', to: 'https://example.com/x' }), ['/done', '/old'])
 
     expect(await named.json()).toEqual({ redirect: { from: '/other', to: 'https://example.com/x' } })
-    expect(devNotFound(root, []).missing.map(row => row.path)).toEqual(['/done'])
+    expect((await devNotFound(root, [])).missing.map(row => row.path)).toEqual(['/done'])
   })
 
   it('refuses a request without the dev header, a cross-site one, a missing target, a bad target and a redirect that exists', async () => {
@@ -790,8 +790,9 @@ describe('the file the log lives in', () => {
     expect(notFoundFile(undefined, root)).toBe(join(root, 'data/not-found.sqlite'))
     expect(notFoundFile('postgres://user@host/db', root)).toBe(join(root, 'data/not-found.sqlite'))
     expect(notFoundFile('sqlite://relative.sqlite', root)).toBe(join(root, 'data/not-found.sqlite'))
-    expect(keepsNotFoundLocally(`sqlite://${root}/app.sqlite`, root)).toBe(false)
-    expect(keepsNotFoundLocally('postgres://user@host/db', root)).toBe(true)
+    expect(keepsNotFoundLocally({ kind: 'sqlite', path: `${root}/app.sqlite` }, root)).toBe(false)
+    expect(keepsNotFoundLocally({ kind: 'pg', source: 'postgres://user@host/db' }, root)).toBe(false)
+    expect(keepsNotFoundLocally(undefined, root)).toBe(true)
   })
 
   it('keeps being the old data/not-found.sqlite once it exists', async () => {

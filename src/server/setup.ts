@@ -21,6 +21,7 @@ import { liveStoreReady } from '../runtime/live-value'
 import { runInLocale } from '../runtime/locale-state'
 import { setSite } from '../runtime/site'
 import { trustSchemes } from '../runtime/url'
+import { appDatabase } from './app-database'
 import { setAppRoot } from './app-identity'
 import { setupStore } from './app-store'
 import { basePath } from './base'
@@ -170,7 +171,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
     setupStore(await sharedStores(exporting && config.store ? { database: config.store.database } : config.store))
 
     if (!mode.dev && !exporting && process.env.NODE_ENV !== 'test')
-      adoptLocalNotFound(config.store?.database)
+      await adoptLocalNotFound(appDatabase())
 
     await liveStoreReady()
     // A test's server restarts with its process and has no replica, so a key of the process is right there.

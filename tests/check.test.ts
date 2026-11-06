@@ -3464,7 +3464,7 @@ describe.concurrent('kay check, a redirect source is served', () => {
     const root = await scratchProject(files)
 
     try {
-      addRuntimeRedirect('/later', '/', { file: join(root, NOT_FOUND_FILE) })
+      await addRuntimeRedirect('/later', '/', { file: join(root, NOT_FOUND_FILE) })
 
       expect(unserved(await check(root, { redirects }))).toEqual(sorted(left))
       expect(unserved(await check(root, { redirects: {} }))).toEqual(sorted([...left, ...sources.filter(row => row[2] !== '/later')]))
@@ -3515,7 +3515,7 @@ describe.concurrent('kay check, a redirect source is served', () => {
     const root = await scratchProject(files)
 
     try {
-      addRuntimeRedirect('/later', '/', { file: join(root, NOT_FOUND_FILE) })
+      await addRuntimeRedirect('/later', '/', { file: join(root, NOT_FOUND_FILE) })
 
       expect(unserved(await check(root, { redirects, base: '/app' }))).toEqual(sorted(left))
       expect(unserved(await check(root, { redirects, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr' } }))).toEqual(sorted(left))
