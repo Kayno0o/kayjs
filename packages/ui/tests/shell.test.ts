@@ -89,6 +89,18 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
     expect(page.errors).toEqual([])
   }, 60_000)
 
+  it('runs a link action, goes to its page and closes its toast, reading the description in the alert region', async () => {
+    const page = await site.open('/toast-rich')
+
+    await page.click('#linked')
+    await page.waitFor('.kui-toast a[data-part=action]')
+    expect(await page.text('[role=alert]')).toContain('See it')
+    await page.click('.kui-toast a[data-part=action]')
+    await page.waitUntil(() => location.pathname === '/shell')
+    await page.waitUntil(() => document.querySelector('.kui-toast') === null)
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
   it('replaces the drawing of a toast with the Toaster\'s toast block, whose dismiss closes it', async () => {
     const page = await site.open('/toast-block')
 

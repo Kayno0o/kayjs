@@ -14,3 +14,4 @@ h1 Toast rich
 button#stack(type="button" onClick={stack}) Stack
 button#later(type="button" onClick={later}) Later
 Toaster(position="top-center" limit={2})
+button#linked(type="button" onClick={() => toast.error('Moved', { description: 'See it', action: { label: 'See', href: '/shell', run: () => { document.body.dataset.ran = 'yes' } } })}) Linked

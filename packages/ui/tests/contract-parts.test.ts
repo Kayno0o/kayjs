@@ -16,7 +16,7 @@ const STRUCTURE: Record<string, Record<string, number>> = {
   'date-input.kay': { thead: 1, tbody: 1 },
   'line-chart.kay': { table: 1, caption: 1, thead: 1, tbody: 1, tr: 2, th: 3, td: 3 },
   'table.kay': { tr: 2, td: 2 },
-  'toaster.kay': { span: 2 },
+  'toaster.kay': { span: 4 },
 }
 
 // The states ARIA has an attribute for: a `data-*` of the same name is a second source of truth, so it stays out unless listed here with the reason it says something else.

@@ -517,7 +517,7 @@ describe('toast.update', () => {
     expect(toast.update(id, { message: 'Saved', tone: 'success', description: 'Two files', action: { label: 'Undo', href: '/undo' } })).toBe(true)
     expect(toasts()).toMatchObject([{ id, message: 'Saved', tone: 'success', type: 'success', description: 'Two files', action: { label: 'Undo', href: '/undo' } }])
 
-    toast.update(id, { action: undefined })
+    toast.update(id, { action: null })
 
     expect(toasts()[0]!.action).toBeUndefined()
   })
@@ -590,5 +590,106 @@ describe('toast.promise', () => {
     await done
 
     expect(toasts()).toMatchObject([{ message: 'Failed', tone: 'danger' }])
+  })
+})
+
+describe('toast.update conventions', () => {
+  test('null clears the description, the action and onDismiss, undefined leaves them', () => {
+    const id = toast.info('x', { duration: false, description: 'd', action: { label: 'Go', run: () => 1 }, onDismiss: () => 1 })
+
+    toast.update(id, { description: undefined, message: 'y' })
+
+    expect(toasts()[0]).toMatchObject({ description: 'd', message: 'y' })
+
+    toast.update(id, { description: null, action: null, onDismiss: null })
+
+    expect(toasts()[0]).toMatchObject({ description: undefined, action: undefined, onDismiss: undefined })
+  })
+
+  test('turning a toast into an error already open closes it instead of stacking', () => {
+    toast.error('Offline')
+
+    const id = toast.info('Checking', { duration: false })
+
+    expect(toast.update(id, { message: 'Offline', tone: 'danger' })).toBe(true)
+    expect(shown()).toEqual([{ message: 'Offline', type: 'error' }])
+  })
+
+  test('during a hold the new clock waits, and a release restarts it from what it has', () => {
+    jest.useFakeTimers()
+
+    try {
+      const id = toast.info('Working', { duration: false })
+
+      holdToasts('pointer', true)
+      toast.update(id, { tone: 'success', duration: '2s' })
+      jest.advanceTimersByTime(10_000)
+
+      expect(toasts()).toHaveLength(1)
+
+      holdToasts('pointer', false)
+      jest.advanceTimersByTime(1999)
+
+      expect(toasts()).toHaveLength(1)
+
+      jest.advanceTimersByTime(1)
+
+      expect(toasts()).toHaveLength(0)
+    }
+    finally {
+      holdToasts('pointer', false)
+      jest.useRealTimers()
+    }
+  })
+})
+
+describe('toast.promise outcome', () => {
+  const action = { label: 'Retry', run: () => 1 }
+
+  test('keeps onDismiss, once, and drops the loading description and action unless the outcome gives its own', async () => {
+    const heard: string[] = []
+    const onDismiss = (reason: string) => heard.push(reason)
+    const done = toast.promise(Promise.resolve(1), { loading: 'Saving', description: 'wait', action, onDismiss, success: 'Saved', error: 'Failed' })
+
+    expect(toasts()[0]).toMatchObject({ description: 'wait', action })
+
+    await done
+
+    expect(toasts()[0]).toMatchObject({ message: 'Saved', description: undefined, action: undefined, outcome: true })
+    expect(heard).toEqual([])
+
+    dismissToast(toasts()[0]!.id, 'user')
+
+    expect(heard).toEqual(['user'])
+  })
+
+  test('an outcome with its own description and action shows them', async () => {
+    await toast.promise(Promise.reject(new Error('x')), { loading: 'Saving', description: 'wait', error: { message: 'Failed', description: 'Try later', action } })
+
+    expect(toasts()[0]).toMatchObject({ message: 'Failed', description: 'Try later', action, outcome: true })
+  })
+
+  test('when the reader closed the loading toast, the new outcome follows the same rule and onDismiss is not heard twice', async () => {
+    const heard: string[] = []
+    const { promise, resolve } = Promise.withResolvers<number>()
+    const done = toast.promise(promise, { loading: 'Saving', description: 'wait', action, onDismiss: reason => heard.push(reason), success: 'Saved', error: 'Failed' })
+
+    dismissToast(toasts()[0]!.id, 'user')
+    resolve(1)
+    await done
+
+    expect(toasts()).toMatchObject([{ message: 'Saved', description: undefined, action: undefined, outcome: true, onDismiss: undefined }])
+    expect(heard).toEqual(['user'])
+  })
+
+  test('a success that throws closes the toast and does not report the call as failed', async () => {
+    const error = jest.spyOn(console, 'error').mockImplementation(() => undefined)
+    const value = await toast.promise(Promise.resolve(7), { loading: 'Saving', success: () => {
+      throw new Error('bug')
+    }, error: 'Failed' })
+
+    expect(value).toBe(7)
+    expect(toasts()).toEqual([])
+    error.mockRestore()
   })
 })

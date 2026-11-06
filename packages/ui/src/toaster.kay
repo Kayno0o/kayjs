@@ -111,6 +111,24 @@ async function acted(item: Toast) {
   dismissToast(item.id, 'action')
 }
 
+// A link action goes to its page as the browser does: its `run` starts, and the toast closes once the click has been handled, as a link removed during its own click does not navigate.
+async function ran(item: Toast) {
+  try {
+    await item.action?.run?.()
+  }
+  catch (error) {
+    console.error('kayjs-ui: the action of a toast threw', error)
+  }
+}
+
+function linked(event: MouseEvent, item: Toast) {
+  if (!(event.target as Element).closest('a[data-part~="action"]'))
+    return
+
+  void ran(item)
+  setTimeout(dismissToast, 0, item.id, 'action')
+}
+
 // Escape dismisses the focused toast alone, not the dialog under it, and focus moves on to the next toast's button rather than falling to the page.
 function dismissed(event: KeyboardEvent) {
   const element = event.currentTarget as HTMLElement
@@ -129,16 +147,22 @@ function dismissed(event: KeyboardEvent) {
 ---
 // Screen readers hear a toast from regions kept in the page, which a message joining reads out: a live region shown only as it fills, as the toaster is, is often not read.
 if owns()
-  div(part="live" role="status")
-    for item of listed().filter(item => toneOf(item) !== 'danger') key={item.id}
+  // The outcome of a `toast.promise` is read politely whatever its tone: the reader waited for it, and an alert would cut in on what they were doing.
+  div(part="live" role="status" aria-live="polite")
+    for item of listed().filter(item => toneOf(item) !== 'danger' || item.outcome) key={item.id}
       span {item.message}
+      if item.description
+        span {` ${item.description}`}
   div(part="live" role="alert")
-    for item of listed().filter(item => toneOf(item) === 'danger') key={item.id}
+    for item of listed().filter(item => toneOf(item) === 'danger' && !item.outcome) key={item.id}
       span {item.message}
+      if item.description
+        span {` ${item.description}`}
   // Holding still while the pointer is on the toasts or focus is in them, as timed content must let itself be paused.
   div({...rest} part="root" data-position={position} ref={ref} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
     for item of listed() key={item.id}
-      div(part="toast" data-id={item.id} data-tone={toneOf(item)} data-type={item.type} onKeyDown={dismissed})
+      // kay-allow unreachable-click
+      div(part="toast" data-id={item.id} data-tone={toneOf(item)} data-type={item.type} onKeyDown={dismissed} onClick={event => linked(event, item)})
         if toast
           | {toast(item, () => dismissToast(item.id, 'user'))}
         else

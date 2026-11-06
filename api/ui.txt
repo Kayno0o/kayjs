@@ -462,14 +462,12 @@ interface Toast
   loading?: boolean | undefined
   message: Element
   onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
+  outcome?: boolean | undefined
   tone?: Tone | undefined
   type: ToastType
 
 [.] ToastAction
-interface ToastAction
-  href?: string | undefined
-  label: string
-  run?: (() => unknown) | undefined
+type ToastAction = { label: string, run: () => unknown, href?: undefined } | { label: string, href: string, run?: (() => unknown) | undefined }
 
 [.] ToastDismissReason
 type ToastDismissReason = 'timeout' | 'user' | 'action' | 'api'
@@ -485,14 +483,18 @@ interface ToastOptions
   onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
   tone?: Tone | undefined
 
+[.] ToastOutcome
+type ToastOutcome = string | { message: string, description?: string | undefined, action?: ToastAction | undefined }
+
 [.] ToastPatch
 interface ToastPatch
-  action?: ToastAction | undefined
-  description?: string | undefined
+  action?: ToastAction | null | undefined
+  description?: null | string | undefined
   duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
   loading?: boolean | undefined
   message?: Element
-  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
+  onDismiss?: ((reason: ToastDismissReason) => unknown) | null | undefined
+  outcome?: boolean | undefined
   tone?: Tone | undefined
 
 [.] ToastPromiseOptions
@@ -500,10 +502,10 @@ interface ToastPromiseOptions<T> extends Omit<ToastOptions, 'tone'>
   action?: ToastAction | undefined
   description?: string | undefined
   duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
-  error: ((error: unknown) => string) | string
+  error: ((error: unknown) => ToastOutcome) | ToastOutcome
   loading: string
   onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
-  success?: ((value: T) => string) | string | undefined
+  success?: ((value: T) => ToastOutcome | undefined) | ToastOutcome | undefined
 
 [.] toasts
 function toasts(): Toast[]

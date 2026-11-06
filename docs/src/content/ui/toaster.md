@@ -22,15 +22,21 @@ This page already renders the `Toaster`. `toast` only shows in the browser: the 
 
 ## Changing a toast that is open
 
-`toast.update(id, { message, description, tone, action, duration })` changes it in place and answers `false` when it already went. Naming `tone` or `duration` starts its clock afresh.
+`toast.update(id, { message, description, tone, action, duration })` changes it in place and answers `false` when it already went. A field left out stays, and `null` clears `description`, `action` or `onDismiss`. Naming `tone` or `duration` starts its clock afresh.
 
 ## Following a call
 
 `toast.promise(upload(), { loading: 'Uploading', success: file => `Uploaded ${file.name}`, error: 'Could not upload' })` shows a spinner toast, then turns the same toast into the outcome, an error staying until it is dismissed. Give it a promise or a function returning one. It resolves to the value, or to `undefined` when the call threw, so it needs no `catch`.
 
+The outcome keeps the toast's `onDismiss` and drops its `description` and `action` unless `success` or `error` is `{ message, description, action }`.
+
+Screen readers hear a message with its description from a polite region, a danger toast from an alert region, and the outcome of a `toast.promise` always politely.
+
 ## Position, limit and your own toast
 
-`Toaster(position="top-center" limit={3})` stacks the toasts against another corner or edge (`top-left`, `top-center`, `top-right`, `bottom-left`, `bottom-center`, `bottom-right`) and shows the newest three, the others waiting with their clocks running. An action may be a link, `{ label: 'Open', href: '/exports/12' }`. To draw the inside of each toast yourself, give the Toaster a block: `@toast(item, dismiss)`, where `dismiss` closes the toast.
+`Toaster(position="top-center" limit={3})` stacks the toasts against another corner or edge (`top-left`, `top-center`, `top-right`, `bottom-left`, `bottom-center`, `bottom-right`) and shows the newest three, the others waiting with their clocks running.
+
+An action may be a link, `{ label: 'Open', href: '/exports/12' }`: a click runs its `run` when it has one, then closes the toast, which would otherwise outlive the page swap. To draw the inside of each toast yourself, give the Toaster a block: `@toast(item, dismiss)`, where `dismiss` closes the toast.
 
 ## After an action
 

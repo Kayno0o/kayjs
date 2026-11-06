@@ -10,12 +10,8 @@ export type ToastTone = Tone
 export type ToastType = 'error' | 'success' | 'info'
 
 // A button in a toast for the obvious next step of its message: busy while `run`'s promise is pending, the toast dismissed once it settles, a rejection logged.
-// With an `href` it is a link to that page and `run` is not used: the toast stays until the reader closes it.
-export interface ToastAction {
-  label: string
-  run?: (() => unknown) | undefined
-  href?: string | undefined
-}
+// With an `href` it is a link to that page: a click runs `run` first when there is one (not awaited, the navigation goes on), then closes the toast with the reason `action`, as the toast outlives a page swap.
+export type ToastAction = { label: string, run: () => unknown, href?: undefined } | { label: string, href: string, run?: (() => unknown) | undefined }
 
 // Why a toast went: its clock ran out, the reader closed it (the button or Escape), its action ran, or the app did, through `dismissToast(id)` or `toast.update`.
 export type ToastDismissReason = 'timeout' | 'user' | 'action' | 'api'
@@ -29,6 +25,8 @@ export interface Toast {
   action?: ToastAction | undefined
   // The toast waits on a call, and shows a spinner in place of its icon.
   loading?: boolean | undefined
+  // The outcome of a `toast.promise`: a danger one is announced politely, as the reader just waited for it, not as an alert.
+  outcome?: boolean | undefined
   // Called once the toast has gone, with why.
   onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
   // A toast pushed by hand with only a `type` takes its tone from it.
@@ -154,15 +152,20 @@ function clockOf(duration: Duration | false | undefined, type: ToastType): numbe
 
 interface PushOptions extends ToastOptions {
   loading?: boolean | undefined
+  outcome?: boolean | undefined
+}
+
+// An error already open with the same words is not stacked again, so a failing poll cannot cover the page.
+function sameError(type: ToastType, message: string | Snippet, except?: number): Toast | undefined {
+  return type === 'error' ? untrack(toasts).find(shown => shown.id !== except && shown.type === 'error' && shown.message === message) : undefined
 }
 
 // Untracked: an effect toasting a settled task would otherwise read the list, and toast again on every toast it adds.
-function push(message: string | Snippet, method: ToastType, { duration, action, tone: chosen, description, loading, onDismiss }: PushOptions): number {
+function push(message: string | Snippet, method: ToastType, { duration, action, tone: chosen, description, loading, outcome, onDismiss }: PushOptions): number {
   const tone: Tone = chosen ?? (method === 'error' ? 'danger' : method)
   const type = typeOf(tone)
 
-  // An error already open with the same words is not stacked again, so a failing poll cannot cover the page.
-  const open = type === 'error' ? untrack(toasts).find(shown => shown.type === 'error' && shown.message === message) : undefined
+  const open = sameError(type, message)
 
   if (open !== undefined)
     return open.id
@@ -170,7 +173,7 @@ function push(message: string | Snippet, method: ToastType, { duration, action, 
   const id = nextId++
   const timer: Timer = { remaining: clockOf(duration, type), started: Date.now() }
 
-  untrack(() => toasts.set(list => [...list, { id, message, description, action, tone, type, loading, onDismiss }]))
+  untrack(() => toasts.set(list => [...list, { id, message, description, action, tone, type, loading, outcome, onDismiss }]))
   timers.set(id, timer)
 
   if (holds.size === 0)
@@ -179,15 +182,16 @@ function push(message: string | Snippet, method: ToastType, { duration, action, 
   return id
 }
 
-// What `toast.update` changes on an open toast. Naming `tone`, `duration` or `loading` starts its clock afresh, from the new tone's default unless `duration` says; `action: undefined` takes the button away.
+// What `toast.update` changes on an open toast: a field left out, or `undefined`, stays as it is, and `null` clears `description`, `action` and `onDismiss`. Naming `tone`, `duration` or `loading` starts its clock afresh, from the new tone's default unless `duration` says. A toast turned into an error already open with the same words closes instead, as a new one would not stack.
 export interface ToastPatch {
   message?: string | Snippet | undefined
-  description?: string | undefined
-  action?: ToastAction | undefined
+  description?: string | null | undefined
+  action?: ToastAction | null | undefined
   tone?: Tone | undefined
   duration?: Duration | false | undefined
   loading?: boolean | undefined
-  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
+  outcome?: boolean | undefined
+  onDismiss?: ((reason: ToastDismissReason) => unknown) | null | undefined
 }
 
 // Changes an open toast in place, answering false when `id` is not open (it went already).
@@ -200,13 +204,16 @@ function update(id: number, patch: ToastPatch): boolean {
   const tone = patch.tone ?? current.tone
   const next: Toast = { ...current, tone, type: tone === undefined ? current.type : typeOf(tone) }
 
-  for (const key of ['message', 'description', 'loading', 'onDismiss'] as const) {
+  for (const key of ['message', 'description', 'action', 'loading', 'outcome', 'onDismiss'] as const) {
     if (patch[key] !== undefined)
-      Object.assign(next, { [key]: patch[key] })
+      Object.assign(next, { [key]: patch[key] ?? undefined })
   }
 
-  if ('action' in patch)
-    next.action = patch.action
+  if (sameError(next.type, next.message, id) !== undefined) {
+    dismissToast(id)
+
+    return true
+  }
 
   untrack(() => toasts.set(list => list.map(item => item.id === id ? next : item)))
 
@@ -224,40 +231,58 @@ function update(id: number, patch: ToastPatch): boolean {
   return true
 }
 
+// What a settled `toast.promise` shows: the words, or the words with their own second line and button. The loading toast's `description` and `action` are not carried over.
+export type ToastOutcome = string | { message: string, description?: string | undefined, action?: ToastAction | undefined }
+
 export interface ToastPromiseOptions<T> extends Omit<ToastOptions, 'tone'> {
   // Shown, with a spinner and no clock, until the call settles.
   loading: string
   // Replaces the toast once the call goes through, read from what it resolved to; a toast with none is closed.
-  success?: string | ((value: T) => string) | undefined
+  success?: ToastOutcome | ((value: T) => ToastOutcome | undefined) | undefined
   // Replaces the toast once the call throws, read from what it threw, and stays until the reader closes it unless `duration` says.
-  error: string | ((error: unknown) => string)
+  error: ToastOutcome | ((error: unknown) => ToastOutcome)
 }
 
-// Shows `loading` while `source` (a promise, or a function returning one) is pending, then settles the same toast into its success or its error. Resolves to what the call returned, or to undefined once it threw, as `attempt` does, so it needs no `catch`. A reader who closed the loading toast meanwhile still gets the outcome, as a new toast.
+// Shows `loading` while `source` (a promise, or a function returning one) is pending, then settles the same toast into its success or its error. Resolves to what the call returned, or to undefined once it threw, as `attempt` does, so it needs no `catch`.
+// The outcome keeps the toast's `onDismiss`, which hears one dismissal for the whole flow, and drops its `description` and `action` unless the outcome gives its own. A reader who closed the loading toast meanwhile still gets the outcome, as a new toast without a second `onDismiss`, which already heard `user`. The outcome is announced politely, an error included.
 async function promise<T>(source: Promise<T> | (() => Promise<T>), { loading, success, error, ...options }: ToastPromiseOptions<T>): Promise<T | undefined> {
   const id = push(loading, 'info', { ...options, duration: false, loading: true })
 
-  const settle = (message: string | undefined, tone: Tone) => {
-    if (message === undefined)
+  const settle = (read: () => ToastOutcome | undefined, tone: Tone) => {
+    let outcome: ToastOutcome | undefined
+
+    // A `success` or `error` that throws is the app's bug, not the call's: the toast closes and the call keeps its result.
+    try {
+      outcome = read()
+    }
+    catch (thrown) {
+      console.error('kayjs-ui: the `success` or `error` of a toast.promise threw', thrown)
+    }
+
+    if (outcome === undefined)
       return dismissToast(id)
 
+    const { message, description, action } = typeof outcome === 'string' ? { message: outcome, description: undefined, action: undefined } : outcome
+
     // `loading` is named so the clock starts afresh, the loading toast having none.
-    if (!update(id, { message, tone, loading: false, duration: options.duration }))
-      push(message, tone === 'danger' ? 'error' : 'success', { tone, duration: options.duration })
+    if (!update(id, { message, tone, loading: false, outcome: true, duration: options.duration, description: description ?? null, action: action ?? null }))
+      push(message, tone === 'danger' ? 'error' : 'success', { tone, duration: options.duration, description, action, outcome: true })
   }
+
+  let value: T
 
   try {
-    const value = await (typeof source === 'function' ? source() : source)
-
-    settle(typeof success === 'function' ? success(value) : success, 'success')
-
-    return value
+    value = await (typeof source === 'function' ? source() : source)
   }
   catch (thrown) {
-    settle(typeof error === 'function' ? error(thrown) : error, 'danger')
+    settle(() => typeof error === 'function' ? error(thrown) : error, 'danger')
 
     return undefined
   }
+
+  settle(() => typeof success === 'function' ? success(value) : success, 'success')
+
+  return value
 }
 
 // Each shows a message and answers its id, for `dismissToast` or `toast.update` to reach it.

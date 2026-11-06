@@ -28,7 +28,7 @@ Their `deprecated-config-groups`, `deprecated-room-types` and `deprecated-durati
 
 ### kayjs-ui's `Toast.message` may be markup and `ToastAction.run` is optional
 
-`Toast.message` is `string | Snippet` and a `ToastAction` is a button (`run`) or a link (`href`), so code reading `toasts()` as strings, or calling `item.action.run()`, fails to type-check: narrow with `typeof item.message === 'string'` and call `item.action.run?.()`. `kay check` cannot see it, the types being the only change, so there is no safe fix. Calls to `toast.*(...)` and `dismissToast(id)` are unchanged.
+`Toast.message` is `string | Snippet` and a `ToastAction` is a button (`run`) or a link (`href`, with an optional `run`), so code reading `toasts()` as strings, or calling `item.action.run()`, fails to type-check: narrow with `typeof item.message === 'string'` and call `item.action.run?.()`. `kay check` cannot see it, the types being the only change, so there is no safe fix. Calls to `toast.*(...)` and `dismissToast(id)` are unchanged.
 
 ## 1.91.0
 
