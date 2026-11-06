@@ -58,7 +58,9 @@ export function sitePaths(): string[] {
 // Runs `use` on the store of the running server, else on the file opened for the call.
 // A SQLite file that does not exist is created by a write and skipped by a read.
 async function inStore<T>(file: string | undefined, write: boolean, use: (store: MissingStore) => Promise<T>): Promise<T | undefined> {
-  const shared = file === undefined ? sharedStore(storeHome(), false) : undefined
+  const where = storeHome()
+  // A write makes the Postgres tables the server's read-only store left alone.
+  const shared = file === undefined ? sharedStore(where, write && where.kind === 'pg') : undefined
 
   if (shared)
     return use(shared)
@@ -68,7 +70,7 @@ async function inStore<T>(file: string | undefined, write: boolean, use: (store:
   if (!write && home.kind === 'sqlite' && !existsSync(home.file))
     return undefined
 
-  const store = openMissing(home, false)
+  const store = openMissing(home, false, !write)
 
   try {
     return await use(store)
@@ -152,7 +154,7 @@ export interface MissingRedirector {
 }
 
 // Answers a page request that found nothing with the redirect an editor added for its path, if there is one, in two hooks registered apart: the `mapResponse` ahead of compression, which would answer a 404 page first, and the `onError`, which reaches only the routes added after it.
-// Every other response costs one comparison of its status.
+// A response that is neither a 404 nor a 410 returns at once, but still passes through an async hook.
 export function missingRedirector(options: { file?: string | undefined, trailingSlash?: TrailingSlash | undefined, base?: string | undefined }): MissingRedirector {
   const home = storeHome(options.file)
   let told = false

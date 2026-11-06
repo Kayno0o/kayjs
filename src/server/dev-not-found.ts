@@ -36,7 +36,7 @@ export async function devNotFound(root: string, redirects: string[]): Promise<De
   if (home === undefined)
     return { file: shown, recorded: false, missing: [] }
 
-  const store = openMissing(home, false)
+  const store = openMissing(home, false, true)
   const answered = answeredBy(redirects)
 
   try {
@@ -69,7 +69,7 @@ export async function devRedirect(root: string, request: Request, redirects: str
     return refused('path and to are texts')
 
   const { home } = await recordedHome(root)
-  const store: MissingStore | undefined = home === undefined ? undefined : openMissing(home, false)
+  const store: MissingStore | undefined = home === undefined ? undefined : openMissing(home, false, true)
 
   try {
     const redirect = body.path

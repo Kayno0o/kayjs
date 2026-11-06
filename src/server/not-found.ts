@@ -53,8 +53,9 @@ function describeHome(home: NotFoundHome): string {
   return home.kind === 'pg' ? 'the app\'s Postgres database' : home.file
 }
 
-export function openMissing(home: NotFoundHome, closedByReload = true): MissingStore {
-  return home.kind === 'pg' ? pgMissingStore(home.source, closedByReload) : missingStore(home.file, closedByReload)
+// A Postgres store opened `readOnly` makes no table: it answers empty while the database has none.
+export function openMissing(home: NotFoundHome, closedByReload = true, readOnly = false): MissingStore {
+  return home.kind === 'pg' ? pgMissingStore(home.source, closedByReload, readOnly) : missingStore(home.file, closedByReload)
 }
 
 // Reads what an old local log held, to move it into the Postgres store.
@@ -77,8 +78,14 @@ function legacyRows(local: string): LegacyRows {
 
 function setAside(local: string): void {
   for (const suffix of ['', '-wal', '-shm']) {
-    if (existsSync(`${local}${suffix}`))
+    try {
       renameSync(`${local}${suffix}`, `${local}.migrated${suffix}`)
+    }
+    catch (error) {
+      // Another process importing the same file moved it first.
+      if ((error as { code?: string }).code !== 'ENOENT')
+        throw error
+    }
   }
 }
 
@@ -607,6 +614,7 @@ export function missingStore(path: string, closedByReload = true): SqliteMissing
 }
 
 let current: MissingStore | undefined
+let currentReadOnly = false
 // The requests a page route took, which are the only routes of the app whose 404 means a page is missing.
 const pageRequests = new WeakSet<Request>()
 
@@ -614,15 +622,23 @@ export function pageRequested(request: Request): void {
   pageRequests.add(request)
 }
 
-// The store this process's server holds open, opened when `create` or its SQLite file exists (a Postgres store is always opened, its tables made by the first use): what a request for a missing path reads and counts in.
+// The store this process's server holds open, opened when `create` or its SQLite file exists: what a request for a missing path reads and counts in.
+// A Postgres store is always opened, but read-only until a hit is counted (`create`), so the tables are made by the first 404 a production server counts and by nothing that only reads.
 export function sharedStore(home: NotFoundHome, create: boolean): MissingStore | undefined {
-  if (current)
+  if (current && !(create && currentReadOnly))
     return current
 
   if (!create && home.kind === 'sqlite' && home.file !== ':memory:' && !existsSync(home.file))
     return undefined
 
-  current = openMissing(home)
+  const reading = current
+  const readOnly = home.kind === 'pg' && !create
+
+  current = openMissing(home, true, readOnly)
+  currentReadOnly = readOnly
+
+  if (reading)
+    void closeQuietly(reading)
 
   return current
 }
@@ -786,7 +802,7 @@ async function inMissing<T>(file: string | undefined, use: (store: MissingStore)
     flushStores()
   }
 
-  const store = openMissing(home)
+  const store = openMissing(home, true, true)
 
   try {
     return await use(store)
