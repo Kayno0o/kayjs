@@ -102,6 +102,10 @@ export interface TestSite {
   sitemap: (path?: string) => Promise<string[]>
   // Runs every job the queues hold whose time has come, those the jobs enqueue included, until none is left; resolves with how many ran.
   runJobs: () => Promise<number>
+  // Fires the `schedule()` jobs of the app once each, now, whatever their time: those given the schedule text (`'@hourly'`, `'30s'`) or the job function, or every one without an argument; waits for each run and resolves with how many it fired, failing when none matches. A run that throws is reported as in production, not thrown here.
+  runSchedule: (which?: string | number | ((signal: AbortSignal) => unknown)) => Promise<number>
+  // Moves the clock forward by a duration with `setSystemTime` from `bun:test`, firing each schedule at every instant it falls due on the way, in order with the clock at that instant, then runs the queue jobs now due; resolves with how many scheduled runs it fired. Sessions, rate-limit windows, caches and sleeps read the moved clock. Restore it with `setSystemTime()`.
+  advance: (by: Duration | number) => Promise<number>
   cookies: Bun.CookieMap
   // What the server logged since the test began, in order: the messages kay and libraries wrote, a `logFrom('reply').info(...)` of the app's included (`{ type: 'message', level, from, message, request?, error? }`), and the request lines when the app's `log` option logs them. Emptied before each test of a site made at the top of a file or a describe. The log is the process's, so two sites open at once each hear the other's lines.
   logs: readonly LogEntry[]

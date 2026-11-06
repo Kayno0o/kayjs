@@ -88,6 +88,31 @@ function autoLock(when: string | number, job: Job) {
 
 export type AutoLock = ReturnType<typeof autoLock>
 
+// What a test fires: a schedule's text, its job, the next instant after `from` it falls due, and one run of it now that waits for the one going.
+export interface ScheduledEntry {
+  when: string | number
+  job: Job
+  next: (from: number) => number | null
+  fire: () => Promise<void>
+}
+
+// A schedule tags its start hook with its entry, so a test finds the schedules of one app in `app.event.start`.
+export const SCHEDULED = Symbol.for('kay.scheduled')
+
+export function scheduledOf(app: { event?: { start?: readonly unknown[] | undefined } | undefined }): ScheduledEntry[] {
+  const found: ScheduledEntry[] = []
+
+  for (const hook of app.event?.start ?? []) {
+    const fn = (hook as { fn?: unknown }).fn ?? hook
+    const entry = (fn as { [SCHEDULED]?: ScheduledEntry } | undefined)?.[SCHEDULED]
+
+    if (entry)
+      found.push(entry)
+  }
+
+  return found
+}
+
 // Runs `job` on a cron schedule, such as `@hourly` or `30 2 * * MON`, or every so long, `'30s'` or `30` seconds, from when the server starts until it stops: once per process, or once across processes with `lock`, never two runs at a time.
 // A list of jobs, or a table of schedules to jobs, gives each job a schedule of its own in one plugin, a table's `tz` read by its crons alone; with `lock`, each job's lock is its schedule and its place in that schedule's list, `report:@hourly:0`.
 // A run that throws is logged and the next one comes as planned; a stopping server waits for the run in progress.
@@ -137,9 +162,16 @@ function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: Au
   let running: Promise<void> | undefined
   const run = scheduledRun(cron, SLOT_MS, job, options, auto)
 
+  const fire = async () => {
+    running = after(running, run)
+    await running
+  }
+
+  const entry: ScheduledEntry = { when: cron, job, fire, next: from => Bun.cron.parse(cron, from, zoneNow())?.getTime() ?? null }
+
   // Unnamed, so Elysia never takes two schedules for one plugin.
   return new Elysia()
-    .onStart(() => {
+    .onStart(Object.assign(() => {
       if (handle)
         return
 
@@ -151,11 +183,8 @@ function scheduleCron(cron: string, job: Job, options: ScheduleOptions, auto: Au
         running = run(true)
 
       // The config's zone is installed once the app is set up, which comes after this plugin is made.
-      handle = Bun.cron(cron, async () => {
-        running = after(running, run)
-        await running
-      }, zoneNow())
-    })
+      handle = Bun.cron(cron, fire, zoneNow())
+    }, { [SCHEDULED]: entry }))
     .onStop(async () => {
       forgetDrain?.()
       handle?.stop()
@@ -178,10 +207,16 @@ function scheduleEvery(every: Duration, job: Job, options: ScheduleOptions, auto
   let running: Promise<void> | undefined
   const run = scheduledRun(`every ${String(every)}`, ms, job, options, auto)
 
+  const fire = async () => {
+    running = after(running, run)
+    await running
+  }
+
+  const entry: ScheduledEntry = { when: every, job, fire, next: from => from + ms - from % ms }
+
   const plan = () => {
     const tick = async () => {
-      running = after(running, run)
-      await running
+      await fire()
 
       if (timer)
         plan()
@@ -191,7 +226,7 @@ function scheduleEvery(every: Duration, job: Job, options: ScheduleOptions, auto
   }
 
   return new Elysia()
-    .onStart(() => {
+    .onStart(Object.assign(() => {
       if (timer)
         return
 
@@ -201,7 +236,7 @@ function scheduleEvery(every: Duration, job: Job, options: ScheduleOptions, auto
 
       if (options.boot === true)
         running = run(true)
-    })
+    }, { [SCHEDULED]: entry }))
     .onStop(async () => {
       forgetDrain?.()
       clearTimeout(timer)

@@ -9,7 +9,7 @@ import type { TestOptions, TestSite, Visit, VisitInit } from './site-types'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeEach } from 'bun:test'
+import { afterAll, beforeEach, setSystemTime } from 'bun:test'
 import { Elysia } from 'elysia'
 import { clientDir, inOutput, KAY_DIR, testWorker } from '../build/assets'
 import { buildClient } from '../build/client'
@@ -21,11 +21,13 @@ import { BuildStamps } from '../dev/fingerprint'
 import { clientOptionsOf, PRODUCTION, resolveProject } from '../project'
 import { joinBase } from '../runtime/base'
 import { installClassTable } from '../runtime/class-table'
+import { durationSeconds } from '../runtime/duration'
 import { solveWork } from '../runtime/work'
 import { MCP_PATH, mcpPath } from '../server/api-modules'
 import { servePages } from '../server/app'
 import { basePath, routerPath } from '../server/base'
 import { clientOptionsKey, readManifest } from '../server/client'
+import { scheduledOf } from '../server/jobs'
 import { memoryKv } from '../server/kv'
 import { runStopHooks, shutdown } from '../server/lifecycle'
 import { forgetStamps } from '../server/live'
@@ -80,6 +82,8 @@ export { solveWork }
 export { waitUntil } from './wait'
 
 const MAX_REDIRECTS = 10
+// Scheduled runs one `advance()` fires before it refuses, so a short schedule over a long span never loops for good.
+const MAX_ADVANCE_RUNS = 1000
 
 // Each test's client, counted across the run as rate limits are. A private address reads as a proxy's, so a test sending the header the app's `proxy` names still posts as the client it gives.
 let clients = 0
@@ -413,6 +417,48 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       logs,
       handle,
       runJobs: drainQueues,
+      runSchedule: async (which) => {
+        const entries = scheduledOf(app).filter(entry => which === undefined || entry.when === which || entry.job === which)
+
+        if (entries.length === 0)
+          throw new Error(`kay: no schedule matches ${typeof which === 'function' ? 'that job' : String(which ?? 'the site')}; the site has ${scheduledOf(app).map(entry => String(entry.when)).join(', ') || 'none'}`)
+
+        for (const entry of entries)
+          await entry.fire()
+
+        return entries.length
+      },
+      advance: async (by) => {
+        const target = Date.now() + durationSeconds(by, 'advance') * 1000
+        const cursors = new Map(scheduledOf(app).map(entry => [entry, Date.now()]))
+        let fired = 0
+
+        for (;;) {
+          let soonest: { entry: ReturnType<typeof scheduledOf>[number], at: number } | undefined
+
+          for (const [entry, from] of cursors) {
+            const at = entry.next(from)
+
+            if (at !== null && at <= target && (!soonest || at < soonest.at))
+              soonest = { entry, at }
+          }
+
+          if (!soonest)
+            break
+
+          if (++fired > MAX_ADVANCE_RUNS)
+            throw new Error(`kay: advancing ${String(by)} fires more than ${MAX_ADVANCE_RUNS} scheduled runs; advance in smaller steps`)
+
+          cursors.set(soonest.entry, soonest.at)
+          setSystemTime(soonest.at)
+          await soonest.entry.fire()
+        }
+
+        setSystemTime(target)
+        await drainQueues()
+
+        return fired
+      },
       sitemap: async (path = SITEMAP) => {
         const response = await send(path, {})
 

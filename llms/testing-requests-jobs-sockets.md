@@ -14,6 +14,20 @@ expect(await site.runJobs()).toBe(1)
 
 A mail an action enqueues is waited for by kayjs-mail's `outbox`, which runs the site's queues until it is there: `await outbox.waitFor(address, { site })` resolves with the newest mail to that address, and `outbox.token(mail, '/auth/verify-email')` reads the token of its link ([kayjs-mail](../packages/mail/llms/contact-form-and-testing.md#testing)).
 
+### Fire a schedule or move the server's clock
+
+`site.runSchedule('@hourly')` runs the job of that `schedule()` once now (the text or the job function names it, no argument fires every schedule), and `site.advance('1h')` moves the clock with `setSystemTime`, fires each schedule at every instant it falls due on the way with the clock at that instant, then runs the queue jobs now due; both resolve with how many runs they fired:
+
+```ts
+import { setSystemTime } from 'bun:test'
+
+await site.runSchedule('@hourly')
+expect(await reportCount()).toBe(1)
+
+await site.advance('1h')
+setSystemTime()
+```
+
 ### Wait for a state nothing else waits for
 
 `waitUntil(condition, { timeout, what })` from `kay/test` polls a sync or async function until it returns something truthy and resolves with that value, as for a title written after a stream ended or state fed by a websocket. It fails after 5 seconds (or `timeout`, such as `'2s'`) naming `what` and the last value seen, and needs real timers, as fake ones freeze it:
@@ -56,6 +70,7 @@ expect(refused.status).toBe(403)
 - A `cookie` header a site or `as` gives is sent on every request, so it beats a cookie the jar deleted or rotated: use the site itself, not `as`, to follow a session's cookie as the app changes it.
 - A default `origin` never replaces the one `call` and `submit` send, and `site.api` sends `accept: application/json` and a JSON body's `content-type` unless the site or the call names them (`site.mcp` always sends its protocol's two); `site.as(cookie).open(path)` opens the browser with that cookie unless `cookies` is given.
 - `site.api(module, path, options)` takes `method` (GET unless named), `params`, `query`, `body` and `headers`, a body with a file going as a form, and resolves with `{ ok, status, headers, body }` for any status, the body parsed as `call()` reads an answer; a param is encoded as one segment, and an empty one or a dot segment throws a `TypeError`.
+- `site.runSchedule(which?)` fires the schedules of the site's app once each, now: `which` is a schedule's text (`'@hourly'`, `'30s'`) or its job function, none fires all of them, and it fails naming the site's schedules when none matches. The run is the production one (timeout, `onSuccess`, `onError`, a job that throws logged not thrown, a `lock` honoured) and waits for a run going. `site.advance(by)` takes a duration, fires schedules in order of their instants (a cap of 1000 runs, then it asks for smaller steps), leaves the clock at the target and drains the queues. The test site runs in the test's process, so `setSystemTime` reaches the server: sessions, rate-limit windows and `cache()` revalidation read it, but a timer already set (`setTimeout`) does not move, and `advance` leaves the clock moved: call `setSystemTime()` in `afterEach`.
 - `site.socketRefusal(module, path, options)` sends the upgrade to the site's server (at the root of its port, whatever the base), keeps the cookies the refusal sets, gives up after 5 seconds, which it starts as `socket` does, and resolves with the response of a refused one; an accepted upgrade is closed and fails the test naming the route. A socket the app closes after accepting is `socket()`'s `status()`.
 - `site.fetch(path, init)` sends any request, an API route's included, with the cookies so far, and resolves with the response as it is, redirects not followed.
 - `site.runJobs()` runs every job the app's queues hold whose time has come, those the jobs enqueue included, and resolves with how many ran: an action enqueues, the test runs the jobs, then checks what they did. It also waits for a `queue.enqueue()` or kayjs-mail `send`/`enqueue` the app started and left unawaited, but not for one a timer or other delay has not started yet.

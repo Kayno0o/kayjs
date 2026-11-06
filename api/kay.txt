@@ -4071,6 +4071,7 @@ function testSite(options?: TestOptions): Promise<TestSite>
 
 [./test] TestSite
 interface TestSite
+  advance: (by: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number) => Promise<number>
   api: <Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<MethodOption<NodeAt<Module, Path>, M> & (MethodRoute<Module, Path, Chosen<M>> extends {
   params: infer Params;
 } ? Record<never, never> extends Params ? {
@@ -4107,6 +4108,7 @@ interface TestSite
   from?: string;
 }) | undefined) => Promise<ActionError<FailuresOf<Target>>>
   runJobs: () => Promise<number>
+  runSchedule: (which?: ((signal: AbortSignal) => unknown) | number | string | undefined) => Promise<number>
   sitemap: (path?: string | undefined) => Promise<string[]>
   socket: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<(SocketRoute<Module, Path> extends {
   params: infer Params;
