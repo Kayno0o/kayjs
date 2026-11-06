@@ -17,6 +17,28 @@ export interface Column<Row> {
   numeric?: true
   // Drawn by the table's `@cell(row, column)` block rather than as the row's value at `key`. Left out, a column is drawn by the block when there is one and no other column sets `cell: true`; `false` keeps it as text.
   cell?: boolean
+  // The column's width and least width: a number is pixels, a string any CSS length.
+  width?: number | string
+  minWidth?: number | string
+  // Keeps the column in view while a wide table scrolls sideways, against the start or the end edge: one column per edge, as the offset is the edge's own. A stacked card ignores it.
+  sticky?: 'start' | 'end'
+  // Not drawn, nor exported. A table with `columnToggle` lets the reader show it, and `hiddenColumns` sets it from the page.
+  hidden?: boolean
+  // Added to the column's header, cells and footer.
+  class?: string
+  // The column's line in the table's foot, drawn as text unless the table's `@footer(column)` block draws it. A table with no footer on any column and no block has no foot.
+  footer?: string
+}
+
+function cssLength(value: number | string): string {
+  return typeof value === 'number' ? `${value}px` : value.replace(/[;{}]/g, '')
+}
+
+// The inline style of a column's header, cells and footer: its width and least width as the custom properties the cells' classes read, so a stacked card can ignore them.
+export function columnStyle<Row>(column: Column<Row>): string | undefined {
+  const parts = [column.width !== undefined && `--column-width: ${cssLength(column.width)}`, column.minWidth !== undefined && `--column-min-width: ${cssLength(column.minWidth)}`].filter(Boolean)
+
+  return parts.length === 0 ? undefined : parts.join('; ')
 }
 
 // The column with what `numeric` stands for filled in where it says nothing itself, and no `sortValue` at all when the table is not `sortable`, `numeric` columns included.

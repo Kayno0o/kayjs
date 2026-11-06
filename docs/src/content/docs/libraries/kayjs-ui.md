@@ -177,7 +177,7 @@ A variant or value the component lacks is added: `Button(tone="brand")` types an
 - In those, the root keeps its `kui-` class (`kui-card`, `kui-badge`, `kui-stat-badge`) as a name for your CSS, and the other parts carry `data-part` alone (`.kui-card > [data-part='head']`, a child selector, as `head`, `title` and `body` are names other components use too).
 - A recipe holds the look as utilities, so `src/ui.ts` or `class` replaces the one it sets, such as `p-6` for the padding it sets, instead of overriding a rule. A rule of yours selecting a removed part class matches nothing. A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
 - A part is named after what its `kui-` class draws: Card has `root`, `head`, `title`, `body` and `link`, Dialog `root`, `title`, `body` and `footer`, Button `root` and `spinner`.
-- Table has `root` (the wrapper), `table`, `head`, `headRow`, `headCell`, `body`, `row`, `cell`, `cellBody`, `cellLabel`, `sortButton`, `sortIcon`, `filter`, `field`, `filterLabel`, `filterInput`, `count`, `selection`, `selected`, `bulk`, `selectHead`, `selectCell`, `selectText`, `spacer`, `emptyCell`, `skeletonRow`, `skeletonCell`, `skeletonBar`, `status`, `failure`, `message`, `rowLink` and `rowButton`.
+- Table has `root` (the wrapper), `table`, `caption`, `foot`, `footRow`, `footCell`, `columnsPanel`, `head`, `headRow`, `headCell`, `body`, `row`, `cell`, `cellBody`, `cellLabel`, `sortButton`, `sortIcon`, `filter`, `field`, `filterLabel`, `filterInput`, `count`, `selection`, `selected`, `bulk`, `selectHead`, `selectCell`, `selectText`, `spacer`, `emptyCell`, `skeletonRow`, `skeletonCell`, `skeletonBar`, `status`, `failure`, `message`, `rowLink` and `rowButton`.
 - DateInput has `root`, `input`, `trigger`, `panel`, `head`, `title`, `step`, `stepIcon`, `grid`, `weekday`, `weekdayRow`, `week`, `cell`, `day` and `today`, DateRangeInput `root` and `separator`, DateTimeInput `root` and `input`, TimeInput `root`.
 - The variants are the props that already exist, and `src/ui.ts` can add more: `tone` (Button, Badge, Notice, CopyButton), `variant` and `size` (Button). `kay check` reports a part that does not exist.
 - A Button with an `onClick` hands its root and spinner classes to its busy button, so `button.kay` reaches both.
@@ -302,7 +302,8 @@ Topics of the kayjs-ui reference the sections above do not link:
 - [Sliders, pickers, file drops and menus](/llms/kayjs-ui-pickers)
 - [MarkdownEditor](/llms/kayjs-ui-markdown-editor)
 - [Forms, FormDialog and Steps](/llms/kayjs-ui-forms-and-steps)
-- [Tables, tabs and pagination](/llms/kayjs-ui-tables-navigation-and-layout)
+- [Table](/llms/kayjs-ui-table)
+- [Tabs, navigation and pagination](/llms/kayjs-ui-tables-navigation-and-layout)
 - [Blocks, links and parts of the components](/llms/kayjs-ui-slots-and-links)
 - [Page layout, command palette and trees](/llms/kayjs-ui-page-layout-palette-and-trees)
 - [Infinite lists, LoadMore and a Table over them](/llms/kayjs-ui-infinite-list)

@@ -1,0 +1,21 @@
+---
+import type { Column } from '@kaynooo/kayjs-ui'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+
+interface Planet {
+  id: number
+  name: string
+  moons: number
+}
+
+const { rows, label, columnToggle = false, hiddenColumns, onHiddenColumnsChange } = props<{ rows: Planet[], label?: string, columnToggle?: boolean, hiddenColumns?: string[], onHiddenColumnsChange?: (keys: string[]) => void }>()
+
+const columns: Column<Planet>[] = [
+  { key: 'name', header: 'Name', sticky: 'start', width: 120, class: 'wide', footer: 'Total' },
+  { key: 'moons', header: 'Moons', sortValue: true, minWidth: '4rem', footer: '3' },
+  { key: 'id', header: 'Id', hidden: true },
+]
+---
+Table(columns={columns} rows={rows} rowKey="id" label={label} columnToggle={columnToggle} hiddenColumns={hiddenColumns} onHiddenColumnsChange={onHiddenColumnsChange})
+  @header(column)
+    em {column.header}

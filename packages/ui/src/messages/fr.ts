@@ -177,6 +177,7 @@ export default defineMessages({
       submit: 'S\'abonner',
     },
     table: {
+      columns: 'Colonnes',
       details: 'Détails',
       empty: 'Aucune ligne.',
       expandRow: 'Détails de {row}',

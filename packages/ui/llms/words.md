@@ -77,7 +77,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.statusStrip.*`: `empty` (`No data yet.`)
 - `ui.steps.*`: `done` (`completed`), `error` (`has an error`), `skipped` (`skipped`)
 - `ui.subscribeForm.*`: `label` (`Email`), `notice` (`We use your address to send you the mails of this site, until you unsubscribe with the link in each one.`), `privacy` (`Privacy policy`), `sent` (`Almost done: open the mail we just sent you and confirm your address.`), `submit` (`Subscribe`)
-- `ui.table.*`: `details` (`Details`), `empty` (`No rows.`), `expandRow` (`Details of {row}`), `export` (`Export CSV`), `failure` (`Could not load the rows.`), `filter` (`Filter`), `loading` (`Loading…`), `openRow` (`Open {row}`), `retry` (`Try again`), `rowCount` (`{count} rows, `1 row` for one`), `selectAll` (`Select all`), `selectRow` (`Select {row}`), `selected` (`{count} selected`)
+- `ui.table.*`: `columns` (`Columns`), `details` (`Details`), `empty` (`No rows.`), `expandRow` (`Details of {row}`), `export` (`Export CSV`), `failure` (`Could not load the rows.`), `filter` (`Filter`), `loading` (`Loading…`), `openRow` (`Open {row}`), `retry` (`Try again`), `rowCount` (`{count} rows, `1 row` for one`), `selectAll` (`Select all`), `selectRow` (`Select {row}`), `selected` (`{count} selected`)
 - `ui.themeToggle.*`: `dark` (`Dark`), `label` (`Theme`), `light` (`Light`), `system` (`System`)
 - `ui.timeline.*`: `empty` (`No events yet.`)
 - `ui.toaster.*`: `dismiss` (`Dismiss notification`)

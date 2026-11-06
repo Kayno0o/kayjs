@@ -1,6 +1,6 @@
 import type { Column } from '../src/table'
 import { describe, expect, test } from 'bun:test'
-import { cellText, csvField, drawnByBlock, exportHref, nextSort, resolvedColumn, rowKeyOf, rowLabel, rowsMatching, sameFields, sortedRows, toCsv } from '../src/table'
+import { cellText, columnStyle, csvField, drawnByBlock, exportHref, nextSort, resolvedColumn, rowKeyOf, rowLabel, rowsMatching, sameFields, sortedRows, toCsv } from '../src/table'
 
 interface Planet { id: number, name: string, moons: number | null }
 
@@ -148,5 +148,13 @@ describe('sameFields', () => {
     expect(sameFields({ a: '1' }, { a: '1', b: '2' })).toBe(false)
     expect(sameFields({ a: '1', b: '2' }, { a: '1' })).toBe(false)
     expect(sameFields({ a: '1' }, { a: '2' })).toBe(false)
+  })
+})
+
+describe('columnStyle', () => {
+  test('writes the width and least width as custom properties, a number as pixels, and drops what could end the declaration', () => {
+    expect(columnStyle({ key: 'a', header: 'A' })).toBeUndefined()
+    expect(columnStyle({ key: 'a', header: 'A', width: 120, minWidth: '4rem' })).toBe('--column-width: 120px; --column-min-width: 4rem')
+    expect(columnStyle({ key: 'a', header: 'A', width: '1rem; color: red' })).toBe('--column-width: 1rem color: red')
   })
 })

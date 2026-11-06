@@ -77,3 +77,13 @@ The choice is made once, when the table is made, and the server draws the first 
 ## Narrow screens
 
 Below 30rem of width, `narrow` is `stack` by default: rows stack as cards labelled by their headers. Set `narrow="scroll"` to scroll the table sideways instead.
+
+## Columns
+
+A column takes `width` and `minWidth` (a number is pixels, a string any CSS length), `sticky` (`start` or `end`, one column per edge, kept in view while the table scrolls sideways), `hidden`, `class` for its header and cells, and `footer`, a line in the foot of the table. Narrow cards ignore the widths and `sticky`.
+
+`@header(column)` draws a header in place of the text, and `@footer(column)` the cells of the foot. `columnToggle` adds a Columns button with a checkbox per column to show and hide them; `hiddenColumns` sets the hidden ones from the page and `onHiddenColumnsChange(keys)` hears the reader's choice.
+
+## Name and scrolling
+
+`label` adds a caption only screen readers see, naming the table. When the table is wider or taller than its box it scrolls, and its box then takes the focus so a keyboard can scroll it, as a region named by `aria-label` or else by `label`. A table that fits adds no focus stop, and `onScrollChange(scrolls)` hears when that changes.

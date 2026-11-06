@@ -9,8 +9,9 @@ import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import LoadMore from './load-more.kay'
+import Popover from './popover.kay'
 import Select from './select.kay'
-import { cellText, drawnByBlock, exportHref, nextSort, resolvedColumn, restoredSort, rowKeyOf, rowLabel, rowsMatching, sameFields, sortedRows, toCsv } from './table'
+import { cellText, columnStyle, drawnByBlock, exportHref, nextSort, resolvedColumn, restoredSort, rowKeyOf, rowLabel, rowsMatching, sameFields, sortedRows, toCsv } from './table'
 import { asyncRows } from './source'
 import { virtualRows } from './virtual'
 import { wording } from 'kay/words'
@@ -26,6 +27,7 @@ const look = recipe({
     field: 'flex items-center gap-2',
     filterInput: 'w-56 max-w-full',
     count: 'sr-only',
+    caption: 'sr-only',
     selection: 'sticky left-0 flex flex-wrap items-center gap-3 border-solid border-b-[length:var(--border-width)] border-border px-3 py-2 text-sm [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6',
     selected: 'm-0',
     bulk: 'flex flex-wrap items-center gap-2',
@@ -34,9 +36,13 @@ const look = recipe({
     head: '@max-[30rem]/table:has-[[data-part=sortButton]]:block @max-[30rem]/table:group-data-virtual/table:sticky @max-[30rem]/table:group-data-virtual/table:top-0 @max-[30rem]/table:group-data-virtual/table:z-2 @max-[30rem]/table:group-data-virtual/table:bg-surface @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden',
     headRow: '@max-[30rem]/table:flex @max-[30rem]/table:flex-wrap @max-[30rem]/table:gap-2 @max-[30rem]/table:border-solid @max-[30rem]/table:border-b-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
     body: '@max-[30rem]/table:block',
-    headCell: 'border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-accent aria-[sort=descending]:text-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:z-2 group-data-virtual/table:bg-surface @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden',
+    headCell: 'border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-accent aria-[sort=descending]:text-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:z-2 group-data-virtual/table:bg-surface @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden w-[var(--column-width,auto)] min-w-[var(--column-min-width,0)] @max-[30rem]/table:w-auto @max-[30rem]/table:min-w-0 data-[sticky]:z-[1] data-[sticky]:bg-surface data-[sticky=start]:sticky data-[sticky=start]:left-0 data-[sticky=end]:sticky data-[sticky=end]:right-0 @max-[30rem]/table:data-[sticky]:static',
     selectHead: 'border-b border-border px-3 py-2 text-left text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] data-[align=center]:text-center data-[align=end]:text-right aria-[sort=ascending]:text-accent aria-[sort=descending]:text-accent group-data-virtual/table:sticky group-data-virtual/table:top-0 group-data-virtual/table:z-2 group-data-virtual/table:bg-surface @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden w-0 @max-[30rem]/table:w-auto',
     selectText: 'sr-only',
+    foot: '@max-[30rem]/table:block',
+    footRow: '@max-[30rem]/table:flex @max-[30rem]/table:flex-wrap @max-[30rem]/table:gap-2 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
+    footCell: 'border-t border-border px-3 py-2 text-sm text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right w-[var(--column-width,auto)] min-w-[var(--column-min-width,0)] @max-[30rem]/table:w-auto @max-[30rem]/table:min-w-0 data-[sticky]:z-[1] data-[sticky]:bg-surface data-[sticky=start]:sticky data-[sticky=start]:left-0 data-[sticky=end]:sticky data-[sticky=end]:right-0 @max-[30rem]/table:data-[sticky]:static @max-[30rem]/table:border-0 @max-[30rem]/table:p-0 @max-[30rem]/table:empty:hidden',
+    columnsPanel: 'flex flex-col gap-1 p-3',
     toggleHead: 'border-b border-border px-3 py-2 text-left text-xs w-0 @max-[30rem]/table:hidden',
     toggleCell: 'px-3 py-1.5 w-0 @max-[30rem]/table:w-auto @max-[30rem]/table:col-span-full @max-[30rem]/table:px-0 @max-[30rem]/table:py-1',
     // The chevron turns over while the row is open.
@@ -47,7 +53,7 @@ const look = recipe({
     sortButton: 'group/sort inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-inherit [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] @max-[30rem]/table:min-h-8 @max-[30rem]/table:border-solid @max-[30rem]/table:border-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-2 @max-[30rem]/table:py-0.5',
     sortIcon: 'size-3.5 group-data-[direction=asc]/sort:rotate-180',
     row: 'border-b border-border @max-[30rem]/table:border-b-0 @max-[30rem]/table:[:is([data-part=row],[data-part=detailRow])+&]:border-t hover:bg-hover aria-selected:bg-hover data-linked:relative data-linked:isolate data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=rowLink],[data-part=rowButton])]:relative data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=rowLink],[data-part=rowButton])]:z-1 @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-[fit-content(40%)_minmax(0,1fr)] @max-[30rem]/table:gap-x-4 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
-    cell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left',
+    cell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-[var(--column-width,auto)] min-w-[var(--column-min-width,0)] @max-[30rem]/table:w-auto @max-[30rem]/table:min-w-0 data-[sticky]:z-[1] data-[sticky]:bg-surface data-[sticky=start]:sticky data-[sticky=start]:left-0 data-[sticky=end]:sticky data-[sticky=end]:right-0 @max-[30rem]/table:data-[sticky]:static',
     // The box is 1rem, so its label grows to the 1.5rem a finger needs.
     selectCell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-0 @max-[30rem]/table:w-auto [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6 [&_.kui-checkbox]:justify-center',
     // Outside a narrow table a cell holds its content alone: the column header names it.
@@ -69,7 +75,7 @@ const look = recipe({
   },
 })
 
-const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, virtual = false, expandable = false, expanded, onOpenChange, onToggle, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
+const { columns: given, label, header, footer, columnToggle = false, columnsLabel = wording('ui.table.columns', 'Columns'), hiddenColumns, onHiddenColumnsChange, onScrollChange, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, emptyLabel = wording('ui.table.empty', 'No rows.'), filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelectedChange, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', busy = false, skeletonRows = 5, loadingLabel = wording('ui.table.loading', 'Loading…'), failureLabel = wording('ui.table.failure', 'Could not load the rows.'), retryLabel = wording('ui.table.retry', 'Try again'), onLoad, onError, rowHref, onRowClick, openRowLabel, virtual = false, expandable = false, expanded, onOpenChange, onToggle, detail, expandLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect' | 'onToggle' | 'onLoad' | 'onError'> & {
   columns: Column<Row>[]
   // The rows to draw: an array, a function returning them, or a promise of them. An array is drawn by the server; a function is called in the browser only (it may touch `window`, and the server draws the skeleton), and so is a promise's answer, skeleton rows standing in meanwhile; a refresh keeps the rows shown, then a failure row with a retry (a function is called again) if it rejects. Left out when `list` holds them: one of the two is required.
   rows?: RowsSource<Row> | undefined
@@ -84,6 +90,22 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   serverSort?: boolean | undefined
   // Called with each sort a header click asks for, to fetch the rows sorted that way when `serverSort` is set.
   onSort?: ((sort: SortState) => unknown) | undefined
+  // Names the table for screen readers, as a caption only they see, and its scroll box when it scrolls, unless an `aria-label` names that already.
+  label?: string | undefined
+  // Draws a column's header in place of its `header` text: `@header(column)`. A sortable column keeps its sort button around it, and a stacked card's label stays the text.
+  header?: Snippet<[column: Column<Row>]> | undefined
+  // Draws a column's line of the foot in place of its `footer` text: `@footer(column)`. With the block, every column that is shown has a foot cell.
+  footer?: Snippet<[column: Column<Row>]> | undefined
+  // A button above the rows opening a list of checkboxes that show and hide each column that has a `header`.
+  columnToggle?: boolean | undefined
+  // Names the column toggle's button.
+  columnsLabel?: string | undefined
+  // The keys of the columns hidden, replacing each column's `hidden`; a table whose parent passes another list follows it.
+  hiddenColumns?: string[] | undefined
+  // Called with the keys of the columns hidden each time the reader shows or hides one.
+  onHiddenColumnsChange?: ((keys: string[]) => unknown) | undefined
+  // Called with whether the table now scrolls, when that changes: its box takes the focus then, to scroll by keyboard.
+  onScrollChange?: ((scrolls: boolean) => unknown) | undefined
   // Draws the cells of the columns it covers, see `Column.cell`.
   cell?: Snippet<[row: Row, column: Column<Row>]> | undefined
   // Shown in place of the rows when there are none.
@@ -268,7 +290,20 @@ effect(() => opened = expanded ?? noneOpen)
 
 const openSet = memo(() => new Set(opened()))
 const detailId = (row: Row) => `${tableId}-detail-${String(rowKeyOf(row, rowKey)).replace(/\s/g, '_')}`
-const columnCount = () => given.length + (selectable ? 1 : 0) + (expandable ? 1 : 0)
+const hiddenKeys = signal(hiddenColumns ?? given.filter(column => column.hidden).map(column => column.key))
+
+effect(() => {
+  const next = hiddenColumns
+
+  if (next)
+    hiddenKeys = next
+})
+
+const shownColumns = memo(() => columns().filter(column => !hiddenKeys().includes(column.key)))
+const hasFoot = () => footer !== undefined || shownColumns().some(column => column.footer !== undefined)
+const columnCount = () => shownColumns().length + (selectable ? 1 : 0) + (expandable ? 1 : 0)
+const regionName = () => (rest as { 'aria-label'?: string })['aria-label'] ?? label
+const scrolls = signal(virtual)
 const countChosen = (count: number) => selectedLabel ? selectedLabel(count) : wording('ui.table.selected', '{count} selected', { count })
 
 // A row that left `rows` leaves the selection for good, so it is not picked again if it comes back.
@@ -331,13 +366,41 @@ const drawn = memo(() => windowed ? windowed.rows() : shown())
 let box: HTMLElement | undefined
 let body: HTMLElement | undefined
 
+function measure() {
+  const now = virtual || box!.scrollWidth > box!.clientWidth || box!.scrollHeight > box!.clientHeight
+
+  if (now === scrolls())
+    return
+
+  scrolls = now
+  onScrollChange?.(now)
+}
+
 onMount(() => {
   if (windowed)
     onCleanup(windowed.attach(box!, body!))
+
+  measure()
+
+  if (typeof ResizeObserver === 'undefined')
+    return
+
+  const observer = new ResizeObserver(measure)
+
+  observer.observe(box!)
+  observer.observe(box!.querySelector('table')!)
+  onCleanup(() => observer.disconnect())
 })
 
+function showColumn(key: string, on: boolean) {
+  const next = on ? hiddenKeys().filter(other => other !== key) : [...hiddenKeys(), key]
+
+  hiddenKeys = next
+  onHiddenColumnsChange?.(next)
+}
+
 function download() {
-  const url = URL.createObjectURL(new Blob([toCsv(shown(), columns())], { type: 'text/csv;charset=utf-8' }))
+  const url = URL.createObjectURL(new Blob([toCsv(shown(), shownColumns())], { type: 'text/csv;charset=utf-8' }))
   const link = document.createElement('a')
 
   link.href = url
@@ -362,7 +425,7 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
   return current()?.direction === 'asc' ? 'ascending' : 'descending'
 }
 ---
-div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={virtual ? '' : undefined} tabindex={virtual ? '0' : undefined})
+div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={virtual ? '' : undefined} tabindex={scrolls() ? '0' : undefined} role={scrolls() && regionName() ? 'region' : undefined} aria-label={scrolls() ? regionName() : undefined})
   if searching() || extra.length > 0
     div(part="filter")
       if searching()
@@ -377,8 +440,15 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
           else
             input.kui-field-input(part="filterInput" type="search" value={fieldValues[index]!()} autocomplete="off" onInput={event => fieldValues[index]!.set(event.currentTarget.value)})
     p(part="count" role="status") {list ? (filtering() && !list.pending() ? counted(rows().length) : '') : (typed() ? counted(kept().length) : '')}
-  if selectable || exportable
+  if selectable || exportable || columnToggle
     div(part="selection")
+      if columnToggle
+        Popover(placement="bottom-start" part="columnsPanel" aria-label={columnsLabel})
+          @trigger(attributes)
+            Button({...attributes} label={columnsLabel} variant="ghost" size="sm")
+          for column of columns() key={column.key}
+            if column.header
+              Checkbox(label={column.header} checked={!hiddenKeys().includes(column.key)} onChange={on => showColumn(column.key, on)})
       if selectable
         Checkbox(label={selectAllLabel} checked={allChosen()} indeterminate={someChosen() && !allChosen()} disabled={visible().length === 0} onChange={pickAll})
         p(part="selected" role="status") {chosen().length > 0 ? countChosen(chosen().length) : ''}
@@ -396,7 +466,9 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
       p(part="message") {failureLabel}
       if source.retryable()
         Button(label={retryLabel} variant="ghost" size="sm" onClick={source.retry})
-  table(part="table" aria-busy={waiting() ? 'true' : undefined} aria-rowcount={virtual ? shown().length + 1 : undefined})
+  table(part="table" aria-busy={waiting() ? 'true' : undefined} aria-rowcount={virtual ? shown().length + (hasFoot() ? 2 : 1) : undefined})
+    if label
+      caption(part="caption") {label}
     thead(part="head")
       tr(part="headRow" aria-rowindex={virtual ? 1 : undefined})
         if expandable
@@ -405,13 +477,18 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
         if selectable
           th(part="selectHead" scope="col")
             span(part="selectText") {selectAllLabel}
-        for column of columns() key={column.key}
-          th(part="headCell" scope="col" data-align={column.align ?? 'start'} aria-sort={ariaSort(column)})
+        for column of shownColumns() key={column.key}
+          th(part="headCell" class={column.class} style={columnStyle(column)} scope="col" data-align={column.align ?? 'start'} data-sticky={column.sticky} aria-sort={ariaSort(column)})
             if column.sortValue
               button(part="sortButton" type="button" data-direction={sorting(column) ? current()?.direction : undefined} onClick={() => toggle(column)})
-                | {column.header}
+                if header
+                  | {header(column)}
+                else
+                  | {column.header}
                 if sorting(column)
                   Icon(icon="chevron" part="sortIcon")
+            else if header
+              | {header(column)}
             else
               | {column.header}
     tbody(part="body" ref={element => body = element})
@@ -427,8 +504,8 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
             td(part="selectCell")
               div(part="cellBody")
                 Checkbox(checked={chosenSet().has(rowKeyOf(row, rowKey))} aria-label={(selectRowLabel ?? (item => wording('ui.table.selectRow', 'Select {row}', { row: rowLabel(item, columns(), rowKey) })))(row)} onChange={on => pick(rowKeyOf(row, rowKey), on)})
-          for column, columnIndex of columns() key={column.key}
-            td(part="cell" data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined})
+          for column, columnIndex of shownColumns() key={column.key}
+            td(part="cell" class={column.class} style={columnStyle(column)} data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined} data-sticky={column.sticky})
               if narrow === 'stack' && column.header
                 span(part="cellLabel") {column.header}
               div(part="cellBody")
@@ -466,5 +543,18 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
       if windowed && windowed.after() > 0
         tr(part="spacer" aria-hidden="true" style={`height: ${windowed.after()}px`})
           td(colspan={columnCount()} style="padding: 0; border: 0")
+    if hasFoot()
+      tfoot(part="foot")
+        tr(part="footRow" aria-rowindex={virtual ? shown().length + 2 : undefined})
+          if expandable
+            td(part="footCell")
+          if selectable
+            td(part="footCell")
+          for column of shownColumns() key={column.key}
+            td(part="footCell" class={column.class} style={columnStyle(column)} data-align={column.align ?? 'start'} data-numeric={column.numeric ? '' : undefined} data-sticky={column.sticky})
+              if footer
+                | {footer(column)}
+              else
+                | {column.footer ?? ''}
   if list
     LoadMore(list={list})

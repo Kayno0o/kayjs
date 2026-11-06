@@ -1192,11 +1192,17 @@ interface ChartSeries
 interface Column<Row>
   align?: "center" | "end" | "start"
   cell?: boolean
+  class?: string
   defaultDirection?: SortDirection
+  footer?: string
   header: string
+  hidden?: boolean
   key: string
+  minWidth?: number | string
   numeric?: true
   sortValue?: ((row: Row) => number | string) | true
+  sticky?: "end" | "start"
+  width?: number | string
 
 [./lib/index] ComboboxOption
 interface ComboboxOption<Value extends string = string>
@@ -2407,11 +2413,20 @@ function cellText<Row>(row: Row, column: Column<Row>): string
 interface Column<Row>
   align?: "center" | "end" | "start"
   cell?: boolean
+  class?: string
   defaultDirection?: SortDirection
+  footer?: string
   header: string
+  hidden?: boolean
   key: string
+  minWidth?: number | string
   numeric?: true
   sortValue?: ((row: Row) => number | string) | true
+  sticky?: "end" | "start"
+  width?: number | string
+
+[./lib/table] columnStyle
+function columnStyle<Row>(column: Column<Row>): string | undefined
 
 [./lib/table] compareValues
 function compareValues(a: number | string, b: number | string): number

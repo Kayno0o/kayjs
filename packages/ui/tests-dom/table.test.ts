@@ -3,6 +3,7 @@ import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import ExpandableTable from '../tests/fixture/src/components/expandable-table.kay'
+import FeatureTable from '../tests/fixture/src/components/feature-table.kay'
 import FilteredTable from '../tests/fixture/src/components/filtered-table.kay'
 import ListedTable from '../tests/fixture/src/components/listed-table.kay'
 import SelectableFeed from '../tests/fixture/src/components/selectable-feed.kay'
@@ -704,5 +705,81 @@ describe('Table expandable', () => {
     await settle()
 
     expect(mounted.root.querySelector('[data-part="row"] + [data-part="detailRow"]')).not.toBeNull()
+  })
+})
+
+describe('Table columns, caption and scroll region', () => {
+  test('draws the column descriptor: width, minWidth, sticky, class, hidden, footer and the header block', async () => {
+    mounted = await mountComponent(FeatureTable, { rows: PLANETS, label: 'Planets' })
+
+    const { root } = mounted
+    const heads = [...root.querySelectorAll('th')]
+
+    expect(heads.map(head => head.textContent)).toEqual(['Name', 'Moons'])
+    expect(heads[0]!.querySelector('em')).not.toBeNull()
+    expect(heads[1]!.querySelector('button em')).not.toBeNull()
+    expect(heads[0]!.getAttribute('style')).toContain('--column-width: 120px')
+    expect(heads[1]!.getAttribute('style')).toContain('--column-min-width: 4rem')
+    expect(heads[0]!.getAttribute('data-sticky')).toBe('start')
+    expect(heads[0]!.classList.contains('wide')).toBe(true)
+    expect(root.querySelector('tbody td')!.classList.contains('wide')).toBe(true)
+    expect([...root.querySelectorAll('tfoot td')].map(cell => cell.textContent)).toEqual(['Total', '3'])
+    expect(root.querySelector('caption')!.textContent).toBe('Planets')
+  })
+
+  test('the column toggle shows and hides a column and reports the hidden keys', async () => {
+    const reported: string[][] = []
+
+    mounted = await mountComponent(FeatureTable, { rows: PLANETS, columnToggle: true, onHiddenColumnsChange: (keys: string[]) => reported.push(keys) })
+
+    const { root } = mounted
+    const boxes = [...root.querySelectorAll<HTMLInputElement>('[data-part="columnsPanel"] input[type="checkbox"]')]
+
+    expect(boxes.map(box => box.checked)).toEqual([true, true, false])
+
+    click(boxes[2]!)
+    await settle()
+
+    expect(root.querySelectorAll('th').length).toBe(3)
+    expect(reported).toEqual([[]])
+
+    click(boxes[0]!)
+    await settle()
+
+    expect(root.querySelectorAll('th').length).toBe(2)
+    expect(reported.at(-1)).toEqual(['name'])
+  })
+
+  test('a table that does not scroll is not a focus stop, and one that does is a named region', async () => {
+    mounted = await mountComponent(FeatureTable, { rows: PLANETS, label: 'Planets' })
+
+    const quiet = mounted.root.firstElementChild!
+
+    expect(quiet.getAttribute('tabindex')).toBeNull()
+    expect(quiet.getAttribute('role')).toBeNull()
+    expect(quiet.getAttribute('aria-label')).toBeNull()
+    mounted.unmount()
+
+    // happy-dom lays nothing out, so the box is made to overflow for the mount.
+    const proto = HTMLElement.prototype
+    const width = Object.getOwnPropertyDescriptor(proto, 'scrollWidth')
+
+    Object.defineProperty(proto, 'scrollWidth', { value: 900, configurable: true })
+
+    try {
+      mounted = await mountComponent(FeatureTable, { rows: PLANETS, label: 'Planets' })
+
+      const box = mounted.root.firstElementChild!
+
+      expect(box.getAttribute('tabindex')).toBe('0')
+      expect(box.getAttribute('role')).toBe('region')
+      expect(box.getAttribute('aria-label')).toBe('Planets')
+    }
+    finally {
+      if (width)
+        Object.defineProperty(proto, 'scrollWidth', width)
+      else
+        delete (proto as unknown as Record<string, unknown>).scrollWidth
+    }
   })
 })
