@@ -603,6 +603,8 @@ export interface InternalConfig {
 export type LoadedConfig = KayConfig & InternalConfig
 
 export const CONFIG_FILE = 'kay.config.ts'
+// The app's own request values for templates, listed as an extension's `context` while the file exists.
+export const APP_CONTEXT = 'src/context.ts'
 
 // The nested bags whose own keys are checked as the config's are, by the key holding them and the shape they take.
 interface NestedBags {

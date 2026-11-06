@@ -1,5 +1,6 @@
-import { readFileSync, realpathSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { APP_CONTEXT } from '../config'
 
 // What reloading the modules a change reached in the running server takes: the files to ask Bun for again, or why the change needs a new process.
 export type ReloadPlan = { evict: string[] } | { restart: string }
@@ -91,6 +92,10 @@ export function planReload({ root, changed, loaded, owned, files = [], content, 
       return { restart: `${file} is the server entry` }
 
     const key = [path, realpathOf(path)].find(candidate => modules.has(candidate))
+
+    // The config lists `src/context.ts` as an extension only while the file exists, so one added or removed needs the config read again.
+    if (path === join(real, APP_CONTEXT) && (key === undefined || !existsSync(path)))
+      return { restart: `${file} is the app's context` }
 
     if (key !== undefined)
       seeds.push(key)

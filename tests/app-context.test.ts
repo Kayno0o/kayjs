@@ -1,7 +1,10 @@
-import { resolve } from 'node:path'
+import { realpathSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
-import { loadConfig } from '../src/config-loader'
+import { loadConfig, withConfig } from '../src/config-loader'
+import { planReload } from '../src/dev/reload'
 import { loadContextValues, useContexts } from '../src/server/context-values'
 import { kayCheck } from './check-helper'
 import { loads } from './fixtures/app-context/src/state'
@@ -67,6 +70,32 @@ describe('the app\'s src/context.ts', () => {
     const dir = await scratchDir('app-context-none-')
 
     expect((await loadConfig(dir)).extensions ?? []).toEqual([])
+  })
+
+  it('is listed once when the options name that file too', async () => {
+    const root = resolve(FIXTURE)
+    const config = await withConfig(root, { extensions: [{ name: 'again', context: './src/context.ts' }] })
+
+    expect(config.extensions?.map(({ name }) => name)).toEqual(['again'])
+  })
+
+  it('needs a new process in kay dev when the file is added or removed, and reloads an edit of it', async () => {
+    const dir = await scratchDir('app-context-dev-')
+
+    await Bun.write(join(dir, 'src/server.ts'), '')
+    await Bun.write(join(dir, 'kay.config.ts'), 'export default {}\n')
+    await Bun.write(join(dir, 'src/context.ts'), 'export default 1\n')
+
+    const real = realpathSync(dir)
+    const at = (file: string) => join(real, file)
+    const input = { root: dir, owned: [at('src/routes'), at('src/api')], config: at('kay.config.ts'), entry: at('src/server.ts') }
+    const loaded = ['src/context.ts', 'src/server.ts', 'kay.config.ts'].map(at)
+
+    // Added: no module of the running process.
+    expect(planReload({ ...input, loaded: loaded.slice(1), changed: ['src/context.ts'] })).toEqual({ restart: 'src/context.ts is the app\'s context' })
+    expect('evict' in planReload({ ...input, loaded, changed: ['src/context.ts'] })).toBe(true)
+    await rm(at('src/context.ts'))
+    expect(planReload({ ...input, loaded, changed: ['src/context.ts'] })).toEqual({ restart: 'src/context.ts is the app\'s context' })
   })
 
   it('is no island\'s to read', () => {
