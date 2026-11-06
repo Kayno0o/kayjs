@@ -255,7 +255,7 @@ describe('a French page served', () => {
     await pages({ root: 'tests/fixtures/typography', prebuilt: false })
   }, 60_000)
 
-  const site = async (more: Record<string, unknown> = {}) => new Elysia().use(await pages({ root: 'tests/fixtures/typography', prebuilt: false, security: false, lang: 'fr', inlineStyles: false, onError: () => undefined, ...more }))
+  const site = async (more: Record<string, unknown> = {}) => new Elysia().use(await pages({ root: 'tests/fixtures/typography', prebuilt: false, security: false, lang: 'fr', client: { inlineStyles: false }, observe: { onError: () => undefined }, ...more }))
 
   it('writes a non-breaking space for the template, a prop, a constant, a collection, the head and a streamed block, and leaves the rest', async () => {
     const { status, html } = await get(await site(), '/')
@@ -265,7 +265,7 @@ describe('a French page served', () => {
   })
 
   it('leaves the spaces as typed with `typography: false`', async () => {
-    const { html } = await get(await site({ typography: false }), '/')
+    const { html } = await get(await site({ client: { inlineStyles: false, typography: false } }), '/')
 
     expectPlain(html)
     expect(html).toContain('<p class="plain">Voulez-vous continuer ? Oui : non ; peut-être</p>')
@@ -341,16 +341,16 @@ describe('a French page served', () => {
   })
 
   it('writes the spaces into a page prerendered at build time, served from its file', async () => {
-    const build = await scratchBuild({ routesDir: routes, contentConfig: content, lang: 'fr', inlineStyles: false })
+    const build = await scratchBuild({ dirs: { routes }, client: { inlineStyles: false }, contentConfig: content, lang: 'fr' })
 
     try {
-      await build.prerender({ routesDir: routes, contentConfig: content, lang: 'fr', inlineStyles: false })
+      await build.prerender({ dirs: { routes }, client: { inlineStyles: false }, contentConfig: content, lang: 'fr' })
 
       const written = await Bun.file(join(build.pages, 'index.html')).text()
 
       expectSpaced(written)
 
-      const served = await build.serve({ routesDir: routes, contentConfig: content, security: false, lang: 'fr' })
+      const served = await build.serve({ dirs: { routes }, contentConfig: content, security: false, lang: 'fr' })
       const { html } = await get(served, '/')
 
       expect(html).toBe(written)
@@ -361,17 +361,17 @@ describe('a French page served', () => {
   })
 
   it('writes the spaces of a server island, rendered when the page is requested and when the browser fetches it', async () => {
-    const build = await scratchBuild({ routesDir: routes, contentConfig: content, lang: 'fr', inlineStyles: false })
+    const build = await scratchBuild({ dirs: { routes }, client: { inlineStyles: false }, contentConfig: content, lang: 'fr' })
 
     try {
-      await build.prerender({ routesDir: routes, contentConfig: content, lang: 'fr', inlineStyles: false })
+      await build.prerender({ dirs: { routes }, client: { inlineStyles: false }, contentConfig: content, lang: 'fr' })
 
       const built = await Bun.file(join(build.pages, 'island.html')).text()
 
       expect(built).toContain(`<h1>Îles${N}!</h1>`)
       expect(built).toContain(`Île${N}: différée`)
 
-      const served = await build.serve({ routesDir: routes, contentConfig: content, security: false, lang: 'fr' })
+      const served = await build.serve({ dirs: { routes }, contentConfig: content, security: false, lang: 'fr' })
       const { html } = await get(served, '/island')
 
       expect(html).toContain(`<p class="prop">Île${N}: serveur</p>`)
@@ -380,7 +380,7 @@ describe('a French page served', () => {
 
       expect(fetched.html).toContain(`<p class="prop">Île${N}: différée</p>`)
 
-      const plain = await build.serve({ routesDir: routes, contentConfig: content, security: false, lang: 'fr', typography: false })
+      const plain = await build.serve({ dirs: { routes }, client: { typography: false }, contentConfig: content, security: false, lang: 'fr' })
 
       expect((await get(plain, '/island?kay_island=1', { [ISLAND_HEADER]: '1' })).html).toContain('<p class="prop">Île : différée</p>')
     }
@@ -399,14 +399,14 @@ describe('a French page served', () => {
     }
 
     expect(await offline()).toContain(`<h1>Hors ligne${N}!</h1><p>Cette page a besoin d'une connexion${N}: aucune n'est ouverte.</p>`)
-    expect(await offline({ typography: false })).toContain('<h1>Hors ligne !</h1><p>Cette page a besoin d\'une connexion : aucune n\'est ouverte.</p>')
+    expect(await offline({ client: { typography: false } })).toContain('<h1>Hors ligne !</h1><p>Cette page a besoin d\'une connexion : aucune n\'est ouverte.</p>')
   })
 
   it('writes the spaces of a page prerendered in a locale only', async () => {
-    const build = await scratchBuild({ routesDir: routes, contentConfig: content, inlineStyles: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages } })
+    const build = await scratchBuild({ dirs: { routes }, client: { inlineStyles: false }, contentConfig: content, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages } })
 
     try {
-      await build.prerender({ routesDir: routes, contentConfig: content, inlineStyles: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages } })
+      await build.prerender({ dirs: { routes }, client: { inlineStyles: false }, contentConfig: content, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages } })
 
       expectPlain(await Bun.file(join(build.pages, 'index.html')).text())
       expectSpaced(await Bun.file(join(build.pages, 'fr.html')).text())
@@ -426,7 +426,7 @@ describe('a French site exported', () => {
     copy = await fixtureCopy('typography')
     out = await mkdtemp(join(tmpdir(), 'kay-typography-'))
     await Promise.all(['boom', 'island'].map(async route => rm(join(copy, `src/routes/${route}.kay`))))
-    await Bun.write(join(copy, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ site: 'https://x.example', lang: 'fr', base: '/repo', trailingSlash: 'always', inlineStyles: false })\n`)
+    await Bun.write(join(copy, 'kay.config.ts'), `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ site: 'https://x.example', lang: 'fr', base: '/repo', trailingSlash: 'always', client: { inlineStyles: false } })\n`)
 
     const child = Bun.spawn([process.execPath, CLI, 'build', copy, '--no-check', '--static', '--outdir', out], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'development' } })
     const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])

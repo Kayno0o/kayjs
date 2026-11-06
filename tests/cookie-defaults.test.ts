@@ -47,7 +47,7 @@ describe('cookie defaults', () => {
       Bun.write(join(dir, 'api/gone.ts'), GONE),
     ])
 
-    const base = { root: dir, routesDir: 'routes', apiDir: 'api', prebuilt: false }
+    const base = { root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false }
 
     servers.plain = await pages({ ...base, security: false })
     servers.off = await pages({ ...base, security: { cookies: false } })
@@ -181,14 +181,14 @@ describe('cookie defaults', () => {
   })
 
   it('keeps plain-http localhost working under kay dev', async () => {
-    const dev = await pages({ root: dir, routesDir: 'routes', apiDir: 'api', prebuilt: false, dev: true, security: { cookies: {} } })
+    const dev = await pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, dev: true, security: { cookies: {} } })
 
     expect((await dev.handle(new Request('http://localhost/cookie'))).headers.getSetCookie()[0]).toBe('theme=dark; Path=/; HttpOnly; SameSite=Lax')
   })
 
   it('refuses a setting that is no cookie attribute', async () => {
-    await expect(pages({ root: dir, routesDir: 'routes', apiDir: 'api', prebuilt: false, security: { cookies: { sameSite: 'sometimes' as 'lax' } } })).rejects.toThrow('security.cookies.sameSite')
-    await expect(pages({ root: dir, routesDir: 'routes', apiDir: 'api', prebuilt: false, security: { cookies: { path: 'shop' } } })).rejects.toThrow('security.cookies.path')
+    await expect(pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, security: { cookies: { sameSite: 'sometimes' as 'lax' } } })).rejects.toThrow('security.cookies.sameSite')
+    await expect(pages({ root: dir, dirs: { routes: 'routes', api: 'api' }, prebuilt: false, security: { cookies: { path: 'shop' } } })).rejects.toThrow('security.cookies.path')
     expect(unknownConfigKeys({ security: { cookies: { samesite: 'lax' } } })).toEqual(['`security.cookies.samesite`, did you mean `security.cookies.sameSite`?'])
   })
 })

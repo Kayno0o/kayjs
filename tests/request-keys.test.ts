@@ -22,7 +22,7 @@ async function get(variant: Variant, path: string, headers: Record<string, strin
   let held = apps.get(key)
 
   if (!held) {
-    held = pages({ root: FIXTURE, extensions: [EXTENSION], prebuilt: false, security: false, inlineStyles: false, site: 'https://site.example', dev: variant.dev, base: variant.base || undefined, i18n: variant.locale ? I18N : undefined })
+    held = pages({ root: FIXTURE, extensions: [EXTENSION], prebuilt: false, security: false, client: { inlineStyles: false }, site: 'https://site.example', dev: variant.dev, base: variant.base || undefined, i18n: variant.locale ? I18N : undefined })
     apps.set(key, held)
   }
 

@@ -213,7 +213,7 @@ describe.each([
   })
 
   it('answers everyone alike with saveData off, the markup telling the browser so', async () => {
-    const { app, remove } = await served({ saveData: false })
+    const { app, remove } = await served({ client: { saveData: false } })
 
     try {
       const saving = await app.handle(request('/', ON))

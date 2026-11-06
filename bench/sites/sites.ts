@@ -279,7 +279,7 @@ export async function prepare() {
       if (variant.kind === 'kay' && INLINE_STYLES !== '') {
         const config = Bun.file(join(dir, 'kay.config.ts'))
 
-        await Bun.write(config, (await config.text()).replace('defineConfig({', () => `defineConfig({ inlineStyles: ${INLINE_STYLES},`))
+        await Bun.write(config, (await config.text()).replace('defineConfig({', () => `defineConfig({ client: { inlineStyles: ${INLINE_STYLES} },`))
       }
 
       await Bun.write(file, JSON.stringify(manifest, null, 2))

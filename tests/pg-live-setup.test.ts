@@ -18,7 +18,7 @@ const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
   include: ['src', '.kay/types'],
 })
-const CONFIG = 'import { defineConfig, pgData } from \'kay/server\'\n\nexport default defineConfig({ log: false, store: pgData(process.env.PG_LIVE_SETUP_URL!) })\n'
+const CONFIG = 'import { defineConfig, pgData } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, store: pgData(process.env.PG_LIVE_SETUP_URL!) })\n'
 // Nothing listens on port 1, so a connection to it is refused at once.
 const UNREACHABLE = 'postgres://test:test@127.0.0.1:1/none'
 const roots: string[] = []
@@ -123,7 +123,7 @@ describe('a build or a check with a pgData store', () => {
     const marker = join(root, 'store-read')
     const getters = ['sessions', 'cache', 'jobs', 'rates', 'rooms', 'vitals', 'live', 'notifications', 'push'].map(name => `get ${name}() { appendFileSync(${JSON.stringify(marker)}, '${name} '); return undefined }`)
 
-    await Bun.write(join(root, 'kay.config.ts'), `import { appendFileSync } from 'node:fs'\nimport { defineConfig } from 'kay/server'\n\nexport default defineConfig({ log: false, store: { ${getters.join(', ')} } })\n`)
+    await Bun.write(join(root, 'kay.config.ts'), `import { appendFileSync } from 'node:fs'\nimport { defineConfig } from 'kay/server'\n\nexport default defineConfig({ observe: { log: false }, store: { ${getters.join(', ')} } })\n`)
 
     const { code, text } = await kay(root, UNREACHABLE, 'build', '--static', '--no-check')
 
@@ -189,7 +189,7 @@ describe('a server starting with a pgData store', () => {
   async function start(options: { dev?: boolean, live: LiveStore }) {
     const root = await project()
 
-    return pages({ root, routesDir: join(root, 'src/routes'), prebuilt: false, security: false, dev: options.dev, store: { live: options.live } })
+    return pages({ root, dirs: { routes: join(root, 'src/routes') }, prebuilt: false, security: false, dev: options.dev, store: { live: options.live } })
   }
 
   it('reads the live values before serving, in production', async () => {
@@ -218,7 +218,7 @@ pgDescribe('a server starting against Postgres', () => {
     await withDatabase(async (database, tables) => {
       const root = await project()
 
-      await pages({ root, routesDir: join(root, 'src/routes'), prebuilt: false, security: false, store: openStore(database) })
+      await pages({ root, dirs: { routes: join(root, 'src/routes') }, prebuilt: false, security: false, store: openStore(database) })
       expect(await tables()).toContain('kay_live')
     })
   }, 60_000)
@@ -286,7 +286,7 @@ pgDescribe('a pgData role that may not alter tables', () => {
       await Bun.write(join(first, 'package.json'), JSON.stringify({ name: 'shop' }))
       await Bun.write(join(second, 'package.json'), JSON.stringify({ name: 'blog' }))
 
-      const boot = async (root: string) => pages({ root, routesDir: join(root, 'src/routes'), prebuilt: false, security: false, store: openStore(database) })
+      const boot = async (root: string) => pages({ root, dirs: { routes: join(root, 'src/routes') }, prebuilt: false, security: false, store: openStore(database) })
 
       await boot(first)
       await boot(first)

@@ -223,7 +223,7 @@ describe('share cards', () => {
   })
 
   it('draws on an image from images.dirs, revalidated since it may change in place', async () => {
-    const uploaded = await pages({ ...config, routesDir: 'src/upload-routes', images: { dirs: { '/uploads/': uploads } } })
+    const uploaded = await pages({ ...config, dirs: { routes: 'src/upload-routes' }, images: { dirs: { '/uploads/': uploads } } })
     const card = await uploaded.handle(new Request(`http://localhost${await cardPath('/', uploaded)}`))
 
     expect(card.status).toBe(200)

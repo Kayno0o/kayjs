@@ -11,7 +11,7 @@ describe('the class check of the dev server', () => {
   let dev: TestSite
 
   beforeAll(async () => {
-    dev = await testSite({ root: 'tests/fixtures/dev-styles', plugins: [tailwind], browser: path === undefined ? false : { path }, dev: true, onError: () => undefined })
+    dev = await testSite({ root: 'tests/fixtures/dev-styles', plugins: [tailwind], browser: path === undefined ? false : { path }, dev: true, observe: { onError: () => undefined } })
   }, 120_000)
 
   afterAll(async () => dev?.close())

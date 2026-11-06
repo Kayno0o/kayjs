@@ -60,18 +60,22 @@ describe('a bare number where milliseconds were taken', () => {
 
 describe('duration words', () => {
   it('words a lifetime in the largest unit it fills exactly, days from two on', () => {
-    expect([86_400, 7 * 86_400, 3600, 90 * 60, 900, 45, 2 * 86_400 + 1].map(seconds => durationWords(seconds, 'en'))).toEqual(['24 hours', '7 days', '1 hour', '90 minutes', '15 minutes', '45 seconds', '172,801 seconds'])
+    expect((['86400s', '7d', '3600s', '90m', '900s', '45s', '172801s'] as const).map(duration => durationWords(duration, 'en'))).toEqual(['24 hours', '7 days', '1 hour', '90 minutes', '15 minutes', '45 seconds', '172,801 seconds'])
   })
 
-  it('takes a duration as it takes seconds', () => {
+  it('takes a duration with its unit', () => {
     expect((['24h', '7d', '1h', '90m', '15m', '45s', '1500ms'] as const).map(duration => durationWords(duration, 'en'))).toEqual(['24 hours', '7 days', '1 hour', '90 minutes', '15 minutes', '45 seconds', '1.5 seconds'])
   })
 
+  it('refuses a bare number of seconds', () => {
+    expect(() => durationWords(86_400 as never, 'en')).toThrow(/^kay: durationWords\(\) is 86400; it takes a positive duration/)
+  })
+
   it('words it in French, with its plurals', () => {
-    expect([86_400, 7 * 86_400, 3600, 7200, 600, 1].map(seconds => durationWords(seconds, 'fr').replace(/\s/g, ' '))).toEqual(['24 heures', '7 jours', '1 heure', '2 heures', '10 minutes', '1 seconde'])
+    expect((['24h', '7d', '1h', '2h', '10m', '1s'] as const).map(duration => durationWords(duration, 'fr').replace(/\s/g, ' '))).toEqual(['24 heures', '7 jours', '1 heure', '2 heures', '10 minutes', '1 seconde'])
   })
 
   it('falls back to English for a bad locale', () => {
-    expect(durationWords(600, 'not a locale')).toBe('10 minutes')
+    expect(durationWords('10m', 'not a locale')).toBe('10 minutes')
   })
 })

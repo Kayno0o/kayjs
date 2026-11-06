@@ -1022,7 +1022,7 @@ describe('request body limits', () => {
   })
 
   it('sends a plain form post over the limit back to its page with the error, counting a body sent without Content-Length', async () => {
-    const site = await testSite({ root: FIXTURE, security: false, maxSize: 64 * 1024 })
+    const site = await testSite({ root: FIXTURE, security: false, limits: { body: 64 * 1024 } })
     const { note } = await import(NOTES) as { note: Action<{ text: string }, number> }
 
     expect((await site.submit(note, { text: 'a'.repeat(65 * 1024) }, { from: '/notes' })).html).toContain('<p class="error">413 Too large to send; 64 KB at most</p>')
@@ -1056,7 +1056,7 @@ describe('request body limits', () => {
   it('reads the limit as a size, in the config, an action and an API module', async () => {
     const app = await serve('1mb')
     const post = async (size: number) => app.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: chunked(size) }))
-    const site = await testSite({ root: FIXTURE, security: false, maxSize: '64kb' })
+    const site = await testSite({ root: FIXTURE, security: false, limits: { body: '64kb' } })
     const { note } = await import(NOTES) as { note: Action<{ text: string }, number> }
 
     expect((await post(2 * MB)).status).toBe(413)

@@ -168,7 +168,7 @@ describe('robots', () => {
   })
 
   it('gives way to a robots.txt in public/', async () => {
-    const app = await appWith({ site, publicDir: resolve('tests/fixtures/seo/public'), robots: { disallow: ['/private'] } })
+    const app = await appWith({ site, dirs: { public: resolve('tests/fixtures/seo/public') }, robots: { disallow: ['/private'] } })
 
     expect(await text(app)).toBe('User-agent: *\nDisallow: /private\n')
   })
@@ -195,7 +195,7 @@ describe('sitemap lastmod', () => {
 
       await Bun.write(`${root}/src/routes/posts/[slug].kay`, `--- server\nexport const page = { sitemap: [{ slug: 'a' }], lastmod: ${lastmod} }\n---\nh1 Post\n`)
 
-      return (await (await appWith({ root, routesDir: 'src/routes', publicDir: `${root}/public`, site })).handle(new Request('http://localhost/sitemap.xml'))).text()
+      return (await (await appWith({ root, dirs: { routes: 'src/routes', public: `${root}/public` }, site })).handle(new Request('http://localhost/sitemap.xml'))).text()
     }
 
     expect(await xml('() => null')).toContain('<url><loc>https://x.example/posts/a</loc></url>')
@@ -275,11 +275,11 @@ describe('layout settings', () => {
   })
 
   it('has a layout\'s noindex and search: false keep the pages under it out of the search index, and its revalidate set their period', async () => {
-    const build = await scratchBuild({ routesDir: `${ROOT}/src/routes`, search: true, publicDir: `${ROOT}/public` })
+    const build = await scratchBuild({ dirs: { routes: `${ROOT}/src/routes`, public: `${ROOT}/public` }, search: true })
     const rendered: RenderedPage[] = []
 
     try {
-      await build.prerender({ routesDir: `${ROOT}/src/routes`, search: true, publicDir: `${ROOT}/public` }, { rendered })
+      await build.prerender({ dirs: { routes: `${ROOT}/src/routes`, public: `${ROOT}/public` }, search: true }, { rendered })
 
       const byPath = new Map(rendered.map(page => [page.path, page]))
 

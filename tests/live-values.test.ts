@@ -806,7 +806,7 @@ describe('live values in a production build', () => {
   it('builds, keeps the pages reading none, and serves the rest per request with a connection each', async () => {
     const root = resolve(await fixtureCopy('live-values'))
 
-    await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n')
 
     const build = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'build', root, '--no-check'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
     const [out, err, built] = await Promise.all([new Response(build.stdout).text(), new Response(build.stderr).text(), build.exited])
@@ -827,7 +827,7 @@ describe('live values in a production build', () => {
       `import { pages } from ${server}`,
       `import { decodeServerValue } from ${wire}`,
       '',
-      `const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, log: false, compress: false }))`,
+      `const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, observe: { log: false }, serve: { compress: false } }))`,
       'const page = async path => (await app.handle(new Request(`http://localhost${path}`))).text()',
       'const home = await page(\'/\')',
       'const about = await page(\'/about\')',

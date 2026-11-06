@@ -253,7 +253,7 @@ describe('the inspector', () => {
 
 describe('a dev server kay dev did not start', () => {
   it('marks no element, loads no inspector and opens nothing', async () => {
-    const app = new Elysia().use(await pages({ routesDir: 'tests/fixtures/bare/src/routes', prebuilt: true, dev: true }))
+    const app = new Elysia().use(await pages({ dirs: { routes: 'tests/fixtures/bare/src/routes' }, prebuilt: true, dev: true }))
     const page = await (await app.handle(new Request('http://localhost/'))).text()
 
     expect(page).toContain('/_kay/dev/events')

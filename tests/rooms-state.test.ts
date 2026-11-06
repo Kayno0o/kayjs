@@ -1,5 +1,5 @@
 import type { SocketOf } from '../src/runtime/live'
-import type { AsyncRooms, AsyncRoomStore, Rooms, RoomStore, StoreRooms } from '../src/server/rooms'
+import type { Rooms, RoomStore } from '../src/server/rooms'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -234,18 +234,6 @@ describe('a room\'s state over a store of your own', () => {
     live.join(connection(), 'hall', 'ada')
     expect(await live.update('hall', state => ({ ...state, round: 2 }))).toEqual({ round: 2, scores: {} })
     expect(await live.state('hall')).toEqual({ round: 2, scores: {} })
-  })
-})
-
-describe('the types kept from before 1.88', () => {
-  type Same<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
-
-  it('keeps AsyncRoomStore, AsyncRooms and StoreRooms as other names of RoomStore and Rooms', () => {
-    const store: Same<AsyncRoomStore, RoomStore> = true
-    const asynchronous: Same<AsyncRooms<Message, string, State>, Rooms<Message, string, State>> = true
-    const either: Same<StoreRooms<Message, string, State>, Rooms<Message, string, State>> = true
-
-    expect([store, asynchronous, either]).toEqual([true, true, true])
   })
 })
 

@@ -43,9 +43,6 @@ export interface RoomStore extends StoreBase {
   update?: (room: string, change: (current: string | undefined) => string) => Promise<string>
 }
 
-/** @deprecated Since 1.88: every `RoomStore` answers `state` and `update` with promises, so this is `RoomStore`. */
-export type AsyncRoomStore = RoomStore
-
 export interface RoomsOptions<Message = never, State = undefined> {
   // `sqliteRooms(path)` reaches every process of the machine; one process's memory by default. `pgData(db).rooms` does across replicas.
   store?: RoomStore | undefined
@@ -85,12 +82,6 @@ export interface Rooms<Message, Member = undefined, State = undefined> extends R
   // Replaces the room's state with what `change` returns for the one it has, one change at a time in every process sharing the store, and gives the new one. `change` runs inside the store's turn: it must be quick and read nothing but its argument. Nothing is sent: publish the change, or its snapshot, to the members.
   update: (room: string, change: (state: State) => State) => Promise<State>
 }
-
-/** @deprecated Since 1.88: `state` and `update` always resolve, so this is `Rooms`. */
-export type AsyncRooms<Message, Member = undefined, State = undefined> = Rooms<Message, Member, State>
-
-/** @deprecated Since 1.88: `state` and `update` always resolve, so this is `Rooms`. */
-export type StoreRooms<Message, Member = undefined, State = undefined> = Rooms<Message, Member, State>
 
 const DEFAULT_WAIT = '50ms'
 // The longest room name, a room being often named by a visitor's URL.

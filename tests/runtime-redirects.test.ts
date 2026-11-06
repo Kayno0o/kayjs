@@ -263,7 +263,7 @@ describe('a served app', () => {
   })
 
   it('answers a missing path with the redirect to a client taking compression, whatever the 404 page weighs', async () => {
-    const served = new Elysia().use(await pages({ root: 'tests/fixtures/site', prebuilt: false, security: false, compress: true }))
+    const served = new Elysia().use(await pages({ root: 'tests/fixtures/site', prebuilt: false, security: false, serve: { compress: true } }))
 
     addRuntimeRedirect('/rt-zipped', '/about')
 
@@ -368,7 +368,7 @@ describe('a page that answers 404 itself', () => {
     await Bun.write(join(root, 'src/routes/_404.kay'), 'main Gone\n')
     await Bun.write(join(root, 'src/routes/post/[slug].kay'), '--- server\nif (ctx.params.slug !== \'here\') ctx.notFound()\n---\nmain Here\n')
 
-    const served = new Elysia().use(await pages({ routesDir: join(root, 'src/routes'), prebuilt: false, security: false, base: '/app' }))
+    const served = new Elysia().use(await pages({ dirs: { routes: join(root, 'src/routes') }, prebuilt: false, security: false, base: '/app' }))
 
     addRuntimeRedirect('/post/old', '/new')
     addRuntimeRedirect('/nowhere', '/new', { status: 302 })

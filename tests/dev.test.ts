@@ -311,7 +311,7 @@ describe.concurrent('kay dev', () => {
 
     await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
     await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
-    await Bun.write(join(root, 'kay.config.ts'), 'export default { publicDir: \'static\' }\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { dirs: { public: \'static\' } }\n')
     await Bun.write(join(root, 'src/posts/one.md'), 'one\n')
     await Bun.write(join(root, 'src/logo.png'), 'a')
     const stop = await dev(root, { onRestart: child => children.push(child) })
@@ -352,7 +352,7 @@ describe.concurrent('kay dev', () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const loads = join(root, 'loads')
     const shadow = join(root, '.kay/types/src/routes/index.kay.tsx')
-    const config = (dir: string) => `import { appendFileSync } from 'node:fs'\n\nappendFileSync(${JSON.stringify(loads)}, 'x')\nprocess.stdout.write('printed by the config')\n\nexport default { publicDir: '${dir}' }\n`
+    const config = (dir: string) => `import { appendFileSync } from 'node:fs'\n\nappendFileSync(${JSON.stringify(loads)}, 'x')\nprocess.stdout.write('printed by the config')\n\nexport default { dirs: { public: '${dir}' } }\n`
 
     await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
     await Bun.write(join(root, 'kay.config.ts'), config('one'))
@@ -390,7 +390,7 @@ describe.concurrent('kay dev', () => {
 
     await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
     await Bun.write(join(root, '.env'), 'KAY_TYPES_DOTENV=from-file\n')
-    await Bun.write(join(root, 'kay.config.ts'), 'export default { publicDir: `${process.env.KAY_TYPES_DOTENV}-${process.env.KAY_TYPES_GIVEN}` }\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { dirs: { public: `${process.env.KAY_TYPES_DOTENV}-${process.env.KAY_TYPES_GIVEN}` } }\n')
 
     const types = new TypesProcess(root, undefined, { ...process.env, KAY_TYPES_GIVEN: 'given' })
 
@@ -408,7 +408,7 @@ describe.concurrent('kay dev', () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
 
     await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
-    await Bun.write(join(root, 'kay.config.ts'), 'export default { publicDir: \'one\' }\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'export default { dirs: { public: \'one\' } }\n')
 
     const types = new TypesProcess(root, undefined)
 
@@ -442,7 +442,7 @@ describe.concurrent('kay dev', () => {
     await Bun.write(join(root, 'src/server.ts'), `Bun.serve({ port: ${port}, fetch: () => new Response() })\n`)
     await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
     await Bun.write(helper, 'export const dir = \'one\'\n')
-    await Bun.write(join(root, 'kay.config.ts'), `import { dir } from ${JSON.stringify(helper)}\n\nexport default { publicDir: dir }\n`)
+    await Bun.write(join(root, 'kay.config.ts'), `import { dir } from ${JSON.stringify(helper)}\n\nexport default { dirs: { public: dir } }\n`)
     process.stdout.isTTY = true
     process.env.NO_COLOR = '1'
 
@@ -481,7 +481,7 @@ describe.concurrent('kay dev', () => {
     await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
     await Bun.write(join(root, 'src/dir.ts'), 'export const dir = \'one\'\n')
     await Bun.write(join(root, 'src/other.ts'), 'export const other = 1\n')
-    await Bun.write(join(root, 'kay.config.ts'), `import { appendFileSync } from 'node:fs'\nimport { dir } from './src/dir'\n\n// Only the process writing the types counts, as the servers load the config too.\nif (process.argv[1]?.endsWith('types.ts'))\n  appendFileSync(${JSON.stringify(loads)}, 'x')\n\nexport default { publicDir: dir }\n`)
+    await Bun.write(join(root, 'kay.config.ts'), `import { appendFileSync } from 'node:fs'\nimport { dir } from './src/dir'\n\n// Only the process writing the types counts, as the servers load the config too.\nif (process.argv[1]?.endsWith('types.ts'))\n  appendFileSync(${JSON.stringify(loads)}, 'x')\n\nexport default { dirs: { public: dir } }\n`)
 
     const stop = await dev(root)
 

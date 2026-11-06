@@ -8,7 +8,6 @@ import process from 'node:process'
 import { clientDir, KAY_DIR, outputDir, testWorker, underKayDev } from './build/assets'
 import { TSCONFIG } from './build/files'
 import { pickConfig } from './config'
-import { groupedKeys } from './config-shape'
 import { isFrench } from './runtime/french'
 import { IMAGE_WIDTHS, parseWidths } from './runtime/image'
 import { basePath } from './server/base'
@@ -190,9 +189,7 @@ export interface Project<Config extends KayConfig = KayConfig> {
 }
 
 export function resolveProject<Config extends KayConfig>(root: string, config: Config, mode: Mode = PRODUCTION): Project<Config> {
-  const named = groupedKeys(config)
-
-  return { root: resolve(root), config: named, paths: projectPaths(root, named), mode }
+  return { root: resolve(root), config, paths: projectPaths(root, config), mode }
 }
 
 // Whether the islands of an app write French spaces: a French `lang` or locale, and `typography` not off.

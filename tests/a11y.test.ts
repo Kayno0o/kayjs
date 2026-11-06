@@ -7,7 +7,7 @@ const ROUTES = 'tests/fixtures/bare/src/routes'
 
 describe('the accessibility check of the dev server', () => {
   it('loads on its pages, axe-core coming from its own route', async () => {
-    const app = new Elysia().use(await pages({ routesDir: ROUTES, prebuilt: true, dev: true }))
+    const app = new Elysia().use(await pages({ dirs: { routes: ROUTES }, prebuilt: true, dev: true }))
 
     expect(await (await app.handle(new Request('http://localhost/'))).text()).toContain('<script type="module" src="/_kay/dev/a11y.js"></script>')
     expect(await (await app.handle(new Request('http://localhost/_kay/dev/a11y.js'))).text()).toContain('startA11y()')
@@ -19,7 +19,7 @@ describe('the accessibility check of the dev server', () => {
   })
 
   it('is no part of a server out of development', async () => {
-    const app = new Elysia().use(await pages({ routesDir: ROUTES, prebuilt: true }))
+    const app = new Elysia().use(await pages({ dirs: { routes: ROUTES }, prebuilt: true }))
 
     expect(await (await app.handle(new Request('http://localhost/'))).text()).not.toContain('/_kay/dev/a11y.js')
     expect((await app.handle(new Request('http://localhost/_kay/dev/a11y.js'))).status).toBe(404)

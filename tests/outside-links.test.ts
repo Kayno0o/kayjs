@@ -11,7 +11,7 @@ const OUT = ' target="_blank" rel="noopener"'
 
 // Each link tag of the page by its class, class name apart.
 async function links(options: Record<string, unknown> = {}, path = '/'): Promise<Record<string, string>> {
-  const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, security: false, inlineStyles: false, ...options }))
+  const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, security: false, client: { inlineStyles: false }, ...options }))
   const html = await (await site.handle(new Request(`http://localhost${path}`))).text()
   const found: Record<string, string> = {}
 
@@ -101,7 +101,7 @@ describe('a link leaving the site, in templates', () => {
 })
 
 async function page(options: Record<string, unknown>, path = '/'): Promise<string> {
-  const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, security: false, inlineStyles: false, ...options }))
+  const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, security: false, client: { inlineStyles: false }, ...options }))
 
   return (await site.handle(new Request(`http://localhost${path}`))).text()
 }
@@ -129,7 +129,7 @@ describe('the cue saying a link opens in a new tab', () => {
 
   it('lets the rule through a strict style-src by its hash, in each locale', async () => {
     const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/outside-links/src/messages') }
-    const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, site: 'https://x.example', inlineStyles: false, i18n, security: { csp: { 'style-src': ['\'self\''] } } }))
+    const site = new Elysia().use(await pages({ root: 'tests/fixtures/outside-links', prebuilt: false, site: 'https://x.example', client: { inlineStyles: false }, i18n, security: { csp: { 'style-src': ['\'self\''] } } }))
 
     for (const path of ['/', '/en']) {
       const response = await site.handle(new Request(`http://localhost${path}`))

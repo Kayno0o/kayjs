@@ -44,8 +44,10 @@ describe('a value of each user in a deferred island and on the error pages', () 
     await pages({ root: ROOT, prebuilt: false })
     build = await scratchBuild({}, false, join(process.cwd(), ROOT))
     await build.prerender({})
-    app = new Elysia().onRequest(hooks).use(await build.serve({ security: false, onError: ({ error }) => {
-      reported.push(String(error))
+    app = new Elysia().onRequest(hooks).use(await build.serve({ security: false, observe: {
+      onError: ({ error }) => {
+        reported.push(String(error))
+      },
     } }))
     live = await import(join(process.cwd(), ROOT, 'src/live.ts')) as Values
     live.unread.set('alice', 3)

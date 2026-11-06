@@ -13,7 +13,7 @@ interface Variant { base: string, dev: boolean, locale: boolean }
 const variants: Variant[] = [false, true].flatMap(dev => ['', '/repo'].flatMap(base => [false, true].map(locale => ({ dev, base, locale }))))
 
 async function get(variant: Variant, path: string): Promise<{ status: number, html: string }> {
-  const app = await pages({ root: FIXTURE, extensions: [OUTER, OWN], prebuilt: false, security: false, inlineStyles: false, site: 'https://site.example', dev: variant.dev, base: variant.base || undefined, i18n: variant.locale ? { locales: ['en', 'fr'], defaultLocale: 'en', messages: 'src/messages' } : undefined })
+  const app = await pages({ root: FIXTURE, extensions: [OUTER, OWN], prebuilt: false, security: false, client: { inlineStyles: false }, site: 'https://site.example', dev: variant.dev, base: variant.base || undefined, i18n: variant.locale ? { locales: ['en', 'fr'], defaultLocale: 'en', messages: 'src/messages' } : undefined })
   const response = await app.handle(new Request(`http://localhost${variant.locale ? '/fr' : ''}${variant.locale && path === '/' ? '' : path}`))
 
   return { status: response.status, html: await response.text() }

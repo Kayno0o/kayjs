@@ -6,7 +6,7 @@ import { kayBuild } from './check-helper'
 import { scratchDir } from './scratch'
 
 // The pages of a route render several at once, each finishing in the reverse of its order: what the build says of each page is still its own, and a failure is the first in order.
-const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n'
+const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n'
 const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
   include: ['src', '.kay/types'],

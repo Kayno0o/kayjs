@@ -144,7 +144,7 @@ beforeAll(async () => {
   const [root, mounted, plain, restricted] = await Promise.all([
     project('export default {}\n'),
     project('export default { base: \'/repo\', trailingSlash: \'always\', i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }\n', true),
-    project('export default { compress: false }\n'),
+    project('export default { serve: { compress: false } }\n'),
     project('export default { security: { csp: { \'connect-src\': [\'https://api.example.com\'] } } }\n'),
   ])
 
@@ -355,7 +355,7 @@ describe('development', () => {
   it('has no dictionary, even over a build that has one and with compression asked for', async () => {
     const [root] = sites
     const { dictionary } = await manifestOf(root!)
-    const app = await pages({ root: root!.root, dev: true, prebuilt: true, compress: true, log: false })
+    const app = await pages({ root: root!.root, dev: true, prebuilt: true, serve: { compress: true }, observe: { log: false } })
     const reply = await app.handle(new Request('http://localhost/about', { headers: { 'accept-encoding': ACCEPT, 'available-dictionary': `:${dictionary!.hash}:` } }))
     const file = await app.handle(new Request(`http://localhost/_kay/${dictionary!.file}`))
 
@@ -401,7 +401,7 @@ describe('a server with no dictionary to use', () => {
   }, 120_000)
 
   it('is not built, nor any dcz copy written, for an app setting compressionDictionary: false, which serves its pages with no link', async () => {
-    const off = await project('export default { compressionDictionary: false }\n')
+    const off = await project('export default { serve: { compressionDictionary: false } }\n')
 
     await build(off)
 

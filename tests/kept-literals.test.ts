@@ -7,7 +7,7 @@ import { keptScan } from '../src/server/pure-page'
 import { scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
-const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n'
+const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n'
 const roots: string[] = []
 
 afterAll(async () => {

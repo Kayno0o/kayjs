@@ -17,7 +17,7 @@ import { pages } from './shared-pages'
 const FIXTURE = 'tests/fixtures/routing'
 const routes = `${FIXTURE}/src/routes`
 const redirects = { '/old/:slug': '/items/:slug', '/legacy/*': '/blog/*', '/temp': { to: '/about', permanent: false }, '/go/*': '/*' }
-const app = new Elysia().use(await pages({ routesDir: routes, prebuilt: false, security: false, redirects }))
+const app = new Elysia().use(await pages({ dirs: { routes }, prebuilt: false, security: false, redirects }))
 
 async function get(path: string, served = app): Promise<{ status: number, html: string, location: string | null }> {
   const response = await served.handle(new Request(`http://localhost${path}`))
@@ -80,7 +80,7 @@ describe('param matchers', () => {
     try {
       await Bun.write(join(copy, 'src/routes/x/[id=nothing].kay'), 'p x\n')
 
-      await expect(pages({ routesDir: `${copy}/src/routes`, prebuilt: false })).rejects.toThrow('names the matcher nothing, which is neither')
+      await expect(pages({ dirs: { routes: `${copy}/src/routes` }, prebuilt: false })).rejects.toThrow('names the matcher nothing, which is neither')
     }
     finally {
       await rm(copy, { recursive: true, force: true })
@@ -137,10 +137,10 @@ describe('redirects', () => {
 
   it('refuse a target naming what the old path lacks, and a path a page serves', async () => {
     expect(() => readRedirects({ '/a': '/b/:id' })).toThrow('goes to /b/:id, whose :id its path has none of')
-    await expect(pages({ routesDir: routes, prebuilt: false, redirects: { '/about': '/bare' } })).rejects.toThrow('the redirect from /about takes a path a page serves')
-    await expect(pages({ routesDir: routes, prebuilt: false, redirects: { '/docs/*': '/about' } })).rejects.toThrow('the redirect from /docs/* takes a path a page serves')
+    await expect(pages({ dirs: { routes }, prebuilt: false, redirects: { '/about': '/bare' } })).rejects.toThrow('the redirect from /about takes a path a page serves')
+    await expect(pages({ dirs: { routes }, prebuilt: false, redirects: { '/docs/*': '/about' } })).rejects.toThrow('the redirect from /docs/* takes a path a page serves')
     // A param and a catch-all are two router paths, the param tried first.
-    const beside = new Elysia().use(await pages({ routesDir: routes, prebuilt: false, security: false, redirects: { '/docs/:page': '/about' } }))
+    const beside = new Elysia().use(await pages({ dirs: { routes }, prebuilt: false, security: false, redirects: { '/docs/:page': '/about' } }))
 
     expect((await get('/docs/a', beside)).location).toBe('/about')
     expect((await get('/docs/a/b', beside)).html).toContain('Docs at a/b')
@@ -205,8 +205,8 @@ describe('localPath', () => {
 
 describe('trailing slashes', () => {
   it('redirect to the URL without one by default, to the one with always, and serve both with ignore', async () => {
-    const always = new Elysia().use(await pages({ routesDir: routes, prebuilt: false, security: false, trailingSlash: 'always' }))
-    const ignore = new Elysia().use(await pages({ routesDir: routes, prebuilt: false, security: false, trailingSlash: 'ignore' }))
+    const always = new Elysia().use(await pages({ dirs: { routes }, prebuilt: false, security: false, trailingSlash: 'always' }))
+    const ignore = new Elysia().use(await pages({ dirs: { routes }, prebuilt: false, security: false, trailingSlash: 'ignore' }))
 
     expect(await get('/about/?x=1')).toMatchObject({ status: 308, location: '/about?x=1' })
     expect(await get('/about', always)).toMatchObject({ status: 308, location: '/about/' })
@@ -218,7 +218,7 @@ describe('trailing slashes', () => {
   })
 
   it('write sitemap and canonical URLs as the setting has them', async () => {
-    const always = new Elysia().use(await pages({ routesDir: routes, prebuilt: false, security: false, trailingSlash: 'always', site: 'https://x.example' }))
+    const always = new Elysia().use(await pages({ dirs: { routes }, prebuilt: false, security: false, trailingSlash: 'always', site: 'https://x.example' }))
 
     expect((await get('/sitemap.xml', always)).html).toContain('<loc>https://x.example/about/</loc>')
     expect((await get('/about/', always)).html).toContain('<link rel="canonical" href="https://x.example/about/">')
@@ -226,7 +226,7 @@ describe('trailing slashes', () => {
 })
 
 describe('prerendering', () => {
-  const build = prerendered({ routesDir: routes })
+  const build = prerendered({ dirs: { routes } })
 
   it('renders an optional param\'s path with and without it, the matcher\'s value handed over', async () => {
     const dir = build.pages

@@ -1485,7 +1485,7 @@ describe('kay lsp on an app holding a nested project and listing an extension be
       Bun.write(join(dir, 'src/params/code.ts'), 'export default (value: string): number | undefined => (/^\\d+$/).test(value) ? Number(value) : undefined\n'),
       Bun.write(join(dir, 'shared/data.ts'), 'export const label: string = \'Item \'\n'),
       Bun.write(join(dir, 'apps/web/tsconfig.json'), await Bun.file(join(fixtures, 'site/tsconfig.json')).text()),
-      Bun.write(join(dir, 'apps/web/kay.config.ts'), 'export default { routesDir: \'src/pages\', contentConfig: \'site-content.ts\', lints: { \'unread-name\': \'warn\', \'css-import-without-text\': \'allow\' } }\n'),
+      Bun.write(join(dir, 'apps/web/kay.config.ts'), 'export default { dirs: { routes: \'src/pages\' }, contentConfig: \'site-content.ts\', lints: { \'unread-name\': \'warn\', \'css-import-without-text\': \'allow\' } }\n'),
       Bun.write(join(dir, 'apps/web/site-content.ts'), 'export {}\n'),
       Bun.write(join(dir, 'apps/web/src/theme.css'), 'p { color: red }\n'),
       Bun.write(join(dir, 'apps/web/src/styled.kay'), '---\nimport theme from \'./theme.css\'\n---\np {theme}\n'),

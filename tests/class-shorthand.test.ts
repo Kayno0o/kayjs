@@ -315,7 +315,7 @@ describe('Tailwind', () => {
   let root = ''
 
   async function head(dir: string, built: Awaited<ReturnType<typeof buildClient>>, path: string): Promise<string> {
-    const app = await servePages(resolveProject(dir, { routesDir: 'src/routes', compress: false }, modeOf({ dev: false, prebuilt: true })), () => ({ ...built, styles: new Map(built.styles), inlineStyles: undefined, inlineSizes: undefined, pageStyles: undefined }))
+    const app = await servePages(resolveProject(dir, { dirs: { routes: 'src/routes' }, serve: { compress: false } }, modeOf({ dev: false, prebuilt: true })), () => ({ ...built, styles: new Map(built.styles), inlineStyles: undefined, inlineSizes: undefined, pageStyles: undefined }))
     const html = await (await app.handle(new Request(`http://localhost${path}`))).text()
 
     return [...html.matchAll(STYLE)].map(match => match[1]!).join('\n')

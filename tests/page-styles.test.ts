@@ -92,7 +92,7 @@ async function copyOfFixture(): Promise<string> {
 // The heads a server writes are kept per `styles` map, so each server gets a map of its own.
 async function serve(options: PagesOptions & { dev?: boolean } = {}, built = client): Promise<App> {
   const mode = modeOf({ dev: options.dev ?? false, prebuilt: options.dev !== true })
-  const config = { routesDir: 'src/routes', compress: false, ...options }
+  const config = { dirs: { routes: 'src/routes' }, serve: { compress: false }, ...options }
 
   return servePages(resolveProject(root, config, mode), () => ({ ...built, styles: new Map(built.styles), inlineStyles: undefined, inlineSizes: undefined, pageStyles: undefined }))
 }
@@ -155,7 +155,7 @@ afterAll(async () => {
 describe('lateStyles', () => {
   it('links the whole stylesheet after the inline rules, where it is off by default', async () => {
     const off = await head(await serve(), '/data')
-    const on = await head(await serve({ lateStyles: true }), '/data')
+    const on = await head(await serve({ client: { lateStyles: true } }), '/data')
 
     expect(off.html).not.toContain('data-kay-rest')
     expect(on.html).toMatch(/<link rel="stylesheet" href="[^"]+" media="print" data-kay-rest>/)
@@ -168,7 +168,7 @@ describe('lateStyles', () => {
 
   it('has the script of the whole stylesheet allowed by the policy, and only when on', async () => {
     const policy = async (late: boolean) => {
-      const served = await serve({ lateStyles: late, security: { csp: { 'script-src': ['\'self\''] } } })
+      const served = await serve({ client: { lateStyles: late }, security: { csp: { 'script-src': ['\'self\''] } } })
 
       return (await served.handle(new Request('http://localhost/data'))).headers.get('content-security-policy') ?? ''
     }
@@ -426,7 +426,7 @@ describe('a page\'s head', () => {
 
     expect(new Set(hashes).size).toBe(hashes.length)
 
-    const compressed = await (await serve({ base, security, compress: true }, built)).handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': 'br, gzip' } }))
+    const compressed = await (await serve({ base, security, serve: { compress: true } }, built)).handle(new Request(`http://localhost${path}`, { headers: { 'accept-encoding': 'br, gzip' } }))
 
     expect(compressed.headers.get('content-encoding')).toBe('gzip')
     expect(new TextDecoder().decode(Bun.gunzipSync(new Uint8Array(await compressed.arrayBuffer())))).toBe(html)
@@ -470,8 +470,8 @@ describe('a page\'s head', () => {
   })
 
   it('stays as it was for inlineStyles true and false, and in development', async () => {
-    const forced = await head(await serve({ inlineStyles: true }), '/about')
-    const linked = await head(await serve({ inlineStyles: false }), '/about')
+    const forced = await head(await serve({ client: { inlineStyles: true } }), '/about')
+    const linked = await head(await serve({ client: { inlineStyles: false } }), '/about')
     const dev = await head(await serve({ dev: true }), '/about')
 
     expect(hasRule(forced.styles, 'bg-lime-300')).toBe(true)
@@ -479,12 +479,12 @@ describe('a page\'s head', () => {
     expect(linked.blocking).toHaveLength(1)
     expect(dev.html).not.toContain('<style>')
 
-    for (const mode of [{ inlineStyles: true }, { inlineStyles: false }, { dev: true }])
+    for (const mode of [{ client: { inlineStyles: true } }, { client: { inlineStyles: false } }, { dev: true }])
       expect((await head(await serve(mode), '/bulk')).blocking[0] ?? '', JSON.stringify(mode)).not.toMatch(ROUTE_COPY)
   })
 
   it('is written into a page kept at build time, its hash known to the server that serves it', async () => {
-    expect(await prerenderPages(resolveProject(root, { routesDir: 'src/routes' }, PRODUCTION), client)).toBeGreaterThan(0)
+    expect(await prerenderPages(resolveProject(root, { dirs: { routes: 'src/routes' } }, PRODUCTION), client)).toBeGreaterThan(0)
 
     const file = await Bun.file(join(outputDir(root), 'pages/prerendered.html')).text()
     const styles = [...file.matchAll(STYLE)].map(match => match[1]!).join('\n')
@@ -494,7 +494,7 @@ describe('a page\'s head', () => {
     expect(hasRule(styles, 'underline')).toBe(true)
     expect(hasRule(styles, 'bg-lime-300')).toBe(false)
 
-    const served = await servePages(resolveProject(root, { routesDir: 'src/routes', security: { csp: { 'style-src': ['\'self\''] } } }, PRODUCTION), async () => (await readClient(root))!)
+    const served = await servePages(resolveProject(root, { dirs: { routes: 'src/routes' }, security: { csp: { 'style-src': ['\'self\''] } } }, PRODUCTION), async () => (await readClient(root))!)
     const response = await served.handle(new Request('http://localhost/prerendered'))
     const body = await response.text()
 
@@ -557,7 +557,7 @@ describe('a class a server builds from data', () => {
   async function prerendered(): Promise<Route[]> {
     const routes: Route[] = []
 
-    expect(await prerenderPages(resolveProject(root, { routesDir: 'src/routes' }, PRODUCTION), client, { routes })).toBeGreaterThan(0)
+    expect(await prerenderPages(resolveProject(root, { dirs: { routes: 'src/routes' } }, PRODUCTION), client, { routes })).toBeGreaterThan(0)
 
     return routes
   }
@@ -646,7 +646,7 @@ describe('a page kept at build time under a mount point', () => {
   it('carries its rules inline and links no stylesheet', async () => {
     const built = await builtUnder('/docs')
 
-    expect(await prerenderPages(resolveProject(root, { routesDir: 'src/routes', base: '/docs' }, PRODUCTION), built)).toBeGreaterThan(0)
+    expect(await prerenderPages(resolveProject(root, { dirs: { routes: 'src/routes' }, base: '/docs' }, PRODUCTION), built)).toBeGreaterThan(0)
 
     const file = await Bun.file(join(outputDir(root), 'pages/prerendered.html')).text()
 

@@ -140,7 +140,7 @@ describe('favicon', () => {
   it('leaves a path to the public file serving it', async () => {
     await Bun.write(join(scratch, 'public/favicon.ico'), 'own icon')
 
-    const own = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: resolve(SOURCE), publicDir: join(scratch, 'public') })
+    const own = await pages({ root: 'tests/fixtures/seo', prebuilt: false, favicon: resolve(SOURCE), dirs: { public: join(scratch, 'public') } })
 
     expect(await (await own.handle(new Request('http://localhost/favicon.ico'))).text()).toBe('own icon')
     expect((await own.handle(new Request('http://localhost/icon-192.png'))).status).toBe(200)

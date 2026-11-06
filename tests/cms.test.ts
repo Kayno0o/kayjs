@@ -47,7 +47,7 @@ const SECRET = 'a-preview-secret-long-enough-for-kay-0123456789'
 const EDITOR = { name: 'editor', editor: 'src/components/draft-editor.kay', routes: { dir: 'admin', prefix: '/admin' } }
 // Another extension, whose pages are content the editor edits.
 const BLOG = { name: 'blog', routes: { dir: 'blog', prefix: '/blog' } }
-const options = { root: FIXTURE, routesDir: 'src/routes', contentConfig: 'src/content.config.ts', apiDir: 'src/api', site: 'https://news.example', inlineStyles: false, security: false as const, preview: { secret: SECRET }, extensions: [EDITOR, BLOG] }
+const options = { root: FIXTURE, dirs: { routes: 'src/routes', api: 'src/api' }, contentConfig: 'src/content.config.ts', site: 'https://news.example', client: { inlineStyles: false }, security: false as const, preview: { secret: SECRET }, extensions: [EDITOR, BLOG] }
 const app = await pages({ ...options, prebuilt: false })
 const COOKIE = /^kay_preview=([^;]+);/
 const HYDRATION_MARK = /<!--[[\]]-->/g

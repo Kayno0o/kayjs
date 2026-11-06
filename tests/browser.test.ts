@@ -24,7 +24,7 @@ function elsewhere(): boolean {
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test in a browser', () => {
   beforeAll(async () => {
     // The fixture's islands break on purpose, which the server would log.
-    site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, onError: () => undefined })
+    site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, observe: { onError: () => undefined } })
   }, 60_000)
 
   // A page of its own for each test, closed after it: with none open between two tests the browser restarts, freeing the renderers the pages it closed left behind, which a page kept open through the whole file never let it.
@@ -714,7 +714,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
   let dev: TestSite
 
   beforeAll(async () => {
-    dev = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, dev: true, onError: () => undefined })
+    dev = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, dev: true, observe: { onError: () => undefined } })
   }, 60_000)
 
   // The browser stays up for minutes after its last page, which the files after this one would run beside.

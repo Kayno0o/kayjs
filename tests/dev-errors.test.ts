@@ -161,11 +161,11 @@ describe('the errors kay dev lists for a reader without a browser', () => {
   it('lists a project that failed to resolve from its config, as a new process', async () => {
     const own = await scratchDir('dev-errors-')
 
-    await Bun.write(join(own, 'kay.config.ts'), 'export default { routesDir: 1 }\n')
+    await Bun.write(join(own, 'kay.config.ts'), 'export default { dirs: { routes: 1 } }\n')
     const run = Bun.spawnSync([process.execPath, '-e', `import { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\nawait pages({ root: ${JSON.stringify(own)}, dev: true }).catch(() => undefined)`], { env: { ...process.env, KAY_DEV_CODE: 'test' }, stderr: 'pipe' })
 
     expect(run.exitCode).toBe(0)
-    expect(listed(own)).toEqual([expect.objectContaining({ kind: 'boot', message: expect.stringContaining('`routesDir` is 1') })])
+    expect(listed(own)).toEqual([expect.objectContaining({ kind: 'boot', message: expect.stringContaining('`dirs.routes` is 1') })])
   })
 
   it('removes what a server killed mid-write left, and keeps a running one\'s', async () => {

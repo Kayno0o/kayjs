@@ -14,7 +14,7 @@ import { pages } from './shared-pages'
 
 const FIXTURE = 'tests/fixtures/endpoints'
 const routes = resolve(FIXTURE, 'src/routes')
-const app = await pages({ routesDir: routes, publicDir: `${FIXTURE}/public`, prebuilt: false, security: false })
+const app = await pages({ dirs: { routes, public: `${FIXTURE}/public` }, prebuilt: false, security: false })
 
 async function get(path: string, headers: Record<string, string> = {}) {
   const response = await app.handle(new Request(`http://localhost${path}`, { headers }))

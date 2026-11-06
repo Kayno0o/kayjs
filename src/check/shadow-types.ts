@@ -32,10 +32,10 @@ import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 import { deprecatedAuthOptions } from './deprecated-auth-options'
-import { deprecatedConfigKeys } from './deprecated-config-keys'
+
 import { deprecatedEscapeOption } from './deprecated-escape-option'
 import { ownFile } from './diagnose'
-import { durationSeconds } from './duration-seconds'
+
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
@@ -47,7 +47,7 @@ import { movedImports } from './moved-imports'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
-import { contextName, exportNames, roomTypes } from './renamed-exports'
+import { contextName, exportNames } from './renamed-exports'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { sizeLimits } from './size-limits'
 import { untypedSockets } from './socket-routes'
@@ -142,12 +142,11 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => removedUiTokens(root, options),
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
-  async ({ root, options }) => roomTypes(root, options),
+
   async ({ root, options }) => exportNames(root, options),
   async ({ root, options }) => libraryNames(root, options),
   async ({ root, options }) => pgLoaderSource(root, options),
-  async ({ root, options }) => durationSeconds(root, options),
-  async ({ root, options }) => deprecatedConfigKeys(root, options),
+
   async ({ root, options }) => contextName(root, options),
   async ({ root, options }) => movedImports(root, options),
   async ({ root, options }) => deprecatedAuthOptions(root, options),

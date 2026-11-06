@@ -145,7 +145,7 @@ async function exportedApp(options: LoadedConfig) {
   const mode = modeOf({ dev: false, prebuilt: true })
   const config = await withConfig(fixture, options)
   const client = await sharedClient(fixture, clientOptionsOf(config, mode, { exported: true }))
-  const project = resolveProject(fixture, { ...config, extensions: config.extensions?.map(({ server: _, ...extension }) => extension), log: false, health: false, security: false, compress: false, dev: mode.dev, prebuilt: mode.prebuilt }, mode)
+  const project = resolveProject(fixture, { ...config, extensions: config.extensions?.map(({ server: _, ...extension }) => extension), observe: { ...config.observe, log: false }, serve: { ...config.serve, compress: false }, health: false, security: false, dev: mode.dev, prebuilt: mode.prebuilt }, mode)
 
   return (await pagesApp(project, () => client, true)).app
 }
@@ -155,7 +155,7 @@ const form = { 'content-type': 'application/x-www-form-urlencoded', 'origin': SI
 
 describe('the hooks pagesApp registers', () => {
   it('runs in production, for each kind of request, in the order pinned', async () => {
-    const app = await pages({ root, prebuilt: false, site: 'https://x.example', compress: true, log: quiet, extensions, mcp: true, openapi: true, metrics: true, cors: { origins: ['https://other.example'] }, redirects: { '/old': '/' }, rewrite: url => url.pathname === '/renamed' ? '/' : undefined })
+    const app = await pages({ root, prebuilt: false, site: 'https://x.example', serve: { compress: true }, observe: { log: quiet }, extensions, mcp: true, openapi: true, metrics: true, cors: { origins: ['https://other.example'] }, redirects: { '/old': '/' }, rewrite: url => url.pathname === '/renamed' ? '/' : undefined })
     const { run, pinned } = recorder(app)
     const page = await (await app.handle(new Request(`${SITE}/`))).text()
     const chunk = CHUNK.exec(page)?.[0]
@@ -199,7 +199,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('runs with the app\'s own hooks set, in the order pinned', async () => {
-    const app = await pages({ root, prebuilt: false, log: quiet, extensions, beforeRequest: () => undefined, onResponse: quiet, onStart: quiet, onStop: quiet, actions: { protect: { rateLimit: { max: 5, window: '1m' } }, beforeRun: quiet, onSuccess: quiet, onError: quiet } })
+    const app = await pages({ root, prebuilt: false, observe: { log: quiet }, extensions, beforeRequest: () => undefined, onResponse: quiet, onStart: quiet, onStop: quiet, actions: { protect: { rateLimit: { max: 5, window: '1m' } }, beforeRun: quiet, onSuccess: quiet, onError: quiet } })
     const { run, pinned } = recorder(app)
     const action = app.routes.find(route => route.method === 'POST' && route.path.startsWith('/_kay/action/'))?.path
     const answers: Record<string, unknown> = {}
@@ -212,7 +212,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('keeps the cookie cache guard ahead of every other mapResponse, whichever stages the config adds', async () => {
-    const app = await pages({ root, prebuilt: false, site: 'https://x.example', compress: true, log: quiet, extensions, security: { cookies: {} }, redirects: { '/old': '/' } })
+    const app = await pages({ root, prebuilt: false, site: 'https://x.example', serve: { compress: true }, observe: { log: quiet }, extensions, security: { cookies: {} }, redirects: { '/old': '/' } })
     const mapResponses = hooksOf(app).filter(({ type }) => type === 'mapResponse').map(({ container }) => sourceOf(container.fn))
 
     expect(mapResponses.length).toBeGreaterThan(2)
@@ -229,7 +229,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('runs under a base with trailing slashes, in the order pinned', async () => {
-    const app = await pages({ root, prebuilt: false, base: '/shop', trailingSlash: 'always', log: quiet, extensions, redirects: { '/old': '/' } })
+    const app = await pages({ root, prebuilt: false, base: '/shop', trailingSlash: 'always', observe: { log: quiet }, extensions, redirects: { '/old': '/' } })
     const { run, pinned } = recorder(app)
     const answers: Record<string, unknown> = {}
 
@@ -241,7 +241,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('runs in development, its dev routes included, in the order pinned', async () => {
-    const app = await bundlingPages({ root, dev: true, log: quiet, extensions })
+    const app = await bundlingPages({ root, dev: true, observe: { log: quiet }, extensions })
     const { run, pinned } = recorder(app)
     const action = app.routes.find(route => route.method === 'POST' && route.path.startsWith('/_kay/action/'))?.path
     const answers: Record<string, unknown> = {}
@@ -267,7 +267,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('runs with hosts, the jobs page, previews, kept pages, the public env, a proxy key, offline and locale hosts, in the order pinned', async () => {
-    const options: LoadedConfig = { site: 'https://x.example', i18n: { locales: ['en', 'fr'], defaultLocale: 'en', domains: { en: 'x.example', fr: 'fr.x.example' } }, security: { hosts: ['www.x.example'] }, jobs: { guard: () => undefined }, preview: {}, publicEnv: true, proxy: { key: 'x-upstream-key' }, offline: true, log: quiet, extensions }
+    const options: LoadedConfig = { site: 'https://x.example', i18n: { locales: ['en', 'fr'], defaultLocale: 'en', domains: { en: 'x.example', fr: 'fr.x.example' } }, security: { hosts: ['www.x.example'] }, jobs: { guard: () => undefined }, preview: {}, publicEnv: true, proxy: { key: 'x-upstream-key' }, offline: true, observe: { log: quiet }, extensions }
     // Built with its pages prerendered, which keeps the about page, a page reading nothing of its request.
     const build = await scratchBuild(options, false, fixture)
 
@@ -307,7 +307,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('lists in the dev tool what registers after its Routes tab: the API module, the actions and the extension\'s route', async () => {
-    const app = await bundlingPages({ root, dev: true, log: quiet, extensions })
+    const app = await bundlingPages({ root, dev: true, observe: { log: quiet }, extensions })
     const { routes: listed } = await (await app.handle(new Request(`${SITE}/_kay/dev/routes`))).json() as DevRoutes
     const named = listed.map(route => `${route.kind} ${route.method} ${route.path}${route.owner === undefined ? '' : ` (${route.owner})`}`)
 

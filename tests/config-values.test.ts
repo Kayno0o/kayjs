@@ -62,7 +62,7 @@ describe('config values checked once at load', () => {
   })
 
   it('leaves a key set to undefined, the shapes the types take and the keys another check owns alone', () => {
-    expect(invalidConfigValues({ lang: undefined, offline: true, health: false, security: false, robots: false, prefetch: false, favicon: false, secret: ['a', 'b'], proxy: true, metrics: true, maxSize: '4mb', limits: { body: 1024 }, serve: { timeout: false, shutdownTimeout: '5s' }, log: false, checks: [], env: { compose: 'x' }, cors: { origins: '*' } })).toEqual([])
+    expect(invalidConfigValues({ lang: undefined, offline: true, health: false, security: false, robots: false, client: { prefetch: false }, favicon: false, secret: ['a', 'b'], proxy: true, metrics: true, limits: { body: 1024 }, serve: { timeout: false, shutdownTimeout: '5s' }, observe: { log: false }, checks: [], env: { compose: 'x' }, cors: { origins: '*' } })).toEqual([])
   })
 
   it('takes the flat keys 1.87 grouped, with the same checks', () => {
@@ -93,7 +93,7 @@ describe('config values checked once at load', () => {
     const trailing = await load('export default { trailingSlash: \'sometimes\', base: \'blog\', compress: 7 } as never\n')
     const lang = await load('export default { lang: 5 } as never\n')
     const locale = await load('export default { i18n: { locales: [\'en\'], defaultLocale: \'fr\' } }\n')
-    const fine = await load('export default { lang: \'en\', trailingSlash: \'always\', compress: false }\n')
+    const fine = await load('export default { lang: \'en\', trailingSlash: \'always\', serve: { compress: false } }\n')
 
     expect(trailing).toMatchObject({ code: 'config-invalid' })
     expect(String(trailing)).toContain('`trailingSlash` is "sometimes"')

@@ -48,7 +48,7 @@ Every option is optional. The tables give each option's default. The full refere
 
 ## Grouped options
 
-Options of one concern sit in one bag, so a key is found by what it does. Before 1.88 each was a key of its own at the top (`routesDir`, `compress`, `navigation`, and so on); those still work until 1.91, and `kay upgrade` writes the bags. A key written in its bag wins over the same key written at the top.
+Options of one concern sit in one bag, so a key is found by what it does. Before 1.88 each was a key of its own at the top (`routesDir`, `compress`, `navigation`, and so on); the top-level keys are refused as unknown, naming the bag key that replaced each.
 
 ```ts
 export default defineConfig({

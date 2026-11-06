@@ -5,8 +5,8 @@ import { testSite } from '../src/test'
 
 const routes = 'tests/fixtures/base-site/src/routes'
 const api = 'tests/fixtures/base-site/src/api'
-const site = await testSite({ routesDir: routes, apiDir: api, base: '/blog', islands: false })
-const strict = await testSite({ routesDir: routes, apiDir: api, base: '/blog', trailingSlash: 'always', islands: false })
+const site = await testSite({ dirs: { routes, api }, base: '/blog', islands: false })
+const strict = await testSite({ dirs: { routes, api }, base: '/blog', trailingSlash: 'always', islands: false })
 const { enter } = await import(join(import.meta.dir, 'fixtures/base-site/src/routes/index.kay')) as { enter: Action<{ name: string }, unknown> }
 
 afterAll(async () => {
@@ -35,7 +35,7 @@ describe('testSite under base', () => {
   })
 
   it('follows a redirect to a base-prefixed url with the cookies', async () => {
-    const jar = await testSite({ routesDir: routes, apiDir: api, base: '/blog', islands: false })
+    const jar = await testSite({ dirs: { routes, api }, base: '/blog', islands: false })
     const response = await jar.fetch('/api/cookies/enter')
 
     expect(response.headers.get('location')).toBe('/blog/home')
@@ -48,7 +48,7 @@ describe('testSite under base', () => {
   })
 
   it('scopes a cookie to its Path, the base or the whole host', async () => {
-    const jar = await testSite({ routesDir: routes, apiDir: api, base: '/blog', islands: false })
+    const jar = await testSite({ dirs: { routes, api }, base: '/blog', islands: false })
 
     await jar.fetch('/api/cookies/enter')
     await jar.fetch('/api/cookies/elsewhere')
@@ -75,7 +75,7 @@ describe('testSite under base', () => {
   })
 
   it('serves the mcp endpoint under the base', async () => {
-    const mcp = await testSite({ routesDir: routes, apiDir: api, base: '/blog', mcp: true, islands: false })
+    const mcp = await testSite({ dirs: { routes, api }, base: '/blog', mcp: true, islands: false })
 
     expect((await mcp.mcp.tools()).map(tool => tool.name)).toEqual(['get_cookies_read'])
     await mcp.close()
@@ -94,7 +94,7 @@ describe('testSite under base', () => {
 
 describe('testSite at the root', () => {
   it('leaves paths as they are', async () => {
-    const root = await testSite({ routesDir: routes, apiDir: api, islands: false })
+    const root = await testSite({ dirs: { routes, api }, islands: false })
 
     expect((await root.visit('/home')).url).toBe('/home')
     expect((await root.visit('/blog/home')).status).toBe(404)

@@ -159,10 +159,10 @@ describe('a prerendered page holding a server island and posting a form', () => 
   it('loads the islands\' entry, not the navigation-only one, whether the island is spliced in or deferred', async () => {
     const root = await fixtureCopy('navigation-entry')
 
-    await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n')
+    await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n')
     expect((await kayBuild([root, '--no-check'])).code).toBe(0)
 
-    const app = new Elysia().use(await pages({ root, prebuilt: true, log: false, compress: false }))
+    const app = new Elysia().use(await pages({ root, prebuilt: true, observe: { log: false }, serve: { compress: false } }))
 
     for (const path of ['/joined', '/deferred']) {
       const html = await (await app.handle(new Request(`http://localhost${path}`))).text()

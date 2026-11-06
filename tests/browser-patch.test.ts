@@ -7,7 +7,7 @@ const path = browserPath()
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev patch in a browser', () => {
   it('applies an edit under navigation: false, leaving a class a script added and the scroll, and loads a page with a changed island fully', async () => {
-    const dev = await testSite({ root: 'tests/fixtures/patch', browser: { path }, dev: true, navigation: false })
+    const dev = await testSite({ root: 'tests/fixtures/patch', browser: { path }, dev: true, client: { navigation: false } })
 
     try {
       const shown = await dev.open('/')

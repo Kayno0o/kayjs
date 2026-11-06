@@ -38,7 +38,7 @@ async function app(options: { base?: string, trailingSlash?: 'always' | 'never',
 
   await Bun.write(join(dir, 'routes/index.kay'), 'h1 Home\n')
 
-  return pages({ root: dir, routesDir: 'routes', prebuilt: false, security: false, dev: false, jobs: { guard: allow }, store: { jobs: memoryJobs() }, extensions: [{ name: 'fake-auth', server: plugin(), ...extension }], ...rest } as Parameters<typeof pages>[0])
+  return pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, dev: false, jobs: { guard: allow }, store: { jobs: memoryJobs() }, extensions: [{ name: 'fake-auth', server: plugin(), ...extension }], ...rest })
 }
 
 const post = async (site: Awaited<ReturnType<typeof app>>, path: string, body: BodyInit, method = 'POST') => site.handle(new Request(`http://localhost${path}`, { method, headers: { 'content-type': 'application/octet-stream' }, body }))

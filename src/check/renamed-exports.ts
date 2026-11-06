@@ -176,11 +176,6 @@ function isName(parent: Node, key: string): boolean {
   return parent.type === 'TSQualifiedName' && key === 'right'
 }
 
-// The types of `kay/server` renamed in 1.88, when the rooms stores became async only, and the name each has now.
-export const ROOM_TYPES: Readonly<Record<string, string>> = { AsyncRoomStore: 'RoomStore', AsyncRooms: 'Rooms', StoreRooms: 'Rooms' }
-
-const OLD_ROOM_TYPE = /AsyncRoomStore|AsyncRooms|StoreRooms/
-
 interface RenamedTypes {
   lint: LintName
   // The old names and their new ones, per module they are imported from.
@@ -279,11 +274,6 @@ export async function renamedTypes(root: string, options: CheckOptions, config: 
       }
     }
   })
-}
-
-// `AsyncRoomStore`, `AsyncRooms` and `StoreRooms` imported from `kay/server`: the same types under the names every store kind shares.
-export async function roomTypes(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
-  return renamedTypes(root, options, { lint: 'deprecated-room-types', modules: { 'kay/server': ROOM_TYPES }, needle: OLD_ROOM_TYPE, since: '1.88', until: '1.91' })
 }
 
 // The exports renamed in 1.90 so no two packages export one name for two things, per module they are imported from, and the name each has now.

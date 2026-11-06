@@ -861,7 +861,7 @@ describe('kay env against compose and .env.example', () => {
     expect((await bad('export default { extensions: [{ name: \'lib\', config: { requireGuard: true } }] }\n')).stderr).toContain('the config of the extension lib has an option kay does not know: `requireGuard`, did you mean `requireGuards`?')
     expect((await bad('export default { nothing: 1 }\n')).stderr).toContain('`nothing`')
     expect((await bad('export default { limits: \'4mb\' }\n')).stderr).toContain('`limits` in kay.config.ts is an object of options, `limits: { ... }`, not "4mb"')
-    expect((await bad('export default { serve: false, maxSize: \'4mb\' }\n')).stderr).toContain('`serve` in kay.config.ts is an object of options')
+    expect((await bad('export default { serve: false, limits: { body: \'4mb\' } }\n')).stderr).toContain('`serve` in kay.config.ts is an object of options')
     expect((await bad('export default { lang: \'en\', offline: true, health: false, security: false }\n')).stderr).not.toContain('does not know')
     // @ts-expect-error a key kay does not know, next to valid ones
     expect(defineConfig({ lang: 'en', trailingslash: 'always' })).toBeDefined()

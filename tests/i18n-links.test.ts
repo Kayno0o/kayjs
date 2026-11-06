@@ -26,7 +26,7 @@ describe('an island of an app with locales', () => {
     const i18n: I18nConfig = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages' }
 
     // The French spacing of an island's text has its own budget, in tests/typography-islands.test.ts.
-    site = await testSite({ root: copy, i18n, typography: false, browser: { path: chrome } })
+    site = await testSite({ root: copy, i18n, client: { typography: false }, browser: { path: chrome } })
   }, 60_000)
 
   afterAll(async () => {

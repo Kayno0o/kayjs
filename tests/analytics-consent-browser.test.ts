@@ -21,7 +21,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the consen
     own = await testSite({
       root: 'tests/fixtures/analytics-consent',
       browser: { path },
-      onError: () => undefined,
+      observe: { onError: () => undefined },
       extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: { notice: false } })],
     })
     opened = await own.open('/')
@@ -96,7 +96,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the consen
     own = await testSite({
       root: 'tests/fixtures/analytics-consent',
       browser: { path },
-      onError: () => undefined,
+      observe: { onError: () => undefined },
       extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: { notice: false, maxAge: '1234s' } })],
     })
     opened = await own.open('/')

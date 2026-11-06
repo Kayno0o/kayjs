@@ -587,7 +587,7 @@ describe('locale detection', () => {
     await Bun.write(join(copy, 'src/routes/computed.kay'), '--- server\nimport { t } from \'kay/i18n\'\n\nconst state = [\'drafted\'][0]!\nconst label = t(`status.${state}` as never)\n---\np {label}\n')
 
     try {
-      const served = new Elysia().use(await pages({ root: copy, prebuilt: false, security: false, i18n: { ...i18n, messages: resolve(copy, 'src/messages') }, onError: () => undefined }))
+      const served = new Elysia().use(await pages({ root: copy, prebuilt: false, security: false, i18n: { ...i18n, messages: resolve(copy, 'src/messages') }, observe: { onError: () => undefined } }))
 
       expect((await get('/computed', served)).status).toBe(500)
     }
@@ -630,7 +630,7 @@ describe('prerendering', () => {
     await Bun.write(join(publicDir, 'manifest.webmanifest'), '{"name":"Mine"}')
     await prerendered(i18n, async (build) => {
       expect(await Bun.file(join(build.pages, 'en.html')).text()).toContain('<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">')
-    }, { publicDir, seo: { name: { fr: 'Le site', en: 'The site' } } })
+    }, { dirs: { public: publicDir }, seo: { name: { fr: 'Le site', en: 'The site' } } })
   })
 
   it('hands a page hook the locale each page was rendered in', async () => {
@@ -1031,7 +1031,7 @@ describe('localized seo defaults', () => {
   })
 
   it('titles the one OpenAPI document with the default locale\'s name, whatever locale asked', async () => {
-    const server = new Elysia().use(await pages({ root: FIXTURE, apiDir: resolve('tests/fixtures/openapi/src/api'), prebuilt: false, security: false, site: SITE, i18n, openapi: true, seo: { name: { en: 'The site', fr: 'Le site' } } }))
+    const server = new Elysia().use(await pages({ root: FIXTURE, dirs: { api: resolve('tests/fixtures/openapi/src/api') }, prebuilt: false, security: false, site: SITE, i18n, openapi: true, seo: { name: { en: 'The site', fr: 'Le site' } } }))
 
     const response = await server.handle(new Request('http://localhost/api/openapi.json', { headers: { 'x-key': 'open', 'accept-language': 'en' } }))
 
@@ -1061,7 +1061,7 @@ describe('localized seo defaults', () => {
 
     await Bun.write(join(publicDir, 'manifest.webmanifest'), '{"name":"Mine"}')
 
-    const server = new Elysia().use(await pages({ root: FIXTURE, publicDir, prebuilt: false, security: false, site: SITE, i18n, seo: { name: { fr: 'Le site', en: 'The site' } } }))
+    const server = new Elysia().use(await pages({ root: FIXTURE, dirs: { public: publicDir }, prebuilt: false, security: false, site: SITE, i18n, seo: { name: { fr: 'Le site', en: 'The site' } } }))
     const html = await (await server.handle(new Request('http://localhost/en'))).text()
 
     expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">')

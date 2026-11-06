@@ -778,8 +778,8 @@ describe('kay.config.ts', () => {
 
   it('keeps the config\'s value for an option pages() is given as undefined', async () => {
     // A process serves one project, so the server runs in its own.
-    const serve = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ root: import.meta.dir, dev: true, routesDir: undefined }))\nconst response = await app.handle(new Request(\'http://localhost/\'))\n\nconsole.log(response.status, (await response.text()).includes(\'Home\'))\nprocess.exit(0)\n'
-    const root = await scratchProject({ 'kay.config.ts': 'export default { routesDir: \'pages\' }\n', 'pages/index.kay': 'p Home\n', 'serve.ts': serve })
+    const serve = 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages({ root: import.meta.dir, dev: true, dirs: { routes: undefined } }))\nconst response = await app.handle(new Request(\'http://localhost/\'))\n\nconsole.log(response.status, (await response.text()).includes(\'Home\'))\nprocess.exit(0)\n'
+    const root = await scratchProject({ 'kay.config.ts': 'export default { dirs: { routes: \'pages\' } }\n', 'pages/index.kay': 'p Home\n', 'serve.ts': serve })
 
     const child = Bun.spawn([process.execPath, 'serve.ts'], { cwd: root, stdout: 'pipe', stderr: 'pipe' })
     const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
@@ -2021,7 +2021,7 @@ import { pages } from 'kay/server'
 
 const logged: string[] = []
 const reported: string[] = []
-const app = new Elysia().use(await pages({ security: false, log: entry => entry.type === 'message' && entry.error?.stack !== undefined && logged.push(entry.error.stack), onError: ({ error }) => reported.push((error as Error).stack ?? '') }))
+const app = new Elysia().use(await pages({ security: false, observe: { log: entry => entry.type === 'message' && entry.error?.stack !== undefined && logged.push(entry.error.stack), onError: ({ error }) => reported.push((error as Error).stack ?? '') } }))
 const status = (await app.handle(new Request('http://localhost/boom', { headers: { 'x-boom': '1' } }))).status
 const island = await app.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { 'content-type': 'application/json', 'origin': 'http://localhost' }, body: JSON.stringify({ name: 'TypeError', message: 'x', url: '/', stack: \`TypeError: x\\n\${process.env.FRAME}\\n    at https://h/_kay/gone.js:1:2\\n    at fn (https://h/_kay/..%2Fcounter.js:1:1)\` }) }))
 
@@ -2979,7 +2979,7 @@ describe('a compiled server', () => {
     const root = await scratchProject({
       'package.json': JSON.stringify({ name: 'notices', private: true, dependencies: { elysia: '*' }, devDependencies: { '@iconify-json/tabler': '*' } }),
       'tsconfig.json': tsconfig,
-      'kay.config.ts': `export default { favicon: 'src/favicon.svg', images: { card: { logo: 'src/favicon.svg' } }, requireGuards: true, inlineStyles: false, preview: { secret: '${secret}' }, fonts: [{ fontsource: '@fontsource/inter', weights: [700] }], extensions: [{ name: 'lib', routes: { dir: 'lib/routes', prefix: '/lib' }, editor: \`\${import.meta.dir}/lib/editor.kay\` }] }\n`,
+      'kay.config.ts': `export default { favicon: 'src/favicon.svg', images: { card: { logo: 'src/favicon.svg' } }, requireGuards: true, client: { inlineStyles: false }, preview: { secret: '${secret}' }, fonts: [{ fontsource: '@fontsource/inter', weights: [700] }], extensions: [{ name: 'lib', routes: { dir: 'lib/routes', prefix: '/lib' }, editor: \`\${import.meta.dir}/lib/editor.kay\` }] }\n`,
       'src/favicon.svg': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#c00"/></svg>',
       'lib/editor.css': '.edited { outline: 1px dashed teal }\n',
       'lib/editor.kay': '---\nimport { signal } from \'kay\'\nimport \'./editor.css\'\n\nconst clicks = signal(0)\n---\nbutton.edited(onClick={() => clicks.set(n => n + 1)}) Edit {clicks()}\n',

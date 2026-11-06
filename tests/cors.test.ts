@@ -255,7 +255,7 @@ describe('answers of a route\'s own under a cors rule', () => {
   })
 
   it('compresses a large Response made per request, each answer naming its own caller', async () => {
-    const compressed = await testSite({ root: 'tests/fixtures/cors', compress: true })
+    const compressed = await testSite({ root: 'tests/fixtures/cors', serve: { compress: true } })
 
     try {
       const grants: (string | null)[] = []

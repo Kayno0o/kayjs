@@ -175,22 +175,22 @@ describe('requestIdHeader', () => {
   const idFrom = async (app: Awaited<ReturnType<typeof pages>>, header: string, headers: Record<string, string> = {}) => (await app.handle(new Request('http://localhost/contact', { headers }))).headers.get(header)
 
   it('names the header an id goes out on and comes in from a trusted proxy on, one name for the process', async () => {
-    const plain = await pages({ routesDir: routes, prebuilt: false, proxy: { hops: 1 } })
+    const plain = await pages({ dirs: { routes }, prebuilt: false, proxy: { hops: 1 } })
 
     expect(await idFrom(plain, 'x-request-id', { 'x-request-id': 'edge-9' })).toBe('edge-9')
 
-    const renamed = await pages({ routesDir: routes, prebuilt: false, proxy: { hops: 1 }, requestIdHeader: 'X-Correlation-Id' })
+    const renamed = await pages({ dirs: { routes }, observe: { requestIdHeader: 'X-Correlation-Id' }, prebuilt: false, proxy: { hops: 1 } })
 
     expect(await idFrom(renamed, 'x-correlation-id')).toMatch(/^[\w-]{22}$/)
     expect(await idFrom(renamed, 'x-request-id')).toBeNull()
     expect(await idFrom(renamed, 'x-correlation-id', { 'x-correlation-id': 'edge-7' })).toBe('edge-7')
     expect(await idFrom(renamed, 'x-correlation-id', { 'x-request-id': 'edge-8' })).not.toBe('edge-8')
-    await expect(pages({ routesDir: routes, prebuilt: false, requestIdHeader: 'x-other-id' })).rejects.toThrow('a process uses one name')
-    expect(await idFrom(await pages({ routesDir: routes, prebuilt: false }), 'x-correlation-id')).toMatch(/^[\w-]{22}$/)
+    await expect(pages({ dirs: { routes }, observe: { requestIdHeader: 'x-other-id' }, prebuilt: false })).rejects.toThrow('a process uses one name')
+    expect(await idFrom(await pages({ dirs: { routes }, prebuilt: false }), 'x-correlation-id')).toMatch(/^[\w-]{22}$/)
   })
 
   it('can be reset for apps naming another header in one process', async () => {
-    const other = async (name: string) => idFrom(await pages({ routesDir: routes, prebuilt: false, requestIdHeader: name }), name)
+    const other = async (name: string) => idFrom(await pages({ dirs: { routes }, observe: { requestIdHeader: name }, prebuilt: false }), name)
 
     expect(await other('x-first-id')).toMatch(/^[\w-]{22}$/)
     await expect(other('x-second-id')).rejects.toThrow('a process uses one name')
@@ -199,8 +199,9 @@ describe('requestIdHeader', () => {
   })
 
   it('refuses a name that is no header', async () => {
-    for (const name of ['', 'two words', 'a:b', 'Set-Cookie', 'content-type'])
-      await expect(pages({ routesDir: routes, prebuilt: false, requestIdHeader: name })).rejects.toThrow('requestIdHeader is')
+    for (const name of ['', 'two words', 'a:b', 'Set-Cookie', 'content-type']) {
+      await expect(pages({ dirs: { routes }, observe: { requestIdHeader: name }, prebuilt: false })).rejects.toThrow('requestIdHeader is')
+    }
   })
 })
 
@@ -291,7 +292,7 @@ describe('security.csp: false in a layout', () => {
       Bun.write(join(root, 'src/routes/plain/inner.kay'), 'h1 Inner\n'),
     ])
 
-    const app = await pages({ routesDir: join(root, 'src/routes'), prebuilt: false })
+    const app = await pages({ dirs: { routes: join(root, 'src/routes') }, prebuilt: false })
     const policy = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).headers.get('content-security-policy')
 
     expect(await policy('/')).toContain('default-src')

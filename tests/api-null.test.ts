@@ -25,7 +25,7 @@ export default api()
 let dir = ''
 
 async function app(options: { dev?: boolean, base?: string, trailingSlash?: 'always' | 'never' } = {}) {
-  return pages({ routesDir: ROUTES, apiDir: join(dir, 'api'), prebuilt: true, ...options })
+  return pages({ dirs: { routes: ROUTES, api: join(dir, 'api') }, prebuilt: true, ...options })
 }
 
 beforeAll(async () => {

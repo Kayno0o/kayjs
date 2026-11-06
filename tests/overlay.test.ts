@@ -71,7 +71,7 @@ describe('the error page', () => {
     let html: string
 
     try {
-      const site = await pages({ root: dir, routesDir: '.', dev: true })
+      const site = await pages({ root: dir, dirs: { routes: '.' }, dev: true })
 
       html = await (await site.handle(new Request('http://localhost/'))).text()
     }

@@ -10,7 +10,7 @@ const path = browserPath()
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('edit mode in a browser', () => {
   it('shows a draft through the page swap, the island showing it kept alive, or where the schema refuses it', async () => {
     const secret = 'a-preview-secret-long-enough-for-kay-0123456789'
-    const cms = await testSite({ root: 'tests/fixtures/cms', preview: { secret }, inlineStyles: false, browser: { path }, extensions: [{ name: 'editor', editor: `src/components/draft-editor.kay` }] })
+    const cms = await testSite({ root: 'tests/fixtures/cms', preview: { secret }, client: { inlineStyles: false }, browser: { path }, extensions: [{ name: 'editor', editor: `src/components/draft-editor.kay` }] })
 
     try {
       const editor = await cms.open(previewUrl('/marks/launch', { edit: true }))

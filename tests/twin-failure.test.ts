@@ -24,9 +24,9 @@ describe('the pages a production server renders inside a layout holding an islan
   for (const base of [undefined, '/repo']) {
     it(`render the island's static components from the build's record and log nothing else, base ${base ?? 'unset'}`, async () => {
       const root = resolve(await fixtureCopy('twin-failure'))
-      const options = JSON.stringify({ root, prebuilt: true, security: false, inlineStyles: false, site: 'https://site.example', ...base !== undefined && { base } })
+      const options = JSON.stringify({ root, prebuilt: true, security: false, client: { inlineStyles: false }, site: 'https://site.example', ...base !== undefined && { base } })
 
-      const built = await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { security: false, inlineStyles: false, site: options.site, base: options.base }, { check: false })\nif (built.failed) throw built.failed.error\n`)
+      const built = await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { security: false, client: { inlineStyles: false }, site: options.site, base: options.base }, { check: false })\nif (built.failed) throw built.failed.error\n`)
 
       expect(built.code).toBe(0)
 
@@ -58,8 +58,8 @@ describe('the pages a production server renders inside a layout holding an islan
 
 async function buildFixture(): Promise<{ root: string, options: string }> {
   const root = resolve(await fixtureCopy('twin-failure'))
-  const options = JSON.stringify({ root, prebuilt: true, security: false, inlineStyles: false, site: 'https://site.example' })
-  const built = await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { security: false, inlineStyles: false, site: options.site }, { check: false })\nif (built.failed) throw built.failed.error\n`)
+  const options = JSON.stringify({ root, prebuilt: true, security: false, client: { inlineStyles: false }, site: 'https://site.example' })
+  const built = await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { security: false, client: { inlineStyles: false }, site: options.site }, { check: false })\nif (built.failed) throw built.failed.error\n`)
 
   expect(built.code).toBe(0)
 

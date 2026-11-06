@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
-const config = (trailingSlash: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ log: false, site: 'https://x.example', base: '/site', trailingSlash: '${trailingSlash}', i18n: { locales: ['en', 'fr'], defaultLocale: 'en' } })\n`
+const config = (trailingSlash: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ observe: { log: false }, site: 'https://x.example', base: '/site', trailingSlash: '${trailingSlash}', i18n: { locales: ['en', 'fr'], defaultLocale: 'en' } })\n`
 const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
   include: ['src', '.kay/types'],
@@ -43,7 +43,7 @@ function serve(root: string, trailingSlash: string, prebuilt: boolean) {
   return `import { Elysia } from 'elysia'
 import { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}
 
-const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: ${prebuilt}, base: '/site', trailingSlash: '${trailingSlash}', log: false, compress: false }))
+const app = new Elysia().use(await pages({ root: ${JSON.stringify(root)}, prebuilt: ${prebuilt}, base: '/site', trailingSlash: '${trailingSlash}', observe: { log: false }, serve: { compress: false } }))
 const get = async (path: string) => { const response = await app.handle(new Request(\`http://localhost\${path}\`)); return { status: response.status, text: await response.text() } }
 const slash = ${JSON.stringify(trailingSlash === 'always')} ? '/' : ''
 

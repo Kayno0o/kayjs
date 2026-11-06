@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { testSite } from '../src/test'
 
 const FIXTURE = 'tests/fixtures/entry-head/src'
-const site = await testSite({ routesDir: `${FIXTURE}/routes`, contentConfig: `${FIXTURE}/content.config.ts`, islands: false, site: 'https://notes.example', seo: { name: 'Notes', titleTemplate: '%s | Notes' } })
+const site = await testSite({ dirs: { routes: `${FIXTURE}/routes` }, contentConfig: `${FIXTURE}/content.config.ts`, islands: false, site: 'https://notes.example', seo: { name: 'Notes', titleTemplate: '%s | Notes' } })
 
 afterAll(async () => site.close())
 

@@ -1238,7 +1238,7 @@ type IssueTokenResult = { ok: true, token: string, id: string } | { ok: false, e
 type Level = 'read' | 'write'
 
 [.] lifetime
-function lifetime(duration: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | number, locale: string): string
+function lifetime(duration: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`, locale: string): string
 
 [.] Limit
 type Limit = AuthRateLimit

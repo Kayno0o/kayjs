@@ -185,7 +185,7 @@ describe('diskFiles', () => {
 
 describe('the server', () => {
   it('keeps the image cache closed to other users', async () => {
-    await pages({ routesDir: 'tests/fixtures/storage/src/routes', prebuilt: false, security: false, store: { files: memoryFiles() } })
+    await pages({ dirs: { routes: 'tests/fixtures/storage/src/routes' }, prebuilt: false, security: false, store: { files: memoryFiles() } })
     expect(await modeOf(cacheDir(process.cwd(), `images${testWorker()}`))).toBe(0o700)
   })
 

@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `src/context.ts`, default-exporting `defineContext(...)`, gives templates `ctx.<key>` with no extension, typed in `kay check`; two sources giving one key stop the page naming both: [Request values](request-values.md).
 - `src/context.ts` (picked up by `kay dev` when added or removed, with a new process), default-exporting `defineContext(...)`, gives templates `ctx.<key>` with no extension, typed in `kay check`; two sources giving one key stop the page naming both: [Request values](request-values.md).
 - kayjs-ui's `ThemeToggle` switches light, dark and system, keeps the choice in a cookie and puts it on `<html>` as `data-theme`, and `scheme()` writes it from the first render so the page never flashes the other scheme: [ThemeToggle](../packages/ui/llms/setup.md).
+- The 1.88 deprecations are gone: the flat config keys (`routesDir`, `compress`, `navigation` and the rest, now `dirs`, `serve`, `observe`, `client` and `limits`), the AsyncRoomStore, AsyncRooms and StoreRooms types, and a number of seconds for `lifetime` and `durationWords`; the root of kayjs-mail and kayjs-ai no longer exports the store names that moved in 1.88: [Upgrading](upgrading.md).
 
 ## 1.91.0
 

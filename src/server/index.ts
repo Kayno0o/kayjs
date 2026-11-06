@@ -62,7 +62,7 @@ export { forgetPushDevice, memoryPush, push, pushSubscriptions, sendPush, sqlite
 export type { EnqueueOptions, FailedJob, JobContext, JobState, JobStore, Queue, QueueOptions, StoredJob, StoredJobState } from './queue'
 export { memoryJobs, queue, retryLater, sqliteJobs } from './queue'
 export { RequestTimeoutError } from './request-timeout'
-export type { AsyncRooms, AsyncRoomStore, CoalesceOptions, RoomConnection, RoomRecipients, Rooms, RoomsOptions, RoomStore, StoreRooms } from './rooms'
+export type { CoalesceOptions, RoomConnection, RoomRecipients, Rooms, RoomsOptions, RoomStore } from './rooms'
 export { memoryRooms, rooms, sqliteRooms } from './rooms'
 export type { Route } from './routes'
 export { safePath } from './safe-path'

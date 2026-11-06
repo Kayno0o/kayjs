@@ -28,7 +28,7 @@ async function get(variant: Variant, path: string, headers: Record<string, strin
   let held = apps.get(key)
 
   if (!held) {
-    held = pages({ root: FIXTURE, extensions: [EXTENSION], prebuilt: false, security: false, inlineStyles: false, site: 'https://site.example', dev: variant.dev, base: variant.base || undefined, i18n: variant.locale ? I18N : undefined })
+    held = pages({ root: FIXTURE, extensions: [EXTENSION], prebuilt: false, security: false, client: { inlineStyles: false }, site: 'https://site.example', dev: variant.dev, base: variant.base || undefined, i18n: variant.locale ? I18N : undefined })
     apps.set(key, held)
   }
 
@@ -234,11 +234,11 @@ describe('a production server started from disk', () => {
     const root = resolve(await fixtureCopy('request-values'))
     const mapped = extensions.map(extension => extension.context === undefined ? extension : { ...extension, context: resolve(root, 'lib/context.ts') })
 
-    return { root, options: JSON.stringify({ root, extensions: mapped, prebuilt: true, security: false, inlineStyles: false, site: 'https://site.example', ...base !== undefined && { base } }) }
+    return { root, options: JSON.stringify({ root, extensions: mapped, prebuilt: true, security: false, client: { inlineStyles: false }, site: 'https://site.example', ...base !== undefined && { base } }) }
   }
 
   async function build(options: string): Promise<void> {
-    await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { extensions: options.extensions, security: false, inlineStyles: false, site: options.site, base: options.base, i18n: options.i18n, librarySettings: options.librarySettings }, { check: false })\nif (built.failed) throw built.failed.error\n`)
+    await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { extensions: options.extensions, security: false, client: { inlineStyles: false }, site: options.site, base: options.base, i18n: options.i18n, librarySettings: options.librarySettings }, { check: false })\nif (built.failed) throw built.failed.error\n`)
   }
 
   // The status and body of a page of the server, as a proxy stripping the base forwards it, started from the build in `options`.

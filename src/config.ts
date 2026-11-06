@@ -125,48 +125,6 @@ export interface KayConfig extends AppHooks {
   env?: { compose?: string | string[] | undefined, example?: string | undefined } | false | undefined
   // The app's own checks, which `kay check` runs with its own: each gets `{ root, routes, report }` and reports problems with `report({ level, message, file, line })`, which join kay's in every format and count toward the exit code. A check that throws, or does not finish within 30 seconds, is reported as an error and the others still run.
   checks?: ProjectCheck[] | undefined
-  /** @deprecated Moved under `dirs` in 1.88 as `dirs: { routes }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  routesDir?: string | undefined
-  /** @deprecated Moved under `dirs` in 1.88 as `dirs: { api }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  apiDir?: string | undefined
-  /** @deprecated Moved under `dirs` in 1.88 as `dirs: { public }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  publicDir?: string | undefined
-  /** @deprecated Moved under `limits` in 1.88 as `limits: { body }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  maxSize?: ByteSize | undefined
-  /** @deprecated Moved under `limits` in 1.88 as `limits: { byPath }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  maxSizeByPath?: Record<string, ByteSize> | undefined
-  /** @deprecated Moved under `serve` in 1.88 as `serve: { apiPath }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  apiPath?: string | undefined
-  /** @deprecated Moved under `serve` in 1.88 as `serve: { compress }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  compress?: boolean | undefined
-  /** @deprecated Moved under `serve` in 1.88 as `serve: { compressionDictionary }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  compressionDictionary?: boolean | undefined
-  /** @deprecated Moved under `serve` in 1.88 as `serve: { shutdownTimeout }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  shutdownTimeout?: Duration | undefined
-  /** @deprecated Moved under `observe` in 1.88 as `observe: { log }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  log?: Logger | undefined
-  /** @deprecated Moved under `observe` in 1.88 as `observe: { serverTiming }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  serverTiming?: boolean | undefined
-  /** @deprecated Moved under `observe` in 1.88 as `observe: { requestIdHeader }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  requestIdHeader?: string | undefined
-  /** @deprecated Moved under `observe` in 1.88 as `observe: { tracer }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  tracer?: Tracer | undefined
-  /** @deprecated Moved under `observe` in 1.88 as `observe: { onError }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  onError?: ((event: { error: unknown, request: Request | undefined, source?: string | undefined }) => void | Promise<void>) | undefined
-  /** @deprecated Moved under `client` in 1.88 as `client: { navigation }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  navigation?: boolean | undefined
-  /** @deprecated Moved under `client` in 1.88 as `client: { inlineStyles }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  inlineStyles?: boolean | undefined
-  /** @deprecated Moved under `client` in 1.88 as `client: { lateStyles }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  lateStyles?: boolean | undefined
-  /** @deprecated Moved under `client` in 1.88 as `client: { typography }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  typography?: boolean | undefined
-  /** @deprecated Moved under `client` in 1.88 as `client: { hydration }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  hydration?: { visible?: string | undefined, serverIslands?: string | undefined } | undefined
-  /** @deprecated Moved under `client` in 1.88 as `client: { prefetch }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  prefetch?: Prefetch | undefined
-  /** @deprecated Moved under `client` in 1.88 as `client: { saveData }`; the old key works until 1.91, and `kay upgrade` moves it. */
-  saveData?: boolean | undefined
   // What libraries add to the app, each listed once: `extensions: [auth()]`.
   extensions?: KayExtension[] | undefined
 }

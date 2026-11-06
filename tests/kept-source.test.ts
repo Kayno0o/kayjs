@@ -191,7 +191,7 @@ describe('a page the scan reads from its parse', () => {
     const root = await scratchDir('kept-source-')
     const files = {
       'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n',
       'src/routes/index.kay': '---\nconst tone = [\'mt-1\', \'mt-2\'][0]\n---\np(class={tone}) Hi\n',
     }
 

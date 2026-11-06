@@ -40,7 +40,7 @@ const varies = (response: Response) => (response.headers.get('vary') ?? '').spli
 
 // Boots the site, which builds the browser bundle and manifest the prerendered pages are served with.
 beforeAll(async () => {
-  await pages({ routesDir: ROUTES, prebuilt: false })
+  await pages({ dirs: { routes: ROUTES }, prebuilt: false })
 }, 60_000)
 
 afterAll(async () => {
@@ -71,7 +71,7 @@ describe.each([
   ['prerendered', 'prerendered'],
 ] as const)('a page %s', (_name, kind) => {
   const served = async (config: Record<string, unknown> = {}) => {
-    const options = { routesDir: ROUTES, fonts: FONTS, security: { csp: { 'style-src': ['\'self\''] } }, ...config }
+    const options = { dirs: { routes: ROUTES }, fonts: FONTS, security: { csp: { 'style-src': ['\'self\''] } }, ...config }
 
     if (kind === 'request')
       return { app: await pages({ ...options, prebuilt: false }), remove: async () => undefined }
@@ -210,7 +210,7 @@ describe.each([
 
 describe('a prerendered page', () => {
   it('gives a visitor saving data an uncompressed copy of its own while the others keep the compressed ones', async () => {
-    const options = { routesDir: ROUTES, fonts: FONTS }
+    const options = { dirs: { routes: ROUTES }, fonts: FONTS }
     const build = await scratchBuild(options)
 
     try {
@@ -223,7 +223,7 @@ describe('a prerendered page', () => {
       await Bun.write(`${file}.br`, brotliCompressSync(page))
       await Bun.write(`${file}.gz`, gzipSync(page))
 
-      const app = await build.serve({ ...options, compress: true })
+      const app = await build.serve({ ...options, serve: { compress: true } })
       const full = await app.handle(request('/about', { 'accept-encoding': 'br, gzip' }))
       const saving = await app.handle(request('/about', { ...ON, 'accept-encoding': 'br, gzip' }))
 
@@ -246,13 +246,13 @@ describe('a prerendered page', () => {
 describe('a prerendered page with server islands', () => {
   it('is spliced plain for a visitor saving data, its head lightened', async () => {
     const routes = 'tests/fixtures/server-islands/src/routes'
-    const options = { routesDir: routes, fonts: FONTS }
+    const options = { dirs: { routes }, fonts: FONTS }
     const build = await scratchBuild(options)
 
     try {
       await build.prerender(options)
 
-      const app = await build.serve({ ...options, compress: true })
+      const app = await build.serve({ ...options, serve: { compress: true } })
       const full = await app.handle(request('/', { 'accept-encoding': 'gzip' }))
       const saving = await app.handle(request('/', { ...ON, 'accept-encoding': 'gzip' }))
       const html = await textOf(saving)

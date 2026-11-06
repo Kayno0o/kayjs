@@ -74,7 +74,7 @@ describe('the tail of the pages server', () => {
 
         return client
       }
-      const project = resolveProject(root, { routesDir: 'src/routes', compress: false, extensions: [{ name: 'probe', server: () => {
+      const project = resolveProject(root, { dirs: { routes: 'src/routes' }, serve: { compress: false }, extensions: [{ name: 'probe', server: () => {
         log.push('extension')
 
         return new Elysia()
@@ -100,7 +100,7 @@ describe('the tail of the pages server', () => {
     seen[SEEN] = []
 
     try {
-      const project = resolveProject(root, { routesDir: 'src/routes', compress: false, extensions: [{ name: 'broken', server: () => {
+      const project = resolveProject(root, { dirs: { routes: 'src/routes' }, serve: { compress: false }, extensions: [{ name: 'broken', server: () => {
         throw new Error('extension failed')
       } }] }, modeOf({ dev: false, prebuilt: true }))
 
@@ -116,7 +116,7 @@ describe('the tail of the pages server', () => {
   it('waits for the client build to end before a setup failure reaches the caller', async () => {
     let ended = false
     // An extension fails while the client builds: a config refused before the build starts never waits on one (tests/refused-before-build.test.ts).
-    const project = resolveProject(root, { routesDir: 'src/routes', compress: false, extensions: [{ name: 'broken', server: () => {
+    const project = resolveProject(root, { dirs: { routes: 'src/routes' }, serve: { compress: false }, extensions: [{ name: 'broken', server: () => {
       throw new Error('extension failed')
     } }] }, modeOf({ dev: false, prebuilt: true }))
     const loadClient = async () => {

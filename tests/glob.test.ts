@@ -39,7 +39,7 @@ describe('import.meta.glob', () => {
   })
 
   it('renders the components a page globs, their stylesheets in its own', async () => {
-    const app = await pages({ routesDir: 'tests/fixtures/glob/src/routes', prebuilt: false })
+    const app = await pages({ dirs: { routes: 'tests/fixtures/glob/src/routes' }, prebuilt: false })
     const html = await (await app.handle(new Request('http://localhost/'))).text()
 
     expect(html).toContain('<main><p class="one">One</p><p class="two">Two</p></main>')

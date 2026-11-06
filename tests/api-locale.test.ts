@@ -8,10 +8,10 @@ const routes = `${FIXTURE}/src/routes`
 const api = `${FIXTURE}/src/api`
 const i18n = { locales: ['en', 'fr'], defaultLocale: 'en', messages: `${FIXTURE}/src/messages` }
 const sites = {
-  plain: await testSite({ routesDir: routes, apiDir: api, islands: false, i18n }),
-  prefixed: await testSite({ routesDir: routes, apiDir: api, islands: false, i18n: { ...i18n, prefixDefault: true } }),
-  mounted: await testSite({ routesDir: routes, apiDir: api, islands: false, i18n, base: '/blog' }),
-  single: await testSite({ routesDir: routes, apiDir: api, islands: false }),
+  plain: await testSite({ dirs: { routes, api }, islands: false, i18n }),
+  prefixed: await testSite({ dirs: { routes, api }, islands: false, i18n: { ...i18n, prefixDefault: true } }),
+  mounted: await testSite({ dirs: { routes, api }, islands: false, i18n, base: '/blog' }),
+  single: await testSite({ dirs: { routes, api }, islands: false }),
 }
 const ORIGIN = 'http://localhost'
 const FRENCH = { word: 'Refusé', t: 'Bonjour' }

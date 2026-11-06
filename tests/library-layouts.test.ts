@@ -21,7 +21,7 @@ async function get(variant: Variant, path: string, security = false): Promise<{ 
   let held = apps.get(key)
 
   if (!held) {
-    held = pages({ root: FIXTURE, extensions: [OWN, SHARED], prebuilt: false, security: security ? undefined : false, inlineStyles: false, site: 'https://site.example', dev: variant.dev, base: variant.base || undefined, i18n: variant.locale ? I18N : undefined })
+    held = pages({ root: FIXTURE, extensions: [OWN, SHARED], prebuilt: false, security: security ? undefined : false, client: { inlineStyles: false }, site: 'https://site.example', dev: variant.dev, base: variant.base || undefined, i18n: variant.locale ? I18N : undefined })
     apps.set(key, held)
   }
 

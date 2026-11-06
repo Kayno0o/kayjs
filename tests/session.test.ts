@@ -1066,7 +1066,7 @@ describe('a page read by who sent it', () => {
       Bun.write(join(dir, 'themed.kay'), '--- server\nexport const page = { prerender: true }\n--- script\nimport { persisted } from "kay"\n\nconst theme = persisted("theme", "light")\n---\np {theme()}\n'),
     ])
 
-    const app = new Elysia().use(await pages({ routesDir: dir, prebuilt: false, security: false }))
+    const app = new Elysia().use(await pages({ dirs: { routes: dir }, prebuilt: false, security: false }))
     const visit = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).headers
     const own = await visit('/own')
     const varied = await visit('/varied')

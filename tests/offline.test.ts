@@ -49,7 +49,7 @@ describe('service worker', () => {
   })
 
   it('asks the network for the API where apiPath mounts it', async () => {
-    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base: '/repo', apiPath: '/v1', offline: { pages: ['/'] } })
+    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base: '/repo', serve: { apiPath: '/v1' }, offline: { pages: ['/'] } })
     const { settings } = await worker(app)
 
     expect(settings!.network).toEqual(['/repo/_kay/', '/repo/v1/'])

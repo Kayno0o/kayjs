@@ -74,7 +74,7 @@ async function i18nLinks(): Promise<Size> {
 
   await Bun.write(join(copy, 'src/components/counter.kay'), '---\nimport { signal } from \'kay\'\n\nconst shown = signal(false)\n---\ndiv\n  button(type="button" onClick={() => shown.set(true)}) Show\n  if shown()\n    a.revealed(href="/about") About\n')
 
-  const site = await testSite({ root: copy, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages' }, typography: false, browser: { path: browserPath() } })
+  const site = await testSite({ root: copy, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages' }, client: { typography: false }, browser: { path: browserPath() } })
 
   try {
     return total(await eagerJs(scriptUrls(await (await site.fetch('/en')).text()), async url => (await site.fetch(url)).text()))
@@ -88,13 +88,13 @@ async function i18nLinks(): Promise<Size> {
 async function servedPage(fixture: string, path: string): Promise<Size> {
   const root = await copyOf(fixture, join(ROOT, 'tests/fixtures', fixture))
 
-  await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n')
+  await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n')
   process.env.NODE_ENV = 'production'
   await build([root], { NODE_ENV: 'production' })
 
   const { Elysia } = await import('elysia')
   const { pages } = await import('../src/server')
-  const app = new Elysia().use(await pages({ root, prebuilt: true, log: false, compress: false }))
+  const app = new Elysia().use(await pages({ root, prebuilt: true, observe: { log: false }, serve: { compress: false } }))
   const get = async (url: string) => (await app.handle(new Request(`http://localhost${url}`))).text()
 
   return total(await eagerJs(scriptUrls(await get(path)), get))

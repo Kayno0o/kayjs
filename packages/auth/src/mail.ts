@@ -91,7 +91,7 @@ function linkMail(words: AuthMailWording, data: MailData, subject: string, lead:
   }
 }
 
-// A lifetime, a duration such as `'24h'` (a number of seconds still works until 1.91), as words in a language: `24 hours`, `7 days`, `1 heure`, from kay's `durationWords`.
+// A lifetime, a duration such as `'24h'`, as words in a language: `24 hours`, `7 days`, `1 heure`, from kay's `durationWords`.
 export const lifetime = durationWords
 
 // How long what the mail carries works, a magic link being usable once.

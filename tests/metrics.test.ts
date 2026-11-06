@@ -46,7 +46,7 @@ async function listening(options: Options, env: Record<string, string> = {}) {
   process.env.NODE_ENV = 'production'
   Object.assign(process.env, env)
 
-  const app = new Elysia().use(await pages({ root: PRODUCTION, prebuilt: false, log: false, ...options })).listen({ port: 0, hostname: '127.0.0.1' })
+  const app = new Elysia().use(await pages({ root: PRODUCTION, prebuilt: false, observe: { log: false }, ...options })).listen({ port: 0, hostname: '127.0.0.1' })
 
   stops.push(async () => app.stop())
 

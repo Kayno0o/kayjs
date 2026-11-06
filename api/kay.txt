@@ -2414,12 +2414,6 @@ interface AppStore extends StoreBase
   sql?: SQL | undefined
   vitals?: VitalsStore | undefined
 
-[./server] AsyncRooms
-type AsyncRooms<Message, Member = undefined, State = undefined> = Rooms<Message, Member, State>
-
-[./server] AsyncRoomStore
-type AsyncRoomStore = RoomStore
-
 [./server] background
 function background(work: (signal: AbortSignal) => unknown, options?: BackgroundOptions): Elysia<"", {
   decorator: {};
@@ -2704,15 +2698,11 @@ const jobTables: readonly ["kay_jobs", "kay_locks"]
 [./server] KayConfig
 interface KayConfig extends AppHooks
   actions?: ActionsConfig | undefined
-  apiDir?: string | undefined
-  apiPath?: string | undefined
   base?: string | undefined
   beforeRequest?: ((event: RequestEvent & { context: HookContext; }) => Promise<Response | false | void> | Response | false | void) | undefined
   budget?: BudgetConfig | undefined
   checks?: ProjectCheck[] | undefined
   client?: ClientConfig | undefined
-  compress?: boolean | undefined
-  compressionDictionary?: boolean | undefined
   contentConfig?: string | undefined
   cors?: CorsOptions | undefined
   dirs?: DirsConfig | undefined
@@ -2723,62 +2713,45 @@ interface KayConfig extends AppHooks
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   head?: HeadTag[] | undefined
   health?: HealthConfig | false | undefined
-  hydration?: undefined | { visible?: string | undefined; serverIslands?: string | undefined; }
   i18n?: I18nConfig | undefined
   images?: ImagesConfig | undefined
-  inlineStyles?: boolean | undefined
   jobs?: JobsConfig | undefined
   lang?: string | undefined
-  lateStyles?: boolean | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
   links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
-  log?: Logger | undefined
   manifest?: ManifestConfig | undefined
   markdown?: MarkdownConfig | undefined
-  maxSize?: ByteSize | undefined
-  maxSizeByPath?: Record<string, ByteSize> | undefined
   mcp?: McpConfig | boolean | undefined
   metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
-  navigation?: boolean | undefined
   observe?: ObserveConfig | undefined
   offline?: OfflineConfig | boolean | undefined
-  onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => Promise<void> | void) | undefined
   onResponse?: Hook<ResponseEvent> | undefined
   onStart?: Hook<StartEvent> | undefined
   onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
   plugins?: BunPlugin[] | undefined
-  prefetch?: Prefetch | undefined
   preview?: PreviewConfig | false | undefined
   proxy?: ProxyConfig | boolean | number | undefined
   publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
-  publicDir?: string | undefined
   redirects?: Redirects | undefined
-  requestIdHeader?: string | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
   robots?: RobotsConfig | false | undefined
-  routesDir?: string | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
-  saveData?: boolean | undefined
   search?: boolean | undefined
   secret?: string | string[] | undefined
   security?: SecurityConfig | false | undefined
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
-  serverTiming?: boolean | undefined
-  shutdownTimeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   site?: string | undefined
   sitemap?: SitemapConfig | false | undefined
   store?: AppStore | undefined
   timeZone?: string | undefined
-  tracer?: Tracer | undefined
   trailingSlash?: TrailingSlash | undefined
-  typography?: boolean | undefined
 
 [./server] KayExtension
 interface KayExtension<Server extends AnyElysia = AnyElysia>
@@ -2986,15 +2959,11 @@ function pages(options?: PagesOptions): Promise<Elysia<"", {
 [./server] PagesOptions
 interface PagesOptions extends KayConfig
   actions?: ActionsConfig | undefined
-  apiDir?: string | undefined
-  apiPath?: string | undefined
   base?: string | undefined
   beforeRequest?: ((event: RequestEvent & { context: HookContext; }) => Promise<Response | false | void> | Response | false | void) | undefined
   budget?: BudgetConfig | undefined
   checks?: ProjectCheck[] | undefined
   client?: ClientConfig | undefined
-  compress?: boolean | undefined
-  compressionDictionary?: boolean | undefined
   contentConfig?: string | undefined
   cors?: CorsOptions | undefined
   dev?: boolean | undefined
@@ -3006,64 +2975,47 @@ interface PagesOptions extends KayConfig
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   head?: HeadTag[] | undefined
   health?: HealthConfig | false | undefined
-  hydration?: undefined | { visible?: string | undefined; serverIslands?: string | undefined; }
   i18n?: I18nConfig | undefined
   images?: ImagesConfig | undefined
-  inlineStyles?: boolean | undefined
   jobs?: JobsConfig | undefined
   lang?: string | undefined
-  lateStyles?: boolean | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
   links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
-  log?: Logger | undefined
   manifest?: ManifestConfig | undefined
   markdown?: MarkdownConfig | undefined
-  maxSize?: ByteSize | undefined
-  maxSizeByPath?: Record<string, ByteSize> | undefined
   mcp?: McpConfig | boolean | undefined
   metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
-  navigation?: boolean | undefined
   observe?: ObserveConfig | undefined
   offline?: OfflineConfig | boolean | undefined
-  onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => Promise<void> | void) | undefined
   onResponse?: Hook<ResponseEvent> | undefined
   onStart?: Hook<StartEvent> | undefined
   onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
-  prefetch?: Prefetch | undefined
   preview?: PreviewConfig | false | undefined
   proxy?: ProxyConfig | boolean | number | undefined
   publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
-  publicDir?: string | undefined
   redirects?: Redirects | undefined
-  requestIdHeader?: string | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
   robots?: RobotsConfig | false | undefined
   root?: string | undefined
-  routesDir?: string | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
-  saveData?: boolean | undefined
   search?: boolean | undefined
   secret?: string | string[] | undefined
   security?: SecurityConfig | false | undefined
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
-  serverTiming?: boolean | undefined
-  shutdownTimeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   site?: string | undefined
   sitemap?: SitemapConfig | false | undefined
   store?: AppStore | undefined
   timeZone?: string | undefined
-  tracer?: Tracer | undefined
   trailingSlash?: TrailingSlash | undefined
-  typography?: boolean | undefined
 
 [./server] pgData
 function pgData(source: PgSource): {
@@ -3675,9 +3627,6 @@ interface StoredNotification
   title: string
   url?: string | undefined
 
-[./server] StoreRooms
-type StoreRooms<Message, Member = undefined, State = undefined> = Rooms<Message, Member, State>
-
 [./server] toolCall
 function toolCall(request: Request): ToolCall | undefined
 
@@ -3997,16 +3946,12 @@ interface TestContent
 [./test] TestOptions
 interface TestOptions extends PagesOptions
   actions?: ActionsConfig | undefined
-  apiDir?: string | undefined
-  apiPath?: string | undefined
   base?: string | undefined
   beforeRequest?: ((event: RequestEvent & { context: HookContext; }) => Promise<Response | false | void> | Response | false | void) | undefined
   browser?: BrowserOptions | boolean | undefined
   budget?: BudgetConfig | undefined
   checks?: ProjectCheck[] | undefined
   client?: ClientConfig | undefined
-  compress?: boolean | undefined
-  compressionDictionary?: boolean | undefined
   contentConfig?: string | undefined
   cors?: CorsOptions | undefined
   dev?: boolean | undefined
@@ -4019,69 +3964,52 @@ interface TestOptions extends PagesOptions
   head?: HeadTag[] | undefined
   headers?: Record<string, string> | undefined
   health?: HealthConfig | false | undefined
-  hydration?: undefined | { visible?: string | undefined; serverIslands?: string | undefined; }
   i18n?: I18nConfig | undefined
   images?: ImagesConfig | undefined
-  inlineStyles?: boolean | undefined
   islands?: boolean | undefined
   jobs?: JobsConfig | undefined
   lang?: string | undefined
-  lateStyles?: boolean | undefined
   librarySettings?: Record<string, string> | undefined
   limits?: LimitsConfig | undefined
   links?: undefined | { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; }
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
   locals?: ((request: Request) => Promise<Record<string, unknown>> | Record<string, unknown>) | undefined
-  log?: Logger | undefined
   manifest?: ManifestConfig | undefined
   markdown?: MarkdownConfig | undefined
-  maxSize?: ByteSize | undefined
-  maxSizeByPath?: Record<string, ByteSize> | undefined
   mcp?: McpConfig | boolean | undefined
   mcpKey?: string | undefined
   metrics?: MetricsConfig | boolean | undefined
   minify?: boolean | undefined
-  navigation?: boolean | undefined
   observe?: ObserveConfig | undefined
   offline?: OfflineConfig | boolean | undefined
-  onError?: ((event: { error: unknown; request: Request | undefined; source?: string | undefined; }) => Promise<void> | void) | undefined
   onResponse?: Hook<ResponseEvent> | undefined
   onStart?: Hook<StartEvent> | undefined
   onStop?: Hook<Record<never, never>> | undefined
   openapi?: OpenApiConfig | boolean | undefined
   plugins?: BunPlugin[] | undefined
   prebuilt?: boolean | undefined
-  prefetch?: Prefetch | undefined
   preview?: PreviewConfig | false | undefined
   proxy?: ProxyConfig | boolean | number | undefined
   proxyKey?: string | undefined
   publicCache?: Record<string, `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`> | undefined
-  publicDir?: string | undefined
   redirects?: Redirects | undefined
-  requestIdHeader?: string | undefined
   requireGuards?: boolean | undefined
   rewrite?: Rewrite | undefined
   robots?: RobotsConfig | false | undefined
   root?: string | undefined
-  routesDir?: string | undefined
   runtimeRedirects?: undefined | { hosts?: string[] | undefined; }
-  saveData?: boolean | undefined
   search?: boolean | undefined
   secret?: string | string[] | undefined
   security?: SecurityConfig | false | undefined
   seo?: SeoConfig | undefined
   serve?: ServeConfig | undefined
-  serverTiming?: boolean | undefined
-  shutdownTimeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   site?: string | undefined
   sitemap?: SitemapConfig | false | undefined
   store?: AppStore | undefined
   styles?: boolean | undefined
   timeZone?: string | undefined
-  tracer?: Tracer | undefined
   trailingSlash?: TrailingSlash | undefined
-  typography?: boolean | undefined
   use?: AnyElysia[] | undefined
 
 [./test] TestPage

@@ -6,7 +6,7 @@ import process from 'node:process'
 import { APP_DEPENDENCIES, dependencyNames, libraryMessageExtensions, readManifest } from './build/manifests'
 import { KayError } from './compiler/errors'
 import { APP_CONTEXT, CONFIG_FILE } from './config'
-import { CONFIG_GROUPS, groupedKeys, invalidConfigValues, isBag, mergeBags, REMOVED_KEYS, unknownConfigKeys } from './config-shape'
+import { CONFIG_GROUPS, invalidConfigValues, isBag, mergeBags, REMOVED_KEYS, unknownConfigKeys } from './config-shape'
 import { NATIVE_PLUGINS } from './native-plugins'
 import { publicEnvFiles } from './server/env-state'
 
@@ -96,7 +96,7 @@ async function importConfig(root: string, fresh = false): Promise<KayConfig> {
 
   checkedConfig(config)
 
-  return groupedKeys(config)
+  return config
 }
 
 const MODULE_DIRECTORY = /^.*\/node_modules\//
@@ -195,7 +195,7 @@ function withExtensions<Config extends KayConfig>(config: Config): Config {
 
     checkedConfig(extension.config, `the config of the extension ${extension.name}`)
 
-    return [groupedKeys(extension.config)]
+    return [extension.config]
   })
 
   const merged = layers.length === 0 ? config : underlay(layers.reduce<KayConfig>((under, layer) => underlay(under, layer) as KayConfig, {}), config) as Config
@@ -308,5 +308,5 @@ export function mergeConfig<Options extends KayConfig>(config: KayConfig, option
   if (removed.length > 0)
     throw new KayError('config-invalid', `kay: the options have keys kay no longer reads: ${removed.map(key => `\`${key}\`, now \`${REMOVED_KEYS[key]}\``).join('; ')}`)
 
-  return withSiteUrl(withExtensions(mergeBags(groupedKeys(config), groupedKeys(options)) as KayConfig & Options))
+  return withSiteUrl(withExtensions(mergeBags(config, options) as KayConfig & Options))
 }

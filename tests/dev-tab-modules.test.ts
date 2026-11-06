@@ -15,7 +15,7 @@ describe('the dev tool tab modules', () => {
 
     await Bun.write(join(dir, 'routes', 'index.kay'), 'p Home\n')
 
-    const app = await pages({ root: relative(process.cwd(), dir), routesDir: 'routes', dev: true })
+    const app = await pages({ root: relative(process.cwd(), dir), dirs: { routes: 'routes' }, dev: true })
 
     for (const name of Object.keys(DEV_TABS)) {
       const response = await app.handle(new Request(`http://localhost/_kay/dev/tab/${name}.js`))

@@ -50,10 +50,6 @@ const CONFIG: Record<keyof KayConfig, Rule> = {
   onStop: fn,
 
   i18n: I18N_BAG,
-  routesDir: str,
-  apiDir: str,
-  apiPath: str,
-  publicDir: str,
   publicCache: map(duration),
   minify: bool,
   lang: str,
@@ -72,111 +68,69 @@ const CONFIG: Record<keyof KayConfig, Rule> = {
   fonts: list(obj),
   security: either(lit(false), bag(SECURITY_KEYS)),
   proxy: either(bool, num, bag(PROXY)),
-  maxSize: bytes,
-  maxSizeByPath: map(bytes),
   requireGuards: bool,
   cors: CORS,
   openapi: either(bool, obj),
   mcp: either(bool, obj),
-  compress: bool,
-  compressionDictionary: bool,
   health: either(lit(false), bag(HEALTH)),
   metrics: either(bool, bag(METRICS)),
   jobs: bag(JOBS),
-  log: true,
-  serverTiming: bool,
-  tracer: true,
   rewrite: true,
   redirects: true,
   runtimeRedirects: bag({ hosts: list(str) }),
   live: bag(LIVE),
-  requestIdHeader: str,
   timeZone: str,
   base: str,
   links: bag({ outside: oneOf('new-tab', 'same-tab'), schemes: list(str) }),
   trailingSlash: oneOf('never', 'always', 'ignore'),
   contentConfig: str,
   markdown: bag(MARKDOWN),
-  shutdownTimeout: duration,
-  navigation: bool,
-  inlineStyles: bool,
-  lateStyles: bool,
-  typography: bool,
-  hydration: HYDRATION,
-  prefetch: either(oneOf('conservative', 'moderate', 'eager'), lit(false)),
-  saveData: bool,
   plugins: list(obj),
   librarySettings: map(str),
   lints: true,
   secret: either(str, list(str)),
   preview: either(lit(false), bag(PREVIEW)),
   store: true,
-  onError: fn,
   env: true,
   checks: true,
   extensions: list(obj),
 }
 
 // The names a config key had before 1.88 (`fileStore` before 1.87) and no longer has, each with where it lives now: one is reported as an unknown key naming its replacement.
-export const REMOVED_KEYS: Record<string, string> = { routes: 'dirs.routes', api: 'dirs.api', content: 'contentConfig', storage: 'store.files', maxSizes: 'limits.byPath', settings: 'librarySettings', fileStore: 'store.files' }
-
-// The flat keys 1.88 grouped by concern, each with the bag that holds it now and its name there: still read until 1.91, and reported by `deprecated-config-groups`.
-export const GROUPED_KEYS = {
-  routesDir: ['dirs', 'routes'],
-  apiDir: ['dirs', 'api'],
-  publicDir: ['dirs', 'public'],
-  maxSize: ['limits', 'body'],
-  maxSizeByPath: ['limits', 'byPath'],
-  apiPath: ['serve', 'apiPath'],
-  compress: ['serve', 'compress'],
-  compressionDictionary: ['serve', 'compressionDictionary'],
-  shutdownTimeout: ['serve', 'shutdownTimeout'],
-  log: ['observe', 'log'],
-  serverTiming: ['observe', 'serverTiming'],
-  requestIdHeader: ['observe', 'requestIdHeader'],
-  tracer: ['observe', 'tracer'],
-  onError: ['observe', 'onError'],
-  navigation: ['client', 'navigation'],
-  inlineStyles: ['client', 'inlineStyles'],
-  lateStyles: ['client', 'lateStyles'],
-  typography: ['client', 'typography'],
-  hydration: ['client', 'hydration'],
-  prefetch: ['client', 'prefetch'],
-  saveData: ['client', 'saveData'],
-} as const satisfies Partial<Record<keyof KayConfig, readonly [keyof KayConfig, string]>>
+export const REMOVED_KEYS: Record<string, string> = {
+  routes: 'dirs.routes',
+  api: 'dirs.api',
+  content: 'contentConfig',
+  storage: 'store.files',
+  maxSizes: 'limits.byPath',
+  settings: 'librarySettings',
+  fileStore: 'store.files',
+  routesDir: 'dirs.routes',
+  apiDir: 'dirs.api',
+  publicDir: 'dirs.public',
+  maxSize: 'limits.body',
+  maxSizeByPath: 'limits.byPath',
+  apiPath: 'serve.apiPath',
+  compress: 'serve.compress',
+  compressionDictionary: 'serve.compressionDictionary',
+  shutdownTimeout: 'serve.shutdownTimeout',
+  log: 'observe.log',
+  serverTiming: 'observe.serverTiming',
+  requestIdHeader: 'observe.requestIdHeader',
+  tracer: 'observe.tracer',
+  onError: 'observe.onError',
+  navigation: 'client.navigation',
+  inlineStyles: 'client.inlineStyles',
+  lateStyles: 'client.lateStyles',
+  typography: 'client.typography',
+  hydration: 'client.hydration',
+  prefetch: 'client.prefetch',
+  saveData: 'client.saveData',
+}
 
 export const CONFIG_GROUPS = ['dirs', 'limits', 'serve', 'observe', 'client'] as const
 
 export const isBag = isRecord
-
-// The config with each key of `GROUPED_KEYS` written in its bag, unless the bag sets it already, in which case the bag wins.
-export function groupedKeys<Config extends object>(config: Config): Config {
-  const given = config as Record<string, unknown>
-
-  if (!Object.keys(GROUPED_KEYS).some(old => Object.hasOwn(given, old)))
-    return config
-
-  const grouped: Record<string, unknown> = { ...given }
-
-  for (const [old, [group, name]] of Object.entries(GROUPED_KEYS)) {
-    if (!Object.hasOwn(given, old))
-      continue
-
-    delete grouped[old]
-
-    const bag = grouped[group]
-
-    if (bag !== undefined && !isBag(bag))
-      continue
-
-    const next = { ...bag }
-
-    next[name] ??= given[old]
-    grouped[group] = next
-  }
-
-  return grouped as Config
-}
 
 const defined = (given: Record<string, unknown>): [string, unknown][] => Object.entries(given).filter(([, value]) => value !== undefined)
 
@@ -215,9 +169,7 @@ export function unknownConfigKeys(config: object): string[] {
 
       const found = nearest(key, Object.keys(known))
       const removed = path === '' && Object.hasOwn(REMOVED_KEYS, key) ? REMOVED_KEYS[key] : undefined
-      // A key that moved into a bag is offered where it lives now.
-      const grouped = found !== undefined && path === '' && Object.hasOwn(GROUPED_KEYS, found) ? GROUPED_KEYS[found as keyof typeof GROUPED_KEYS] : undefined
-      const near = removed ?? (grouped === undefined ? found : `${grouped[0]}.${grouped[1]}`)
+      const near = removed ?? found
 
       problems.push(`\`${path}${key}\`${near === undefined ? '' : `, did you mean \`${path}${near}\`?`}`)
     }

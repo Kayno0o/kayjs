@@ -34,7 +34,7 @@ describe('the ids of a page rendered per request', () => {
     await Bun.write(join(dir, 'components/menu.kay'), MENU)
     await Bun.write(join(dir, 'routes/index.kay'), PAGE)
     await Bun.write(join(dir, 'routes/about.kay'), PAGE)
-    app = await pages({ routesDir: join(dir, 'routes'), prebuilt: true })
+    app = await pages({ dirs: { routes: join(dir, 'routes') }, prebuilt: true })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -113,7 +113,7 @@ describe('the ids in the slots of a persistent island', () => {
     await Bun.write(join(dir, 'components/shell.kay'), SHELL)
     await Bun.write(join(dir, 'routes/index.kay'), KEPT)
     await Bun.write(join(dir, 'routes/other.kay'), OTHER)
-    app = await pages({ routesDir: join(dir, 'routes'), prebuilt: true })
+    app = await pages({ dirs: { routes: join(dir, 'routes') }, prebuilt: true })
   })
 
   afterAll(async () => rm(dir, { recursive: true, force: true }))

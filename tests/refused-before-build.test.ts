@@ -10,13 +10,13 @@ import { scratchDir } from './scratch'
 const routes = 'tests/fixtures/i18n/src/routes'
 const routing = 'tests/fixtures/routing/src/routes'
 const content = 'tests/fixtures/content/src/content.config.ts'
-const cards = { routesDir: 'tests/fixtures/cards/src/routes', fonts: [{ family: 'Archivo Black', src: 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2' }] }
+const cards = { dirs: { routes: 'tests/fixtures/cards/src/routes' }, fonts: [{ family: 'Archivo Black', src: 'tests/fixtures/cards/src/fonts/archivo-black-latin-400-normal.woff2' }] }
 const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' }
 
 // Serves `options` with a client loader that only counts, answering how many builds the server started and what it refused with.
 async function refusal(options: ServedOptions, root = process.cwd()): Promise<{ builds: number, message: string }> {
   let builds = 0
-  const project = resolveProject(root, { routesDir: routes, prebuilt: false, security: false, ...options }, { dev: false, prebuilt: false, underKayDev: false, devRoutes: false })
+  const project = resolveProject(root, { prebuilt: false, security: false, ...options, dirs: { routes, ...options.dirs } }, { dev: false, prebuilt: false, underKayDev: false, devRoutes: false })
   const loadClient = (): ClientBuild => {
     builds++
 
@@ -41,15 +41,15 @@ describe('a refused config', () => {
     ['cors origins', { cors: { origins: ['example.com'] } }, 'no origin'],
     ['cors credentials', { cors: { origins: '*', credentials: true } as never }, 'credentials'],
     ['health.timeout', { health: { timeout: 0 } }, 'health.timeout is'],
-    ['requestIdHeader', { requestIdHeader: 'x-bad header' }, 'requestIdHeader is'],
+    ['requestIdHeader', { observe: { requestIdHeader: 'x-bad header' } }, 'requestIdHeader is'],
     ['proxy', { proxy: {} }, 'kay: proxy'],
-    ['a redirect from a page', { routesDir: routing, redirects: { '/about': '/bare' } }, 'the redirect from /about takes a path a page serves'],
+    ['a redirect from a page', { dirs: { routes: routing }, redirects: { '/about': '/bare' } }, 'the redirect from /about takes a path a page serves'],
     ['the manifest startUrl', { manifest: { startUrl: 'notes' } }, 'the manifest\'s startUrl is a path of the site'],
     ['an i18n path no page serves', { i18n: { ...i18n, paths: { '/contact': { en: '/reach-us' } } } }, 'translates /contact, which no page serves'],
     ['an i18n path another page takes', { i18n: { ...i18n, paths: { '/about': { en: '/' } } } }, 'are both served at / in en'],
     ['a content config that is missing', { contentConfig: 'tests/fixtures/content/src/missing.config.ts' }, 'there is no such file'],
-    ['a feed without the site', { routesDir: 'tests/fixtures/content/src/routes', contentConfig: content }, 'has a feed, whose links need the site\'s URL'],
-    ['an mcp path a page serves', { routesDir: 'tests/fixtures/mcp-clash/src/routes', mcp: true }, '`mcp` both serve /mcp'],
+    ['a feed without the site', { dirs: { routes: 'tests/fixtures/content/src/routes' }, contentConfig: content }, 'has a feed, whose links need the site\'s URL'],
+    ['an mcp path a page serves', { dirs: { routes: 'tests/fixtures/mcp-clash/src/routes' }, mcp: true }, '`mcp` both serve /mcp'],
     ['images.card.background', { ...cards, images: { card: { background: 'white' } } }, 'images.card.background is white'],
     ['images.card.font', { ...cards, images: { card: { font: { family: 'Inter' } } } }, 'images.card.font names Inter'],
     ['images.card.logo', { ...cards, images: { card: { logo: 'tests/fixtures/cards/src/none.svg' } } }, 'which does not exist'],
@@ -68,12 +68,12 @@ describe('a refused config naming a file of the project', () => {
     await Bun.write(`${dir}/en/about`, 'shadowed')
     await Bun.write(`${dir}/old`, 'moved')
 
-    const shadowed = await refusal({ publicDir: dir, i18n })
+    const shadowed = await refusal({ dirs: { public: dir }, i18n })
 
     expect(shadowed.message).toContain('and a page both serve /en/about')
     expect(shadowed.builds).toBe(0)
 
-    const taken = await refusal({ routesDir: 'tests/fixtures/site/src/routes', publicDir: dir, redirects: { '/old': '/about' } })
+    const taken = await refusal({ dirs: { routes: 'tests/fixtures/site/src/routes', public: dir }, redirects: { '/old': '/about' } })
 
     expect(taken.message).toContain('/old and the redirect from /old both serve /old')
     expect(taken.builds).toBe(0)
@@ -87,13 +87,13 @@ describe('a refused config naming files of the project', () => {
     await Bun.write(`${dir}/public/_kay/env.js`, '')
     await Bun.write(`${dir}/public/llms.txt`, 'plain')
 
-    const env = await refusal({ publicDir: `${dir}/public`, publicEnv: true })
+    const env = await refusal({ dirs: { public: `${dir}/public` }, publicEnv: true })
 
     expect(env.message).toContain('`s.Public` and')
     expect(env.message).toContain('both serve /_kay/env.js')
     expect(env.builds).toBe(0)
 
-    const file = await refusal({ routesDir: 'tests/fixtures/endpoints/src/routes', publicDir: `${dir}/public` })
+    const file = await refusal({ dirs: { routes: 'tests/fixtures/endpoints/src/routes', public: `${dir}/public` } })
 
     expect(file.message).toContain('llms.txt.ts and the public file')
     expect(file.builds).toBe(0)
@@ -101,7 +101,7 @@ describe('a refused config naming files of the project', () => {
     await Bun.write(`${dir}/routes/data.json.kay`, 'h1 Data\n')
     await Bun.write(`${dir}/routes/data.json.ts`, 'export function GET() { return {} }\n')
 
-    const page = await refusal({ routesDir: `${dir}/routes` })
+    const page = await refusal({ dirs: { routes: `${dir}/routes` } })
 
     expect(page.message).toContain('data.json.kay and')
     expect(page.message).toContain('data.json.ts both serve /data.json')
@@ -115,7 +115,7 @@ describe('a refused config naming files of the project', () => {
     await Bun.write(`${dir}/src/env.ts`, env('STRIPE_SECRET'))
     await Bun.write(`${dir}/routes/index.kay`, 'h1 Home\n')
 
-    const secret = await refusal({ routesDir: `${dir}/routes`, publicEnv: true }, dir)
+    const secret = await refusal({ dirs: { routes: `${dir}/routes` }, publicEnv: true }, dir)
 
     expect(secret.message).toContain('s.Public declares STRIPE_SECRET')
     expect(secret.builds).toBe(0)
@@ -123,7 +123,7 @@ describe('a refused config naming files of the project', () => {
     await rm(`${dir}/src/env.ts`)
     await Bun.write(`${dir}/src/map.kay`, '---\nimport { s } from \'kay\'\nconst field = s.Public(s.String())\n---\nh1 Map\n')
 
-    const fence = await refusal({ routesDir: `${dir}/routes`, publicEnv: true }, dir)
+    const fence = await refusal({ dirs: { routes: `${dir}/routes` }, publicEnv: true }, dir)
 
     expect(fence.message).toContain('src/map.kay declares an s.Public field')
     expect(fence.builds).toBe(0)
@@ -135,14 +135,14 @@ describe('a refused config naming files of the project', () => {
     await Bun.write(`${dir}/routes/index.kay`, 'h1 Home\n')
     await Bun.write(`${dir}/routes/[...rest].json.ts`, 'export function GET() { return {} }\n')
 
-    const endpoint = await refusal({ routesDir: `${dir}/routes` })
+    const endpoint = await refusal({ dirs: { routes: `${dir}/routes` } })
 
     expect(endpoint.message).toContain('answers one path per set of params')
     expect(endpoint.builds).toBe(0)
 
     await Bun.write(`${dir}/routes/a:b.kay`, 'h1 Colon\n')
 
-    const both = await refusal({ routesDir: `${dir}/routes` })
+    const both = await refusal({ dirs: { routes: `${dir}/routes` } })
 
     expect(both.message).toContain('has a :, * or \' in its name')
     expect(both.builds).toBe(0)
@@ -154,7 +154,7 @@ describe('a refused config naming files of the project', () => {
     await Bun.write(`${dir}/public/${MANIFEST.slice(1)}`, '{}')
 
     const favicon = 'tests/fixtures/cards/src/logo.svg'
-    const held = await refusal({ publicDir: `${dir}/public`, favicon, manifest: { startUrl: 'notes' } })
+    const held = await refusal({ dirs: { public: `${dir}/public` }, favicon, manifest: { startUrl: 'notes' } })
     const redirected = await refusal({ favicon, redirects: { [MANIFEST]: '/about' }, manifest: { startUrl: 'notes' } })
     const made = await refusal({ favicon, manifest: { startUrl: 'notes' } })
 

@@ -10,7 +10,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('an actio
   let site: Awaited<ReturnType<typeof testSite>>
 
   beforeAll(async () => {
-    site = await testSite({ routesDir: 'tests/fixtures/load-refresh/src/routes', browser: { path: chrome } })
+    site = await testSite({ dirs: { routes: 'tests/fixtures/load-refresh/src/routes' }, browser: { path: chrome } })
   }, 120_000)
 
   afterAll(async () => site?.close())

@@ -345,7 +345,7 @@ describe('cached with a store', () => {
 
     try {
       await build.prerender({})
-      const app = await build.serve({ root: 'tests/fixtures/production', security: false, serverTiming: true })
+      const app = await build.serve({ root: 'tests/fixtures/production', security: false, observe: { serverTiming: true } })
       const visit = async () => (await app.handle(new Request('http://localhost/news'))).text()
 
       expect(await visit()).toContain('<h1>Edition 1</h1>')

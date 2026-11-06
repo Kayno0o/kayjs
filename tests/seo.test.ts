@@ -12,7 +12,7 @@ const HEAD = /<head>([\s\S]*)<\/head>/
 const app = await pages({
   root: 'tests/fixtures/seo',
   prebuilt: false,
-  publicDir: resolve('tests/fixtures/seo/share'),
+  dirs: { public: resolve('tests/fixtures/seo/share') },
   site: 'https://example.com/',
   seo: {
     name: 'Kay site',
@@ -326,7 +326,7 @@ describe('sitemap and robots', () => {
 
   it('leaves both to a public file of the same name, and serves neither without a site', async () => {
     const own = await pages({ root: 'tests/fixtures/seo', prebuilt: false, site: 'https://example.com' })
-    const plain = await pages({ root: 'tests/fixtures/seo', publicDir: 'none', prebuilt: false })
+    const plain = await pages({ root: 'tests/fixtures/seo', dirs: { public: 'none' }, prebuilt: false })
 
     expect(await (await own.handle(new Request('http://localhost/robots.txt'))).text()).toBe('User-agent: *\nDisallow: /private\n')
     expect((await own.handle(new Request('http://localhost/sitemap.xml'))).status).toBe(200)

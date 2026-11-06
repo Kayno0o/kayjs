@@ -17,9 +17,9 @@ const LARGE = 'lorem ipsum dolor sit amet\n'.repeat(40_000)
 
 let dir: string
 
-async function serve(options: { base?: string, dev?: boolean, trailingSlash?: 'always' | 'never', onError?: (event: { error: unknown }) => void } = {}) {
+async function serve({ onError, ...options }: { base?: string, dev?: boolean, trailingSlash?: 'always' | 'never', onError?: (event: { error: unknown }) => void } = {}) {
   // `prebuilt: false` is what a test run means by default, spelled out so the client build is the one shared for the file.
-  return pages({ root: 'tests/fixtures/site', prebuilt: false, publicDir: join(dir, 'public'), compress: true, log: false, ...options })
+  return pages({ root: 'tests/fixtures/site', prebuilt: false, dirs: { public: join(dir, 'public') }, serve: { compress: true }, observe: { log: false, onError }, ...options })
 }
 
 async function get(app: Awaited<ReturnType<typeof serve>>, path: string, headers: Record<string, string> = {}, method = 'GET') {
@@ -351,7 +351,7 @@ describe('a public file changed under a running server', () => {
 
     await writeFile(path, MEDIUM)
 
-    const app = await pages({ routesDir: 'tests/fixtures/bare/src/routes', publicDir: join(dir, 'public'), compress: true, log: false, prebuilt: true })
+    const app = await pages({ dirs: { routes: 'tests/fixtures/bare/src/routes', public: join(dir, 'public') }, serve: { compress: true }, observe: { log: false }, prebuilt: true })
     const unknown = await get(app, '/never-there.json')
 
     expect((await get(app, '/bare.json')).status).toBe(200)
@@ -504,7 +504,7 @@ describe('a deleted public file is a path nothing serves', () => {
 
     await writeFile(path, MEDIUM)
 
-    const app = await pages({ root: 'tests/fixtures/i18n', publicDir: join(dir, 'public'), compress: true, log: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve(MESSAGES) } })
+    const app = await pages({ root: 'tests/fixtures/i18n', dirs: { public: join(dir, 'public') }, serve: { compress: true }, observe: { log: false }, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve(MESSAGES) } })
 
     expect((await get(app, '/locale.json')).status).toBe(200)
     await rm(path)
@@ -530,9 +530,12 @@ describe('a deleted public file is a path nothing serves', () => {
 
     try {
       const errors: unknown[] = []
-      const app = await pages({ routesDir: join(root, 'src/routes'), publicDir: join(root, 'public'), compress: true, log: false, prebuilt: false, onError: ({ error }) => {
-        errors.push(error)
-      } })
+      const app = await pages({ dirs: { routes: join(root, 'src/routes'), public: join(root, 'public') }, serve: { compress: true }, observe: {
+        log: false,
+        onError: ({ error }) => {
+          errors.push(error)
+        },
+      }, prebuilt: false })
 
       expect((await get(app, '/only-error.json')).status).toBe(200)
       await rm(join(root, 'public/only-error.json'))
@@ -560,7 +563,7 @@ describe('a deleted public file is a path nothing serves', () => {
 
       await writeFile(path, MEDIUM)
 
-      const app = await pages({ routesDir: 'tests/fixtures/bare/src/routes', publicDir: join(dir, 'public'), compress: true, log: false, prebuilt: true, ...options })
+      const app = await pages({ dirs: { routes: 'tests/fixtures/bare/src/routes', public: join(dir, 'public') }, serve: { compress: true }, observe: { log: false }, prebuilt: true, ...options })
 
       expect((await get(app, `/${name}`)).status, name).toBe(200)
       await rm(path)

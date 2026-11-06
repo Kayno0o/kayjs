@@ -282,7 +282,7 @@ describe('an action returning an async iterable', () => {
   })
 
   it('sends each value as it comes when compressed, and stops once the client goes away', async () => {
-    const compressed = await testSite({ root: 'tests/fixtures/action-streams', islands: false, compress: true })
+    const compressed = await testSite({ root: 'tests/fixtures/action-streams', islands: false, serve: { compress: true } })
     const before = seen.stopped
     const { headers, body } = encodeCall(undefined)
     const response = await compressed.fetch(actions.endless.url, { method: 'POST', headers: { ...headers, 'origin': 'http://localhost', 'accept-encoding': 'gzip' }, body })

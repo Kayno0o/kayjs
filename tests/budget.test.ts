@@ -21,7 +21,7 @@ async function project(config: string): Promise<string> {
   const root = await scratchDir('budget-')
   const files: Record<string, string> = {
     'tsconfig.json': TSCONFIG,
-    'kay.config.ts': `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ log: false, ${config} })\n`,
+    'kay.config.ts': `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ observe: { log: false }, ${config} })\n`,
     'src/words.ts': `export const words = [${NOISE}]\n`,
     'src/counter.kay': '---\nimport { signal } from \'kay\'\nimport { words } from \'./words\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {words[n()]} {n()}\n',
     'src/light.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',

@@ -4,7 +4,7 @@ import { setupStore } from '../../../src/server/app-store'
 
 // Started by tests/production.test.ts in a process of its own, to be stopped by a signal.
 const app = new Elysia()
-  .use(await pages({ root: 'tests/fixtures/production', prebuilt: false, security: false, shutdownTimeout: `${Number(process.env.SHUTDOWN_TIMEOUT ?? 10)}s` }))
+  .use(await pages({ root: 'tests/fixtures/production', prebuilt: false, security: false, serve: { shutdownTimeout: `${Number(process.env.SHUTDOWN_TIMEOUT ?? 10)}s` } }))
   .get('/slow', async () => {
     console.log('slow started')
     await Bun.sleep(Number(process.env.SLOW_MS ?? 300))

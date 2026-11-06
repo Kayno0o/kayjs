@@ -11,7 +11,7 @@ import { pages } from './shared-pages'
 const LINK = /<a\b[^>]*>/g
 
 async function render(options: Record<string, unknown> = {}): Promise<{ html: string, tags: Record<string, string> }> {
-  const site = new Elysia().use(await pages({ root: 'tests/fixtures/link-schemes', prebuilt: false, security: false, inlineStyles: false, ...options }))
+  const site = new Elysia().use(await pages({ root: 'tests/fixtures/link-schemes', prebuilt: false, security: false, client: { inlineStyles: false }, ...options }))
   const html = await (await site.handle(new Request('http://localhost/'))).text()
   const tags: Record<string, string> = {}
 
@@ -144,7 +144,7 @@ describe('links: { schemes }', () => {
     const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
 
     try {
-      const site = new Elysia().use(await pages({ root: 'tests/fixtures/link-schemes', prebuilt: false, security: false, inlineStyles: false, dev: true }))
+      const site = new Elysia().use(await pages({ root: 'tests/fixtures/link-schemes', prebuilt: false, security: false, client: { inlineStyles: false }, dev: true }))
 
       await site.handle(new Request('http://localhost/'))
       await site.handle(new Request('http://localhost/'))

@@ -17,7 +17,7 @@ type Route = Parameters<typeof keptScan>[0]
 const keptStop = async (route: Route) => (await keptScan(route)).stop
 const readsNothing = async (route: Route) => await keptStop(route) === undefined
 
-const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n'
+const CONFIG = 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false } })\n'
 const TSCONFIG = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
   include: ['src', '.kay/types'],
@@ -64,7 +64,7 @@ interface Answered {
 // The warnings it logged come with the answers.
 // `parent` is chained onto the app ahead of `pages()`, as hooks of a parent app are.
 async function servedWith(root: string, asked: (Asked | Asked[])[], options = '', parent = ''): Promise<{ answers: Answered[], warnings: string }> {
-  await Bun.write(join(root, 'serve.ts'), `import { Elysia } from 'elysia'\nimport { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\n\nconst app = new Elysia()${parent}.use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, log: false, compress: false${options} }))\nconst answers = []\nconst ask = async ({ path, method, headers, body, wait }) => {\n  if (wait)\n    await Bun.sleep(wait)\n\n  const response = await app.handle(new Request(\`http://localhost\${path}\`, { method, headers, body }))\n\n  return { status: response.status, etag: response.headers.get('etag'), cache: response.headers.get('cache-control'), text: await response.text() }\n}\n\nfor (const group of ${JSON.stringify(asked)}) {\n  if (Array.isArray(group))\n    answers.push(...await Promise.all(group.map(ask)))\n  else\n    answers.push(await ask(group))\n}\n\nconsole.log(JSON.stringify(answers))\nprocess.exit(0)\n`)
+  await Bun.write(join(root, 'serve.ts'), `import { Elysia } from 'elysia'\nimport { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\n\nconst app = new Elysia()${parent}.use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, observe: { log: false }, serve: { compress: false }${options} }))\nconst answers = []\nconst ask = async ({ path, method, headers, body, wait }) => {\n  if (wait)\n    await Bun.sleep(wait)\n\n  const response = await app.handle(new Request(\`http://localhost\${path}\`, { method, headers, body }))\n\n  return { status: response.status, etag: response.headers.get('etag'), cache: response.headers.get('cache-control'), text: await response.text() }\n}\n\nfor (const group of ${JSON.stringify(asked)}) {\n  if (Array.isArray(group))\n    answers.push(...await Promise.all(group.map(ask)))\n  else\n    answers.push(await ask(group))\n}\n\nconsole.log(JSON.stringify(answers))\nprocess.exit(0)\n`)
 
   const child = Bun.spawn([process.execPath, join(root, 'serve.ts')], { cwd: root, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
   const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
@@ -195,7 +195,7 @@ describe('a page that reads nothing from its request', () => {
 
   it('is kept once per locale, under a base and a trailing slash', async () => {
     const root = await project({
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', messages: \'src/messages\' } })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', messages: \'src/messages\' } })\n',
       'src/messages/fr.ts': MESSAGES.fr,
       'src/messages/en.ts': MESSAGES.en,
       'src/routes/index.kay': '--- server\nimport { t } from \'kay/i18n\'\n---\nh1 {t(\'hello\')}\na(href="/about") About\n',
@@ -248,7 +248,7 @@ const GUESTBOOK: Record<string, string> = {
 
 const under: Record<string, string> = {
   ...GUESTBOOK,
-  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', messages: \'src/messages\' } })\n',
+  'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\', trailingSlash: \'always\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', messages: \'src/messages\' } })\n',
   'src/messages/fr.ts': MESSAGES.fr,
   'src/messages/en.ts': MESSAGES.en,
   'src/routes/index.kay': '--- server\nimport { t } from \'kay/i18n\'\nimport { messages } from \'../guestbook\'\n---\np {t(\'hello\')} {messages.join(\',\')}\n',
@@ -890,7 +890,7 @@ describe('what stops a page from being kept', () => {
 
   it('reports a page saying keep: true that is not kept at the level unkept-page has, and under --static a page the export renders', async () => {
     const files = { 'src/routes/random.kay': '--- server\nexport const page = { keep: true }\n---\np {Math.random()}\n' }
-    const config = (lints: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ log: false, lints: { 'unkept-page': '${lints}' } })\n`
+    const config = (lints: string) => `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ observe: { log: false }, lints: { 'unkept-page': '${lints}' } })\n`
     const levels = async (lints: string, args: string[] = []) => {
       const root = await project({ ...files, 'kay.config.ts': config(lints) })
 
@@ -1112,7 +1112,7 @@ describe('what kay exports to a page that is kept', () => {
 
   it('keeps such pages in a build under a base', async () => {
     const root = await project({
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, base: \'/app\' })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\' })\n',
       'src/routes/index.kay': '---\nimport { shape } from \'../shape\'\n---\np {typeof shape}\n',
       'src/routes/local.kay': '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\', { storage: \'local\' })\n---\np {theme()}\n',
       'src/routes/cookie.kay': '---\nimport { persisted } from \'kay\'\n\nconst theme = persisted(\'theme\', \'light\')\n---\np {theme()}\n',
@@ -1242,7 +1242,7 @@ describe('a page reading only what its path fixes', () => {
     const files = { 'src/routes/about.kay': AT_PATH, 'src/routes/index.kay': AT_PATH }
 
     for (const trailingSlash of ['never', 'always', 'ignore']) {
-      const root = await project({ ...files, 'kay.config.ts': `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ log: false, trailingSlash: '${trailingSlash}' })\n` })
+      const root = await project({ ...files, 'kay.config.ts': `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ observe: { log: false }, trailingSlash: '${trailingSlash}' })\n` })
 
       roots.push(root)
       expect(await built(root), trailingSlash).toEqual(['/', '/about'])
@@ -1273,7 +1273,7 @@ describe('a page reading only what its path fixes', () => {
 
   it('serves a layout reading the pathname at the rendered spelling alone, and stores the path it was rendered at', async () => {
     const root = await project({
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, trailingSlash: \'ignore\' })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, trailingSlash: \'ignore\' })\n',
       'src/routes/_layout.kay': '--- server\nconst { url: { pathname } } = ctx\n---\nheader {pathname}\nslot\n',
       'src/routes/about.kay': 'p About\n',
       'src/routes/plain.kay': 'p Plain\n',
@@ -1315,7 +1315,7 @@ describe('a page reading only what its path fixes', () => {
 
   it('is kept once per locale prefix and under a base, the pathname being the one the router sees', async () => {
     const root = await project({
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, base: \'/app\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', messages: \'src/messages\' } })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\', i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\', messages: \'src/messages\' } })\n',
       'src/messages/fr.ts': MESSAGES.fr,
       'src/messages/en.ts': MESSAGES.en,
       'src/routes/_layout.kay': '--- server\nimport { t } from \'kay/i18n\'\n\nconst here = ctx.url.pathname\n---\nheader {t(\'hello\')} {here}\nslot\n',
@@ -1335,7 +1335,7 @@ describe('a page reading only what its path fixes', () => {
 
   it('is also kept by a static build, rendered at the path the host answers it at', async () => {
     const root = await project({
-      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, trailingSlash: \'always\' })\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, trailingSlash: \'always\' })\n',
       'src/routes/about.kay': AT_PATH,
     })
 
@@ -1441,7 +1441,7 @@ describe('a layout reading ctx.locals', () => {
   }, 60_000)
 
   it('names the file and line in a static export, under a base', async () => {
-    const root = await project({ ...FILES, 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, base: \'/app\' })\n' })
+    const root = await project({ ...FILES, 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\' })\n' })
 
     roots.push(root)
 
@@ -1453,7 +1453,7 @@ describe('a layout reading ctx.locals', () => {
   }, 60_000)
 
   it('is kept per request under a base too', async () => {
-    const root = await project({ ...FILES, 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false, base: \'/app\' })\n' })
+    const root = await project({ ...FILES, 'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ observe: { log: false }, base: \'/app\' })\n' })
 
     roots.push(root)
     expect(await built(root)).toEqual([])

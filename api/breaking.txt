@@ -1,0 +1,14 @@
+ai [.] sqliteConversations
+auth [.] lifetime
+kay [./server] AsyncRoomStore
+kay [./server] AsyncRooms
+kay [./server] KayConfig
+kay [./server] PagesOptions
+kay [./server] StoreRooms
+kay [./test] TestOptions
+mail [.] createMailListTables
+mail [.] createMailSuppressionTable
+mail [.] mailListTables
+mail [.] pgLists
+mail [.] pgSuppressions
+mail [.] sqliteSuppressions

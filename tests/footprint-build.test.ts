@@ -45,7 +45,7 @@ async function project(config: string, extra: Record<string, string | Uint8Array
   const root = await scratchDir('footprint-build-')
   const files: Record<string, string | Uint8Array> = {
     'tsconfig.json': TSCONFIG,
-    'kay.config.ts': `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ log: false, fonts: [{ family: 'Display', src: './src/display.woff2', preload: true }], ${config} })\n`,
+    'kay.config.ts': `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({ observe: { log: false }, fonts: [{ family: 'Display', src: './src/display.woff2', preload: true }], ${config} })\n`,
     'src/hero.png': await Bun.file(join(FIXTURES, 'images/src/hero.png')).bytes(),
     'src/display.woff2': await Bun.file(join(FIXTURES, 'seo/src/fonts/display.woff2')).bytes(),
     'src/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ hello: \'Hello\' })\n',

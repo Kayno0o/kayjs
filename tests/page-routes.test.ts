@@ -68,7 +68,7 @@ describe('pageResponder', () => {
 
   it('serves the copy kay build rendered, and renders afresh for a visitor coming back from a form post, kept by no cache', async () => {
     // Boots the site, which builds the browser bundle the responder reads.
-    await pages({ routesDir: 'tests/fixtures/site/src/routes', prebuilt: false })
+    await pages({ dirs: { routes: 'tests/fixtures/site/src/routes' }, prebuilt: false })
     const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
     const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', built('/about')]]), settings: undefined, transforms: [], served: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
     const visit = async (path: string, headers: Record<string, string> = {}) => {
@@ -85,7 +85,7 @@ describe('pageResponder', () => {
   })
 
   it('answers a page with a shared cache-control to everyone, and keeps it from a guarded page, a visitor with a flash cookie and one saving data', async () => {
-    await pages({ routesDir: 'tests/fixtures/site/src/routes', prebuilt: false })
+    await pages({ dirs: { routes: 'tests/fixtures/site/src/routes' }, prebuilt: false })
     const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
     const shared = 'public, max-age=0, s-maxage=3600, stale-while-revalidate=3600'
     const timedWith = (headers: [string, string][]) => new Map([['/about', new Map([['/about', { ...built('/about').get('/about')!, cacheControl: shared, headers }]])]])
@@ -106,7 +106,7 @@ describe('pageResponder', () => {
   })
 
   it('runs the served-page hooks on a page rendered per request alone, HTML only, and leaves the prerendered copy to transformPage', async () => {
-    await pages({ routesDir: 'tests/fixtures/site/src/routes', prebuilt: false })
+    await pages({ dirs: { routes: 'tests/fixtures/site/src/routes' }, prebuilt: false })
     const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
     const seen: string[] = []
     const hook = ({ path, html }: { path: string, html: string }) => {
@@ -128,7 +128,7 @@ describe('pageResponder', () => {
   })
 
   it('keeps a kept page after a refused write and renders it live after one that went through', async () => {
-    await pages({ routesDir: 'tests/fixtures/site/src/routes', prebuilt: false })
+    await pages({ dirs: { routes: 'tests/fixtures/site/src/routes' }, prebuilt: false })
     const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
     const copies = built('/about')
     const page = copies.get('/about')!
@@ -172,7 +172,7 @@ describe('pageResponder', () => {
       Bun.write(join(dir, 'gone/_guard.ts'), guard('({ notFound }) => notFound()')),
       Bun.write(join(dir, '_error.kay'), '--- server\nconst { status } = ctx.error\n---\nh1 Error {status}\na(href="/home") Home\n'),
     ])
-    await pages({ routesDir: dir, prebuilt: false })
+    await pages({ dirs: { routes: dir }, prebuilt: false })
 
     const client = (await readClient(root))!
     const routes = await Promise.all((await scanRoutes(dir)).map(async route => loadGuards(route)))
@@ -207,7 +207,7 @@ describe('over a listening server', () => {
       Bun.write(join(dir, 'api/files.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/*\', ({ params }) => \'<p class="api">\' + params[\'*\'])\n'),
     ])
 
-    const app = new Elysia().use(await pages({ routesDir: routes, apiDir: join(dir, 'api'), redirects: { '/old/*': '/new/*' }, prebuilt: false, store: { files: storage } }))
+    const app = new Elysia().use(await pages({ dirs: { routes, api: join(dir, 'api') }, redirects: { '/old/*': '/new/*' }, prebuilt: false, store: { files: storage } }))
     const client = (await readClient(process.cwd()))!
     const asset = (await readdir(client.dir)).find(file => file.endsWith('.js'))!
     const key = await files.put(new File(['hello'], 'hello.txt'))
@@ -253,7 +253,7 @@ describe('over a listening server', () => {
 
     // kay registers a page of params as `/:p1/:p2`.
     const own = { '/:p1/:p2': { POST: new Response('posted') } }
-    const app = new Elysia({ serve: { routes: own } as never }).use(await pages({ routesDir: routes, redirects: { '/old/*': '/new/*' }, prebuilt: false, store: { files: memoryFiles() } }))
+    const app = new Elysia({ serve: { routes: own } as never }).use(await pages({ dirs: { routes }, redirects: { '/old/*': '/new/*' }, prebuilt: false, store: { files: memoryFiles() } }))
 
     app.listen({ port: 0, hostname: 'localhost' })
 

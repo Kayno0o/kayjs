@@ -9,7 +9,7 @@ const root = await scratchDir('answers-bench-')
 
 await cp(join(import.meta.dir, '../tests/fixtures/answers'), root, { recursive: true })
 
-const app = await pages({ root, apiDir: join(root, 'src/api'), prebuilt: false, log: false, compress: true, store: { files: memoryFiles() } })
+const app = await pages({ root, dirs: { api: join(root, 'src/api') }, observe: { log: false }, serve: { compress: true }, prebuilt: false, store: { files: memoryFiles() } })
 const key = await files.put(new File([new Uint8Array(2000)], 'a.png', { type: 'image/png' }))
 const html = await (await app.handle(new Request('http://localhost/'))).text()
 const asset = (/\/_kay\/entry-[^"]+\.js/).exec(html)?.[0]

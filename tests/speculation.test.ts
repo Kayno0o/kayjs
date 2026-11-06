@@ -13,7 +13,7 @@ describe('the speculation rules of a page', () => {
   let app: Awaited<ReturnType<typeof pages>>
 
   beforeAll(async () => {
-    app = await pages({ routesDir: ROUTES, prebuilt: false, security: { csp: {} } })
+    app = await pages({ dirs: { routes: ROUTES }, prebuilt: false, security: { csp: {} } })
   }, 60_000)
 
   const html = async (path: string, headers?: Record<string, string>) => (await app.handle(request(path, headers))).text()
@@ -65,14 +65,14 @@ describe('a prerendered page', () => {
   let build: Awaited<ReturnType<typeof scratchBuild>>
 
   beforeAll(async () => {
-    build = await scratchBuild({ routesDir: ROUTES })
-    await build.prerender({ routesDir: ROUTES })
+    build = await scratchBuild({ dirs: { routes: ROUTES } })
+    await build.prerender({ dirs: { routes: ROUTES } })
   }, 60_000)
 
   afterAll(async () => build.remove())
 
   it('with a server island carries the full rules, as the island is spliced in per request', async () => {
-    const app = await build.serve({ routesDir: ROUTES })
+    const app = await build.serve({ dirs: { routes: ROUTES } })
 
     expect(await (await app.handle(request('/island'))).text()).toContain(FULL)
   })

@@ -50,7 +50,7 @@ describe('who gets the dev routes', () => {
     process.env.NODE_ENV = 'development'
     delete process.env.KAY_DEV_CODE
 
-    const app = await pages({ root: await root(), routesDir: 'routes', prebuilt: false, security: false })
+    const app = await pages({ root: await root(), dirs: { routes: 'routes' }, prebuilt: false, security: false })
 
     for (const path of READS)
       expect([path, await answers(app, path, 'GET')]).toEqual([path, 404])
@@ -68,7 +68,7 @@ describe('who gets the dev routes', () => {
     process.env.KAY_DEV_CODE = '1'
     process.env.NODE_ENV = 'development'
 
-    const app = await pages({ root: await root(), routesDir: 'routes', prebuilt: false, security: false })
+    const app = await pages({ root: await root(), dirs: { routes: 'routes' }, prebuilt: false, security: false })
 
     expect(await answers(app, DEV_ROUTES, 'GET')).toBe(200)
     expect(await (await app.handle(new Request('http://localhost/'))).text()).toContain(DEV_TOOL)
@@ -80,7 +80,7 @@ describe('kay dev --host', () => {
     process.env.KAY_DEV_CODE = '1'
     process.env.NODE_ENV = 'development'
 
-    const app = await pages({ root: await root(), routesDir: 'routes', prebuilt: false, security: false })
+    const app = await pages({ root: await root(), dirs: { routes: 'routes' }, prebuilt: false, security: false })
     const server = { requestIP: () => address === undefined ? null : { address, family: 'IPv4', port: 1 } } as unknown as Server<unknown>
 
     // Elysia hands a handler the server it listens on, which `handle` has none of.

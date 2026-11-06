@@ -88,8 +88,10 @@ describe('proxy.key', () => {
 
   it('logs a refused request like any other, under the id its 403 carries, without the key header', async () => {
     const lines: LogEntry[] = []
-    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER }, log: (entry) => {
-      lines.push(entry)
+    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER }, observe: {
+      log: (entry) => {
+        lines.push(entry)
+      },
     } })
     const refused = await app.handle(new Request('http://localhost/secret?token=1', { headers: { [HEADER]: 'wrong-guess' } }))
     const id = refused.headers.get('x-request-id')
@@ -103,7 +105,7 @@ describe('proxy.key', () => {
   })
 
   it('logs nothing for a refusal while requests are not logged, and still sends the id', async () => {
-    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER }, log: false })
+    const app = await served({ KAY_PROXY_KEY: KEY }, { proxy: { key: HEADER }, observe: { log: false } })
 
     expect((await app.handle(new Request('http://localhost/'))).headers.get('x-request-id')).toBeTruthy()
   })

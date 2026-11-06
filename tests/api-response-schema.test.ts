@@ -37,7 +37,7 @@ const reported: string[] = []
 const FIRST_LINE = /^.*/
 
 async function app(options: { dev?: boolean, base?: string, trailingSlash?: 'always' | 'never' } = {}) {
-  return pages({ routesDir: ROUTES, apiDir: join(dir, 'api'), prebuilt: true, ...options, onError: ({ error, request }) => void reported.push(`${new URL(request!.url).pathname}: ${FIRST_LINE.exec((error as Error).message)![0]}`) })
+  return pages({ dirs: { routes: ROUTES, api: join(dir, 'api') }, observe: { onError: ({ error, request }) => void reported.push(`${new URL(request!.url).pathname}: ${FIRST_LINE.exec((error as Error).message)![0]}`) }, prebuilt: true, ...options })
 }
 
 beforeAll(async () => {

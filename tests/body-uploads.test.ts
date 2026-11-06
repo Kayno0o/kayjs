@@ -4,8 +4,8 @@ import { testSite } from '../src/test'
 const MB = 1024 * 1024
 const APP = 'https://app.example.com'
 const site = await testSite({ root: 'tests/fixtures/body-uploads', islands: false })
-const overridden = await testSite({ root: 'tests/fixtures/body-uploads', islands: false, cors: { origins: [APP] }, maxSizeByPath: { '/api/uploads': '8mb', '/api/uploads/small': '1kb' } })
-const lowered = await testSite({ root: 'tests/fixtures/body-uploads', islands: false, maxSizeByPath: { '/api/uploads': '1kb' } })
+const overridden = await testSite({ root: 'tests/fixtures/body-uploads', islands: false, cors: { origins: [APP] }, limits: { byPath: { '/api/uploads': '8mb', '/api/uploads/small': '1kb' } } })
+const lowered = await testSite({ root: 'tests/fixtures/body-uploads', islands: false, limits: { byPath: { '/api/uploads': '1kb' } } })
 
 afterAll(async () => {
   await Promise.all([site, overridden, lowered].map(async open => open.close()))

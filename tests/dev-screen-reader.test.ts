@@ -93,7 +93,7 @@ describe.skipIf(path === undefined)('the screen reader tab of the dev tool', () 
   beforeAll(async () => {
     // As under `kay dev`, which marks every element with its `.kay` position.
     process.env.KAY_DEV_CODE = '0'
-    dev = await testSite({ root: 'tests/fixtures/dev-screen-reader', browser: { path }, dev: true, onError: () => undefined })
+    dev = await testSite({ root: 'tests/fixtures/dev-screen-reader', browser: { path }, dev: true, observe: { onError: () => undefined } })
   }, 60_000)
 
   afterEach(async () => {

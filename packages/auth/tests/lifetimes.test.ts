@@ -22,14 +22,14 @@ const tokenOf = (mail: { url?: string | undefined }) => new URL(mail.url!).searc
 
 describe('lifetime words', () => {
   test('uses the largest unit that fills the time, in the language', () => {
-    expect([lifetime(86_400, 'en'), lifetime(7 * 86_400, 'en'), lifetime(3600, 'en'), lifetime(90 * 60, 'en'), lifetime(900, 'en'), lifetime(45, 'en')]).toEqual(['24 hours', '7 days', '1 hour', '90 minutes', '15 minutes', '45 seconds'])
-    expect([lifetime(86_400, 'fr'), lifetime(3600, 'fr'), lifetime(600, 'fr')].map(words => words.replace(/\s/g, ' '))).toEqual(['24 heures', '1 heure', '10 minutes'])
-    expect(lifetime(600, 'not a locale')).toBe('10 minutes')
+    expect([lifetime('86400s', 'en'), lifetime('7d', 'en'), lifetime('3600s', 'en'), lifetime('90m', 'en'), lifetime('900s', 'en'), lifetime('45s', 'en')]).toEqual(['24 hours', '7 days', '1 hour', '90 minutes', '15 minutes', '45 seconds'])
+    expect([lifetime('86400s', 'fr'), lifetime('3600s', 'fr'), lifetime('600s', 'fr')].map(words => words.replace(/\s/g, ' '))).toEqual(['24 heures', '1 heure', '10 minutes'])
+    expect(lifetime('600s', 'not a locale')).toBe('10 minutes')
   })
 
-  test('takes a duration, or seconds until 1.91', () => {
+  test('takes a duration with its unit, and refuses a bare number', () => {
     expect([lifetime('24h', 'en'), lifetime('7d', 'en'), lifetime('90m', 'en'), lifetime('1800s', 'en'), lifetime('45s', 'en')]).toEqual(['24 hours', '7 days', '90 minutes', '30 minutes', '45 seconds'])
-    expect(lifetime('10m', 'fr')).toBe(lifetime(600, 'fr'))
+    expect(() => lifetime(600 as never, 'en')).toThrow('durationWords()')
     expect(() => lifetime('soon' as never, 'en')).toThrow('durationWords()')
   })
 })

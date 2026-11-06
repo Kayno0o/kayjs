@@ -40,7 +40,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
     site = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      onError: () => undefined,
+      observe: { onError: () => undefined },
       extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: { text: 'Count?', agree: 'Yes', refuse: 'No' } })],
     })
     page = await site.open('/')
@@ -169,7 +169,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a custom p
     custom = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      onError: () => undefined,
+      observe: { onError: () => undefined },
       extensions: [analytics({ provider: 'custom', script: `http://localhost:${provider.port}/script.js`, endpoint: `http://localhost:${provider.port}/collect`, consent: true })],
     })
     opened = await custom.open('/')
@@ -225,7 +225,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a counter 
     open = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      onError: () => undefined,
+      observe: { onError: () => undefined },
       extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, info: { text: 'Counting', ok: 'Fine', optOut: 'Stop' } })],
     })
     opened = await open.open('/')
@@ -305,7 +305,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
     own = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      onError: () => undefined,
+      observe: { onError: () => undefined },
       extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: true, policyUrl: '/privacy', exclude: ['/second', '/*/admin'] })],
     })
     opened = await own.open('/')
@@ -467,7 +467,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a notice t
     flaky = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      onError: () => undefined,
+      observe: { onError: () => undefined },
       use: [new Elysia().onRequest(({ request }) => {
         return request.url.endsWith('/notice.js') && failures-- > 0 ? new Response('down', { status: 503 }) : undefined
       })],
@@ -525,7 +525,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a tracker 
     nonced = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      onError: () => undefined,
+      observe: { onError: () => undefined },
       use: [new Elysia().mapResponse({ as: 'global' }, async ({ responseValue }) => {
         if (!(responseValue instanceof Response) || !(responseValue.headers.get('content-type') ?? '').includes('text/html'))
           return undefined
@@ -578,7 +578,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('fathom and
     ['fathom', { provider: 'fathom', siteId: 'ABCDEFGH' } as const, 'script[src^="https://cdn.usefathom.com"]'],
     ['cloudflare', { provider: 'cloudflare', token: 'abc123' } as const, 'script[src^="https://static.cloudflareinsights.com"]'],
   ])('%s loads nothing before a yes, and its script after one', async (_name, options, selector) => {
-    const own = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, onError: () => undefined, extensions: [analytics(options)] })
+    const own = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, observe: { onError: () => undefined }, extensions: [analytics(options)] })
 
     try {
       const opened = await own.open('/')
@@ -616,7 +616,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a script p
     ['fathom', { provider: 'fathom', siteId: 'ABCDEFGH', consent: false } as const, 'script[src^="https://cdn.usefathom.com"]'],
     ['cloudflare', { provider: 'cloudflare', token: 'abc123', consent: false } as const, 'script[src^="https://static.cloudflareinsights.com"]'],
   ])('%s loads at once with the line, and an opt-out reloads the page without it and keeps it out', async (_name, options, selector) => {
-    const own = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, onError: () => undefined, extensions: [analytics(options)] })
+    const own = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, observe: { onError: () => undefined }, extensions: [analytics(options)] })
 
     try {
       const opened = await own.open('/')
@@ -644,7 +644,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a script p
     const nonced = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      onError: () => undefined,
+      observe: { onError: () => undefined },
       use: [new Elysia().mapResponse({ as: 'global' }, async ({ responseValue }) => {
         if (!(responseValue instanceof Response) || !(responseValue.headers.get('content-type') ?? '').includes('text/html'))
           return undefined
@@ -715,7 +715,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
     words = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      onError: () => undefined,
+      observe: { onError: () => undefined },
       extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, consent: true })],
     })
     opened = await words.open('/')
@@ -753,7 +753,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an app\'s 
     own = await testSite({
       root: 'tests/fixtures/navigation',
       browser: { path },
-      onError: () => undefined,
+      observe: { onError: () => undefined },
       extensions: [analytics({ provider: 'plausible', domain: 'example.com', host: `http://localhost:${provider.port}`, info: { optOut: 'Stop', text: { en: 'Counting {provider}' } } })],
     })
     opened = await own.open('/')

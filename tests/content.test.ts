@@ -118,7 +118,7 @@ describe('the content mode', () => {
       setContentMode({ dev: false, prebuilt: true })
       expect(await authors()).toEqual(['Built'])
 
-      const served = await pages({ root: FIXTURE, contentConfig: content, prebuilt: false, dev: true, security: false, log: false, site: SITE })
+      const served = await pages({ root: FIXTURE, contentConfig: content, prebuilt: false, dev: true, security: false, observe: { log: false }, site: SITE })
 
       expect(contentMode().dev).toBe(true)
       served.listen(0)
