@@ -34,13 +34,13 @@ it('hydrates an initial turn with sources as the server drew it: formatted from 
 
   await using page = await site.open('/citing-initial')
 
-  // Every state the turn went through while the page loaded: a stand-in of the Markdown as written, or a list that came and went, would show here.
+  // Every state the turn went through once the page was parsed: a stand-in of the Markdown as written, or a list that came and went, would show here. A turn the parser has not finished is half there, which a slow host shows between two network chunks.
   await page.initScript(() => {
     const seen = new Set<string>()
     const record = () => {
       const turn = document.querySelector('.kai-chat-turn')
 
-      if (turn)
+      if (turn && document.readyState !== 'loading')
         seen.add(turn.innerHTML)
     }
 
@@ -53,7 +53,7 @@ it('hydrates an initial turn with sources as the server drew it: formatted from 
 
   const states = await page.evaluate(() => [...(window as unknown as { seen: Set<string> }).seen])
 
-  expect(states.every(state => state.includes('<h1>Title</h1>') && state.split('kai-chat-source-link').length === 3)).toBe(true)
+  expect(states.filter(state => !state.includes('<h1>Title</h1>') || state.split('kai-chat-source-link').length !== 3)).toEqual([])
   expect(await page.evaluate(() => document.querySelector('.kai-chat-turn')!.innerHTML)).toContain('<h1>Title</h1>')
   expect(await page.count('.kai-chat-sources')).toBe(1)
   expect(page.errors).toEqual([])

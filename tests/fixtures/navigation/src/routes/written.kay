@@ -1,0 +1,7 @@
+---
+import Written from '../components/written.kay'
+---
+head
+  title Written
+h1 Written
+Written

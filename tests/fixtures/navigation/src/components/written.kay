@@ -1,0 +1,13 @@
+---
+import { onMount, signal } from 'kay'
+
+// Writes its text to the field as it mounts, as a controlled field does, which wipes what was typed into the server's markup before.
+const text = signal('')
+let field: HTMLInputElement | undefined
+
+onMount(() => {
+  if (field)
+    field.value = text()
+})
+---
+input.written(aria-label="Written" ref={element => field = element} onInput={event => text.set(event.currentTarget.value)})

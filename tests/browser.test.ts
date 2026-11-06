@@ -92,6 +92,32 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     expect(await page.value('input[name="title"]')).toBe('')
   })
 
+  it('fills a field of an island a page just loaded only once it hydrated, so hydrating does not write the text away', async () => {
+    await using own = await site.open('/')
+    let held = 0
+
+    // The island's code arrives late, as on a loaded host.
+    await own.route(url => url.pathname.endsWith('.js'), async (request) => {
+      held++
+      await Bun.sleep(800)
+      await request.continue()
+    })
+
+    try {
+      await own.evaluate(() => {
+        setTimeout(() => location.assign('/written'), 0)
+      })
+      await own.fill('input.written', 'typed early')
+      await own.waitUntil(() => (document.querySelector('input.written')!.closest('[data-component]') as unknown as { _$k?: boolean } | null)?._$k === true)
+
+      expect(held).toBeGreaterThan(0)
+      expect(await own.value('input.written')).toBe('typed early')
+    }
+    finally {
+      await own.unroute()
+    }
+  })
+
   it('solves an action\'s proof-of-work in a worker under the default csp, for a form the swap posts and an island\'s call alike', async () => {
     await using costly = await site.open('/costly')
 

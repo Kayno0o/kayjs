@@ -248,8 +248,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
 
         await request.fulfill({ status: response.status, headers: response.headers, body: eagerness === undefined ? html.replace('<meta name="kay-prefetch" content="moderate">', '') : html.replace('<meta name="kay-prefetch" content="moderate">', `<meta name="kay-prefetch" content="${eagerness}">`) })
       })
-      await fresh.goto(origin)
+      // Emptied before the load: an eager page fetches the link in view as its code loads, which a host slow enough to finish that before the load settles would otherwise have cleared along with the rest.
       fresh.responses.length = 0
+      await fresh.goto(origin)
       await act(fresh)
       await settled(fresh)
       // Past the prefetch's hover delay, so a link the rules do not prefetch would have been fetched by now.
