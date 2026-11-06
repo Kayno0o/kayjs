@@ -1,13 +1,19 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { Glob } from 'bun'
-import { expect, it } from 'bun:test'
+import { beforeAll, expect, it } from 'bun:test'
 import { breakingKeys, changesOf, INTERNAL, isInternal, isInternalPath, lineDiff, recordBreaking, snapshots, sortUnions, wrap } from '../scripts/api'
 
 const root = process.cwd()
 
+// The snapshot is a whole type pass, so it is built once for the file, under one bound that every test reading it shares.
+let current: Awaited<ReturnType<typeof snapshots>>
+
+beforeAll(async () => {
+  current = await snapshots(root)
+}, 120_000)
+
 // The public surface of kay and each library is committed in `api/`, so a change to a name or a type an app imports shows in the diff and cannot reach an npm `^` range by accident. What the docs call internal is committed apart in `api/internal/` and changes without `--breaking`.
-it('matches the committed API snapshot', async () => {
-  const current = await snapshots(root)
+it('matches the committed API snapshot', () => {
   const problems: string[] = []
 
   for (const { path, change: { added, removed, changed } } of changesOf(root, current))
@@ -18,7 +24,7 @@ it('matches the committed API snapshot', async () => {
   problems.push(...committed.filter(path => !current.has(path)).map(path => `stale ${path}`))
 
   expect(problems, 'the public API differs from api/: run `bun scripts/api.ts --update` and commit it; a removed or changed export of api/<package>.txt also needs `--break="<key>"` (or `--breaking`) and its line in llms/upgrading.md').toEqual([])
-}, 60_000)
+})
 
 // The shadows the components' props are read from come from the libraries' sources, which a change to one must reach this test through.
 it('has components to read props from', () => {
@@ -68,9 +74,7 @@ it('classifies what the docs call internal', () => {
   expect(isInternal('cms', './form', 'createEntryForm')).toBe(false)
 })
 
-it('names only entries and exports that exist', async () => {
-  const current = await snapshots(root)
-
+it('names only entries and exports that exist', () => {
   for (const [name, { names = {} }] of Object.entries(INTERNAL)) {
     const text = current.get(`api/internal/${name}.txt`) ?? ''
 
