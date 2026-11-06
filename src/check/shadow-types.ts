@@ -32,10 +32,8 @@ import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 import { deprecatedAuthOptions } from './deprecated-auth-options'
-
 import { deprecatedEscapeOption } from './deprecated-escape-option'
 import { ownFile } from './diagnose'
-
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
@@ -142,11 +140,9 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => removedUiTokens(root, options),
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
-
   async ({ root, options }) => exportNames(root, options),
   async ({ root, options }) => libraryNames(root, options),
   async ({ root, options }) => pgLoaderSource(root, options),
-
   async ({ root, options }) => contextName(root, options),
   async ({ root, options }) => movedImports(root, options),
   async ({ root, options }) => deprecatedAuthOptions(root, options),

@@ -68,7 +68,7 @@ describe('duration words', () => {
   })
 
   it('refuses a bare number of seconds', () => {
-    expect(() => durationWords(86_400 as never, 'en')).toThrow(/^kay: durationWords\(\) is 86400; it takes a positive duration/)
+    expect(() => durationWords(86_400 as never, 'en')).toThrow('kay: durationWords() takes a duration with its unit, such as \'24h\' or \'90s\', not 86400; 86400 seconds is \'86400s\'')
   })
 
   it('words it in French, with its plurals', () => {

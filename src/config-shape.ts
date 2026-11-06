@@ -170,8 +170,9 @@ export function unknownConfigKeys(config: object): string[] {
       const found = nearest(key, Object.keys(known))
       const removed = path === '' && Object.hasOwn(REMOVED_KEYS, key) ? REMOVED_KEYS[key] : undefined
       const near = removed ?? found
+      const hint = removed === undefined ? `, did you mean \`${path}${near}\`?` : `, moved to \`${removed}\``
 
-      problems.push(`\`${path}${key}\`${near === undefined ? '' : `, did you mean \`${path}${near}\`?`}`)
+      problems.push(`\`${path}${key}\`${near === undefined ? '' : hint}`)
     }
   }
 

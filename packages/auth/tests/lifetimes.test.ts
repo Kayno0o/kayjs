@@ -29,7 +29,7 @@ describe('lifetime words', () => {
 
   test('takes a duration with its unit, and refuses a bare number', () => {
     expect([lifetime('24h', 'en'), lifetime('7d', 'en'), lifetime('90m', 'en'), lifetime('1800s', 'en'), lifetime('45s', 'en')]).toEqual(['24 hours', '7 days', '90 minutes', '30 minutes', '45 seconds'])
-    expect(() => lifetime(600 as never, 'en')).toThrow('durationWords()')
+    expect(() => lifetime(600 as never, 'en')).toThrow('kay: lifetime() takes a duration with its unit, such as \'24h\' or \'90s\', not 600; 600 seconds is \'600s\'')
     expect(() => lifetime('soon' as never, 'en')).toThrow('durationWords()')
   })
 })
