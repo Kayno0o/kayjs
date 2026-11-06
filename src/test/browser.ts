@@ -7,7 +7,6 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve as resolvePath } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { sleep } from '@kaynooo/utils/function'
 import { within } from '@kaynooo/utils/promise'
 import { afterAll } from 'bun:test'
 import { withUnreadable } from '../runtime/dev-a11y'
@@ -976,9 +975,9 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         if (context !== undefined && document.querySelector(context) === null)
           return null
 
-        // A dev server's own check may be running, and axe-core runs one at a time.
+        // A dev server's own check may be running, and axe-core runs one at a time. This runs in the page, so it cannot reach an import such as utils' `sleep`.
         while (axe._running)
-          await sleep(25)
+          await new Promise(resolve => setTimeout(resolve, 25))
 
         // Leaving out a dev server's dev tool.
         const results = await axe.run({ include: context === undefined ? document : [[context]], exclude: [['kay-dev']] }, { resultTypes: ['violations', 'incomplete'] })
