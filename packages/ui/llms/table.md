@@ -27,6 +27,8 @@ Table(columns={columns} rows={posts} rowKey="id" filter={['title', 'author']} fi
     EmptyState(title="No post matches")
 ```
 
+## Reference
+
 - With a `@cell(row, column)` block, every column shows what it draws, but one with `cell: false`, which shows the row's value at `key` as text, as every column does without the block. A table where any column sets `cell: true` draws only those through the block.
 - `numeric: true` marks a count or an amount: aligned to the end, its digits in columns, sorted by its own value and largest first, each overridable by `align`, `sortValue` and `defaultDirection`.
 - A column with `sortValue` sorts when its header is clicked. `true` sorts by the row's value at `key`; a function sorts by what it returns.
