@@ -1,0 +1,16 @@
+---
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import { toast } from '@kaynooo/kayjs-ui'
+
+const stack = () => {
+  toast.info('One', { description: 'Detail', duration: false })
+  toast.info('Two', { duration: false })
+  toast.info('Three', { duration: false, action: { label: 'Open', href: '/shell' } })
+}
+
+const later = () => toast.promise(new Promise<string>(resolve => setTimeout(resolve, 80, 'ok')), { loading: 'Working', success: value => `Done ${value}`, error: 'Failed' })
+---
+h1 Toast rich
+button#stack(type="button" onClick={stack}) Stack
+button#later(type="button" onClick={later}) Later
+Toaster(position="top-center" limit={2})

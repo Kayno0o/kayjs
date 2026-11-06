@@ -474,3 +474,121 @@ describe('callAction reading a refusal without `refused`', () => {
     expect(await run({ error: 'Raw' }, () => '')).toEqual(['Raw'])
   })
 })
+
+describe('onDismiss', () => {
+  test('hears timeout, user, action and api, once, after the toast has gone', () => {
+    jest.useFakeTimers()
+
+    try {
+      const heard: string[] = []
+      const onDismiss = (reason: string) => heard.push(`${reason}:${toasts().length}`)
+
+      toast.info('timed', { duration: '1s', onDismiss })
+      jest.advanceTimersByTime(1000)
+      dismissToast(toast.info('closed', { onDismiss }), 'user')
+      dismissToast(toast.info('acted', { onDismiss }), 'action')
+      dismissToast(toast.info('by app', { onDismiss }))
+      dismissToast(999)
+
+      expect(heard).toEqual(['timeout:0', 'user:0', 'action:0', 'api:0'])
+    }
+    finally {
+      jest.useRealTimers()
+    }
+  })
+
+  test('one that throws is logged and the toast still goes', () => {
+    const error = jest.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    dismissToast(toast.info('x', { onDismiss: () => {
+      throw new Error('boom')
+    } }))
+
+    expect(toasts()).toEqual([])
+    expect(error).toHaveBeenCalledTimes(1)
+    error.mockRestore()
+  })
+})
+
+describe('toast.update', () => {
+  test('changes the message, tone, description and action of an open toast, keeping its id', () => {
+    const id = toast.info('Saving', { duration: false })
+
+    expect(toast.update(id, { message: 'Saved', tone: 'success', description: 'Two files', action: { label: 'Undo', href: '/undo' } })).toBe(true)
+    expect(toasts()).toMatchObject([{ id, message: 'Saved', tone: 'success', type: 'success', description: 'Two files', action: { label: 'Undo', href: '/undo' } }])
+
+    toast.update(id, { action: undefined })
+
+    expect(toasts()[0]!.action).toBeUndefined()
+  })
+
+  test('answers false for a toast that went, and starts the clock afresh when the tone changes', () => {
+    jest.useFakeTimers()
+
+    try {
+      expect(toast.update(404, { message: 'x' })).toBe(false)
+
+      const id = toast.info('Working', { duration: false })
+
+      jest.advanceTimersByTime(60_000)
+      toast.update(id, { tone: 'success' })
+      jest.advanceTimersByTime(5999)
+
+      expect(toasts()).toHaveLength(1)
+
+      jest.advanceTimersByTime(1)
+
+      expect(toasts()).toHaveLength(0)
+    }
+    finally {
+      jest.useRealTimers()
+    }
+  })
+
+  test('takes markup as the message', () => {
+    const message = () => 'markup'
+    const id = toast.info('plain')
+
+    toast.update(id, { message })
+
+    expect(toasts()[0]!.message).toBe(message)
+  })
+})
+
+describe('toast.promise', () => {
+  test('shows a loading toast, then settles the same one to success', async () => {
+    const { promise, resolve } = Promise.withResolvers<number>()
+    const done = toast.promise(promise, { loading: 'Saving', success: value => `Saved ${value}`, error: 'Failed' })
+
+    expect(toasts()).toMatchObject([{ message: 'Saving', loading: true }])
+
+    const id = toasts()[0]!.id
+
+    resolve(3)
+
+    expect(await done).toBe(3)
+    expect(toasts()).toMatchObject([{ id, message: 'Saved 3', tone: 'success', loading: false }])
+  })
+
+  test('settles to a danger toast that stays, and resolves to undefined with no catch needed', async () => {
+    const done = await toast.promise(async () => Promise.reject(new Error('nope')), { loading: 'Saving', error: thrown => `Failed: ${(thrown as Error).message}` })
+
+    expect(done).toBeUndefined()
+    expect(toasts()).toMatchObject([{ message: 'Failed: nope', tone: 'danger', type: 'error' }])
+  })
+
+  test('without success the loading toast just closes, and a closed one still gets the outcome', async () => {
+    await toast.promise(Promise.resolve(1), { loading: 'Saving', error: 'Failed' })
+
+    expect(toasts()).toEqual([])
+
+    const { promise, reject } = Promise.withResolvers<number>()
+    const done = toast.promise(promise, { loading: 'Saving', error: 'Failed' })
+
+    dismissToast(toasts()[0]!.id, 'user')
+    reject(new Error('x'))
+    await done
+
+    expect(toasts()).toMatchObject([{ message: 'Failed', tone: 'danger' }])
+  })
+})

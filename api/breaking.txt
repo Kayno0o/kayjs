@@ -12,3 +12,5 @@ mail [.] mailListTables
 mail [.] pgLists
 mail [.] pgSuppressions
 mail [.] sqliteSuppressions
+ui [.] Toast
+ui [.] ToastAction

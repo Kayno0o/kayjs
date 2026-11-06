@@ -16,6 +16,22 @@ This page already renders the `Toaster`. `toast` only shows in the browser: the 
 
 `toast.info('Copied', { duration: '3s' })` sets how long a toast stays. `false` keeps it until the reader dismisses it, and each call answers the toast's id, for `dismissToast(id)` to close a sticky one from code. A toast carries a `tone`, any of `neutral`, `accent`, `success`, `warning`, `danger` or `info`, and `toast.warning(...)` pushes a warning one; the info toast takes `--color-info`. `type` is the deprecated name of the tone, with `error` for `danger`.
 
+## A second line, markup and what happened to it
+
+`description` adds a quieter line under the message, and `message` may be markup instead of a string. `onDismiss(reason)` is called once a toast has gone, with `timeout`, `user` (the close button or Escape), `action` (its button ran) or `api` (`dismissToast(id)`, or `toast.update`): `toast.info('Exported', { description: '12 rows', onDismiss: reason => track(reason) })`.
+
+## Changing a toast that is open
+
+`toast.update(id, { message, description, tone, action, duration })` changes it in place and answers `false` when it already went. Naming `tone` or `duration` starts its clock afresh.
+
+## Following a call
+
+`toast.promise(upload(), { loading: 'Uploading', success: file => `Uploaded ${file.name}`, error: 'Could not upload' })` shows a spinner toast, then turns the same toast into the outcome, an error staying until it is dismissed. Give it a promise or a function returning one. It resolves to the value, or to `undefined` when the call threw, so it needs no `catch`.
+
+## Position, limit and your own toast
+
+`Toaster(position="top-center" limit={3})` stacks the toasts against another corner or edge (`top-left`, `top-center`, `top-right`, `bottom-left`, `bottom-center`, `bottom-right`) and shows the newest three, the others waiting with their clocks running. An action may be a link, `{ label: 'Open', href: '/exports/12' }`. To draw the inside of each toast yourself, give the Toaster a block: `@toast(item, dismiss)`, where `dismiss` closes the toast.
+
 ## After an action
 
 Call `toast` once what the user started has finished, with the outcome as its type. Here the button fails every other time.

@@ -69,6 +69,38 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
     expect(page.errors).toEqual([])
   }, 60_000)
 
+  it('stacks toasts at the Toaster\'s position, shows at most its limit, draws a description and a link action, and settles a promise', async () => {
+    const page = await site.open('/toast-rich')
+
+    await page.click('#stack')
+    await page.waitFor('.kui-toast')
+    expect(await page.count('.kui-toast')).toBe(2)
+    expect(await page.text('.kui-toast [data-part=message]')).toBe('Two')
+    expect(await page.evaluate(() => document.querySelector('.kui-toaster')!.getAttribute('data-position'))).toBe('top-center')
+    expect(await page.evaluate(() => document.querySelector('.kui-toast a[data-part=action]')?.getAttribute('href'))).toBe('/shell')
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.kui-toaster')!).top)).not.toBe('auto')
+
+    await page.click('.kui-toast [data-part=dismiss]')
+    await page.waitUntil(() => document.querySelectorAll('.kui-toast [data-part=description]').length === 1)
+
+    await page.click('#later')
+    await page.waitUntil(() => document.querySelector('.kui-toast [data-loading]') !== null)
+    await page.waitUntil(() => [...document.querySelectorAll('.kui-toast [data-part=message]')].some(item => item.textContent === 'Done ok'))
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
+  it('replaces the drawing of a toast with the Toaster\'s toast block, whose dismiss closes it', async () => {
+    const page = await site.open('/toast-block')
+
+    await page.click('#saved')
+    await page.waitFor('#custom')
+    expect(await page.text('#custom')).toBe('Saved')
+    expect(await page.count('.kui-toast [data-part=message]')).toBe(0)
+    await page.click('#custom-close')
+    await page.waitUntil(() => document.querySelector('.kui-toast') === null)
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
   it('lets a utility passed through class beat the component\'s own rule beside the app\'s stylesheet', async () => {
     const page = await site.open('/shell-class')
     const display = async (id: string) => page.evaluate((selector: string) => getComputedStyle(document.querySelector(selector)!).display, id as never)

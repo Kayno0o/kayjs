@@ -114,7 +114,7 @@ interface DescriptionItem
   value?: number | string | undefined
 
 [.] dismissToast
-function dismissToast(id: number): void
+function dismissToast(id: number, reason?: ToastDismissReason): void
 
 [.] editing
 function editing<Row, Draft = void>(): RowEditing<Row, Draft>
@@ -444,24 +444,35 @@ interface TimelineEntry<Key extends string | number = string>
 
 [.] toast
 const toast: {
-  error: (message: string, options?: ToastOptions) => number;
-  success: (message: string, options?: ToastOptions) => number;
-  info: (message: string, options?: ToastOptions) => number;
-  warning: (message: string, options?: ToastOptions) => number;
+  error: (message: Element, options?: ToastOptions) => number;
+  success: (message: Element, options?: ToastOptions) => number;
+  info: (message: Element, options?: ToastOptions) => number;
+  warning: (message: Element, options?: ToastOptions) => number;
+  update: (id: number, patch: ToastPatch) => boolean;
+  promise: <T>(source: (() => Promise<T>) | Promise<T>, {
+    loading, success, error, ...options
+  }: ToastPromiseOptions<T>) => Promise<T | undefined>;
 }
 
 [.] Toast
 interface Toast
   action?: ToastAction | undefined
+  description?: string | undefined
   id: number
-  message: string
+  loading?: boolean | undefined
+  message: Element
+  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
   tone?: Tone | undefined
   type: ToastType
 
 [.] ToastAction
 interface ToastAction
+  href?: string | undefined
   label: string
-  run: () => unknown
+  run?: (() => unknown) | undefined
+
+[.] ToastDismissReason
+type ToastDismissReason = 'timeout' | 'user' | 'action' | 'api'
 
 [.] ToastHold
 type ToastHold = 'pointer' | 'focus'
@@ -469,8 +480,30 @@ type ToastHold = 'pointer' | 'focus'
 [.] ToastOptions
 interface ToastOptions
   action?: ToastAction | undefined
+  description?: string | undefined
   duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
+  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
   tone?: Tone | undefined
+
+[.] ToastPatch
+interface ToastPatch
+  action?: ToastAction | undefined
+  description?: string | undefined
+  duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
+  loading?: boolean | undefined
+  message?: Element
+  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
+  tone?: Tone | undefined
+
+[.] ToastPromiseOptions
+interface ToastPromiseOptions<T> extends Omit<ToastOptions, 'tone'>
+  action?: ToastAction | undefined
+  description?: string | undefined
+  duration?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | false | undefined
+  error: ((error: unknown) => string) | string
+  loading: string
+  onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined
+  success?: ((value: T) => string) | string | undefined
 
 [.] toasts
 function toasts(): Toast[]
@@ -2686,7 +2719,9 @@ component default
   icon?: string | undefined | {
     root?: string | undefined;
   };
+  content?: string | undefined;
   message?: string | undefined;
+  description?: string | undefined;
   action?: string | undefined | {
     root?: string | undefined | {
       root?: string | undefined;
@@ -2706,6 +2741,9 @@ component default
 }
   dismissLabel?: string | undefined
   hotkey?: null | string | undefined
+  limit?: number | undefined
+  position?: "bottom-center" | "bottom-left" | "bottom-right" | "top-center" | "top-left" | "top-right" | undefined
+  toast?: ((item: Toast, dismiss: () => void) => Element) | undefined
 
 [./toggle.kay] default
 component default

@@ -1,5 +1,5 @@
 ---
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { IconSlot } from './defaults'
 import type { Toast, ToastType } from './toast'
 import type { Tone } from './tone'
@@ -21,21 +21,40 @@ const ICONS: Record<Tone, IconSlot> = { neutral: 'info', accent: 'info', info: '
 // 'kui-toaster' and 'kui-toast' stay as the components' names for an app's CSS and skins; theme.css keeps the toast's raised shadow. A toast's tone is the colour its icon takes.
 const look = recipe({
   parts: {
-    root: 'kui-toaster pointer-events-none fixed inset-auto right-4 bottom-4 z-100 m-0 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 overflow-visible border-0 bg-transparent p-0',
+    root: 'kui-toaster pointer-events-none fixed inset-auto z-100 m-0 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2 overflow-visible border-0 bg-transparent p-0',
     live: 'sr-only',
     toast: 'kui-toast pointer-events-auto flex items-start gap-2 rounded-lg border-solid border-[length:var(--border-width)] border-border-strong bg-surface px-3 py-2 [--_toast-tone:var(--color-accent)] data-[tone=neutral]:[--_toast-tone:var(--color-muted)] data-[tone=warning]:[--_toast-tone:var(--color-warning)] data-[tone=danger]:[--_toast-tone:var(--color-danger)] data-[tone=success]:[--_toast-tone:var(--color-success)] data-[tone=info]:[--_toast-tone:var(--color-info)]',
-    icon: 'mt-0.5 size-4 shrink-0 text-(--_toast-tone)',
-    message: 'min-w-0 flex-1 text-xs/snug text-foreground',
+    icon: 'mt-0.5 size-4 shrink-0 text-(--_toast-tone) data-loading:animate-spin motion-reduce:animate-none',
+    content: 'min-w-0 flex-1',
+    message: 'text-xs/snug text-foreground',
+    description: 'mt-0.5 text-xs/snug text-muted',
     action: 'shrink-0',
     dismiss: 'shrink-0 text-[var(--color-muted)] hover:text-foreground',
   },
+  variants: {
+    // Which corner or edge the toasts stack against.
+    position: {
+      'top-left': { root: 'top-4 left-4' },
+      'top-center': { root: 'top-4 left-1/2 -translate-x-1/2' },
+      'top-right': { root: 'top-4 right-4' },
+      'bottom-left': { root: 'bottom-4 left-4' },
+      'bottom-center': { root: 'bottom-4 left-1/2 -translate-x-1/2' },
+      'bottom-right': { root: 'right-4 bottom-4' },
+    },
+  },
+  defaults: { position: 'bottom-right' },
 })
 
-const { dismissLabel = wording('ui.toaster.dismiss', 'Dismiss notification'), hotkey = 't', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'popover'> & {
+const { dismissLabel = wording('ui.toaster.dismiss', 'Dismiss notification'), hotkey = 't', position = 'bottom-right', limit, toast, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'popover'> & {
   // Names each toast's close button for screen readers.
   dismissLabel?: string | undefined
   // Alt and this key move focus to the toasts on screen, where Escape dismisses the focused one; `null` leaves it to the app.
   hotkey?: string | null | undefined
+
+  // At most this many toasts are shown, the newest; the older ones wait their turn with their clocks running, and show again as room is made.
+  limit?: number | undefined
+  // Draws what is inside each toast in place of its icon, message, description and buttons: `@toast(item, dismiss)`, given the toast and a function closing it. The toast keeps its box, its tone, its clock and Escape.
+  toast?: Snippet<[item: Toast, dismiss: () => void]> | undefined
 }>()
 
 const toaster = signal<HTMLElement>()
@@ -48,7 +67,9 @@ const mounted = signal(false)
 onMount(() => mounted = true)
 
 function listed() {
-  return mounted() ? toasts() : []
+  const all = mounted() ? toasts() : []
+
+  return limit !== undefined && limit >= 0 && all.length > limit ? all.slice(all.length - limit) : all
 }
 
 // A manual popover lives in the top layer, and showing it again lifts it above any dialog opened since.
@@ -81,18 +102,18 @@ shortcut(() => hotkey ? `alt+${hotkey}` : null, (event) => {
 // The button is busy while the action runs, as a Button with an onClick is on its promise; the toast goes once it settles, a rejection being logged.
 async function acted(item: Toast) {
   try {
-    await item.action?.run()
+    await item.action?.run?.()
   }
   catch (error) {
     console.error('kayjs-ui: the action of a toast threw', error)
   }
 
-  dismissToast(item.id)
+  dismissToast(item.id, 'action')
 }
 
 // Escape dismisses the focused toast alone, not the dialog under it, and focus moves on to the next toast's button rather than falling to the page.
 function dismissed(event: KeyboardEvent) {
-  const toast = event.currentTarget as HTMLElement
+  const element = event.currentTarget as HTMLElement
 
   if (event.key !== 'Escape')
     return
@@ -100,9 +121,9 @@ function dismissed(event: KeyboardEvent) {
   event.preventDefault()
   event.stopPropagation()
 
-  const next = (toast.nextElementSibling ?? toast.previousElementSibling)?.querySelector('button')
+  const next = (element.nextElementSibling ?? element.previousElementSibling)?.querySelector('button')
 
-  dismissToast(Number(toast.dataset.id))
+  dismissToast(Number(element.dataset.id), 'user')
   next?.focus()
 }
 ---
@@ -115,11 +136,20 @@ if owns()
     for item of listed().filter(item => toneOf(item) === 'danger') key={item.id}
       span {item.message}
   // Holding still while the pointer is on the toasts or focus is in them, as timed content must let itself be paused.
-  div({...rest} part="root" ref={ref} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
+  div({...rest} part="root" data-position={position} ref={ref} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
     for item of listed() key={item.id}
       div(part="toast" data-id={item.id} data-tone={toneOf(item)} data-type={item.type} onKeyDown={dismissed})
-        Icon(icon={ICONS[toneOf(item)]} part="icon")
-        p(part="message") {item.message}
-        if item.action as action
-          Button(part="action" size="sm" variant="ghost" label={action.label} onClick={() => acted(item)})
-        IconButton(icon="close" label={dismissLabel} size="sm" variant="inline" part="dismiss" onClick={() => dismissToast(item.id)})
+        if toast
+          | {toast(item, () => dismissToast(item.id, 'user'))}
+        else
+          Icon(icon={item.loading ? 'spinner' : ICONS[toneOf(item)]} part="icon" data-loading={item.loading ? '' : undefined})
+          div(part="content")
+            p(part="message") {item.message}
+            if item.description
+              p(part="description") {item.description}
+          if item.action as action
+            if action.href
+              Button(part="action" size="sm" variant="ghost" label={action.label} href={action.href})
+            else
+              Button(part="action" size="sm" variant="ghost" label={action.label} onClick={() => acted(item)})
+          IconButton(icon="close" label={dismissLabel} size="sm" variant="inline" part="dismiss" onClick={() => dismissToast(item.id, 'user')})

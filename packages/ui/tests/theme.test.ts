@@ -18,6 +18,8 @@ const CLASS_IN_EXPRESSION = /([!=]==\s*)?'([a-z][\w-]*)'|\b([a-z][\w-]*)(?=\s*:)
 const KUI_NAME = /(?<![\w-])kui-[a-z][a-z0-9-]*(?![\w-])/g
 const WHITESPACE = /\s+/
 const RECIPE_STRING = /'([^']+)'/g
+// A quoted variant key, such as `'top-left':`, is a name and no class.
+const QUOTED_KEY = /'[^']+':/g
 // A line comment of a recipe, whose apostrophe is no string quote.
 const LINE_COMMENT = /^\s*\/\/.*$/gm
 const COLOUR_TOKEN = /(--color-[\w-]+): ([^;]+);/g
@@ -881,7 +883,7 @@ describe('theme.css', () => {
       const start = source.indexOf('recipe({')
       const recipe = source.slice(start, Math.min(...['defaults:', '\n})', '\n\nconst', '\n---'].map(end => source.indexOf(end, start)).filter(end => end !== -1)))
 
-      for (const name of new Set([...recipe.replace(LINE_COMMENT, '').replaceAll('\'\'', '').matchAll(RECIPE_STRING)].flatMap(([, value = '']) => value.split(WHITESPACE)).filter(name => name !== '' && !name.startsWith('kui-') && !name.startsWith('group/') && !name.startsWith('peer/')))) {
+      for (const name of new Set([...recipe.replace(LINE_COMMENT, '').replaceAll(QUOTED_KEY, '').replaceAll('\'\'', '').matchAll(RECIPE_STRING)].flatMap(([, value = '']) => value.split(WHITESPACE)).filter(name => name !== '' && !name.startsWith('kui-') && !name.startsWith('group/') && !name.startsWith('peer/')))) {
         const next = compiler.build([name])
 
         if (next.length === css.length && !seen.has(name))
