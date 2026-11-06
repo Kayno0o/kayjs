@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { $, Glob } from 'bun'
 import { dependenciesOnly } from './dependency-change'
+import { hostEnv } from './host-env'
 import { librariesToTest, libraryDependencies } from './library-dependents'
 import { addedMarkers } from './merge-markers'
 import { describeSamples, describeScope, sampleScope, scopeMemory } from './scope-memory'
@@ -19,6 +20,11 @@ import { crashedWorkers, failedTests } from './test-failures'
 const BUN = process.execPath
 const EXIT = { unlandable: 2, conflict: 3, step: 4, refused: 5 }
 const LOG = join((await $`git rev-parse --absolute-git-dir`.text()).trim(), 'land.log')
+// This host's landing settings (KAY_LAND_*, the test database URLs) as `KEY=value` lines in kay-land.env of the repo's shared git folder, read by every worktree, so `just land` runs bare; a variable already set wins.
+const HOST_ENV = join((await $`git rev-parse --path-format=absolute --git-common-dir`.text()).trim(), 'kay-land.env')
+
+for (const [key, value] of Object.entries(await hostEnv(HOST_ENV)))
+  process.env[key] ??= value
 // Lines of a failing step's output shown, the rest staying in the log: its last ones, or after its failed tests only bun test's summary.
 const TAIL = 30
 const SUMMARY = 8

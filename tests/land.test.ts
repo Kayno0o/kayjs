@@ -5,6 +5,7 @@ import process from 'node:process'
 import { $ } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { dependenciesOnly } from '../scripts/dependency-change'
+import { hostEnv } from '../scripts/host-env'
 import { librariesToTest, libraryDependencies } from '../scripts/library-dependents'
 import { addedMarkers } from '../scripts/merge-markers'
 import { FIXTURE_WALK, FIXTURE_WALKERS, READERS, readersOf, SOURCE_CHANGE, SOURCE_FILE_READ, SOURCE_FILE_READERS, SOURCE_READERS, SOURCE_SCAN, sourcesRead, UI_THEME_USE, WHOLE_SUITE } from '../scripts/source-readers'
@@ -66,6 +67,18 @@ describe('the command of a landing step', () => {
     expect(slotPrefix('tests', both, {})).toEqual(['slot', '-l', 'tests', '--no-slot', '--'])
     expect(slotPrefix(undefined, only('nice'), {})).toBeUndefined()
     expect(slotPrefix(undefined, both, { KAY_LAND_SLOT: '0' })).toBeUndefined()
+  })
+})
+
+describe('a host\'s landing settings', () => {
+  it('reads the KEY=value lines, skipping blanks and comments, and nothing from a missing file', async () => {
+    const dir = await scratchDir('host-env-')
+    const path = join(dir, 'kay-land.env')
+
+    await Bun.write(path, '# this host\nKAY_LAND_WORKERS=2\n\n  TEST_DATABASE_URL = postgres://test:test@127.0.0.1:55432/kay_app_test  \nnot a line\n')
+
+    expect(await hostEnv(path)).toEqual({ KAY_LAND_WORKERS: '2', TEST_DATABASE_URL: 'postgres://test:test@127.0.0.1:55432/kay_app_test' })
+    expect(await hostEnv(join(dir, 'missing.env'))).toEqual({})
   })
 })
 
