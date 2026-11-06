@@ -4763,7 +4763,12 @@ describe.concurrent('kay check, unused code', () => {
   it('clears the terminal before each check with --watch', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p a\n' })
     let output = ''
-    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '--watch'], { env: { ...process.env, KIT_MODE: 'terminal' }, terminal: { data: (_terminal, data) => {
+    // A terminal draws only in the kit's terminal mode and in colour, which an agent's variable or a kayCheck run earlier in this worker (NO_COLOR) would turn off.
+    const env = { ...process.env, KIT_MODE: 'terminal' }
+
+    delete env.NO_COLOR
+    delete env.NODE_DISABLE_COLORS
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '--watch'], { env, terminal: { data: (_terminal, data) => {
       output += new TextDecoder().decode(data)
     } } })
     const printed = async (times: number, text: string) => {
