@@ -39,6 +39,9 @@ export function withPageHeaders(respond: PageResponder, options: SecurityOptions
     for (const name of headers.replaced) {
       if (set && set.headers[name] === site?.[name])
         delete set.headers[name]
+      // A prerendered page starts with the site's headers on the response itself, not on the context.
+      else if (site?.[name] !== undefined && response.headers.get(name) === site[name])
+        response.headers.delete(name)
     }
 
     for (const [name, value] of Object.entries(headers.headers)) {

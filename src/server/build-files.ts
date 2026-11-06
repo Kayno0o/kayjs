@@ -10,7 +10,7 @@ import { SEARCH_MANIFEST } from '../runtime/search'
 import { encodedCopies, encodedPath, filesUnder, preferredEncoding } from './compress'
 import { useAsDictionary } from './dictionary'
 import { decodePath } from './routes'
-import { headerCopies, ownHeaders } from './security'
+import { headerCopies, ownHeadersInit } from './security'
 
 const SOURCE_MAP = '.js.map'
 
@@ -95,13 +95,13 @@ export async function serveBuildFiles(app: Elysia, client: ClientBuild, { dev, s
     if (known.map) {
       await mapBundleToKay(known.path)
 
-      return new Response(known.file, { headers: ownHeaders(set, sourceMapHeaders) })
+      return new Response(known.file, { headers: ownHeadersInit(set, sourceMapHeaders) })
     }
 
     const encoding = preferredEncoding(request.headers.get('accept-encoding'), known.copies)
 
     if (!encoding)
-      return new Response(known.file, { headers: ownHeaders(set, known.plain) })
+      return new Response(known.file, { headers: ownHeadersInit(set, known.plain) })
 
     let copy = known.encoded.get(encoding)
 
@@ -110,7 +110,7 @@ export async function serveBuildFiles(app: Elysia, client: ClientBuild, { dev, s
       known.encoded.set(encoding, copy)
     }
 
-    return new Response(copy.file, { headers: ownHeaders(set, copy.headers) })
+    return new Response(copy.file, { headers: ownHeadersInit(set, copy.headers) })
   })
 
   return clientFiles.map(file => `${ASSET_PREFIX}${encodedName(client.dir, file)}`)

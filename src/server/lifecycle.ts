@@ -13,6 +13,7 @@ import { logMessage } from './log'
 import { START_COMMAND, START_PARENT } from './parent'
 import { reportBackgroundError } from './report'
 import { requestUrl } from './request-url'
+import { headerCopies, ownHeadersInit } from './security'
 
 export const HEALTH_PATH = '/_kay/health'
 const DEFAULT_SHUTDOWN_TIMEOUT = '10s'
@@ -34,8 +35,9 @@ let signalsTaken = false
 
 // Answers 200 while the server takes requests and its check passes, 503 otherwise, for a load balancer or a container's health check.
 // Answered as the request arrives, before routing, so no global hook of an extension (an auth check, say) stands between a probe and the answer; `holds` is asked per request, as an app's own route at the path wins.
-export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => boolean, config: HealthConfig = {}): void {
-  const headers = { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }
+export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => boolean, config: HealthConfig = {}, security?: Record<string, string>): void {
+  // The security headers ride the response itself, so Elysia has no header on the context to copy it for.
+  const copies = headerCopies({ 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }, security)
   const path = config.path ?? HEALTH_PATH
   const timeoutMs = healthTimeoutMs(config)
   let checked: { at: number, healthy: Promise<boolean>, settled: boolean } | undefined
@@ -56,11 +58,11 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
 
   // Elysia awaits only a hook that is async, so with nothing to check the hook is not, and a request for another path costs no promise.
   if (!config.check && stores.length === 0) {
-    app.onRequest(({ request }) => {
+    app.onRequest(({ request, set }) => {
       if (!asked(request))
         return undefined
 
-      return lifecycle.draining ? wholeResponse('stopping', { status: 503, headers }) : wholeResponse('ok', { headers })
+      return lifecycle.draining ? wholeResponse('stopping', { status: 503, headers: ownHeadersInit(set, copies, true) }) : wholeResponse('ok', { headers: ownHeadersInit(set, copies, true) })
     })
 
     return
@@ -68,12 +70,12 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
 
   const { check } = config
 
-  app.onRequest(async ({ request }) => {
+  app.onRequest(async ({ request, set }) => {
     if (!asked(request))
       return undefined
 
     if (lifecycle.draining)
-      return wholeResponse('stopping', { status: 503, headers })
+      return wholeResponse('stopping', { status: 503, headers: ownHeadersInit(set, copies, true) })
 
     const now = Date.now()
 
@@ -92,7 +94,7 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
       checked = run
     }
 
-    return await checked.healthy ? wholeResponse('ok', { headers }) : wholeResponse('unhealthy', { status: 503, headers })
+    return await checked.healthy ? wholeResponse('ok', { headers: ownHeadersInit(set, copies, true) }) : wholeResponse('unhealthy', { status: 503, headers: ownHeadersInit(set, copies, true) })
   })
 }
 

@@ -169,10 +169,16 @@ export interface HeaderCopies {
   plain: Record<string, string>
   secured: Record<string, string>
   security: [name: string, value: string][]
+  // `secured` as a Headers, which Bun copies into a response far faster than an object of a dozen entries; never changed.
+  securedHeaders: Headers
+  // The security headers alone, as the request hook sets them on the context.
+  hooked: Record<string, string>
 }
 
 export function headerCopies(headers: Record<string, string>, security: Record<string, string> | undefined): HeaderCopies {
-  return { plain: headers, secured: security ? { ...security, ...headers } : headers, security: Object.entries(security ?? {}) }
+  const secured = security ? { ...security, ...headers } : headers
+
+  return { plain: headers, secured, security: Object.entries(security ?? {}), securedHeaders: new Headers(secured), hooked: security ?? {} }
 }
 
 // The security headers set on the context, under any the app set there first.
@@ -195,6 +201,42 @@ export function ownHeaders(set: Context['set'], copies: HeaderCopies): Record<st
   setSecurityHeaders(set, copies.security)
 
   return copies.plain
+}
+
+// What `ownHeaders` gives, as the headers of a `new Response`: a prebuilt Headers copied in one step with the request id and build set on it, in place of an object of every header parsed per request.
+export function ownHeadersInit(set: Context['set'], copies: HeaderCopies, hooked = false): Headers | Record<string, string> {
+  const own = takeOwnHeaders(set, hooked ? copies.hooked : undefined)
+
+  if (own !== undefined) {
+    const headers = new Headers(copies.securedHeaders)
+
+    for (const name in own)
+      headers.set(name, own[name]!)
+
+    return headers
+  }
+
+  if (Object.keys(set.headers).length === 0)
+    return copies.securedHeaders
+
+  setSecurityHeaders(set, copies.security)
+
+  return copies.plain
+}
+
+// The headers a response made by kay itself starts with when the context holds nothing but what the request hooks put there: the security headers, the request id and the build, taken off it so Elysia has nothing to copy the response for. Undefined when the app or an extension set a header on the context too, for the caller to build its headers as before.
+export function startingHeaders(set: Context['set'], copies: HeaderCopies): Headers | undefined {
+  const own = takeOwnHeaders(set, copies.hooked)
+
+  if (own === undefined)
+    return undefined
+
+  const headers = new Headers(copies.securedHeaders)
+
+  for (const name in own)
+    headers.set(name, own[name]!)
+
+  return headers
 }
 
 // The names a response was given from the context, by response: a response answered twice, as a constant is, has them taken off before it gets the second request's.
@@ -292,20 +334,24 @@ export function ownedHeaders(set: Context['set'], headers: Record<string, string
 }
 
 // The request id and the build every context holds, when they are all that is there, taken off it for the response to carry.
-function takeOwnHeaders(set: Context['set']): Record<string, string> | undefined {
+// With `carried`, the security headers the request hook set on the context count as kay's too, when they hold the value it gave them, and are taken off with the rest.
+function takeOwnHeaders(set: Context['set'], carried?: Record<string, string>): Record<string, string> | undefined {
   const own: Record<string, string> = {}
+  const taken: string[] = []
 
   for (const name in set.headers) {
-    if (name !== requestIdHeader() && name !== BUILD_HEADER)
-      return undefined
+    taken.push(name)
 
-    own[name] = String(set.headers[name])
+    if (name === requestIdHeader() || name === BUILD_HEADER)
+      own[name] = String(set.headers[name])
+    else if (carried?.[name] === undefined || set.headers[name] !== carried[name])
+      return undefined
   }
 
-  if (Object.keys(own).length === 0)
+  if (taken.length === 0 || (Object.keys(own).length === 0 && carried === undefined))
     return undefined
 
-  for (const name in own)
+  for (const name of taken)
     delete set.headers[name]
 
   return own

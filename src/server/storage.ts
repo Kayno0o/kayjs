@@ -16,7 +16,7 @@ import { holdsImageMetadata, stripImageMetadata } from './image-metadata'
 import { isPrivate, PRIVATE_DIR, writePrivate } from './private-dir'
 import { cacheKey } from './remote'
 import { requestUrl } from './request-url'
-import { headerCopies, ownedHeaders, ownHeaders, setSecurityHeaders } from './security'
+import { headerCopies, ownedHeaders, ownHeadersInit, setSecurityHeaders } from './security'
 import { setupStampSecret, signedText, signText } from './stamp'
 
 // Where files are kept: `diskFiles`, `s3Files` and `memoryFiles` make one, an app may write its own. Keys are never written twice, unless `files.put` is given an `id` for bytes it names (a hash), so a store needs no locking.
@@ -396,7 +396,7 @@ export function serveFiles(app: Elysia, security: Record<string, string> | undef
     const key = params['*']
 
     if (!KEY.test(key))
-      return new Response('Not Found', { status: 404, headers: ownHeaders(set, text) })
+      return new Response('Not Found', { status: 404, headers: ownHeadersInit(set, text) })
 
     const own = (headers: Record<string, string>) => ownedHeaders(set, headers, entries)
 
@@ -408,7 +408,7 @@ export function serveFiles(app: Elysia, security: Record<string, string> | undef
       const until = Number(query.get('until'))
 
       if (!linkSigned(key, query))
-        return new Response('Not a valid link to this file', { status: 403, headers: ownHeaders(set, text) })
+        return new Response('Not a valid link to this file', { status: 403, headers: ownHeadersInit(set, text) })
 
       return await fileResponse(key, request, `private, max-age=${Math.max(0, Math.floor(until - Date.now() / 1000))}`, own)
     }

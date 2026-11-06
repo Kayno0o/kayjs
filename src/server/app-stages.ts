@@ -78,6 +78,7 @@ import { NOT_PUBLISHING, watchPublishing } from './publishing'
 import { redirectSpelling } from './redirect-spelling'
 import { redirectStatus, serveRedirects } from './redirects'
 import { remoteImages, remotePatterns } from './remote'
+import { pageHeaderCopies } from './render'
 import { reportServerError, useAppOnError } from './report'
 import { rewriteRequests, withMovedApi } from './rewrite'
 import { routeMatch } from './route-table'
@@ -371,11 +372,11 @@ export function identifyRequests({ app, env, setup: { client } }: Boot): void {
 }
 
 // kay's endpoints answered ahead of the extensions: the health check, the metrics and the public env, with the jobs page's path claimed. Returns the jobs page, served after the extensions whose values its guard reads.
-export function kayEndpoints({ app, env, options, served, lifecycle, health, metrics }: Boot, publicModules: string[]) {
+export function kayEndpoints({ app, env, options, served, lifecycle, health, metrics, security }: Boot, publicModules: string[]) {
   if (health) {
     served.offer(health)
     // Before the extension servers, whose hooks it answers ahead of; it answers only where the claims, known once all are in, leave it the path.
-    serveHealth(app, lifecycle, () => served.holds(health), options.health === false ? undefined : options.health)
+    serveHealth(app, lifecycle, () => served.holds(health), options.health === false ? undefined : options.health, security || undefined)
   }
 
   // Read in development too, so a setting without a guard fails there; claimed, so an app file at the path stops the boot.
@@ -766,7 +767,7 @@ export async function pageRoutes(boot: Boot, { redirects, publicServed, redirect
   await servePublic(app, served, publicServed, env.dev ? undefined : publicCache, compressing && !env.dev, pageFor)
 
   const pageFile = assetFiles({ clientDir: client.dir, publicDir: project.paths.public, base: env.base, aspects: options.images?.aspects })
-  const respond = withPageHeaders(withSavedData(pageResponder({ client, renderOptions, prerendered, writes, settings: i18n?.settings, transforms: pageHooks(options.extensions), served: servedPageHooks(options.extensions), pageFile, pageSizes: pageSizes(pageFile) }), renderOptions), securityOptions, security)
+  const respond = withPageHeaders(withSavedData(pageResponder({ client, renderOptions: { ...renderOptions, pageHeaders: pageHeaderCopies(security || undefined) }, prerendered, writes, settings: i18n?.settings, transforms: pageHooks(options.extensions), served: servedPageHooks(options.extensions), pageFile, pageSizes: pageSizes(pageFile) }), renderOptions), securityOptions, security)
 
   const fallback = await source.fallback(project, mounts)
 

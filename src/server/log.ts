@@ -67,6 +67,24 @@ export function statusOf(responseValue: unknown, set: { status?: unknown }): num
   return typeof set.status === 'number' ? set.status : 200
 }
 
+let isoSecond = -1
+let isoPrefix = ''
+
+// `new Date().toISOString()`, with the part up to the seconds kept for the second it belongs to: a request log line makes one per request.
+export function nowIso(): string {
+  const now = Date.now()
+  const second = Math.floor(now / 1000)
+
+  if (second !== isoSecond) {
+    isoSecond = second
+    isoPrefix = new Date(second * 1000).toISOString().slice(0, 20)
+  }
+
+  const ms = now - second * 1000
+
+  return `${isoPrefix}${String(ms).padStart(3, '0')}Z`
+}
+
 // The path of a request's absolute URL, cut out rather than parsed: a request's URL comes normalized already, and parsing one costs more than logging it.
 export function pathOf(url: string): string {
   const start = url.indexOf('/', url.indexOf('//') + 2)
@@ -136,7 +154,7 @@ export function logMessage(level: LogLevel, message: string, error?: unknown, re
 function messageEntry(level: LogLevel, message: string, error?: unknown, request?: Request, from = 'kay'): MessageEntry {
   return {
     type: 'message',
-    time: new Date().toISOString(),
+    time: nowIso(),
     level,
     from,
     message: message === '' && error instanceof Error ? error.message : message,
@@ -223,7 +241,7 @@ export function requestRefusalLogger(logger: Logger): ((request: Request, status
 
   const writeLine = writerFor(logger)
 
-  return (request, status) => writeLine({ type: 'request', time: new Date().toISOString(), level: 'info', method: request.method, path: pathOf(request.url), status, duration: 0, id: requestId(request) })
+  return (request, status) => writeLine({ type: 'request', time: nowIso(), level: 'info', method: request.method, path: pathOf(request.url), status, duration: 0, id: requestId(request) })
 }
 
 // Logs one line per request, `GET /blog/hello 200 12ms AZnL...`, in the format the `log` option of this `pages()` says; kay's own `/_kay/` routes, an extension's API modules served there excepted, and the health route are left out.
@@ -255,6 +273,6 @@ export function logRequests(app: Elysia, logger: Exclude<Logger, false>, healthP
 
     const status = statusOf(responseValue, set)
 
-    writeLine({ type: 'request', time: new Date().toISOString(), level: 'info', method: start.method, path: start.path, status, duration: Math.round((start.answered ?? performance.now()) - start.at), id: requestId(request), ...traceOf(request) })
+    writeLine({ type: 'request', time: nowIso(), level: 'info', method: start.method, path: start.path, status, duration: Math.round((start.answered ?? performance.now()) - start.at), id: requestId(request), ...traceOf(request) })
   })
 }

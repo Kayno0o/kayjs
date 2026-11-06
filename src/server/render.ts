@@ -1,3 +1,4 @@
+import type { Context } from 'elysia'
 import type { KayConfig } from '../config'
 import type { RenderConfigKey } from '../project'
 import type { CardPageContext, ErrorPageContext, Locals, PageContext, PageError } from '../runtime'
@@ -17,6 +18,7 @@ import type { DevRequest } from './dev'
 import type { Flash, SuccessFlash } from './flash'
 import type { Refusal, ServedRoute } from './guards'
 import type { SpecialPage, SpecialPages } from './routes'
+import type { HeaderCopies } from './security'
 import type { SeoHead } from './seo'
 import type { CutIslands } from './server-islands'
 import type { Revalidation } from './stale-pages'
@@ -79,6 +81,7 @@ import { askedPath } from './rewrite'
 import { CONTEXT_LAYOUT, guardUrl, routeChain } from './routes'
 import { savesLess } from './save-data'
 import { askedForEndedEntry, inLoad, inServerScope, markPrivate, readPersonally, wasReadPersonally, withEndedEntries, withOutcome } from './scope'
+import { headerCopies, startingHeaders } from './security'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
 import { prefetchMeta, speculationRules } from './speculation'
 import { formChecks, renderBlock, renderStatic, settle, streamDocument } from './stream'
@@ -107,6 +110,18 @@ type Body = Written | Pieced | Bun.BunFile
 const editors = new Map<string, EditorModule>()
 
 const HTML_HEADERS = { 'content-type': 'text/html; charset=utf-8' }
+
+// What a prerendered page starts its headers from: its content type and the site's security headers, which the request hook would set on the context and Elysia or `carryContext` copy header by header.
+export function pageHeaderCopies(security: Record<string, string> | undefined): HeaderCopies {
+  return headerCopies(HTML_HEADERS, security)
+}
+
+function startingPageHeaders(context: RequestContext, copies: HeaderCopies | undefined): Headers {
+  const set = (context as { set?: Context['set'] }).set
+
+  return (copies && set ? startingHeaders(set, copies) : undefined) ?? new Headers(HTML_HEADERS)
+}
+
 // The refreshed loads development already warned of, by route, so a button asking for one does not fill the log.
 const warnedLoads = new Set<string>()
 
@@ -191,6 +206,8 @@ export interface RenderOptions extends Pick<KayConfig, RenderConfigKey> {
   islandPreloads?: { drop: ReadonlySet<string>, wait: readonly string[] } | undefined
   // A page rendered without its guards, as a prerender does, still being one a guard covers.
   guarded?: boolean | undefined
+  // The starting headers of a prerendered page served as it is, security headers among them.
+  pageHeaders?: HeaderCopies | undefined
   // How a redirect a guard or the page threw is spelled, with the trailing slash its page has.
   redirectSpelling?: ((location: string) => string) | undefined
   // The modules of the extensions' `context`, whose request values the pages reaching a template that reads `ctx` load.
@@ -585,7 +602,7 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
   if (refusal)
     return refusal
 
-  const headers = rendering?.headers ?? new Headers(HTML_HEADERS)
+  const headers = rendering?.headers ?? startingPageHeaders(context, options.pageHeaders)
 
   headers.set('cache-control', 'public, max-age=0, must-revalidate')
   for (const [name, value] of page.headers)

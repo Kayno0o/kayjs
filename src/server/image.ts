@@ -29,7 +29,7 @@ import { cacheKey, remoteAllowed, remotePatterns, remoteVariants } from './remot
 import { requestUrl } from './request-url'
 import { decodePath } from './routes'
 import { savesData } from './save-data'
-import { headerCopies, ownHeaders } from './security'
+import { headerCopies, ownHeaders, ownHeadersInit } from './security'
 import { storedImage } from './storage'
 
 export interface ImageRouteOptions {
@@ -278,7 +278,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
     const known = answered.get(key)
 
     if (known)
-      return new Response(known.file, { headers: ownHeaders(set, known.headers) })
+      return new Response(known.file, { headers: ownHeadersInit(set, known.headers) })
 
     let passed: GuardedRequest | undefined
     // What the guards set goes out with every answer they let through.
@@ -290,7 +290,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
 
       return response
     }
-    const fail = (body: string, status: number) => guarded(new Response(body, { status, headers: ownHeaders(set, text) }))
+    const fail = (body: string, status: number) => guarded(new Response(body, { status, headers: ownHeadersInit(set, text) }))
 
     const url = requestUrl(request)
     const src = url.searchParams.get('src') ?? ''
@@ -495,7 +495,7 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
       keep(answered, key, { file, headers })
     }
 
-    return new Response(file, { headers: ownHeaders(set, headers) })
+    return new Response(file, { headers: ownHeadersInit(set, headers) })
   }
 }
 
