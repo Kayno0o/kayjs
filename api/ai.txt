@@ -29,9 +29,10 @@ interface AiMessage
   sources?: readonly Source[] | undefined
 
 [.] AiOptions
-interface AiOptions extends AskHooks
+interface AiOptions extends AskHooks, Resilience
   budget?: BudgetOptions | false | undefined
   conversations?: ConversationStore | undefined
+  fallback?: readonly FallbackModel[] | undefined
   imageAlt?: boolean | undefined | { reviewed?: string[] | undefined; }
   key?: ((request: Request) => Promise<string | undefined> | string | undefined) | undefined
   onError?: ((error: unknown) => unknown) | undefined
@@ -40,6 +41,7 @@ interface AiOptions extends AskHooks
   onStep?: ((step: Step) => unknown) | undefined
   onToolCall?: ((call: AiToolCall) => unknown) | undefined
   rateLimit?: AskLimit | AskLimit[] | false | undefined
+  retry?: RetryOptions | false | undefined
 
 [.] AiReply
 interface AiReply extends PromiseLike<string>, AsyncIterable<string>
@@ -103,10 +105,11 @@ interface AskHooks
 type AskLimit = Omit<RateLimit, 'key'>
 
 [.] AskOptions
-interface AskOptions extends AskHooks
+interface AskOptions extends AskHooks, Resilience
   body?: Record<string, unknown> | undefined
   cache?: "1h" | boolean | undefined
   confirm?: Confirm | false | undefined
+  fallback?: readonly FallbackModel[] | undefined
   key?: string | undefined
   maxAttachmentBytes?: number | undefined
   maxInputChars?: number | undefined
@@ -122,6 +125,7 @@ interface AskOptions extends AskHooks
   outlive?: boolean | undefined
   provider?: Provider | undefined
   reasoning?: Reasoning | undefined
+  retry?: RetryOptions | false | undefined
   signal?: AbortSignal | undefined
   sources?: readonly Source[] | undefined
   system?: string | undefined
@@ -305,6 +309,11 @@ const fakeAi: Fake
 [.] FakeAnswer
 type FakeAnswer<Given, Value> = Value | Error | ((given: Given) => Value)
 
+[.] FallbackModel
+interface FallbackModel
+  model: string
+  provider?: Provider | undefined
+
 [.] Finish
 type Finish = 'stop' | 'length' | 'filtered' | 'steps'
 
@@ -391,6 +400,8 @@ interface Passage
 
 [.] Piece
 type Piece = {
+  served: Served
+} | {
   text: string
 } | {
   reasoning: string
@@ -482,11 +493,28 @@ interface RequestHookChange
   messages?: AiMessage[] | undefined
   system?: string | undefined
 
+[.] Resilience
+interface Resilience
+  fallback?: readonly FallbackModel[] | undefined
+  retry?: RetryOptions | false | undefined
+
 [.] resuming
 function resuming(request?: Request | undefined): boolean
 
+[.] RetryOptions
+interface RetryOptions
+  attempts?: number | undefined
+  backoff?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  maxWait?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+
 [.] Script
 type Script = Scripted | ((asked: Asked) => Scripted)
+
+[.] Served
+interface Served
+  attempt: number
+  model: string
+  provider: string
 
 [.] Source
 interface Source
@@ -527,10 +555,14 @@ interface Spoken
 
 [.] Step
 interface Step
+  attempt: number
   calls: AiToolCall[]
+  failed: AiErrorKind | undefined
   finish: Finish | undefined
   firstTokenMs: number | undefined
+  model: string
   ms: number
+  provider: string
   usage: Usage | undefined
 
 [.] StoredConversation
@@ -558,6 +590,7 @@ interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOpti
   body?: Record<string, unknown> | undefined
   cache?: "1h" | boolean | undefined
   confirm?: Confirm | false | undefined
+  fallback?: readonly FallbackModel[] | undefined
   key?: string | undefined
   maxAttachmentBytes?: number | undefined
   maxInputChars?: number | undefined
@@ -573,6 +606,7 @@ interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOpti
   outlive?: boolean | undefined
   provider?: Provider | undefined
   reasoning?: Reasoning | undefined
+  retry?: RetryOptions | false | undefined
   schema: Schema
   signal?: AbortSignal | undefined
   sources?: readonly Source[] | undefined

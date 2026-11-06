@@ -115,13 +115,20 @@ describe('reply.steps', () => {
     expect(await reply.usage).toMatchObject({ inputTokens: steps[0]!.usage!.inputTokens + steps[1]!.usage!.inputTokens, outputTokens: 12 })
   })
 
-  it('never rejects when the reply fails, and lists no request that did not end', async () => {
-    fakeAi.fail(new AiError('unavailable', 'down'))
+  it('never rejects when the reply fails, and lists a request that failed on availability but none that was refused', async () => {
+    fakeAi.fail(new AiError('invalid', 'refused'))
 
     const reply = ask('Hi')
 
     expect(await reply.steps).toEqual([])
-    await expect((async () => reply)()).rejects.toThrow('down')
+    await expect((async () => reply)()).rejects.toThrow('refused')
+
+    fakeAi.fail(new AiError('unavailable', 'down'))
+
+    const outage = ask('Hi')
+
+    expect((await outage.steps).map(step => step.failed)).toEqual(['unavailable'])
+    await expect((async () => outage)()).rejects.toThrow('down')
   })
 
   it('is on an ask with a schema too', async () => {

@@ -258,6 +258,27 @@ A provider that stalls fails the reply with an `AiError` of kind `timeout`. kay 
 
 `ask` also takes `model`, `maxTokens` (4096 by default), `temperature` and a `signal`.
 
+## When a provider fails
+
+A request that fails before the first word of the reply, because the provider is down, overloaded, rate limiting you or too slow, is asked again once, after a short wait. When the provider says how long to wait (`Retry-After`), kay waits that long, unless it is more than ten seconds.
+
+A reply that already started is never asked again, as the visitor has read part of it.
+
+Change it for every ask in `ai()`, or for one ask:
+
+```ts
+ai({
+  retry: { attempts: 3, backoff: '500ms', maxWait: '10s' },
+  fallback: [{ model: 'claude-haiku-4-5' }, { model: 'gpt-5-mini', provider: openai({ apiKey }) }],
+})
+```
+
+`attempts` counts the requests made to each model, the first included, and `retry: false` turns it off. Once a model kept failing, `fallback` models are asked in turn, on the same provider unless one is named.
+
+`await reply.steps` lists every request, the failed ones too, with the `provider`, `model` and `attempt` of each and the error kind in `failed`. `onStep` and `onError` run for each of them.
+
+Under `bun test` the fake is not retried unless the ask names `retry`. Script `fakeAi.fail(error)` then `fakeAi.reply('ok')` to test a failure followed by a success.
+
 ### Thinking
 
 `reasoning: 'none' | 'low' | 'medium' | 'high'` sets how much a reasoning model thinks. An OpenAI-compatible server gets it as `reasoning_effort`. Anthropic gets adaptive thinking at that effort, with its text summarized so it streams. `'none'` asks for the lowest effort with thinking disabled, and a model that refuses `disabled` or the effort (Haiku 4.5 and Sonnet 4.5 take no effort) is asked again without that part.
@@ -461,7 +482,7 @@ Code in an answer is coloured the way the rest of your Markdown is. Once a code 
 
 You can also read `reply.progress()` yourself. It gives the text so far and every tool call, again with each change, plus the code blocks that were highlighted since the last snapshot. Each call is `{ id, name, input, status, result }`, its status `running`, then `done` or `failed`. `await reply.calls` gives the final list, each finished call with its `ms`, how long it took.
 
-To see where a slow answer spends its time, read `await reply.steps`. It has one entry per request made to the model, one for each round of a tool loop: `{ ms, firstTokenMs, usage, finish, calls }`. `ms` is how long the model took to answer and `firstTokenMs` how long until it first spoke. The tools it called are not counted in `ms`, they have their own on `calls`.
+To see where a slow answer spends its time, read `await reply.steps`. It has one entry per request made to the model, one for each round of a tool loop: `{ ms, firstTokenMs, usage, finish, calls, provider, model, attempt, failed }`. `ms` is how long the model took to answer and `firstTokenMs` how long until it first spoke. The tools it called are not counted in `ms`, they have their own on `calls`.
 
 A failed or stopped reply lists the requests that ended before it. A reply stopped while its tools ran ends on that request, with the calls that ran.
 
@@ -627,7 +648,7 @@ The same names in `ask(..., { onFinish })` replace the one of `ai()` for that as
 
 ## Errors
 
-A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `timeout`, `cut`, `protocol`, `limited`, `too-long`, `schema`, `unsupported` or `conflict`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. A `schema` error has `fields` too. Nothing is retried for you.
+A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `timeout`, `cut`, `protocol`, `limited`, `too-long`, `schema`, `unsupported` or `conflict`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. A `schema` error has `fields` too. A request that fails with `unavailable`, `rate-limited`, `timeout` or `network` before the reply streamed anything is asked again for you, see below.
 
 ## Test it
 

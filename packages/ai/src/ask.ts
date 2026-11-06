@@ -18,6 +18,7 @@ import { converse, single } from './loop'
 import { outputSchema } from './output-schema'
 import { createReply } from './reply'
 import { conversationCallOf, replacesOf, replyCallOf } from './resume'
+import { planFor, resilient } from './retry'
 import { structured } from './structured'
 
 const DEFAULT_MAX_TOKENS = 4096
@@ -289,6 +290,8 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchem
     throw configError('no model to ask; set AI_MODEL or pass { model }')
 
   const hooks = hooksFor(options, provider)
+  // The provider the requests go through, which asks again or elsewhere after a failure before the first piece.
+  const sturdy = resilient(provider, model, planFor(options, provider), hooks.onError)
   const answering = currentRequest()
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS
   const described = answer === undefined ? undefined : answerSchema(answer)
@@ -333,11 +336,11 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchem
       about: { provider: provider.name, model, prompt: current.findLast(message => message.role === 'user')?.content ?? '', chars: asker.chars },
       open: (signal: AbortSignal): AsyncIterable<Piece> => {
         if (!tools)
-          return guarded(() => via(signal, request => single(provider.stream(request, signal))), asker, signal)
+          return guarded(() => via(signal, request => single(sturdy.stream(request, signal), { provider: provider.name, model, attempt: 1 })), asker, signal)
 
         looping.maxTokens = maxTokens * maxSteps
 
-        return guarded(() => via(signal, request => converse(provider, request, offered, maxSteps, answering, signal, options.confirm)), looping, signal)
+        return guarded(() => via(signal, request => converse(sturdy, request, offered, maxSteps, answering, signal, options.confirm)), looping, signal)
       },
     }
   }

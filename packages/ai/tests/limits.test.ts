@@ -430,7 +430,7 @@ describe('ai({ budget })', () => {
     const reply = ask('abcd', { key: 'v', provider: { name: 's', model: 'm', async* stream(_, signal) {
       yield { usage: { inputTokens: 7 } }
       yield { text: usedBy(3) }
-      await new Promise(resolve => signal.addEventListener('abort', resolve))
+      await new Promise(resolve => signal.aborted ? resolve(undefined) : signal.addEventListener('abort', resolve))
     } } })
     const reading = reply[Symbol.asyncIterator]()
 

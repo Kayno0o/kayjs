@@ -2,6 +2,7 @@ import type { Action, Duration, Static } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { ByteSize, TSchema } from 'kay/library'
 import type { StoredFile } from './attachments'
+import type { AiErrorKind } from './errors'
 
 // The round buttons of a `Chat` an app draws its own icon on, by `icons`.
 export type ChatIconName = 'send' | 'stop' | 'new' | 'attach' | 'regenerate' | 'edit' | 'record'
@@ -149,7 +150,15 @@ export type Finish = 'stop' | 'length' | 'filtered' | 'steps'
 // `toolUse` is a provider's finished tool call, which the loop answers and the reply never shows; `tool` is a call as the reply shows it, sent again as its status changes; `step` is a request to the model that ended, which `reply.steps` lists.
 // `restart` drops the text so far: the tool loop sends it for a `schema` reply when a step that wrote some went on to call tools, as only the text of the last step is the object.
 // `reasoning` is a part of the model's thinking as it streams, never mixed into `text`; `thinking` is a finished block of it, which the loop sends back with the calls and the reply never shows.
-export type Piece = { text: string } | { reasoning: string } | { thinking: Thinking } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: AiToolCall } | { step: Step } | { restart: true }
+// `served` is sent by the retry layer before the first piece of content: which provider and model answered, and on which request of the round.
+export type Piece = { served: Served } | { text: string } | { reasoning: string } | { thinking: Thinking } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: AiToolCall } | { step: Step } | { restart: true }
+
+// Who answered a request: the provider and model that did, and how many requests the round took to get there (1 when the first answered).
+export interface Served {
+  provider: string
+  model: string
+  attempt: number
+}
 
 export interface Provider {
   readonly name: string
@@ -276,7 +285,31 @@ export interface AskHooks {
   onError?: ((error: unknown) => unknown) | undefined
 }
 
-export interface AskOptions extends AskHooks {
+// How a request that fails before streaming anything is asked again: an `unavailable`, `rate-limited`, `timeout` or `network` error is retried, a refused key or request never is.
+export interface RetryOptions {
+  // The requests made to one model, the first included: 2 by default, 1 never retries.
+  attempts?: number | undefined
+  // The wait before the second request, doubled for each one after it and shortened by up to half at random so asks failing together do not retry together; `'500ms'` by default. A rate limit's `Retry-After` is waited instead.
+  backoff?: Duration | undefined
+  // The longest a wait may be, `'10s'` by default. A `Retry-After` past it is not waited: the next fallback is asked at once, else the error is thrown.
+  maxWait?: Duration | undefined
+}
+
+// Another model to ask when the one asked keeps failing: the same provider unless `provider` names one.
+export interface FallbackModel {
+  model: string
+  provider?: Provider | undefined
+}
+
+// Retry and fallback, set once in `ai({ ... })` and replaced as a whole by the same names in `ask(..., { ... })`.
+export interface Resilience {
+  // Asks again after a failure before the first piece of the reply, 2 requests per model by default; `false` never retries. A request that already streamed something is never asked again. Under `bun test` the fake is not retried unless the ask itself names `retry`.
+  retry?: false | RetryOptions | undefined
+  // The models asked in turn once the one before kept failing with `unavailable`, `rate-limited`, `timeout` or `network`, each with its own `retry`: `[]` for none. The `ai()` list is not used for the fake, as its hooks are not.
+  fallback?: readonly FallbackModel[] | undefined
+}
+
+export interface AskOptions extends AskHooks, Resilience {
   system?: string | undefined
   // The model for this reply, `AI_MODEL` when left out.
   model?: string | undefined
@@ -353,6 +386,13 @@ export interface Step {
   finish: Finish | undefined
   // The tool calls the model made in this request, run, with their `ms`.
   calls: AiToolCall[]
+  // The provider and model that took this request. After a retry or a fallback they are the ones that answered, or the ones that failed for a request listed with `failed`.
+  provider: string
+  model: string
+  // Which request of its round this is: 1 for the first, 2 for the retry or the fallback after a failure. A round that failed twice and then answered lists three steps, the two failed ones first.
+  attempt: number
+  // The kind of the error when this request failed before streaming anything and was retried, fell back or ended the reply; undefined for one that answered.
+  failed: AiErrorKind | undefined
 }
 
 // The reply so far, for a chat to show: the text of all steps and every call, each as last seen, and the code blocks that were finished since the previous snapshot.
