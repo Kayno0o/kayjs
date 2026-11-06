@@ -503,25 +503,32 @@ describe('the naming conventions', () => {
   })
 
   // A library's boot error names its library and the option, so the message points at where the option is written.
+  // An option held in a variable is listed with the names it takes.
   it('give every configError of a library its own name and an option its llms document', async () => {
     const found: string[] = []
+    const variables: Record<string, string[]> = { 'packages/ai/src/hooks.ts': ['onRequest', 'onStep', 'onToolCall', 'onFinish', 'onError'] }
 
     for (const { library, files } of sources) {
       const docs = (await Promise.all([`packages/${library}/llms.txt`, ...await Array.fromAsync(new Glob(`packages/${library}/llms/*.md`).scan())].map(async file => Bun.file(file).text()))).join('\n')
+      const code = (docs.match(/```[\s\S]*?```|`[^`\n]+`/g) ?? []).join('\n')
 
       for (const { file, text } of files) {
-        for (const [, name, option] of text.matchAll(/configError\((?:'(\w+)', '([\w.]+)')?/g)) {
-          if (name !== library || option === undefined) {
+        for (const [, name, literal] of text.matchAll(/configError\((?:'(\w+)', (?:'([\w.]+)'|\w+,))?/g)) {
+          const options = literal === undefined ? variables[file] : [literal]
+
+          if (name !== library || options === undefined) {
             found.push(`${file}: a configError does not start with '${library}' and an option`)
 
             continue
           }
 
           // The option's last segment is a name of its own: a span equal to it or ending in `.name` or `name(`, or a `name:` / `name?:` key in code.
-          const segment = option.split('.').at(-1)!
+          for (const option of options) {
+            const segment = option.split('.').at(-1)!
 
-          if (!new RegExp(`\`(?:[^\`\\n]*\\.)?${segment}(?:\\(|\`)|\\b${segment}\\??:`).test(docs))
-            found.push(`${file}: option ${option} is not written in the llms of ${library}`)
+            if (!new RegExp(`\`(?:[^\`\\n]*\\.)?${segment}(?:\\(|\`)`).test(docs) && !new RegExp(`\\b${segment}\\??:`).test(code))
+              found.push(`${file}: option ${option} is not written in the llms of ${library}`)
+          }
         }
       }
     }

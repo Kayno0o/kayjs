@@ -25,7 +25,7 @@ export function configureHooks(options: AskHooks): void {
       continue
 
     if (typeof hook !== 'function')
-      throw configError('ai', 'hooks', `ai({ ${name} }) is a function`)
+      throw configError('ai', name, `ai({ ${name} }) is a function`)
 
     Object.assign(next, { [name]: hook })
   }
@@ -43,7 +43,7 @@ export function hooksFor(options: AskHooks, provider: Provider): AskHooks {
     const own: unknown = options[name]
 
     if (own !== undefined && typeof own !== 'function')
-      throw configError('ai', 'hooks', `ask({ ${name} }) is a function`)
+      throw configError('ai', name, `ask({ ${name} }) is a function`)
 
     const hook = own ?? (fake ? undefined : set[name])
 
