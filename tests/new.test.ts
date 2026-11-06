@@ -579,7 +579,7 @@ describe('kay command line', () => {
 
     try {
       expect((await kay(['new', 'styled', '--kay', '^1.0.0', '--template', 'blank', '--with', 'tailwind, tests'], dir)).code).toBe(0)
-      expect((await readdir(join(dir, 'styled'), { recursive: true })).sort()).toEqual(['.gitignore', '.npmrc', '.vscode', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'bunfig.toml', 'kay.config.ts', 'package.json', 'src', 'src/app.css', 'src/routes', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tests', 'tests/home.test.ts', 'tsconfig.json'])
+      expect((await readdir(join(dir, 'styled'), { recursive: true })).sort()).toEqual(['.gitignore', '.mcp.json', '.npmrc', '.vscode', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'CLAUDE.md', 'bunfig.toml', 'kay.config.ts', 'package.json', 'src', 'src/app.css', 'src/routes', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tests', 'tests/home.test.ts', 'tsconfig.json'])
       expect((await kay(['new', 'lean', '--kay', '^1.0.0', '--without', 'docker,ci'], dir)).code).toBe(0)
       expect(await readdir(join(dir, 'lean'))).not.toEqual(expect.arrayContaining(['Dockerfile']))
       expect(await Bun.file(join(dir, 'lean/src/server.ts')).exists()).toBe(true)
@@ -959,12 +959,15 @@ describe('kay new', () => {
       const files = await createProject(dir, { kay: '^1.0.0', features: PRESETS.blank.features })
       const manifest = await Bun.file(join(dir, 'package.json')).json() as { dependencies: Record<string, string>, devDependencies: Record<string, string>, scripts: Record<string, string> }
 
-      expect(files).toEqual(['.gitignore', '.npmrc', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'kay.config.ts', 'package.json', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tsconfig.json'])
+      expect(files).toEqual(['.gitignore', '.mcp.json', '.npmrc', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'CLAUDE.md', 'kay.config.ts', 'package.json', 'src/routes/_layout.kay', 'src/routes/index.kay', 'tsconfig.json'])
       // kay itself comes from the registry this names, whatever else is left out.
       expect(await Bun.file(join(dir, '.npmrc')).text()).toBe('@kaynooo:registry=https://git.kaynooo.fr/api/packages/kaynooo/npm/\n')
       expect(manifest.scripts).toEqual({ 'dev': 'kay dev', 'build': 'kay build --static', 'check': 'kay check', 'fmt': 'kay fmt', 'fmt:check': 'kay fmt --check' })
       // An agent reads kay's docs as installed, renames the site every title ends with, and runs the checks this project's scripts hold.
-      expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toBe('# my-app\n\nBuilt with kay, a Bun web framework: a `.kay` file is one component, TypeScript fences then a pug-like template. Read kay\'s docs for the installed version before writing kay code; the topic files they link are in `node_modules/kay/llms/`, and `bunx kay docs <words>` prints the section of them or of an installed library\'s that matches:\n\n@node_modules/kay/llms.txt\n\nEvery page title ends with `seo.name` from `kay.config.ts`, which `kay new` filled in from the folder name: set it to the site\'s real name.\n\nBefore calling a change done, run `bun run check` and `bun run fmt`.\n')
+      expect(await Bun.file(join(dir, 'AGENTS.md')).text()).toBe('# my-app\n\nBuilt with kay, a Bun web framework: a `.kay` file is one component, TypeScript fences then a pug-like template. Read kay\'s docs for the installed version before writing kay code; the topic files they link are in `node_modules/kay/llms/`, and `bunx kay docs <words>` prints the section of them or of an installed library\'s that matches:\n\n@node_modules/kay/llms.txt\n\nThe `kay` MCP server (`.mcp.json`, started by `bunx kay mcp`) gives an agent the project\'s own tools: `check`, `routes`, `explain`, `docs`, `render`, `screenshot`, `doctor`, `fmt`, `generate`, `add`, `test`, `env`, `i18n_missing`, `a11y` and `dev_errors`. Prefer them to running the commands by hand.\n\nEvery page title ends with `seo.name` from `kay.config.ts`, which `kay new` filled in from the folder name: set it to the site\'s real name.\n\nBefore calling a change done, run `bun run check` and `bun run fmt`.\n')
+      // Claude Code reads CLAUDE.md, which imports AGENTS.md, and starts kay's MCP server from .mcp.json.
+      expect(await Bun.file(join(dir, 'CLAUDE.md')).text()).toBe('@AGENTS.md\n')
+      expect(await Bun.file(join(dir, '.mcp.json')).json()).toEqual({ mcpServers: { kay: { command: 'bunx', args: ['kay', 'mcp'] } } })
       // Published, so the docs AGENTS.md imports are in node_modules/kay.
       expect(((await Bun.file(join(repo, 'package.json')).json()) as { files: string[] }).files).toEqual(expect.arrayContaining(['llms', 'llms.txt']))
       expect(Object.keys(manifest.devDependencies)).toEqual(['@types/bun'])
@@ -1275,4 +1278,19 @@ describe('kay build --compile', () => {
       await server.exited
     }
   }, 120_000)
+})
+
+it('leaves out AGENTS.md, CLAUDE.md and .mcp.json with agents false', async () => {
+  const dir = join(await mkdtemp(join(tmpdir(), 'kay-agents-')), 'app')
+
+  try {
+    const files = await createProject(dir, { kay: '^1.0.0', features: PRESETS.blank.features, dryRun: true })
+    const without = await createProject(dir, { kay: '^1.0.0', features: PRESETS.blank.features, dryRun: true, agents: false })
+
+    expect(files).toEqual(expect.arrayContaining(['AGENTS.md', 'CLAUDE.md', '.mcp.json']))
+    expect(without.filter(path => ['AGENTS.md', 'CLAUDE.md', '.mcp.json'].includes(path))).toEqual([])
+  }
+  finally {
+    await rm(join(dir, '..'), { recursive: true, force: true })
+  }
 })

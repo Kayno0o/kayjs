@@ -6,6 +6,7 @@ import process from 'node:process'
 import { isDeepStrictEqual } from 'node:util'
 import { insertImport } from './imports'
 import { FEATURE_NAMES, FEATURES, originHost, projectFiles } from './new'
+import { AGENT_FILES } from './templates'
 
 // Files whose lines are a set: a feature adds the lines the file lacks and keeps the rest.
 const LINE_FILES = new Set(['.gitignore', '.dockerignore'])
@@ -355,6 +356,10 @@ async function planCore(dir: string, core: readonly Feature[]): Promise<Plan> {
 
       if (merged !== disk)
         writes.set(path, merged)
+    }
+    // CLAUDE.md and .mcp.json, which projects made before `kay new` wrote them lack, follow an AGENTS.md the project has; one without it chose `--agents none`.
+    else if (disk === undefined && was === content && path !== 'AGENTS.md' && AGENT_FILES.includes(path) && existsSync(join(dir, 'AGENTS.md'))) {
+      writes.set(path, content)
     }
     else if (was !== content && disk !== content) {
       if (was === undefined && disk === undefined) {

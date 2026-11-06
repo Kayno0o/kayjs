@@ -57,6 +57,7 @@ kay new my-app --template app --without docker
 | `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests` |
 | `--without <features>` | Drops features from the preset |
 | `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow |
+| `--agents none` | Leaves out `AGENTS.md`, `CLAUDE.md` and `.mcp.json` |
 | `--editor helix,zed` | Also set those editors up as [`kay editor install`](/guides/other-editors#kay-editor-install) does. In a terminal, `kay new` asks once for the editors it finds on the PATH when this is not given |
 | `--runner <label>` | The runner label the CI jobs run on: `debian` on Forgejo and `ubuntu-latest` on GitHub by default. The Forgejo workflow installs only the `git` and `unzip` the image lacks, and skips the Bun setup when the image already has bun, so an Alpine image with bun and git runs it as written |
 | `--kay <dependency>` | The `kay` dependency the project installs, such as a path to a packed copy. By default the minor of the kay running the command |
@@ -71,7 +72,11 @@ Without `--forge`, `kay new` reads the `origin` remote. A remote on github.com g
 
 The workflow can read the repository and nothing more, except a Pages workflow, which gets the permission it publishes with. Each action it uses is pinned to the commit of a release, with the version in a comment.
 
-Every project gets an `AGENTS.md` for coding agents. It points them at kay's docs for the installed version and names the checks the project's scripts run. It also tells them to set `seo.name` to the real name of the site: every page title ends with it, and `kay new` fills it in from the folder name.
+Every project gets an `AGENTS.md` for coding agents, a `CLAUDE.md` that imports it for Claude Code, and a `.mcp.json` that registers [`kay mcp`](/guides/other-editors) for it, so the agent has kay's tools with no `claude mcp add`.
+
+`kay add` writes the last two into a project that has an `AGENTS.md` and lacks them.
+
+`AGENTS.md` points them at kay's docs for the installed version and names the checks the project's scripts run. It also tells them to set `seo.name` to the real name of the site: every page title ends with it, and `kay new` fills it in from the folder name.
 
 ### Features
 

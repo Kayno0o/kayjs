@@ -6,7 +6,7 @@ import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { checklist, select } from '@kaynooo/cli-kit/prompt'
 import { nativeExe } from './compiler/native-typescript'
-import { agentsFile, templateFiles } from './templates'
+import { AGENT_FILES, agentsFile, CLAUDE_FILE, MCP_FILE, templateFiles } from './templates'
 
 // The kay this command runs from: a git checkout, which a new project depends on a packed copy of, or the published package.
 const KAY_ROOT = resolve(import.meta.dir, '..')
@@ -65,6 +65,8 @@ export interface NewOptions {
   host?: Host | undefined
   // The label of the runner the CI jobs run on, the host's own image by default: `debian` on Forgejo, `ubuntu-latest` on GitHub.
   runner?: string | undefined
+  // Writes AGENTS.md, CLAUDE.md and .mcp.json, `false` leaving the three out.
+  agents?: boolean | undefined
   // Lists the files without writing any, nor packing a checkout of kay into `vendor`.
   dryRun?: boolean | undefined
 }
@@ -163,6 +165,11 @@ export async function createProject(target: string, options: NewOptions = {}): P
 
   const files = await projectFiles(dir, features, options.kay ?? (options.dryRun === true ? DRY_RUN_KAY : undefined), {}, options.host, options.runner)
 
+  if (options.agents === false) {
+    for (const path of AGENT_FILES)
+      delete files[path]
+  }
+
   if (options.dryRun === true)
     return Object.keys(files).sort()
 
@@ -199,6 +206,8 @@ export async function projectFiles(dir: string, features: ReadonlySet<Feature>, 
   const files: Record<string, string> = {
     ...templateFiles(features, settings, host, runner),
     'AGENTS.md': agentsFile(scripts, settings.seo !== false),
+    'CLAUDE.md': CLAUDE_FILE,
+    '.mcp.json': MCP_FILE,
     'package.json': `${JSON.stringify({
       name,
       type: 'module',

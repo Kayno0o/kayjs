@@ -9,8 +9,8 @@ import { createProject, detectHost, FEATURE_NAMES, HOSTS, pickFeatures, PRESET_N
 import { count, done, formatOption, printDocument, reportFailure, shellQuote } from './command'
 
 export const scaffold: Command = {
-  usage: 'new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [--editor helix,zed|none] [--forge forgejo|github] [--runner <label>] [-y] [--dry-run] [--format text|json] [--quiet]',
-  options: { 'kay': { type: 'string' }, 'template': { type: 'string' }, 'with': { type: 'string' }, 'forge': { type: 'string' }, 'editor': { type: 'string' }, 'runner': { type: 'string' }, 'without': { type: 'string' }, 'yes': { type: 'boolean', short: 'y' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
+  usage: 'new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [--editor helix,zed|none] [--forge forgejo|github] [--agents none] [--runner <label>] [-y] [--dry-run] [--format text|json] [--quiet]',
+  options: { 'kay': { type: 'string' }, 'template': { type: 'string' }, 'with': { type: 'string' }, 'forge': { type: 'string' }, 'agents': { type: 'string' }, 'editor': { type: 'string' }, 'runner': { type: 'string' }, 'without': { type: 'string' }, 'yes': { type: 'boolean', short: 'y' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [dir] }, refuse) => {
     const format = formatOption('new', values.format)
@@ -35,6 +35,12 @@ export const scaffold: Command = {
 
       if (forge !== undefined && !HOSTS.includes(forge as Host)) {
         reportFailure(`kay new: --forge is ${String(forge)}, which is none of ${HOSTS.join(', ')}`, format)
+
+        return 1
+      }
+
+      if (values.agents !== undefined && values.agents !== 'none') {
+        reportFailure(`kay new: --agents is ${String(values.agents)}, which is none of none`, format)
 
         return 1
       }
@@ -85,7 +91,7 @@ export const scaffold: Command = {
         return 1
       }
 
-      const files = await createProject(dir, { kay: typeof values.kay === 'string' ? values.kay : undefined, features, host: forge === undefined ? await detectHost(dir) : forge as Host, runner: typeof values.runner === 'string' ? values.runner : undefined, dryRun })
+      const files = await createProject(dir, { kay: typeof values.kay === 'string' ? values.kay : undefined, features, host: forge === undefined ? await detectHost(dir) : forge as Host, runner: typeof values.runner === 'string' ? values.runner : undefined, agents: values.agents === undefined, dryRun })
 
       const editors = dryRun ? [] : await setUpEditors(dir, wanted.filter(name => name !== 'none') as Editor[], values.editor === undefined && yes !== true && format === 'text' && isInteractive())
 
