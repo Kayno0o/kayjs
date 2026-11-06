@@ -71,13 +71,17 @@ describe('the command of a landing step', () => {
 })
 
 describe('a host\'s landing settings', () => {
-  it('reads the KEY=value lines, skipping blanks and comments, and nothing from a missing file', async () => {
+  it('reads the KEY=value lines as a shell writes them, skipping blanks and comments, and nothing from a missing file', async () => {
     const dir = await scratchDir('host-env-')
     const path = join(dir, 'kay-land.env')
 
     await Bun.write(path, '# this host\nKAY_LAND_WORKERS=2\n\n  TEST_DATABASE_URL = postgres://test:test@127.0.0.1:55432/kay_app_test  \nnot a line\n')
 
     expect(await hostEnv(path)).toEqual({ KAY_LAND_WORKERS: '2', TEST_DATABASE_URL: 'postgres://test:test@127.0.0.1:55432/kay_app_test' })
+
+    await Bun.write(path, 'export KAY_LAND_SHARDS=4\r\nKAYJS_AUTH_TEST_DATABASE_URL="postgres://a@b/c?ssl=off"\r\nKAY_LAND_NICE=\'5\'\r\n')
+
+    expect(await hostEnv(path)).toEqual({ KAY_LAND_SHARDS: '4', KAYJS_AUTH_TEST_DATABASE_URL: 'postgres://a@b/c?ssl=off', KAY_LAND_NICE: '5' })
     expect(await hostEnv(join(dir, 'missing.env'))).toEqual({})
   })
 })
