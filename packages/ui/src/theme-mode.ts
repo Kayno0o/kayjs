@@ -1,4 +1,4 @@
-import { persisted, untrack } from 'kay'
+import { persisted } from 'kay'
 
 // What the visitor chose: a fixed scheme, or `system` to follow `prefers-color-scheme`.
 export type ThemeMode = 'light' | 'dark' | 'system'
@@ -14,15 +14,11 @@ export function themeMode(cookie = THEME_COOKIE) {
 }
 
 // The scheme the page is in, `light` or `dark`, for `html(data-theme={scheme()})` in a layout: the visitor's choice from the first render, so the page never paints the other one first.
-// `undefined` while the visitor follows the system and the browser has not been asked, the server's case: no attribute is written, and `theme.css` follows `prefers-color-scheme`.
-// In the browser a `system` choice is answered from `prefers-color-scheme` when read, and does not follow the system changing afterwards.
+// `undefined` while the visitor follows the system, on the server and in the browser alike: no attribute is written, and `theme.css` follows `prefers-color-scheme`, as the toggle leaves `html` for a `system` choice.
 export function scheme(cookie = THEME_COOKIE): 'light' | 'dark' | undefined {
   const mode = themeMode(cookie)()
 
-  if (mode !== 'system')
-    return mode
-
-  return typeof matchMedia === 'function' ? untrack(() => matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : undefined
+  return mode === 'system' ? undefined : mode
 }
 
 // Puts the mode on `<html>` as `data-theme`, a `system` one taking it off so the stylesheet follows the system.

@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, beforeEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import Icons from '../tests/fixture/src/components/theme-toggle-icons.kay'
 import { library } from './dom'
 
 let mounted: Mounted | undefined
@@ -70,4 +71,11 @@ test('a promise from onChange holds the choice until it resolves', async () => {
   release(true)
   await settle()
   expect(document.cookie).toContain('theme=')
+})
+
+test('class reaches the group and its parts, and an option block keeps each radio named', async () => {
+  mounted = await mountComponent(Icons)
+  expect(mounted.root.querySelector('[role=radiogroup]')?.classList.contains('mine-root')).toBe(true)
+  expect(mounted.root.querySelector('[data-part=option]')?.classList.contains('mine-option')).toBe(true)
+  expect([...mounted.root.querySelectorAll('input')].map(input => input.getAttribute('aria-label'))).toEqual(['System', 'Light', 'Dark'])
 })

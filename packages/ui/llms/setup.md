@@ -62,11 +62,11 @@ head
   html(data-theme={scheme()})
 ```
 
-`scheme()` is `'light'`, `'dark'`, or `undefined` while the visitor follows the system and the server cannot tell (no attribute, so `theme.css` follows `prefers-color-scheme`); in the browser a `system` choice is answered from `prefers-color-scheme` when read. A page the build prerenders renders the default, and the toggle corrects it as it hydrates, so a site wanting no flash renders its pages per request. `themeMode()` is the cookie's signal, for code of your own.
+`scheme()` is `'light'`, `'dark'`, or `undefined` while the visitor follows the system (no attribute, so `theme.css` follows `prefers-color-scheme`), on the server and in the browser alike. It reads the cookie only: a toggle with a `value` of the app's (an account preference) has the layout write that value into `html(data-theme=...)` itself. A page the build prerenders renders the default, and the toggle corrects it as it hydrates, so a site wanting no flash renders its pages per request. `themeMode()` is the cookie's signal, for code of your own.
 
 - `ThemeToggle(modes={['light', 'dark']} label="Appearance" showLabel)`: `modes` lists and orders the choices, each a mode or `{ value, label?, icon? }` to word or draw it yourself. `label` names the group (`ui.themeToggle.label`), `showLabel` writes it above, `@option(option)` draws each option, and `class` and its parts are Segmented's (`root`, `option`, `input`, `label`, `icon`).
 - `value` makes the app the holder, such as a signed-in visitor's saved preference: the toggle follows it and writes no cookie. `onChange(mode, option)` hears each pick and may return a promise, as Segmented's: the toggle is busy until it settles, and a pick that resolves to `false`, rejects or throws is put back and not kept.
-- `cookie="appearance"` names another cookie, to give to `scheme('appearance')` as well.
+- `cookie="appearance"` names another cookie; the layout must then call `scheme('appearance')`, or it reads the default cookie.
 
 A layout may still render its own `Toaster` and `TooltipHost`, as an app did before `ui()`: only the first mounted shows toasts and tooltips, so the two copies never double them.
 

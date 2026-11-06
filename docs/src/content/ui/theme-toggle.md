@@ -18,7 +18,7 @@ head
   html(data-theme={scheme()})
 ```
 
-`scheme()` is `'light'`, `'dark'`, or `undefined` while the visitor follows the system, which the server cannot tell: no attribute is written and the stylesheet follows the system. A page prerendered at build renders the default and the toggle corrects it as it hydrates, so a site that wants no flash renders its pages per request.
+`scheme()` is `'light'`, `'dark'`, or `undefined` while the visitor follows the system: no attribute is written and the stylesheet follows the system. It reads the cookie only, so with a `value` of your own (an account preference) the layout writes that value into `html(data-theme=...)` itself. A page prerendered at build renders the default and the toggle corrects it as it hydrates, so a site that wants no flash renders its pages per request.
 
 ## Choices
 
@@ -34,4 +34,4 @@ ThemeToggle(modes={['light', { value: 'dark', label: 'Night' }]} label="Appearan
 
 `value` makes the app the holder, such as a saved preference of a signed-in visitor. The toggle follows it and writes no cookie. `onChange(mode, option)` hears each pick, and may return a promise as on Segmented: the toggle is busy until it settles, and a pick that resolves to `false` or rejects is put back and not kept.
 
-`cookie="appearance"` keeps the choice under another name, given to `scheme('appearance')` as well.
+`cookie="appearance"` keeps the choice under another name; the layout must then call `scheme('appearance')`, or it reads the default cookie.

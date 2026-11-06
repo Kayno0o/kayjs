@@ -1,0 +1,7 @@
+---
+import ThemeToggle from '@kaynooo/kayjs-ui/theme-toggle.kay'
+import Sun from '~icons/tabler/sun'
+---
+ThemeToggle(class={{ root: 'mine-root', option: 'mine-option' }})
+  @option(mode)
+    Sun
