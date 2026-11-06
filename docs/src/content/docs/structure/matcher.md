@@ -18,6 +18,8 @@ h1 {item.name}
 
 The matcher returns the value `ctx.params` hands the page, typed as it returns it, or `undefined` to refuse the URL. kay ships `integer`, `uuid` and `slug` in `kay/params`, and a project adds its own in [`src/params/`](/structure/params). A matcher nobody provides stops the server.
 
+The `slug` matcher takes lowercase words of any script joined by dashes, so every slug the CMS makes from a title matches.
+
 A URL the matcher refuses falls through to the page without one serving the same path, such as `items/[slug].kay` beside `items/[id=integer].kay`. It is a 404 when none does.
 
 An [optional param](/structure/optional) takes a matcher too, as in `[[page=integer]].kay`.

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { slug } from 'kay/params'
 import { checkSlug, slugify } from '../src/slug'
 
 describe('slugify', () => {
@@ -65,5 +66,14 @@ describe('checkSlug', () => {
     expect(checkSlug('notes/dratfs/c', [...existing, 'notes/drafts/d'])).toMatchObject({ inside: 'notes', created: 'dratfs', near: 'notes/drafts' })
     expect(checkSlug('guide/c', existing)).toMatchObject({ near: 'guides' })
     expect(checkSlug('xy/c', existing).near).toBeUndefined()
+  })
+})
+
+describe('slugify and the slug matcher', () => {
+  test('a slug slugify gives is one the `slug` matcher accepts', () => {
+    const titles = ['Été à la ferme : Œufs', 'a/b', 'a_b', 'Привет, Мир 2', '你好 世界', 'مرحبا بالعالم', 'हिन्दी', 'καλημέρα'.normalize('NFD'), 'A -- B / C', '  2024 / Notes  ', 'Straße ŁÓDŹ']
+
+    for (const title of titles)
+      expect(slug(slugify(title, { final: true })), title).toBe(slugify(title, { final: true }))
   })
 })
