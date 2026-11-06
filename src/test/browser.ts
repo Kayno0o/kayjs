@@ -501,8 +501,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   // The milliseconds of a call's own `timeout`, undefined for the page's.
   const waitMs = (value: Duration | undefined) => value === undefined ? undefined : optionMs(value, 'timeout')
 
-  // Polls the page, reading an error as not yet: the page may be between two documents.
-  const poll = async (expression: string, wanted: string, wait = timeout) => {
+  // Polls the page, reading an error as not yet: the page may be between two documents. `told` is the wait the error names, the call's whole budget when this poll has only what is left of it.
+  const poll = async (expression: string, wanted: string, wait = timeout, told = wait) => {
     const until = Date.now() + wait
     // Why the last try failed, if it threw: a page swap in flight throws once, a condition naming a test variable every time.
     let failure: unknown
@@ -514,7 +514,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       try {
         trying ??= inView(expression)
 
-        const answer = await within(trying, until - Date.now(), TIMED_OUT)
+        const answer = await within(trying, Math.max(until - Date.now(), 0), TIMED_OUT)
 
         if (answer !== TIMED_OUT) {
           trying = undefined
@@ -536,7 +536,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       }
 
       if (Date.now() > until)
-        throw new Error(`${UNSETTLED} ${wait}ms waiting for ${wanted}${failure === undefined ? '' : `, last throwing ${failure instanceof Error ? failure.message : String(failure)}`}`, failure === undefined ? undefined : { cause: failure })
+        throw new Error(`${UNSETTLED} ${told}ms waiting for ${wanted}${failure === undefined ? '' : `, last throwing ${failure instanceof Error ? failure.message : String(failure)}`}`, failure === undefined ? undefined : { cause: failure })
 
       await Bun.sleep(POLL_MS)
     }
@@ -862,7 +862,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       // Bun's click waits for the element in view without scrolling to it. Centered, so a fixed header or bar does not cover it; at once, so a smooth scroll does not keep it moving. Scrolled again between short waits, as a page restoring its scroll once loaded moves it away. An island not hydrated yet replays the click once it is.
       for (;;) {
         try {
-          await poll(script(scrolledTo, [selector, false]), selector, Math.max(until - Date.now(), 1))
+          await poll(script(scrolledTo, [selector, false]), selector, Math.max(until - Date.now(), 1), budget)
         }
         catch (error) {
           throw refused !== undefined && error instanceof Error && error.message.startsWith(UNSETTLED) ? refused : error
