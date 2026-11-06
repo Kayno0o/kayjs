@@ -53,7 +53,7 @@ const look = recipe({
     sortButton: 'group/sort inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-inherit [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] @max-[30rem]/table:min-h-8 @max-[30rem]/table:border-solid @max-[30rem]/table:border-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-2 @max-[30rem]/table:py-0.5',
     sortIcon: 'size-3.5 group-data-[direction=asc]/sort:rotate-180',
     row: 'border-b border-border @max-[30rem]/table:border-b-0 @max-[30rem]/table:[:is([data-part=row],[data-part=detailRow])+&]:border-t hover:bg-hover aria-selected:bg-hover data-linked:relative data-linked:isolate data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=rowLink],[data-part=rowButton])]:relative data-linked:[&_:where(a,button,input,select,textarea,label,summary,[tabindex],[role=button]):not([data-part=rowLink],[data-part=rowButton])]:z-1 @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-[fit-content(40%)_minmax(0,1fr)] @max-[30rem]/table:gap-x-4 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
-    cell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-[var(--column-width,auto)] min-w-[var(--column-min-width,0)] @max-[30rem]/table:w-auto @max-[30rem]/table:min-w-0 data-[sticky]:z-[1] data-[sticky]:bg-surface data-[sticky=start]:sticky data-[sticky=start]:left-0 data-[sticky=end]:sticky data-[sticky=end]:right-0 @max-[30rem]/table:data-[sticky]:static',
+    cell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-[var(--column-width,auto)] min-w-[var(--column-min-width,0)] @max-[30rem]/table:w-auto @max-[30rem]/table:min-w-0 data-[sticky]:z-[1] data-[sticky]:[tr:not(:hover,[aria-selected=true])>&]:bg-surface data-[sticky]:[tr:is(:hover,[aria-selected=true])>&]:bg-hover data-[sticky=start]:sticky data-[sticky=start]:left-0 data-[sticky=end]:sticky data-[sticky=end]:right-0 @max-[30rem]/table:data-[sticky]:static',
     // The box is 1rem, so its label grows to the 1.5rem a finger needs.
     selectCell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-0 @max-[30rem]/table:w-auto [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6 [&_.kui-checkbox]:justify-center',
     // Outside a narrow table a cell holds its content alone: the column header names it.
@@ -367,7 +367,8 @@ let box: HTMLElement | undefined
 let body: HTMLElement | undefined
 
 function measure() {
-  const now = virtual || box!.scrollWidth > box!.clientWidth || box!.scrollHeight > box!.clientHeight
+  // One pixel of tolerance: sub-pixel rounding can make the scroll size exceed the client size on a box that does not scroll.
+  const now = virtual || box!.scrollWidth - box!.clientWidth > 1 || box!.scrollHeight - box!.clientHeight > 1
 
   if (now === scrolls())
     return
@@ -395,7 +396,9 @@ onMount(() => {
 function showColumn(key: string, on: boolean) {
   const next = on ? hiddenKeys().filter(other => other !== key) : [...hiddenKeys(), key]
 
-  hiddenKeys = next
+  if (hiddenColumns === undefined)
+    hiddenKeys = next
+
   onHiddenColumnsChange?.(next)
 }
 
@@ -425,7 +428,7 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
   return current()?.direction === 'asc' ? 'ascending' : 'descending'
 }
 ---
-div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={virtual ? '' : undefined} tabindex={scrolls() ? '0' : undefined} role={scrolls() && regionName() ? 'region' : undefined} aria-label={scrolls() ? regionName() : undefined})
+div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={virtual ? '' : undefined} tabindex={scrolls() ? '0' : undefined} role={scrolls() && regionName() ? 'region' : undefined} aria-label={scrolls() ? regionName() : (rest as { 'aria-label'?: string })['aria-label']})
   if searching() || extra.length > 0
     div(part="filter")
       if searching()

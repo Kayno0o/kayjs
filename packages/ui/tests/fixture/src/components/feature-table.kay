@@ -8,7 +8,7 @@ interface Planet {
   moons: number
 }
 
-const { rows, label, columnToggle = false, hiddenColumns, onHiddenColumnsChange } = props<{ rows: Planet[], label?: string, columnToggle?: boolean, hiddenColumns?: string[], onHiddenColumnsChange?: (keys: string[]) => void }>()
+const { rows, label, named, columnToggle = false, hiddenColumns, onHiddenColumnsChange } = props<{ rows: Planet[], label?: string, named?: string, columnToggle?: boolean, hiddenColumns?: string[], onHiddenColumnsChange?: (keys: string[]) => void }>()
 
 const columns: Column<Planet>[] = [
   { key: 'name', header: 'Name', sticky: 'start', width: 120, class: 'wide', footer: 'Total' },
@@ -16,6 +16,6 @@ const columns: Column<Planet>[] = [
   { key: 'id', header: 'Id', hidden: true },
 ]
 ---
-Table(columns={columns} rows={rows} rowKey="id" label={label} columnToggle={columnToggle} hiddenColumns={hiddenColumns} onHiddenColumnsChange={onHiddenColumnsChange})
+Table(columns={columns} rows={rows} rowKey="id" label={label} aria-label={named} columnToggle={columnToggle} hiddenColumns={hiddenColumns} onHiddenColumnsChange={onHiddenColumnsChange})
   @header(column)
     em {column.header}

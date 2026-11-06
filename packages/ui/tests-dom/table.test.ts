@@ -782,4 +782,48 @@ describe('Table columns, caption and scroll region', () => {
         delete (proto as unknown as Record<string, unknown>).scrollWidth
     }
   })
+
+  test('keeps the caller\'s aria-label while the table does not scroll', async () => {
+    mounted = await mountComponent(FeatureTable, { rows: PLANETS, label: 'Planets', named: 'Mine' })
+
+    expect(mounted.root.firstElementChild!.getAttribute('aria-label')).toBe('Mine')
+    expect(mounted.root.firstElementChild!.getAttribute('role')).toBeNull()
+  })
+
+  test('a controlled hiddenColumns wins: the toggle only reports', async () => {
+    const reported: string[][] = []
+
+    mounted = await mountComponent(FeatureTable, { rows: PLANETS, columnToggle: true, hiddenColumns: ['id'], onHiddenColumnsChange: (keys: string[]) => reported.push(keys) })
+
+    const box = mounted.root.querySelector<HTMLInputElement>('[data-part="columnsPanel"] input[type="checkbox"]')!
+
+    click(box)
+    await settle()
+
+    expect(reported).toEqual([['id', 'name']])
+    expect(mounted.root.querySelectorAll('th').length).toBe(2)
+  })
+
+  test('a box overflowing by a rounding pixel does not scroll', async () => {
+    const proto = HTMLElement.prototype
+    const width = Object.getOwnPropertyDescriptor(proto, 'scrollWidth')
+    const client = Object.getOwnPropertyDescriptor(proto, 'clientWidth')
+
+    Object.defineProperty(proto, 'scrollWidth', { value: 301, configurable: true })
+    Object.defineProperty(proto, 'clientWidth', { value: 300, configurable: true })
+
+    try {
+      mounted = await mountComponent(FeatureTable, { rows: PLANETS, label: 'Planets' })
+
+      expect(mounted.root.firstElementChild!.getAttribute('tabindex')).toBeNull()
+    }
+    finally {
+      for (const [name, descriptor] of [['scrollWidth', width], ['clientWidth', client]] as const) {
+        if (descriptor)
+          Object.defineProperty(proto, name, descriptor)
+        else
+          delete (proto as unknown as Record<string, unknown>)[name]
+      }
+    }
+  })
 })
