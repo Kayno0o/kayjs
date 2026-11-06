@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `// kay-allow <lint>[, <lint>] -- <reason>` and `// kay-allow-file` keep the reason after `--` on the comment's line, commas and issue links included, as ESLint's `eslint-disable` does, and the editor's lint completion stops at the `--`: [lints](lints.md).
 - kayjs-mail's `MAIL_TO` drops empty items, so `a@example.com,` is one recipient rather than two, and a value of only separators is no recipient ([Mail](../packages/mail/llms.txt)).
 - `cache()` takes `max`, the number of argument lists whose values it keeps (the least recently called goes first), and with `store: false` holds values that cannot serialize; kayjs-mail's SNS certificates use it in place of their own map: [rendering](rendering.md).
 - `cache()` takes `max`, the number of loaded values it keeps (the oldest goes first), its function has `reload(...args)`, and with `store: false` holds values that cannot serialize; kayjs-mail's SNS certificates use it in place of their own map: [rendering](rendering.md).

@@ -21,7 +21,7 @@ export interface TemplateContext {
   replace: Span
 }
 
-const KAY_ALLOW = /\/\/\s*kay-allow(?:-file)?\s(?:[\w-]+[,\s]+)*([\w-]*)$/
+const KAY_ALLOW = /\/\/\s*kay-allow(?:-file)?\s(?:\w[\w-]*[,\s]+)*(\w[\w-]*)?$/
 const MESSAGE = /\bt\(\s*['"]([\w.-]*)$/
 const PATH = /(?:\b(?:href|action)=|\bnavigate\()\s*["'`](\/[^"'`{}]*)?$/
 const LINE_START = /^(\s*)(?:[\w-]+:\s+)?(@?)([\w-]*)$/
@@ -51,7 +51,7 @@ export function templateContext(source: string, offset: number, templateStart: n
   const lint = KAY_ALLOW.exec(prefix)
 
   if (lint)
-    return { wanted: { kind: 'lint' }, replace: reaching(offset - lint[1]!.length) }
+    return { wanted: { kind: 'lint' }, replace: reaching(offset - (lint[1] ?? '').length) }
 
   const message = MESSAGE.exec(prefix)
 

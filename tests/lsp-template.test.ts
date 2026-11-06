@@ -57,6 +57,9 @@ describe('template completion contexts', () => {
     expect(at('---\nnavigate(\'/|\')\n---\np x', 0)).toMatchObject({ kind: 'path' })
     expect(at('p {t(\'nav.ab|\')}')).toMatchObject({ kind: 'message', replaced: 'nav.ab' })
     expect(at('// kay-allow unread-name, un|')).toMatchObject({ kind: 'lint', replaced: 'un' })
+    expect(at('// kay-allow unread-name -- un|')).toBeUndefined()
+    expect(at('// kay-allow-file unread-name -- why, un|')).toBeUndefined()
+    expect(at('// kay-allow unread-name, -- |')).toBeUndefined()
   })
 
   it('offers no element or attribute name inside a fence', () => {

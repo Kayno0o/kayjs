@@ -76,6 +76,39 @@ describe('lint levels', () => {
     expect(diagnostics[0]!.help).toContain('`positional-key`')
   })
 
+  describe('a reason after `--`', () => {
+    const img = 'img(src="/a.png" width="1" height="1")'
+    const code = (source: string) => lints(source).map(d => d.code)
+
+    it('allows the lints before it, whatever the reason holds, in the template alone on its line or ending it', () => {
+      expect(code(`// kay-allow missing-alt -- kaynooo/kayjs#3120, a decorative image\n${img}\n`)).toEqual([])
+      expect(code(`${img} // kay-allow missing-alt -- kaynooo/kayjs#3120, why\n`)).toEqual([])
+      expect(code(`// kay-allow missing-alt, missing-title -- one, two\n${img}\n`)).toEqual([])
+    })
+
+    it('allows in a fence, ending a line or alone on its line, and for `kay-allow-file`', () => {
+      const fence = (comment: string, ending = '') => `---\nimport { signal } from 'kay'\n\n${comment}\nconst a = signal(1)${ending}\n---\np {a()}\n`
+
+      expect(code(fence('// kay-allow constant-signal -- #1, because'))).toEqual([])
+      expect(code(fence('', ' // kay-allow constant-signal -- #1, because'))).toEqual([])
+      expect(code(fence('// kay-allow-file constant-signal, missing-alt -- #1, because'))).toEqual([])
+    })
+
+    it('still reports a name before the separator that is no lint, with the reason left alone', () => {
+      const diagnostics = compileKay(`// kay-allow missing-alt, missing-alts -- missing-nothing, really\n${img}\n`, 'list.kay', { check: true }).diagnostics
+
+      expect(diagnostics.map(d => [d.message, d.code])).toEqual([['Unknown lint `missing-alts`', 'unknown-lint']])
+      expect(code(`// kay-allow-file nope -- why\n${img}\n`)).toContain('unknown-lint')
+      expect(code(`// kay-allow missing-alt, -- why\n${img}\n`)).toEqual([])
+    })
+
+    it('takes an empty reason, and a reason that is no lint name list', () => {
+      expect(code(`// kay-allow missing-alt --\n${img}\n`)).toEqual([])
+      expect(code(`// kay-allow missing-alt -- \n${img}\n`)).toEqual([])
+      expect(code(`// kay-allow missing-alt -- constant-signal, nonsense\n${img}\n`)).toEqual([])
+    })
+  })
+
   it('reports nothing outside type checking, so no lint ever stops a page from running', () => {
     expect(compileKay(`${ROWS}img(src="/a.png" width="1" height="1")\nfor todo, i of todos key={i}\n  p {todo.id}\n`, 'list.kay', { output: 'html' }).diagnostics).toEqual([])
   })

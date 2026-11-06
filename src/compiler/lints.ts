@@ -825,9 +825,10 @@ export type LintLevels = Partial<Record<LintName | LintGroup, LintLevel>> & { sa
 
 export const LEVELS: ReadonlySet<string> = new Set<LintLevel>(['allow', 'warn', 'deny'])
 
-const ALLOW_COMMENT = /\/\/[ \t]*kay-allow[ \t]+([\w-]+(?:[ \t]*,[ \t]*[\w-]+)*)/g
+// A lint's name starts with a letter, so the `--` of a reason is never read as one: `// kay-allow a, b -- why`.
+const ALLOW_COMMENT = /\/\/[ \t]*kay-allow[ \t]+(\w[\w-]*(?:[ \t]*,[ \t]*\w[\w-]*)*)/g
 // The file-wide form, which allows the lints it names wherever they are reported in the file.
-const ALLOW_FILE_COMMENT = /\/\/[ \t]*kay-allow-file[ \t]+([\w-]+(?:[ \t]*,[ \t]*[\w-]+)*)/g
+const ALLOW_FILE_COMMENT = /\/\/[ \t]*kay-allow-file[ \t]+(\w[\w-]*(?:[ \t]*,[ \t]*\w[\w-]*)*)/g
 const LINT_NAME = /[\w-]+/g
 const MINOR = /^(\d+)\.(\d+)(?:\.\d+)?$/
 const IDENTIFIER = /^[a-z_$][\w$]*$/i

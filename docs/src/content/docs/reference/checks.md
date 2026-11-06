@@ -285,7 +285,14 @@ A comment on the line, or alone on the line before it, allows a lint in that pla
 const label = signal('Save')
 ```
 
-`// kay-allow-file constant-signal` allows a lint in the whole file, for a file where it fits everywhere. It takes the same names, and a name that is no lint is reported.
+Write why after ` -- `, as ESLint does in `eslint-disable`. Kay reads nothing after the `--`, so the reason may hold commas, a link or an issue number:
+
+```kay
+// kay-allow constant-signal -- kaynooo/kayjs#3120, the label is set by a test
+const label = signal('Save')
+```
+
+`// kay-allow-file constant-signal` allows a lint in the whole file, for a file where it fits everywhere. It takes the same names and the same ` -- ` reason, and a name that is no lint is reported.
 
 No comment silences an `seo` lint, `over-budget` or `unkept-page`, as no template reports them. Change their level in `lints` instead.
 
