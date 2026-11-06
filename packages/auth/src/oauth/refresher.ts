@@ -28,7 +28,7 @@ export interface TokenRefresherDeps<K, S> {
 /** Wraps a token `exchange` with per-subject caching + in-flight dedup; non-expiring credentials pass through. Feeds `GrantStore.hasCredential` (non-null = live). */
 export function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>) {
   const margin = deps.margin === undefined ? 5 * MINUTE_MS : optionMs(deps.margin, 'margin')
-  // Decisions: not kay's `cache()`, which keys by call site (one entry set for every refresher made here, while each has its own `exchange`), takes one ttl before the load runs (this expiry is only known from the exchange's answer, less a margin) and would keep a failed exchange's `null` for its ttl.
+  // Decisions: not kay's `cache()`, as each refresher has its own `exchange` and the expiry is only known from its answer.
   const cache = new Map<K, { accessToken: string, expiresAt: number }>()
   const inFlight = new Map<K, Promise<string | null>>()
 

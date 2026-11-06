@@ -232,6 +232,29 @@ describe('SES through SNS', () => {
     expect((await mail.suppression(late))?.reason).toBe('bounce')
   })
 
+  it('fetches a rotated certificate once for a burst of posts failing at the same time', async () => {
+    const rotated = rsa()
+    const url = `${base}/SimpleNotificationService-burst.pem`
+
+    served.set('/SimpleNotificationService-burst.pem', served.get(CERT)!)
+    expect((await post(signed(notification(bounce([fresh()])), { url }))).status).toBe(200)
+    served.set('/SimpleNotificationService-burst.pem', certificate(rotated.privateKey, rotated.publicKey))
+
+    const before = hits.cert
+
+    network.refetchAfter = 0
+
+    try {
+      const answers = await Promise.all(Array.from({ length: 5 }, async () => post(signed(notification(bounce([fresh()])), { key: rotated.privateKey, url }))))
+
+      expect(answers.map(answer => answer.status)).toEqual([200, 200, 200, 200, 200])
+      expect(hits.cert - before).toBe(1)
+    }
+    finally {
+      network.refetchAfter = 60_000
+    }
+  })
+
   it('refuses a certificate URL of the wrong shape, a redirect and an oversized file, and takes an UnsubscribeConfirmation as nothing', async () => {
     const email = fresh()
     const before = hits.cert

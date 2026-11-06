@@ -67,6 +67,11 @@ interface Entry {
 type Tracker = <T>(load: () => Promise<T>) => Promise<{ result: T, reads: string[], invalidated?: boolean }>
 
 const entries = new Map<string, Entry>()
+
+// The loaded keys of each `cache()` function given a `max`, by its site, least recently loaded first.
+interface Bound { max: number, keys: Set<string> }
+
+const bounds = new Map<string, Bound>()
 // When each key whose first load failed, with a `fallback` given, may be loaded again.
 const failures = new Map<string, { until: number, deps: string[] }>()
 // Every store a call named, which `invalidate` empties too.
@@ -126,7 +131,7 @@ export interface CacheFunctionOptions<Ttl extends Duration = Duration, T = unkno
   ttl: Ttl & PositiveDuration<Ttl>
   // Groups to drop together: `invalidate()` of any tag drops every value that names it, and the pages that read them.
   tags?: CacheTag[] | undefined
-  // At most this many values for different arguments: past it the least recently called one is dropped, as `invalidate(...args)` drops it, so a function taking an outside value as its argument cannot grow the cache without bound.
+  // At most this many loaded values for different arguments: past it the least recently loaded one is dropped from memory alone (a stored row, the pages that read it and the other processes keep theirs), so a function taking an outside value as its argument cannot grow the cache without bound.
   max?: number | undefined
 }
 
@@ -142,6 +147,8 @@ export interface CacheTag {
 export interface CachedFunction<A extends unknown[], T> {
   (...args: A): Promise<T>
   invalidate: (...args: A | []) => void
+  // Loads the value for those arguments again and gives it, joining a load already running, and keeping the value it had while the load runs or when it throws: for a value found wrong, which many callers may find wrong together.
+  reload: (...args: A) => Promise<T>
 }
 
 const AT = /^at /
@@ -185,7 +192,7 @@ export function cache<A extends unknown[], T>(load: (...args: A) => T | Promise<
   const site = id === undefined ? callSite('cache', cache) : `cache:${id}`
   const { ttl, tags = [], max, ...rest } = options
 
-  durationSeconds(ttl, `${site}'s ttl`)
+  const seconds = durationSeconds(ttl, `${site}'s ttl`)
 
   if (max !== undefined && !(Number.isInteger(max) && max > 0))
     throw new Error(`kay: ${site}'s max must be a positive whole number`)
@@ -193,46 +200,34 @@ export function cache<A extends unknown[], T>(load: (...args: A) => T | Promise<
   const tagKeys = tags.map(tag => tagKey(tag))
   const keyOf = (args: unknown[]) => args.length === 0 ? site : `${site}${argumentsText(site, args)}`
 
-  // The keys called, least recently first; only kept when `max` is given.
-  const called = new Set<string>()
+  const bound = max === undefined ? undefined : boundFor(site, max)
 
-  const call = async (...args: A): Promise<T> => {
-    const key = keyOf(args)
+  if (max === undefined)
+    bounds.delete(site)
 
-    if (max !== undefined)
-      keepWithin(called, key, max)
-
-    return cachedFor<T>(key, ttl, async () => load(...args), rest, renderingForVisitor(), tagKeys)
-  }
+  const call = async (...args: A): Promise<T> => cachedFor<T>(keyOf(args), ttl, async () => load(...args), rest, renderingForVisitor(), tagKeys)
 
   return Object.assign(call, {
     invalidate: (...args: A | []) => {
       if (args.length > 0)
         return invalidate(keyOf(args))
 
-      called.clear()
+      bound?.keys.clear()
       invalidateFunction(site)
     },
+    reload: async (...args: A): Promise<T> => {
+      const key = keyOf(args)
+      const entry = entries.get(key)
+
+      if (!entry?.loaded || renderingForVisitor())
+        return call(...args)
+
+      if (!entry.loading)
+        void refresh(key, seconds, entry, async () => load(...args), rest.store === false ? undefined : rest.store ?? appCache, tagKeys, rest.store === undefined, true)
+
+      return (await (entry.loading as Promise<{ result: T }>)).result
+    },
   })
-}
-
-// Notes `key` as the most recently called, and drops the least recently called ones past `max`. A key whose load failed or whose value an `invalidate` dropped holds no place.
-function keepWithin(called: Set<string>, key: string, max: number): void {
-  for (const other of called) {
-    if (!entries.has(other))
-      called.delete(other)
-  }
-
-  called.delete(key)
-  called.add(key)
-
-  for (const oldest of called) {
-    if (called.size <= max)
-      return
-
-    called.delete(oldest)
-    invalidate(oldest)
-  }
 }
 
 // The arguments as devalue writes them, which a function or a class instance cannot be.
@@ -889,6 +884,42 @@ function splitDeps(stored: string): { deps?: string[], text: string } {
 function remember(key: string, entry: Entry): void {
   entries.delete(key)
   entries.set(key, entry)
+  place(key)
+}
+
+function boundFor(site: string, max: number): Bound {
+  const bound = bounds.get(site) ?? { max, keys: new Set<string>() }
+
+  bound.max = max
+  bounds.set(site, bound)
+
+  return bound
+}
+
+// Counts a loaded key against its function's `max` and drops the oldest ones past it from memory alone: a bounded function's rows, pages and dependents are not the cap's to touch. A key still loading holds no place, so a load that fails or a preview call never evicts a loaded value.
+function place(key: string): void {
+  for (const [site, bound] of bounds) {
+    if (key !== site && !key.startsWith(`${site}[`))
+      continue
+
+    for (const other of bound.keys) {
+      if (!entries.has(other))
+        bound.keys.delete(other)
+    }
+
+    bound.keys.delete(key)
+    bound.keys.add(key)
+
+    for (const oldest of bound.keys) {
+      if (bound.keys.size <= bound.max)
+        return
+
+      bound.keys.delete(oldest)
+      entries.delete(oldest)
+    }
+
+    return
+  }
 }
 
 function trim(): void {

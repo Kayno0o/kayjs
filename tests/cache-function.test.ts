@@ -3,7 +3,8 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
-import { cache, cacheTag, invalidate, invalidateLocally, onKeysInvalidated, trackStore, untrackStore } from '../src/runtime/cache'
+import { stringify } from 'devalue'
+import { cache, cacheTag, invalidate, invalidateLocally, onKeysInvalidated, trackLoads, trackStore, untrackStore } from '../src/runtime/cache'
 import { readsOf } from '../src/server/page-reads'
 import { scratchDir } from './scratch'
 
@@ -293,49 +294,188 @@ describe('cache', () => {
     }
   })
 
-  it('keeps the values of the max arguments called last', async () => {
-    const loaded: number[] = []
-    const square = cache(async (n: number) => {
-      loaded.push(n)
+  describe('max', () => {
+    // Loads recorded by argument, so a test reads which values were dropped.
+    function counted(max: number, store?: CacheStore) {
+      const loaded: number[] = []
+      const fn = cache(async (n: number) => {
+        loaded.push(n)
 
-      return n * n
-    }, { ttl: '1h', store: false, max: 2 })
+        if (n < 0)
+          throw new Error('down')
 
-    await square(1)
-    await square(2)
-    await square(1)
-    await square(3)
-    // 2 was the least recently called, so it loads again; 1 and 3 do not.
-    await square(1)
-    await square(3)
-    await square(2)
-    expect(loaded).toEqual([1, 2, 3, 2])
+        return n
+      }, { ttl: '1h', max, store: store ?? false })
+
+      return { fn, loaded }
+    }
+
+    it('keeps the values loaded last and drops the oldest past it', async () => {
+      const { fn, loaded } = counted(2)
+
+      await fn(1)
+      await fn(2)
+      await fn(3)
+      await fn(2)
+      await fn(3)
+      expect(loaded).toEqual([1, 2, 3])
+      await fn(1)
+      expect(loaded).toEqual([1, 2, 3, 1])
+    })
+
+    it('starts the count again after fn.invalidate()', async () => {
+      const { fn, loaded } = counted(2)
+
+      await fn(1)
+      await fn(2)
+      fn.invalidate()
+      await fn(3)
+      await fn(4)
+      await fn(3)
+      await fn(4)
+      expect(loaded).toEqual([1, 2, 3, 4])
+    })
+
+    it('counts concurrent loads of one key once', async () => {
+      const { fn, loaded } = counted(2)
+
+      await Promise.all([fn(1), fn(1), fn(1), fn(2)])
+      await fn(1)
+      await fn(2)
+      expect(loaded).toEqual([1, 2])
+    })
+
+    it('survives an invalidate during a load', async () => {
+      const gate = Promise.withResolvers<void>()
+      const loaded: number[] = []
+      const slow = cache(async (n: number) => {
+        loaded.push(n)
+        await gate.promise
+
+        return n
+      }, { ttl: '1h', max: 1, store: false })
+
+      const first = slow(1)
+
+      slow.invalidate(1)
+      gate.resolve()
+      await first
+      await slow(2)
+      await slow(2)
+      expect(loaded.filter(n => n === 2)).toEqual([2])
+    })
+
+    it('holds no place for a load that failed, so it never evicts a loaded value', async () => {
+      const { fn, loaded } = counted(2)
+
+      await fn(1)
+      await fn(2)
+      await expect(fn(-1)).rejects.toThrow('down')
+      await expect(fn(-2)).rejects.toThrow('down')
+      await fn(1)
+      await fn(2)
+      expect(loaded.filter(n => n > 0)).toEqual([1, 2])
+    })
+
+    it('stays within the cap when a store reads concurrently, and leaves the stored rows', async () => {
+      const rows = new Map<string, { text: string, freshUntil: number }>()
+      let reads = 0
+
+      const store: CacheStore = {
+        get: async (key) => {
+          reads++
+          await Bun.sleep(1)
+
+          return rows.get(key)
+        },
+        set: (key, text, freshUntil) => void rows.set(key, { text, freshUntil }),
+        delete: key => void rows.delete(key),
+        keys: () => [...rows.keys()],
+      }
+
+      const { fn } = counted(3, store)
+
+      await Promise.all(Array.from({ length: 12 }, async (_, n) => fn(n)))
+      expect(rows.size).toBe(12)
+      reads = 0
+      await Promise.all([fn(11), fn(10), fn(9)])
+      expect(reads).toBe(0)
+      await fn(0)
+      expect(reads).toBe(1)
+    })
+
+    it('drops a value from memory without telling a page, a dependent or the other processes', async () => {
+      const told: string[] = []
+      const sent: string[] = []
+      const rows = new Map<string, { text: string, freshUntil: number }>()
+
+      const store: CacheStore = {
+        get: key => rows.get(key),
+        set: (key, text, freshUntil) => void rows.set(key, { text, freshUntil }),
+        delete: key => void rows.delete(key),
+        keys: () => [...rows.keys()],
+        publish: message => void sent.push(message),
+        subscribe: () => undefined,
+      }
+
+      const off = onKeysInvalidated((_matches, dropped) => {
+        told.push(...[...rows.keys()].filter(dropped))
+
+        return []
+      })
+
+      // The build adds the module's id as a third argument, which the type keeps from apps.
+      const named = cache as unknown as <A extends unknown[], T>(load: (...args: A) => Promise<T>, options: CacheFunctionOptions, id: string) => CachedFunction<A, T>
+      const parent = named(async (n: number) => n, { ttl: '1h', max: 1, store }, 'max-parent')
+      let child = 0
+      const dependent = named(async () => ++child, { ttl: '1h', store: false }, 'max-child')
+      const key = `cache:max-parent${stringify([1])}`
+
+      try {
+        await parent(1)
+        trackLoads(async load => ({ result: await load(), reads: [key] }))
+        await dependent()
+        sent.length = 0
+        told.length = 0
+        await parent(2)
+        await parent(3)
+        expect(told).toEqual([])
+        expect(sent).toEqual([])
+        expect(rows.has(key)).toBe(true)
+        expect(await dependent()).toBe(1)
+      }
+      finally {
+        trackLoads(async load => ({ result: await load(), reads: [] }))
+        off()
+      }
+    })
+
+    it('refuses a max that is not a positive whole number', () => {
+      for (const max of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])
+        expect(() => cache(() => 1, { ttl: '1m', max })).toThrow('max')
+    })
   })
 
-  it('holds no place for a load that failed or a key invalidated', async () => {
-    const loaded: number[] = []
-    const fetched = cache(async (n: number) => {
-      loaded.push(n)
+  it('reloads a value once for the callers asking while it loads, keeping the old one if the load throws', async () => {
+    let loads = 0
+    let failing = false
 
-      if (n === 0)
+    const fn = cache(async (n: number) => {
+      loads++
+      await Bun.sleep(5)
+
+      if (failing)
         throw new Error('down')
 
-      return n
-    }, { ttl: '1h', store: false, max: 2 })
+      return `${n}:${loads}`
+    }, { ttl: '1h', store: false, stale: false })
 
-    await expect(fetched(0)).rejects.toThrow('down')
-    await fetched(1)
-    await fetched(2)
-    fetched.invalidate(2)
-    await fetched(3)
-    await fetched(1)
-    await fetched(3)
-    expect(loaded).toEqual([0, 1, 2, 3])
-  })
-
-  it('refuses a max that is not a positive whole number', () => {
-    expect(() => cache(() => 1, { ttl: '1m', max: 0 })).toThrow('max')
-    expect(() => cache(() => 1, { ttl: '1m', max: 1.5 })).toThrow('max')
+    expect(await fn(1)).toBe('1:1')
+    expect(await Promise.all([fn.reload(1), fn.reload(1), fn.reload(1)])).toEqual(['1:2', '1:2', '1:2'])
+    expect(loads).toBe(2)
+    failing = true
+    await expect(fn.reload(1)).rejects.toThrow('down')
+    expect(await fn(1)).toBe('1:2')
   })
 
   it('refuses a tag it did not make', () => {

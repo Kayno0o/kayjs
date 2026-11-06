@@ -10,7 +10,6 @@ import { normalizeAddress } from 'kay/library'
 // The only place a signing certificate or a subscription is fetched from: https, the SNS endpoint of a region, no port, no login.
 const SNS_HOST = /^sns\.[a-z\d-]+\.amazonaws\.com$/
 const CERT_MAX = 16_384
-
 const CERT_CACHE_MAX = 8
 const FETCH_TIMEOUT = 5000
 const TOPIC_ARN = /^arn:aws:sns:/
@@ -75,7 +74,6 @@ export function stringToSign(message: Record<string, unknown>): string | undefin
 // SignatureVersion 1 is SHA1, 2 is SHA256.
 const ALGORITHMS: Record<string, string> = { 1: 'RSA-SHA1', 2: 'RSA-SHA256' }
 
-
 // The body as text when it is no larger than the cap, read as it arrives.
 async function boundedText(response: Response): Promise<string | undefined> {
   if (!response.ok || response.body === null || Number(response.headers.get('content-length') ?? 0) > CERT_MAX)
@@ -106,15 +104,13 @@ const certificateOf = cache(async (url: string): Promise<{ key: KeyObject, at: n
   return found
 }, { ttl: '24h', store: false, stale: false, max: CERT_CACHE_MAX })
 
-// The certificate at `url` and whether this call fetched it; `forceFresh` drops the one kept first.
-async function certificateKey(url: string, forceFresh: boolean): Promise<{ key: KeyObject, at: number, fresh: boolean } | undefined> {
+// The certificate at `url` and whether this call fetched it; `replacing` is the `at` of a certificate that failed a check, fetched again unless another call already has, and with the fetch shared by every call asking at once.
+async function certificateKey(url: string, replacing?: number): Promise<{ key: KeyObject, at: number, fresh: boolean } | undefined> {
   const began = Date.now()
 
-  if (forceFresh)
-    certificateOf.invalidate(url)
-
   try {
-    const found = await certificateOf(url)
+    const kept = await certificateOf(url)
+    const found = kept.at === replacing ? await certificateOf.reload(url) : kept
 
     return { ...found, fresh: found.at >= began }
   }
@@ -165,7 +161,7 @@ export async function snsSigned(message: Record<string, unknown>): Promise<boole
   if (text === undefined || typeof url !== 'string' || !certificateUrl(url))
     return false
 
-  const first = await certificateKey(url, false)
+  const first = await certificateKey(url)
 
   if (first === undefined)
     return false
@@ -177,7 +173,7 @@ export async function snsSigned(message: Record<string, unknown>): Promise<boole
   if (first.fresh || Date.now() - first.at < network.refetchAfter)
     return false
 
-  const again = await certificateKey(url, true)
+  const again = await certificateKey(url, first.at)
 
   return again !== undefined && signatureHolds(message, text, again.key)
 }

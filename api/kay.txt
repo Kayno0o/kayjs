@@ -1485,6 +1485,7 @@ function cached<T, `${number}d` | `${number}h` | `${number}m` | `${number}s` | `
 [./cache] CachedFunction
 interface CachedFunction<A extends unknown[], T>
   invalidate: (...args: A | []) => void
+  reload: (...args: A) => Promise<T>
 
 [./cache] CacheFunctionOptions
 interface CacheFunctionOptions<Ttl extends Duration = Duration, T = unknown> extends CacheOptions<T>

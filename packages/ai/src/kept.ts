@@ -18,6 +18,7 @@ interface Entry {
 }
 
 interface Slot {
+  // Decisions: not kay's `cache()`, as these entries are read and changed in place and synchronously, and finished replies go before running ones.
   replies: Map<string, Entry>
   // Keys a stop named before their reply was kept, as a stop may reach the server ahead of the call it ends.
   stopped: Map<string, { at: number, owner: Promise<string | undefined> }>
@@ -28,7 +29,6 @@ function same(kept: string | undefined, asked: string | undefined): boolean {
   return kept !== undefined && kept === asked
 }
 
-// Decisions: not kay's `cache()`, which gives its values asynchronously through a key made from the call site, where this is read and changed in place and synchronously (`ended`, `refunds`, a `stopped` mark made before the reply exists) and evicts finished replies before running ones, an order `cache()` does not know.
 const SLOT = Symbol.for('kayjs-ai.kept')
 
 // On the global, so every copy of the library in the process shares the replies.
