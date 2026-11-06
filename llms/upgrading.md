@@ -4,9 +4,6 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.92.0
 
-### kayjs-ui and kayjs-auth need `@kaynooo/utils` 3
-
-Their peer range is `^3.0.0`, since utils 3.0.0 renamed `copy` to `copyToClipboard` and `entriesFromDataTransfer` to `readDataTransferEntries`, which kayjs-ui calls. An app on utils 2 raises `@kaynooo/utils` to `^3.0.0` and follows utils' `MIGRATION.md` for what it imports itself.
 
 ### The root of kayjs-mail and kayjs-ai stops exporting the store names that moved in 1.88, which 1.91 still exports
 

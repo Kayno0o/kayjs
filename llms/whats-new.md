@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- kayjs-ui and kayjs-auth follow `@kaynooo/utils` 3.0.0: their peer range is `^3.0.0`, so an app on utils 2 moves to 3 ([Upgrading](upgrading.md)).
+- kayjs-ui and kayjs-auth depend on `@kaynooo/utils` 3.0.0, so kayjs-ui type-checks in an app that is on utils 3; an app still on utils 2 keeps it, as each package installs its own copy.
 - Every error kay and its libraries throw for an app to catch extends `KayError` (from `kay/library`) with `code`, `kind`, `status`, `cause` and `name`, its old class kept for `instanceof`, and `kay explain <code>` documents them in the new `runtime` and `library` groups: [Errors](errors.md). An uncaught `SaveConflictError` now answers 409 and an `UnknownCollectionError` 404, where both answered 500.
 - A library's config-time problems (a `cms({ collections })` layout, `roles`, `rules`, a rate limit) throw through `configError`, and each library's `llms/` lists its errors in one `Errors` table.
 - `pgData(...).close()` and `pgHandle(...).close()` settle within about 5 seconds whatever a statement in flight or a locked table holds, so an app's shutdown is no longer held by a close that waits on the database: [queues](queues.md).
