@@ -19,5 +19,5 @@ export async function imageFixture(): Promise<{ root: string, dispose: () => Pro
 export function heroPaths(html: string): { image: string, asset: string } {
   const hero = decodeURIComponent(HERO.exec(html)![1]!)
 
-  return { image: `/_kay/image?src=${encodeURIComponent(`/_kay/assets/${hero}`)}&w=320`, asset: `/_kay/assets/${hero}` }
+  return { image: `/_kay/images?src=${encodeURIComponent(`/_kay/assets/${hero}`)}&w=320`, asset: `/_kay/assets/${hero}` }
 }

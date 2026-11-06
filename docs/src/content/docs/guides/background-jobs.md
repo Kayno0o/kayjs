@@ -77,7 +77,7 @@ app.use(background(async (signal) => {
 A queue holds jobs that must not be lost. An action enqueues one and answers at once. The server runs the job after the response, or after a restart or a deploy if it has to.
 
 ```ts
-// src/jobs.ts
+// src/plugins/jobs.ts
 import { queue } from 'kay/server'
 
 export const welcomeMails = queue(
@@ -85,9 +85,11 @@ export const welcomeMails = queue(
   async ({ to }: { to: string }) => sendWelcome(to),
   { attempts: 5, backoff: '30s', onError: reportFailedMail },
 )
+
+export default welcomeMails
 ```
 
-The server runs it with `.use(welcomeMails)`. An action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later.
+`src/plugins/jobs.ts` is the one home of jobs, and the server runs what it exports by default. With several queues, export `new Elysia().use(welcomeMails).use(scans)`. `.use(welcomeMails)` before `pages()` in `src/server.ts` also works, and `kay check` reports a `src/jobs.ts` that nothing imports. An action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later.
 
 A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onError` as `{ id, payload, attempts, error }`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
 
@@ -186,7 +188,7 @@ Set `idlePoll: '1s'` to look every second, or `'30s'` to ask the database less o
 A page can list the jobs a queue holds and follow them as they are added, start, finish or fail. Give the queue `live`, then read `jobs` from `kay` in an island.
 
 ```ts
-// src/jobs.ts
+// src/plugins/jobs.ts
 export const scans = queue('scans', scan, {
   live: ({ target }: { target: string }) => ({ target }),
 })
@@ -299,7 +301,7 @@ export const welcomeMails = queue('welcome-mails', sendWelcome, { store: myStore
 A `workflow` is a flow of steps that survives restarts, sleeps for days without holding a process and waits for an event. `step.run` runs a step once and keeps its result, `step.sleep` lets the run go for a while, and `step.waitFor` waits for an event.
 
 ```ts
-// src/jobs.ts
+// src/plugins/jobs.ts
 import { workflow } from 'kay/server'
 
 export const onboarding = workflow<{ userId: string }, { visited: undefined }>('onboarding', async ({ input, step }) => {
@@ -312,7 +314,7 @@ export const onboarding = workflow<{ userId: string }, { visited: undefined }>('
 })
 ```
 
-Use it like a queue: `.use(onboarding)` before `pages()` in `src/server.ts`, or `export { onboarding as default } from '../jobs'` in `src/plugins/jobs.ts`. An action starts a run with one call and sends it an event with another. The `id` names the run, so an app can use its own, a user's id say.
+Use it like a queue: `export default onboarding` in `src/plugins/jobs.ts`, or `.use(onboarding)` before `pages()` in `src/server.ts`. An action starts a run with one call and sends it an event with another. The `id` names the run, so an app can use its own, a user's id say.
 
 ```ts
 await onboarding.start({ userId }, { id: userId })

@@ -1,15 +1,15 @@
 # Queues
 
-A `queue` runs jobs in the background, each surviving a restart, and a `workflow` is a multi-step flow that sleeps and waits for events across restarts; `schedule` and `background` are in [Running in production](production.md#background-jobs).
+A `queue` runs jobs in the background, a `workflow` is a multi-step flow that sleeps and waits for events, both surviving restarts; `schedule` and `background` are in [Running in production](production.md#background-jobs).
 
 ## Common tasks
 
 ### Run a job in the background
 
-A queue holds jobs that must not be lost: an action enqueues one and goes on, and the server runs it in the background, after a restart or a deploy if need be:
+A queue holds jobs that must not be lost: an action enqueues one and goes on, and the server runs it:
 
 ```ts
-// src/jobs.ts
+// src/plugins/jobs.ts
 import { queue } from 'kay/server'
 
 export const welcomeMails = queue(
@@ -17,16 +17,15 @@ export const welcomeMails = queue(
   async ({ to }: { to: string }) => sendWelcome(to),
   { attempts: 5, backoff: '30s' },
 )
+
+export default welcomeMails
 ```
 
-```ts
-// src/plugins/jobs.ts, or `.use(welcomeMails)` before `pages()` in src/server.ts
-export { welcomeMails as default } from '../jobs'
-```
+`src/plugins/jobs.ts` is the one home of jobs: `pages()` mounts its default export (`new Elysia().use(a).use(b)` for several), and an action imports the queue from it. `kay check` warns of a `src/jobs.ts` nothing imports.
 
 ### Delay a job or keep one per key
 
-`enqueue` takes a `delay`, and a `key` keeps one job waiting or running for it:
+`enqueue` takes a `delay`, and a `key` keeps one job per key:
 
 ```ts
 await welcomeMails.enqueue({ to: email }, { delay: '1h', key: email })
@@ -34,10 +33,10 @@ await welcomeMails.enqueue({ to: email }, { delay: '1h', key: email })
 
 ### Show a queue's jobs on a page
 
-`live` on a queue lets an island list its waiting and running jobs, following them as they are added, taken, done or failed, with no route or `live()` value written:
+`live` on a queue lets an island list its waiting and running jobs, following them as they change, with no route or `live()` value written:
 
 ```ts
-// src/jobs.ts: `live: true` would send the whole payload, key, progress and last error
+// src/plugins/jobs.ts: `live: true` would send the whole payload, key, progress and last error
 export const scans = queue('scans', scan, { live: ({ target }: { target: string }) => ({ target }) })
 ```
 
@@ -51,10 +50,10 @@ for job of jobs<{ target: string }>('scans')
 
 ### Write a flow that sleeps and waits
 
-A `workflow` runs steps once each, keeps their results in the job store and survives restarts. `start` and `send` are one call each, and the `id` names the run. Used like a queue: `.use(onboarding)`, or `export { onboarding as default } from '../jobs'` in a plugin file.
+A `workflow` runs steps once each, keeps their results in the job store and survives restarts. `start` and `send` are one call, and the `id` names the run. Used like a queue: `export default onboarding` in `src/plugins/jobs.ts`, or `.use(onboarding)` before `pages()` in `src/server.ts`.
 
 ```ts
-// src/jobs.ts
+// src/plugins/jobs.ts
 import { workflow } from 'kay/server'
 
 export const onboarding = workflow<{ userId: string }, { visited: undefined }>('onboarding', async ({ input, step }) => {

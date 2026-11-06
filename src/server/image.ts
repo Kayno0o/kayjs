@@ -22,6 +22,7 @@ import { AVIF_ENCODER, AVIF_SPEED, DEFAULT_AVIF_QUALITY, encodeAvif } from './av
 import { coverImage } from './crop'
 import { dominantColor, setImageColors } from './image-color'
 import { decodable, drawing, imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
+import { LEGACY_IMAGE_ROUTE } from './image-route'
 import { limiter } from './limit'
 import { clientAddress } from './protection'
 import { revalidated } from './public'
@@ -271,196 +272,198 @@ export function serveImages(app: Elysia, options: ImageRouteOptions): void {
   })
   app.onStop(() => clearInterval(pruning))
 
-  app.get(IMAGE_ROUTE, async (context) => {
-    const { request, server, set } = context
-    const saving = lightens && savesData(request)
-    const key = `${request.url}${options.avif === undefined ? '' : `\n${acceptsAvif(request.headers.get('accept'))}`}${saving ? '\nsave-data' : ''}`
-    const known = answered.get(key)
+  for (const route of [IMAGE_ROUTE, LEGACY_IMAGE_ROUTE]) {
+    app.get(route, async (context) => {
+      const { request, server, set } = context
+      const saving = lightens && savesData(request)
+      const key = `${request.url}${options.avif === undefined ? '' : `\n${acceptsAvif(request.headers.get('accept'))}`}${saving ? '\nsave-data' : ''}`
+      const known = answered.get(key)
 
-    if (known)
-      return new Response(known.file, { headers: ownHeadersInit(set, known.headers) })
+      if (known)
+        return new Response(known.file, { headers: ownHeadersInit(set, known.headers) })
 
-    let passed: GuardedRequest | undefined
-    // What the guards set goes out with every answer they let through.
-    const guarded = (response: Response) => {
-      for (const [name, value] of passed?.headers ?? [])
-        response.headers[name === 'set-cookie' ? 'append' : 'set'](name, value)
+      let passed: GuardedRequest | undefined
+      // What the guards set goes out with every answer they let through.
+      const guarded = (response: Response) => {
+        for (const [name, value] of passed?.headers ?? [])
+          response.headers[name === 'set-cookie' ? 'append' : 'set'](name, value)
 
-      passed?.jar.writeTo(response.headers)
+        passed?.jar.writeTo(response.headers)
 
-      return response
-    }
-    const fail = (body: string, status: number) => guarded(new Response(body, { status, headers: ownHeadersInit(set, text) }))
+        return response
+      }
+      const fail = (body: string, status: number) => guarded(new Response(body, { status, headers: ownHeadersInit(set, text) }))
 
-    const url = requestUrl(request)
-    const src = url.searchParams.get('src') ?? ''
-    let source = await findSource(src, options, clientAddress(request, server))
+      const url = requestUrl(request)
+      const src = url.searchParams.get('src') ?? ''
+      let source = await findSource(src, options, clientAddress(request, server))
 
-    if (!source && options.resolve) {
+      if (!source && options.resolve) {
       // The guards get a copy of the context: Elysia's Sucrose reads a handler passing its whole context to a function, `context,` or `context)`, as using all of it, so it would parse the cookies of every request and copy every response for the jar that sets.
-      const found = await resolvedSource(src, { ...context }, options.resolve)
+        const found = await resolvedSource(src, { ...context }, options.resolve)
 
-      if (found instanceof Response) {
-        for (const [name, value] of Object.entries(options.security ?? {})) {
-          if (!found.headers.has(name))
-            found.headers.set(name, value)
+        if (found instanceof Response) {
+          for (const [name, value] of Object.entries(options.security ?? {})) {
+            if (!found.headers.has(name))
+              found.headers.set(name, value)
+          }
+
+          found.headers.set('cache-control', 'private, no-store')
+
+          return found
         }
 
-        found.headers.set('cache-control', 'private, no-store')
-
-        return found
+        source = found?.source
+        passed = found?.passed
       }
 
-      source = found?.source
-      passed = found?.passed
-    }
+      if (!source)
+        return fail('Not Found', 404)
 
-    if (!source)
-      return fail('Not Found', 404)
+      if ('status' in source)
+        return fail(source.message, source.status)
 
-    if ('status' in source)
-      return fail(source.message, source.status)
+      const { path } = source
+      let stats: { size: number, mtimeMs: number } | undefined
+      let own = source.immutable ? importedSizes.get(path) : undefined
+      let runtimeKey: string | undefined
 
-    const { path } = source
-    let stats: { size: number, mtimeMs: number } | undefined
-    let own = source.immutable ? importedSizes.get(path) : undefined
-    let runtimeKey: string | undefined
+      if (!own) {
+        try {
+          stats = await stat(path)
+          // A runtime image may change in place, so its header is kept by the size and time just read.
+          runtimeKey = source.immutable ? undefined : `${path}\n${stats.size}\n${stats.mtimeMs}`
+          own = runtimeKey === undefined ? undefined : runtimeSizes.get(runtimeKey)
+          own ??= await imageHeader(Bun.file(path), source.immutable ? undefined : MAX_UPLOAD_PIXELS)
+        }
+        catch (error) {
+          if ((error as { code?: string }).code === 'ERR_IMAGE_TOO_MANY_PIXELS')
+            return fail(`Image over ${MAX_UPLOAD_PIXELS} pixels`, 413)
 
-    if (!own) {
-      try {
-        stats = await stat(path)
-        // A runtime image may change in place, so its header is kept by the size and time just read.
-        runtimeKey = source.immutable ? undefined : `${path}\n${stats.size}\n${stats.mtimeMs}`
-        own = runtimeKey === undefined ? undefined : runtimeSizes.get(runtimeKey)
-        own ??= await imageHeader(Bun.file(path), source.immutable ? undefined : MAX_UPLOAD_PIXELS)
-      }
-      catch (error) {
-        if ((error as { code?: string }).code === 'ERR_IMAGE_TOO_MANY_PIXELS')
-          return fail(`Image over ${MAX_UPLOAD_PIXELS} pixels`, 413)
-
-        return stats ? fail('Not an image kay can resize', 415) : fail('Not Found', 404)
-      }
-
-      if (source.immutable)
-        importedSizes.set(path, own)
-      else if (runtimeKey !== undefined)
-        keep(runtimeSizes, runtimeKey, own)
-    }
-
-    if (runtimeKey !== undefined && source.private !== true && !src.startsWith(FILES_ROUTE))
-      void learnColor(src, runtimeKey, path, own)
-
-    const requested = requestedVariant(url, own, allowed)
-
-    if (typeof requested === 'string' && requested !== 'card')
-      return fail(requested, 400)
-
-    // Its URL may carry a signed link, or `images.resolve` admit only some, so no shared cache keeps it.
-    const answer = (response: Response) => {
-      if (source.private === true)
-        response.headers.set('cache-control', 'private, no-cache')
-
-      return guarded(response)
-    }
-
-    const asIs = () => {
-      const original = Bun.file(path, { type: 'image/gif' })
-
-      if (source.immutable)
-        return remembered(key, original, immutable, set)
-
-      return answer(revalidated(request, `W/"${cacheKey(`${path}\n${stats!.size}\n${stats!.mtimeMs}`)}"`, () => original, ownHeaders(set, revalidatedAs)))
-    }
-
-    // An animated GIF goes as it is at every width, a variant flattening it to its first frame; its card is still drawn from that frame.
-    if (own.animated && requested !== 'card')
-      return asIs()
-
-    // A visitor saving data gets the next width down of the same image.
-    const variant = saving && typeof requested === 'object' ? { ...requested, width: narrowerWidth(requested.width) } : requested
-    // Both formats answer the same URL, so a cache keeps one per `Accept`.
-    const negotiated = options.avif !== undefined && variant !== 'card'
-    const format = negotiated && acceptsAvif(request.headers.get('accept')) ? 'avif' : 'webp'
-    const varied = lightens && variant !== 'card'
-    const headers = immutables(negotiated, varied)
-    // An imported image is named after its content; a runtime one may change in place, so its size and time, read above since its size is never kept, go in the name, after the prefix of a remote or stored one, whose variants go when its original does.
-    const name = source.immutable ? variantName(path, variant, format) : inFormat(`${source.prefix ?? ''}${cacheKey(`${path}\n${stats!.size}\n${stats!.mtimeMs}`)}${variantSuffix(variant)}`, format)
-    const found = source.immutable ? importedVariants.get(name) : undefined
-
-    if (found)
-      return remembered(key, found, headers, set)
-
-    const built = join(options.clientDir, VARIANTS_DIR, name)
-    const cached = join(options.cacheDir, name)
-    let file = source.immutable && await Bun.file(built).exists() ? built : cached
-
-    const version = `${path}\n${stats?.size}\n${stats?.mtimeMs}`
-    // A failure belongs to the kind of variant that hit it, so a card or an AVIF failing leaves the widths in WebP alone.
-    const kind = typeof variant === 'object' && variant.aspect ? 'crop' : 'resize'
-    const failure = `${version}\n${format}\n${variant === 'card' ? 'card' : kind}`
-    // A browser draws GIFs Bun.Image reads the header of and cannot decode, so such a GIF goes as it is rather than break its preview.
-    const refused = () => own.format === 'gif' && requested !== 'card' ? asIs() : fail('Not an image kay can resize', 415)
-
-    if (file === cached && undecodable.has(failure))
-      return refused()
-
-    let writing = pending.get(cached)
-
-    // Requests for a variant being written wait for that one write.
-    if (file === cached && (writing || !await touched(cached))) {
-      if (!writing) {
-        // Counted before it waits its turn, so the variants a burst asks for share the decode.
-        const decoding = own.format === 'avif' ? decodedAvif.get(version) ?? { writers: 0 } : undefined
-
-        if (decoding) {
-          decoding.writers++
-          decodedAvif.set(version, decoding)
+          return stats ? fail('Not an image kay can resize', 415) : fail('Not Found', 404)
         }
 
-        writing = (async () => {
-          try {
-            await drawing(async () => {
-              const decoded = decoding ? await (decoding.png ??= decodable(Bun.file(path), source.immutable ? undefined : MAX_UPLOAD_PIXELS)) : path
-
-              await writeVariant(decoded, variant, cached, variantLevel(variant, format, options.quality ?? DEFAULT_QUALITY, options.avif ?? DEFAULT_AVIF_QUALITY), format)
-            })
-          }
-          finally {
-            pending.delete(cached)
-
-            if (decoding && --decoding.writers === 0)
-              decodedAvif.delete(version)
-          }
-        })()
-        pending.set(cached, writing)
+        if (source.immutable)
+          importedSizes.set(path, own)
+        else if (runtimeKey !== undefined)
+          keep(runtimeSizes, runtimeKey, own)
       }
 
-      try {
-        await writing
+      if (runtimeKey !== undefined && source.private !== true && !src.startsWith(FILES_ROUTE))
+        void learnColor(src, runtimeKey, path, own)
+
+      const requested = requestedVariant(url, own, allowed)
+
+      if (typeof requested === 'string' && requested !== 'card')
+        return fail(requested, 400)
+
+      // Its URL may carry a signed link, or `images.resolve` admit only some, so no shared cache keeps it.
+      const answer = (response: Response) => {
+        if (source.private === true)
+          response.headers.set('cache-control', 'private, no-cache')
+
+        return guarded(response)
       }
-      catch (error) {
-        // A full or unwritable cache directory is the server's failure, which its error log reports, not the image's.
-        if (typeof (error as { syscall?: unknown }).syscall === 'string')
-          throw error
 
-        keep(undecodable, failure, true)
+      const asIs = () => {
+        const original = Bun.file(path, { type: 'image/gif' })
 
+        if (source.immutable)
+          return remembered(key, original, immutable, set)
+
+        return answer(revalidated(request, `W/"${cacheKey(`${path}\n${stats!.size}\n${stats!.mtimeMs}`)}"`, () => original, ownHeaders(set, revalidatedAs)))
+      }
+
+      // An animated GIF goes as it is at every width, a variant flattening it to its first frame; its card is still drawn from that frame.
+      if (own.animated && requested !== 'card')
+        return asIs()
+
+      // A visitor saving data gets the next width down of the same image.
+      const variant = saving && typeof requested === 'object' ? { ...requested, width: narrowerWidth(requested.width) } : requested
+      // Both formats answer the same URL, so a cache keeps one per `Accept`.
+      const negotiated = options.avif !== undefined && variant !== 'card'
+      const format = negotiated && acceptsAvif(request.headers.get('accept')) ? 'avif' : 'webp'
+      const varied = lightens && variant !== 'card'
+      const headers = immutables(negotiated, varied)
+      // An imported image is named after its content; a runtime one may change in place, so its size and time, read above since its size is never kept, go in the name, after the prefix of a remote or stored one, whose variants go when its original does.
+      const name = source.immutable ? variantName(path, variant, format) : inFormat(`${source.prefix ?? ''}${cacheKey(`${path}\n${stats!.size}\n${stats!.mtimeMs}`)}${variantSuffix(variant)}`, format)
+      const found = source.immutable ? importedVariants.get(name) : undefined
+
+      if (found)
+        return remembered(key, found, headers, set)
+
+      const built = join(options.clientDir, VARIANTS_DIR, name)
+      const cached = join(options.cacheDir, name)
+      let file = source.immutable && await Bun.file(built).exists() ? built : cached
+
+      const version = `${path}\n${stats?.size}\n${stats?.mtimeMs}`
+      // A failure belongs to the kind of variant that hit it, so a card or an AVIF failing leaves the widths in WebP alone.
+      const kind = typeof variant === 'object' && variant.aspect ? 'crop' : 'resize'
+      const failure = `${version}\n${format}\n${variant === 'card' ? 'card' : kind}`
+      // A browser draws GIFs Bun.Image reads the header of and cannot decode, so such a GIF goes as it is rather than break its preview.
+      const refused = () => own.format === 'gif' && requested !== 'card' ? asIs() : fail('Not an image kay can resize', 415)
+
+      if (file === cached && undecodable.has(failure))
         return refused()
+
+      let writing = pending.get(cached)
+
+      // Requests for a variant being written wait for that one write.
+      if (file === cached && (writing || !await touched(cached))) {
+        if (!writing) {
+        // Counted before it waits its turn, so the variants a burst asks for share the decode.
+          const decoding = own.format === 'avif' ? decodedAvif.get(version) ?? { writers: 0 } : undefined
+
+          if (decoding) {
+            decoding.writers++
+            decodedAvif.set(version, decoding)
+          }
+
+          writing = (async () => {
+            try {
+              await drawing(async () => {
+                const decoded = decoding ? await (decoding.png ??= decodable(Bun.file(path), source.immutable ? undefined : MAX_UPLOAD_PIXELS)) : path
+
+                await writeVariant(decoded, variant, cached, variantLevel(variant, format, options.quality ?? DEFAULT_QUALITY, options.avif ?? DEFAULT_AVIF_QUALITY), format)
+              })
+            }
+            finally {
+              pending.delete(cached)
+
+              if (decoding && --decoding.writers === 0)
+                decodedAvif.delete(version)
+            }
+          })()
+          pending.set(cached, writing)
+        }
+
+        try {
+          await writing
+        }
+        catch (error) {
+        // A full or unwritable cache directory is the server's failure, which its error log reports, not the image's.
+          if (typeof (error as { syscall?: unknown }).syscall === 'string')
+            throw error
+
+          keep(undecodable, failure, true)
+
+          return refused()
+        }
+
+        file = cached
       }
 
-      file = cached
-    }
+      if (source.immutable) {
+        const variantFile = Bun.file(file)
 
-    if (source.immutable) {
-      const variantFile = Bun.file(file)
+        importedVariants.set(name, variantFile)
 
-      importedVariants.set(name, variantFile)
+        return remembered(key, variantFile, headers, set)
+      }
 
-      return remembered(key, variantFile, headers, set)
-    }
-
-    return answer(revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, revalidatedCopies(negotiated, varied))))
-  })
+      return answer(revalidated(request, `W/"${name}"`, () => Bun.file(file), ownHeaders(set, revalidatedCopies(negotiated, varied))))
+    })
+  }
 
   // The color of a runtime image shown until it loads, read once per version of the file in the background and kept by the `src` pages give `image()`. A private image, a stored one and an AVIF, which is costly to decode, get none.
   async function learnColor(src: string, version: string, path: string, own: { animated: boolean, format: string }): Promise<void> {

@@ -2,7 +2,7 @@ import { pages } from 'kay/server'
 import { measure } from 'mitata'
 import { heroPaths, imageFixture } from './image-fixture'
 
-// What an imported image's variant costs a request on `/_kay/image`, against the same image as a build file on the `/_kay/*` wildcard. `bun bench/image-probe.ts <variant>`
+// What an imported image's variant costs a request on `/_kay/images`, against the same image as a build file on the `/_kay/*` wildcard. `bun bench/image-probe.ts <variant>`
 const VARIANTS: Record<string, object> = {
   stock: {},
   nosecurity: { security: false },

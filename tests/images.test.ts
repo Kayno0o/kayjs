@@ -160,7 +160,7 @@ describe('image()', () => {
     const build = await Bun.build({ entrypoints: [entry], target: 'browser', minify: true })
     const code = await build.outputs[0]!.text()
 
-    expect(code).toContain('/_kay/image')
+    expect(code).toContain('/_kay/images')
 
     for (const serverOnly of ['images.remote', 'images.aspects', 'remote-', '/_kay/images/'])
       expect(code).not.toContain(serverOnly)
@@ -206,7 +206,7 @@ describe('density cap', () => {
 })
 
 describe('image route', () => {
-  const heroAt = (width: number | string) => `/_kay/image?src=${encodeURIComponent(`/_kay/assets/${heroUrl}`)}&w=${width}`
+  const heroAt = (width: number | string) => `/_kay/images?src=${encodeURIComponent(`/_kay/assets/${heroUrl}`)}&w=${width}`
 
   it('answers a WebP of an imported image at a ladder width, cached for good', async () => {
     const response = await get(heroAt(640))
@@ -241,7 +241,7 @@ describe('image route', () => {
 
   it('takes the image\'s own width and a multiple of 16 below the ladder, and refuses any other width or one above its own', async () => {
     expect((await new Bun.Image(await (await get(heroAt(1000))).bytes()).metadata()).width).toBe(1000)
-    const smallAt = (width: number) => `/_kay/image?src=${encodeURIComponent('/uploads/small.webp')}&w=${width}`
+    const smallAt = (width: number) => `/_kay/images?src=${encodeURIComponent('/uploads/small.webp')}&w=${width}`
 
     for (const width of [96, 16, 304])
       expect((await new Bun.Image(await (await get(heroAt(width))).bytes()).metadata()).width).toBe(width)
@@ -256,7 +256,7 @@ describe('image route', () => {
   })
 
   it('makes no variant of an image wider than the ladder at its own size, whatever the request', async () => {
-    const wideAt = (width: number) => `/_kay/image?src=${encodeURIComponent('/uploads/wide.png')}&w=${width}`
+    const wideAt = (width: number) => `/_kay/images?src=${encodeURIComponent('/uploads/wide.png')}&w=${width}`
 
     expect((await new Bun.Image(await (await get(wideAt(2560))).bytes()).metadata()).width).toBe(2560)
 
@@ -266,21 +266,21 @@ describe('image route', () => {
 
   it('reads nothing outside the built assets and the runtime image directories', async () => {
     for (const src of ['/_kay/assets/missing-1.png', '/_kay/assets/../../package.json.png', '/_kay/assets/%2E%2E%2F%2E%2E%2Fx.png', '/elsewhere/photo.png', '/uploads/../photo.png', '/uploads/%2E%2E/x.png', '/uploads/photo.txt'])
-      expect((await get(`/_kay/image?src=${encodeURIComponent(src)}&w=320`)).status).toBe(404)
+      expect((await get(`/_kay/images?src=${encodeURIComponent(src)}&w=320`)).status).toBe(404)
   })
 
   it('resizes an image added to a runtime directory, revalidated since it may change in place', async () => {
-    const response = await get(`/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&w=320`)
+    const response = await get(`/_kay/images?src=${encodeURIComponent('/uploads/photo.png')}&w=320`)
     const etag = response.headers.get('etag')!
 
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('public, max-age=0, must-revalidate')
     expect((await new Bun.Image(await response.bytes()).metadata()).width).toBe(320)
-    expect((await get(`/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&w=320`, { 'if-none-match': etag })).status).toBe(304)
+    expect((await get(`/_kay/images?src=${encodeURIComponent('/uploads/photo.png')}&w=320`, { 'if-none-match': etag })).status).toBe(304)
 
     await Bun.write(join(uploads, 'photo.png'), await new Bun.Image(HERO).resize(800, 480).png().bytes())
 
-    const changed = await get(`/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&w=320`, { 'if-none-match': etag })
+    const changed = await get(`/_kay/images?src=${encodeURIComponent('/uploads/photo.png')}&w=320`, { 'if-none-match': etag })
 
     expect(changed.status).toBe(200)
     expect(changed.headers.get('etag')).not.toBe(etag)
@@ -304,7 +304,7 @@ describe('image route', () => {
   it('answers several requests for a variant not written yet, each with the whole file', async () => {
     await Bun.write(join(uploads, 'burst.png'), Bun.file(HERO))
 
-    const responses = await Promise.all(Array.from({ length: 6 }, async () => get(`/_kay/image?src=${encodeURIComponent('/uploads/burst.png')}&w=960`)))
+    const responses = await Promise.all(Array.from({ length: 6 }, async () => get(`/_kay/images?src=${encodeURIComponent('/uploads/burst.png')}&w=960`)))
     const bodies = await Promise.all(responses.map(async response => response.bytes()))
 
     expect(responses.map(response => response.status)).toEqual([200, 200, 200, 200, 200, 200])
@@ -321,7 +321,7 @@ describe('image route', () => {
     header.set([8, 6, 0, 0, 0], 8)
     await Bun.write(join(uploads, 'huge.png'), new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...pngChunk('IHDR', header), ...pngChunk('IEND', new Uint8Array())]))
 
-    expect((await get(`/_kay/image?src=${encodeURIComponent('/uploads/huge.png')}&w=320`)).status).toBe(413)
+    expect((await get(`/_kay/images?src=${encodeURIComponent('/uploads/huge.png')}&w=320`)).status).toBe(413)
   })
 
   it('answers an AVIF to a browser whose Accept names it, varying on Accept', async () => {
@@ -349,7 +349,7 @@ describe('image route', () => {
   it('encodes a runtime image\'s AVIF on request, under an ETag of its own', async () => {
     await Bun.write(join(uploads, 'formats.png'), Bun.file(HERO))
 
-    const path = `/_kay/image?src=${encodeURIComponent('/uploads/formats.png')}&w=320`
+    const path = `/_kay/images?src=${encodeURIComponent('/uploads/formats.png')}&w=320`
     const avif = await get(path, { accept: 'image/avif' })
     const webp = await get(path)
     const etag = avif.headers.get('etag')!
@@ -389,7 +389,7 @@ describe('image route', () => {
 
       serveImages(plain, { clientDir: join(cache, 'client'), cacheDir: cache, dirs: { '/uploads/': uploads } })
 
-      const response = await plain.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent('/uploads/formats.png')}&w=320`, { headers: { accept: 'image/avif' } }))
+      const response = await plain.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/uploads/formats.png')}&w=320`, { headers: { accept: 'image/avif' } }))
 
       expect(response.headers.get('content-type')).toBe('image/webp')
       expect(response.headers.get('vary')).toBe('save-data')
@@ -403,7 +403,7 @@ describe('image route', () => {
   it('answers 415 for a file that is no image', async () => {
     await Bun.write(join(uploads, 'broken.png'), 'not a png')
 
-    expect((await get(`/_kay/image?src=${encodeURIComponent('/uploads/broken.png')}&w=320`)).status).toBe(415)
+    expect((await get(`/_kay/images?src=${encodeURIComponent('/uploads/broken.png')}&w=320`)).status).toBe(415)
   })
 
   it('fails as the server, not the image, where the variant cannot be written, leaving no part of it', async () => {
@@ -418,7 +418,7 @@ describe('image route', () => {
 
       serveImages(app, { clientDir: join(dir, 'client'), cacheDir: cache, dirs: { '/uploads/': uploads } })
 
-      const response = await app.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent('/uploads/formats.png')}&w=320`, { headers: { accept: 'image/webp' } }))
+      const response = await app.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/uploads/formats.png')}&w=320`, { headers: { accept: 'image/webp' } }))
 
       expect(response.status).toBe(500)
       expect(await readdir(dir)).toEqual(['cache'])
@@ -641,7 +641,7 @@ describe('AVIF', () => {
 describe('crops and share cards', () => {
   const hero = registerImage('/_kay/assets/crop-abc.png', 1000, 600)
   const heroSrc = () => `/_kay/assets/${heroUrl}`
-  const route = async (query: string) => get(`/_kay/image?src=${encodeURIComponent(heroSrc())}&${query}`)
+  const route = async (query: string) => get(`/_kay/images?src=${encodeURIComponent(heroSrc())}&${query}`)
 
   // What the server installs to record the variants pages ask for, which `writeImageVariants` writes.
   beforeAll(() => {
@@ -653,7 +653,7 @@ describe('crops and share cards', () => {
 
     expect(square).toMatchObject({ width: 600, height: 600, src: imageUrl(hero, 600, [1, 1]) })
     expect(square.srcset).toBe(`${imageUrl(hero, 320, [1, 1])} 320w, ${imageUrl(hero, 600, [1, 1])} 600w`)
-    expect(square.src).toBe('/_kay/image?src=%2F_kay%2Fassets%2Fcrop-abc.png&w=600&crop=1x1')
+    expect(square.src).toBe('/_kay/images?src=%2F_kay%2Fassets%2Fcrop-abc.png&w=600&crop=1x1')
     expect(image(hero, { aspect: '16/9' })).toMatchObject({ width: 1000, height: 563 })
     expect(() => image(hero, { aspect: '5/1' })).toThrow('images.aspects in kay.config.ts does not list')
     expect(() => image(hero, { aspect: 'wide' })).toThrow('two whole numbers from 1 to 100')
@@ -698,7 +698,7 @@ describe('crops and share cards', () => {
   it('serves a 1200x630 JPEG share card of an image, enlarged when smaller', async () => {
     const card = await route('card')
 
-    expect(shareImage(hero)).toBe('/_kay/image?src=%2F_kay%2Fassets%2Fcrop-abc.png&card')
+    expect(shareImage(hero)).toBe('/_kay/images?src=%2F_kay%2Fassets%2Fcrop-abc.png&card')
     expect(card.status).toBe(200)
     expect(card.headers.get('content-type')).toBe('image/jpeg')
     expect(await new Bun.Image(await card.bytes()).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
@@ -713,7 +713,7 @@ describe('crops and share cards', () => {
     header.set([8, 0, 0, 0, 0], 8)
     await Bun.write(join(uploads, 'thin.png'), new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, ...pngChunk('IHDR', header), ...pngChunk('IDAT', deflateSync(new Uint8Array(200_000 * 2))), ...pngChunk('IEND', new Uint8Array())]))
 
-    const card = await get(`/_kay/image?src=${encodeURIComponent('/uploads/thin.png')}&card`)
+    const card = await get(`/_kay/images?src=${encodeURIComponent('/uploads/thin.png')}&card`)
 
     expect(card.status).toBe(200)
     expect(await new Bun.Image(await card.bytes()).metadata()).toEqual({ width: 1200, height: 630, format: 'jpeg' })
@@ -764,7 +764,7 @@ describe('crops and share cards', () => {
 
       expect(image(hero, { aspect: '5/1' })).toMatchObject({ width: 1000, height: 200 })
       expect(() => image(hero, { aspect: '1/1' })).toThrow('does not list')
-      expect((await wide.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent(heroSrc())}&w=1000&crop=5x1`))).status).toBe(200)
+      expect((await wide.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent(heroSrc())}&w=1000&crop=5x1`))).status).toBe(200)
       await expect(pages({ root: 'tests/fixtures/images', prebuilt: false, images: { aspects: ['16:9'] } })).rejects.toThrow('images.aspects holds 16:9')
     }
     finally {
@@ -826,7 +826,7 @@ describe('remote images', () => {
   let cache: string
   let remote: Elysia
 
-  const at = async (path: string, width: number | string = 320) => remote.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent(`${origin}${path}`)}&w=${width}`))
+  const at = async (path: string, width: number | string = 320) => remote.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent(`${origin}${path}`)}&w=${width}`))
 
   beforeAll(async () => {
     cache = await mkdtemp(join(tmpdir(), 'kay-remote-'))
@@ -866,7 +866,7 @@ describe('remote images', () => {
 
       const props = image('https://cms.example.com/uploads/a.jpg', { width: 1000, height: 600 })
 
-      expect(props.srcset).toBe(['320', '640', '960', '1000'].map(width => `/_kay/image?src=${encodeURIComponent('https://cms.example.com/uploads/a.jpg')}&w=${width} ${width}w`).join(', '))
+      expect(props.srcset).toBe(['320', '640', '960', '1000'].map(width => `/_kay/images?src=${encodeURIComponent('https://cms.example.com/uploads/a.jpg')}&w=${width} ${width}w`).join(', '))
       const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
 
       try {
@@ -901,7 +901,7 @@ describe('remote images', () => {
     expect((await at('/photos/hero.png', 1280)).status).toBe(400)
     expect(hits).toEqual(['/photos/hero.png'])
 
-    const unlisted = await remote.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent(`${origin}/private/hero.png`)}&w=320`))
+    const unlisted = await remote.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent(`${origin}/private/hero.png`)}&w=320`))
 
     expect(unlisted.status).toBe(403)
     expect(await unlisted.text()).toBe('The image is on a host images.remote in kay.config.ts does not list')
@@ -1356,7 +1356,7 @@ describe('pruneVariants', () => {
   it('keeps a variant a request just served, however long since it was written', async () => {
     const dir = await scratchDir('image-prune-served-')
     const app = new Elysia()
-    const url = `http://localhost/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&w=320`
+    const url = `http://localhost/_kay/images?src=${encodeURIComponent('/uploads/photo.png')}&w=320`
 
     serveImages(app, { clientDir: join(dir, 'client'), cacheDir: dir, dirs: { '/uploads/': uploads } })
     expect((await app.handle(new Request(url, { headers: { accept: 'image/webp' } }))).status).toBe(200)

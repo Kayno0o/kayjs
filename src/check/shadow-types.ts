@@ -52,6 +52,7 @@ import { untypedSockets } from './socket-routes'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
 import { uiTypes } from './ui-types'
+import { unmountedJobs } from './unmounted-jobs'
 
 // Imports each page of the extensions kay check reports as the app's own, so TypeScript checks them.
 const EXTENSION_PAGES = 'kay-extension-pages.ts'
@@ -140,6 +141,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => removedUiTokens(root, options),
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
+  ({ root, options }) => unmountedJobs(root, options),
   async ({ root, options }) => exportNames(root, options),
   async ({ root, options }) => libraryNames(root, options),
   async ({ root, options }) => pgLoaderSource(root, options),

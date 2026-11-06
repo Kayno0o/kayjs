@@ -91,7 +91,7 @@ new Elysia()
 A `queue` runs its jobs in the background, after a restart or a deploy if need be, and an action enqueues one and goes on:
 
 ```ts
-// src/jobs.ts
+// src/plugins/jobs.ts
 import { queue } from 'kay/server'
 
 export const welcomeMails = queue(
@@ -99,11 +99,8 @@ export const welcomeMails = queue(
   async ({ to }: { to: string }) => sendWelcome(to),
   { attempts: 5, backoff: '30s' },
 )
-```
 
-```ts
-// src/server.ts
-new Elysia().use(welcomeMails).use(await pages())
+export default welcomeMails
 ```
 
 Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(payload, { delay: '1h' })` to run it later., and more in [Queues](queues.md).

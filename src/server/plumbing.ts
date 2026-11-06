@@ -7,6 +7,7 @@ import { ACTION_PREFIX } from '../runtime/wire'
 import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH, NOTICE_SCRIPT_PATH } from './analytics'
 import { PUBLIC_ENV_PATH } from './env-state'
 import { ERROR_REPORTS } from './errors'
+
 import { PREVIEW_ROUTE } from './preview'
 import { PUSH_KEY_PATH, PUSH_SUBSCRIBE_PATH, PUSH_UNSUBSCRIBE_PATH } from './push-settings'
 import { CSP_REPORTS } from './violations'
@@ -52,6 +53,7 @@ const KNOWN: Known[] = [
   { method: 'GET', path: `${IMPORTED}*`, purpose: 'imported files, named after their content', docs: '/llms/imported-files', when: built(IMPORTED) },
   { method: 'GET', path: `${VARIANTS}*`, purpose: 'the image variants the build wrote', docs: '/llms/images', when: built(VARIANTS) },
   { method: 'GET', path: IMAGE_ROUTE, purpose: 'resized images, by width and crop', docs: '/llms/images', when: always },
+
   { method: 'GET', path: CARD_ROUTE, purpose: 'share cards, drawn on the first request', docs: '/llms/images', when: always },
   { method: 'GET', path: `${FILES_ROUTE}*`, purpose: 'stored files, a private one to a signed link', docs: '/llms/files', when: always },
   { method: 'POST', path: `${ACTION_PREFIX}<file>/<name>`, route: `${ACTION_PREFIX}*`, purpose: 'a page or layout\'s actions', docs: '/llms/actions', when: served => served.actions },

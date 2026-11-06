@@ -11,7 +11,7 @@ import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const NONE: PlumbingServed = { actions: false, publicEnv: false, preview: false, cspReports: false, buildFiles: [], mounted: [] }
-const ALWAYS = ['GET /_kay/*', 'GET /_kay/image', 'GET /_kay/card', 'GET /_kay/files/*', 'POST /_kay/live', 'POST /_kay/error']
+const ALWAYS = ['GET /_kay/*', 'GET /_kay/images', 'GET /_kay/card', 'GET /_kay/files/*', 'POST /_kay/live', 'POST /_kay/error']
 
 const line = ({ method, path }: { method: string, path: string }) => `${method} ${path}`
 
@@ -87,7 +87,7 @@ describe('kay\'s plumbing in the dev tool\'s routes', () => {
 
     // The dev build always has an asset of its own.
     expect(plumbed(bare).map(line)).toEqual([...ALWAYS.slice(0, 1), 'GET /_kay/assets/*', ...ALWAYS.slice(1)])
-    expect(plumbed(bare).find(route => route.path === '/_kay/image')).toMatchObject({ kind: 'plumbing', owner: expect.any(String), docs: '/llms/images', href: '/_kay/image' })
+    expect(plumbed(bare).find(route => route.path === '/_kay/images')).toMatchObject({ kind: 'plumbing', owner: expect.any(String), docs: '/llms/images', href: '/_kay/images' })
     expect(plumbed(bare).find(route => route.path === '/_kay/live')!.href).toBeUndefined()
     expect(plumbed(bare).find(route => route.path === '/_kay/files/*')!.href).toBeUndefined()
   })
@@ -126,14 +126,14 @@ describe('kay\'s plumbing in the dev tool\'s routes', () => {
   it('links the GET paths under the base, the others naming no link', async () => {
     const { routes: found } = await listed({ ...await site(), base: '/shop', security: { reports: true } })
 
-    expect(plumbed(found).filter(route => route.href !== undefined).map(route => route.href)).toEqual(['/shop/_kay/image', '/shop/_kay/card'])
+    expect(plumbed(found).filter(route => route.href !== undefined).map(route => route.href)).toEqual(['/shop/_kay/images', '/shop/_kay/card'])
   })
 
   it('shows a path an app file took over as the app\'s', async () => {
     const { routes: found } = await listed(await site({ 'public/_kay/card': 'mine' }))
 
     expect(plumbed(found).map(line)).not.toContain('GET /_kay/card')
-    expect(plumbed(found).map(line)).toContain('GET /_kay/image')
+    expect(plumbed(found).map(line)).toContain('GET /_kay/images')
   })
 })
 

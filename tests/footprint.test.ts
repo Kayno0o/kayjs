@@ -95,7 +95,7 @@ describe('pickImage', () => {
 
 const roots: string[] = []
 
-// A directory of files, which a URL names by its path in it; `/_kay/image?...` has no file, as an image made on request has none.
+// A directory of files, which a URL names by its path in it; `/_kay/images?...` has no file, as an image made on request has none.
 async function site(files: Record<string, string | Uint8Array>) {
   const root = await scratchDir('footprint-')
 
@@ -194,7 +194,7 @@ describe('measurePage', () => {
 
   it('counts a request of another origin without its weight, and a file the build did not make', async () => {
     const { find } = await site({})
-    const page = await measurePage('<html><head><script src="https://cdn.example/x.js"></script><script src="//cdn.example/y.js"></script><link rel="stylesheet" href="https://cdn.example/x.css"></head><body><img src="/_kay/image?src=%2Fuploads%2Fa.png&amp;w=640"><img src="data:image/gif;base64,R0lGOD"></body></html>', '/', weighing(find, false))
+    const page = await measurePage('<html><head><script src="https://cdn.example/x.js"></script><script src="//cdn.example/y.js"></script><link rel="stylesheet" href="https://cdn.example/x.css"></head><body><img src="/_kay/images?src=%2Fuploads%2Fa.png&amp;w=640"><img src="data:image/gif;base64,R0lGOD"></body></html>', '/', weighing(find, false))
 
     expect(page.requests).toBe(5)
     expect(page.unweighed).toBe(4)

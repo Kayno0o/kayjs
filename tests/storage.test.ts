@@ -351,14 +351,14 @@ describe('stored images', () => {
     const props = image(files.url(key))
 
     expect(props).toMatchObject({ width: 1000, height: 600 })
-    expect(props.srcset).toContain(`/_kay/image?src=${encodeURIComponent(`/_kay/files/${key}`)}&w=320 320w`)
+    expect(props.srcset).toContain(`/_kay/images?src=${encodeURIComponent(`/_kay/files/${key}`)}&w=320 320w`)
 
     const html = await (await get(`/?key=${encodeURIComponent(key)}`)).text()
 
     expect(html).toContain('width="1000" height="600"')
-    expect(html).toContain(`srcset="/_kay/image?src=${encodeURIComponent(`/_kay/files/${key}`)}&amp;w=320 320w`)
+    expect(html).toContain(`srcset="/_kay/images?src=${encodeURIComponent(`/_kay/files/${key}`)}&amp;w=320 320w`)
 
-    const variant = await get(`/_kay/image?src=${encodeURIComponent(files.url(key))}&w=320`)
+    const variant = await get(`/_kay/images?src=${encodeURIComponent(files.url(key))}&w=320`)
 
     expect(variant.status).toBe(200)
     expect(variant.headers.get('content-type')).toBe('image/webp')
@@ -368,9 +368,9 @@ describe('stored images', () => {
     const get = await serve(memoryFiles())
     const key = await files.put(await hero(), { private: true })
 
-    expect((await get(`/_kay/image?src=${encodeURIComponent(`/_kay/files/${key}`)}&w=320`)).status).toBe(403)
+    expect((await get(`/_kay/images?src=${encodeURIComponent(`/_kay/files/${key}`)}&w=320`)).status).toBe(403)
 
-    const variant = await get(`/_kay/image?src=${encodeURIComponent(files.url(key))}&w=320`)
+    const variant = await get(`/_kay/images?src=${encodeURIComponent(files.url(key))}&w=320`)
 
     expect(variant.status).toBe(200)
     expect(variant.headers.get('cache-control')).toBe('private, no-cache')
@@ -379,7 +379,7 @@ describe('stored images', () => {
   it('stop resizing once deleted, the copy taken from a store off this disk included', async () => {
     const get = await serve(memoryFiles())
     const key = await files.put(await hero())
-    const url = `/_kay/image?src=${encodeURIComponent(files.url(key))}&w=640`
+    const url = `/_kay/images?src=${encodeURIComponent(files.url(key))}&w=640`
     const variants = cacheDir(resolve(ROOT), `images${testWorker()}`)
     const made = async () => new Set(await readdir(variants))
 
@@ -420,7 +420,7 @@ describe('stored images', () => {
     const get = await serve(diskFiles(store))
     const key = await files.put(await hero())
 
-    expect((await get(`/_kay/image?src=${encodeURIComponent(files.url(key))}&w=320`)).status).toBe(200)
+    expect((await get(`/_kay/images?src=${encodeURIComponent(files.url(key))}&w=320`)).status).toBe(200)
     expect(await readdir(store)).toEqual([key])
   })
 })
@@ -552,8 +552,8 @@ describe('files.variants', () => {
 
     await mkdir(variants, { recursive: true })
     expect((await files.variants([key])).get(key)).toEqual([])
-    expect((await get(`/_kay/image?src=${encodeURIComponent(files.url(key))}&w=640`)).status).toBe(200)
-    expect((await get(`/_kay/image?src=${encodeURIComponent(files.url(other))}&w=640`)).status).toBe(200)
+    expect((await get(`/_kay/images?src=${encodeURIComponent(files.url(key))}&w=640`)).status).toBe(200)
+    expect((await get(`/_kay/images?src=${encodeURIComponent(files.url(other))}&w=640`)).status).toBe(200)
     expect((await files.variants([key, other])).get(key)).toEqual([expect.stringMatching(/^stored-\w+-\w+-640\.webp$/)])
     await files.delete(key)
     expect((await files.variants([key])).get(key)).toEqual([])
@@ -601,7 +601,7 @@ describe('s3Files', () => {
       expect(response.status).toBe(200)
       expect(response.headers.get('content-type')).toBe('image/png')
       expect((await response.arrayBuffer()).byteLength).toBe(Bun.file(HERO).size)
-      expect((await get(`/_kay/image?src=${encodeURIComponent(files.url(key))}&w=320`)).status).toBe(200)
+      expect((await get(`/_kay/images?src=${encodeURIComponent(files.url(key))}&w=320`)).status).toBe(200)
 
       await files.delete(key)
       expect(objects.size).toBe(0)

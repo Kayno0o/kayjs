@@ -1,12 +1,12 @@
 import type { StrongestCopies } from './compress'
 import { join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX, outputDir } from '../build/assets'
-import { IMAGE_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { servedSize, wholeResponse } from './compress'
 import { FAVICON_DIR, FAVICON_PATHS } from './favicon'
 import { builtVariant } from './image'
+import { isImageRoute } from './image-route'
 import { limiter } from './limit'
 import { pageEtag } from './prerendered'
 import { decodePath } from './routes'
@@ -102,7 +102,7 @@ export function assetFiles(dirs: AssetDirs): RenderedPage['file'] {
 
     const path = url.pathname.slice(dirs.base.length)
 
-    if (path === IMAGE_ROUTE)
+    if (isImageRoute(path))
       return builtVariant(url, dirs.clientDir, dirs.aspects)
 
     if (path.startsWith(ASSET_PREFIX))

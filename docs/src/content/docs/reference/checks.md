@@ -94,6 +94,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `uncaught-await` | warn | code | An `await` block with no `catch` and no `try` around it |
 | `once-read-prop` | warn | code | A destructured prop read into a top-level `const` or `let` that a function or the template reads later, in a browser script, so it keeps its first value |
 | `public-env-outside-src` | warn | code | An `s.Public` field in a `.ts` file outside `src`, which kay does not read, so an island types it as a string |
+| `unmounted-jobs` | warn | code | A `src/jobs.ts` that no plugin and no `src/server.ts` imports, so its queues run nowhere; jobs live in `src/plugins/jobs.ts` |
 | `removed-ui-token` | warn | code | A kayjs-ui theme token or utility under its old `kui-` name, such as `--color-kui-canvas` or `bg-kui-surface2`, which stopped working in 1.75: a utility builds nothing and a `var()` of it resolves to nothing. `kay check --fix` rewrites it to the app's own name where one stands for it, and the report says where to set the rest: a `--kui-border-*` knob and a `kui-` utility with no new form are reported without a fix. Names quoted in a comment are not reported |
 | `unknown-tool-label` | warn | code | A key of a `toolLabels` object on `Chat` that names no tool of the project (an export in snake case, a `tool.name` or the name of a `tool()`), whose calls show the raw name. |
 | `unkept-page` | warn | code | A page saying `keep: true` that `kay build` does not keep |

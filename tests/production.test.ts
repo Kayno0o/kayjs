@@ -204,7 +204,7 @@ describe('security headers', () => {
       })
       .use(await pages({ root: IMAGES, prebuilt: false }))
     const hero = (/src=(%2F_kay%2Fassets%2F[^&]+)&amp;/).exec(await (await stock.handle(new Request('http://localhost/'))).text())![1]!
-    const paths = [decodeURIComponent(hero), `/_kay/image?src=${hero}&w=320`, `/_kay/image?src=${hero}&w=7`]
+    const paths = [decodeURIComponent(hero), `/_kay/images?src=${hero}&w=320`, `/_kay/images?src=${hero}&w=7`]
 
     for (const app of [stock, own]) {
       for (const path of paths) {

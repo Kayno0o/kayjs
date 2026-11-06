@@ -87,7 +87,7 @@ The Head tab shows the head as a search result: the title and description with t
 
 The Routes tab lists every page, endpoint and API route the server serves, each locale's copy of a page on its own line. Type in the filter box to match a path, a file or what a route is for. A path with nothing to fill in links to itself.
 
-Under "Served by kay" come the sitemap, robots.txt, feeds, favicons, the service worker and the health check. Beneath them, "kay's plumbing" lists the endpoints you meet in the network panel or in a proxy or firewall rule: `/_kay/live`, `/_kay/action/<file>/<name>`, `/_kay/image`, `/_kay/files/`, `/_kay/error` and the rest. Each has one line on what it is for and a link to where the docs describe it.
+Under "Served by kay" come the sitemap, robots.txt, feeds, favicons, the service worker and the health check. Beneath them, "kay's plumbing" lists the endpoints you meet in the network panel or in a proxy or firewall rule: `/_kay/live`, `/_kay/action/<file>/<name>`, `/_kay/images`, `/_kay/files/`, `/_kay/error` and the rest. Each has one line on what it is for and a link to where the docs describe it.
 
 The tab lists only what the running server serves. The CSP reports route shows with `security.reports`, the preview and draft routes with `preview`, the analytics routes with `analytics()`, the search files once the site builds a search index, and so on. If one of your own files serves a path, the tab shows it as yours.
 

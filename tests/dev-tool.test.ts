@@ -1143,7 +1143,7 @@ describe('the dev tool', () => {
         { kind: 'page', method: 'GET', path: '/fr/a-propos', file: 'src/routes/about.kay', locale: 'fr', href: '/fr/a-propos' },
         { kind: 'api', method: 'POST', path: '/api/stock/:id', file: 'src/api/stock.ts' },
         { kind: 'kay', method: 'GET', path: '/manifest.webmanifest', file: '', owner: 'the web app manifest', href: '/manifest.webmanifest' },
-        { kind: 'plumbing', method: 'GET', path: '/_kay/image', file: '', owner: 'resized images, by width and crop', docs: '/llms/images', href: '/_kay/image' },
+        { kind: 'plumbing', method: 'GET', path: '/_kay/images', file: '', owner: 'resized images, by width and crop', docs: '/llms/images', href: '/_kay/images' },
         { kind: 'plumbing', method: 'POST', path: '/_kay/csp', file: '', owner: 'what the Content-Security-Policy blocked', docs: '/llms/proxy-and-security' },
       ] }), { status })
     }) as unknown as typeof window.fetch)
@@ -1165,9 +1165,9 @@ describe('the dev tool', () => {
       await eventually(() => expect(sections()).toEqual(['Pages (3)', 'API (1)', 'Served by kay (3)', 'kay\'s plumbing (2)']))
 
       expect(fetched).toEqual(['/_kay/dev/routes'])
-      expect(rows()).toEqual(['GET | /broken |  | src/routes/broken.kay', 'GET | /items/:id |  | src/routes/items/[id].kay', 'GET | /fr/a-propos | fr | src/routes/about.kay', 'POST | /api/stock/:id |  | src/api/stock.ts', 'GET | /manifest.webmanifest |  | the web app manifest', 'GET | /_kay/image | docs | resized images, by width and crop', 'POST | /_kay/csp | docs | what the Content-Security-Policy blocked'])
-      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes-under-test a')].map(link => link.getAttribute('href'))).toEqual(['/broken', '/fr/a-propos', '/manifest.webmanifest', '/_kay/image', 'https://kayjs.kaynooo.fr/llms/images', 'https://kayjs.kaynooo.fr/llms/proxy-and-security'])
-      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes-under-test a[target=_blank]')].map(link => [link.getAttribute('aria-label'), link.rel])).toEqual([['Docs for /_kay/image', 'noopener noreferrer'], ['Docs for /_kay/csp', 'noopener noreferrer']])
+      expect(rows()).toEqual(['GET | /broken |  | src/routes/broken.kay', 'GET | /items/:id |  | src/routes/items/[id].kay', 'GET | /fr/a-propos | fr | src/routes/about.kay', 'POST | /api/stock/:id |  | src/api/stock.ts', 'GET | /manifest.webmanifest |  | the web app manifest', 'GET | /_kay/images | docs | resized images, by width and crop', 'POST | /_kay/csp | docs | what the Content-Security-Policy blocked'])
+      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes-under-test a')].map(link => link.getAttribute('href'))).toEqual(['/broken', '/fr/a-propos', '/manifest.webmanifest', '/_kay/images', 'https://kayjs.kaynooo.fr/llms/images', 'https://kayjs.kaynooo.fr/llms/proxy-and-security'])
+      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes-under-test a[target=_blank]')].map(link => [link.getAttribute('aria-label'), link.rel])).toEqual([['Docs for /_kay/images', 'noopener noreferrer'], ['Docs for /_kay/csp', 'noopener noreferrer']])
       expect(shadow().querySelector('#kay-dev-routes-under-test > .list > .note')?.textContent).toContain('no sitemap or robots.txt')
       expect(shadow().querySelector('#kay-dev-routes-under-test [aria-current=page] .name')?.textContent).toBe('/broken')
 
@@ -1183,7 +1183,7 @@ describe('the dev tool', () => {
       expect(sections()).toEqual(['Served by kay (1)', 'kay\'s plumbing (1)'])
       filter().value = '/_kay/im'
       filter().dispatchEvent(new Event('input'))
-      expect(rows()).toEqual(['GET | /_kay/image | docs | resized images, by width and crop'])
+      expect(rows()).toEqual(['GET | /_kay/images | docs | resized images, by width and crop'])
       filter().value = 'nothing'
       filter().dispatchEvent(new Event('input'))
       expect(shadow().querySelector<HTMLElement>('#kay-dev-routes-under-test .empty:not([hidden])')?.textContent).toBe('Nothing matches the filter.')
@@ -1501,7 +1501,7 @@ describe('the dev tool', () => {
 
     happyDOM.setURL('http://localhost/')
     document.body.innerHTML = [
-      '<img id="hero" src="/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280" width="1280" height="720" alt="">',
+      '<img id="hero" src="/_kay/images?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280" width="1280" height="720" alt="">',
       '<img id="plain" src="/photo.jpg" width="4000" height="3000" alt="">',
       '<img id="bare" src="/_kay/images/logo-320-1x1.webp" loading="lazy" alt="">',
       '<img id="far" src="https://cdn.example/a.png" width="10" height="10" alt="">',
@@ -1558,7 +1558,7 @@ describe('the dev tool', () => {
 
       // Only loaded images of kay's own routes are asked for: the app's handlers, an image not drawn yet and another host are not, and a request that hangs holds back none of the others.
       await eventually(() => expect(rows()).toEqual([
-        '/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280 (largest paint) | 1280w, resized on request - avif, 43.9 KB - 1280x1280 drawn 640x360 at 2x',
+        '/_kay/images?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280 (largest paint) | 1280w, resized on request - avif, 43.9 KB - 1280x1280 drawn 640x360 at 2x',
         '/photo.jpg | not resized by kay - format not looked up - 4000x4000 drawn 300x225 at 2x | served 59 times the pixels it is drawn with, give it a smaller width or `sizes`',
         '/_kay/images/logo-320-1x1.webp | 320w, cut 1x1, written by kay build - webp, 43.9 KB - 160x160 drawn 80x80 at 2x | no width and height, so the page shifts as it loads | lazy-loaded but in view, which delays it',
         'https://cdn.example/a.png | not resized by kay - on another host - 10x10 drawn 10x10 at 2x',
@@ -1568,7 +1568,7 @@ describe('the dev tool', () => {
         '/_kay/images/hung.webp | not resized by kay - format... - 10x10 drawn 10x10 at 2x',
         '/_kay/images/unloaded.webp | not resized by kay - not loaded - not loaded, drawn 10x10 at 2x',
       ]))
-      expect(asked).toEqual(['HEAD http://localhost/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280', 'HEAD http://localhost/_kay/images/logo-320-1x1.webp', 'HEAD http://localhost/_kay/images/100%.webp', 'HEAD http://localhost/_kay/images/gone.webp', 'HEAD http://localhost/_kay/images/hung.webp'])
+      expect(asked).toEqual(['HEAD http://localhost/_kay/images?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280', 'HEAD http://localhost/_kay/images/logo-320-1x1.webp', 'HEAD http://localhost/_kay/images/100%.webp', 'HEAD http://localhost/_kay/images/gone.webp', 'HEAD http://localhost/_kay/images/hung.webp'])
       expect(signals.every(signal => signal instanceof AbortSignal)).toBe(true)
       expect(shadow().querySelector('#kay-dev-tab-images .count')?.textContent).toBe('3')
 

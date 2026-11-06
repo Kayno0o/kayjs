@@ -58,7 +58,7 @@ afterAll(async () => {
 })
 
 async function get(src: string, query = 'w=320', headers: Record<string, string> = {}): Promise<Response> {
-  return app.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent(src)}&${query}`, { headers }))
+  return app.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent(src)}&${query}`, { headers }))
 }
 
 const signedIn = { cookie: 'user=ada' }
@@ -229,7 +229,7 @@ describe('images.resolve and images.guard', () => {
   it('resizes any path of the site image() is given a size for, which the app resolves', () => {
     const props = image('/media/7', { width: 1000, height: 600 })
 
-    expect(props.srcset).toContain(`/_kay/image?src=${encodeURIComponent('/media/7')}&w=640 640w`)
+    expect(props.srcset).toContain(`/_kay/images?src=${encodeURIComponent('/media/7')}&w=640 640w`)
     expect(image('//elsewhere.example/7', { width: 1000, height: 600 }).srcset).toBeUndefined()
   })
 
@@ -258,7 +258,7 @@ describe('images.resolve and images.guard', () => {
         resolve: src => src === '/media/7' ? join(media, '7') : undefined,
       },
     }))
-    const response = await withLocals.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent('/media/7')}&w=320`, { headers: { cookie: 'theme=dark' } }))
+    const response = await withLocals.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/media/7')}&w=320`, { headers: { cookie: 'theme=dark' } }))
 
     expect(response.status).toBe(200)
     expect(response.headers.get('x-guarded')).toBe('yes')

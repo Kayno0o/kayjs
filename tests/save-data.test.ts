@@ -353,7 +353,7 @@ describe('the image route', () => {
 
     serveImages(app, { clientDir: join(root, 'client'), cacheDir: cache, dirs: { '/uploads/': root }, ...options })
 
-    return async (path: string, headers: Record<string, string> = {}) => app.handle(request(`/_kay/image?src=${encodeURIComponent(`/uploads/${file}`)}&${path}`, headers))
+    return async (path: string, headers: Record<string, string> = {}) => app.handle(request(`/_kay/images?src=${encodeURIComponent(`/uploads/${file}`)}&${path}`, headers))
   }
   const widthOf = async (response: Response) => (await new Bun.Image(await response.bytes()).metadata()).width
 

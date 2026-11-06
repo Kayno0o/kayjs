@@ -315,6 +315,6 @@ describe('one Not Found spelling', () => {
     const app = await pages({ root: 'tests/fixtures/production', prebuilt: false })
     const text = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).text()
 
-    expect(await text('/_kay/image?src=%2Fnone.png&w=320')).toBe('Not Found')
+    expect(await text('/_kay/images?src=%2Fnone.png&w=320')).toBe('Not Found')
   })
 })

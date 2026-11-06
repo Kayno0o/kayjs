@@ -297,7 +297,7 @@ describe('placeholder on a page', () => {
     const mounted = await render(new Elysia().use(await open({ base: '/docs' })))
 
     expect(img(mounted, 'photo')).toContain('style="background-color:#c86432"')
-    expect(img(mounted, 'photo')).toContain('src="/docs/_kay/image?')
+    expect(img(mounted, 'photo')).toContain('src="/docs/_kay/images?')
   })
 
   it('leaves the color out where the site CSP refuses inline styles', async () => {
@@ -311,7 +311,7 @@ describe('placeholder on a page', () => {
 
   it('gives an image added at runtime its color once the route has read it, and again when the file changes', async () => {
     const app = await open()
-    const route = async () => app.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&w=64`))
+    const route = async () => app.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/uploads/photo.png')}&w=64`))
     const settled = async (expected: string | undefined) => {
       for (let tries = 0; tries < 100; tries++) {
         if ((/background-color:#(\w{6})/).exec(img(await render(app), 'upload') ?? '')?.[1] === expected)
@@ -343,7 +343,7 @@ describe('placeholder on a page', () => {
 
     try {
       const app = await open({ images: { dirs: { '/uploads/': uploads }, remote: [`http://127.0.0.1:${host.port}/photos/`], resolve: () => resolve(dir, 'src/photo.png') } })
-      const ask = async (src: string) => app.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent(src)}&w=64`))
+      const ask = async (src: string) => app.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent(src)}&w=64`))
 
       expect(image(remote, { width: 64, height: 48 }).style).toBeUndefined()
       expect((await ask(remote)).status).toBe(200)

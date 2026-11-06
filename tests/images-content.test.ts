@@ -65,7 +65,7 @@ describe('images.widths', () => {
       await Bun.write(join(uploads, 'photo.png'), Bun.file(HERO))
 
       const app = await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { dirs: { '/uploads/': uploads }, widths: [400, 800] } })
-      const get = async (path: string) => app.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&${path}`))
+      const get = async (path: string) => app.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/uploads/photo.png')}&${path}`))
 
       expect((await get('w=400')).status).toBe(200)
       expect((await get('w=800')).status).toBe(200)
@@ -114,7 +114,7 @@ describe('image() quality', () => {
       await Bun.write(join(uploads, 'photo.png'), Bun.file(HERO))
 
       const app = await pages({ root: 'tests/fixtures/images', prebuilt: false, images: { dirs: { '/uploads/': uploads } } })
-      const get = async (query: string) => app.handle(new Request(`http://localhost/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&w=640${query}`))
+      const get = async (query: string) => app.handle(new Request(`http://localhost/_kay/images?src=${encodeURIComponent('/uploads/photo.png')}&w=640${query}`))
       const bytesOf = async (query: string) => Bun.hash(await (await get(query)).bytes())
       const [plain, low, high] = [await bytesOf(''), await bytesOf('&q=5'), await bytesOf('&q=100')]
 

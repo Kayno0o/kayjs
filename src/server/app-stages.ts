@@ -54,6 +54,7 @@ import { FAVICON_DIR, faviconSource, serveFavicons } from './favicon'
 import { loadGuard, requiredGuards } from './guards'
 import { refuseUnknownHosts } from './host-allowlist'
 import { avifQuality, serveImages, webpQuality } from './image'
+import { LEGACY_IMAGE_ROUTE } from './image-route'
 import { jobsPageOf, serveJobsPage } from './jobs-page'
 import { countWrites, NO_WRITES } from './kept-pages'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
@@ -191,7 +192,7 @@ export function bootOf(input: BootInput) {
     securityOptions,
     security: securityHeaders(securityOptions),
     // The paths of the build's files and the image route, whose responses carry the security headers themselves.
-    filePaths: new Set<string>([IMAGE_ROUTE]),
+    filePaths: new Set<string>([IMAGE_ROUTE, LEGACY_IMAGE_ROUTE]),
     log,
     lifecycle: { draining: false },
     hasPreview: options.preview !== undefined && options.preview !== false,

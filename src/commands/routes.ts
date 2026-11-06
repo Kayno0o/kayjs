@@ -23,6 +23,7 @@ import { buildingWithoutEnv, PUBLIC_ENV_PATH } from '../server/env-state'
 import { ERROR_REPORTS } from '../server/errors'
 import { FAVICON_PATHS, faviconSource, localeManifests } from '../server/favicon'
 import { localeCopies, localeSettings, routedSettings } from '../server/i18n'
+
 import { HEALTH_PATH } from '../server/lifecycle'
 import { registerLoader } from '../server/loader'
 import { METRICS_PATH, metricsOf } from '../server/metrics'
@@ -213,6 +214,7 @@ function kayRoutes(root: string, config: LoadedConfig): Listed[] {
     ...config.publicEnv ? [kay(PUBLIC_ENV_PATH, 'public environment')] : [],
     kay('/_kay/*', 'build files'),
     kay(IMAGE_ROUTE, 'image variants'),
+
     kay(CARD_ROUTE, 'share cards'),
     kay(`${FILES_ROUTE}*`, 'stored files'),
     kay(ERROR_REPORTS, 'browser error reports', 'POST'),

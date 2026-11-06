@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { KayError } from '../compiler/errors'
 import { projectPaths } from '../project'
 import { inlineText, keepHeadMarkup } from '../runtime/head'
-import { CARD, CARD_ROUTE, IMAGE_ROUTE, importedSize, RESIZABLE, VARIANTS } from '../runtime/image'
+import { CARD, CARD_ROUTE, importedSize, RESIZABLE, VARIANTS } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
 import { localizedText } from '../runtime/localized'
 import { jsonLd } from '../runtime/seo'
@@ -17,6 +17,7 @@ import { faviconTags, isOwnManifest, manifestPath } from './favicon'
 import { builtFonts, fontTags, prepareFonts } from './fonts'
 import { localeCopies } from './i18n'
 import { imageHeader } from './image-format'
+import { isImageRoute } from './image-route'
 import { publicFiles } from './public'
 import { slashedPath } from './routes'
 import { lightFontCss } from './save-data'
@@ -106,7 +107,7 @@ export async function cardImageSizes(publicDir: string): Promise<(path: string) 
   return (path) => {
     const { pathname, searchParams } = new URL(path, 'http://localhost')
 
-    if ((pathname === IMAGE_ROUTE && searchParams.has('card')) || pathname.startsWith(CARD_ROUTE) || CARD_FILE.test(pathname) || (pathname.startsWith(VARIANTS) && pathname.endsWith('-card.jpg')))
+    if ((isImageRoute(pathname) && searchParams.has('card')) || pathname.startsWith(CARD_ROUTE) || CARD_FILE.test(pathname) || (pathname.startsWith(VARIANTS) && pathname.endsWith('-card.jpg')))
       return CARD
 
     return importedSize(path) ?? sizes.get(pathname)

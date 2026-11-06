@@ -4,7 +4,8 @@ import { dirname, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { resolveFrom } from '../build/files'
 import { KayError } from '../compiler/errors'
-import { CARD, IMAGE_ROUTE } from '../runtime/image'
+import { CARD } from '../runtime/image'
+import { isImageRoute } from './image-route'
 import { decodePath } from './routes'
 
 const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
@@ -100,7 +101,7 @@ export async function answer(request: Request, html: string, clientDir: string, 
   if (path === '/')
     return new Response(html.replace(HEAD, head => head + FRAME), { headers: HTML })
 
-  if (path === IMAGE_ROUTE && images !== undefined)
+  if (isImageRoute(path) && images !== undefined)
     return images(request)
 
   const parts = path.startsWith(ASSET_PREFIX) ? path.slice(ASSET_PREFIX.length).split('/') : []

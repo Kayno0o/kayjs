@@ -14,7 +14,8 @@ const FIXED_SIZE = /^\s*(\d+(?:\.\d+)?)px\s*$/i
 // The densities an image drawn at a fixed width gets variants for when `images.maxDensity` leaves the browser's choice.
 const UNCAPPED_DENSITY = 3
 
-export const IMAGE_ROUTE = '/_kay/image'
+// The resizer, beside the variants `kay build` writes under `/_kay/images/`; it was `/_kay/image` before 1.92 (kaynooo/kayjs#3018), which the server still answers until 1.95.
+export const IMAGE_ROUTE = '/_kay/images'
 export const CARD_ROUTE = '/_kay/card'
 // Where imported images are served, and the variants `kay build` writes of them.
 export const IMPORTED = '/_kay/assets/'

@@ -4,7 +4,7 @@ import type { DevKit, DevTab, DevTool } from './dev-tool'
 const BUILT_EVENT = 'kay-dev-built'
 // An image served more than this many times the pixels it is drawn with is flagged: the ladder's widths are at most 2 apart, so a variant picked for the size drawn is under 2 times as wide, 4 times the pixels, even at its worst.
 const OVERSIZED = 4
-const IMAGE_ROUTE = '/_kay/image'
+const IMAGE_ROUTES = new Set(['/_kay/images', '/_kay/image'])
 const SVG_TYPE = /^image\/svg\+xml\s*(?:;|$)/i
 // The files `kay build` wrote for the variants.
 const IMAGE_FILES = '/_kay/images/'
@@ -46,7 +46,7 @@ function imageVariant(kit: DevKit, src: string, origin: string): string {
   if (url === undefined || url.origin !== origin)
     return 'not resized by kay'
 
-  if (url.pathname === IMAGE_ROUTE) {
+  if (IMAGE_ROUTES.has(url.pathname)) {
     const crop = url.searchParams.get('crop')
 
     return url.searchParams.has('card') ? 'share card, 1200x630, resized on request' : `${url.searchParams.get('w') ?? 'original'}w${crop === null ? '' : `, cut ${crop}`}, resized on request`
@@ -286,7 +286,7 @@ function unaskedFormat(kit: DevKit, win: Window & typeof globalThis, image: HTML
   if (url.origin !== win.location.origin)
     return 'on another host'
 
-  if (url.pathname !== IMAGE_ROUTE && !url.pathname.startsWith(IMAGE_FILES))
+  if (!IMAGE_ROUTES.has(url.pathname) && !url.pathname.startsWith(IMAGE_FILES))
     return `format not looked up${transferred(kit, win, url.href)}`
 
   return !image.complete || image.naturalWidth === 0 ? 'not loaded' : undefined

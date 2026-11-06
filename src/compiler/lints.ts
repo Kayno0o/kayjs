@@ -704,6 +704,14 @@ export const LINTS = {
     wrong: '// common/env.ts\nexport const env = defineEnv({ MAP_KEY: s.Public\u0028s.String()) })',
     right: '// src/env.ts\nexport const env = defineEnv({ MAP_KEY: s.Public\u0028s.String()) })',
   },
+  'unmounted-jobs': {
+    level: 'warn',
+    group: 'code',
+    site: true,
+    summary: 'A `src/jobs.ts` that no server plugin and no `src/server.ts` imports: the queues in it are mounted by nothing, so none runs. Jobs have one home, `src/plugins/jobs.ts`, where a queue is defined and mounted at once; a plugin re-exporting the queues of `src/jobs.ts` is accepted too.',
+    wrong: '// src/jobs.ts, imported by no plugin\nexport const welcomeMails = queue(\'welcome-mails\', sendWelcome)',
+    right: '// src/plugins/jobs.ts\nexport const welcomeMails = queue(\'welcome-mails\', sendWelcome)\nexport default welcomeMails',
+  },
   'deprecated-auth-options': {
     level: 'warn',
     group: 'deprecated',

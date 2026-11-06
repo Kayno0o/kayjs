@@ -1249,7 +1249,7 @@ describe('kay build --compile', () => {
 
       const avif = await fetch(`${origin}${variant}`, { headers: { accept: 'image/avif,image/webp' } })
       // Encoded on request, on the worker thread the executable carries.
-      const upload = await fetch(`${origin}/_kay/image?src=${encodeURIComponent('/uploads/photo.png')}&w=320`, { headers: { accept: 'image/avif' } })
+      const upload = await fetch(`${origin}/_kay/images?src=${encodeURIComponent('/uploads/photo.png')}&w=320`, { headers: { accept: 'image/avif' } })
 
       expect([avif.headers.get('content-type'), avif.headers.get('vary')]).toEqual(['image/avif', 'accept, save-data'])
       expect(upload.headers.get('content-type')).toBe('image/avif')

@@ -3591,7 +3591,7 @@ describe.concurrent('kay check, URLs written out besides links', () => {
       'form(action="/nowhere")',
       'form(action="/")',
       'form(action="/logout" method="post")',
-      'img(src="/_kay/image?src=a.png&w=640" width="1" height="1" alt="")',
+      'img(src="/_kay/images?src=a.png&w=640" width="1" height="1" alt="")',
       'button(onClick={go}) {String(fine)}',
       'form(action="/search" method="GET")',
       'link(rel="manifest" href="/manifest.fr.webmanifest")',
