@@ -5,7 +5,7 @@ description: The project's own matchers, one file per matcher.
 path: src/params/
 ---
 
-`src/params/<name>.ts`, beside `src/routes/`, is the matcher a route names as `[id=<name>]`. Its default export takes the segment and returns the value `ctx.params` hands the page, or `undefined` to refuse the URL.
+`src/params/<name>.ts`, beside `src/routes/`, is the matcher a route names as `[id=<name>]`. Its default export takes the segment and returns the value `ctx.params` hands the page, or `undefined` to refuse the URL. Its second argument is `true` when the param is a catch-all, `[...path=<name>]`, whose value holds slashes.
 
 ```ts
 // src/params/even.ts
