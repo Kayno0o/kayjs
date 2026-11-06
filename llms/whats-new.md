@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-mail's `MAIL_TO` drops empty items, so `a@example.com,` is one recipient rather than two, and a value of only separators is no recipient ([Mail](../packages/mail/llms.txt)).
+- `cache()` takes `max`, the number of argument lists whose values it keeps (the least recently called goes first), and with `store: false` holds values that cannot serialize; kayjs-mail's SNS certificates use it in place of their own map: [rendering](rendering.md).
 - `call()` types a route's `null` answer as `null`, as it already arrives, rather than `''`; an empty answer (`undefined`, a 204) stays `''` ([API from islands](api-from-islands.md)).
 - `src/context.ts`, default-exporting `defineContext(...)`, gives templates `ctx.<key>` with no extension, typed in `kay check`; two sources giving one key stop the page naming both: [Request values](request-values.md).
 - `src/context.ts` (picked up by `kay dev` when added or removed, with a new process), default-exporting `defineContext(...)`, gives templates `ctx.<key>` with no extension, typed in `kay check`; two sources giving one key stop the page naming both: [Request values](request-values.md).

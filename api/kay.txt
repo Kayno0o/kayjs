@@ -1490,6 +1490,7 @@ interface CachedFunction<A extends unknown[], T>
 interface CacheFunctionOptions<Ttl extends Duration = Duration, T = unknown> extends CacheOptions<T>
   fallback?: T | undefined
   live?: boolean | undefined
+  max?: number | undefined
   stale?: boolean | undefined
   store?: CacheStore | false | undefined
   tags?: CacheTag[] | undefined

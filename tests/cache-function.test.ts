@@ -293,6 +293,51 @@ describe('cache', () => {
     }
   })
 
+  it('keeps the values of the max arguments called last', async () => {
+    const loaded: number[] = []
+    const square = cache(async (n: number) => {
+      loaded.push(n)
+
+      return n * n
+    }, { ttl: '1h', store: false, max: 2 })
+
+    await square(1)
+    await square(2)
+    await square(1)
+    await square(3)
+    // 2 was the least recently called, so it loads again; 1 and 3 do not.
+    await square(1)
+    await square(3)
+    await square(2)
+    expect(loaded).toEqual([1, 2, 3, 2])
+  })
+
+  it('holds no place for a load that failed or a key invalidated', async () => {
+    const loaded: number[] = []
+    const fetched = cache(async (n: number) => {
+      loaded.push(n)
+
+      if (n === 0)
+        throw new Error('down')
+
+      return n
+    }, { ttl: '1h', store: false, max: 2 })
+
+    await expect(fetched(0)).rejects.toThrow('down')
+    await fetched(1)
+    await fetched(2)
+    fetched.invalidate(2)
+    await fetched(3)
+    await fetched(1)
+    await fetched(3)
+    expect(loaded).toEqual([0, 1, 2, 3])
+  })
+
+  it('refuses a max that is not a positive whole number', () => {
+    expect(() => cache(() => 1, { ttl: '1m', max: 0 })).toThrow('max')
+    expect(() => cache(() => 1, { ttl: '1m', max: 1.5 })).toThrow('max')
+  })
+
   it('refuses a tag it did not make', () => {
     expect(() => cache(() => 1, { ttl: '1m', tags: [{ invalidate: () => undefined } as CacheTag] })).toThrow('cacheTag()')
   })

@@ -2,6 +2,7 @@ import type { KeyObject } from 'node:crypto'
 import type { Found } from './events'
 import { createVerify, X509Certificate } from 'node:crypto'
 import { splitList } from '@kaynooo/utils/text'
+import { cache } from 'kay/cache'
 import { normalizeAddress } from 'kay/library'
 
 // Amazon SES delivers its events through an SNS topic subscribed to the app's endpoint. The message format and its signature are Amazon SNS's: https://docs.aws.amazon.com/sns/latest/dg/sns-verify-signature-of-message.html
@@ -9,7 +10,7 @@ import { normalizeAddress } from 'kay/library'
 // The only place a signing certificate or a subscription is fetched from: https, the SNS endpoint of a region, no port, no login.
 const SNS_HOST = /^sns\.[a-z\d-]+\.amazonaws\.com$/
 const CERT_MAX = 16_384
-const CERT_TTL = 24 * 3_600_000
+
 const CERT_CACHE_MAX = 8
 const FETCH_TIMEOUT = 5000
 const TOPIC_ARN = /^arn:aws:sns:/
@@ -74,7 +75,6 @@ export function stringToSign(message: Record<string, unknown>): string | undefin
 // SignatureVersion 1 is SHA1, 2 is SHA256.
 const ALGORITHMS: Record<string, string> = { 1: 'RSA-SHA1', 2: 'RSA-SHA256' }
 
-const certificates = new Map<string, { key: KeyObject, at: number }>()
 
 // The body as text when it is no larger than the cap, read as it arrives.
 async function boundedText(response: Response): Promise<string | undefined> {
@@ -96,33 +96,34 @@ async function boundedText(response: Response): Promise<string | undefined> {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-// Requests for one certificate share a fetch, so a burst of posts makes one.
-const fetching = new Map<string, Promise<{ key: KeyObject, fresh: boolean } | undefined>>()
+// Decisions: a `KeyObject` cannot serialize, hence `store: false`; `stale: false` makes a call past the ttl wait for one shared fetch, as a burst of posts must not verify against an expired certificate; a failed fetch throws so nothing is kept.
+const certificateOf = cache(async (url: string): Promise<{ key: KeyObject, at: number }> => {
+  const found = await fetchCertificate(url)
 
-async function certificateKey(url: string, forceFresh: boolean): Promise<{ key: KeyObject, fresh: boolean } | undefined> {
-  const cached = certificates.get(url)
+  if (found === undefined)
+    throw new Error('no usable certificate')
 
-  if (cached !== undefined && !forceFresh && Date.now() - cached.at < CERT_TTL)
-    return Promise.resolve({ key: cached.key, fresh: false })
+  return found
+}, { ttl: '24h', store: false, stale: false, max: CERT_CACHE_MAX })
 
-  let pending = fetching.get(url)
+// The certificate at `url` and whether this call fetched it; `forceFresh` drops the one kept first.
+async function certificateKey(url: string, forceFresh: boolean): Promise<{ key: KeyObject, at: number, fresh: boolean } | undefined> {
+  const began = Date.now()
 
-  if (pending === undefined) {
-    pending = (async () => {
-      try {
-        return await fetchCertificate(url)
-      }
-      finally {
-        fetching.delete(url)
-      }
-    })()
-    fetching.set(url, pending)
+  if (forceFresh)
+    certificateOf.invalidate(url)
+
+  try {
+    const found = await certificateOf(url)
+
+    return { ...found, fresh: found.at >= began }
   }
-
-  return pending
+  catch {
+    return undefined
+  }
 }
 
-async function fetchCertificate(url: string): Promise<{ key: KeyObject, fresh: boolean } | undefined> {
+async function fetchCertificate(url: string): Promise<{ key: KeyObject, at: number } | undefined> {
   try {
     const response = await network.fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT), redirect: 'error' })
     const text = await boundedText(response)
@@ -135,14 +136,7 @@ async function fetchCertificate(url: string): Promise<{ key: KeyObject, fresh: b
     if (Date.now() < Date.parse(certificate.validFrom) || Date.now() > Date.parse(certificate.validTo))
       return undefined
 
-    certificates.delete(url)
-    certificates.set(url, { key: certificate.publicKey, at: Date.now() })
-
-    // Oldest first out: a Map keeps insertion order.
-    for (const old of [...certificates.keys()].slice(0, Math.max(0, certificates.size - CERT_CACHE_MAX)))
-      certificates.delete(old)
-
-    return { key: certificate.publicKey, fresh: true }
+    return { key: certificate.publicKey, at: Date.now() }
   }
   catch {
     return undefined
@@ -180,9 +174,7 @@ export async function snsSigned(message: Record<string, unknown>): Promise<boole
     return true
 
   // A certificate rotated since it was cached.
-  const cached = certificates.get(url)
-
-  if (first.fresh || cached === undefined || Date.now() - cached.at < network.refetchAfter)
+  if (first.fresh || Date.now() - first.at < network.refetchAfter)
     return false
 
   const again = await certificateKey(url, true)
