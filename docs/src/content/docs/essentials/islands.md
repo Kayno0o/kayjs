@@ -325,7 +325,7 @@ onNavigate(({ url }) => track(url.pathname))
 
 What a script appends to `<body>` goes with the next swap, as the next page never renders it. Mark it `data-kay-keep` to keep it through every swap, the same element at the end of the body, such as a live region an announcer fills. The swap never moves it, so a live region is still read. Only a direct child of `<body>` is kept this way, and only one a script added: an element the server renders comes back with the next page.
 
-A link with `data-reload` loads its page fully. So does every link to a page setting `reload: true` in its `page`.
+An `onClick` on a link runs before the page swaps, and `event.preventDefault()` in it keeps the link from being followed. A link with `data-reload` loads its page fully. So does every link to a page setting `reload: true` in its `page`.
 
 A form with `method="get"` swaps the page in place as a link does, with its fields in the query, so a search or a filter keeps your persisted islands, the scroll and the focus. `data-reload` on the form loads the page fully.
 

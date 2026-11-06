@@ -1188,6 +1188,21 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
+  it('leaves a link alone that a document listener added after the router prevents', async () => {
+    const fresh = await open('/')
+
+    try {
+      await fresh.evaluate(() => document.addEventListener('click', event => event.preventDefault()))
+      await fresh.click('a.second')
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      expect(await fresh.path()).toBe('/')
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
   it('loads the next page fully when the swap cannot load', async () => {
     const fresh = await open('/')
 

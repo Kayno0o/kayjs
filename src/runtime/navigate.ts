@@ -67,7 +67,8 @@ export function startNavigation(given: NavigationHooks): void {
   }
 
   history.scrollRestoration = 'manual'
-  document.addEventListener('click', onClick)
+  // On the window, after the document's one listener runs the `onClick` of an element, so a handler that prevents the default keeps the link from being followed.
+  window.addEventListener('click', onClick)
   document.addEventListener('focusin', onFocus)
   window.addEventListener('popstate', onPopState)
   // `pagehide` saves the scroll for a full load only: back or forward between entries of this document fires `popstate` once the entry already changed, too late to save the one left, so the entry is kept up to date as the page scrolls.

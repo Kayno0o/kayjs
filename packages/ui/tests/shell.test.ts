@@ -101,6 +101,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
     expect(page.errors).toEqual([])
   }, 60_000)
 
+  it('runs the onClick of a Button drawn as a link before it navigates, and stays on the page when the handler prevents the default', async () => {
+    const page = await site.open('/toast-rich')
+
+    await page.click('#held')
+    await page.waitUntil(() => document.body.dataset.clicked === 'held')
+    await new Promise(resolve => setTimeout(resolve, 200))
+    expect(await page.evaluate(() => location.pathname)).toBe('/toast-rich')
+
+    await page.click('#go')
+    await page.waitUntil(() => location.pathname === '/shell')
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
   it('keeps a link action\'s toast on a ctrl-click', async () => {
     const page = await site.open('/toast-rich')
 
