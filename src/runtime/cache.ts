@@ -218,12 +218,20 @@ export function cache<A extends unknown[], T>(load: (...args: A) => T | Promise<
     reload: async (...args: A): Promise<T> => {
       const key = keyOf(args)
       const entry = entries.get(key)
+      const store = rest.store === false ? undefined : rest.store ?? appCache
 
-      if (!entry?.loaded || renderingForVisitor())
+      if (renderingForVisitor())
+        return call(...args)
+
+      // Nothing in memory: a stored row would be read back as the value, so it goes first and the load writes the fresh one.
+      if (!entry && store)
+        await store.delete(key)
+
+      if (!entry?.loaded)
         return call(...args)
 
       if (!entry.loading)
-        void refresh(key, seconds, entry, async () => load(...args), rest.store === false ? undefined : rest.store ?? appCache, tagKeys, rest.store === undefined, true)
+        void refresh(key, seconds, entry, async () => load(...args), store, tagKeys, rest.store === undefined, true)
 
       return (await (entry.loading as Promise<{ result: T }>)).result
     },

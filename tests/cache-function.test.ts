@@ -456,6 +456,29 @@ describe('cache', () => {
     })
   })
 
+  it('reloads from the load, not the stored row, after a max eviction, and writes the fresh row', async () => {
+    const rows = new Map<string, { text: string, freshUntil: number }>()
+
+    const store: CacheStore = {
+      get: key => rows.get(key),
+      set: (key, text, freshUntil) => void rows.set(key, { text, freshUntil }),
+      delete: key => void rows.delete(key),
+      keys: () => [...rows.keys()],
+    }
+
+    let loads = 0
+    const fn = cache(async (n: number) => `${n}:${++loads}`, { ttl: '1h', max: 1, store })
+
+    expect(await fn(1)).toBe('1:1')
+    expect(await fn(2)).toBe('2:2')
+    // 1 is gone from memory, its row stays.
+    expect(await fn(1)).toBe('1:1')
+    await fn(2)
+    expect(await fn.reload(1)).toBe('1:3')
+    expect([...rows.values()].some(row => row.text.includes('1:3'))).toBe(true)
+    expect(await fn(1)).toBe('1:3')
+  })
+
   it('reloads a value once for the callers asking while it loads, keeping the old one if the load throws', async () => {
     let loads = 0
     let failing = false
