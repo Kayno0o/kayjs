@@ -48,5 +48,7 @@ describe('sha256', () => {
     expect(sha256('a', { encoding: 'base64' })).toBe(Buffer.from(sha256('a'), 'hex').toString('base64'))
     expect(sha256('a', { encoding: 'base64url', length: 22 })).toBe(Buffer.from(sha256('a'), 'hex').toString('base64url').slice(0, 22))
     expect(sha256('a', { key: 'k' })).toBe(new Bun.CryptoHasher('sha256', 'k').update('a').digest('hex'))
+    // A fixed HMAC, so a stored token's format cannot drift with the helper.
+    expect(sha256('a', { key: 'k', encoding: 'base64url' })).toBe('eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4')
   })
 })
