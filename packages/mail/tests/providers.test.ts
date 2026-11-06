@@ -297,6 +297,12 @@ describe('MAIL_URL naming a provider', () => {
     await providerFromUrl(`ses://AKID:a%2Fb%2Bc@us-east-1?baseUrl=${base}`).send(mail)
     expect(seen[0]!.headers.get('authorization')).toContain('Credential=AKID/')
   })
+
+  it('reads the whole query after its first `?`', async () => {
+    answer = () => json({ MessageID: 'p1', ErrorCode: 0 })
+    await providerFromUrl(`postmark://tok?baseUrl=${base}&stream=a?b`).send(mail)
+    expect(JSON.parse(seen[0]!.body).MessageStream).toBe('a?b')
+  })
 })
 
 describe('mailer() on a provider\'s MAIL_URL', () => {

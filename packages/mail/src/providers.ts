@@ -97,7 +97,15 @@ const base64 = (content: MailAttachment['content']): string => typeof content ==
 
 // Words an API refused with, without anything the request carried.
 async function reason(response: Response): Promise<string> {
-  const text = (await response.text()).trim()
+  let text: string
+
+  try {
+    text = (await response.text()).trim()
+  }
+  catch {
+    // The timeout ran out while the refusal was read: its status alone says it.
+    return ''
+  }
 
   try {
     const body = JSON.parse(text) as Record<string, unknown>
@@ -316,7 +324,8 @@ export function ses(settings: SesSettings): Transport {
   if (!REGION.test(region))
     throw configError(`ses()'s region is ${JSON.stringify(region)}; it takes an AWS region such as eu-west-1`)
 
-  const base = baseOf(settings, `https://email.${region}.amazonaws.com`, 'ses()')
+  // The China regions answer under their own partition's domain.
+  const base = baseOf(settings, `https://email.${region}.amazonaws.com${region.startsWith('cn-') ? '.cn' : ''}`, 'ses()')
   const wait = timeoutOf(settings, 'ses()')
 
   return {
@@ -363,7 +372,8 @@ function decoded(text: string, what: string): string {
 export function providerFromUrl(value: string): Transport {
   const provider = providerOf(value)!
   const [, , rest] = SCHEME.exec(value)!
-  const [authority = '', query = ''] = rest!.split('?', 2)
+  const mark = rest!.indexOf('?')
+  const [authority, query] = mark === -1 ? [rest!, ''] : [rest!.slice(0, mark), rest!.slice(mark + 1)]
   const options = new URLSearchParams(query)
   const common: ProviderSettings = { baseUrl: options.get('baseUrl') ?? undefined }
   const usage: Record<HttpProvider, string> = { resend: 'resend://API_KEY', postmark: 'postmark://SERVER_TOKEN', sendgrid: 'sendgrid://API_KEY', mailgun: 'mailgun://API_KEY@mg.example.com, then ?region=eu for the European region', ses: 'ses://ACCESS_KEY_ID:SECRET_ACCESS_KEY@eu-west-1, the secret percent-encoded' }
