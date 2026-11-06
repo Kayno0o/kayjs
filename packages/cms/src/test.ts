@@ -93,13 +93,13 @@ export interface CmsTest {
   signInAs: (role?: string) => Promise<string>
   // Signs the site out of the cms, its other cookies kept.
   signOut: () => void
-  // Saves an entry as the signed-in editor does from the screen: the answer is `{ saved: true, version }`, or `{ issues }` for a refused entry, and a site not signed in throws.
+  // Saves an entry as the signed-in editor does from the screen: the answer is `{ ok: true, saved: true, version }`, or `{ ok: false, error, issues }` for a refused entry, and a site not signed in throws.
   save: (collection: string, slug: string, data: Record<string, unknown>, options?: CmsSaveOptions) => Promise<CmsSaveOutcome>
   // The entry as the editor opens it, with its `version`, or undefined when there is none.
   entry: (collection: string, slug: string, options?: Pick<EntryRef, 'locale'>) => Promise<StoredEntry | undefined>
-  // Deletes an entry as the editor does, naming the version of the entry as it is now; the answer is `{ saved: true }` or `{ issues }`.
+  // Deletes an entry as the editor does, naming the version of the entry as it is now; the answer is `{ ok: true, saved: true }` or `{ ok: false, error, issues }`.
   delete: (collection: string, slug: string, options?: CmsEntryOptions) => Promise<CmsSaveOutcome>
-  // Renames an entry's slug, naming its version; the answer is `{ saved: true, slug }` or `{ issues }`.
+  // Renames an entry's slug, naming its version; the answer is `{ ok: true, saved: true, slug }` or `{ ok: false, error, issues }`.
   rename: (collection: string, slug: string, to: string, options?: CmsEntryOptions) => Promise<CmsSaveOutcome & { slug?: string }>
   // Moves an entry up or down in a collection that names an order field.
   move: (collection: string, slug: string, direction: 'up' | 'down', options?: Pick<EntryRef, 'locale'>) => Promise<CmsSaveOutcome>

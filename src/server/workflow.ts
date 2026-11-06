@@ -1,4 +1,5 @@
 import type { Elysia } from 'elysia'
+import type { ErrorShape } from '../runtime/api-error'
 import type { Duration } from '../runtime/duration'
 import type { Hook } from './hooks'
 import type { JobContext, JobStore, QueueOptions, RunHold } from './queue'
@@ -10,15 +11,27 @@ import { defaultJobStore, GiveUpError, jobQueue } from './queue'
 
 type Events = Record<string, unknown>
 
-// What a wait with a timeout resolves with: the event's data, or that the timeout came first.
-export type WaitResult<Data> = { timedOut: false, data: Data } | { timedOut: true, data?: undefined }
+// What a wait with a timeout resolves with: `{ ok: true, data }`, or `{ ok: false, error }` when the timeout came first, as every result discriminates.
+// `timedOut` is `!ok`, kept beside it for the code that reads it: read `ok`.
+export type WaitResult<Data>
+  = | { ok: true, timedOut: false, data: Data, error?: undefined }
+    | { ok: false, timedOut: true, error: ErrorShape, data?: undefined }
+
+// The memo keeps the wait as it was first written, `{ timedOut, data? }`, so a run kept before `ok` existed replays; the result an app reads is made from it.
+type WaitMemo = { timedOut: false, data: unknown } | { timedOut: true, data?: undefined }
+
+function waited(event: string, kept: WaitMemo): WaitResult<unknown> {
+  return kept.timedOut
+    ? { ok: false, timedOut: true, error: { status: 408, message: `waitFor('${event}') timed out`, errors: {}, data: undefined } }
+    : { ok: true, timedOut: false, data: kept.data }
+}
 
 export interface WorkflowStep<Known extends Events> {
   // Runs `work` once for the run and keeps its result, a value devalue keeps, in the store: a restart or a retry gets the kept result back instead of running it again. Steps run one at a time, each awaited before the next.
   run: <Result>(name: string, work: (signal: AbortSignal) => Result | Promise<Result>) => Promise<Awaited<Result>>
   // Lets the run go for `wait`: nothing holds a process meanwhile, and the code after it runs once the time comes, in whichever process takes the run.
   sleep: (wait: Duration) => Promise<void>
-  // Waits for `send(id, event, data)` to this run and resolves with its data; with a `timeout`, resolves with `{ timedOut: true }` when the time comes first.
+  // Waits for `send(id, event, data)` to this run and resolves with its data; with a `timeout`, resolves with `{ ok: false, error }` when the time comes first.
   waitFor: {
     <Event extends keyof Known & string>(event: Event): Promise<Known[Event]>
     <Event extends keyof Known & string>(event: Event, options: { timeout: Duration }): Promise<WaitResult<Known[Event]>>
@@ -275,14 +288,14 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
       },
       async waitFor(event: string, waitOptions?: { timeout: Duration }): Promise<never> {
         const { slot, seen } = enter('wait', event)
-        const reply = (result: WaitResult<unknown>) => (waitOptions === undefined ? result.data : result) as never
+        const reply = (kept: WaitMemo) => (waitOptions === undefined ? kept.data : waited(event, kept)) as never
 
         if (seen)
-          return reply(seen.value as WaitResult<unknown>)
+          return reply(seen.value as WaitMemo)
 
         // Taken again with no result kept: only the timeout makes a waiting run due.
         if (payload.waiting?.index === slot && payload.waiting.event === event) {
-          const value: WaitResult<unknown> = { timedOut: true }
+          const value: WaitMemo = { timedOut: true }
 
           memo.push({ kind: 'wait', name: event, value })
 
@@ -294,7 +307,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
         // The event came before the run waited for it.
         if (early !== -1) {
           const [sent] = inbox.splice(early, 1)
-          const value: WaitResult<unknown> = { timedOut: false, data: sent!.data }
+          const value: WaitMemo = { timedOut: false, data: sent!.data }
 
           memo.push({ kind: 'wait', name: event, value })
 
@@ -375,7 +388,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
       return update(run.job.id, { payload: stringify({ ...run.payload, inbox }) }, { payload: run.job.payload, now })
     }
 
-    const memo: Entry[] = [...run.payload.memo, { kind: 'wait', name: event, value: { timedOut: false, data } satisfies WaitResult<unknown> }]
+    const memo: Entry[] = [...run.payload.memo, { kind: 'wait', name: event, value: { timedOut: false, data } satisfies WaitMemo }]
     const woken = await update(run.job.id, { payload: stringify({ ...run.payload, memo, waiting: undefined }), runAt: now }, { payload: run.job.payload, now })
 
     if (woken)

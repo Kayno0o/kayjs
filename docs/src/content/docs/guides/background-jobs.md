@@ -307,7 +307,7 @@ export const onboarding = workflow<{ userId: string }, { visited: undefined }>('
 
   const visit = await step.waitFor('visited', { timeout: '3d' })
 
-  if (visit.timedOut)
+  if (!visit.ok)
     await step.run('reminder', () => sendReminder(input.userId))
 })
 ```
@@ -323,7 +323,7 @@ The run is a job of the queue `workflow:onboarding` in the same store as your qu
 
 The function runs again from its top each time the run is taken, and a finished step returns its kept result, so what lies between steps must give the same answer every time. Await each step before the next. Renaming or reordering steps under a run that is waiting fails that run at once, with an error naming the step. Results go through devalue, as a queue's payload does.
 
-`step.sleep('3d')` and `step.waitFor` hold no process: the run waits in the store and the code after them runs in whichever process takes the run. `waitFor(event)` resolves with the event's data. With a `timeout` it resolves with `{ timedOut: false, data }` or `{ timedOut: true }`.
+`step.sleep('3d')` and `step.waitFor` hold no process: the run waits in the store and the code after them runs in whichever process takes the run. `waitFor(event)` resolves with the event's data. With a `timeout` it resolves with `{ ok: true, data }` or, when the time came first, `{ ok: false, error }`. `timedOut` is still there as `!ok`.
 
 `send(id, event, data)` resolves with whether the run took the event. A run that is not waiting for it yet keeps it for the wait that names it, so `start` followed by `send` works. It keeps 50 such events, dropping and logging the oldest. An event sent while a step is running is dropped. `status(id)` tells whether a run is `running`, `sleeping`, `waiting` or `failed`, and `cancel(id)` ends it.
 

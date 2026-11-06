@@ -273,11 +273,11 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     expect(got).toEqual([])
     later(24 * 60 * MINUTE + 1000)
     await flow.drain()
-    expect(got).toEqual([{ timedOut: true }])
+    expect(got).toMatchObject([{ ok: false, timedOut: true, error: { status: 408 } }])
     expect(await flow.status(id)).toMatchObject({ status: 'waiting', event: 'verified', steps: 2 })
     expect(await flow.send(id, 'verified', 'yes')).toBe(true)
     await flow.drain()
-    expect(got).toEqual([{ timedOut: true }, { timedOut: false, data: 'yes' }])
+    expect(got).toMatchObject([{ ok: false, timedOut: true }, { ok: true, timedOut: false, data: 'yes' }])
   })
 
   it('wakes only once when an event and a timeout race', async () => {
@@ -296,7 +296,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     // The drain may lose its claim to the event, which leaves the woken run for the next drain.
     await flow.drain()
     expect(got).toHaveLength(1)
-    expect(got[0]).toEqual(sent ? { timedOut: false, data: 1 } : { timedOut: true })
+    expect(got[0]).toMatchObject(sent ? { ok: true, timedOut: false, data: 1 } : { ok: false, timedOut: true })
   })
 
   it('keeps one live run per id, and starts again once it ended', async () => {
@@ -520,7 +520,7 @@ pgDescribe('two workflows on separate Postgres connections', () => {
     await first.drain()
     expect(await second.send(id, 'go', 1)).toBe(true)
     await first.drain()
-    expect(got).toEqual([{ timedOut: false, data: 1 }])
+    expect(got).toEqual([{ ok: true, timedOut: false, data: 1 }])
 
     const raced = await first.start(undefined, { id: 'raced' })
 
@@ -531,7 +531,7 @@ pgDescribe('two workflows on separate Postgres connections', () => {
 
     await Promise.all([first.drain(), second.drain()])
     expect(got).toHaveLength(2)
-    expect(got[1]).toEqual(sent ? { timedOut: false, data: 3 } : { timedOut: true })
+    expect(got[1]).toMatchObject(sent ? { ok: true, timedOut: false, data: 3 } : { ok: false, timedOut: true })
     expect(await first.status(raced)).toBeUndefined()
   })
 

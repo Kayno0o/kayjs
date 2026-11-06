@@ -379,10 +379,10 @@ Add `push()` to `extensions` and a person who opts in also gets each `notify` as
 ---
 import { webPush } from 'kay'
 ---
-button(onClick={async () => { await webPush.subscribe() }}) Notify me
+button(onClick={async () => { await webPush.enable() }}) Notify me
 ```
 
-kay asks the browser's permission only from a click, keeps the device in your store, forgets it when kayjs-auth signs the person out of that browser, and drops it when the push service says it is gone. `sendPush(userId, { title, body, url })` from `kay/server` sends one without the inbox, and `notify(userId, { title, push: false })` keeps one out of the push. `installPrompt.available()` and `installPrompt.show()` from `kay` draw an "Install" button once the browser offers one.
+kay asks the browser's permission only from a click, keeps the device in your store, forgets it when kayjs-auth signs the person out of that browser, and drops it when the push service says it is gone. `sendPush(userId, { title, body, url })` from `kay/server` sends one without the inbox, and `notify(userId, { title, push: false })` keeps one out of the push. `installPrompt.available()` and `installPrompt.install()` from `kay` draw an "Install" button once the browser offers one.
 
 When the browser rotates a subscription, kay's worker subscribes again by itself and keeps the person.
 

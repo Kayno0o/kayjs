@@ -224,7 +224,7 @@ type CallPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found exte
 type CallQueue = 'parallel' | 'serial' | 'latest'
 
 [.] CallResult
-type CallResult<Data, Failed> = | { ok: true, data: Data } | ({ ok: false } & ErrorShape<Failed>)
+type CallResult<Data, Failed> = | { ok: true, data: Data, error?: undefined } | ({ ok: false, error: ErrorShape<Failed> } & ErrorShape<Failed>)
 
 [.] CardPageContext
 interface CardPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params>
@@ -469,7 +469,10 @@ type InputOf<Target> = Target extends Action<infer Input, unknown> ? Input : nev
 type InstallOutcome = 'accepted' | 'dismissed' | 'unavailable'
 
 [.] installPrompt
-const installPrompt: { available: () => boolean; show(): Promise<InstallOutcome>; }
+const installPrompt: { available: () => boolean; install(): Promise<InstallResult>; show(): Promise<InstallOutcome>; }
+
+[.] InstallResult
+type InstallResult = | { ok: true, outcome: 'accepted', error?: undefined } | { ok: false, outcome: 'dismissed' | 'unavailable', error: ErrorShape }
 
 [.] isEmail
 function isEmail(input: unknown): input is string
@@ -836,6 +839,13 @@ type PublicFieldsOfModule<Module> = Intersection<{
     readonly [PUBLIC_FIELDS]: infer Fields
   } ? Fields : never
 }[keyof Module]>
+
+[.] PushEnableResult
+type PushEnableResult = | {
+  ok: true, state: 'subscribed', error?: undefined
+} | {
+  ok: false, state: Exclude<PushSubscribeResult, 'subscribed'>, error: ErrorShape
+}
 
 [.] PushState
 type PushState = 'unsupported' | 'denied' | 'subscribed' | 'off'
@@ -1291,7 +1301,7 @@ interface WatchOptions
   immediate?: boolean | undefined
 
 [.] webPush
-const webPush: { state: () => PushState; subscribe(): Promise<PushSubscribeResult>; unsubscribe(): Promise<boolean>; }
+const webPush: { state: () => PushState; enable(): Promise<PushEnableResult>; subscribe(): Promise<PushSubscribeResult>; unsubscribe(): Promise<boolean>; }
 
 [.] withBase
 function withBase(path: string): string
@@ -3657,7 +3667,7 @@ interface VerifyWorkOptions
   store?: RateStore | undefined
 
 [./server] WaitResult
-type WaitResult<Data> = { timedOut: false, data: Data } | { timedOut: true, data?: undefined }
+type WaitResult<Data> = | { ok: true, timedOut: false, data: Data, error?: undefined } | { ok: false, timedOut: true, error: ErrorShape, data?: undefined }
 
 [./server] workChallenge
 function workChallenge(scope: string, options?: WorkChallengeOptions): string

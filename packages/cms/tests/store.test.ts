@@ -144,7 +144,7 @@ void mock.module('../src/kay/content', () => content)
 const { default: entriesApi } = await import('../src/api/entries')
 const { default: markdownApi } = await import('../src/api/markdown')
 const { leavesPublication } = await import('../src/publishing')
-const { copySlug, deleteEntry, duplicateEntry, entryOf, entryScreen, moveEntry, publishEntry, saveEntry, UnknownCollectionError } = await import('../src/store')
+const { copySlug, deleteEntry, duplicateEntry, entryOf, entryScreen, moveEntry, publishEntry, refused, saveEntry, UnknownCollectionError } = await import('../src/store')
 
 beforeEach(() => {
   saved = []
@@ -167,7 +167,7 @@ beforeEach(() => {
 
 describe('saveEntry', () => {
   test('commits a folder entry\'s file, named by what kay wrote', async () => {
-    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi there' }, body: 'Body' })).toEqual({ saved: true, commit: { sha: 'abc' }, version: fileVersion('{"title":"Hi there"}\nBody') })
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi there' }, body: 'Body' })).toMatchObject({ saved: true, commit: { sha: 'abc' }, version: fileVersion('{"title":"Hi there"}\nBody') })
     expect(saved).toEqual([{ repoPath: 'content/posts/hello.md', absolute: '/site/content/posts/hello.md', text: '{"title":"Hi there"}\nBody', message: 'content(posts): update hello' }])
   })
 
@@ -181,7 +181,7 @@ describe('saveEntry', () => {
   })
 
   test('refuses a body that would run as the site, unless its collection takes raw HTML, and publishes one already stored', async () => {
-    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' }, body: '<div onclick="steal()">x</div>' })).toEqual({ issues: [{ collection: 'posts', slug: 'hello', locale: undefined, path: '', body: true, message: 'The text holds the attribute onclick, which would run as the site: write it as Markdown, or list posts in cms({ rawHtml })' }] })
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' }, body: '<div onclick="steal()">x</div>' })).toMatchObject({ issues: [{ collection: 'posts', slug: 'hello', locale: undefined, path: '', body: true, message: 'The text holds the attribute onclick, which would run as the site: write it as Markdown, or list posts in cms({ rawHtml })' }] })
     expect(saved).toEqual([])
 
     stored.posts![0]!.body = '<script>trusted()</script>'
@@ -232,7 +232,7 @@ describe('saveEntry', () => {
   })
 
   test('passes on the schema\'s issues and writes nothing', async () => {
-    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: '' } })).toEqual({ issues: [{ collection: 'posts', slug: 'hello', path: 'title', message: 'Required' }] })
+    expect(await saveEntry({ collection: 'posts', slug: 'hello', data: { title: '' } })).toMatchObject({ issues: [{ collection: 'posts', slug: 'hello', path: 'title', message: 'Required' }] })
     expect(saved).toEqual([])
   })
 
@@ -298,7 +298,7 @@ describe('saveEntry', () => {
   })
 
   test('hands a loaded entry to its collection\'s loader', async () => {
-    expect(await saveEntry({ collection: 'products', slug: 'mug', data: { name: 'Big mug' } })).toEqual({ saved: true })
+    expect(await saveEntry({ collection: 'products', slug: 'mug', data: { name: 'Big mug' } })).toMatchObject({ saved: true })
     expect(loaded).toEqual([{ slug: 'mug', data: { name: 'Big mug' } }])
     expect(saved).toEqual([])
   })
@@ -331,7 +331,7 @@ describe('saveEntry', () => {
 
 describe('deleteEntry', () => {
   test('commits a folder entry\'s file away', async () => {
-    expect(await deleteEntry({ collection: 'posts', slug: 'hello' })).toEqual({ saved: true, commit: { sha: 'abc' } })
+    expect(await deleteEntry({ collection: 'posts', slug: 'hello' })).toMatchObject({ saved: true, commit: { sha: 'abc' } })
     expect(saved).toEqual([{ repoPath: 'content/posts/hello.md', absolute: '/site/content/posts/hello.md', text: undefined, message: 'content(posts): delete hello' }])
   })
 
@@ -354,7 +354,7 @@ describe('deleteEntry', () => {
   })
 
   test('removes a loaded entry through its loader, or passes on why kay would not', async () => {
-    expect(await deleteEntry({ collection: 'products', slug: 'mug' })).toEqual({ saved: true })
+    expect(await deleteEntry({ collection: 'products', slug: 'mug' })).toMatchObject({ saved: true })
     expect(await deleteEntry({ collection: 'products', slug: 'nope' })).toHaveProperty('issues.0.key', 'slug')
     expect(removed).toEqual(['mug'])
   })
@@ -514,7 +514,7 @@ describe('a loaded entry\'s version', () => {
     const [a, b] = [await opened(), await opened()]
     const first = await saveEntry(named('From A'), { version: a, required: true })
 
-    expect(first).toEqual({ saved: true, version: contentVersion({ data: { name: 'From A' } }) })
+    expect(first).toMatchObject({ saved: true, version: contentVersion({ data: { name: 'From A' } }) })
 
     const second = await saveEntry(named('From B'), { version: b, required: true })
 
@@ -566,7 +566,7 @@ describe('a loaded entry\'s version', () => {
     await saveEntry(named('Saved'), { version, required: true })
     expect(await deleteEntry(mug, undefined, { version, required: true })).toMatchObject({ issues: [{ message: 'This entry was changed since you opened it, by another editor or by the app' }], conflict: { version: contentVersion({ data: { name: 'Saved' } }) } })
     expect(removed).toEqual([])
-    expect(await deleteEntry(mug, undefined, { version: contentVersion({ data: { name: 'Saved' } }), required: true })).toEqual({ saved: true })
+    expect(await deleteEntry(mug, undefined, { version: contentVersion({ data: { name: 'Saved' } }), required: true })).toMatchObject({ saved: true })
     expect(removed).toEqual(['mug'])
   })
 
@@ -584,11 +584,31 @@ describe('a loaded entry\'s version', () => {
     expect(removed).toEqual([])
   })
 
+  test('answers ok on a save and an error shape on a refusal, the old fields kept beside them', async () => {
+    const done = await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } })
+
+    expect(done).toMatchObject({ ok: true, saved: true })
+    expect(done.error).toBeUndefined()
+
+    configure({ files: { save: async () => {
+      throw new SaveConflictError('f00d')
+    } } })
+
+    const stale = await saveEntry({ collection: 'posts', slug: 'hello', data: { title: 'Hi' } }, { version: 'old' })
+
+    expect(stale).toMatchObject({ ok: false, conflict: { version: 'f00d' }, error: { status: 409, errors: { '': expect.any(String) }, data: undefined } })
+    expect(stale.ok === false && stale.error.message).toBe(stale.ok === false && stale.issues.map(issue => issue.message).join('; '))
+
+    const missing = refused({ collection: 'posts', slug: 'ghost' }, 'ghost does not exist', 'slug')
+
+    expect(missing).toMatchObject({ ok: false, error: { status: 422, message: 'ghost does not exist' }, issues: [{ key: 'slug' }] })
+  })
+
   test('saves and deletes without reading the loader again when no version is asked for', async () => {
     const read = spyOn(content, 'entries')
 
-    expect(await saveEntry(named('Plain'))).toEqual({ saved: true })
-    expect(await deleteEntry(mug)).toEqual({ saved: true })
+    expect(await saveEntry(named('Plain'))).toMatchObject({ saved: true })
+    expect(await deleteEntry(mug)).toMatchObject({ saved: true })
     expect(read).not.toHaveBeenCalled()
     read.mockRestore()
   })
@@ -731,7 +751,7 @@ describe('references on save', () => {
     collectionList.push(notes)
 
     try {
-      expect(await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N', post: 'ghost' } })).toEqual({ issues: [{ collection: 'notes', slug: 'n', locale: undefined, path: 'post', message: 'No entry ghost in posts' }] })
+      expect(await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N', post: 'ghost' } })).toMatchObject({ issues: [{ collection: 'notes', slug: 'n', locale: undefined, path: 'post', message: 'No entry ghost in posts' }] })
       expect(saved).toEqual([])
       expect(await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N', post: 'hello' } })).toHaveProperty('saved', true)
     }

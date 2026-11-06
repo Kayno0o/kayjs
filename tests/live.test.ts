@@ -880,7 +880,7 @@ describe('call()', () => {
 
     const missing = await edit({ method: 'patch', params: { id: 404 }, body: { title: 'x' } })
 
-    expect(missing).toEqual({ ok: false, status: 404, message: 'No such note', errors: { '': 'No such note' }, data: 'No such note' })
+    expect(missing).toEqual({ ok: false, status: 404, message: 'No such note', errors: { '': 'No such note' }, data: 'No such note', error: { status: 404, message: 'No such note', errors: { '': 'No such note' }, data: 'No such note' } })
 
     const invalid = await save({ method: 'post', body: { title: '' } })
 

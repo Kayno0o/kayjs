@@ -1,3 +1,4 @@
+import type { ErrorShape } from './api-error'
 import { within } from '@kaynooo/utils/promise'
 import { withBase } from './base'
 import { createSignal, markSignal } from './reactive'
@@ -10,6 +11,20 @@ export type PushState = 'unsupported' | 'denied' | 'subscribed' | 'off'
 
 // What `webPush.subscribe()` ended with.
 export type PushSubscribeResult = PushState | 'needs-gesture' | 'signed-out' | 'failed'
+
+// What `webPush.enable()` ended with: `{ ok: true }` once this device is subscribed, else `{ ok: false, error }`; `state` is what `subscribe()` answers, for the code that branches on it.
+export type PushEnableResult
+  = | { ok: true, state: 'subscribed', error?: undefined }
+    | { ok: false, state: Exclude<PushSubscribeResult, 'subscribed'>, error: ErrorShape }
+
+const REFUSALS: Record<Exclude<PushSubscribeResult, 'subscribed'>, [status: number, message: string]> = {
+  'unsupported': [0, 'This browser or site cannot receive push notifications'],
+  'denied': [403, 'The browser blocks notifications for this site'],
+  'off': [0, 'The notification permission was not granted'],
+  'needs-gesture': [0, 'Asking for the notification permission needs a click or a tap'],
+  'signed-out': [401, 'Sign in to receive push notifications'],
+  'failed': [0, 'This device could not be subscribed to push notifications'],
+}
 
 const READY_TIMEOUT_MS = 10_000
 
@@ -147,10 +162,20 @@ async function post(path: string, body: object): Promise<Response> {
 const readState = markSignal((): PushState => (onServer() ? 'unsupported' : pushSignal()()))
 
 // The visitor's opt-in to push, once `push()` is in kay.config.ts: `webPush.state()` is a signal to draw the button from, `webPush.subscribe()` asks the browser's permission and registers this device for the signed-in visitor, `webPush.unsubscribe()` takes it back.
-// `subscribe()` asks the permission only while the page has a user gesture to answer, from a click handler; called with none it answers `'needs-gesture'` and asks nothing.
+// `enable()` asks the permission only while the page has a user gesture to answer, from a click handler; called with none it resolves `{ ok: false, state: 'needs-gesture' }` and asks nothing. `subscribe()` answers the bare state the same call ends with, and stays for the code written before `enable()`.
 // kept: free
 export const webPush = {
   state: readState,
+  async enable(): Promise<PushEnableResult> {
+    const state = await webPush.subscribe()
+
+    if (state === 'subscribed')
+      return { ok: true, state }
+
+    const [status, message] = REFUSALS[state]
+
+    return { ok: false, state, error: { status, message, errors: {}, data: undefined } }
+  },
   async subscribe(): Promise<PushSubscribeResult> {
     if (onServer() || !capable())
       return 'unsupported'

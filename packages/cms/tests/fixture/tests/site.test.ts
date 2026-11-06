@@ -438,7 +438,7 @@ test('saving a file entry hands the file kay wrote to the saver, as a commit by 
   const file = Bun.file(`${import.meta.dir}/../src/content/posts/hello.md`)
 
   expect(opened.entry.version).toBe(fileVersion(await file.bytes()))
-  expect(await send('POST', 'posts/hello', { data: { title: 'Hello again', tags: ['kay'] }, body: 'New body.\n', version: opened.entry.version })).toEqual({ status: 200, answer: { saved: true, commit: { sha: 'c0ffee' }, version: fileVersion(saved[0]!.text!) } })
+  expect(await send('POST', 'posts/hello', { data: { title: 'Hello again', tags: ['kay'] }, body: 'New body.\n', version: opened.entry.version })).toEqual({ status: 200, answer: { ok: true, saved: true, commit: { sha: 'c0ffee' }, version: fileVersion(saved[0]!.text!) } })
   expect(saved[0]?.base).toBe(opened.entry.version)
   expect(saved.map(({ repoPath, message }) => [repoPath, message])).toEqual([['packages/cms/tests/fixture/src/content/posts/hello.md', 'content(posts): update hello']])
   expect(saved[0]?.text).toContain('title: Hello again')
@@ -474,7 +474,7 @@ test('a save refused comes back as issues and nothing is written, a body showing
   const { answer } = await send('POST', 'posts/hello', { data: { title: 3 }, version: await versionOf('posts/hello') }) as { answer: { issues: { path: string }[] } }
 
   expect(answer.issues.map(issue => issue.path)).toContain('title')
-  expect((await send('POST', 'posts/hello', { data: { title: 'Again' }, create: true })).answer).toEqual({ issues: [{ collection: 'posts', slug: 'hello', path: '', key: 'slug', message: 'names an entry the collection already holds' }] })
+  expect((await send('POST', 'posts/hello', { data: { title: 'Again' }, create: true })).answer).toMatchObject({ issues: [{ collection: 'posts', slug: 'hello', path: '', key: 'slug', message: 'names an entry the collection already holds' }] })
   expect((await send('POST', 'posts/..%2Fescape', { data: { title: 'Out' }, create: true })).answer).toHaveProperty('issues.0.key', 'slug')
   expect((await send('DELETE', 'products/nope')).answer).toHaveProperty('issues.0.message', 'names no entry of the collection')
 
@@ -544,7 +544,7 @@ test('a loaded entry is created and removed through its loader, a slug starting 
   expect((await send('POST', 'products/lamp', { data: { name: 'Lamp' }, create: true })).answer).toHaveProperty('saved', true)
   expect(products.map(product => product.slug)).toEqual(['mug', 'lamp'])
   expect((await send('GET', 'products/lamp')).answer).toHaveProperty('entry.data.name', 'Lamp')
-  expect((await send('DELETE', `products/lamp?version=${await versionOf('products/lamp')}`)).answer).toEqual({ saved: true })
+  expect((await send('DELETE', `products/lamp?version=${await versionOf('products/lamp')}`)).answer).toMatchObject({ saved: true })
   expect(products.map(product => product.slug)).toEqual(['mug'])
   expect((await send('POST', 'products/%2Fabout', { data: { name: 'About' }, create: true })).answer).toHaveProperty('saved', true)
 

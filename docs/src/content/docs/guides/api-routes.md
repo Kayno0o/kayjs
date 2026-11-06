@@ -79,7 +79,7 @@ button(onClick={() => call(notes, '/', { method: 'post', body: { title: title() 
 
 A refusal throws an `ApiError` with its `status` and `message`. Its status is 0 when no answer came.
 
-`call.track(notes, '/')` gives a handle that answers a refusal as a result instead of throwing, as an action's `track()` does: `const result = await save({ method: 'post', body })` is `{ ok: true, data }` or `{ ok: false, status, message, errors, data }`, with `errors` a message per field a refused route names, else the refusal's message under `''`, and `save.pending()` reads only its own calls. A call that got no answer still throws.
+`call.track(notes, '/')` gives a handle that answers a refusal as a result instead of throwing, as an action's `track()` does: `const result = await save({ method: 'post', body })` is `{ ok: true, data }` or `{ ok: false, status, message, errors, data, error }` (`error` repeats them), with `errors` a message per field a refused route names, else the refusal's message under `''`, and `save.pending()` reads only its own calls. A call that got no answer still throws.
 
 To show a refusal, read the `message` of the `ApiError` a call throws: it is the field messages or the `message` the route answered, else the status text, and `The server could not be reached` when no answer came. `errors` holds a message per field and `data` what the route answered.
 

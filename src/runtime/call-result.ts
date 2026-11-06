@@ -4,9 +4,12 @@ import { apiErrorOf } from './api-error'
 import { ownSignal, untrack } from './reactive'
 
 // How a tracked call went, for an action and for a route alike: what it answered, or the refusal. `message` is the text to show; `errors` holds a message per field, the form-wide one under ''; `data` is what the handler passed to `ctx.fail` for an action, the answer a route refused with for a route.
+// A refusal carries them twice, flat on the result and as its `error`, the one place every other result keeps its failure.
 export type CallResult<Data, Failed>
-  = | { ok: true, data: Data }
-    | ({ ok: false } & ErrorShape<Failed>)
+  = | { ok: true, data: Data, error?: undefined }
+    | ({ ok: false, error: ErrorShape<Failed> } & ErrorShape<Failed>)
+
+type Refusal = { ok: false } & ErrorShape
 
 // What `settled()` waits on: callers resolved as the count of calls in flight reaches 0.
 export function whenIdle(): { wait: (count: number) => Promise<void>, check: (count: number) => void } {
@@ -32,7 +35,7 @@ export function whenIdle(): { wait: (count: number) => Promise<void>, check: (co
 // It resolves `{ ok: true, data }`, or what `refused` makes of an error the call threw, which rethrows when it returns undefined; an abort rethrows and is no failure. `holds` says a result is a stream, which counts as in flight until it ends, calling `release` then.
 export function trackCalls<Args extends unknown[]>(
   call: (...args: Args) => Promise<unknown>,
-  refused: (error: unknown) => CallResult<never, unknown> | undefined,
+  refused: (error: unknown) => Refusal | undefined,
   holds?: (data: unknown, release: () => void) => boolean,
   // An error that is no failure of the call, such as a redirect, which `status()`, `error()` and `retry()` leave alone (a retry would post a login or a checkout again).
   aside?: (error: unknown) => boolean,
@@ -73,7 +76,7 @@ export function trackCalls<Args extends unknown[]>(
       if (result === undefined)
         throw failure
 
-      return result
+      return { ...result, error: { status: result.status, message: result.message, errors: result.errors, data: result.data } }
     }
     finally {
       if (!streaming)

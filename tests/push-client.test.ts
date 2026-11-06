@@ -168,6 +168,24 @@ describe('push.subscribe', () => {
     expect(posts).toEqual([])
   })
 
+  it('enable() resolves ok on a subscribed device and an error shape for every other end', async () => {
+    active = false
+    expect(await module.webPush.enable()).toMatchObject({ ok: false, state: 'needs-gesture', error: { status: 0, errors: {} } })
+
+    active = true
+    expect(await module.webPush.enable()).toEqual({ ok: true, state: 'subscribed' })
+
+    created = 0
+    answer = 401
+    permission = 'granted'
+    subscription = null
+    expect(await module.webPush.enable()).toMatchObject({ ok: false, state: 'signed-out', error: { status: 401 } })
+    answer = 500
+    expect(await module.webPush.enable()).toMatchObject({ ok: false, state: 'failed', error: { message: expect.any(String) } })
+    permission = 'denied'
+    expect(await module.webPush.enable()).toMatchObject({ ok: false, state: 'denied', error: { status: 403 } })
+  })
+
   it('never asks a visitor who blocked notifications', async () => {
     permission = 'denied'
     expect(await module.webPush.subscribe()).toBe('denied')
@@ -375,6 +393,16 @@ describe('installPrompt', () => {
     expect(module.installPrompt.available()).toBe(true)
     expect(await module.installPrompt.show()).toBe('dismissed')
     expect(module.installPrompt.available()).toBe(false)
+  })
+
+  it('install() resolves ok once accepted, else an error shape naming the outcome', async () => {
+    expect(await module.installPrompt.install()).toMatchObject({ ok: false, outcome: 'unavailable', error: { status: 0, errors: {} } })
+
+    Object.assign(window, { $kayInstall: Object.assign(new Event('beforeinstallprompt'), { prompt: async () => undefined, userChoice: Promise.resolve({ outcome: 'dismissed' as const }) }) })
+    expect(await module.installPrompt.install()).toMatchObject({ ok: false, outcome: 'dismissed' })
+
+    Object.assign(window, { $kayInstall: Object.assign(new Event('beforeinstallprompt'), { prompt: async () => undefined, userChoice: Promise.resolve({ outcome: 'accepted' as const }) }) })
+    expect(await module.installPrompt.install()).toEqual({ ok: true, outcome: 'accepted' })
   })
 
   it('answers unavailable when the browser refuses to show it', async () => {
