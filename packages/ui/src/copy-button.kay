@@ -1,6 +1,6 @@
 ---
 import type { Duration, JSX } from 'kay'
-import { copy } from '@kaynooo/utils/browser/clipboard'
+import { copyToClipboard } from '@kaynooo/utils/browser/clipboard'
 import { durationMs, onCleanup, recipe, signal } from 'kay'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
@@ -69,7 +69,7 @@ async function write(): Promise<string> {
   const resolved = await pending
 
   if (resolved)
-    await copy(resolved, html === undefined ? {} : { html })
+    await copyToClipboard(resolved, html === undefined ? {} : { html })
 
   return resolved
 }

@@ -1,7 +1,7 @@
 ---
 import type { JSX, Snippet } from 'kay'
 import type { TextEdit, ToolbarAction, ToolbarTools } from './markdown-edit'
-import { entriesFromDataTransfer } from '@kaynooo/utils/browser/clipboard'
+import { readDataTransferEntries } from '@kaynooo/utils/browser/clipboard'
 import { effect, onMount, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 import { controlledValue } from './controlled-value'
@@ -376,7 +376,7 @@ function paste(event: ClipboardEvent) {
     return
   }
 
-  const html = entriesFromDataTransfer(data).find(entry => entry.type === 'text/html')?.text
+  const html = readDataTransferEntries(data).find(entry => entry.type === 'text/html')?.text
 
   if (html) {
     event.preventDefault()

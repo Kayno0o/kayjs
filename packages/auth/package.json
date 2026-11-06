@@ -75,7 +75,7 @@
     }
   },
   "dependencies": {
-    "@kaynooo/utils": "^2.27.0",
+    "@kaynooo/utils": "^3.0.0",
     "jose": "^6.2.12"
   },
   "devDependencies": {
