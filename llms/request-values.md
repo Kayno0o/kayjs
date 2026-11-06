@@ -16,24 +16,28 @@ nav
 
 They are loaded before the render, so the markup is in the first bytes with JavaScript off. A page whose imports (its layouts, components and helpers, however deep) reach no template reading `ctx` loads nothing and reads no session. A page that does is the visitor's own: its answer is `private, no-cache` with `Vary: cookie`, and a page kept by the build is rendered per request. `kay build` records which templates read `ctx` in `.kay/client/context-reads.json`, which a server started from disk reads in place of the templates.
 
-### Give templates request values from an extension
+### Give templates request values from the app
 
-An extension's `context` names a module default-exporting `defineContext(load)`. `load(request)` runs at most once per request, for a page reaching a template that reads `ctx`, and the keys it returns are `ctx.<key>`:
-
-```ts
-// src/pages/index.ts
-import type { KayExtension } from 'kay/server'
-
-export function reports(): KayExtension {
-  return { name: 'reports', context: `${import.meta.dir}/../context.ts` }
-}
-```
+Write `src/context.ts` default-exporting `defineContext(load)`: no extension, no config. `load(request)` runs at most once per request, for a page reaching a template that reads `ctx`, and the keys it returns are `ctx.<key>`, typed in `kay check`:
 
 ```ts
 // src/context.ts
 import { defineContext } from 'kay/library'
 
 export default defineContext(async (request: Request) => ({ plan: await planOf(request) }))
+```
+
+### Give templates request values from an extension
+
+A library gives its own by naming the module as its extension's `context`, or as `"kay": { "context": "./src/context.ts" }` in its package.json:
+
+```ts
+// the library's extension
+import type { KayExtension } from 'kay/server'
+
+export function reports(): KayExtension {
+  return { name: 'reports', context: `${import.meta.dir}/../context.ts` }
+}
 ```
 
 ### Load a value only for the pages that show it
@@ -57,8 +61,8 @@ a(href="/cart") Cart ({ctx.cartCount})
 
 ## Reference
 
-- The keys are typed from the extension's module in `kay check` and the editor: `kay check` writes them into `.kay/types/kay-env.d.ts`.
-- Two extensions loading the same key throw, naming both.
+- The keys are typed from the context module in `kay check` and the editor: `kay check` writes them into `.kay/types/kay-env.d.ts`.
+- The app's `src/context.ts` counts as an extension listed first, unless an extension already names that file. Two sources (the app and an extension, or two extensions) loading the same key throw, naming both modules.
 - A fence reads `ctx` as before, the request: only a template reading `ctx` with no `ctx` declared in its file gets the values.
 - An island cannot read `ctx`, it renders in the browser too: `kay check` and the build refuse it, so pass the value as a prop.
 - A page with `prerender: true` that reaches a template reading `ctx` fails the build asking for a render per request, as any request read does.

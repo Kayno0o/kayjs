@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `call()` types a route's `null` answer as `null`, as it already arrives, rather than `''`; an empty answer (`undefined`, a 204) stays `''` ([API from islands](api-from-islands.md)).
+- `src/context.ts`, default-exporting `defineContext(...)`, gives templates `ctx.<key>` with no extension, typed in `kay check`; two sources giving one key stop the page naming both: [Request values](request-values.md).
 
 ## 1.91.0
 

@@ -1,7 +1,7 @@
 import type { BunPlugin } from 'bun'
 import type { InternalConfig, KayConfig, LoadedConfig } from './config'
 import { existsSync, realpathSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { APP_DEPENDENCIES, dependencyNames, libraryMessageExtensions, readManifest } from './build/manifests'
 import { KayError } from './compiler/errors'
@@ -12,9 +12,10 @@ import { publicEnvFiles } from './server/env-state'
 
 // `fresh` reads the file again as it is now, as `kay dev` does once it changed, rather than the module this process imported first.
 export async function loadConfig(root: string, fresh = false): Promise<LoadedConfig> {
-  return withTailwind(root, withSiteUrl(withPublicFields(root, withExtensions(withLibraryMessages(root, await importConfig(root, fresh))))))
+  return withTailwind(root, withSiteUrl(withPublicFields(root, withExtensions(withAppContext(root, withLibraryMessages(root, await importConfig(root, fresh)))))))
 }
 
+const APP_CONTEXT = 'src/context.ts'
 const CONFIG_TIMEOUT = 30_000
 
 // `loadConfig` for a command or an editor that must not hang on a config awaiting something that never comes, such as a database that does not answer: it fails after `timeout` ms, the import left to finish or not.
@@ -177,6 +178,16 @@ function withLibraryMessages(root: string, config: KayConfig): KayConfig {
   return shipped.length === 0 ? config : { ...config, extensions: [...shipped, ...config.extensions ?? []] }
 }
 
+// The config with the app's own `src/context.ts` listed as an extension giving `ctx` to templates, ahead of the others, unless an extension already names that file.
+function withAppContext(root: string, config: KayConfig): KayConfig {
+  const file = join(root, APP_CONTEXT)
+
+  if (!existsSync(file) || (config.extensions ?? []).some(({ context }) => context !== undefined && resolve(root, context) === file))
+    return config
+
+  return { ...config, extensions: [{ name: APP_CONTEXT, context: `./${APP_CONTEXT}` }, ...config.extensions ?? []] }
+}
+
 // The config with each extension's own laid under it, a later extension's over an earlier one's.
 function withExtensions<Config extends KayConfig>(config: Config): Config {
   const layers = (config.extensions ?? []).flatMap((extension) => {
@@ -287,7 +298,7 @@ function withSiteUrl<Config extends KayConfig>(config: Config): Config {
 
 // The project's config under the options given in code; an option passed as `undefined` leaves the config's value alone rather than wiping it.
 export async function withConfig<Options extends KayConfig>(root: string, options: Options): Promise<KayConfig & Options> {
-  return withTailwind(root, withPublicFields(root, mergeConfig(withLibraryMessages(root, await importConfig(root)), options)))
+  return withTailwind(root, withPublicFields(root, mergeConfig(withAppContext(root, withLibraryMessages(root, await importConfig(root))), options)))
 }
 
 // `config` is as `kay.config.ts` writes it, so the extensions the options name lie under it rather than the file's.

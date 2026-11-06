@@ -17,6 +17,8 @@ export interface LoadedContexts {
   values: Record<string, unknown>
   keys: Set<string>
   wholes: Set<number>
+  // The module that gave each key.
+  owners: Map<string, string>
 }
 
 // Called where a render starts, so a layout can load the values of the request being rendered. `keys` are the ones the page reads, every key when not given.
@@ -88,7 +90,7 @@ export async function loadContextValues(request: Request): Promise<void> {
 }
 
 async function loadMissing(request: Request, record: RequestRecord, provider: ContextProvider): Promise<boolean> {
-  const state = record.loadedContexts ?? { values: Object.create(null) as Record<string, unknown>, keys: new Set<string>(), wholes: new Set<number>() }
+  const state = record.loadedContexts ?? { values: Object.create(null) as Record<string, unknown>, keys: new Set<string>(), wholes: new Set<number>(), owners: new Map<string, string>() }
   const definitions = await Promise.all(provider.modules.map(definitionOf))
   const jobs: { module: string, key?: string, whole?: number, run: () => unknown }[] = []
 
@@ -121,7 +123,7 @@ async function loadMissing(request: Request, record: RequestRecord, provider: Co
   const owners = new Map<string, string>()
   const give = (key: string, value: unknown, module: string) => {
     if (key in state.values || owners.has(key))
-      throw new Error(`kay: two extensions give ctx.${key}, the latter ${module}`)
+      throw new Error(`kay: two extensions give ctx.${key}: ${owners.get(key) ?? state.owners.get(key)} and ${module}`)
 
     owners.set(key, module)
     Object.defineProperty(fresh, key, { value, enumerable: true, configurable: true, writable: true })
@@ -162,6 +164,9 @@ async function loadMissing(request: Request, record: RequestRecord, provider: Co
   }
 
   Object.defineProperties(state.values, Object.getOwnPropertyDescriptors(fresh))
+
+  for (const [key, module] of owners)
+    state.owners.set(key, module)
 
   // A render that loaded nothing reads an error, not an empty object.
   if (state.keys.size + state.wholes.size > 0)
