@@ -24,6 +24,7 @@ This page lists what each feature keeps, for a site's privacy notice and for the
 | `kay_editor_session` | kayjs-cms `passwordGuard` | 14 days by default, or its `maxAge` |
 | `kay_local_clear` | `local()`, set by `forgetLocalMirrors(request)` at sign-out | a year, only a random value |
 | `ksteps_<name>` | kayjs-ui `stepDraft`, the values of a multi-step form | an hour by default, ended by `clear()` |
+| `theme` | kayjs-ui `ThemeToggle`, the light, dark or system scheme picked, under another name when you give its `cookie` | a year |
 | `kay_push_device` | `push()`, a hash naming the push subscription this browser made, so signing out stops its pushes alone | a year |
 | the name given to `persisted()` | a persisted signal, or kayjs-ui `SidePanel` when you name a `sizeKey` (the panel's width) and `SplitLayout` when you name a `listWidthKey` (the list's width) | a year, or its `maxAge` |
 
