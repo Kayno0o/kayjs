@@ -130,6 +130,7 @@ export function pgMissingStore(source: PgSource, closedByReload = true, readOnly
   let failure: unknown
   let closed = false
   let told = false
+  let toldDropped = false
 
   // A failed creation is tried again by the next use rather than kept.
   const connect = async (): Promise<SQL | undefined> => {
@@ -322,8 +323,17 @@ export function pgMissingStore(source: PgSource, closedByReload = true, readOnly
       }
 
       // Past a few batches held back (a database slower than the flood), a new path is not counted: the log keeps at most MAX_PATHS anyway.
-      if (closed || readOnly || (pending.size >= MAX_PENDING * 4 && !pending.has(path)))
+      if (closed || readOnly)
         return
+
+      if (pending.size >= MAX_PENDING * 4 && !pending.has(path)) {
+        if (!toldDropped) {
+          toldDropped = true
+          kayLog('warn', 'the database writes the 404 log slower than visitors find new missing paths: the ones arriving meanwhile are not counted')
+        }
+
+        return
+      }
 
       holdHit(pending, path, referrer, suggest)
 

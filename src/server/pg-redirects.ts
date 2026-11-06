@@ -56,8 +56,12 @@ export function pgRedirectSet(connect: () => Promise<SQL | undefined>, failed: (
       return fresh
     }
     catch (error) {
-      degraded = true
-      retryAt = Date.now() + RETRY_MS
+      // A write since the read started has made it moot.
+      if (started === generation) {
+        degraded = true
+        retryAt = Date.now() + RETRY_MS
+      }
+
       failed(error)
 
       return undefined
