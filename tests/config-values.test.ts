@@ -23,7 +23,7 @@ describe('config values checked once at load', () => {
     expect(invalidConfigValues({ images: { maxDensity: Infinity } })).toEqual([])
     expect(invalidConfigValues({ images: { maxDensity: NaN } })).toEqual(['`images.maxDensity` is NaN, expected a number'])
     expect(invalidConfigValues({ images: { quality: Infinity } })).toEqual(['`images.quality` is Infinity, expected a number'])
-    expect(invalidConfigValues({ compress: 'x'.repeat(60) })[0]).toBe(`\`compress\` is "${'x'.repeat(40)}...", expected true or false`)
+    expect(invalidConfigValues({ serve: { compress: 'x'.repeat(60) } })[0]).toBe(`\`serve.compress\` is "${'x'.repeat(40)}...", expected true or false`)
     expect(problem('auth.sessionSecret', 'hunter2', 'a number')).toBe('`auth.sessionSecret` is a string, expected a number')
     expect(problem('proxy.key', 'abc', 'a number')).toBe('`proxy.key` is a string, expected a number')
   })
@@ -35,10 +35,10 @@ describe('config values checked once at load', () => {
   })
 
   it('reports the kind of a value that is not the kind of its key, the path through bags, lists and maps', () => {
-    expect(invalidConfigValues({ lang: 5, base: true, compress: 7, serve: { timeout: 30 }, images: { webp: { quality: '90' } }, fonts: ['x'], publicCache: { '/a/**': 5 }, i18n: { locales: ['en', 3], defaultLocale: 'en' } })).toEqual([
+    expect(invalidConfigValues({ lang: 5, base: true, serve: { compress: 7, timeout: 30 }, images: { webp: { quality: '90' } }, fonts: ['x'], publicCache: { '/a/**': 5 }, i18n: { locales: ['en', 3], defaultLocale: 'en' } })).toEqual([
       '`lang` is 5, expected a string',
       '`base` is true, expected a string',
-      '`compress` is 7, expected true or false',
+      '`serve.compress` is 7, expected true or false',
       '`serve.timeout` is 30, expected a duration such as \'250ms\', \'5m\' or \'30d\' or false',
       '`images.webp.quality` is "90", expected a number',
       '`fonts[0]` is "x", expected an object',
@@ -65,12 +65,12 @@ describe('config values checked once at load', () => {
     expect(invalidConfigValues({ lang: undefined, offline: true, health: false, security: false, robots: false, client: { prefetch: false }, favicon: false, secret: ['a', 'b'], proxy: true, metrics: true, limits: { body: 1024 }, serve: { timeout: false, shutdownTimeout: '5s' }, observe: { log: false }, checks: [], env: { compose: 'x' }, cors: { origins: '*' } })).toEqual([])
   })
 
-  it('takes the flat keys 1.87 grouped, with the same checks', () => {
-    expect(invalidConfigValues({ compress: 'yes', maxSize: 'big' })).toEqual(['`compress` is "yes", expected true or false', '`maxSize` is "big", expected a size such as 4096 or \'20kb\''])
+  it('checks the keys of the bags 1.88 grouped', () => {
+    expect(invalidConfigValues({ serve: { compress: 'yes' }, limits: { body: 'big' } })).toEqual(['`serve.compress` is "yes", expected true or false', '`limits.body` is "big", expected a size such as 4096 or \'20kb\''])
   })
 
   it('finds a mistyped key in every option bag, with the nearest one', () => {
-    expect(unknownConfigKeys({ images: { qualty: 80, webp: { qualty: 1 } }, markdown: { headinLinks: true }, jobs: { gard: () => undefined }, live: { connection: 1 }, links: { outsde: 'new-tab' }, cors: { origin: '*' }, hydration: { visble: 'x' }, budget: { weigth: 1 }, manifest: { shortname: 'x' }, robots: { dissallow: [] }, preview: { secrt: 'x' }, metrics: { pth: '/m' }, runtimeRedirects: { host: [] }, sitemap: { tll: '1h' } })).toEqual([
+    expect(unknownConfigKeys({ images: { qualty: 80, webp: { qualty: 1 } }, markdown: { headinLinks: true }, jobs: { gard: () => undefined }, live: { connection: 1 }, links: { outsde: 'new-tab' }, cors: { origin: '*' }, client: { hydration: { visble: 'x' } }, budget: { weigth: 1 }, manifest: { shortname: 'x' }, robots: { dissallow: [] }, preview: { secrt: 'x' }, metrics: { pth: '/m' }, runtimeRedirects: { host: [] }, sitemap: { tll: '1h' } })).toEqual([
       '`images.qualty`, did you mean `images.quality`?',
       '`images.webp.qualty`, did you mean `images.webp.quality`?',
       '`markdown.headinLinks`, did you mean `markdown.headingLinks`?',
@@ -78,7 +78,7 @@ describe('config values checked once at load', () => {
       '`live.connection`, did you mean `live.connections`?',
       '`links.outsde`, did you mean `links.outside`?',
       '`cors.origin`, did you mean `cors.origins`?',
-      '`hydration.visble`, did you mean `hydration.visible`?',
+      '`client.hydration.visble`, did you mean `client.hydration.visible`?',
       '`budget.weigth`, did you mean `budget.weight`?',
       '`manifest.shortname`, did you mean `manifest.shortName`?',
       '`robots.dissallow`, did you mean `robots.disallow`?',
@@ -90,14 +90,14 @@ describe('config values checked once at load', () => {
   })
 
   it('refuses, at load, the values the types would have refused, as config-invalid and never a TypeError', async () => {
-    const trailing = await load('export default { trailingSlash: \'sometimes\', base: \'blog\', compress: 7 } as never\n')
+    const trailing = await load('export default { trailingSlash: \'sometimes\', base: \'blog\', serve: { compress: 7 } } as never\n')
     const lang = await load('export default { lang: 5 } as never\n')
     const locale = await load('export default { i18n: { locales: [\'en\'], defaultLocale: \'fr\' } }\n')
     const fine = await load('export default { lang: \'en\', trailingSlash: \'always\', serve: { compress: false } }\n')
 
     expect(trailing).toMatchObject({ code: 'config-invalid' })
     expect(String(trailing)).toContain('`trailingSlash` is "sometimes"')
-    expect(String(trailing)).toContain('`compress` is 7')
+    expect(String(trailing)).toContain('`serve.compress` is 7')
     expect(lang).toMatchObject({ code: 'config-invalid' })
     expect(String(lang)).toContain('`lang` is 5, expected a string')
     expect(String(locale)).toContain('`i18n.defaultLocale` is "fr"')

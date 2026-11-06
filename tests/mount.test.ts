@@ -280,7 +280,7 @@ describe('mount', () => {
     try {
       expect(await shown('{ lang: \'fr\' }')).toEqual(['Prix~: 12~!', 'Reste~: 1~!', 'Prix : 12 !'])
       expect(await shown('{ i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\' } }')).toEqual(['Prix~: 12~!', 'Reste~: 1~!', 'Prix : 12 !'])
-      expect(await shown('{ lang: \'fr\', typography: false }')).toEqual(['Prix : 12 !', 'Reste : 1 !', 'Prix : 12 !'])
+      expect(await shown('{ lang: \'fr\', client: { typography: false } }')).toEqual(['Prix : 12 !', 'Reste : 1 !', 'Prix : 12 !'])
       expect(await shown('{ lang: \'en\' }')).toEqual(['Prix : 12 !', 'Reste : 1 !', 'Prix : 12 !'])
     }
     finally {

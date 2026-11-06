@@ -32,7 +32,7 @@ function plugin(): AnyElysia {
     .post('/auth/upload', reach('upload'))
 }
 
-async function app(options: { base?: string, trailingSlash?: 'always' | 'never', maxSize?: string, maxSizeByPath?: Record<string, number | string>, extension?: Partial<KayExtension> } = {}) {
+async function app(options: { base?: string, trailingSlash?: 'always' | 'never', limits?: { body?: string, byPath?: Record<string, number | string> }, extension?: Partial<KayExtension> } = {}) {
   const dir = await scratchDir('body-fallback-')
   const { extension, ...rest } = options
 
@@ -119,8 +119,8 @@ describe('a route no action, API module or extension limit covers', () => {
     expect((await post(mounted, '/auth/token', 'x')).status).toBe(200)
   })
 
-  it('follows the app\'s maxSize', async () => {
-    const site = await app({ maxSize: '4mb' })
+  it('follows the app\'s limits.body', async () => {
+    const site = await app({ limits: { body: '4mb' } })
 
     expect((await post(site, '/auth/token', big)).status).toBe(200)
     expect((await post(site, '/auth/token', 'x'.repeat(5 * MB))).status).toBe(413)
@@ -137,7 +137,7 @@ describe('a route no action, API module or extension limit covers', () => {
 describe('the app\'s own limits by path', () => {
   it('raises the limit for a route of its own: with a Content-Length, chunked, with a trailing slash and under a base', async () => {
     for (const options of [{}, { trailingSlash: 'always' as const }, { base: '/blog' }]) {
-      const site = await app({ ...options, maxSizeByPath: { '/auth/upload': '8mb' } })
+      const site = await app({ ...options, limits: { byPath: { '/auth/upload': '8mb' } } })
 
       expect((await post(site, '/auth/upload', big)).status).toBe(200)
       expect((await post(site, '/auth/upload/', big)).status).toBe(200)
@@ -150,12 +150,12 @@ describe('the app\'s own limits by path', () => {
   })
 
   it('lowers it, wins over an extension for one path, and stops the boot for a bad entry', async () => {
-    const site = await app({ maxSizeByPath: { '/auth/token': 100, '/auth/upload': '1kb' }, extension: { maxSizeByPath: { '/auth/upload': '8mb' } } })
+    const site = await app({ limits: { byPath: { '/auth/token': 100, '/auth/upload': '1kb' } }, extension: { maxSizeByPath: { '/auth/upload': '8mb' } } })
 
     expect((await post(site, '/auth/token', 'x'.repeat(101))).status).toBe(413)
     expect((await post(site, '/auth/upload', 'x'.repeat(2000))).status).toBe(413)
-    await expect(app({ maxSizeByPath: { 'auth/token': '1mb' } })).rejects.toThrow('does not start with a slash')
-    await expect(app({ maxSizeByPath: { '/auth/token': 0 } })).rejects.toThrow('maxSize')
+    await expect(app({ limits: { byPath: { 'auth/token': '1mb' } } })).rejects.toThrow('does not start with a slash')
+    await expect(app({ limits: { byPath: { '/auth/token': 0 } } })).rejects.toThrow('maxSize')
   })
 })
 
@@ -216,7 +216,7 @@ describe('a cross-origin route of an extension', () => {
   })
 
   it('keeps a limit on a parent path holding the cross-origin one, and the grant on its 413', async () => {
-    for (const options of [{ extension: crossOrigin({ '/auth': 100 }) }, { extension: crossOrigin(), maxSizeByPath: { '/auth': 100 } }]) {
+    for (const options of [{ extension: crossOrigin({ '/auth': 100 }) }, { extension: crossOrigin(), limits: { byPath: { '/auth': 100 } } }]) {
       const site = await app(options)
       const refused = await tooBig(site, '/auth/token')
 
@@ -226,8 +226,8 @@ describe('a cross-origin route of an extension', () => {
     }
   })
 
-  it('keeps the grant on a limit of its own, the app\'s maxSizeByPath or the extension\'s maxSize', async () => {
-    for (const options of [{ extension: crossOrigin({ '/auth/token': 100 }) }, { extension: crossOrigin(), maxSizeByPath: { '/auth/token': 100 } }]) {
+  it('keeps the grant on a limit of its own, the app\'s limits.byPath or the extension\'s maxSize', async () => {
+    for (const options of [{ extension: crossOrigin({ '/auth/token': 100 }) }, { extension: crossOrigin(), limits: { byPath: { '/auth/token': 100 } } }]) {
       const refused = await tooBig(await app(options), '/auth/token')
 
       expect(refused.status).toBe(413)

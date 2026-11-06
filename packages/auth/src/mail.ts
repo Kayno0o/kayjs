@@ -1,7 +1,7 @@
 import type { Duration } from 'kay'
 import type { AuthLinkKind, AuthMailData, AuthMailKind, AuthMailWording, AuthNoticeKind } from 'kay/library/auth-mails'
 import type { EmailCore } from './email'
-import { durationWords, escapeHtml as escape, trackDetached } from 'kay/library'
+import { configError, durationWords, escapeHtml as escape, trackDetached } from 'kay/library'
 import { AUTH_LINK_KINDS, AUTH_MAIL_WORDING, AUTH_NOTICE_KINDS } from 'kay/library/auth-mails'
 import { language, pickLocale } from './locale'
 import { log } from './log'
@@ -94,7 +94,7 @@ function linkMail(words: AuthMailWording, data: MailData, subject: string, lead:
 // A lifetime, a duration such as `'24h'`, as words in a language: `24 hours`, `7 days`, `1 heure`, from kay's `durationWords`.
 export function lifetime(duration: Duration, locale: string): string {
   if (typeof duration === 'number')
-    throw new Error(`kay: lifetime() takes a duration with its unit, such as '24h' or '90s', not ${String(duration)}; ${String(duration)} seconds is '${String(duration)}s'`)
+    throw configError(`lifetime() takes a duration with its unit, such as '24h' or '90s', not ${String(duration)}; ${String(duration)} seconds is '${String(duration)}s'`)
 
   return durationWords(duration, locale)
 }
