@@ -1430,3 +1430,14 @@ test('Create and add another saves the entry and opens an empty form for the nex
   expect(page.errors).toEqual([])
   ledgerRows.length = 0
 }, 60_000)
+
+test('the share route answers ok with its link, and a review route ok with its review', async () => {
+  saved.length = 0
+
+  const shared = (await send('POST', 'posts/hello/share')).answer
+
+  expect(shared).toMatchObject({ ok: true, link: expect.stringContaining('/') })
+  expect((await send('POST', 'posts/ghost/share')).answer).toMatchObject({ ok: false, error: { status: 422 }, issues: [{ key: 'slug' }] })
+
+  expect((await send('POST', 'posts/notes%2Fgarden/submit')).answer).toMatchObject({ ok: true, saved: true, review: { status: 'review' } })
+})
