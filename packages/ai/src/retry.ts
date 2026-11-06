@@ -100,7 +100,7 @@ function waitFor(error: AiError, made: number, { backoff, maxWait }: Policy): nu
     const asked = error.retryAfter * 1000
 
     // Never shorter than the provider asked, a little longer so asks told the same do not return together.
-    return asked > maxWait ? undefined : asked * (1 + Math.random() * JITTER / 5)
+    return asked > maxWait ? undefined : Math.min(maxWait, asked * (1 + Math.random() * JITTER / 5))
   }
 
   return Math.min(maxWait, backoff * 2 ** (made - 1)) * (1 - Math.random() * JITTER)

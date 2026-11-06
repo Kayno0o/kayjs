@@ -107,6 +107,14 @@ describe('retry', () => {
     expect(performance.now() - began).toBeLessThan(500)
   })
 
+  it('never waits past maxWait for a Retry-After just under it', async () => {
+    const provider = scripted(call => call === 1 ? new AiError('rate-limited', 'slow', { retryAfter: 0.2 }) : says('ok'))
+    const began = performance.now()
+
+    expect(await ask('hi', { provider, retry: { backoff: '1ms', maxWait: '201ms' } })).toBe('ok')
+    expect(performance.now() - began).toBeLessThan(260)
+  })
+
   it('stops after attempts requests with the last error', async () => {
     const provider = scripted(() => down())
 
