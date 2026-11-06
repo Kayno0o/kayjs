@@ -561,6 +561,13 @@ describe('configuration', () => {
 
     process.env.MAIL_TO = 'team@example.com, Support <support@example.com>'
     expect((await fromEnv.render({ subject: 'Contact', text: 'Hi' })).to).toEqual(['team@example.com', 'Support <support@example.com>'])
+
+    process.env.MAIL_TO = 'a@example.com,'
+    expect((await fromEnv.render({ subject: 'Contact', text: 'Hi' })).to).toEqual(['a@example.com'])
+    process.env.MAIL_TO = 'a@example.com,,b@example.com'
+    expect((await fromEnv.render({ subject: 'Contact', text: 'Hi' })).to).toEqual(['a@example.com', 'b@example.com'])
+    process.env.MAIL_TO = ' , '
+    await expect(fromEnv.render({ subject: 'Nobody', text: 'Hi' })).rejects.toThrow('"Nobody" has no recipient')
   })
 
   it('counts MAIL_TO among what an optional mailer misses for a send naming no recipient, and stops a production boot on a malformed one', async () => {

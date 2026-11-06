@@ -122,6 +122,8 @@ export async function notify<E extends object>(source: string, hooks: readonly (
     await run
 }
 
+const LATE = Symbol('late')
+
 // Runs the `beforeX` hooks of one transition in order: each sees the event with what the ones before changed, the first refusal stops the chain, and a throw other than `refuse()` refuses as a server error after it is reported.
 export async function decide<E extends object, C extends object>(source: string, hooks: readonly (BeforeHook<E, C> | undefined)[], event: E, given?: HookContext): Promise<{ change: Partial<C> } | { refused: ErrorShape & { retryAfter?: number | undefined } }> {
   if (!hooks.some(hook => hook !== undefined))
@@ -136,15 +138,14 @@ export async function decide<E extends object, C extends object>(source: string,
 
     let answer: void | false | Partial<C>
 
-    let timer: ReturnType<typeof setTimeout> | undefined
-
     try {
       // A check that does not finish refuses, as one that throws does: it never lets a change through unchecked.
-      const late = new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(reject, HOOK_TIMEOUT_MS, new Error(`${source} did not finish in ${HOOK_TIMEOUT_MS} ms`))
-      })
+      const done = await within(Promise.resolve(hook({ ...event, ...change, context })), HOOK_TIMEOUT_MS, LATE)
 
-      answer = await Promise.race([hook({ ...event, ...change, context }), late])
+      if (done === LATE)
+        throw new Error(`${source} did not finish in ${HOOK_TIMEOUT_MS} ms`)
+
+      answer = done
     }
     catch (error) {
       const refusal = thrownRefusal(error)
@@ -155,9 +156,6 @@ export async function decide<E extends object, C extends object>(source: string,
       await reportHookError(source, error, context.request)
 
       return { refused: { status: 500, message: 'Internal server error', errors: {}, data: undefined } }
-    }
-    finally {
-      clearTimeout(timer)
     }
 
     if (answer === false)

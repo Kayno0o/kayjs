@@ -1,6 +1,7 @@
 import type { Duration } from 'kay'
 import type { AuthLinkKind, AuthMailData, AuthMailKind, AuthMailWording, AuthNoticeKind } from 'kay/library/auth-mails'
 import type { EmailCore } from './email'
+import { within } from '@kaynooo/utils/promise'
 import { configError, durationWords, escapeHtml as escape, trackDetached } from 'kay/library'
 import { AUTH_LINK_KINDS, AUTH_MAIL_WORDING, AUTH_NOTICE_KINDS } from 'kay/library/auth-mails'
 import { language, pickLocale } from './locale'
@@ -158,6 +159,7 @@ export const frenchTemplates: Templates = builtInTemplates.fr!
 
 // How long a notice mail may stay with the mailer before it is given up on, and how many may be with it at once: a relay that hangs costs memory for at most this many mails, the rest being logged and dropped.
 const ASIDE_TIMEOUT_MS = 30_000
+const LATE = Symbol('late')
 const ASIDE_MAX = 200
 let aside = 0
 // Whether the drop in the current burst is logged already: one line says it, and the next burst, once room is back, says it again.
@@ -177,20 +179,14 @@ export function sendAside(email: EmailCore, build: () => AuthMailMessage, what: 
   dropping = false
   aside++
   trackDetached((async () => {
-    let timer: ReturnType<typeof setTimeout> | undefined
-
     try {
-      const timeout = new Promise<never>((_, reject) => {
-        timer = setTimeout(reject, ASIDE_TIMEOUT_MS, new Error(`no answer from the mailer in ${ASIDE_TIMEOUT_MS / 1000} s`))
-      })
-
-      await Promise.race([Promise.resolve(email.mailer.send(build())), timeout])
+      if (await within(Promise.resolve(email.mailer.send(build())), ASIDE_TIMEOUT_MS, LATE) === LATE)
+        throw new Error(`no answer from the mailer in ${ASIDE_TIMEOUT_MS / 1000} s`)
     }
     catch (error) {
       log.error(`mailing ${what} failed`, error)
     }
     finally {
-      clearTimeout(timer)
       aside--
     }
   })())

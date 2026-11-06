@@ -1,3 +1,4 @@
+import { within } from '@kaynooo/utils/promise'
 import { withBase } from './base'
 import { createSignal, markSignal } from './reactive'
 
@@ -49,17 +50,7 @@ function sameKey(held: ArrayBuffer | null, served: string): boolean {
 let setState: ((value: PushState) => void) | undefined
 
 async function worker(): Promise<ServiceWorkerRegistration | undefined> {
-  let timer: number | undefined
-  const none = new Promise<undefined>((done) => {
-    timer = window.setTimeout(done, READY_TIMEOUT_MS)
-  })
-
-  try {
-    return await Promise.race([navigator.serviceWorker.ready, none])
-  }
-  finally {
-    clearTimeout(timer)
-  }
+  return await within(navigator.serviceWorker.ready, READY_TIMEOUT_MS) ?? undefined
 }
 
 const POSTED_KEY = 'kay-push-posted'

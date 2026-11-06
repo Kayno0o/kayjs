@@ -2,6 +2,7 @@ import { appendFile } from 'node:fs/promises'
 import os from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
+import { within } from '@kaynooo/utils/promise'
 import { $, Glob } from 'bun'
 import { dependenciesOnly } from './dependency-change'
 import { hostEnv } from './host-env'
@@ -94,20 +95,6 @@ async function takeLock() {
   return (await holder(['flock', lock])).release
 }
 
-// Waits for `work` for at most `ms`, and leaves no timer behind: a pending `Bun.sleep` would keep the landing alive for its whole length once it is done.
-async function settledWithin(work: Promise<void>, ms: number) {
-  let timer: ReturnType<typeof setTimeout> | undefined
-
-  try {
-    await Promise.race([work, new Promise((resolve) => {
-      timer = setTimeout(resolve, ms)
-    })])
-  }
-  finally {
-    clearTimeout(timer)
-  }
-}
-
 // The named lock the test runs hold one at a time machine-wide, whatever the number of sessions landing, as each run starts a worker per core.
 const TESTS_LOCK = 'kay-land-tests'
 
@@ -164,7 +151,7 @@ async function run(label: string, argv: string[], cwd: string, lock?: string) {
 
   running = undefined
   clearTimeout(limit)
-  await settledWithin(drained, DRAIN_MS)
+  await within(drained, DRAIN_MS)
   // A process left holding the pipe would otherwise keep the landing alive once it is done.
   await reader.cancel()
   const sampled = sampler?.stop()

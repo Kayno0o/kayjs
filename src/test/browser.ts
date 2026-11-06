@@ -7,6 +7,8 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve as resolvePath } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { sleep } from '@kaynooo/utils/function'
+import { within } from '@kaynooo/utils/promise'
 import { afterAll } from 'bun:test'
 import { withUnreadable } from '../runtime/dev-a11y'
 import { optionMs } from '../runtime/duration'
@@ -456,7 +458,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   const inView = async <T>(expression: string): Promise<T> => {
     const previous = evaluating
     const call = (async () => {
-      await within(Promise.race([previous, crash]), timeout)
+      await within(Promise.race([previous, crash]), timeout, TIMED_OUT)
 
       return live(async () => view.evaluate<T>(expression))
     })()
@@ -513,7 +515,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       try {
         trying ??= inView(expression)
 
-        const answer = await within(trying, until - Date.now())
+        const answer = await within(trying, until - Date.now(), TIMED_OUT)
 
         if (answer !== TIMED_OUT) {
           trying = undefined
@@ -563,7 +565,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       let failed: string[] | typeof TIMED_OUT = []
 
       try {
-        failed = await within(inView<string[]>(FAILED_FILES), FAILED_WAIT_MS)
+        failed = await within(inView<string[]>(FAILED_FILES), FAILED_WAIT_MS, TIMED_OUT)
       }
       catch {}
 
@@ -740,7 +742,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   // Waits once for a loading page, before a click or hover scrolls, as the browser restoring a reload's scroll position until then would move the page away from the place a press is aimed at. A page that never finishes is acted on after the bound.
   const untilLoaded = async () => {
     try {
-      await within(inView(script(loaded, [LOAD_WAIT_MS])), LOAD_WAIT_MS + POLL_MS)
+      await within(inView(script(loaded, [LOAD_WAIT_MS])), LOAD_WAIT_MS + POLL_MS, TIMED_OUT)
     }
     catch (error) {
       // A page replaced while waiting is the next try's to find.
@@ -841,7 +843,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       cold = false
 
       // A page that does not finish loading, a stalled image holding its load event, is not waited on past the budget.
-      if (await within(navigate(), budget) === TIMED_OUT)
+      if (await within(navigate(), budget, TIMED_OUT) === TIMED_OUT)
         throw new Error(`${UNSETTLED} ${budget}ms waiting for ${target.pathname} to load${heldConnections()}`)
 
       // Its renderer has started, so the pages that open from now on are no longer cold.
@@ -976,7 +978,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
         // A dev server's own check may be running, and axe-core runs one at a time.
         while (axe._running)
-          await new Promise(resolve => setTimeout(resolve, 25))
+          await sleep(25)
 
         // Leaving out a dev server's dev tool.
         const results = await axe.run({ include: context === undefined ? document : [[context]], exclude: [['kay-dev']] }, { resultTypes: ['violations', 'incomplete'] })
@@ -1068,7 +1070,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   catch (error) {
     // The profile Bun made is noted while the browser still answers, should the blank page have failed.
     if (first)
-      await within(noteBunProfile(view, dir), timeout)
+      await within(noteBunProfile(view, dir), timeout, TIMED_OUT)
 
     page.close()
 
@@ -1400,19 +1402,6 @@ async function ended(promise: Promise<unknown>): Promise<void> {
     await promise
   }
   catch {}
-}
-
-// Resolves as `promise` does, or with TIMED_OUT after `ms`: an evaluation a page never answers does not outlast the wait.
-async function within<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
-  const { promise: timedOut, resolve } = Promise.withResolvers<typeof TIMED_OUT>()
-  const timer = setTimeout(resolve, Math.max(ms, 0), TIMED_OUT)
-
-  try {
-    return await Promise.race([promise, timedOut])
-  }
-  finally {
-    clearTimeout(timer)
-  }
 }
 
 // A console argument as text: an object arrives as DevTools describes it, an error with its stack.

@@ -1,5 +1,6 @@
 // What a `kay/test` page does with the network: the responses it received, requests a test answers or refuses, and going offline. Built on DevTools' Network and Fetch domains, through the view's `cdp()`.
 import type { Duration } from '../runtime/duration'
+import { within } from '@kaynooo/utils/promise'
 import { optionMs } from '../runtime/duration'
 
 // A response the page received, its headers lowercased as the wire carried them.
@@ -140,19 +141,6 @@ const TIMED_OUT = Symbol('timed out')
 class RouteRemoved extends Error {
   constructor() {
     super('kay: the route was removed before the server answered')
-  }
-}
-
-// Resolves as `promise` does, or with TIMED_OUT after `ms`.
-async function within<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
-  const { promise: timedOut, resolve } = Promise.withResolvers<typeof TIMED_OUT>()
-  const timer = setTimeout(resolve, ms, TIMED_OUT)
-
-  try {
-    return await Promise.race([promise, timedOut])
-  }
-  finally {
-    clearTimeout(timer)
   }
 }
 
@@ -310,7 +298,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
     try {
       await send('Runtime.evaluate', { expression: `fetch(${JSON.stringify(PROBE_URL)}, { mode: "no-cors", cache: "no-store" }).catch(() => {})` })
 
-      const failure = await within(promise, PROBE_TIMEOUT_MS)
+      const failure = await within(promise, PROBE_TIMEOUT_MS, TIMED_OUT)
 
       return failure === TIMED_OUT ? undefined : failure
     }
@@ -418,7 +406,7 @@ export function createNetwork({ view, cdp, origin, errors, timeout }: NetworkOpt
         if (type.startsWith('text/event-stream'))
           throw new Error(`kay: fetch() cannot read the event stream ${paused.request.url}; continue the request instead`)
 
-        const read = await within(cdp<{ body: string, base64Encoded: boolean }>('Fetch.getResponseBody', { requestId }), timeout)
+        const read = await within(cdp<{ body: string, base64Encoded: boolean }>('Fetch.getResponseBody', { requestId }), timeout, TIMED_OUT)
 
         if (read === TIMED_OUT)
           throw new Error(`kay: the body of ${paused.request.url} did not arrive within ${timeout}ms`)

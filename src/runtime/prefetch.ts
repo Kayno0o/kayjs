@@ -1,3 +1,4 @@
+import { within } from '@kaynooo/utils/promise'
 import { followable, linkOf, loadSwap } from './navigate'
 import { pageKey, prefetched } from './navigation'
 import { savesDataInBrowser } from './save-data'
@@ -120,16 +121,7 @@ async function fetchAhead(link: HTMLAnchorElement): Promise<void> {
 
     if (url && link.isConnected) {
       ;(await loadSwap()).prefetch(url, link)
-      let slot: ReturnType<typeof setTimeout> | undefined
-
-      try {
-        await Promise.race([prefetched.get(pageKey(url))?.page, new Promise((done) => {
-          slot = setTimeout(done, SLOT_MS)
-        })])
-      }
-      finally {
-        clearTimeout(slot)
-      }
+      await within(Promise.resolve(prefetched.get(pageKey(url))?.page), SLOT_MS)
     }
   }
   catch {}

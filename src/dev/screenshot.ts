@@ -2,6 +2,7 @@ import type { DevError } from '../server/dev-errors'
 import { linkSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
+import { within } from '@kaynooo/utils/promise'
 import { KAY_DIR, testWorker } from '../build/assets'
 import { routerPath } from '../server/base'
 import { browse, browserPath } from '../test/browser'
@@ -155,7 +156,7 @@ export async function screenshot(root: string, input: string, options: ShotOptio
 
     for (const width of widths) {
       const open: { page?: { close: () => void } } = {}
-      const taken = await within(shoot(open, root, url, path, width, height, scheme, options.fullPage === true, options.cookies ?? []), SHOT_MS)
+      const taken = await within(shoot(open, root, url, path, width, height, scheme, options.fullPage === true, options.cookies ?? []), SHOT_MS) ?? undefined
 
       if (taken === undefined) {
         // The shot goes on in the background, its page closed rather than left to the end of the process.
@@ -406,16 +407,4 @@ function devProblems(root: string, pathname: string): DevError[] {
 // A trailing slash is the same page, which a redirect may add.
 function withoutSlash(path: string): string {
   return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
-}
-
-async function within<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
-  const { promise: timedOut, resolve } = Promise.withResolvers<undefined>()
-  const timer = setTimeout(resolve, ms)
-
-  try {
-    return await Promise.race([promise, timedOut])
-  }
-  finally {
-    clearTimeout(timer)
-  }
 }

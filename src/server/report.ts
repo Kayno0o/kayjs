@@ -1,4 +1,5 @@
 import type { ObserveConfig } from '../config'
+import { within } from '@kaynooo/utils/promise'
 import { kayLog } from '../runtime/log'
 import { recordRequestError } from './dev-errors'
 import { logMessage } from './log'
@@ -74,21 +75,8 @@ async function deliverCapped(error: unknown, request: Request | undefined, timeo
   if (!onError)
     return
 
-  let timer: ReturnType<typeof setTimeout> | undefined
-
-  const late = new Promise<void>((resolve) => {
-    timer = setTimeout(() => {
-      kayLog('error', `onError did not finish in ${timeout} ms, not waited for any longer`)
-      resolve()
-    }, timeout)
-  })
-
-  try {
-    await Promise.race([deliver(error, request, onError, source), late])
-  }
-  finally {
-    clearTimeout(timer)
-  }
+  if (await within(deliver(error, request, onError, source), timeout, 'late' as const) === 'late')
+    kayLog('error', `onError did not finish in ${timeout} ms, not waited for any longer`)
 }
 
 // Logs an error met outside any request, a scheduled, background or queued job or an `onStop` hook, and hands it to the app's `onError` with no request.

@@ -3,6 +3,7 @@ import type { StoreBase } from '../runtime/store-base'
 import type { AppStore } from './app-store'
 import type { PgIndex, PgSource } from './pg-jobs'
 import type { DeletableSessionStore } from './session'
+import { within } from '@kaynooo/utils/promise'
 import { kayLog } from '../runtime/log'
 import { appName, claimDatabase } from './app-identity'
 import { pgCache } from './pg-cache'
@@ -178,16 +179,8 @@ export function pgHandle(db: SQL): PgHandle & { close: () => Promise<void> } {
   const close = async () => {
     closing ??= (async () => {
       const ending = Promise.all(disposers.splice(0).map(run))
-      let timer: ReturnType<typeof setTimeout> | undefined
 
-      try {
-        await Promise.race([ending, new Promise<void>((resolve) => {
-          timer = setTimeout(resolve, CLOSE_MS)
-        })])
-      }
-      finally {
-        clearTimeout(timer)
-      }
+      await within(ending, CLOSE_MS)
     })()
 
     return closing

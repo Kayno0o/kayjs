@@ -191,8 +191,10 @@ describe('sendAside', () => {
       expect(logged.mock.calls.filter(([message]) => String(message).includes('dropped'))).toHaveLength(1)
 
       jest.advanceTimersByTime(31_000)
-      await Promise.resolve()
-      await Promise.resolve()
+
+      // The give-up passes through the timeout race and the catch, a few ticks.
+      for (let tick = 0; tick < 10; tick++)
+        await Promise.resolve()
 
       const before = handed
 

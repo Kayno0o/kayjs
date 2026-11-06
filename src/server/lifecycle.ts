@@ -3,6 +3,7 @@ import type { HealthConfig } from '../config'
 import type { Duration } from '../runtime/duration'
 import type { StoreBase } from '../runtime/store-base'
 import process from 'node:process'
+import { within } from '@kaynooo/utils/promise'
 import { kayLog } from '../runtime/log'
 import { appStore, storesOf } from './app-store'
 import { wholeResponse } from './compress'
@@ -208,18 +209,15 @@ export function alive(pid: number): boolean {
   }
 }
 
-async function withTimeout(check: unknown, ms: number, what: string): Promise<unknown> {
-  let timer: Timer | undefined
-  const timedOut = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`kay: ${what} took longer than ${ms / 1000} s`)), ms)
-  })
+const LATE = Symbol('late')
 
-  try {
-    return await Promise.race([check, timedOut])
-  }
-  finally {
-    clearTimeout(timer)
-  }
+async function withTimeout(check: unknown, ms: number, what: string): Promise<unknown> {
+  const answer = await within(Promise.resolve(check), ms, LATE)
+
+  if (answer === LATE)
+    throw new Error(`kay: ${what} took longer than ${ms / 1000} s`)
+
+  return answer
 }
 
 // Closes each store of `store` once, so a replica that stops leaves no member behind in the rooms for the others to list until it is dropped as quiet, and no connection open.

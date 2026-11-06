@@ -2,6 +2,7 @@ import type { Interactions } from './interact'
 import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
+import { sleep } from '@kaynooo/utils/function'
 import { VOUCH_MODULE } from '../build/icons'
 import { kay } from '../build/plugin'
 import { refuseBuiltinImports } from '../build/server-only'
@@ -35,7 +36,7 @@ const bundles = new Map<string, Promise<string>>()
 
 // Lets queued effects and timers due now land, as after a click, before the DOM is read.
 export async function settle(): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, 0))
+  await sleep(0)
 }
 
 // Keeps a value in localStorage as `persisted(key, initial, { storage: 'local' })` does, encoded as island props are rather than as JSON, for a component mounted after to read.
