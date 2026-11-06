@@ -334,8 +334,8 @@ export function ownedHeaders(set: Context['set'], headers: Record<string, string
 }
 
 // The request id and the build every context holds, when they are all that is there, taken off it for the response to carry.
-// With `carried`, the security headers the request hook set on the context count as kay's too, when they hold the value it gave them, and are taken off with the rest.
-function takeOwnHeaders(set: Context['set'], carried?: Record<string, string>): Record<string, string> | undefined {
+// With `hooked`, the security headers the request hook set on the context count as kay's too, when they hold the value it gave them, and are taken off with the rest.
+function takeOwnHeaders(set: Context['set'], hooked?: Record<string, string>): Record<string, string> | undefined {
   const own: Record<string, string> = {}
   const taken: string[] = []
 
@@ -344,11 +344,11 @@ function takeOwnHeaders(set: Context['set'], carried?: Record<string, string>): 
 
     if (name === requestIdHeader() || name === BUILD_HEADER)
       own[name] = String(set.headers[name])
-    else if (carried?.[name] === undefined || set.headers[name] !== carried[name])
+    else if (hooked?.[name] === undefined || set.headers[name] !== hooked[name])
       return undefined
   }
 
-  if (taken.length === 0 || (Object.keys(own).length === 0 && carried === undefined))
+  if (taken.length === 0 || (Object.keys(own).length === 0 && hooked === undefined))
     return undefined
 
   for (const name of taken)
