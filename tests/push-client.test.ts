@@ -183,7 +183,7 @@ describe('push.subscribe', () => {
     answer = 500
     expect(await module.webPush.enable()).toMatchObject({ ok: false, state: 'failed', error: { message: expect.any(String) } })
     permission = 'denied'
-    expect(await module.webPush.enable()).toMatchObject({ ok: false, state: 'denied', error: { status: 403 } })
+    expect(await module.webPush.enable()).toMatchObject({ ok: false, state: 'denied', error: { status: 0 } })
   })
 
   it('never asks a visitor who blocked notifications', async () => {

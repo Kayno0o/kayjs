@@ -144,7 +144,7 @@ void mock.module('../src/kay/content', () => content)
 const { default: entriesApi } = await import('../src/api/entries')
 const { default: markdownApi } = await import('../src/api/markdown')
 const { leavesPublication } = await import('../src/publishing')
-const { copySlug, deleteEntry, duplicateEntry, entryOf, entryScreen, moveEntry, publishEntry, refused, saveEntry, UnknownCollectionError } = await import('../src/store')
+const { copySlug, deleteEntry, duplicateEntry, entryOf, entryScreen, moveEntry, publishEntry, refused, renameEntry, saveEntry, shareLink, unpublishEntry, UnknownCollectionError } = await import('../src/store')
 
 beforeEach(() => {
   saved = []
@@ -636,6 +636,29 @@ describe('publishEntry', () => {
   })
 })
 
+describe('every outcome', () => {
+  test('carries ok on success, the one failure shape on a refusal', async () => {
+    stored.shelf = [{ slug: 'a', path: 'content/shelf/a.md', data: { title: 'a', order: 10 }, body: 'about a', draft: false }, { slug: 'b', path: 'content/shelf/b.md', data: { title: 'b', order: 20 }, body: 'about b', draft: false }]
+
+    configure({ files: { save: async change => void saved.push(change), move: async () => undefined } })
+
+    const hello = { collection: 'posts', slug: 'hello' }
+    const done = [
+      await publishEntry(hello),
+      await unpublishEntry(hello),
+      await duplicateEntry(hello),
+      await moveEntry({ collection: 'shelf', slug: 'b' }, 'up'),
+      await renameEntry(hello, 'renamed'),
+      await deleteEntry(hello),
+    ]
+
+    for (const outcome of done)
+      expect(outcome).toMatchObject({ ok: true, saved: true })
+
+    expect(await publishEntry({ collection: 'posts', slug: 'ghost' })).toEqual({ ok: false, issues: [expect.objectContaining({ key: 'slug' })], error: { status: 422, message: expect.any(String), errors: { '': expect.any(String) }, data: undefined } })
+  })
+})
+
 describe('moveEntry', () => {
   const place = (collection: string, slug: string, order: number | undefined, extra: Record<string, unknown> = {}): SourceEntry => ({ slug, path: collection === 'shelf' ? `content/shelf/${slug}.md` : undefined, data: order === undefined ? { title: slug, ...extra } : { title: slug, order, ...extra }, body: collection === 'shelf' ? `about ${slug}` : undefined, draft: false })
 
@@ -753,6 +776,7 @@ describe('references on save', () => {
     try {
       expect(await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N', post: 'ghost' } })).toMatchObject({ issues: [{ collection: 'notes', slug: 'n', locale: undefined, path: 'post', message: 'No entry ghost in posts' }] })
       expect(saved).toEqual([])
+      expect(await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N', post: 'ghost' } })).toMatchObject({ ok: false, error: { status: 422, message: 'No entry ghost in posts', errors: { post: 'No entry ghost in posts' } } })
       expect(await saveEntry({ collection: 'notes', slug: 'n', data: { title: 'N', post: 'hello' } })).toHaveProperty('saved', true)
     }
     finally {
@@ -937,4 +961,8 @@ describe('heldDate', () => {
     expect(held('date')).toBe('9999-12-31')
     expect(held('date-time')).toBe('9999-12-31T00:00:00.000Z')
   })
+})
+
+test('a share link answers ok with its link, and the one failure shape when refused', async () => {
+  expect(await shareLink({ collection: 'posts', slug: 'ghost' })).toMatchObject({ ok: false, error: { status: 422 }, issues: [{ key: 'slug' }] })
 })

@@ -2,15 +2,19 @@ import type { Actor } from './authors'
 import type { Identity } from './files'
 import type { EntryRef, Issue } from './kay/contract'
 import type { Review, ReviewView } from './review'
+import type { Settled } from './store'
 import { notify } from 'kay/server'
 import { wording } from 'kay/words'
 import { entryPath, entryTitle } from './listing'
 import { log } from './log'
 import { mayNotApprove, readReview, reviewable, settleReview, viewOf, writeReview } from './review'
 import { settings } from './settings'
-import { collectionNamed, entryOf, publishEntry, refused } from './store'
+import { answering, collectionNamed, entryOf, publishEntry, refused } from './store'
 
-export type ReviewOutcome = { issues: Issue[] } | { saved: true, review: ReviewView, entry?: { data: Record<string, unknown> | undefined, body: string | undefined, version: string | undefined } | undefined }
+// What a review step ends with: `{ ok: true, saved: true, review }`, or `{ ok: false, error, issues }` as a save's refusal is.
+export type ReviewOutcome = Settled<ReviewAnswer>
+
+type ReviewAnswer = { issues: Issue[] } | { saved: true, review: ReviewView, entry?: { data: Record<string, unknown> | undefined, body: string | undefined, version: string | undefined } | undefined }
 
 // The longest note a send-back carries.
 const NOTE_LIMIT = 1000
@@ -66,8 +70,7 @@ async function keep(ref: EntryRef, review: Review, author: Identity | undefined,
   }
 }
 
-// Sends a draft for review: its writer waits for a reviewer, who is told. A draft sent back may be sent again.
-export async function submitEntry(ref: EntryRef, actor: Actor, author?: Identity): Promise<ReviewOutcome> {
+async function submitEntryAnswer(ref: EntryRef, actor: Actor, author?: Identity): Promise<ReviewAnswer> {
   const found = await target(ref)
 
   if ('issues' in found)
@@ -92,8 +95,7 @@ export async function submitEntry(ref: EntryRef, actor: Actor, author?: Identity
   return { saved: true, review: viewOf(next, actor) }
 }
 
-// Publishes an entry in review, or leaves it scheduled at the publish date it holds, and tells its writer. `seen` is the version the reviewer opened.
-export async function approveEntry(ref: EntryRef, actor: Actor, author: Identity | undefined, seen: string | undefined): Promise<ReviewOutcome> {
+async function approveEntryAnswer(ref: EntryRef, actor: Actor, author: Identity | undefined, seen: string | undefined): Promise<ReviewAnswer> {
   const found = await target(ref)
 
   if ('issues' in found)
@@ -136,8 +138,7 @@ export async function approveEntry(ref: EntryRef, actor: Actor, author: Identity
   return { saved: true, review: viewOf(next, actor), entry: after && { data: after.data, body: after.body, version: after.version } }
 }
 
-// Hands an entry in review back to its writer with a note saying what to change, and tells them.
-export async function sendBackEntry(ref: EntryRef, note: string, actor: Actor, author?: Identity): Promise<ReviewOutcome> {
+async function sendBackEntryAnswer(ref: EntryRef, note: string, actor: Actor, author?: Identity): Promise<ReviewAnswer> {
   const said = note.trim()
 
   if (said === '')
@@ -166,3 +167,12 @@ export async function sendBackEntry(ref: EntryRef, note: string, actor: Actor, a
 
   return { saved: true, review: viewOf(next) }
 }
+
+// Sends a draft for review: its writer waits for a reviewer, who is told. A draft sent back may be sent again.
+export const submitEntry = answering(submitEntryAnswer)
+
+// Publishes an entry in review, or leaves it scheduled at the publish date it holds, and tells its writer. `seen` is the version the reviewer opened.
+export const approveEntry = answering(approveEntryAnswer)
+
+// Hands an entry in review back to its writer with a note saying what to change, and tells them.
+export const sendBackEntry = answering(sendBackEntryAnswer)

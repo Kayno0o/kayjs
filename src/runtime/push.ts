@@ -19,7 +19,7 @@ export type PushEnableResult
 
 const REFUSALS: Record<Exclude<PushSubscribeResult, 'subscribed'>, [status: number, message: string]> = {
   'unsupported': [0, 'This browser or site cannot receive push notifications'],
-  'denied': [403, 'The browser blocks notifications for this site'],
+  'denied': [0, 'The browser blocks notifications for this site'],
   'off': [0, 'The notification permission was not granted'],
   'needs-gesture': [0, 'Asking for the notification permission needs a click or a tap'],
   'signed-out': [401, 'Sign in to receive push notifications'],

@@ -30,7 +30,7 @@ import { contentVersion } from './version'
 // A refusal over another save carries `conflict`, the version the file is at now, null once deleted, which a save writing over it names.
 export type SaveOutcome = Settled<Answer>
 
-type Settled<Result> = Result extends { saved: true } ? Result & { ok: true, error?: undefined } : Result extends { issues: Issue[] } ? Result & { ok: false, error: ErrorShape } : Result
+export type Settled<Result> = Result extends { issues: Issue[] } ? Result & { ok: false, error: ErrorShape } : Result & { ok: true, error?: undefined }
 
 type Answer = { issues: Issue[], conflict?: { version: string | null } | undefined } | { saved: true, commit?: Commit | undefined, version?: string | undefined }
 
@@ -113,8 +113,7 @@ export async function entryScreen(ref: EntryRef): Promise<{ collection: ScreenCo
 // How long a share link lasts, which the messages word as a week.
 const SHARE_TTL = '7d'
 
-// A link showing the entry's draft alone, on its own page, to whoever it is sent to: the page of the entry as saved. Refused for an entry the site gives no page, or an app without `preview` in kay.config.ts.
-export async function shareLink(ref: EntryRef): Promise<{ link: string } | { issues: Issue[] }> {
+async function shareLinkAnswer(ref: EntryRef): Promise<{ link: string } | { issues: Issue[] }> {
   const entry = await entryOf(ref)
 
   if (!entry)
@@ -131,6 +130,9 @@ export async function shareLink(ref: EntryRef): Promise<{ link: string } | { iss
     return refused(ref, error instanceof Error ? error.message : String(error))
   }
 }
+
+// A link showing the entry's draft alone, on its own page, to whoever it is sent to: the page of the entry as saved. Refused for an entry the site gives no page, or an app without `preview` in kay.config.ts.
+export const shareLink = answering(shareLinkAnswer)
 
 // `kind` is the collection's when the caller has it, else it is read.
 export async function entryOf(ref: EntryRef, bare?: CollectionInfo): Promise<StoredEntry | undefined> {
@@ -169,31 +171,39 @@ export async function versionOf(ref: EntryRef): Promise<string | undefined> {
   return await file.exists() ? fileVersion(await file.bytes()) : undefined
 }
 
-// Gives an outcome its `ok` and, for a refusal, its `error`.
-function settle<Result extends Answer>(outcome: Result): Settled<Result> {
-  if ('saved' in outcome)
+// Gives an outcome its `ok` and, for a refusal (`issues`), its `error`.
+function settle<Result extends object>(outcome: Result): Settled<Result> {
+  if (!('issues' in outcome))
     return { ...outcome, ok: true } as Settled<Result>
 
+  const refusal = outcome as { issues: Issue[], conflict?: unknown }
   const errors: Record<string, string> = {}
 
-  for (const { path, message } of outcome.issues)
+  for (const { path, message } of refusal.issues)
     errors[path] ??= message
 
-  return { ...outcome, ok: false, error: { status: outcome.conflict === undefined ? 422 : 409, message: outcome.issues.map(issue => issue.message).join('; '), errors, data: undefined } } as Settled<Result>
+  return { ...outcome, ok: false, error: { status: refusal.conflict === undefined ? 422 : 409, message: refusal.issues.map(issue => issue.message).join('; '), errors, data: undefined } } as Settled<Result>
 }
 
-function answering<Args extends unknown[], Result extends Answer>(run: (...args: Args) => Promise<Result>): (...args: Args) => Promise<Settled<Result>> {
+export function answering<Args extends unknown[], Result extends object>(run: (...args: Args) => Promise<Result>): (...args: Args) => Promise<Settled<Result>> {
   return async (...args) => settle(await run(...args))
 }
 
-// Saves an entry as an editor does, past the version rule, the schema, the references and the hooks.
+// Saves an entry where its collection keeps it: a loaded one through its loader, a folder one as a file through the configured saver.
+// `version` is the one the editor opened, so a save made over someone else's is refused; a new entry's file must not exist yet.
 export const saveEntry = answering(saveEntryAnswer)
-// Deletes an entry, to the trash when the collection keeps one.
 export const deleteEntry = answering(deleteEntryAnswer)
+// Sets the collection's draft field to false, keeping the rest of the entry as saved.
 export const publishEntry = answering(publishEntryAnswer)
+// Turns a published entry back into a draft, the way Publish turns a draft public.
 export const unpublishEntry = answering(unpublishEntryAnswer)
+// Saves a copy of an entry as a draft, when the collection has a draft field, under a free slug; the outcome names the slug.
 export const duplicateEntry = answering(duplicateEntryAnswer)
+// Moves an entry one place up or down in its collection's order, among the entries of its locale, by saving the `order` field of the one or the few entries that change: a loaded collection's as one write, a folder's file by file, stopping at the first that is refused.
+// A folder's file is written from the entry read after the version it commits against, so a save of a neighbour made meanwhile refuses the move, never undone; a loaded collection's group is read and written inside one turn, which keeps every save of this process, and the loader writes only each entry's order field if it still holds the number it was read at (`expect`), so a save or a move of another process in between refuses the move and is never undone, with a loader that offers it.
 export const moveEntry = answering(moveEntryAnswer)
+// Renames an entry's slug: a folder entry's file is moved, a loaded entry is saved under the new slug and removed from the old with its history kept, the entries naming it point at the new slug, and the page it had redirects to the page it has, without the app writing anything.
+// Refused when the new slug is taken, the collection holds one entry, the saver cannot move files, or an entry naming this one cannot be saved. `version` is the one the editor opened. `unpointed` names the entries naming this one that could not be saved after it, and `unredirected` the old address that will not redirect and why (the redirect set is full, or the address cannot be named).
 export const renameEntry = answering(renameEntryAnswer)
 
 export function refused(ref: EntryRef, message: string, key?: Issue['key'] | 'body'): Settled<{ issues: Issue[] }> {
@@ -252,8 +262,6 @@ async function saved(event: SaveEvent): Promise<void> {
     log.error(`onSave for ${event.collection}/${event.slug} did not finish in ${hookLimit / 1000} s; the save does not wait for it`)
 }
 
-// Saves an entry where its collection keeps it: a loaded one through its loader, a folder one as a file through the configured saver.
-// `version` is the one the editor opened, so a save made over someone else's is refused; a new entry's file must not exist yet.
 async function saveEntryAnswer(entry: CmsDraftEntry, options: SaveOptions = {}): Promise<Answer> {
   let outcome: Answer
 
@@ -447,7 +455,6 @@ function storedState(entry: SourceEntry | undefined): { data: Record<string, unk
   return entry?.data === undefined ? undefined : { data: entry.data, body: entry.body }
 }
 
-// Sets the collection's draft field to false, keeping the rest of the entry as saved.
 async function publishEntryAnswer(ref: EntryRef, author?: Identity, { reviewed = false, version }: { reviewed?: boolean, version?: string | undefined } = {}): Promise<Answer> {
   const collection = await collectionNamed(ref.collection)
 
@@ -465,7 +472,6 @@ async function publishEntryAnswer(ref: EntryRef, author?: Identity, { reviewed =
   return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: false }, body: existing.body }, { version: version ?? existing.version, verb: 'publish', author, bodyKept: true, reviewed })
 }
 
-// Turns a published entry back into a draft, the way Publish turns a draft public.
 async function unpublishEntryAnswer(ref: EntryRef, author?: Identity): Promise<Answer> {
   const collection = await collectionNamed(ref.collection)
 
@@ -553,7 +559,6 @@ function copyData(collection: CollectionInfo, data: Record<string, unknown>, sib
   return copy
 }
 
-// Saves a copy of an entry as a draft, when the collection has a draft field, under a free slug; the outcome names the slug.
 async function duplicateEntryAnswer(ref: EntryRef, author?: Identity): Promise<Answer & { slug?: string }> {
   const collection = await collectionNamed(ref.collection)
 
@@ -583,8 +588,6 @@ async function movePlan(ref: EntryRef, direction: 'up' | 'down', field: string):
   return { group, changes: moveChanges(group.map(entry => ({ slug: entry.slug, value: orderValue(entry, field) })), ref.slug, direction) }
 }
 
-// Moves an entry one place up or down in its collection's order, among the entries of its locale, by saving the `order` field of the one or the few entries that change: a loaded collection's as one write, a folder's file by file, stopping at the first that is refused.
-// A folder's file is written from the entry read after the version it commits against, so a save of a neighbour made meanwhile refuses the move, never undone; a loaded collection's group is read and written inside one turn, which keeps every save of this process, and the loader writes only each entry's order field if it still holds the number it was read at (`expect`), so a save or a move of another process in between refuses the move and is never undone, with a loader that offers it.
 async function moveEntryAnswer(ref: EntryRef, direction: 'up' | 'down', author?: Identity): Promise<Answer> {
   const collection = await collectionNamed(ref.collection)
   const field = collection.orderField
@@ -714,8 +717,6 @@ async function pointings(collection: CollectionInfo, ref: EntryRef, slug: string
   return result
 }
 
-// Renames an entry's slug: a folder entry's file is moved, a loaded entry is saved under the new slug and removed from the old with its history kept, the entries naming it point at the new slug, and the page it had redirects to the page it has, without the app writing anything.
-// Refused when the new slug is taken, the collection holds one entry, the saver cannot move files, or an entry naming this one cannot be saved. `version` is the one the editor opened. `unpointed` names the entries naming this one that could not be saved after it, and `unredirected` the old address that will not redirect and why (the redirect set is full, or the address cannot be named).
 async function renameEntryAnswer(ref: EntryRef, slug: string, options: { author?: Identity | undefined, version?: string | undefined } & VersionRule = {}): Promise<Answer & { slug?: string, unpointed?: string[], unredirected?: Unredirected }> {
   let outcome: Awaited<ReturnType<typeof renameOne>>
 

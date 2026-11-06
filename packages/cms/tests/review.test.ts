@@ -153,11 +153,11 @@ describe('review with fourEyes', () => {
     const ref = await draft('posts')
     const sent = await submitEntry(ref, writer)
 
-    expect(sent).toMatchObject({ review: { own: true } })
-    expect(await approveEntry(ref, { ...writer, reviewers: [] }, undefined, (await entryOf(ref))?.version)).toMatchObject({ issues: [{ message: 'You sent this entry for review: another person approves it' }] })
+    expect(sent).toMatchObject({ ok: true, saved: true, review: { own: true } })
+    expect(await approveEntry(ref, { ...writer, reviewers: [] }, undefined, (await entryOf(ref))?.version)).toMatchObject({ ok: false, error: { status: 422 }, issues: [{ message: 'You sent this entry for review: another person approves it' }] })
     expect((await entryOf(ref))?.draft).toBe(true)
     expect((await readReview(ref))?.status).toBe('review')
-    expect(await approve(ref)).toMatchObject({ saved: true, review: { status: 'approved' } })
+    expect(await approve(ref)).toMatchObject({ ok: true, saved: true, review: { status: 'approved' } })
   })
 
   test('matches a person with no id by name, and never one with no name', async () => {
