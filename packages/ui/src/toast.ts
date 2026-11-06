@@ -25,7 +25,7 @@ export interface Toast {
   action?: ToastAction | undefined
   // The toast waits on a call, and shows a spinner in place of its icon.
   loading?: boolean | undefined
-  // The outcome of a `toast.promise`: a danger one is announced politely, as the reader just waited for it, not as an alert.
+  /** @internal The outcome of a `toast.promise`: a danger one is announced politely, as the reader just waited for it, not as an alert. */
   outcome?: boolean | undefined
   // Called once the toast has gone, with why.
   onDismiss?: ((reason: ToastDismissReason) => unknown) | undefined

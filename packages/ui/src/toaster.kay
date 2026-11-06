@@ -122,7 +122,10 @@ async function ran(item: Toast) {
 }
 
 function linked(event: MouseEvent, item: Toast) {
-  if (!(event.target as Element).closest('a[data-part~="action"]'))
+  const link = (event.target as Element).closest('a[data-part~="action"]')
+
+  // A click that opens elsewhere leaves this page, and its toast, as they are. `defaultPrevented` is no sign of it: kay's router prevents the default of every link it takes over.
+  if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0 || link.getAttribute('target') === '_blank')
     return
 
   void ran(item)
@@ -161,6 +164,7 @@ if owns()
   // Holding still while the pointer is on the toasts or focus is in them, as timed content must let itself be paused.
   div({...rest} part="root" data-position={position} ref={ref} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
     for item of listed() key={item.id}
+      // kaynooo/kayjs#3120: Button's link branch takes no onClick, so the click is handled here.
       // kay-allow unreachable-click
       div(part="toast" data-id={item.id} data-tone={toneOf(item)} data-type={item.type} onKeyDown={dismissed} onClick={event => linked(event, item)})
         if toast

@@ -101,6 +101,23 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
     expect(page.errors).toEqual([])
   }, 60_000)
 
+  it('keeps a link action\'s toast on a ctrl-click', async () => {
+    const page = await site.open('/toast-rich')
+
+    await page.click('#linked')
+    await page.waitFor('.kui-toast a[data-part=action]')
+    await page.evaluate(() => {
+      const link = document.querySelector<HTMLAnchorElement>('.kui-toast a[data-part=action]')!
+
+      link.addEventListener('click', event => event.preventDefault(), { once: true })
+      link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }))
+    })
+    await new Promise(resolve => setTimeout(resolve, 200))
+    expect(await page.count('.kui-toast')).toBe(1)
+    expect(await page.evaluate(() => location.pathname)).toBe('/toast-rich')
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
   it('replaces the drawing of a toast with the Toaster\'s toast block, whose dismiss closes it', async () => {
     const page = await site.open('/toast-block')
 
