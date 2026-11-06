@@ -18,7 +18,7 @@ export function deriveKeys(secret: string | string[]): Keys {
   const secrets = [secret].flat()
 
   if (weakSecrets(secrets))
-    throw configError(`a secret is at least ${MIN_SECRET_LENGTH} characters; generate one with ${GENERATE_SECRET}`)
+    throw configError('auth', 'secret', `a secret is at least ${MIN_SECRET_LENGTH} characters; generate one with ${GENERATE_SECRET}`)
 
   const derive = (purpose: string) => secrets.map(value => Buffer.from(hkdfSync('sha256', value, '', `kayjs-auth ${purpose}`, KEY_BYTES)))
   const encryption = derive('encryption')

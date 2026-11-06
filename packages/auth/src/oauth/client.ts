@@ -40,7 +40,7 @@ function requireSecureEndpoints(endpoints: OAuthEndpoints, provider: string): vo
 
   for (const [name, url] of Object.entries(urls)) {
     if (url !== undefined && new URL(url).protocol !== 'https:')
-      throw configError(`the ${provider} provider's ${name} ${url} is not https, which a site at https refuses`)
+      throw configError('auth', 'oauth', `the ${provider} provider's ${name} ${url} is not https, which a site at https refuses`)
   }
 }
 
@@ -79,7 +79,7 @@ export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuth
     const url = (await endpoints())[name]
 
     if (url === undefined)
-      throw configError(`the ${provider.name} provider has no ${name}`)
+      throw configError('auth', 'oauth', `the ${provider.name} provider has no ${name}`)
 
     return url
   }
@@ -97,7 +97,7 @@ export function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuth
 
   const userInfo = async (accessToken: string, userUrl: string | undefined): Promise<Record<string, unknown>> => {
     if (userUrl === undefined)
-      throw configError(`the ${provider.name} provider has neither a userUrl nor an ID token to read the user from`)
+      throw configError('auth', 'oauth', `the ${provider.name} provider has neither a userUrl nor an ID token to read the user from`)
 
     const { res, text } = await askProvider(provider.name, 'user fetch', userUrl, {
       headers: {

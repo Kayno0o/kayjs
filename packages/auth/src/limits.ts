@@ -74,7 +74,7 @@ export function resolveLimits(given: LimitsOption | undefined): ResolvedLimits {
     const list = [option].flat()
 
     if (list.length === 0)
-      throw configError(`rateLimit.${name} is an empty list; give it a limit or leave it out`)
+      throw configError('auth', 'rateLimit', `rateLimit.${name} is an empty list; give it a limit or leave it out`)
 
     for (const [index, limit] of list.entries()) {
       const place = list.length === 1 ? `rateLimit.${name}` : `rateLimit.${name}[${index}]`
@@ -82,7 +82,7 @@ export function resolveLimits(given: LimitsOption | undefined): ResolvedLimits {
       durationSeconds(limit.window, `${place}.window`)
 
       if (limit.store !== undefined && typeof limit.store?.hit !== 'function')
-        throw configError(`${place}.store has no hit(key, window) method; give it a RateStore`)
+        throw configError('auth', 'rateLimit', `${place}.store has no hit(key, window) method; give it a RateStore`)
     }
 
     limits[name] = list.map(({ max, window, store }) => ({ max, window, store })) as LimitSet

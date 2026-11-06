@@ -51,7 +51,7 @@ export function tokenLifetimes(maxAge: EmailOptions['maxAge']): Record<TokenType
   const unknown = Object.keys(maxAge ?? {}).find(key => !Object.hasOwn(TOKEN_LIFETIMES, key))
 
   if (unknown !== undefined)
-    throw configError(`${named(unknown)} is no link or code of kayjs-auth`)
+    throw configError('auth', 'links', `${named(unknown)} is no link or code of kayjs-auth`)
 
   for (const type of Object.keys(lifetimes) as TokenType[]) {
     const wanted = maxAge?.[type]
@@ -100,7 +100,7 @@ export function pagesHandle(core: Core, options: { pages?: boolean | AuthPagesCo
         return
 
       if (own.prefix !== undefined && own.prefix !== (given.prefix ?? DEFAULT_PAGES_PREFIX))
-        throw configError(`auth() serves the pages under '${given.prefix ?? DEFAULT_PAGES_PREFIX}' and authCore({ pages: { prefix: '${own.prefix}' } }) sends users to '${own.prefix}'. Give auth({ prefix: '${own.prefix}' }), or drop the prefix of one of them`)
+        throw configError('auth', 'pages', `auth() serves the pages under '${given.prefix ?? DEFAULT_PAGES_PREFIX}' and authCore({ pages: { prefix: '${own.prefix}' } }) sends users to '${own.prefix}'. Give auth({ prefix: '${own.prefix}' }), or drop the prefix of one of them`)
 
       if (own.home === undefined && given.home !== undefined)
         pages.home = given.home
@@ -132,13 +132,13 @@ function siteOptions(options: { site?: string | undefined, name?: string | undef
   const site = options.site
 
   if (site !== undefined && !HAS_SCHEME.test(site))
-    throw configError(HOST_LIKE.test(site) ? `\`site\` is the site's origin, such as \`https://${site}\`, and \`${site}\` has no scheme: add it, or give the display name as \`name\`` : `\`site\` is the site's origin, such as \`https://example.com\`, and \`${site}\` is not one: give the display name as \`name\``)
+    throw configError('auth', 'site', HOST_LIKE.test(site) ? `\`site\` is the site's origin, such as \`https://${site}\`, and \`${site}\` has no scheme: add it, or give the display name as \`name\`` : `\`site\` is the site's origin, such as \`https://example.com\`, and \`${site}\` is not one: give the display name as \`name\``)
 
   return { origin: site, name: options.name }
 }
 
 function noSecret(): never {
-  throw configError('`secret` is missing and the session plugin cannot derive one; pass a secret of at least 32 characters, or a plugin from kay\'s `session()`')
+  throw configError('auth', 'secret', '`secret` is missing and the session plugin cannot derive one; pass a secret of at least 32 characters, or a plugin from kay\'s `session()`')
 }
 
 // What createCore builds on the site's origin, once it has one.
@@ -179,7 +179,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     const url = given ?? configuredSite()?.origin.replace(TRAILING_SLASH, '')
 
     if (needsUrl && url === undefined)
-      throw configError('OAuth sign-in and mailed links need the site\'s public origin to build their URLs: set `site` in kay.config.ts or SITE_URL, or in authCore')
+      throw configError('auth', 'site', 'OAuth sign-in and mailed links need the site\'s public origin to build their URLs: set `site` in kay.config.ts or SITE_URL, or in authCore')
 
     if (url === undefined && waiting)
       return waiting
@@ -318,13 +318,13 @@ function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: strin
     return undefined
 
   if (!pages || !options.store.oauth)
-    throw configError('`oauthServer` needs the prebuilt `pages`, for its consent page, and a store with `oauth`, as `memoryAuth` and `pgAuth` have')
+    throw configError('auth', 'oauthServer', '`oauthServer` needs the prebuilt `pages`, for its consent page, and a store with `oauth`, as `memoryAuth` and `pgAuth` have')
 
   const custom = typeof wanted === 'object' ? wanted.fetch : undefined
   const defaultScopes = typeof wanted === 'object' ? [...new Set(wanted.defaultScopes)] : []
 
   if (defaultScopes.some(scope => !options.scopes?.includes(scope)))
-    throw configError('`oauthServer.defaultScopes` names a scope that `scopes` does not declare')
+    throw configError('auth', 'oauthServer.defaultScopes', '`oauthServer.defaultScopes` names a scope that `scopes` does not declare')
 
   // Switched on by the app, not by the pages and the store alone, which every app with the prebuilt pages has.
   if (wanted !== undefined && (options.scopes?.length ?? 0) === 0)
@@ -347,7 +347,7 @@ function emailLinks(links: Partial<Record<LinkType, string>> | undefined, pages:
   const missing = LINK_TYPES.filter(type => merged[type] === undefined)
 
   if (missing.length > 0)
-    throw configError(`email.links needs a page for ${missing.join(', ')}, or \`pages\` for the prebuilt ones`)
+    throw configError('auth', 'email', `email.links needs a page for ${missing.join(', ')}, or \`pages\` for the prebuilt ones`)
 
   return merged as Record<LinkType, string>
 }

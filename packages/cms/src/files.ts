@@ -214,7 +214,7 @@ export function requireSecure(url: string, saver = 'forgejo'): void {
   const parsed = URL.parse(url)
 
   if (parsed === null || (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && LOOPBACK.test(parsed.hostname))))
-    throw configError(`${saver} baseUrl is '${url}', which must be https:, or http: on localhost`)
+    throw configError('cms', 'uploads', `${saver} baseUrl is '${url}', which must be https:, or http: on localhost`)
 }
 
 // Commits each change through Forgejo's contents API, so the site rebuilds from git and every edit has history.

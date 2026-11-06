@@ -77,10 +77,10 @@ export function organizationsOf(core: Core): { config: OrganizationsCore, store:
   const { organizations, members, invitations } = core.store
 
   if (!config)
-    throw configError('organizations need the `organizations` option')
+    throw configError('auth', 'organizations', 'organizations need the `organizations` option')
 
   if (!organizations || !members || !invitations)
-    throw configError('the `organizations` option needs a store keeping organizations, members and invitations, as memoryAuth and pgAuth do')
+    throw configError('auth', 'organizations', 'the `organizations` option needs a store keeping organizations, members and invitations, as memoryAuth and pgAuth do')
 
   return { config, store: { organizations, members, invitations } }
 }

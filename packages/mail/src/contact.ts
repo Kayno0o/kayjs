@@ -78,10 +78,10 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
   const reserved = [...RESERVED, honeypot, ...consent ? ['consent'] : []].filter(key => key in fields)
 
   if (honeypot === '' || RESERVED.has(honeypot) || (consent && honeypot === 'consent'))
-    throw configError(`contactForm cannot use \`${honeypot}\` as its honeypot, a field the form already has`)
+    throw configError('mail', 'contactForm', `contactForm cannot use \`${honeypot}\` as its honeypot, a field the form already has`)
 
   if (reserved.length > 0)
-    throw configError(`contactForm already has the field ${reserved.join(', ')}, which \`fields\` cannot replace`)
+    throw configError('mail', 'contactForm', `contactForm already has the field ${reserved.join(', ')}, which \`fields\` cannot replace`)
 
   const words = { reach: reach ?? '' }
 

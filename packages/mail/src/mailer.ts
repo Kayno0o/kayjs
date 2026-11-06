@@ -186,7 +186,7 @@ function agreeOnQueue(name: string, store: object | undefined, settings: Record<
 
   // A `kay dev` reload makes the mailer again before the old one is gone, with options the developer just changed.
   if (differing.length > 0 && !underKayDev())
-    throw configError(`mailer({ queue }) shares the queue "${name}" with another mailer that sets ${differing.join(', ')} differently; a queue has one set of retry and keep settings whichever mailer claims a job, so give each mailer its own queue \`name\` or the same settings`)
+    throw configError('mail', 'queue', `mailer({ queue }) shares the queue "${name}" with another mailer that sets ${differing.join(', ')} differently; a queue has one set of retry and keep settings whichever mailer claims a job, so give each mailer its own queue \`name\` or the same settings`)
 
   // A refused mailer is never made, so it records nothing; a reload replaces the old values.
   const ref = new WeakRef(owner)
@@ -356,7 +356,7 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
   const api = provider === undefined ? undefined : providerFromUrl(env.MAIL_URL)
 
   if ((env.MAIL_DKIM_SELECTOR === undefined) !== (env.MAIL_DKIM_PRIVATE_KEY === undefined))
-    throw configError('MAIL_DKIM_SELECTOR and MAIL_DKIM_PRIVATE_KEY go together: set both to sign mails, or neither')
+    throw configError('mail', 'dkim', 'MAIL_DKIM_SELECTOR and MAIL_DKIM_PRIVATE_KEY go together: set both to sign mails, or neither')
 
   // A `.env` file often holds the key on one line, its line breaks written `\\n`.
   const dkimKey = env.MAIL_DKIM_PRIVATE_KEY?.replaceAll('\\n', '\n')
@@ -426,7 +426,7 @@ function conventionalMailer(app: ExtensionApp | undefined): Mailer | undefined {
   const exported = loaded.mail
 
   if (typeof exported !== 'object' || exported === null || !('handle' in exported))
-    throw configError('src/mail.ts does not export a mailer as `mail`: write `export const mail = mailer({ ... })`, or give `mail({ ... })` its options in kay.config.ts and remove the file')
+    throw configError('mail', 'mail', 'src/mail.ts does not export a mailer as `mail`: write `export const mail = mailer({ ... })`, or give `mail({ ... })` its options in kay.config.ts and remove the file')
 
   return exported as Mailer
 }
@@ -528,7 +528,7 @@ export function mail(options: MailExtensionOptions = {}): KayExtension<Mailer> {
 export function mailer(options: MailerOptions = {}): Mailer {
   if (options.smtp !== undefined) {
     if (options.transport !== undefined)
-      throw configError('mailer() takes `smtp` or `transport`, not both: `smtp` adjusts the SMTP built from the environment, which a `transport` replaces; give the options to smtp() instead')
+      throw configError('mail', 'smtp', 'mailer() takes `smtp` or `transport`, not both: `smtp` adjusts the SMTP built from the environment, which a `transport` replaces; give the options to smtp() instead')
 
     // Even where mails go to the outbox, so a broken option fails in development rather than in production.
     checkOptions(options.smtp, 'mailer({ smtp })')

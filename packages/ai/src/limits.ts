@@ -106,7 +106,7 @@ function memoryFor(memories: Map<string, RateStore>, name: string): RateStore {
 
 function wholeNumber(value: unknown, what: string): number {
   if (!Number.isInteger(value) || (value as number) < 1)
-    throw configError(what, value, 'a whole number of at least 1')
+    throw configError('ai', 'rateLimit', `${what} is ${JSON.stringify(value)}; it takes a whole number of at least 1`)
 
   return value as number
 }
@@ -119,7 +119,7 @@ function settingsOf({ rateLimit, budget, key }: AiOptions, memories: Map<string,
   const chosenBudget = budget ?? (production ? DEFAULT_BUDGET : undefined)
 
   if (Array.isArray(chosenLimit) && chosenLimit.length === 0)
-    throw configError('ai({ rateLimit })', chosenLimit, 'a limit, a list of at least one, or false')
+    throw configError('ai', 'rateLimit', `ai({ rateLimit }) is ${JSON.stringify(chosenLimit)}; it takes a limit, a list of at least one, or false`)
 
   if (chosenLimit !== undefined && chosenLimit !== false) {
     settings.limit = [chosenLimit].flat().map((own, index) => {

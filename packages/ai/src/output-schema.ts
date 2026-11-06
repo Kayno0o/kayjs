@@ -21,7 +21,7 @@ function simplify(value: unknown): unknown {
 
   for (const key of UNSUPPORTED) {
     if (key in value)
-      throw configError('a schema holds an s.Record or an s.Intersect, which a model cannot be held to; name the fields with s.Object({ ... })')
+      throw configError('ai', 'schema', 'a schema holds an s.Record or an s.Intersect, which a model cannot be held to; name the fields with s.Object({ ... })')
   }
 
   const out: Node = {}

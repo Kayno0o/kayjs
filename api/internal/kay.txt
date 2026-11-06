@@ -864,6 +864,7 @@ interface CommandProject
   root: string
 
 [./library] configError
+function configError(library: ConfigLibrary, option: string, message: string, options?: ErrorOptions | undefined): KayError
 function configError(message: string, options?: ErrorOptions | undefined): KayError
 function configError(option: string, value: unknown, takes: string): KayError
 

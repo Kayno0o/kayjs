@@ -11,7 +11,7 @@ function limit(value: number | undefined, fallback: number, name: string): numbe
     return fallback
 
   if (!Number.isInteger(value) || value < 1)
-    throw configError(`rules.${name} is ${value}, a whole number of at least 1`)
+    throw configError('auth', 'rules', `rules.${name} is ${value}, a whole number of at least 1`)
 
   return value
 }
@@ -22,16 +22,16 @@ export function resolveRules(rules: CredentialRules = {}): ResolvedRules {
   const username = { min: limit(rules.username?.min, USERNAME_MIN_LENGTH, 'username.min'), max: limit(rules.username?.max, USERNAME_MAX_LENGTH, 'username.max') }
 
   if (password.max > FORM_PASSWORD_MAX)
-    throw configError(`rules.password.max is ${password.max}, over the ${FORM_PASSWORD_MAX} the prebuilt pages post`)
+    throw configError('auth', 'rules', `rules.password.max is ${password.max}, over the ${FORM_PASSWORD_MAX} the prebuilt pages post`)
 
   if (username.max > FORM_USERNAME_MAX)
-    throw configError(`rules.username.max is ${username.max}, over the ${FORM_USERNAME_MAX} the prebuilt pages post`)
+    throw configError('auth', 'rules', `rules.username.max is ${username.max}, over the ${FORM_USERNAME_MAX} the prebuilt pages post`)
 
   if (password.min > password.max)
-    throw configError(`rules.password.min is ${password.min}, over rules.password.max ${password.max}`)
+    throw configError('auth', 'rules', `rules.password.min is ${password.min}, over rules.password.max ${password.max}`)
 
   if (username.min > username.max)
-    throw configError(`rules.username.min is ${username.min}, over rules.username.max ${username.max}`)
+    throw configError('auth', 'rules', `rules.username.min is ${username.min}, over rules.username.max ${username.max}`)
 
   return { password, username }
 }

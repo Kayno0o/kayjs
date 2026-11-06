@@ -34,11 +34,11 @@ function messagesOf(prompt: string | AiMessage[], replayed = false): AiMessage[]
     return [{ role: 'user', content: prompt }]
 
   if (!Array.isArray(prompt) || prompt.length === 0)
-    throw configError('ask takes a prompt or at least one message')
+    throw configError('ai', 'messages', 'ask takes a prompt or at least one message')
 
   return prompt.map((message) => {
     if (typeof message !== 'object' || message === null || !ROLES.has(message.role) || typeof message.content !== 'string')
-      throw configError('a message is { role: \'user\' | \'assistant\', content: string }; the system prompt goes in options.system')
+      throw configError('ai', 'messages', 'a message is { role: \'user\' | \'assistant\', content: string }; the system prompt goes in options.system')
 
     const attachments = attachmentsOf(message.attachments)
 
@@ -116,7 +116,7 @@ function offer(actions: readonly (ToolAction | FunctionTool)[]): Offered[] {
       continue
 
     if (taken.has(action.name))
-      throw configError(`tools[${index}] is named ${action.name}, as another function tool of this ask is`)
+      throw configError('ai', 'tools', `tools[${index}] is named ${action.name}, as another function tool of this ask is`)
 
     taken.add(action.name)
     named.add(action)
@@ -139,7 +139,7 @@ function offer(actions: readonly (ToolAction | FunctionTool)[]): Offered[] {
     const tool = actionTool(action as Parameters<typeof actionTool>[0], taken)
 
     if (!tool)
-      throw configError(`tools[${index}] cannot be a tool: an action taking a file, one of a page with params or one with \`tool: false\` is none; a function tool is made with tool()`)
+      throw configError('ai', 'tools', `tools[${index}] cannot be a tool: an action taking a file, one of a page with params or one with \`tool: false\` is none; a function tool is made with tool()`)
 
     offered.push({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, ...tool.label !== undefined && { label: tool.label }, tool })
   }
@@ -159,7 +159,7 @@ function answerSchema(schema: unknown): { plain: object, chars: number } {
   const plain = typeof schema === 'object' && schema !== null ? jsonSchemaOf(schema) as { type?: unknown } : undefined
 
   if (plain?.type !== 'object')
-    throw configError('schema is an object schema, s.Object({ ... })')
+    throw configError('ai', 'schema', 'schema is an object schema, s.Object({ ... })')
 
   // Refuses a shape no provider can be held to before anything is sent.
   outputSchema(plain)
@@ -287,7 +287,7 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchem
   const model = options.model ?? configured ?? options.provider?.model
 
   if (model === undefined)
-    throw configError('no model to ask; set AI_MODEL or pass { model }')
+    throw configError('ai', 'model', 'no model to ask; set AI_MODEL or pass { model }')
 
   const hooks = hooksFor(options, provider)
   // The provider the requests go through, which asks again or elsewhere after a failure before the first piece.
@@ -303,7 +303,7 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchem
   const maxAttachmentBytes = attachmentSize === Infinity ? Infinity : byteSize(attachmentSize, `the ${options.maxSize === undefined ? 'maxAttachmentBytes' : 'maxSize'} of ask`)
 
   if (typeof maxInputChars !== 'number' || !(maxInputChars >= 1))
-    throw configError('maxInputChars is a number of characters of 1 or more')
+    throw configError('ai', 'maxInputChars', 'maxInputChars is a number of characters of 1 or more')
 
   const outlive = options.outlive === true
   const kept = call?.key
@@ -354,12 +354,12 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchem
     maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
 
     if (!Number.isInteger(maxSteps) || maxSteps < 1)
-      throw configError('maxSteps is a whole number of 1 or more')
+      throw configError('ai', 'maxSteps', 'maxSteps is a whole number of 1 or more')
 
     offered = offer(options.tools!)
 
     if (!answering && offered.some(item => item.tool))
-      throw configError('an action runs as the visitor, so ask() with one needs the request being answered; call it from a page, an action or a handler kay is answering, or offer tool({ ... }) functions, which run with no visitor')
+      throw configError('ai', 'tools', 'an action runs as the visitor, so ask() with one needs the request being answered; call it from a page, an action or a handler kay is answering, or offer tool({ ... }) functions, which run with no visitor')
   }
 
   const about = { ...first.about }

@@ -76,7 +76,7 @@ export function proofOfWork(options: AuthProofOfWorkOptions = {}): ProofOfWorkCa
 
   // kay takes up to 1,000,000,000, which the difficulty reaches doubled to its most.
   if (!Number.isInteger(difficulty) || difficulty < 1 || difficulty * 2 ** MOST_DOUBLINGS > 1e9)
-    throw configError(`proofOfWork's difficulty is ${difficulty}; it takes a whole number from 1 to ${1e9 / 2 ** MOST_DOUBLINGS}`)
+    throw configError('auth', 'proofOfWork', `proofOfWork's difficulty is ${difficulty}; it takes a whole number from 1 to ${1e9 / 2 ** MOST_DOUBLINGS}`)
 
   return {
     proofOfWork: { difficulty, maxAge: options.maxAge ?? '1h', store: options.store },

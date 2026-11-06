@@ -14,7 +14,7 @@ const built = new WeakSet<object>()
 // A tool that is a plain function, for an ask with no visitor to run as, such as a scheduled job's: it runs with the app's own rights, whoever (or nobody) asked.
 export function tool<const Schema extends TSchema>(options: FunctionToolOptions<Schema>): FunctionTool {
   if (typeof options !== 'object' || options === null || typeof options.name !== 'string' || !NAME.test(options.name) || typeof options.description !== 'string' || options.description === '' || typeof options.run !== 'function' || typeof options.input !== 'object' || options.input === null)
-    throw configError('tool takes { name, description, input, run }: a name of letters, digits, _ and - up to 64 characters, a description, a schema s.Object({ ... }) and the function to run')
+    throw configError('ai', 'tools', 'tool takes { name, description, input, run }: a name of letters, digits, _ and - up to 64 characters, a description, a schema s.Object({ ... }) and the function to run')
 
   const made = Object.freeze({ name: options.name, description: options.description, input: options.input, run: options.run, ...typeof options.label === 'string' && options.label !== '' && { label: options.label } }) as unknown as FunctionTool
 
@@ -28,7 +28,7 @@ export function mocked<const Schema extends TSchema, const Honeypot extends stri
   const offered = actionTool(action as unknown as Parameters<typeof actionTool>[0])
 
   if (!offered)
-    throw configError('mocked takes an action that can be a tool, one a page module exports: not one taking a file, one of a page with params or one with `tool: false`')
+    throw configError('ai', 'tools', 'mocked takes an action that can be a tool, one a page module exports: not one taking a file, one of a page with params or one with `tool: false`')
 
   return tool({ name: offered.name, description: offered.description, label: offered.label, input: action.schema, run })
 }
@@ -40,12 +40,12 @@ export function isFunctionTool(value: unknown): value is FunctionTool {
 // A function tool as the loop runs it: the input checked against its schema, the result as the text the model reads.
 export function plainTool(tool: FunctionTool): Offered {
   if (typeof tool.input !== 'object' || tool.input === null || !(KIND in tool.input))
-    throw configError(`tool ${tool.name}'s input is a kay schema, s.Object({ ... })`)
+    throw configError('ai', 'tools', `tool ${tool.name}'s input is a kay schema, s.Object({ ... })`)
 
   const plain = jsonSchemaOf(tool.input) as { type?: unknown }
 
   if (plain.type !== 'object')
-    throw configError(`tool ${tool.name}'s input is an object schema, s.Object({ ... })`)
+    throw configError('ai', 'tools', `tool ${tool.name}'s input is an object schema, s.Object({ ... })`)
 
   const run = async (input: Record<string, unknown>, signal: AbortSignal): Promise<Ran> => {
     try {

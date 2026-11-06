@@ -190,7 +190,7 @@ kay and its libraries name the same idea the same way. A new option, export or f
 
 ### Errors
 
-- A wrong option at start-up throws `KayError('config-invalid')`, in a library too.
+- A wrong option at start-up throws `KayError('config-invalid')`, in a library too, through `configError('cms', 'pageSize', message)`: the message ends on the library and the option, and the option has to be written in the library's own docs.
 - An error class ends in `Error` and has a `code`. kay's own take it too: `HydrationMismatchError`, `ActionRedirectError`, `CspViolationError` and `RedirectRefusedError` were named without it.
 
 ### Prefixes

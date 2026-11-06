@@ -18,7 +18,7 @@ export function siteRoot(core: Core, request: Request): string {
   const fixed = configuredSite()?.origin ?? core.url
 
   if (!rootUsable(core))
-    throw configError('the OAuth server needs the site\'s origin in production: set `site` in kay.config.ts or in authCore, as the Host header cannot name the issuer')
+    throw configError('auth', 'site', 'the OAuth server needs the site\'s origin in production: set `site` in kay.config.ts or in authCore, as the Host header cannot name the issuer')
 
   return (fixed ?? new URL(request.url).origin).replace(TRAILING_SLASH, '')
 }

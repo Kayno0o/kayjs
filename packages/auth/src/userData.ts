@@ -17,7 +17,7 @@ export function userDataRules(schema: TSchema): UserDataRules {
   const properties = (schema as { properties?: Record<string, unknown> }).properties
 
   if (properties === undefined)
-    throw configError('`user` is an object schema, such as `s.Object({ avatar: s.Optional(s.String()) })`')
+    throw configError('auth', 'user', '`user` is an object schema, such as `s.Object({ avatar: s.Optional(s.String()) })`')
 
   return { keys: Object.keys(properties), check: TypeCompiler.Compile(schema) }
 }

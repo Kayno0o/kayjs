@@ -71,18 +71,18 @@ export function choose(): Chosen {
   const kind = env.AI_PROVIDER ?? implied(base, anthropicKey, openaiKey)
 
   if (kind === undefined)
-    throw configError('ANTHROPIC_API_KEY and OPENAI_API_KEY are both set; set AI_PROVIDER to anthropic or openai, or unset one')
+    throw configError('ai', 'provider', 'ANTHROPIC_API_KEY and OPENAI_API_KEY are both set; set AI_PROVIDER to anthropic or openai, or unset one')
 
   if (kind === 'none') {
     if (process.env.NODE_ENV === 'development')
       return { provider: fakeAi, model: fakeAi.model }
 
-    throw configError('no provider is configured; set ANTHROPIC_API_KEY, OPENAI_API_KEY, or AI_BASE_URL for an OpenAI-compatible server such as Ollama')
+    throw configError('ai', 'provider', 'no provider is configured; set ANTHROPIC_API_KEY, OPENAI_API_KEY, or AI_BASE_URL for an OpenAI-compatible server such as Ollama')
   }
 
   if (kind === 'anthropic') {
     if (anthropicKey === undefined)
-      throw configError('AI_PROVIDER is anthropic and ANTHROPIC_API_KEY is not set')
+      throw configError('ai', 'provider', 'AI_PROVIDER is anthropic and ANTHROPIC_API_KEY is not set')
 
     const options: AnthropicOptions = { apiKey: anthropicKey, insecure: env.AI_INSECURE, ...base === undefined ? {} : { baseUrl: base } }
 
@@ -91,7 +91,7 @@ export function choose(): Chosen {
 
   // A key is optional only for an OpenAI-compatible server named by AI_BASE_URL.
   if (openaiKey === undefined && base === undefined)
-    throw configError('AI_PROVIDER is openai and OPENAI_API_KEY is not set')
+    throw configError('ai', 'provider', 'AI_PROVIDER is openai and OPENAI_API_KEY is not set')
 
   return { provider: openaiAt({ baseUrl: base ?? OPENAI_URL, apiKey: openaiKey, insecure: env.AI_INSECURE }, 'AI_BASE_URL'), model: env.AI_MODEL }
 }
@@ -135,12 +135,12 @@ function chooseFor(call: Call): Chosen & { voice: string | undefined } {
   }
 
   if (process.env.NODE_ENV !== 'development' && env.ANTHROPIC_API_KEY === undefined && env.OPENAI_API_KEY === undefined && env.AI_BASE_URL === undefined)
-    throw configError(`no server for ${call}(); set ${url} to an OpenAI-compatible server, or OPENAI_API_KEY or AI_BASE_URL for the one ask() uses`)
+    throw configError('ai', 'baseUrl', `no server for ${call}(); set ${url} to an OpenAI-compatible server, or OPENAI_API_KEY or AI_BASE_URL for the one ask() uses`)
 
   const { provider } = choose()
 
   if (provider[call] === undefined)
-    throw configError(`${provider.name} has no ${what}; set ${url} to an OpenAI-compatible server`)
+    throw configError('ai', 'baseUrl', `${provider.name} has no ${what}; set ${url} to an OpenAI-compatible server`)
 
   return { provider, model: provider === fakeAi ? fakeAi.model : env[model], voice: env.AI_VOICE }
 }
@@ -152,7 +152,7 @@ export function setUp<C extends Call>(call: C, options: CallOptions) {
   const method = chosen.provider[call]
 
   if (model === undefined)
-    throw configError(`no model for ${call}(); set ${CALLS[call].model} or pass { model }`)
+    throw configError('ai', 'model', `no model for ${call}(); set ${CALLS[call].model} or pass { model }`)
 
   if (method === undefined)
     throw new AiError('unsupported', `${chosen.provider.name} has no ${CALLS[call].what}`)

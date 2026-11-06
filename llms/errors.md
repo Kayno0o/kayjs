@@ -21,7 +21,7 @@ kay explain template-syntax
 - No level applies to them, and no `// kay-allow` comment reaches them.
 - Errors kay raises while serving a request, other than the classes of the `runtime` group below, and the app's own code, carry none.
 - Every error kay and its libraries throw for an app to catch extends `KayError` (from `kay/library`): `code` is the registered name, `kind` tells apart what one code covers (the code itself when it covers one cause), `status` is the HTTP status it stands for (`undefined` when none), `cause` the error underneath, and `name` the class's, so `instanceof` of each class still works.
-- A message opens with `kay: ` when it names a setting (a `configError`, which every library throws for an option it refuses at boot), with `kayjs-<library>: ` when a library refuses a call of the developer's, and with nothing when the app shows it to a visitor or an editor (a `SaveConflictError`, a `RedirectRefusedError`).
+- A message opens with `kay: ` when it names a setting (a `configError`, which every library throws for an option it refuses at boot, ending on the library, the option and where it is documented), with `kayjs-<library>: ` when a library refuses a call of the developer's, and with nothing when the app shows it to a visitor or an editor (a `SaveConflictError`, a `RedirectRefusedError`).
 - Every error class kay exports ends in `Error`, as a library's does (`HydrationMismatchError` of `kay/dom`, `ActionRedirectError` from `kay`, `CspViolationError` from `kay/server`, `RedirectRefusedError` of `kay/library`, their `name` too).
 
 | Error | Group | Raised for | Fix |

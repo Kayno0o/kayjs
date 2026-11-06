@@ -110,6 +110,11 @@ describe('kay/library', () => {
     expect(configError('cms({ pageSize })', 0, 'a positive whole number')).toMatchObject({ code: 'config-invalid', message: 'kay: cms({ pageSize }) is 0; it takes a positive whole number' })
     expect(configError('mailer() takes smtp or transport, not both')).toMatchObject({ code: 'config-invalid', message: 'kay: mailer() takes smtp or transport, not both' })
     expect(configError('a sender is missing', { cause: 'x' }).cause).toBe('x')
+    expect(configError('cms', 'pageSize', 'pageSize is 0; it takes a positive whole number')).toMatchObject({ code: 'config-invalid', message: 'kay: pageSize is 0; it takes a positive whole number (kayjs-cms option `pageSize`: kayjs-cms/llms.txt)' })
+    expect(configError('mail', 'smtp', 'the login needs a password', { cause: 'x' }).cause).toBe('x')
+    expect(configError('ai', 'rateLimit', 'x').message).toBe('kay: x (kayjs-ai option `rateLimit`: kayjs-ai/llms.txt)')
+    expect(configError('thing', 0, 'a number').message).toBe('kay: thing is 0; it takes a number')
+    expect(configError('cms', 0, 'a number').message).toBe('kay: cms is 0; it takes a number')
     expect(() => asConfigError(() => {
       throw new Error('kay: rules.min is 0')
     })).toThrow(expect.objectContaining({ code: 'config-invalid', message: 'kay: rules.min is 0' }))

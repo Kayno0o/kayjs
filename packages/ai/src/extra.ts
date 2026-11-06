@@ -6,7 +6,7 @@ export function extraBody(value: unknown, where: string): Record<string, unknown
     return undefined
 
   if (typeof value !== 'object' || value === null || Array.isArray(value))
-    throw configError(`${where} is an object of fields to add to the request body`)
+    throw configError('ai', 'body', `${where} is an object of fields to add to the request body`)
 
   return value as Record<string, unknown>
 }

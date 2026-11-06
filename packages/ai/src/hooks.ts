@@ -25,7 +25,7 @@ export function configureHooks(options: AskHooks): void {
       continue
 
     if (typeof hook !== 'function')
-      throw configError(`ai({ ${name} }) is a function`)
+      throw configError('ai', 'onRequest', `ai({ ${name} }) is a function`)
 
     Object.assign(next, { [name]: hook })
   }
@@ -43,7 +43,7 @@ export function hooksFor(options: AskHooks, provider: Provider): AskHooks {
     const own: unknown = options[name]
 
     if (own !== undefined && typeof own !== 'function')
-      throw configError(`ask({ ${name} }) is a function`)
+      throw configError('ai', 'onRequest', `ask({ ${name} }) is a function`)
 
     const hook = own ?? (fake ? undefined : set[name])
 
@@ -87,7 +87,7 @@ export async function requested(hook: NonNullable<AskHooks['onRequest']>, call: 
     return undefined
 
   if (typeof change !== 'object' || change === null || Array.isArray(change))
-    throw configError('onRequest returns nothing, or { messages?, system? }')
+    throw configError('ai', 'onRequest', 'onRequest returns nothing, or { messages?, system? }')
 
   return change
 }

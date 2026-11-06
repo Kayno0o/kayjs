@@ -24,7 +24,7 @@ export function authWords(mail: AuthMail): AuthWords {
   const { kind } = mail
 
   if (!isLinkKind(kind) && !isNoticeKind(kind))
-    throw configError(`${kind} is no kind of mail kayjs-auth sends`)
+    throw configError('mail', 'authWords', `${kind} is no kind of mail kayjs-auth sends`)
 
   const english = en[kind]
   const of = (line: 'subject' | 'lead' | 'ending'): string => wording(`mail.auth.${kind}.${line}`, english[line], { site: mail.name, email: mail.to, detail: mail.detail ?? '', what: mail.url === undefined ? wording('mail.auth.code', en.code) : wording('mail.auth.link', en.link) })

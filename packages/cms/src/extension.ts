@@ -59,14 +59,14 @@ function savedFromEnv(): FileSaver {
   const { CMS_HOST: host = 'forgejo', CMS_BASE_URL: baseUrl, CMS_REPO: repo, CMS_TOKEN: token, CMS_BRANCH: branch } = defineEnv(CMS_ENV)
 
   if (baseUrl === undefined && repo === undefined && token === undefined)
-    throw configError(NO_SAVER)
+    throw configError('cms', 'files', NO_SAVER)
 
   if (host === 'github' || host === 'gitlab') {
     const lacking = Object.entries({ CMS_REPO: repo, CMS_TOKEN: token }).filter(([, value]) => value === undefined).map(([name]) => name)
     const forge = host === 'github' ? 'GitHub' : 'GitLab'
 
     if (repo === undefined || token === undefined)
-      throw configError(`the cms commits to the ${forge} the environment names, which lacks ${lacking.join(' and ')}`)
+      throw configError('cms', 'saver', `the cms commits to the ${forge} the environment names, which lacks ${lacking.join(' and ')}`)
 
     return host === 'github' ? github({ baseUrl, repo, token, branch }) : gitlab({ baseUrl, repo, token, branch })
   }
@@ -74,7 +74,7 @@ function savedFromEnv(): FileSaver {
   const missing = Object.entries({ CMS_BASE_URL: baseUrl, CMS_REPO: repo, CMS_TOKEN: token }).filter(([, value]) => value === undefined).map(([name]) => name)
 
   if (baseUrl === undefined || repo === undefined || token === undefined)
-    throw configError(`the cms commits to the Forgejo the environment names, which lacks ${missing.join(' and ')}`)
+    throw configError('cms', 'saver', `the cms commits to the Forgejo the environment names, which lacks ${missing.join(' and ')}`)
 
   return forgejo({ baseUrl, repo, token, branch })
 }

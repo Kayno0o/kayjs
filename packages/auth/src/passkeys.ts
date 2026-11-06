@@ -301,7 +301,7 @@ export function userHandle(userId: string): string {
 
 export function relyingParty(core: Core): Relying {
   if (!core.passkeys)
-    throw configError('passkeys need `url`, the site\'s public origin, which names who they are made for')
+    throw configError('auth', 'passkeys', 'passkeys need `url`, the site\'s public origin, which names who they are made for')
 
   return core.passkeys
 }

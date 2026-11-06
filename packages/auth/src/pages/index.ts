@@ -209,7 +209,7 @@ function authOfModule(module: Partial<Record<'auth' | 'default', { plugin: AnyEl
   const auth = module.auth ?? module.default
 
   if (!auth)
-    throw configError('the auth module exports no `auth`, the `authCore` result')
+    throw configError('auth', 'module', 'the auth module exports no `auth`, the `authCore` result')
 
   return auth
 }
@@ -220,7 +220,7 @@ async function authOfServer(server: (() => AnyElysia | Promise<AnyElysia>) | und
   const auth = plugin?.[AUTH_OF]
 
   if (!auth)
-    throw configError('the `server` of auth() is not the `plugin` of a `authCore` result, so its commands cannot reach the app\'s auth; give `module: \'./src/auth\'` instead')
+    throw configError('auth', 'module', 'the `server` of auth() is not the `plugin` of a `authCore` result, so its commands cannot reach the app\'s auth; give `module: \'./src/auth\'` instead')
 
   return auth
 }

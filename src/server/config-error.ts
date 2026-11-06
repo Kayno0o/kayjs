@@ -2,15 +2,24 @@ import type { Duration } from '../runtime/duration'
 import { KayError } from '../compiler/errors'
 import { durationSeconds as durationOf, optionMs as optionOf } from '../runtime/duration'
 
-// The error a setting kay or a library refuses at boot throws, as `kay: <option> is <value>; it takes <what>`, or `kay: <message>` for a problem of another shape (two options that exclude each other, one that needs another).
-// The message names the option as the app wrote it (`cms({ pageSize })`), so it needs no library name before it.
+export type ConfigLibrary = 'ai' | 'auth' | 'cms' | 'mail' | 'ui'
+
+const LIBRARIES: ReadonlySet<unknown> = new Set<ConfigLibrary>(['ai', 'auth', 'cms', 'mail', 'ui'])
+
+// The error a setting kay or a library refuses at boot throws.
+// A library names itself and the option as `configError('cms', 'pageSize', message)`, and the message ends on where the option is documented, `kayjs-cms/llms.txt`.
+// The older forms stay accepted: `configError(option, value, takes)` prints `kay: <option> is <value>; it takes <what>`, and `configError(message)` prints `kay: <message>`.
+export function configError(library: ConfigLibrary, option: string, message: string, options?: ErrorOptions): KayError
 export function configError(message: string, options?: ErrorOptions): KayError
 export function configError(option: string, value: unknown, takes: string): KayError
-export function configError(first: string, second?: unknown, takes?: string): KayError {
-  if (takes === undefined)
+export function configError(first: string, second?: unknown, third?: string | ErrorOptions, fourth?: ErrorOptions): KayError {
+  if (LIBRARIES.has(first) && typeof second === 'string' && typeof third === 'string')
+    return new KayError('config-invalid', `kay: ${third} (kayjs-${first} option \`${second}\`: kayjs-${first}/llms.txt)`, fourth)
+
+  if (third === undefined)
     return new KayError('config-invalid', `kay: ${first}`, second as ErrorOptions | undefined)
 
-  return new KayError('config-invalid', `kay: ${first} is ${shown(second)}; it takes ${takes}`)
+  return new KayError('config-invalid', `kay: ${first} is ${shown(second)}; it takes ${third as string}`)
 }
 
 function shown(value: unknown): string {

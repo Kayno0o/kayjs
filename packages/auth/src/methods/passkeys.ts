@@ -39,7 +39,7 @@ export class PasskeyMethods {
   // The options for `askPasskey` of `@kaynooo/kayjs-auth/browser`, naming no account; with its `autofill` the browser offers the passkeys in the sign-in field's autofill.
   async signInOptions(): Promise<PublicKeyCredentialRequestOptionsJSON> {
     if (!this.state.core.switches.passkeys)
-      throw configError('passkeys are switched off: `passkeys: false` in the options of authCore or auth()')
+      throw configError('auth', 'passkeys', 'passkeys are switched off: `passkeys: false` in the options of authCore or auth()')
 
     return (await load.passkeys()).passkeySignInOptions(this.state)
   }

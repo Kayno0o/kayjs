@@ -501,6 +501,32 @@ describe('the naming conventions', () => {
 
     expect(found).toEqual([])
   })
+
+  // A library's boot error names its library and the option, so the message points at where the option is written.
+  it('give every configError of a library its own name and an option its llms document', async () => {
+    const found: string[] = []
+
+    for (const { library, files } of sources) {
+      const docs = (await Promise.all([`packages/${library}/llms.txt`, ...await Array.fromAsync(new Glob(`packages/${library}/llms/*.md`).scan())].map(async file => Bun.file(file).text()))).join('\n')
+
+      for (const { file, text } of files) {
+        for (const [, name, option] of text.matchAll(/configError\((?:'(\w+)', '([\w.]+)')?/g)) {
+          if (name !== library || option === undefined) {
+            found.push(`${file}: a configError does not start with '${library}' and an option`)
+
+            continue
+          }
+
+          for (const segment of option.split('.')) {
+            if (!new RegExp(`\`[^\`\\n]*\\b${segment}\\b[^\`\\n]*\``).test(docs))
+              found.push(`${file}: option ${option} is not written in the llms of ${library}`)
+          }
+        }
+      }
+    }
+
+    expect(found).toEqual([])
+  })
 })
 
 // Topic files open with the tasks and keep the facts under Reference, for kay and for each library alike.

@@ -25,18 +25,18 @@ export function forwardOf(option: ForwardDomains | ForwardAuthOptions | undefine
   const listed = (typeof domains === 'string' ? [domains] : domains).map(domain => domain.trim().toLowerCase())
 
   if (listed.length === 0)
-    throw configError('`forwardAuth` needs at least one domain: `forwardAuth: \'example.com\'`')
+    throw configError('auth', 'forwardAuth', '`forwardAuth` needs at least one domain: `forwardAuth: \'example.com\'`')
 
   for (const domain of listed) {
     const labels = domain.split('.')
     const parsed = labels.length > 1 && labels.every(label => label !== '') ? URL.parse(`https://${domain}`) : null
 
     if (parsed === null || parsed.hostname !== domain)
-      throw configError(`\`forwardAuth\` domain '${domain}' is not a hostname such as 'example.com': no scheme, port or path, and at least two labels`)
+      throw configError('auth', 'forwardAuth', `\`forwardAuth\` domain '${domain}' is not a hostname such as 'example.com': no scheme, port or path, and at least two labels`)
   }
 
   if (requireTwoFactor && !twoFactor)
-    throw configError('`forwardAuth.requireTwoFactor` sends users to set two-factor up, which `twoFactor: false` switches off: turn one of them off')
+    throw configError('auth', 'forwardAuth', '`forwardAuth.requireTwoFactor` sends users to set two-factor up, which `twoFactor: false` switches off: turn one of them off')
 
   return { domains: listed, requireTwoFactor }
 }

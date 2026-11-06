@@ -54,7 +54,7 @@ export function checkKey(key: string, what: string): void {
     createPrivateKey(key)
   }
   catch {
-    throw configError(`${what} is no private key; it takes one in PEM, as 'openssl genrsa' writes it`)
+    throw configError('mail', 'smtp', `${what} is no private key; it takes one in PEM, as 'openssl genrsa' writes it`)
   }
 }
 
@@ -80,7 +80,7 @@ export function nodemailerMessage(mail: Mail) {
 
 function positiveInteger(what: string, name: string, value: number | undefined): void {
   if (value !== undefined && (!Number.isInteger(value) || value < 1))
-    throw configError(`${what}'s ${name}`, value, 'a whole number of at least 1')
+    throw configError('mail', 'smtp', `${what}'s ${name} is ${JSON.stringify(value)}; it takes a whole number of at least 1`)
 }
 
 const WHOLE_NUMBER = /^\d+$/
@@ -113,7 +113,7 @@ export function rateFromText(text: string | undefined): { max: number, window: D
 // Throws naming `what` for a name, a timeout or a count that cannot be used, so one fails where it is given rather than at the first mail.
 export function checkOptions(settings: SmtpOverrides, what: string): number | undefined {
   if (settings.name !== undefined && !GREETING.test(settings.name))
-    throw configError(`${what}'s name is ${JSON.stringify(settings.name)}; it takes a domain name, such as the sending domain`)
+    throw configError('mail', 'smtp', `${what}'s name is ${JSON.stringify(settings.name)}; it takes a domain name, such as the sending domain`)
 
   positiveInteger(what, 'maxConnections', settings.maxConnections)
   rateOf(settings.rateLimit, what)
@@ -124,7 +124,7 @@ export function checkOptions(settings: SmtpOverrides, what: string): number | un
 // Sends over SMTP, connecting on the first mail rather than when made, so a module making one at import never opens a socket.
 export function smtp(settings: SmtpSettings): Transport {
   if ((settings.user === undefined) !== (settings.pass === undefined))
-    throw configError('the login needs a user and a password: give both, or neither for a server that needs no login')
+    throw configError('mail', 'smtp', 'the login needs a user and a password: give both, or neither for a server that needs no login')
 
   if (settings.dkim !== undefined)
     checkKey(settings.dkim.privateKey, 'smtp()\'s dkim.privateKey')

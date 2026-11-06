@@ -17,7 +17,7 @@ export function parseMailUrl(value: string): MailServer {
   const url = URL.parse(value)
 
   if (url === null || (url.protocol !== 'smtp:' && url.protocol !== 'smtps:') || url.hostname === '')
-    throw configError('MAIL_URL is no SMTP server: write it as smtp://user:pass@mail.example.com:465, the login and the port optional, a password with special characters percent-encoded')
+    throw configError('mail', 'MAIL_URL', 'MAIL_URL is no SMTP server: write it as smtp://user:pass@mail.example.com:465, the login and the port optional, a password with special characters percent-encoded')
 
   let user: string | undefined
   let pass: string | undefined
@@ -26,11 +26,11 @@ export function parseMailUrl(value: string): MailServer {
     [user, pass] = [url.username === '' ? undefined : decodeURIComponent(url.username), url.password === '' ? undefined : decodeURIComponent(url.password)]
   }
   catch {
-    throw configError('the login in MAIL_URL has a malformed percent-encoding: write a password with special characters percent-encoded, as %40 for @ and %25 for %')
+    throw configError('mail', 'MAIL_URL', 'the login in MAIL_URL has a malformed percent-encoding: write a password with special characters percent-encoded, as %40 for @ and %25 for %')
   }
 
   if ((user === undefined) !== (pass === undefined))
-    throw configError('the login in MAIL_URL needs a user and a password, written smtp://user:pass@host: give both, or neither for a server that needs no login')
+    throw configError('mail', 'MAIL_URL', 'the login in MAIL_URL needs a user and a password, written smtp://user:pass@host: give both, or neither for a server that needs no login')
 
   return { host: url.hostname, port: url.port === '' ? DEFAULT_PORT : Number(url.port), user, pass, secure: url.protocol === 'smtps:' ? true : undefined }
 }

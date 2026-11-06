@@ -24,7 +24,7 @@ How kay and its libraries name the same idea, written before the renames land: a
 - A switch is `false` to turn off what is on by default and `true` to turn on what is off by default, with an object where it takes options; the default is the first line of its doc. `optional` on mail is reviewed against this (#1694).
 
 **Errors**
-- A boot-time config problem throws `KayError('config-invalid', 'kay: <option> is <value>; it takes <what>')`, in a library too, through `configError(option, value, takes)` from `kay/library`, or `configError(message)` for a problem of another shape; a reader that also runs in the browser throws a plain `Error` and its server caller wraps it in `asConfigError(() => ...)`.
+- A boot-time config problem throws `KayError('config-invalid', 'kay: <option> is <value>; it takes <what>')`, in a library too, through `configError(library, option, message)` from `kay/library` (`configError('cms', 'pageSize', message)`), whose message ends on `(kayjs-cms option `pageSize`: kayjs-cms/llms.txt)`, so the option must be written between backticks in the library's `llms/` (`tests/packages.test.ts` fails for one that is not); the older `configError(option, value, takes)` and `configError(message)` still work for kay's own code and an app; a reader that also runs in the browser throws a plain `Error` and its server caller wraps it in `asConfigError(() => ...)`.
 - A runtime error class ends in `Error`, extends `Error`, and carries `code` (`AiError.kind` is also its `code`; an HTTP `status` stays beside it).
 
 **Prefixes**

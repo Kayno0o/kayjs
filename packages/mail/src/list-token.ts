@@ -19,7 +19,7 @@ function secrets(): string[] {
   const found = appSecrets()
 
   if (found === undefined)
-    throw configError('a mailing list signs its confirmation and unsubscribe links with the app secret: set KAY_SECRET to at least 32 random characters')
+    throw configError('mail', 'KAY_SECRET', 'a mailing list signs its confirmation and unsubscribe links with the app secret: set KAY_SECRET to at least 32 random characters')
 
   return found
 }

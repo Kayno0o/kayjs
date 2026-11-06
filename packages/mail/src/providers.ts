@@ -62,7 +62,7 @@ function timeoutOf(settings: ProviderSettings, what: string): number {
 
 function needs(what: string, name: string, value: string | undefined): string {
   if (value === undefined || value === '')
-    throw configError(`${what} needs its ${name}`)
+    throw configError('mail', 'MAIL_URL', `${what} needs its ${name}`)
 
   return value
 }
@@ -71,7 +71,7 @@ function baseOf(settings: ProviderSettings, fallback: string, what: string): str
   const base = settings.baseUrl ?? fallback
 
   if (URL.parse(base) === null)
-    throw configError(`${what}'s baseUrl is ${JSON.stringify(base)}; it takes an address such as ${fallback}`)
+    throw configError('mail', 'MAIL_URL', `${what}'s baseUrl is ${JSON.stringify(base)}; it takes an address such as ${fallback}`)
 
   return base.replace(TRAILING_SLASHES, '')
 }
@@ -322,7 +322,7 @@ export function ses(settings: SesSettings): Transport {
   const region = needs('ses()', 'region', settings.region)
 
   if (!REGION.test(region))
-    throw configError(`ses()'s region is ${JSON.stringify(region)}; it takes an AWS region such as eu-west-1`)
+    throw configError('mail', 'MAIL_URL', `ses()'s region is ${JSON.stringify(region)}; it takes an AWS region such as eu-west-1`)
 
   // The China regions answer under their own partition's domain.
   const base = baseOf(settings, `https://email.${region}.amazonaws.com${region.startsWith('cn-') ? '.cn' : ''}`, 'ses()')
@@ -364,7 +364,7 @@ function decoded(text: string, what: string): string {
     return decodeURIComponent(text)
   }
   catch {
-    throw configError(`${what} has a malformed percent-encoding: write special characters percent-encoded, as %2F for / and %2B for +`)
+    throw configError('mail', 'MAIL_URL', `${what} has a malformed percent-encoding: write special characters percent-encoded, as %2F for / and %2B for +`)
   }
 }
 
@@ -378,7 +378,7 @@ export function providerFromUrl(value: string): Transport {
   const common: ProviderSettings = { baseUrl: options.get('baseUrl') ?? undefined }
   const usage: Record<HttpProvider, string> = { resend: 'resend://API_KEY', postmark: 'postmark://SERVER_TOKEN', sendgrid: 'sendgrid://API_KEY', mailgun: 'mailgun://API_KEY@mg.example.com, then ?region=eu for the European region', ses: 'ses://ACCESS_KEY_ID:SECRET_ACCESS_KEY@eu-west-1, the secret percent-encoded' }
   const refuse = (): never => {
-    throw configError(`MAIL_URL is no ${NAMES[provider]} address: write it as ${usage[provider]}`)
+    throw configError('mail', 'MAIL_URL', `MAIL_URL is no ${NAMES[provider]} address: write it as ${usage[provider]}`)
   }
 
   if (provider === 'resend' || provider === 'postmark' || provider === 'sendgrid') {
@@ -405,7 +405,7 @@ export function providerFromUrl(value: string): Transport {
     const region = options.get('region') ?? undefined
 
     if (region !== undefined && region !== 'us' && region !== 'eu')
-      throw configError('MAIL_URL\'s region is not us or eu: write mailgun://API_KEY@mg.example.com?region=eu')
+      throw configError('mail', 'MAIL_URL', 'MAIL_URL\'s region is not us or eu: write mailgun://API_KEY@mg.example.com?region=eu')
 
     return mailgun({ ...common, apiKey: credentials, domain: host, region })
   }

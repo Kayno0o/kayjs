@@ -69,24 +69,24 @@ export class Passwords {
     const production = process.env.NODE_ENV === 'production'
 
     if (entries.length === 0)
-      throw configError('`passwordGuard()` takes a password, or an object of passwords by role')
+      throw configError('cms', 'passwordGuard', '`passwordGuard()` takes a password, or an object of passwords by role')
 
     for (const [role, password] of entries) {
       if (!ROLE.test(role))
-        throw configError(`\`passwordGuard()\` names the role ${JSON.stringify(role)}; a role is letters, digits, \`_\` and \`-\``)
+        throw configError('cms', 'passwordGuard', `\`passwordGuard()\` names the role ${JSON.stringify(role)}; a role is letters, digits, \`_\` and \`-\``)
 
       // An unset environment variable reads as an empty string, which must not open the admin.
       if (typeof password !== 'string' || password.trim() === '')
-        throw configError(`\`passwordGuard()\` has no password for ${JSON.stringify(role)}; check the environment variable it reads`)
+        throw configError('cms', 'passwordGuard', `\`passwordGuard()\` has no password for ${JSON.stringify(role)}; check the environment variable it reads`)
 
       if (production && password.length < MIN_PASSWORD_LENGTH)
-        throw configError(`\`passwordGuard()\` has a password of ${password.length} characters for ${JSON.stringify(role)}: in production it is at least ${MIN_PASSWORD_LENGTH}`)
+        throw configError('cms', 'passwordGuard', `\`passwordGuard()\` has a password of ${password.length} characters for ${JSON.stringify(role)}: in production it is at least ${MIN_PASSWORD_LENGTH}`)
 
       if (production) {
         const twin = [...this.given].find(([, other]) => other === password)
 
         if (twin)
-          throw configError(`\`passwordGuard()\` gives ${JSON.stringify(twin[0])} and ${JSON.stringify(role)} the same password, which could only open the first; give each role its own`)
+          throw configError('cms', 'passwordGuard', `\`passwordGuard()\` gives ${JSON.stringify(twin[0])} and ${JSON.stringify(role)} the same password, which could only open the first; give each role its own`)
       }
 
       this.given.set(role, password)

@@ -32,7 +32,7 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<B
   const { speed } = options
 
   if (speed !== undefined && !(speed >= MIN_SPEED && speed <= MAX_SPEED))
-    throw configError(`speak({ speed }) is ${speed}; it takes a number from ${MIN_SPEED} to ${MAX_SPEED}`)
+    throw configError('ai', 'speed', `speak({ speed }) is ${speed}; it takes a number from ${MIN_SPEED} to ${MAX_SPEED}`)
 
   const { send, model, voice, timeout, signal } = setUp('speak', options)
 

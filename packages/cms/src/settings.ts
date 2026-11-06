@@ -145,15 +145,15 @@ let current: CmsSettings | undefined
 
 export function configure({ prefix = '/admin', guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles, history, newsletter, fourEyes = false }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
-    throw configError('`cms({ pageSize })`', pageSize, 'a positive whole number of entries')
+    throw configError('cms', 'pageSize', `\`cms({ pageSize })\` is ${JSON.stringify(pageSize)}; it takes a positive whole number of entries`)
 
   const { types = DEFAULT_UPLOADS, maxSize } = Array.isArray(uploads) ? { types: uploads, maxSize: undefined } : uploads ?? {}
 
   if (own !== undefined && role !== undefined)
-    throw configError('`cms({ role })` stands for a guard, so it is not given with `cms({ guard })`: keep one')
+    throw configError('cms', 'extensions', '`cms({ role })` stands for a guard, so it is not given with `cms({ guard })`: keep one')
 
   if (role !== undefined && (typeof role !== 'string' || role === ''))
-    throw configError('`cms({ role })`', role, 'the name of a kayjs-auth role, such as \'editor\'')
+    throw configError('cms', 'role', `\`cms({ role })\` is ${JSON.stringify(role)}; it takes the name of a kayjs-auth role, such as 'editor'`)
 
   const guard = own ?? (role === undefined ? undefined : roleGuard(role))
   const tracked = trackPasswords(guard)
@@ -169,7 +169,7 @@ export function adminLogo(logo: Logo | undefined): Logo | undefined {
     return undefined
 
   if (!LOGO.test(logo.src))
-    throw configError('the `logo` of the cms settings\'s src', logo.src, 'a path of the site such as \'/logo.svg\', or an https URL')
+    throw configError('cms', 'logo', `the \`logo\` of the cms settings's src is ${JSON.stringify(logo.src)}; it takes a path of the site such as '/logo.svg', or an https URL`)
 
   return logo
 }
@@ -181,7 +181,7 @@ function checkHistory(history: CmsOptions['history']): HistorySettings | undefin
   const { revisions = DEFAULT_REVISIONS, trash = DEFAULT_TRASH, maxAge = DEFAULT_MAX_AGE } = history ?? {}
 
   if (!Number.isInteger(revisions) || revisions < 1)
-    throw configError('`cms({ history: { revisions } })`', revisions, 'a positive whole number of saves to keep per entry')
+    throw configError('cms', 'history.revisions', `\`cms({ history: { revisions } })\` is ${JSON.stringify(revisions)}; it takes a positive whole number of saves to keep per entry`)
 
   return { revisions, trash: trash === false ? undefined : optionMs(trash, '`cms({ history: { trash } })`'), maxAge: maxAge === false ? undefined : optionMs(maxAge, '`cms({ history: { maxAge } })`') }
 }
@@ -194,10 +194,10 @@ function uploadSize(maxSize: ByteSize | undefined): number {
   const bytes = byteSize(maxSize, '`cms({ uploads: { maxSize } })`')
 
   if (!Number.isInteger(bytes))
-    throw configError(`\`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes a whole number of bytes`)
+    throw configError('cms', 'extensions', `\`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes a whole number of bytes`)
 
   if (bytes > LARGEST_MAX_SIZE)
-    throw configError(`\`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes at most ${LARGEST_MAX_SIZE} bytes, 128 MB less the multipart envelope, as Bun refuses a request body over 128 MB before the upload route sees it`)
+    throw configError('cms', 'extensions', `\`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes at most ${LARGEST_MAX_SIZE} bytes, 128 MB less the multipart envelope, as Bun refuses a request body over 128 MB before the upload route sees it`)
 
   return bytes
 }
@@ -209,10 +209,10 @@ function checkNewsletter(given: CmsOptions['newsletter']): ReadonlyMap<string, N
     const { list, message, testTo } = (options) ?? {}
 
     if (typeof message !== 'function' || typeof list?.send !== 'function' || typeof list.test !== 'function' || typeof list.preview !== 'function' || typeof list.count !== 'function')
-      throw configError(`\`cms({ newsletter: { ${name} } })\``, options, 'an object with a `list` from kayjs-mail\'s `mail.list()` and a `message` function')
+      throw configError('cms', 'newsletter', `\`cms({ newsletter: { ${name} } })\` is ${JSON.stringify(options)}; it takes an object with a \`list\` from kayjs-mail's \`mail.list()\` and a \`message\` function`)
 
     if (testTo !== undefined && typeof testTo !== 'string' && typeof testTo !== 'function')
-      throw configError(`\`cms({ newsletter: { ${name} } })\``, options, 'a `testTo` that is an address or a function returning one')
+      throw configError('cms', 'newsletter', `\`cms({ newsletter: { ${name} } })\` is ${JSON.stringify(options)}; it takes a \`testTo\` that is an address or a function returning one`)
 
     checked.set(name, { list, message, testTo })
   }
@@ -223,7 +223,7 @@ function checkNewsletter(given: CmsOptions['newsletter']): ReadonlyMap<string, N
 // What `cms()` in kay.config.ts was given.
 export function settings(): CmsSettings {
   if (!current)
-    throw configError('cms() is not set up: list it in the extensions of kay.config.ts')
+    throw configError('cms', 'extensions', 'cms() is not set up: list it in the extensions of kay.config.ts')
 
   return current
 }

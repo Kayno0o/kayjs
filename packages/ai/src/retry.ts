@@ -40,25 +40,25 @@ function milliseconds(value: unknown, what: string): number {
 
 function policyOf(retry: RetryOptions, what: string): Policy {
   if (typeof retry !== 'object' || retry === null || Array.isArray(retry))
-    throw configError(`${what} is false or { attempts?, backoff?, maxWait? }`)
+    throw configError('ai', 'retry', `${what} is false or { attempts?, backoff?, maxWait? }`)
 
   const attempts = retry.attempts ?? DEFAULT_ATTEMPTS
 
   if (!Number.isInteger(attempts) || attempts < 1 || attempts > MAX_ATTEMPTS)
-    throw configError(`${what}.attempts is a whole number from 1 to ${MAX_ATTEMPTS}`)
+    throw configError('ai', 'retry', `${what}.attempts is a whole number from 1 to ${MAX_ATTEMPTS}`)
 
   return { attempts, backoff: milliseconds(retry.backoff ?? DEFAULT_BACKOFF, `${what}.backoff`), maxWait: milliseconds(retry.maxWait ?? DEFAULT_MAX_WAIT, `${what}.maxWait`) }
 }
 
 function checkedFallback(fallback: unknown, what: string): readonly FallbackModel[] {
   if (!Array.isArray(fallback))
-    throw configError(`${what} is a list of { model, provider? }`)
+    throw configError('ai', 'fallback', `${what} is a list of { model, provider? }`)
 
   for (const [index, entry] of (fallback as unknown[]).entries()) {
     const item = entry as Partial<FallbackModel> | null
 
     if (typeof item !== 'object' || item === null || typeof item.model !== 'string' || item.model === '')
-      throw configError(`${what}[${index}] is { model, provider? }, with the model's name`)
+      throw configError('ai', 'fallback', `${what}[${index}] is { model, provider? }, with the model's name`)
   }
 
   return fallback as readonly FallbackModel[]

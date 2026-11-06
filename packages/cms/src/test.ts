@@ -23,7 +23,7 @@ async function passwordsOf(site: Pick<TestSite, 'cookies' | 'fetch'>) {
   const passwords = activePasswords()
 
   if (!passwords)
-    throw configError('the site\'s `cms({ guard })` is not a `passwordGuard()`')
+    throw configError('cms', 'guard', 'the site\'s `cms({ guard })` is not a `passwordGuard()`')
 
   return passwords
 }
@@ -35,7 +35,7 @@ export async function cmsSignInAs(site: Pick<TestSite, 'cookies' | 'fetch'>, rol
   const chosen = role ?? (roles.length === 1 ? roles[0] : undefined)
 
   if (chosen === undefined || !roles.includes(chosen))
-    throw configError(`cmsSignInAs needs one of the guard's roles (${roles.join(', ')})${role === undefined ? '' : `, not ${JSON.stringify(role)}`}`)
+    throw configError('cms', 'cmsSignInAs', `cmsSignInAs needs one of the guard's roles (${roles.join(', ')})${role === undefined ? '' : `, not ${JSON.stringify(role)}`}`)
 
   const cookie = passwords.issue(chosen, false)
 

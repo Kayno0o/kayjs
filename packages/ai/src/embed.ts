@@ -14,7 +14,7 @@ export async function embed(input: string | readonly string[], options: EmbedOpt
   const { dimensions } = options
 
   if (dimensions !== undefined && !(Number.isInteger(dimensions) && dimensions >= 1))
-    throw configError(`embed({ dimensions }) is ${dimensions}; it takes a whole number of 1 or more`)
+    throw configError('ai', 'dimensions', `embed({ dimensions }) is ${dimensions}; it takes a whole number of 1 or more`)
 
   const { send, model, timeout, signal } = setUp('embed', options)
 

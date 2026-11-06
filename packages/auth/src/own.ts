@@ -103,7 +103,7 @@ function appOf(name: string, given: true | PresetApp | OAuthApp): OAuthApp {
   const preset = PRESETS[name]
 
   if (!preset)
-    throw configError(`oauth.${name} is \`true\` or has no \`provider\`, and only ${Object.keys(PRESETS).join(', ')} are presets: give \`{ provider, clientId, clientSecret }\``)
+    throw configError('auth', 'oauth', `oauth.${name} is \`true\` or has no \`provider\`, and only ${Object.keys(PRESETS).join(', ')} are presets: give \`{ provider, clientId, clientSecret }\``)
 
   const { clientId, clientSecret, label, keepTokens, ...options } = given === true ? {} as PresetApp : given
   const key = name.toUpperCase()
@@ -111,7 +111,7 @@ function appOf(name: string, given: true | PresetApp | OAuthApp): OAuthApp {
   const secret = clientSecret ?? process.env[`${key}_CLIENT_SECRET`]
 
   if (id === undefined || id === '' || secret === undefined || secret === '')
-    throw configError(`oauth.${name} needs ${key}_CLIENT_ID and ${key}_CLIENT_SECRET in the environment, or \`clientId\` and \`clientSecret\``)
+    throw configError('auth', 'oauth', `oauth.${name} needs ${key}_CLIENT_ID and ${key}_CLIENT_SECRET in the environment, or \`clientId\` and \`clientSecret\``)
 
   return { provider: preset(options), clientId: id, clientSecret: secret, ...label !== undefined && { label }, ...keepTokens !== undefined && { keepTokens } }
 }
@@ -201,7 +201,7 @@ async function storeOf(store: StoreOption | undefined, root: string, shared: str
     pg = await import('./pg')
   }
   catch (error) {
-    throw configError('the store of auth() is a pg-orm database, and @kaynooo/pg-orm is not installed: install it, or give `store` an AuthStore', { cause: error })
+    throw configError('auth', 'store', 'the store of auth() is a pg-orm database, and @kaynooo/pg-orm is not installed: install it, or give `store` an AuthStore', { cause: error })
   }
 
   const db = new orm.Database({ url: underRoot(url ?? `sqlite://${file}`, root), tables: [...pg.authTables] })
@@ -216,7 +216,7 @@ function conventionalHooks(loaded: Record<string, unknown> | undefined): AuthHoo
   const own = loaded?.auth
 
   if (typeof own === 'object' && own !== null && 'plugin' in own)
-    throw configError('src/auth.ts exports `auth`, a authCore result, while auth() builds its own: give `auth({ module: \'./src/auth\' })` for kay to mount it, or `auth({ server: false })` if you mount it by hand')
+    throw configError('auth', 'module', 'src/auth.ts exports `auth`, a authCore result, while auth() builds its own: give `auth({ module: \'./src/auth\' })` for kay to mount it, or `auth({ server: false })` if you mount it by hand')
 
   return loaded?.hooks as AuthHooks | undefined
 }
