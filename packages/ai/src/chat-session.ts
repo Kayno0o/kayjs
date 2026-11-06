@@ -2,13 +2,13 @@ import type { Action, ActionStream, Failure, Signal } from 'kay'
 import type { Attachments } from './chat-attachments'
 import type { ConversationAnswer, ConversationSummary } from './conversation-title'
 import type { AiMessage, AiToolCall, ChatFailure, ChatMessage, ChatTurn, CodeBlock, Progress, Source } from './types'
-import { safely } from '@kaynooo/kayjs-ui/lib/safely'
 import { ActionError, effect, onMount, signal, untrack } from 'kay'
 import { markdownReady } from 'kay/markdown'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, restored, shrunk, stored } from './chat-history'
 import { sameSources, usableSources } from './chat-sources'
 import { renamedTitle, titleOf } from './conversation-title'
 import { CONVERSATION_HEADER, CONVERSATION_ID, REPLACES_HEADER, REPLY_HEADER } from './resume'
+import { safely } from './safely'
 
 export interface Turn extends AiMessage {
   id: number

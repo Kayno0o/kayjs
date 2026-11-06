@@ -874,6 +874,7 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.89' },
   { since: '1.90' },
   { since: '1.91' },
+  { since: '1.92' },
 ]
 
 // The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.
