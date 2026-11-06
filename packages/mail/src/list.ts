@@ -153,7 +153,7 @@ function sourceOf(ctx: ActionContext): string {
 // The confirmation mails one list sends in an hour, whoever asks.
 export const CONFIRMS_PER_HOUR = 300
 
-function randomId(): string {
+function subscriberId(): string {
   return Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64url')
 }
 
@@ -402,7 +402,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         // Rendered here once, so a missing `site` fails the send and not each recipient.
         await footerOf(await renderLocale())
 
-        const id = randomId()
+        const id = subscriberId()
         const kept: StoredMessage = { from: stored.from, replyTo: stored.replyTo, subject: stored.subject, html: stored.html, text: stored.text, headers: stored.headers }
 
         await lists.get().addBroadcast(id, name, JSON.stringify(kept))

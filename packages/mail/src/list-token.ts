@@ -1,4 +1,4 @@
-import { appSecrets, configError, sameText } from 'kay/library'
+import { appSecrets, configError, sameText, sha256 } from 'kay/library'
 
 export type TokenPurpose = 'confirm' | 'unsubscribe'
 
@@ -28,7 +28,7 @@ function secrets(): string[] {
 function signature(secret: string, purpose: TokenPurpose, payload: string): string {
   const key = new Bun.CryptoHasher('sha256', secret).update(`kmail-list\0${purpose}`).digest()
 
-  return new Bun.CryptoHasher('sha256', key).update(payload).digest('base64url')
+  return sha256(payload, { encoding: 'base64url', key })
 }
 
 // `<payload>.<signature>`: the purpose, the list, the subscriber's id and, for a confirmation, when it expires. An unsubscribe link never expires, as the mail holding it may be read years on.

@@ -23,6 +23,7 @@ import { TimeoutError } from './pg-poll'
 import { onReload } from './reload'
 import { recordOf, requestRecord } from './request-record'
 import { rewrittenAddress } from './rewrite'
+import { sha256 } from './sha256'
 import { sharedKey, stampTime } from './stamp'
 import { kayWord } from './words'
 import { proofOfWork, signWork, workRefusal } from './work'
@@ -256,7 +257,7 @@ function openRates(path: string): OpenRates {
 
   // Read on the first key hashed without a secret, so an app with one never makes the file.
   let ownKey: Buffer | undefined
-  const hashed = (key: string) => new Bun.CryptoHasher('sha256', sharedKey('rates') ?? (ownKey ??= ratesKeyFile(path))).update(key).digest('base64url')
+  const hashed = (key: string) => sha256(key, { encoding: 'base64url', key: sharedKey('rates') ?? (ownKey ??= ratesKeyFile(path)) })
 
   // The row's old values are what both cases read: a closed window opens afresh, an open one counts the weight more.
   const hit = db.query<{ count: number, reset_at: number }, [string, number, number, number]>('INSERT INTO kay_rates (key, count, reset_at) VALUES (?1, ?4, ?2 + ?3) ON CONFLICT (key) DO UPDATE SET count = CASE WHEN reset_at <= ?2 THEN ?4 ELSE count + ?4 END, reset_at = CASE WHEN reset_at <= ?2 THEN ?2 + ?3 ELSE reset_at END RETURNING count, reset_at')

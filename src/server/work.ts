@@ -1,6 +1,6 @@
 import type { Action, ProofOfWorkRefusal, RateStore } from '../runtime/action'
 import { isAction, workOf } from '../runtime/action'
-import { nodeCrypto } from './builtins'
+import { sha256 } from './sha256'
 import { signedText, signText, WORK_MARK, WORK_OPEN } from './stamp'
 
 const DIGITS = /^\d{1,10}$/
@@ -22,7 +22,7 @@ export function proofOfWork(action: Action<never, unknown>): ReturnType<typeof w
 }
 
 function hashOf(text: string): string {
-  return nodeCrypto().createHash('sha256').update(text).digest('hex')
+  return sha256(text)
 }
 
 // An action's challenge is bound to its URL; one `workChallenge` signs is bound to its scope and its difficulty, under another `use`, so neither passes for the other.

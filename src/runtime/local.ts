@@ -3,6 +3,7 @@ import { encodeCall } from './action'
 import { actionFailed, messageOf } from './api-error'
 import { withBase } from './base'
 import { MOST_FAULTS, MOST_WAIT_MS, RETRY_LATER } from './local-status'
+import { randomId } from './random-id'
 import { createSignal, getOwner, onCleanup } from './reactive'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from './swap'
 import { decodeServerValue } from './wire'
@@ -483,7 +484,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
     this.changes++
     rows.put({ c: this.c, k, row: op === 'put' ? row : (before?.row ?? row), base: before?.base, gone: op === 'remove' } satisfies RowRecord)
-    tx.objectStore('outbox').add({ c: this.c, id: crypto.randomUUID(), op, k, url: withBase(action.url), headers: sent, body, row, tries: 0, cleared: this.token } satisfies Entry)
+    tx.objectStore('outbox').add({ c: this.c, id: randomId(), op, k, url: withBase(action.url), headers: sent, body, row, tries: 0, cleared: this.token } satisfies Entry)
     await finished(tx)
     await this.reload()
     announce(this.c)
@@ -733,7 +734,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
       const { headers, body } = encodeCall(kept)
 
       rows.put({ c: this.c, k: entry.k, row: kept, base: theirs, gone: false })
-      tx.objectStore('outbox').put({ ...entry, id: crypto.randomUUID(), op: 'put', url: withBase(this.options.put.url), headers: { ...entry.headers, ...headers }, body: body as string, row: kept, tries: entry.tries + 1, answer: undefined })
+      tx.objectStore('outbox').put({ ...entry, id: randomId(), op: 'put', url: withBase(this.options.put.url), headers: { ...entry.headers, ...headers }, body: body as string, row: kept, tries: entry.tries + 1, answer: undefined })
     }
 
     await this.trim(tx.objectStore('issues'))

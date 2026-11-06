@@ -7,6 +7,7 @@ import { ipVersion, PrivateAddressError, resolveHost } from './address'
 import { FETCH_TIMEOUT_MS, MAX_REMOTE_BYTES } from './config-limits'
 import { pinnedGet } from './fetch-public'
 import { overLimit } from './protection'
+import { sha256 } from './sha256'
 
 export type { Resolver } from './address'
 
@@ -22,7 +23,7 @@ export interface RemotePattern {
 
 // What a remote original or an image variant is named after: a truncated SHA-256 of what identifies it, so a visitor cannot choose two addresses with one name.
 export function cacheKey(text: string): string {
-  return new Bun.CryptoHasher('sha256').update(text).digest('hex').slice(0, 32)
+  return sha256(text, { length: 32 })
 }
 
 // A remote original kept on disk, with the key its variants are named after, or why the route answers without one.

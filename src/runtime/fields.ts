@@ -1,4 +1,5 @@
 import { previewState } from './preview'
+import { randomId } from './random-id'
 import { html } from './rendered'
 
 // Edit mode's field markers: what an entry's data gives while a page renders for an editor tells which markup renders which field, and the page is marked for the CMS once whole.
@@ -94,7 +95,7 @@ export function editMarks(): FieldMarks | undefined {
     return undefined
 
   if (!state.marks) {
-    const nonce = crypto.randomUUID().slice(0, 8)
+    const nonce = randomId(4)
 
     state.marks = { refs: [], indexes: new Map(), unrendered: new Map(), numbers: [], renders: 0, entries: new Map(), read: new Map(), frozen: new Map(), wrapped: new WeakMap(), blockItems: new Map(), nonce, fence: new RegExp(`${OPEN}${nonce}([fbl])(\\d+)${END}|${CLOSE}${nonce}${END}`, 'g') }
   }

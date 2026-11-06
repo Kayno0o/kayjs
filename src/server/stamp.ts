@@ -7,6 +7,7 @@ import { WORK_SCRIPT } from '../runtime/swap'
 import { nodeCrypto } from './builtins'
 import { devSecret } from './dev-secret'
 import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sameText, sealWith, warnLowEntropy } from './seal'
+import { sha256 } from './sha256'
 
 const KEY_BYTES = 32
 
@@ -143,7 +144,7 @@ function derivedKey(kind: 'kay-key' | 'kay-seal', use: string, base: Uint8Array)
 export function keyedDigest(use: string, text: string): string {
   const key = sharedKey(use)
 
-  return (key === undefined ? new Bun.CryptoHasher('sha256') : new Bun.CryptoHasher('sha256', key)).update(text).digest('base64url').slice(0, 22)
+  return sha256(text, { encoding: 'base64url', length: 22, key })
 }
 
 // The value a prerendered page holds in place of a stamp, with the action it is for: the server signs one each time it serves the page.
@@ -157,7 +158,7 @@ export const WORK_OPEN = `<script type="application/json" ${WORK_SCRIPT}>`
 export const STAMP_HOLE = new RegExp(`name="${STAMP_FIELD}" value="${STAMP_MARK}([^"]*)"|${WORK_OPEN}([^<]*)</script>|data-kay-work="${WORK_MARK}([^"]*)"`, 'g')
 
 function signWith(key: Uint8Array, use: string, text: string): string {
-  return new Bun.CryptoHasher('sha256', key).update(`${use}\0${text}`).digest('base64url')
+  return sha256(`${use}\0${text}`, { encoding: 'base64url', key })
 }
 
 // `use` keeps what one feature signs from passing for another's. The first key of the secret list signs.

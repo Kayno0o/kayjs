@@ -261,7 +261,9 @@ if open()
   p(id={id}) More about it
 ```
 
-`randomId(bytes = 16)` from `kay` gives random hex, `2 * bytes` characters long, for a name that must not repeat across visits, such as an idempotency key. Unlike `crypto.randomUUID()` it also works on an insecure page, such as http on a home network. It differs on every call, so use it in an island or a handler.
+`randomId(bytes = 16)` from `kay` gives random hex, `2 * bytes` characters long, for a name that must not repeat across visits, such as an idempotency key. Unlike `crypto.randomUUID()` it also works on an insecure page, such as http on a home network. `0` gives an empty string, a negative count throws, and a browser refuses more than 65,536 bytes.
+
+It differs on every call, so draw it in a handler or after mount. An id in markup belongs to `uid()`, which is the same on the server and in the browser.
 
 ## Page navigation
 

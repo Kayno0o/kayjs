@@ -157,7 +157,7 @@ ul(id={id} hidden={!open()})
   slot
 ```
 
-`randomId(bytes = 16)` from `kay` gives random hex (`2 * bytes` characters) for a name that must not repeat across visits, such as an idempotency key or a tab name; unlike `crypto.randomUUID()` it works on an insecure page (http on a home network). It differs on every render, so it belongs in an island or a handler, not in a page that is compressed once.
+`randomId(bytes = 16)` from `kay` gives random hex (`2 * bytes` characters) for a name that must not repeat across visits, such as an idempotency key or a tab name; unlike `crypto.randomUUID()` it works on an insecure page (http on a home network). `0` gives `''` and a negative count throws; a browser refuses more than 65,536 bytes. It differs on every call, so draw it in a handler or after mount, never for an id in markup: the server render and the hydration would disagree, and `uid()` above is the id that stays the same on both.
 
 ### Read an element's size
 

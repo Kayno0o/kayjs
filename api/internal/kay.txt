@@ -1306,6 +1306,9 @@ function serverRoot(): Promise<string>
 [./library] setSite
 function setSite(origin: string | undefined, trailingSlash?: "always" | "ignore" | "never" | undefined, prerendering?: boolean, keepSameTab?: boolean): void
 
+[./library] sha256
+function sha256(text: string, { encoding, length, key }?: Sha256Options): string
+
 [./library] sitePaths
 function sitePaths(): string[]
 

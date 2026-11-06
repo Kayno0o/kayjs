@@ -17,6 +17,7 @@ import { encryptPayload, generateVapidKeys, MAX_PAYLOAD_BYTES, validVapidKeys, v
 import { pushLoose, pushSettings, setPushSettings } from './push-settings'
 import { pushStore } from './push-store'
 import { onReload } from './reload'
+import { sha256 } from './sha256'
 
 export { pushesSettled } from './push-settings'
 export type { PushStore, PushSubscriptionRecord } from './push-store'
@@ -396,7 +397,7 @@ const DEVICE_COOKIE = 'kay_push_device'
 const DEVICE_MAX_AGE = 31_536_000
 
 function deviceTag(endpoint: string): string {
-  return new Bun.CryptoHasher('sha256').update(endpoint).digest('base64url').slice(0, 22)
+  return sha256(endpoint, { encoding: 'base64url', length: 22 })
 }
 
 // The cookie that tells which of a person's subscriptions this browser holds, a hash of its endpoint: `forgetPushDevice` reads it at sign-out. It names no one and opens nothing.

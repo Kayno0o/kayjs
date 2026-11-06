@@ -14,6 +14,7 @@ import { limited, limitedStore, MAINTENANCE_TIMEOUT_MS } from './pg-limit'
 import { closeWith, TimeoutError } from './pg-poll'
 import { NOW, query } from './pg-sql'
 import { compileMatch, matchesSession } from './session'
+import { sha256 } from './sha256'
 import { sharedKey } from './stamp'
 import { WINDOW_DAYS } from './vitals-store'
 
@@ -126,7 +127,7 @@ export function pgRates(pg: PgHandle): RateStore {
 
     return ownKey = Buffer.from(row!.value, 'base64url')
   }
-  const hashed = async (key: string) => new Bun.CryptoHasher('sha256', await keyOf()).update(key).digest('base64url')
+  const hashed = async (key: string) => sha256(key, { encoding: 'base64url', key: await keyOf() })
 
   return limitedStore({
     async hit(key, window, weight = 1) {

@@ -4,6 +4,7 @@ import { DEV_BOOT, liveReload } from './dev'
 import { historyScript } from './history'
 import { hydrationScript } from './hydration'
 import { registerScript } from './offline'
+import { sha256 } from './sha256'
 import { speculationRules } from './speculation'
 import { SWAP_CALL, SWAP_SCRIPT } from './swap'
 
@@ -35,5 +36,5 @@ export function inlineScriptHashes(options: ScriptHashOptions = {}): string[] {
 
 // The `'sha256-...'` source allowing one inline script or style.
 export function sourceHash(text: string): string {
-  return `'sha256-${new Bun.CryptoHasher('sha256').update(text).digest('base64')}'`
+  return `'sha256-${sha256(text, { encoding: 'base64' })}'`
 }
