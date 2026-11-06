@@ -6,6 +6,7 @@ import type { ListStore } from './list-store'
 import type { MailReply } from './mime'
 import type { Relayed } from './outbox'
 import type { Relay } from './preview'
+import type { HttpProvider } from './providers'
 import type { SmtpOverrides } from './smtp'
 import type { SuppressionStore } from './suppressions'
 import type { Address, Delivery, Envelope, Mail, MailMessage, Transport } from './types'
@@ -24,6 +25,7 @@ import { createLists, mountListRoutes } from './list'
 import { log } from './log'
 import { messageId } from './message-id'
 import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
+import { providerFromUrl, providerName, providerOf } from './providers'
 import { checkKey, checkOptions, greetingOf, rateFromText, smtp } from './smtp'
 import { htmlToText } from './text'
 
@@ -322,7 +324,7 @@ function smtpEnv({ optional = false, listed = false }: { optional?: boolean, lis
   const hostOptional = listed || optional
 
   return s.Object({
-    MAIL_URL: hostOptional ? s.Optional(s.String(listed ? { description: 'smtp://user:pass@mail.example.com:465, the login and the port optional', requiredInProduction: true } : {})) : s.String(),
+    MAIL_URL: hostOptional ? s.Optional(s.String(listed ? { description: 'smtp://user:pass@mail.example.com:465, the login and the port optional; or a provider\'s API: resend://KEY, postmark://TOKEN, sendgrid://KEY, mailgun://KEY@mg.example.com, ses://ACCESSKEY:SECRET@eu-west-1', requiredInProduction: true } : {})) : s.String(),
     MAIL_INSECURE: s.Optional(s.Boolean()),
     MAIL_RATE_LIMIT: s.Optional(s.String({ pattern: '^\\d+(?:/\\S+)?$', description: 'mails per window, such as 5/1s' })),
     MAIL_DKIM_SELECTOR: s.Optional(s.String()),
@@ -345,11 +347,13 @@ function defined<T extends object>(options: T): Partial<T> {
 }
 
 // SMTP from `MAIL_URL`, `MAIL_INSECURE`, `MAIL_RATE_LIMIT`, `MAIL_DKIM_*`, `MAIL_FROM` and `MAIL_TO`, read as the server boots, which stops naming each one missing or refused unless the mailer is `optional`.
-function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean, overrides: SmtpOverrides = {}): { transport: Transport, from: Address, to: string | undefined, server: string, missing: () => string[] } {
+function fromEnvironment(from: Address | undefined, fromName: string | undefined, optional: boolean, overrides: SmtpOverrides = {}): { transport: Transport, from: Address, to: string | undefined, server: string, provider: HttpProvider | undefined, missing: () => string[] } {
   const env = defineEnv(smtpEnv({ optional }))
 
   // Parsed as the server boots, so a URL that is no server stops it; absent under `optional`, where the first mail says so.
-  const server = env.MAIL_URL === undefined || env.MAIL_URL === '' ? undefined : parseMailUrl(env.MAIL_URL)
+  const provider = env.MAIL_URL === undefined ? undefined : providerOf(env.MAIL_URL)
+  const server = env.MAIL_URL === undefined || env.MAIL_URL === '' || provider !== undefined ? undefined : parseMailUrl(env.MAIL_URL)
+  const api = provider === undefined ? undefined : providerFromUrl(env.MAIL_URL)
 
   if ((env.MAIL_DKIM_SELECTOR === undefined) !== (env.MAIL_DKIM_PRIVATE_KEY === undefined))
     throw configError('MAIL_DKIM_SELECTOR and MAIL_DKIM_PRIVATE_KEY go together: set both to sign mails, or neither')
@@ -364,10 +368,10 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
 
   let transport: Transport | undefined
   const sender = () => from ?? named(env.MAIL_FROM ?? defaultSender() ?? 'kay@localhost', fromName)
-  const missing = () => [...server === undefined ? ['MAIL_URL'] : [], ...from === undefined && env.MAIL_FROM === undefined && defaultSender() === undefined ? ['MAIL_FROM'] : []]
+  const missing = () => [...server === undefined && api === undefined ? ['MAIL_URL'] : [], ...from === undefined && env.MAIL_FROM === undefined && defaultSender() === undefined ? ['MAIL_FROM'] : []]
 
   // Built on the first mail, as `kay build` runs without the server's environment and leaves a missing variable to throw where it is read.
-  const opened = () => transport ??= smtp({ host: server!.host, port: server!.port, secure: server!.secure, insecure: env.MAIL_INSECURE, user: server!.user, pass: server!.pass, rateLimit, name: greetingOf(domainOf(sender())), ...defined(overrides), dkim: dkimKey === undefined ? undefined : { domain: env.MAIL_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.MAIL_DKIM_SELECTOR!, privateKey: dkimKey } })
+  const opened = () => transport ??= api ?? smtp({ host: server!.host, port: server!.port, secure: server!.secure, insecure: env.MAIL_INSECURE, user: server!.user, pass: server!.pass, rateLimit, name: greetingOf(domainOf(sender())), ...defined(overrides), dkim: dkimKey === undefined ? undefined : { domain: env.MAIL_DKIM_DOMAIN ?? domainOf(sender())!, selector: env.MAIL_DKIM_SELECTOR!, privateKey: dkimKey } })
 
   return {
     transport: {
@@ -381,8 +385,9 @@ function fromEnvironment(from: Address | undefined, fromName: string | undefined
       return env.MAIL_TO
     },
     get server() {
-      return `${server?.host}:${server?.port}`
+      return provider === undefined ? `${server?.host}:${server?.port}` : providerName(provider)
     },
+    provider,
     missing,
   }
 }
@@ -751,6 +756,14 @@ export function mailer(options: MailerOptions = {}): Mailer {
     plugin.onStart(async () => {
       if (configured.missing().length > 0)
         return
+
+      // The provider reports bounces and complaints to a route that answers 404 without its secret, which an API key cannot stand in for.
+      if (configured.provider !== undefined) {
+        if (secretsOf(options.events)[configured.provider] === undefined)
+          log.warn(`MAIL_URL sends through ${providerName(configured.provider)}, whose bounces and complaints reach /_kay/mail/events/${configured.provider} once MAIL_EVENTS_${configured.provider.toUpperCase()} is set: until then a dead address is mailed again`)
+
+        return
+      }
 
       try {
         await configured.transport.verify?.()

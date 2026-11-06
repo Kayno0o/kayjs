@@ -17,6 +17,8 @@ export { enqueue, mail, mailer, MailNotConfiguredError, registeredMailer, send }
 export type { MailReply, Attachment as ReplyAttachment } from './mime'
 export type { MailWaitOptions, Outbox, SentMail } from './outbox'
 export { outbox } from './outbox'
+export type { MailgunSettings, PostmarkSettings, ProviderSettings, ResendSettings, SendgridSettings, SesSettings } from './providers'
+export { mailgun, postmark, resend, sendgrid, ses } from './providers'
 export type { SmtpSettings } from './smtp'
 export { smtp } from './smtp'
 export type { SuppressionStore } from './suppressions'

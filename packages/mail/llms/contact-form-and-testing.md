@@ -77,7 +77,21 @@ export default { name: 'Ada', url: 'https://example.com/confirm' } satisfies Par
 
 ### Other transports
 
-`transport` takes any `{ send(mail, signal?) }` resolving with a `Delivery`, such as a provider's HTTP API. A queued mail's `signal` aborts when the queue gives up on the run (past `lostAfter`, or the server stopping): pass it to `fetch` so the request stops; `smtp()` stops waiting for the server and drops its pool, though a message already with the server may still arrive, so the retry can send it twice. `smtp({ host, port, insecure, user, pass, name, timeout, maxConnections, rateLimit, dkim: { domain, selector, privateKey } })` is the SMTP one, for settings read some other way. `outbox` is a transport too, for a staging server that must never send. In production a custom `transport` still needs a sender, `from`, `MAIL_FROM` or the site's host, or the server stops as it starts, naming them (an `optional` mailer throws `MailNotConfiguredError` per send); development and tests keep `kay@localhost`.
+A provider's HTTP API needs no transport of your own: `MAIL_URL` names it, beside `smtp://`, and the mailer sends through it with `fetch` and no dependency, queued, retried and suppressed as over SMTP, and with the outbox and `mailTest` unchanged in development and tests:
+
+| `MAIL_URL` | Provider | Notes |
+| --- | --- | --- |
+| `resend://API_KEY` | Resend | |
+| `postmark://SERVER_TOKEN` | Postmark | `?stream=broadcast` picks the message stream |
+| `sendgrid://API_KEY` | SendGrid | |
+| `mailgun://API_KEY@mg.example.com` | Mailgun, the sending domain after the `@` | `?region=eu` for the European API |
+| `ses://ACCESS_KEY_ID:SECRET@eu-west-1` | Amazon SES (API v2), the region after the `@` | the secret percent-encoded (`/` is `%2F`, `+` is `%2B`); `?sessionToken=` and `?configurationSet=` |
+
+The key keeps its case, and `?baseUrl=` points any of them at a proxy or a local stand-in. The delivery's `messageId` is the provider's own id, the one its webhooks report. The same transports are `resend({ apiKey })`, `postmark({ token, messageStream })`, `sendgrid({ apiKey })`, `mailgun({ apiKey, domain, region })` and `ses({ accessKeyId, secretAccessKey, region, sessionToken, configurationSet })` for `transport`, each also taking `baseUrl` and a `timeout` (30 seconds by default). A queued mail's `signal` stops the request. A provider signs and rate-limits for itself, so `MAIL_INSECURE`, `MAIL_RATE_LIMIT` and `MAIL_DKIM_*` apply to SMTP only. A refusal throws with the provider's words and its status, so the queue retries it.
+
+The provider's bounces and complaints come from its own webhook: set the matching `MAIL_EVENTS_<PROVIDER>` ([bounces](bounces-and-replies.md)), which an API key cannot stand in for. The server says so as it boots while it is unset.
+
+`transport` takes any `{ send(mail, signal?) }` resolving with a `Delivery`, for a provider not listed. A queued mail's `signal` aborts when the queue gives up on the run (past `lostAfter`, or the server stopping): pass it to `fetch` so the request stops; `smtp()` stops waiting for the server and drops its pool, though a message already with the server may still arrive, so the retry can send it twice. `smtp({ host, port, insecure, user, pass, name, timeout, maxConnections, rateLimit, dkim: { domain, selector, privateKey } })` is the SMTP one, for settings read some other way. `outbox` is a transport too, for a staging server that must never send. In production a custom `transport` still needs a sender, `from`, `MAIL_FROM` or the site's host, or the server stops as it starts, naming them (an `optional` mailer throws `MailNotConfiguredError` per send); development and tests keep `kay@localhost`.
 
 ### kayjs-auth
 

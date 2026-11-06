@@ -1,6 +1,6 @@
 # kayjs-mail
 
-> Mail for kay apps: SMTP configured from typed environment variables, mails written as `.kay` components rendered to html and text, an outbox in development and tests instead of a real server, and sending through kay's queue with retries. It works from kay pages, actions and jobs, and from a plain Elysia app.
+> Mail for kay apps: SMTP or a provider's HTTP API (Resend, Postmark, SendGrid, Mailgun, SES) configured from `MAIL_URL`, mails written as `.kay` components rendered to html and text, an outbox in development and tests instead of a real server, and sending through kay's queue with retries. It works from kay pages, actions and jobs, and from a plain Elysia app.
 
 Setup, three ways: `mail()` runs with no argument (SMTP from the environment, and the `mail` a `src/mail.ts` exports when the app has one), `mail({ from, locale, ... })` takes the options of `mailer()` inline, and `mail({ module: './src/mail' })` names a mailer file of your own; `mail({ server: false })` is the escape for an app using the mailer by hand.
 

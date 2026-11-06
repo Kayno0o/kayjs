@@ -51,7 +51,7 @@ In production the mailer reads its settings from the environment. `MAIL_URL` is 
 
 | Variable | Use |
 | --- | --- |
-| `MAIL_URL` | The server to send through, such as `smtp://user:pass@mail.example.com:465`. Required. The login (both or neither, for a server needing no login) and the port (465 by default) are optional, and a password with special characters is percent-encoded. |
+| `MAIL_URL` | The server to send through, such as `smtp://user:pass@mail.example.com:465`, or a provider's API: `resend://API_KEY`, `postmark://SERVER_TOKEN`, `sendgrid://API_KEY`, `mailgun://API_KEY@mg.example.com` or `ses://ACCESS_KEY_ID:SECRET@eu-west-1`. Required. The login (both or neither, for a server needing no login) and the port (465 by default) are optional, and a password with special characters is percent-encoded. |
 | `MAIL_RATE_LIMIT` | Optional. The most mails sent in a window, such as `5/1s`, for a provider capping the rate. A bare `5` is 5 a second. |
 | `MAIL_DKIM_SELECTOR`, `MAIL_DKIM_PRIVATE_KEY` | Optional, both or neither. Sign each mail with DKIM, for a relay that does not. The PEM key's line breaks may be written `\n`. |
 | `MAIL_DKIM_DOMAIN` | Optional. The domain the signature vouches for, the sender's by default. |
@@ -257,6 +257,13 @@ export const mail = mailer({
 ```
 
 In production a mailer with a custom `transport` still needs a sender, `from`, `MAIL_FROM` or the site's host, or the server stops as it starts, naming them. Development and tests keep sending from `kay@localhost`.
+
+Resend, Postmark, SendGrid, Mailgun and Amazon SES need no transport of your own. Put the provider's address in `MAIL_URL` and the mailer sends through its HTTP API, queued and retried like any mail. The outbox and `mailTest` are unchanged in development and tests.
+
+`?region=eu` picks Mailgun's European API and `?stream=` a Postmark message stream. A percent-encoded secret keeps a `/` or a `+` in an SES key.
+The same transports exist as `resend({ apiKey })`, `postmark({ token })`, `sendgrid({ apiKey })`, `mailgun({ apiKey, domain })` and `ses({ accessKeyId, secretAccessKey, region })` to give as `transport`. The delivery's `messageId` is the provider's own id.
+
+`MAIL_INSECURE`, `MAIL_RATE_LIMIT` and `MAIL_DKIM_*` apply to SMTP only, as a provider signs and limits for itself. Its bounces and complaints still come through the webhook below. The server warns at boot while the matching `MAIL_EVENTS_*` variable is unset.
 
 `smtp({ host, port, user, pass })` is the SMTP transport, for settings read some other way. It takes the options of `mailer({ smtp })` as well as `insecure` and `dkim: { domain, selector, privateKey }`, which signs each mail for a relay that does not. The private key is PEM, and the public key is published at `<selector>._domainkey.<domain>`. `outbox` is a transport too, for a staging server that must never send.
 

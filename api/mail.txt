@@ -278,6 +278,17 @@ interface MailField
   label: string
   value?: string | undefined
 
+[.] mailgun
+function mailgun(settings: MailgunSettings): Transport
+
+[.] MailgunSettings
+interface MailgunSettings extends ProviderSettings
+  apiKey: string
+  baseUrl?: string | undefined
+  domain: string
+  region?: "eu" | "us" | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+
 [.] MailingList
 interface MailingList
   count: () => Promise<number>
@@ -369,6 +380,21 @@ interface Palette
   surface: string
   text: string
 
+[.] postmark
+function postmark(settings: PostmarkSettings): Transport
+
+[.] PostmarkSettings
+interface PostmarkSettings extends ProviderSettings
+  baseUrl?: string | undefined
+  messageStream?: string | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  token: string
+
+[.] ProviderSettings
+interface ProviderSettings
+  baseUrl?: string | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+
 [.] registeredMailer
 function registeredMailer(): Promise<Mailer | undefined>
 
@@ -381,8 +407,26 @@ interface ReplyAttachment
   contentType: string
   filename: string
 
+[.] resend
+function resend(settings: ResendSettings): Transport
+
+[.] ResendSettings
+interface ResendSettings extends ProviderSettings
+  apiKey: string
+  baseUrl?: string | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+
 [.] send
 function send<P extends object>(message: MailMessage<P>): Promise<Delivery>
+
+[.] sendgrid
+function sendgrid(settings: SendgridSettings): Transport
+
+[.] SendgridSettings
+interface SendgridSettings extends ProviderSettings
+  apiKey: string
+  baseUrl?: string | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [.] SentMail
 interface SentMail extends Mail
@@ -399,6 +443,19 @@ interface SentMail extends Mail
   subject: string
   text: string
   to: Address[]
+
+[.] ses
+function ses(settings: SesSettings): Transport
+
+[.] SesSettings
+interface SesSettings extends ProviderSettings
+  accessKeyId: string
+  baseUrl?: string | undefined
+  configurationSet?: string | undefined
+  region: string
+  secretAccessKey: string
+  sessionToken?: string | undefined
+  timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [.] smtp
 function smtp(settings: SmtpSettings): Transport
