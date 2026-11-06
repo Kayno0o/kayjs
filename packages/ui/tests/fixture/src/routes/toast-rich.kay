@@ -1,5 +1,6 @@
 ---
 import Button from '@kaynooo/kayjs-ui/button.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import { toast } from '@kaynooo/kayjs-ui'
 
@@ -18,3 +19,4 @@ Toaster(position="top-center" limit={2})
 button#linked(type="button" onClick={() => toast.error('Moved', { description: 'See it', action: { label: 'See', href: '/shell', run: () => { document.body.dataset.ran = 'yes' } } })}) Linked
 Button#go(href="/shell" label="Go" onClick={() => { document.body.dataset.clicked = 'go' }})
 Button#held(href="/shell" label="Held" onClick={event => { event.preventDefault(); document.body.dataset.clicked = 'held' }})
+IconButton#icon(href="/shell" icon="close" label="Icon" onClick={event => { event.preventDefault(); document.body.dataset.clicked = 'icon' }})

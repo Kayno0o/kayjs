@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.92.0
 
+### A link handler that prevents the default keeps the router from following it
+
+An island's `onClick` on a link that calls `event.preventDefault()` now stops kay's router from swapping the page in; before, the router followed the link anyway. A handler that wants the navigation to go on leaves the default alone.
+
 ### kayjs-ai retries a failed request, and a `Step` has four more members
 
 A request that fails with `unavailable`, `rate-limited`, `timeout` or `network` before anything streamed is now asked again by default, 2 requests per model (`ai({ retry: false })` opts out), so a failing request can cost up to two requests per model, and each failed attempt reaches `onStep` and `onError` and is listed in `reply.steps`. An app building a `Step` by hand (a test double, a stored copy) adds `provider`, `model`, `attempt` and `failed`: [when a provider fails](../packages/ai/llms/asking.md#when-a-provider-fails).

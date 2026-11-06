@@ -67,8 +67,10 @@ export function startNavigation(given: NavigationHooks): void {
   }
 
   history.scrollRestoration = 'manual'
-  // On the window, after the document's one listener runs the `onClick` of an element, so a handler that prevents the default keeps the link from being followed.
+  // The modifier is noted first, in case a handler submits a form while it runs. The link is followed on the window, after the document's one listener runs the `onClick` of an element, so a handler that prevents the default keeps the link from being followed; a click such a handler stops is handed over by that listener.
+  window.addEventListener('click', noteModified, true)
   window.addEventListener('click', onClick)
+  ;(document as { _$kf?: typeof onClick })._$kf = onClick
   document.addEventListener('focusin', onFocus)
   window.addEventListener('popstate', onPopState)
   // `pagehide` saves the scroll for a full load only: back or forward between entries of this document fires `popstate` once the entry already changed, too late to save the one left, so the entry is kept up to date as the page scrolls.
@@ -238,16 +240,26 @@ export function plainClick(event: MouseEvent): boolean {
   return !event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
 }
 
-function onClick(event: MouseEvent): void {
-  // Told to the forms' listener, which leaves a submit button pressed with a key held to the browser as a link is.
+// Told to the forms' listener, which leaves a submit button pressed with a key held to the browser as a link is.
+function noteModified(event: MouseEvent): void {
   navigation.modified = !plainClick(event)
 
-  if (navigation.modified) {
-    // The submit this click causes follows at once, so a later one without a click is not a modified one.
+  // The submit this click causes follows at once, so a later one without a click is not a modified one.
+  if (navigation.modified)
     setTimeout(() => navigation.modified = false)
+}
 
+const handled = new WeakSet<Event>()
+
+function onClick(event: MouseEvent): void {
+  // The document's listener hands over a click it stopped, which then reaches the window too when it was not.
+  if (handled.has(event))
     return
-  }
+
+  handled.add(event)
+
+  if (!plainClick(event))
+    return
 
   const link = linkOf(event)
   const url = link && followable(link)

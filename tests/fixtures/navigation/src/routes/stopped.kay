@@ -1,0 +1,5 @@
+head
+  title Stopped
+h1 Stopped
+div.card(onClick={() => { document.body.dataset.card = 'yes' }})
+  a.inner(href="/second" onClick|stopPropagation={() => { document.body.dataset.inner = 'yes' }}) Inner

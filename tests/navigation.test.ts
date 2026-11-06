@@ -1188,15 +1188,63 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
-  it('leaves a link alone that a document listener added after the router prevents', async () => {
+  it('leaves a link alone that a document listener added after the router prevents, and follows the next one', async () => {
     const fresh = await open('/')
 
     try {
-      await fresh.evaluate(() => document.addEventListener('click', event => event.preventDefault()))
-      await fresh.click('a.second')
-      await new Promise(resolve => setTimeout(resolve, 300))
+      await fresh.evaluate(() => {
+        const seen: string[] = []
 
-      expect(await fresh.path()).toBe('/')
+        ;(window as { kayNavigated?: string[] }).kayNavigated = seen
+        document.addEventListener('kay:navigate', event => seen.push(new URL((event as CustomEvent<{ url: string }>).detail.url).pathname))
+        document.addEventListener('click', (event) => {
+          if ((event.target as Element).closest('a.second'))
+            event.preventDefault()
+        })
+      })
+      await fresh.click('a.second')
+      await fresh.click('a.later')
+      await fresh.waitUntil(() => location.pathname === '/later')
+
+      expect(await fresh.evaluate(() => (window as { kayNavigated?: string[] }).kayNavigated)).toEqual(['/later'])
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
+  it('swaps a link whose island handler stops the click from bubbling, inside a clickable parent', async () => {
+    const fresh = await open('/stopped')
+
+    try {
+      await fresh.evaluate(() => {
+        (window as { kayAlive?: boolean }).kayAlive = true
+      })
+      await fresh.click('a.inner')
+      await fresh.waitFor('h1', { text: 'Second' })
+
+      expect(await sameDocument(fresh)).toBe(true)
+      expect(await fresh.evaluate(() => [document.body.dataset.inner, document.body.dataset.card ?? 'none'])).toEqual(['yes', 'none'])
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
+  it('swaps a link whose handler stops the click in an island mounted by an earlier swap', async () => {
+    const fresh = await open('/')
+
+    try {
+      await fresh.evaluate(() => {
+        (window as { kayAlive?: boolean }).kayAlive = true
+        document.body.insertAdjacentHTML('beforeend', '<a class="to-stopped" href="/stopped">Stopped</a>')
+      })
+      await fresh.click('a.to-stopped')
+      await fresh.waitFor('h1', { text: 'Stopped' })
+      await fresh.click('a.inner')
+      await fresh.waitFor('h1', { text: 'Second' })
+
+      expect(await sameDocument(fresh)).toBe(true)
     }
     finally {
       fresh.close()

@@ -55,6 +55,8 @@ const DELEGATED = /^(?:beforeinput|click|dblclick|contextmenu|focus(?:in|out)|in
 // The events the document already has a listener for, kept on the document so a second copy of this runtime on the page adds none of its own.
 interface DelegatingDocument extends Document {
   _$kt?: Set<string>
+  // The router's click handler, which takes a click an island's handler stopped from reaching the window.
+  _$kf?: (event: Event) => void
 }
 
 let claim: Claim | undefined
@@ -955,8 +957,12 @@ export function dispatch(event: Event): void {
       Object.defineProperty(event, 'currentTarget', { configurable: true, get: () => node ?? document })
       fire.call(node as unknown as ElementRecord, event)
 
-      if (event.cancelBubble)
+      if (event.cancelBubble) {
+        if (event.type === 'click' && !event.defaultPrevented)
+          (document as DelegatingDocument)._$kf?.(event)
+
         return
+      }
     }
 
     node = node.parentNode ?? (node as unknown as ShadowRoot).host ?? null

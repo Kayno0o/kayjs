@@ -123,7 +123,7 @@ async function ran(item: Toast) {
 
 function linked(event: MouseEvent, item: Toast) {
   // A click that opens elsewhere leaves this page, and its toast, as they are. `defaultPrevented` is no sign of it: kay's router prevents the default of every link it takes over.
-  if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0 || (event.currentTarget as Element | null)?.getAttribute('target') === '_blank')
+  if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0)
     return
 
   void ran(item)

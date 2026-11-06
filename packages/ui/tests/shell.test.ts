@@ -101,16 +101,44 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
     expect(page.errors).toEqual([])
   }, 60_000)
 
-  it('runs the onClick of a Button drawn as a link before it navigates, and stays on the page when the handler prevents the default', async () => {
+  // Records the path of each page swapped in, so a link that was not followed is told from one not yet swapped by the one clicked after it.
+  const watchSwaps = async (page: Awaited<ReturnType<typeof site.open>>) => page.evaluate(() => {
+    const seen: string[] = []
+
+    ;(window as { swapped?: string[] }).swapped = seen
+    document.addEventListener('kay:navigate', event => seen.push(new URL((event as CustomEvent<{ url: string }>).detail.url).pathname))
+  })
+  const swaps = async (page: Awaited<ReturnType<typeof site.open>>) => page.evaluate(() => (window as { swapped?: string[] }).swapped)
+
+  it('runs the onClick of a Button and an IconButton drawn as links before they navigate, and stays on the page when the handler prevents the default', async () => {
     const page = await site.open('/toast-rich')
 
+    await watchSwaps(page)
     await page.click('#held')
     await page.waitUntil(() => document.body.dataset.clicked === 'held')
-    await new Promise(resolve => setTimeout(resolve, 200))
-    expect(await page.evaluate(() => location.pathname)).toBe('/toast-rich')
-
+    await page.click('#icon')
+    await page.waitUntil(() => document.body.dataset.clicked === 'icon')
     await page.click('#go')
     await page.waitUntil(() => location.pathname === '/shell')
+    expect(await swaps(page)).toEqual(['/shell'])
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
+  it('runs a link action and closes its toast without a page swap when another listener prevents the click', async () => {
+    const page = await site.open('/toast-rich')
+
+    await watchSwaps(page)
+    await page.evaluate(() => document.addEventListener('click', (event) => {
+      if ((event.target as Element).closest('.kui-toast a[data-part=action]'))
+        event.preventDefault()
+    }))
+    await page.click('#linked')
+    await page.waitFor('.kui-toast a[data-part=action]')
+    await page.click('.kui-toast a[data-part=action]')
+    await page.waitUntil(() => document.body.dataset.ran === 'yes' && document.querySelector('.kui-toast') === null)
+    await page.click('#go')
+    await page.waitUntil(() => location.pathname === '/shell')
+    expect(await swaps(page)).toEqual(['/shell'])
     expect(page.errors).toEqual([])
   }, 60_000)
 
