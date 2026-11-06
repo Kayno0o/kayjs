@@ -895,7 +895,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       }
     }),
     fill: async (selector, text) => serial(async () => {
-      // The field is waited on and focused in one script, as a render can replace it between two. A field of an island not hydrated yet is waited on too, as hydrating would write the text typed into it away: a click replays, typing cannot.
+      // The field is waited on and focused in one script, as a render can replace it between two. A field of an island not hydrated yet is waited on too, as an island writing its state to the field as it mounts would wipe the text typed into the server's markup, which the events queued for replay do not restore.
       await poll(script((css: string, island: string) => {
         const field = document.querySelector<HTMLInputElement>(css)
 
