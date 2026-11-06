@@ -8,8 +8,24 @@ describe('slug matcher', () => {
   })
 
   test('accepts letters and digits of any script, marks and underscores', () => {
-    for (const value of ['été', 'привет-мир', '你好-世界', 'مرحبا-بالعالم', 'हिन्दी', 'a_b', '_a', 'a_', 'a/b', 'a/b-c/d'])
+    for (const value of ['été', 'привет-мир', '你好-世界', 'مرحبا-بالعالم', 'हिन्दी', 'a_b', '_a', 'a_', 'a-b'])
       expect(slug(value)).toBe(value)
+
+    for (const value of ['a/b', 'a/b-c/d']) {
+      expect(slug(value)).toBeUndefined()
+      expect(slug(value, true)).toBe(value)
+    }
+  })
+
+  test('refuses a decomposed form, which the cms never stores, and words of marks or underscores alone', () => {
+    expect(slug('été')).toBeUndefined()
+    expect(slug('été')).toBe('été')
+
+    for (const value of ['́', '́a', 'a-́', 'a/́'])
+      expect(slug(value)).toBeUndefined()
+
+    expect(slug('_')).toBe('_')
+    expect(slug('___')).toBe('___')
   })
 
   test('refuses uppercase, empty values, doubled or edge separators and everything else', () => {

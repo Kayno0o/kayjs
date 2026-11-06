@@ -1,10 +1,11 @@
+import type { Matcher } from '../src/server/params'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { check } from '../src/check'
 import { joinBase, localPath } from '../src/runtime/base'
-import { integer } from '../src/runtime/params'
+import { integer, slug } from '../src/runtime/params'
 import { openSqlite } from '../src/runtime/sqlite.server'
 import { routerShapes, shapeParams } from '../src/server/params'
 import { readRedirects, redirectProblems } from '../src/server/redirects'
@@ -89,7 +90,7 @@ describe('param matchers', () => {
 })
 
 describe('the page an action was posted from', () => {
-  const matchers = new Map([['integer', integer]])
+  const matchers = new Map<string, Matcher>([['integer', integer], ['slug', slug]])
   const paramsOf = (file: string, path: string, prefix = '', pattern?: string) => {
     const route = { ...routeOf('/r', `/r/${file}`)!, layouts: [], special: {}, guards: [] }
 
@@ -113,6 +114,12 @@ describe('the page an action was posted from', () => {
     expect(paramsOf('blog/[[page]].kay', '/blog/2')).toEqual({ page: '2' })
     expect(paramsOf('items/[id=integer].kay', '/items/7')).toEqual({ id: 7 })
     expect(paramsOf('orgs/[org].kay', '/fr/organisations/acme', '/fr', '/organisations/:org')).toEqual({ org: 'acme' })
+  })
+
+  it('reads a slug of any script, and only a rest param takes a slash', () => {
+    expect(paramsOf('tags/[tag=slug].kay', '/tags/%C3%A9t%C3%A9')).toEqual({ tag: 'été' })
+    expect(paramsOf('tags/[tag=slug].kay', '/tags/a%2Fb')).toBeUndefined()
+    expect(paramsOf('docs/[...path=slug].kay', '/docs/a/b')).toEqual({ path: 'a/b' })
   })
 
   it('reads none from a page its route does not serve', () => {

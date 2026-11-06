@@ -3595,6 +3595,9 @@ describe.concurrent('kay check, URLs written out besides links', () => {
       'button(onClick={go}) {String(fine)}',
       'form(action="/search" method="GET")',
       'link(rel="manifest" href="/manifest.fr.webmanifest")',
+      'a(href="/tags/été") ok',
+      'a(href="/tags/a_b") ok',
+      'a(href="/tags/Été") bad',
       '',
     ].join('\n')
     const root = await scratchProject({
@@ -3616,6 +3619,7 @@ describe.concurrent('kay check, URLs written out besides links', () => {
         [18, 'No page, public file or app route serves /nope.css'],
         [21, 'No page, public file or app route serves /nowhere'],
         [26, 'No page, public file or app route serves /search'],
+        [30, 'No page, public file or app route serves /tags/Été'],
       ])
     }
     finally {

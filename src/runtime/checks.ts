@@ -92,7 +92,12 @@ type Matches<Segments extends readonly string[], Pattern extends readonly string
 type HexDigit = Digit | 'a' | 'b' | 'c' | 'd' | 'e' | 'f'
 type Runs<Text extends string, Chars, Count extends unknown[] = []> = Text extends `${infer Char}${infer Rest}` ? Char extends Chars ? Runs<Rest, Chars, [...Count, 0]> : -1 : Count['length']
 type Integer<Text extends string> = Text extends `-${infer Rest}` ? Runs<Rest, Digit> extends 0 | -1 ? false : true : Runs<Text, Digit> extends 0 | -1 ? false : true
-type Slug<Text extends string> = Text extends `${infer Word}-${infer Rest}` ? Runs<Word, SchemeStart | Digit> extends 0 | -1 ? false : Slug<Rest> : Runs<Text, SchemeStart | Digit> extends 0 | -1 ? false : true
+type AsciiUpper = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z'
+type AsciiPunctuation = ' ' | '!' | '"' | '#' | '$' | '%' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | '.' | '/' | ':' | ';' | '<' | '=' | '>' | '?' | '@' | '[' | '\\' | ']' | '^' | '`' | '{' | '|' | '}' | '~'
+// A character of a slug word: ASCII lowercase, digit or `_`, or any non-ASCII character that has no other case. Template types cannot read `\p{L}`, so the NFC rule and a word of marks alone are left to the request.
+type SlugChar<Char extends string> = Char extends SchemeStart | Digit | '_' ? true : Char extends AsciiUpper | AsciiPunctuation ? false : Lowercase<Char> extends Char ? true : false
+type SlugWord<Text extends string, Seen extends boolean = false> = Text extends `${infer Char}${infer Rest}` ? SlugChar<Char> extends true ? SlugWord<Rest, true> : false : Seen
+type Slug<Text extends string> = Text extends `${infer Word}-${infer Rest}` ? SlugWord<Word> extends true ? Slug<Rest> : false : SlugWord<Text>
 type Uuid<Text extends string> = Lowercase<Text> extends `${infer A}-${infer B}-${infer C}-${infer D}-${infer E}` ? [Runs<A, HexDigit>, Runs<B, HexDigit>, Runs<C, HexDigit>, Runs<D, HexDigit>, Runs<E, HexDigit>] extends [8, 4, 4, 4, 12] ? true : false : false
 // A segment written out must be one the param's matcher takes, as `src/runtime/params.ts` reads it; one computed, `${number}` or `string`, is checked when the request comes.
 // A computed segment is no single key: a record keyed by it is an index signature, which an empty object satisfies.

@@ -10,7 +10,7 @@ import { projectSource } from './source'
 const EDGE_SLASHES = /^\/+|\/+$/g
 
 // Gives the param's value, or undefined to refuse the URL, which then falls through to the next page serving its path.
-export type Matcher = (value: string) => unknown
+export type Matcher = (value: string, rest?: boolean) => unknown
 
 // One path a route serves as the router registers it: params named by position, `/blog/:p2`, so pages naming the same segment apart share one router path.
 export interface RouterShape {
@@ -113,7 +113,7 @@ export function matchedParams(route: Route, params: Record<string, string>, matc
     if (value === undefined)
       continue
 
-    matched[name] = matchers.get(matcher)!(value)
+    matched[name] = matchers.get(matcher)!(value, route.catchAll === name)
 
     if (matched[name] === undefined)
       return undefined

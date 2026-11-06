@@ -74,6 +74,10 @@ describe('slugify and the slug matcher', () => {
     const titles = ['Été à la ferme : Œufs', 'a/b', 'a_b', 'Привет, Мир 2', '你好 世界', 'مرحبا بالعالم', 'हिन्दी', 'καλημέρα'.normalize('NFD'), 'A -- B / C', '  2024 / Notes  ', 'Straße ŁÓDŹ']
 
     for (const title of titles)
+      expect(slug(slugify(title, { final: true }), true), title).toBe(slugify(title, { final: true }))
+
+    // A plain `[slug]` segment holds no folder, so its slugs are the ones without `/`.
+    for (const title of titles.filter(title => !title.includes('/')))
       expect(slug(slugify(title, { final: true })), title).toBe(slugify(title, { final: true }))
   })
 })

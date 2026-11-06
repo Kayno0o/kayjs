@@ -2287,7 +2287,7 @@ function mount<P extends object>(component: (props: P) => unknown, element: Elem
 function integer(value: string): number | undefined
 
 [./params] slug
-function slug(value: string): string | undefined
+function slug(value: string, rest?: boolean): string | undefined
 
 [./params] uuid
 function uuid(value: string): string | undefined

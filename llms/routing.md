@@ -199,7 +199,7 @@ Pages live in `src/routes/`:
 #### Matchers
 
 - A matcher checks a param, `[name=matcher]` or `[[name=matcher]]`: it returns the value `ctx.params` hands the page, typed as it returns it, or `undefined` to refuse the URL.
-- kay ships `integer`, `uuid` and `slug` in `kay/params`: a safe whole number, as a number, a UUID, lowercased, and lowercase words of any script (letters, digits, `_`) joined by single dashes, or slashes in a rest param, which is what the cms `slugify` gives.
+- kay ships `integer`, `uuid` and `slug` in `kay/params`: a safe whole number, as a number, a UUID, lowercased, and lowercase words of any script (letters, digits, `_`) joined by single dashes, or slashes in a rest param (a matcher gets `true` as its second argument for one), which is what the cms `slugify` gives.
 - A project adds its own as `src/params/<name>.ts`, beside `src/routes/`, its default export the matcher, and one of that name wins over kay's.
 - A matcher nobody provides stops the server.
 
