@@ -1476,3 +1476,12 @@ describe('FormField in a form calling an action', () => {
     expect(refused.find('#island-handle')[0]?.attributes['aria-describedby']).toBeUndefined()
   })
 })
+
+test('a page writing scheme() on html has the theme the visitor kept from the first paint, none while the system decides', async () => {
+  const theme = async (cookie?: string) => (await (cookie === undefined ? site : site.as(cookie)).visit('/theme-toggle')).html.match(/<html[^>]*>/)![0]
+
+  expect(await theme(persistedCookie('theme', 'dark'))).toContain('data-theme="dark"')
+  expect(await theme(persistedCookie('theme', 'light'))).toContain('data-theme="light"')
+  expect(await theme()).not.toContain('data-theme')
+  expect(await theme(persistedCookie('theme', 'sepia'))).not.toContain('data-theme')
+})

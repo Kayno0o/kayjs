@@ -1,0 +1,86 @@
+---
+import type { JSX, Snippet } from 'kay'
+import type { IconProps } from 'kay/icons'
+import type { IconSlot } from './defaults'
+import type { ThemeMode } from './theme-mode'
+import { effect } from 'kay'
+import { wording } from 'kay/words'
+import Moon from '~icons/tabler/moon'
+import Sun from '~icons/tabler/sun'
+import Desktop from '~icons/tabler/device-desktop'
+import { isPromiseLike } from './change'
+import { applyMode, THEME_COOKIE, themeMode } from './theme-mode'
+import Segmented from './segmented.kay'
+
+interface Mode {
+  value: ThemeMode
+  label?: string | undefined
+  icon?: IconSlot | IconProps | undefined
+}
+
+interface Option { value: ThemeMode, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }
+
+const { modes = ['system', 'light', 'dark'], value, label = wording('ui.themeToggle.label', 'Theme'), showLabel = false, cookie = THEME_COOKIE, onChange, option, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+  // The choices, in this order: a mode (`'system'`, `'light'` or `'dark'`), or `{ value, label?, icon? }` to word or draw one yourself. All three by default, each with its icon and a `ui.themeToggle.*` word.
+  modes?: readonly (ThemeMode | Mode)[] | undefined
+  // The mode, when the app holds it (a signed-in visitor's saved preference): the toggle follows it and writes no cookie, `onChange` being where the app saves a pick. Left out, the visitor's choice is kept in the cookie.
+  value?: ThemeMode | undefined
+  // Names the group for screen readers; the `ui.themeToggle.label` message by default.
+  label?: string | undefined
+  // Writes `label` above the group, as Segmented's does.
+  showLabel?: boolean | undefined
+  // The cookie the choice is kept in, which `scheme(cookie)` reads on the server.
+  cookie?: string | undefined
+  // Hears the mode picked, with its option as a second argument. A promise holds the toggle busy until it settles, and a pick that resolves to false, rejects or throws (logged) is put back and not kept, as Segmented's.
+  // Typed `unknown`, so a callback answering something else, such as `list.push`, still fits.
+  onChange?: ((mode: ThemeMode, option: Option | undefined) => unknown) | undefined
+  // Draws each option in place of its label (and icon), as Segmented's.
+  option?: Snippet<[option: Option]> | undefined
+}>()
+
+const kept = themeMode(cookie)
+const current = () => value ?? kept()
+
+const words: Record<ThemeMode, string> = {
+  light: wording('ui.themeToggle.light', 'Light'),
+  dark: wording('ui.themeToggle.dark', 'Dark'),
+  system: wording('ui.themeToggle.system', 'System'),
+}
+const icons: Record<ThemeMode, IconProps> = { light: Sun, dark: Moon, system: Desktop }
+
+const choices = (): Option[] => modes.map((mode) => {
+  const given = typeof mode === 'string' ? { value: mode } as Mode : mode
+
+  return { value: given.value, label: given.label ?? words[given.value], icon: given.icon ?? icons[given.value] }
+})
+
+// The page follows the mode as it is picked, and corrects a layout that did not write it.
+effect(() => applyMode(current()))
+
+function keep(mode: ThemeMode) {
+  if (value === undefined)
+    kept.set(mode)
+}
+
+async function settle(answer: PromiseLike<unknown>, mode: ThemeMode) {
+  const done = await answer
+
+  if (done !== false)
+    keep(mode)
+
+  return done
+}
+
+function pick(mode: ThemeMode, chosen: Option | undefined) {
+  const answer = onChange?.(mode, chosen)
+
+  if (isPromiseLike(answer))
+    return settle(answer, mode)
+
+  // As Segmented's, only a promise can refuse.
+  keep(mode)
+
+  return answer
+}
+---
+Segmented({...rest} options={choices()} value={current()} label={label} showLabel={showLabel} option={option} onChange={pick})

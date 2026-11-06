@@ -1,0 +1,9 @@
+---
+import ThemeToggle from '@kaynooo/kayjs-ui/theme-toggle.kay'
+import { scheme } from '@kaynooo/kayjs-ui'
+import '../app.css'
+---
+head
+  html(data-theme={scheme()})
+main
+  ThemeToggle#toggle

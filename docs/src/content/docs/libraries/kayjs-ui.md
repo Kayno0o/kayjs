@@ -278,7 +278,7 @@ Dates and times: [DateInput](/ui/date-input), [DateRangeInput](/ui/date-range-in
 
 Layout: [Card](/ui/card), [CardRow](/ui/card-row), [PageHeader](/ui/page-header), [PageSection](/ui/page-section), [CollapsibleSection](/ui/collapsible-section), [Widget](/ui/widget), [SplitLayout](/ui/split-layout), [EmptyState](/ui/empty-state), [Notice](/ui/notice), [Toolbar](/ui/toolbar), [Masonry](/ui/masonry).
 
-Navigation: [Tabs](/ui/tabs), [TabNav](/ui/tab-nav), [Breadcrumb](/ui/breadcrumb), [Segmented](/ui/segmented), [SiteNav](/ui/site-nav), [AppHeader](/ui/app-header), [AppSwitcher](/ui/app-switcher), [Pagination](/ui/pagination), [Steps](/ui/steps), [TreeView](/ui/tree-view), [Timeline](/ui/timeline).
+Navigation: [Tabs](/ui/tabs), [TabNav](/ui/tab-nav), [Breadcrumb](/ui/breadcrumb), [Segmented](/ui/segmented), [ThemeToggle](/ui/theme-toggle), [SiteNav](/ui/site-nav), [AppHeader](/ui/app-header), [AppSwitcher](/ui/app-switcher), [Pagination](/ui/pagination), [Steps](/ui/steps), [TreeView](/ui/tree-view), [Timeline](/ui/timeline).
 
 Data: [Table](/ui/table), [Stat](/ui/stat), [Meter](/ui/meter), [BarList](/ui/bar-list), [Badge](/ui/badge), [DescriptionList](/ui/description-list), [RelativeTime](/ui/relative-time), [Avatar](/ui/avatar).
 

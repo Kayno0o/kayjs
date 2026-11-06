@@ -7,6 +7,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `call()` types a route's `null` answer as `null`, as it already arrives, rather than `''`; an empty answer (`undefined`, a 204) stays `''` ([API from islands](api-from-islands.md)).
 - `src/context.ts`, default-exporting `defineContext(...)`, gives templates `ctx.<key>` with no extension, typed in `kay check`; two sources giving one key stop the page naming both: [Request values](request-values.md).
 - `src/context.ts` (picked up by `kay dev` when added or removed, with a new process), default-exporting `defineContext(...)`, gives templates `ctx.<key>` with no extension, typed in `kay check`; two sources giving one key stop the page naming both: [Request values](request-values.md).
+- kayjs-ui's `ThemeToggle` switches light, dark and system, keeps the choice in a cookie and puts it on `<html>` as `data-theme`, and `scheme()` writes it from the first render so the page never flashes the other scheme: [ThemeToggle](../packages/ui/llms/setup.md).
 
 ## 1.91.0
 

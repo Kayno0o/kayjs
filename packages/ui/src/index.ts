@@ -39,6 +39,8 @@ export type { StepCookies, StepDraft, StepDraftOptions, StepItem } from './steps
 export { currentStep, stepDraft, stepHref } from './steps'
 export { toCsv } from './table'
 export type { Column, FilterField, RowFilter, RowKey, RowKeyValue, SortDirection, SortState } from './table'
+export type { ThemeMode } from './theme-mode'
+export { scheme, themeMode } from './theme-mode'
 export type { TimelineEntry } from './timeline'
 export * from './toast'
 export type { Tone } from './tone'

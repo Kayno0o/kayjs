@@ -191,6 +191,7 @@ export default defineMessages({
       selectRow: 'Sélectionner {row}',
       selected: { one: '{count} sélectionnée', other: '{count} sélectionnées' },
     },
+    themeToggle: { dark: 'Sombre', label: 'Thème', light: 'Clair', system: 'Système' },
     timeline: { empty: 'Aucun événement.' },
     toaster: { dismiss: 'Fermer la notification' },
     treeView: { empty: 'Rien pour le moment.', failure: 'Impossible de charger.', retry: 'Réessayer' },

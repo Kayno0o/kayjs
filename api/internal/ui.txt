@@ -1470,6 +1470,9 @@ interface ScatterPoint
   x: number
   y: number
 
+[./lib/index] scheme
+function scheme(cookie?: string): "dark" | "light" | undefined
+
 [./lib/index] SortDirection
 type SortDirection = 'asc' | 'desc'
 
@@ -1544,6 +1547,12 @@ interface SwitcherApp
   label: string
   newTab?: NewTab | undefined
   rel?: string | undefined
+
+[./lib/index] themeMode
+function themeMode(cookie?: string): Signal<ThemeMode>
+
+[./lib/index] ThemeMode
+type ThemeMode = 'light' | 'dark' | 'system'
 
 [./lib/index] TimelineEntry
 interface TimelineEntry<Key extends string | number = string>
@@ -2427,6 +2436,24 @@ interface SortState
 
 [./lib/table] toCsv
 function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string
+
+[./lib/theme-mode] applyMode
+function applyMode(mode: ThemeMode): void
+
+[./lib/theme-mode] scheme
+function scheme(cookie?: string): "dark" | "light" | undefined
+
+[./lib/theme-mode] THEME_COOKIE
+const THEME_COOKIE: "theme"
+
+[./lib/theme-mode] THEME_MODES
+const THEME_MODES: readonly ThemeMode[]
+
+[./lib/theme-mode] themeMode
+function themeMode(cookie?: string): Signal<ThemeMode>
+
+[./lib/theme-mode] ThemeMode
+type ThemeMode = 'light' | 'dark' | 'system'
 
 [./lib/timeline] TimelineEntry
 interface TimelineEntry<Key extends string | number = string>

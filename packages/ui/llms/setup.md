@@ -52,6 +52,22 @@ The theme's tokens are `@theme default` and carry the app's own names, so one th
 
 The theme is dark unless the visitor's system asks for light. `data-theme="light"` or `data-theme="dark"` on `html` wins over both, for a site with its own switch, and on any element it themes what that element holds. A colour the app overrides with a single value stays that value in both.
 
+`ThemeToggle` is that switch made: a Segmented of `system`, `light` and `dark` (each with its icon and a `ui.themeToggle.*` word) that keeps the choice in the `theme` cookie and puts it on `html` as `data-theme` as it is picked, `system` taking the attribute off. The cookie is read by the server, so a layout writes the choice from the first render, with no flash and no script:
+
+```kay
+---
+import { scheme } from '@kaynooo/kayjs-ui'
+---
+head
+  html(data-theme={scheme()})
+```
+
+`scheme()` is `'light'`, `'dark'`, or `undefined` while the visitor follows the system and the server cannot tell (no attribute, so `theme.css` follows `prefers-color-scheme`); in the browser a `system` choice is answered from `prefers-color-scheme` when read. A page the build prerenders renders the default, and the toggle corrects it as it hydrates, so a site wanting no flash renders its pages per request. `themeMode()` is the cookie's signal, for code of your own.
+
+- `ThemeToggle(modes={['light', 'dark']} label="Appearance" showLabel)`: `modes` lists and orders the choices, each a mode or `{ value, label?, icon? }` to word or draw it yourself. `label` names the group (`ui.themeToggle.label`), `showLabel` writes it above, `@option(option)` draws each option, and `class` and its parts are Segmented's (`root`, `option`, `input`, `label`, `icon`).
+- `value` makes the app the holder, such as a signed-in visitor's saved preference: the toggle follows it and writes no cookie. `onChange(mode, option)` hears each pick and may return a promise, as Segmented's: the toggle is busy until it settles, and a pick that resolves to `false`, rejects or throws is put back and not kept.
+- `cookie="appearance"` names another cookie, to give to `scheme('appearance')` as well.
+
 A layout may still render its own `Toaster` and `TooltipHost`, as an app did before `ui()`: only the first mounted shows toasts and tooltips, so the two copies never double them.
 
 ```kay

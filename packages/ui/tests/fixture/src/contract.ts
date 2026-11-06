@@ -79,6 +79,7 @@ import Table from '@kaynooo/kayjs-ui/table.kay'
 import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import ThemeToggle from '@kaynooo/kayjs-ui/theme-toggle.kay'
 import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
 import Timeline from '@kaynooo/kayjs-ui/timeline.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
@@ -192,6 +193,7 @@ export const COMPONENTS = {
   'tabs': Tabs,
   'text-input': TextInput,
   'textarea': Textarea,
+  'theme-toggle': ThemeToggle,
   'time-input': TimeInput,
   'toaster': Toaster,
   'timeline': Timeline,
@@ -288,6 +290,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'tabs': { tabs: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], value: 'a', label: 'Tabs', panel: (value: string) => value },
   'text-input': { 'aria-label': 'Name', 'value': '' },
   'textarea': { 'aria-label': 'Bio' },
+  'theme-toggle': {},
   'time-input': { 'aria-label': 'Start', 'value': '09:30' },
   'toaster': {},
   'timeline': { entries: [{ key: 'a', time: '08:00', text: 'Home', icon }, { key: 'b', time: '09:00', text: 'Gap', tone: 'neutral' }], label: 'Day', selected: 'a', onSelectedChange: noop },

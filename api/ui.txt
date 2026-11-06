@@ -347,6 +347,9 @@ interface ScatterPoint
   x: number
   y: number
 
+[.] scheme
+function scheme(cookie?: string): "dark" | "light" | undefined
+
 [.] SortDirection
 type SortDirection = 'asc' | 'desc'
 
@@ -421,6 +424,12 @@ interface SwitcherApp
   label: string
   newTab?: NewTab | undefined
   rel?: string | undefined
+
+[.] themeMode
+function themeMode(cookie?: string): Signal<ThemeMode>
+
+[.] ThemeMode
+type ThemeMode = 'light' | 'dark' | 'system'
 
 [.] TimelineEntry
 interface TimelineEntry<Key extends string | number = string>
@@ -2615,6 +2624,16 @@ component default
   size?: FieldSize | undefined
   value?: string | undefined
   writeFocused?: boolean | undefined
+
+[./theme-toggle.kay] default
+component default
+  cookie?: string | undefined
+  label?: string | undefined
+  modes?: readonly (Mode | ThemeMode)[] | undefined
+  onChange?: ((mode: ThemeMode, option: Option | undefined) => unknown) | undefined
+  option?: ((option: Option) => Element) | undefined
+  showLabel?: boolean | undefined
+  value?: ThemeMode | undefined
 
 [./time-input.kay] default
 component default
