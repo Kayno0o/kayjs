@@ -64,6 +64,16 @@ const oversized = oversizedPages(pages)
 if (oversized.length > 0)
   throw new Error(`the release leaves ${oversized.join(', ')} over ${MAX_PAGE_BYTES} bytes, which tests/llms.test.ts would fail on: split the release's section into a new file first`)
 
+// `ft release` closes the milestone named after the version once the push succeeds, so its open issues are named here, before the tag, while the release can still wait for them.
+const milestone = await $`ft milestone ${version} --json`.quiet().nothrow()
+
+if (milestone.exitCode === 0) {
+  const { issues } = milestone.json() as { issues: { number: number, title: string }[] }
+
+  if (issues.length > 0)
+    console.warn(`milestone ${version} still holds ${issues.length} open issue${issues.length === 1 ? '' : 's'}, which the release leaves open:\n${issues.map(issue => `  #${issue.number} ${issue.title}`).join('\n')}`)
+}
+
 const start = (await $`git rev-parse HEAD`.text()).trim()
 const tag = `v${version}`
 
