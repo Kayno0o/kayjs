@@ -1,6 +1,7 @@
 import type { Commit, FileChange, FileMove, Identity } from './files'
 import type { CmsDraftEntry, CollectionInfo, EntryRef, Issue, JsonSchema, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { SaveEvent } from './settings'
+import { within } from '@kaynooo/utils/promise'
 import { KayError, redirectMovedPage, RedirectRefusedError } from 'kay/library'
 import { previewUrl } from 'kay/server'
 import { wording } from 'kay/words'
@@ -202,30 +203,20 @@ async function saved(event: SaveEvent): Promise<void> {
   if (hook === undefined)
     return
 
-  let timer: ReturnType<typeof setTimeout> | undefined
+  // A hook given up on may still fail later, which is logged as well.
+  const running = (async () => {
+    try {
+      await hook(event)
+    }
+    catch (error) {
+      log.error(`onSave failed for ${event.collection}/${event.slug}`, error)
+    }
 
-  try {
-    // A hook given up on may still fail later, which is logged as well.
-    const running = (async () => {
-      try {
-        await hook(event)
-      }
-      catch (error) {
-        log.error(`onSave failed for ${event.collection}/${event.slug}`, error)
-      }
+    return 'done' as const
+  })()
 
-      return 'done' as const
-    })()
-    const late = new Promise<'late'>((resolve) => {
-      timer = setTimeout(resolve, hookLimit, 'late')
-    })
-
-    if (await Promise.race([running, late]) === 'late')
-      log.error(`onSave for ${event.collection}/${event.slug} did not finish in ${hookLimit / 1000} s; the save does not wait for it`)
-  }
-  finally {
-    clearTimeout(timer)
-  }
+  if (await within(running, hookLimit, 'late' as const) === 'late')
+    log.error(`onSave for ${event.collection}/${event.slug} did not finish in ${hookLimit / 1000} s; the save does not wait for it`)
 }
 
 // Saves an entry where its collection keeps it: a loaded one through its loader, a folder one as a file through the configured saver.

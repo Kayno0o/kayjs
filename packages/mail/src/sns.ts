@@ -1,6 +1,7 @@
 import type { KeyObject } from 'node:crypto'
 import type { Found } from './events'
 import { createVerify, X509Certificate } from 'node:crypto'
+import { splitList } from '@kaynooo/utils/text'
 import { normalizeAddress } from 'kay/library'
 
 // Amazon SES delivers its events through an SNS topic subscribed to the app's endpoint. The message format and its signature are Amazon SNS's: https://docs.aws.amazon.com/sns/latest/dg/sns-verify-signature-of-message.html
@@ -43,7 +44,7 @@ const FIELDS_OF: Record<string, readonly string[]> = { SubscriptionConfirmation:
 
 // The topic ARNs a secret allows, comma separated.
 export function topicsOf(secret: string): string[] {
-  return secret.split(',').map(topic => topic.trim()).filter(topic => TOPIC_ARN.test(topic))
+  return splitList(secret).filter(topic => TOPIC_ARN.test(topic))
 }
 
 // `Name\nValue\n` for each field in byte order, one ending the string; an absent `Subject` is left out.

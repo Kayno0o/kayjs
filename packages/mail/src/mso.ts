@@ -1,4 +1,5 @@
 import type { JSX } from 'kay'
+import { splitList } from '@kaynooo/utils/text'
 import { html } from 'kay/html'
 
 // Markup only Outlook for Windows reads, inside a conditional comment. kay templates drop comments, but the server writes what `html()` from `kay/html` made into the markup as it is.
@@ -21,7 +22,7 @@ const QUOTES = /^['"]|['"]$/g
 
 // The fonts of a stack Windows has, and its generic family: Outlook for Windows is known to try the first font alone and fall back to Times New Roman when it lacks it, as with `system-ui` or a web font.
 export function windowsStack(stack: string): string {
-  const families = stack.split(',').map(family => family.trim())
+  const families = splitList(stack)
   const kept = families.filter(family => WINDOWS_FONTS.has(family.replace(QUOTES, '').toLowerCase()))
   const generic = families.map(family => family.toLowerCase()).find(family => Object.hasOwn(GENERIC, family)) ?? 'sans-serif'
 

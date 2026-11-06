@@ -1,3 +1,4 @@
+import { sleep } from '@kaynooo/utils/function'
 import { withBase } from 'kay'
 import { REBUILD_WINDOW } from './rebuild'
 
@@ -30,8 +31,6 @@ interface Watch {
   // Ends the watch early, as a newer save has taken over.
   cancelled?: () => boolean
 }
-
-const sleep = async (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
 // Reads the public page until it differs from how it stood right after the save and then holds still for two reads, so a rebuild that is under way, or a page that changes on each request, does not count. False when the window passes first or the watch is cancelled: a page that does not show the saved fields never turns live.
 export async function whenLive(url: string, { read = readPage, pause = sleep, interval = LIVE_INTERVAL, window = REBUILD_WINDOW, cancelled = () => false }: Watch = {}): Promise<boolean> {

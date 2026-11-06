@@ -10,6 +10,7 @@ import type { SmtpOverrides } from './smtp'
 import type { SuppressionStore } from './suppressions'
 import type { Address, Delivery, Envelope, Mail, MailMessage, Transport } from './types'
 import process from 'node:process'
+import { splitList } from '@kaynooo/utils/text'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
 import { direction } from 'kay/i18n'
@@ -549,7 +550,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
     const fromEnv = configured === undefined ? process.env.MAIL_TO : configured.to
 
-    return fromEnv !== undefined && fromEnv !== '' ? fromEnv.split(',').map(address => address.trim()) : undefined
+    return fromEnv !== undefined && fromEnv !== '' ? splitList(fromEnv) : undefined
   }
 
   // Before rendering, so a mail that cannot go is neither rendered nor queued to fail every retry.
