@@ -28,7 +28,7 @@ head
 ThemeToggle(modes={['light', { value: 'dark', label: 'Night' }]} label="Appearance")
 ```
 
-`showLabel` writes `label` above the group, and `@option(option)` draws each option in place of its label, as on [Segmented](/ui/segmented), whose `class` parts the toggle takes.
+`showLabel` writes `label` above the group, and `@option(option)` draws each option in place of its label, as on [Segmented](/ui/segmented). `class` is a string for the group, or `class={{ root: { option: 'p-2' } }}` for Segmented's parts.
 
 ## Holding the choice yourself
 

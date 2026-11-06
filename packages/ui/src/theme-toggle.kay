@@ -83,4 +83,4 @@ function pick(mode: ThemeMode, chosen: Option | undefined) {
   return answer
 }
 ---
-Segmented({...rest} options={choices()} value={current()} label={label} showLabel={showLabel} option={option} onChange={pick})
+Segmented(part="root" {...rest} options={choices()} value={current()} label={label} showLabel={showLabel} option={option} onChange={pick})
