@@ -610,8 +610,9 @@ describe('kay command line', () => {
       terminal.write('\x1B[H\x1B[1;5B \x1B[B\x1B[B\x1B[B \r')
 
       expect(await child.exited).toBe(0)
-      expect(screen).toContain('✓ Start from blank')
-      expect(screen).toContain('✓ Features server, starter, tailwind, accents')
+      // The answer is coloured on a terminal and plain where an agent's variable or NO_COLOR reaches the child, so the text is read without its escapes.
+      expect(Bun.stripANSI(screen)).toContain('✓ Start from blank')
+      expect(Bun.stripANSI(screen)).toContain('✓ Features server, starter, tailwind, accents')
 
       const files = await readdir(join(dir, 'picked'), { recursive: true })
 
