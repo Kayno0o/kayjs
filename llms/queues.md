@@ -50,7 +50,7 @@ for job of jobs<{ target: string }>('scans')
 
 ### Write a flow that sleeps and waits
 
-A `workflow` runs steps once each, keeps their results in the job store and survives restarts. `start` and `send` are one call, and the `id` names the run. Used like a queue: `export default onboarding` in `src/plugins/jobs.ts`, or `.use(onboarding)` before `pages()` in `src/server.ts`.
+A `workflow` runs steps once each, keeps their results in the job store and survives restarts. `start` and `send` are one call, and the `id` names the run. It is mounted like a queue, as a default export of `src/plugins/jobs.ts`.
 
 ```ts
 // src/plugins/jobs.ts
