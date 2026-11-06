@@ -898,27 +898,21 @@ it('installs a package at its latest version when kay carries no devDependencies
   expect(rangeIn({ version: '1.2.3', devDependencies: { '@iconify-json/tabler': '^1.0.0' } }, '@iconify-json/tabler')).toBe('^1.0.0')
 })
 
-it('writes the CLAUDE.md and .mcp.json a project with an AGENTS.md lacks, and nothing to one without', async () => {
+it('never writes back the CLAUDE.md and .mcp.json the app deleted', async () => {
   const dir = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
-  const bare = join(await mkdtemp(join(tmpdir(), 'kay-add-')), 'app')
 
   try {
     const features = PRESETS.server.features.filter(feature => feature !== 'eslint')
 
     await createProject(dir, { kay: '^1.0.0', features })
-    await createProject(bare, { kay: '^1.0.0', features, agents: false })
     await rm(join(dir, 'CLAUDE.md'))
     await rm(join(dir, '.mcp.json'))
     await addFeatures(dir, ['eslint'], { install: false })
-    await addFeatures(bare, ['eslint'], { install: false })
 
-    expect(await Bun.file(join(dir, 'CLAUDE.md')).text()).toBe('@AGENTS.md\n')
-    expect(await Bun.file(join(dir, '.mcp.json')).exists()).toBe(true)
-    expect(await Bun.file(join(bare, 'CLAUDE.md')).exists()).toBe(false)
-    expect(await Bun.file(join(bare, '.mcp.json')).exists()).toBe(false)
+    expect(await Bun.file(join(dir, 'CLAUDE.md')).exists()).toBe(false)
+    expect(await Bun.file(join(dir, '.mcp.json')).exists()).toBe(false)
   }
   finally {
     await rm(join(dir, '..'), { recursive: true, force: true })
-    await rm(join(bare, '..'), { recursive: true, force: true })
   }
 })

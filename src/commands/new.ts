@@ -40,7 +40,7 @@ export const scaffold: Command = {
       }
 
       if (values.agents !== undefined && values.agents !== 'none') {
-        reportFailure(`kay new: --agents is ${String(values.agents)}, which is none of none`, format)
+        reportFailure(`kay new: --agents is ${String(values.agents)}, which is not allowed: --agents takes none`, format)
 
         return 1
       }

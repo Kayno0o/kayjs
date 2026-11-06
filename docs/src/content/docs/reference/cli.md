@@ -74,7 +74,7 @@ The workflow can read the repository and nothing more, except a Pages workflow, 
 
 Every project gets an `AGENTS.md` for coding agents, a `CLAUDE.md` that imports it for Claude Code, and a `.mcp.json` that registers [`kay mcp`](/guides/other-editors) for it, so the agent has kay's tools with no `claude mcp add`.
 
-`kay add` writes the last two into a project that has an `AGENTS.md` and lacks them.
+`kay add` never writes them, so a project made earlier gets them by copying them from a `kay new` of the same version.
 
 `AGENTS.md` points them at kay's docs for the installed version and names the checks the project's scripts run. It also tells them to set `seo.name` to the real name of the site: every page title ends with it, and `kay new` fills it in from the folder name.
 

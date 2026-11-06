@@ -16,7 +16,8 @@ import { loadConfig } from '../src/config-loader'
 import { formatFiles } from '../src/format'
 import { createProject, detectHost, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
 import { SEARCH_MANIFEST } from '../src/runtime/search'
-import { TAILWIND_CLASS_REGEX } from '../src/templates'
+import { projectCapabilities } from '../src/mcp/tools'
+import { agentsFile, TAILWIND_CLASS_REGEX } from '../src/templates'
 import { listeningPort } from './listening'
 import { lintInProcess } from './scaffold-lint'
 
@@ -1278,6 +1279,14 @@ describe('kay build --compile', () => {
       await server.exited
     }
   }, 120_000)
+})
+
+it('names every tool of kay mcp in AGENTS.md', async () => {
+  const { tools } = await projectCapabilities(tmpdir())
+  const agents = agentsFile({}, false)
+
+  for (const { name } of tools)
+    expect(agents).toContain(`\`${name}\``)
 })
 
 it('leaves out AGENTS.md, CLAUDE.md and .mcp.json with agents false', async () => {
