@@ -35,7 +35,7 @@ export async function cmsSignInAs(site: Pick<TestSite, 'cookies' | 'fetch'>, rol
   const chosen = role ?? (roles.length === 1 ? roles[0] : undefined)
 
   if (chosen === undefined || !roles.includes(chosen))
-    throw configError('cms', 'cmsSignInAs', `cmsSignInAs needs one of the guard's roles (${roles.join(', ')})${role === undefined ? '' : `, not ${JSON.stringify(role)}`}`)
+    throw configError('cms', 'guard', `cmsSignInAs needs one of the guard's roles (${roles.join(', ')})${role === undefined ? '' : `, not ${JSON.stringify(role)}`}`)
 
   const cookie = passwords.issue(chosen, false)
 

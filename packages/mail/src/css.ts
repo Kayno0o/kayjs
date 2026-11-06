@@ -15,7 +15,7 @@ function read(path: string): string {
     return readFileSync(path, 'utf8')
   }
   catch {
-    throw configError('mail', 'css', `the mail settings take their colours from ${path}, which cannot be read; a server built with \`kay build --compile\` carries no source file, so import the stylesheet's text with \`with { type: 'text' }\` instead`)
+    throw configError('mail', 'cssColors', `the mail settings take their colours from ${path}, which cannot be read; a server built with \`kay build --compile\` carries no source file, so import the stylesheet's text with \`with { type: 'text' }\` instead`)
   }
 }
 
@@ -26,7 +26,7 @@ export function cssColors(stylesheet: string | URL, name = 'the stylesheet'): (p
 
   // A string was a file's path before kayjs-mail 0.8, and a stylesheet declaring custom properties holds a rule.
   if (typeof stylesheet === 'string' && !RULE.test(css))
-    throw configError('mail', 'css', `the mail settings take their colours from ${JSON.stringify(css)}, which is no stylesheet; give its text, imported with \`with { type: 'text' }\`, or its file as a URL`)
+    throw configError('mail', 'cssColors', `the mail settings take their colours from ${JSON.stringify(css)}, which is no stylesheet; give its text, imported with \`with { type: 'text' }\`, or its file as a URL`)
 
   const declared = new Map<string, string>()
 
@@ -44,10 +44,10 @@ export function cssColors(stylesheet: string | URL, name = 'the stylesheet'): (p
     const value = declared.get(property)
 
     if (value === undefined)
-      throw configError('mail', 'css', `${[...seen, property].join(' -> ')} is not declared in ${named}`)
+      throw configError('mail', 'cssColors', `${[...seen, property].join(' -> ')} is not declared in ${named}`)
 
     if (seen.includes(property))
-      throw configError('mail', 'css', `${[...seen, property].join(' -> ')} in ${named} refers to itself`)
+      throw configError('mail', 'cssColors', `${[...seen, property].join(' -> ')} in ${named} refers to itself`)
 
     return expand(value, [...seen, property])
   }
@@ -57,10 +57,10 @@ export function cssColors(stylesheet: string | URL, name = 'the stylesheet'): (p
     const rgba = Bun.color(value, '[rgba]')
 
     if (rgba === null)
-      throw configError('mail', 'css', `${property} in ${named} is ${value}, which is no colour`)
+      throw configError('mail', 'cssColors', `${property} in ${named} is ${value}, which is no colour`)
 
     if (rgba[3] !== OPAQUE)
-      throw configError('mail', 'css', `${property} in ${named} is ${value}, a colour seen through, which mail clients show unevenly; give the mail an opaque one`)
+      throw configError('mail', 'cssColors', `${property} in ${named} is ${value}, a colour seen through, which mail clients show unevenly; give the mail an opaque one`)
 
     return Bun.color(value, 'hex')!
   }

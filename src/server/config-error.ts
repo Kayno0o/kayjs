@@ -13,6 +13,7 @@ export function configError(library: ConfigLibrary, option: string, message: str
 export function configError(message: string, options?: ErrorOptions): KayError
 export function configError(option: string, value: unknown, takes: string): KayError
 export function configError(first: string, second?: unknown, third?: string | ErrorOptions, fourth?: ErrorOptions): KayError {
+  // An old three-string call whose option is literally a library name reads as the new form, accepted for the three-minor window.
   if (LIBRARIES.has(first) && typeof second === 'string' && typeof third === 'string')
     return new KayError('config-invalid', `kay: ${third} (kayjs-${first} option \`${second}\`: kayjs-${first}/llms.txt)`, fourth)
 

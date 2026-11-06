@@ -517,10 +517,11 @@ describe('the naming conventions', () => {
             continue
           }
 
-          for (const segment of option.split('.')) {
-            if (!new RegExp(`\`[^\`\\n]*\\b${segment}\\b[^\`\\n]*\``).test(docs))
-              found.push(`${file}: option ${option} is not written in the llms of ${library}`)
-          }
+          // The option's last segment is a name of its own: a span equal to it or ending in `.name` or `name(`, or a `name:` / `name?:` key in code.
+          const segment = option.split('.').at(-1)!
+
+          if (!new RegExp(`\`(?:[^\`\\n]*\\.)?${segment}(?:\\(|\`)|\\b${segment}\\??:`).test(docs))
+            found.push(`${file}: option ${option} is not written in the llms of ${library}`)
         }
       }
     }

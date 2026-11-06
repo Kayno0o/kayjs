@@ -254,10 +254,10 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
   const make = (name: string, options: ListOptions): Entry => {
     if (!NAME.test(name))
-      throw configError('mail', 'list', `mail.list(${JSON.stringify(name)}): a list's name is letters, digits, dashes and underscores, at most 40 characters`)
+      throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): a list's name is letters, digits, dashes and underscores, at most 40 characters`)
 
     if (options.store !== undefined && options.file !== undefined)
-      throw configError('mail', 'list', `mail.list(${JSON.stringify(name)}): give a store or a file, not both`)
+      throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): give a store or a file, not both`)
 
     const file = () => options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : defaultFile() ?? LIST_FILE)
     const chosen = () => options.store ?? (options.file === undefined ? defaultStore() : undefined)
@@ -280,7 +280,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     const pace = { batch: options.pace?.batch ?? 20, every: options.pace?.every ?? '1m' }
 
     if (!Number.isInteger(pace.batch) || pace.batch < 1)
-      throw configError('mail', 'list', `mail.list(${JSON.stringify(name)}): pace.batch is ${pace.batch}, a whole number of at least 1`)
+      throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): pace.batch is ${pace.batch}, a whole number of at least 1`)
 
     durationSeconds(pace.every, `mail.list(${JSON.stringify(name)})'s pace.every`)
 
@@ -292,7 +292,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         void new URL(options.privacy, 'https://kay.invalid')
       }
       catch {
-        throw configError('mail', 'list', `mail.list(${JSON.stringify(name)}): privacy is ${JSON.stringify(options.privacy)}, a path or a URL`)
+        throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): privacy is ${JSON.stringify(options.privacy)}, a path or a URL`)
       }
     }
 
@@ -537,7 +537,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         host.activate()
       }
       else if ((options.store ?? options.file) !== undefined && (options.store ?? options.file) !== entry.source) {
-        throw configError('mail', 'list', `mail.list(${JSON.stringify(name)}): the list was made with another ${options.store === undefined ? 'file' : 'store'}, and a list keeps one`)
+        throw configError('mail', 'mail.list', `mail.list(${JSON.stringify(name)}): the list was made with another ${options.store === undefined ? 'file' : 'store'}, and a list keeps one`)
       }
 
       return entry.list

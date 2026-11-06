@@ -194,10 +194,10 @@ function uploadSize(maxSize: ByteSize | undefined): number {
   const bytes = byteSize(maxSize, '`cms({ uploads: { maxSize } })`')
 
   if (!Number.isInteger(bytes))
-    throw configError('cms', 'extensions', `\`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes a whole number of bytes`)
+    throw configError('cms', 'uploads.maxSize', `\`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes a whole number of bytes`)
 
   if (bytes > LARGEST_MAX_SIZE)
-    throw configError('cms', 'extensions', `\`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes at most ${LARGEST_MAX_SIZE} bytes, 128 MB less the multipart envelope, as Bun refuses a request body over 128 MB before the upload route sees it`)
+    throw configError('cms', 'uploads.maxSize', `\`cms({ uploads: { maxSize } })\` is ${JSON.stringify(maxSize)}, which is ${bytes} bytes; it takes at most ${LARGEST_MAX_SIZE} bytes, 128 MB less the multipart envelope, as Bun refuses a request body over 128 MB before the upload route sees it`)
 
   return bytes
 }

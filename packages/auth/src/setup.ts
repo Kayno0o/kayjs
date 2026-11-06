@@ -324,7 +324,7 @@ function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: strin
   const defaultScopes = typeof wanted === 'object' ? [...new Set(wanted.defaultScopes)] : []
 
   if (defaultScopes.some(scope => !options.scopes?.includes(scope)))
-    throw configError('auth', 'oauthServer.defaultScopes', '`oauthServer.defaultScopes` names a scope that `scopes` does not declare')
+    throw configError('auth', 'scopes', '`oauthServer.defaultScopes` names a scope that `scopes` does not declare')
 
   // Switched on by the app, not by the pages and the store alone, which every app with the prebuilt pages has.
   if (wanted !== undefined && (options.scopes?.length ?? 0) === 0)
