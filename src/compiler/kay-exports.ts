@@ -61,6 +61,7 @@ export const KAY_ROLES: Readonly<Record<string, KayRole>> = {
   previewing: 'browser',
   publicEnv: 'shared',
   queryParam: 'browser',
+  randomId: 'browser',
   recipe: 'shared',
   reducedMotion: 'browser',
   refresh: 'browser',
