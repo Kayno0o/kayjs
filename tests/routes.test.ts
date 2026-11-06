@@ -95,7 +95,7 @@ describe('kay routes', () => {
         'GET | /_kay/health | kay | health check',
         'GET | /_kay/env.js | kay | public environment',
         'GET | /_kay/* | kay | build files',
-        'GET | /_kay/images | kay | image variants',
+        'GET | /_kay/images | kay | image resizer (`/_kay/image` before 1.92, answered until 1.95)',
         'GET | /_kay/card | kay | share cards',
         'GET | /_kay/files/* | kay | stored files',
         'POST | /_kay/error | kay | browser error reports',

@@ -3,7 +3,7 @@ import { s } from 'kay'
 import { BOARD, board } from '../board'
 import { db } from '../db'
 import { Notice } from '../db/notice'
-import { announcements } from '../jobs'
+import { announcements } from '../plugins/jobs'
 import { latestNotices } from '../notices'
 
 export const post = action(s.Object({

@@ -1,10 +1,10 @@
 import { AuthUsers } from '@kaynooo/kayjs-auth/pg'
 import { siteUrl } from 'kay/seo'
 import { queue } from 'kay/server'
-import { db } from './db'
-import { Notice } from './db/notice'
-import { mail } from './mail'
-import Announcement from './mails/announcement.kay'
+import { db } from '../db'
+import { Notice } from '../db/notice'
+import { mail } from '../mail'
+import Announcement from '../mails/announcement.kay'
 
 // Tells every other member with a verified address about a new notice, in the background: the post answers at once, and a database hiccup is retried.
 export const announcements = queue('announcements', async ({ noticeId }: { noticeId: number }) => {
@@ -20,3 +20,5 @@ export const announcements = queue('announcements', async ({ noticeId }: { notic
   for (const user of users.filter(each => each.id !== notice.author_id && each.email !== null))
     await mail.enqueue({ to: user.email!, subject: `New notice: ${notice.title}`, view: Announcement, props: { title: notice.title, author, url: siteUrl(`/notices/${notice.id}`) } })
 }, { attempts: 3 })
+
+export default announcements

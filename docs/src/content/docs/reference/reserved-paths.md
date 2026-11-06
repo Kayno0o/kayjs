@@ -16,9 +16,11 @@ A route follows the same rule. An endpoint is `/_kay/<noun>`, such as `/_kay/car
 | Path | Holds |
 | --- | --- |
 | `src/routes/` | pages, layouts, endpoints and guards |
+| `kay.config.ts` | the project's settings |
+| `public/` | files served as they are, from the site root |
+| `data/` | the SQLite files and stored files of the default stores, ignored by git and docker |
 | `src/api/` | API modules |
 | `src/plugins/` | server plugins, one per file; `plugins/jobs.ts` is the one home of queues, workflows and schedules |
-
 | `src/messages/` | one catalog per locale, `<locale>.ts` |
 | `src/params/` | route param matchers, `<name>.ts` |
 | `src/content/` and `src/content.config.ts` | Markdown collections and their schemas |
@@ -30,6 +32,7 @@ A route follows the same rule. An endpoint is `/_kay/<noun>`, such as `/_kay/car
 | `src/context.ts` | `defineContext` request values |
 | `src/env.ts` | `defineEnv` variables |
 | `src/theme.ts`, `src/app.css` | the theme and the stylesheet |
+| `src/logo.svg` | the card logo, where `card.logo` points at it |
 
 ## Routes
 
