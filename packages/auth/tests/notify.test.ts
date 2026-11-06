@@ -192,9 +192,11 @@ describe('sendAside', () => {
 
       jest.advanceTimersByTime(31_000)
 
-      // The give-up passes through the timeout race and the catch, a few ticks.
-      for (let tick = 0; tick < 10; tick++)
+      // The give-up is logged once it has passed through the timeout race and the catch, however many ticks that takes.
+      for (let tick = 0; tick < 100 && !logged.mock.calls.some(([message]) => String(message).includes('failed')); tick++)
         await Promise.resolve()
+
+      expect(logged.mock.calls.some(([message]) => String(message).includes('failed'))).toBe(true)
 
       const before = handed
 
