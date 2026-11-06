@@ -360,7 +360,7 @@ describe.concurrent('kay mcp', () => {
       const { result } = await agent.request('tools/call', { name: 'doctor', arguments: { port: busy.port } })
       const checks = (result?.structuredContent as { checks: { name: string, ok: boolean }[] }).checks
 
-      expect(checks.map(check => check.name)).toEqual(['bun', 'versions', 'config', 'env', 'port', 'build'])
+      expect(checks.map(check => check.name)).toEqual(['bun', 'versions', 'tsconfig', 'config', 'env', 'port', 'build', 'browser', 'database'])
       expect(checks.find(check => check.name === 'port')!.ok).toBe(false)
       expect(result?.isError).toBeUndefined()
     }

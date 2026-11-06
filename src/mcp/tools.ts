@@ -206,7 +206,7 @@ function tools(root: string): Tool[] {
     {
       name: 'doctor',
       title: 'Diagnose the setup',
-      description: 'Checks what can keep the project from running, without starting it: the Bun version, kay and its libraries on one minor, the config loading, the declared environment variables being set, the port being free and `.kay` being built by this kay. Answers `{ checks }`, each with its name, whether it is ok, a message and, on a failure, the `fix`. A failing check is a result, not a failure of the tool.',
+      description: 'Checks what can keep the project from running, without starting it: the Bun version, kay and its libraries on one minor, a tsconfig.json, the config loading and its i18n locales being consistent, the declared environment variables being set, the port being free, `.kay` being built by this kay, a Chrome or Chromium being found (a warning) and `DATABASE_URL` answering. Answers `{ checks }`, each with its name, whether it is ok, a message, `warning` when ok but worth a look and, on a failure, the `fix`. A failing check is a result, not a failure of the tool.',
       inputSchema: { type: 'object', properties: { port: { type: 'integer', minimum: 1, maximum: 65_535, description: 'The port to check is free; PORT, else 3000, by default.' } }, additionalProperties: false },
       annotations: READ_ONLY,
       run: async (args) => {

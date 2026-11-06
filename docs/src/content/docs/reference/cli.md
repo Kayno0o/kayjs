@@ -520,12 +520,15 @@ kay doctor --port 4000
 | --- | --- |
 | `bun` | Bun is older than kay needs |
 | `versions` | `@kaynooo/kayjs` or a `@kaynooo/kayjs-*` library listed in `package.json` is not installed, or a library is not on kay's minor |
-| `config` | `kay.config.ts` does not load |
+| `tsconfig` | No `tsconfig.json` in the project or above it, which `kay check` types the project through |
+| `config` | `kay.config.ts` does not load, or its `i18n` is refused (a default outside the locales, a bad tag, a domain for no locale) |
 | `env` | A variable the project declares as required is set neither in the shell nor in the project's `.env` files. `kay env` lists them |
 | `port` | The port is in use. It is `--port`, else `PORT`, else 3000. The port of this project's own `kay dev` passes. It is tried on `HOST` when set, else on every IPv4 address and on both loopback addresses (IPv4 and IPv6), and `0` passes as a port the system picks |
 | `build` | `.kay/client` or `.kay/dev` was built by another kay, which `kay build` or a restart of `kay dev` fixes |
+| `browser` | Never fails: warns when no Chrome or Chromium is found (`BUN_CHROME_PATH`, the PATH or Playwright's cache), which `kay screenshot`, `kay a11y` and `testSite({ browser })` need |
+| `database` | `DATABASE_URL`, from the shell or `.env`, does not answer: a Postgres url gets a `select 1` within 3 seconds, a `sqlite://` file must open read-only (one not created yet passes). Unset passes |
 
-`--format json` prints `{ checks }`, each with its `name`, `ok`, `message` and, on a failure, its `fix`.
+`--format json` prints `{ checks }`, each with its `name`, `ok`, `message`, `warning` on an ok check worth a look and, on a failure, its `fix`.
 
 ## kay env
 

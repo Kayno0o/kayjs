@@ -3,14 +3,18 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { findUp } from '@kaynooo/cli-kit'
+import { SQL } from 'bun'
+import { Database } from 'bun:sqlite'
 import { version as runningVersion } from '../../package.json'
 import { KAY_DIR } from '../build/assets'
 import { bunProblem } from '../bun'
 import { loadConfig } from '../config-loader'
 import { readDevAddress } from '../dev/address'
 import { loopbackTaken } from '../dev/loopback'
+import { sqlitePath } from '../server/app-database'
 import { readManifest } from '../server/client'
 import { buildingWithoutEnv } from '../server/env-state'
+import { localeSettings } from '../server/i18n'
 import { formatOption, isPort, printDocument, projectRoot, withStdoutOnStderr } from './command'
 import { listEnv } from './env'
 
@@ -18,6 +22,8 @@ export interface Check {
   name: string
   ok: boolean
   message: string
+  // Set on an ok check that is worth a look: shown as `warn`, and no reason for a failing exit code.
+  warning?: boolean
   // What to run or change, on a failure.
   fix?: string
 }
@@ -29,6 +35,8 @@ const DEPENDENCY_SECTIONS = ['dependencies', 'devDependencies', 'optionalDepende
 const BUILDS = [{ dir: `${KAY_DIR}/client`, fix: 'run `kay build`' }, { dir: `${KAY_DIR}/dev`, fix: 'restart `kay dev`' }]
 // A manifest `kay dev` or `kay build` is writing reads as half a file: it is read again after this long before it counts as unreadable.
 const MANIFEST_RETRY_MS = 150
+// How long the database named by DATABASE_URL has to answer.
+const DATABASE_TIMEOUT_S = 3
 const DEFAULT_PORTS: Record<string, string> = { 'http:': '80', 'https:': '443' }
 const DEFAULT_PORT = 3000
 const LINE_BREAK = /\r?\n/
@@ -68,8 +76,10 @@ export const doctor: Command = {
   },
 }
 
-function formatCheck({ name, ok, message, fix }: Check): string {
-  return `${ok ? 'ok  ' : 'FAIL'} ${name.padEnd(8)} ${message}${fix === undefined ? '' : `\n${' '.repeat(14)}fix: ${fix}`}`
+function formatCheck({ name, ok, message, warning, fix }: Check): string {
+  const status = ok ? 'ok  ' : 'FAIL'
+
+  return `${warning === true ? 'warn' : status} ${name.padEnd(8)} ${message}${fix === undefined ? '' : `\n${' '.repeat(14)}fix: ${fix}`}`
 }
 
 export async function diagnose(root: string, port?: string): Promise<Check[]> {
@@ -78,10 +88,13 @@ export async function diagnose(root: string, port?: string): Promise<Check[]> {
   return [
     bunCheck(root),
     versionsCheck(root),
+    tsconfigCheck(root),
     await configCheck(root),
     await envCheck(root, dotenv),
     await portCheck(root, port ?? process.env.PORT ?? dotenv.PORT ?? String(DEFAULT_PORT), process.env.HOST ?? dotenv.HOST),
     await buildCheck(root),
+    await browserCheck(),
+    await databaseCheck(dotenv.DATABASE_URL),
   ]
 }
 
@@ -142,12 +155,79 @@ function versionsCheck(root: string): Check {
 
 async function configCheck(root: string): Promise<Check> {
   try {
-    await loadConfig(root)
+    const config = await loadConfig(root)
+
+    if (config.i18n !== undefined)
+      localeSettings(config.i18n)
 
     return { name: 'config', ok: true, message: existsSync(join(root, 'kay.config.ts')) ? 'kay.config.ts loads' : 'no kay.config.ts, the defaults apply' }
   }
   catch (error) {
     return { name: 'config', ok: false, message: firstLine(error), fix: 'fix kay.config.ts, then `kay check` points at the line' }
+  }
+}
+
+// The project's types are checked through its tsconfig.json, which a workspace may keep above the project.
+function tsconfigCheck(root: string): Check {
+  const found = findUp('tsconfig.json', root)
+
+  return found === undefined
+    ? { name: 'tsconfig', ok: false, message: 'no tsconfig.json in the project or above it', fix: 'add a tsconfig.json (`kay new` writes one), as `kay check` types the project through it' }
+    : { name: 'tsconfig', ok: true, message: found === join(root, 'tsconfig.json') ? 'tsconfig.json found' : `${found} found` }
+}
+
+// Chrome or Chromium drive `kay screenshot`, `kay a11y` and `testSite({ browser })`; an app that uses none of them is no worse off without one, so a missing browser warns.
+async function browserCheck(): Promise<Check> {
+  const { browserPath } = await import('../test/browser')
+  const found = browserPath()
+
+  if (found !== undefined)
+    return { name: 'browser', ok: true, message: found }
+
+  const given = process.env.BUN_CHROME_PATH
+
+  return { name: 'browser', ok: true, warning: true, message: `no Chrome or Chromium found${given === undefined || given === '' ? '' : ` (BUN_CHROME_PATH=${given} is none)`}`, fix: 'install one, or set BUN_CHROME_PATH to its path' }
+}
+
+// DATABASE_URL, from the shell or `.env`, must answer: Postgres a `select 1` within a few seconds, SQLite a file that opens read-only (a file not created yet is the first start's to make).
+async function databaseCheck(fromDotenv: string | undefined): Promise<Check> {
+  const url = process.env.DATABASE_URL === undefined || process.env.DATABASE_URL === '' ? fromDotenv : process.env.DATABASE_URL
+
+  if (url === undefined)
+    return { name: 'database', ok: true, message: 'DATABASE_URL is not set' }
+
+  const file = sqlitePath(url)
+
+  try {
+    if (file !== undefined) {
+      if (!existsSync(file))
+        return { name: 'database', ok: true, message: `${file} is created on first start` }
+
+      const database = new Database(file, { readonly: true })
+
+      try {
+        database.query('select 1').get()
+      }
+      finally {
+        database.close()
+      }
+
+      return { name: 'database', ok: true, message: `${file} opens` }
+    }
+
+    const sql = new SQL(url, { max: 1, connectionTimeout: DATABASE_TIMEOUT_S, idleTimeout: 1 })
+
+    try {
+      await sql`select 1`
+    }
+    finally {
+      await sql.close()
+    }
+
+    return { name: 'database', ok: true, message: 'DATABASE_URL answers' }
+  }
+  catch (error) {
+    return { name: 'database', ok: false, message: `DATABASE_URL does not answer: ${firstLine(error)}`, fix: 'start the database, or fix DATABASE_URL in the shell or in .env' }
   }
 }
 

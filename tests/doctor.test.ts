@@ -1,7 +1,9 @@
-import { rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { createServer } from 'node:net'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
+import { Database } from 'bun:sqlite'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { version } from '../package.json'
 import { manifestOf } from '../src/commands/doctor'
@@ -18,6 +20,7 @@ interface Check {
   name: string
   ok: boolean
   message: string
+  warning?: boolean
   fix?: string
 }
 
@@ -29,7 +32,7 @@ async function project(files: Record<string, string> = {}): Promise<string> {
   const root = await scratchDir('doctor-')
 
   dirs.push(root)
-  await Promise.all(Object.entries({ 'package.json': '{ "name": "app" }', ...files }).map(async ([path, content]) => Bun.write(join(root, path), content)))
+  await Promise.all(Object.entries({ 'package.json': '{ "name": "app" }', 'tsconfig.json': '{}', ...files }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
   return root
 }
@@ -74,15 +77,15 @@ describe('kay doctor', () => {
     const result = await doctor(root, [], { PORT: port })
 
     expect(result.code, result.stderr).toBe(0)
-    expect(result.checks.map(check => check.name)).toEqual(['bun', 'versions', 'config', 'env', 'port', 'build'])
+    expect(result.checks.map(check => check.name)).toEqual(['bun', 'versions', 'tsconfig', 'config', 'env', 'port', 'build', 'browser', 'database'])
     expect(result.checks.every(check => check.ok)).toBe(true)
 
     const text = Bun.spawnSync([process.execPath, cli, 'doctor'], { cwd: root, env: { PATH: process.env.PATH!, PORT: port } })
     const lines = text.stdout.toString().trimEnd().split('\n')
 
     expect(text.exitCode).toBe(0)
-    expect(lines).toHaveLength(6)
-    expect(lines.every(line => line.startsWith('ok '))).toBe(true)
+    expect(lines).toHaveLength(9)
+    expect(lines.every(line => line.startsWith('ok ') || line.startsWith('warn'))).toBe(true)
   })
 
   it('--quiet prints nothing while every check passes', async () => {
@@ -141,8 +144,74 @@ describe('kay doctor', () => {
     expect(result.code).toBe(1)
     expect(result.check('config').ok).toBe(false)
     expect(result.check('config').message).toContain('boom in the config')
-    expect(result.checks).toHaveLength(6)
+    expect(result.checks).toHaveLength(9)
     expect(result.check('bun').ok).toBe(true)
+  })
+
+  it('refuses a config whose i18n default is none of its locales, as kay routes does', async () => {
+    const result = await doctor(await project({ 'kay.config.ts': 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'de\' } }\n' }))
+
+    expect(result.code).toBe(1)
+    expect(result.check('config').ok).toBe(false)
+    expect(result.check('config').message).toContain('defaultLocale')
+
+    const both = await doctor(await project({ 'kay.config.ts': 'export default { i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', prefixDefault: true, domains: { en: \'a.com\', fr: \'b.com\' } } }\n' }))
+
+    expect(both.check('config').message).toContain('not both')
+  })
+
+  it('fails a project with no tsconfig.json', async () => {
+    // Outside the checkout, whose own tsconfig.json a scratch project would find above it.
+    const root = await mkdtemp(join(tmpdir(), 'doctor-no-tsconfig-'))
+
+    dirs.push(root)
+    await Bun.write(join(root, 'package.json'), '{ "name": "app" }')
+
+    const result = await doctor(root)
+
+    expect(result.check('tsconfig').ok).toBe(false)
+    expect(result.check('tsconfig').fix).toContain('tsconfig.json')
+    expect((await doctor(await project())).check('tsconfig').ok).toBe(true)
+  })
+
+  it('warns, without failing, when no browser is found, and finds one named by BUN_CHROME_PATH', async () => {
+    const root = await project()
+    const none = await doctor(root, [], { BUN_CHROME_PATH: join(root, 'no-chrome') })
+
+    expect(none.check('browser')).toMatchObject({ ok: true, warning: true, fix: expect.stringContaining('BUN_CHROME_PATH') })
+    expect(none.check('browser').message).toContain('no-chrome')
+
+    const found = await doctor(root, [], { BUN_CHROME_PATH: process.execPath })
+
+    expect(found.check('browser')).toMatchObject({ ok: true, message: process.execPath })
+    expect(found.check('browser').warning).toBeUndefined()
+  })
+
+  describe('database', () => {
+    it('passes with no DATABASE_URL, and with a SQLite file that opens or is not made yet', async () => {
+      const root = await project()
+      const file = join(root, 'app.sqlite')
+
+      expect((await doctor(root)).check('database').ok).toBe(true)
+      expect((await doctor(root, [], { DATABASE_URL: `sqlite://${file}` })).check('database').message).toContain('created on first start')
+
+      new Database(file, { create: true }).close()
+
+      expect((await doctor(root, [], { DATABASE_URL: `sqlite://${file}` })).check('database').message).toContain('opens')
+    })
+
+    it('fails a Postgres url nothing answers at, naming the fix, reading it from the dotenv file too', async () => {
+      const busy = await busyPort('127.0.0.1')
+
+      busy.release()
+
+      const url = `postgres://u:p@127.0.0.1:${busy.port}/db`
+      const fromShell = await doctor(await project(), [], { DATABASE_URL: url })
+
+      expect(fromShell.check('database').ok).toBe(false)
+      expect(fromShell.check('database').fix).toContain('DATABASE_URL')
+      expect((await doctor(await project({ '.env': `DATABASE_URL=${url}\n` }))).check('database').ok).toBe(false)
+    })
   })
 
   describe('env', () => {
