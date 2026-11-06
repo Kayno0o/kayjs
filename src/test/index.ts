@@ -271,6 +271,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
   // A site made at the top of a file or a describe posts as a new client in each test, so no test meets the rate limits another one's posts counted; one made inside a test, or outside bun test, keeps one.
   const logs: LogEntry[] = []
+  // Shared by `as()` views of the site: whether `advance()` moved the clock, which closing the site and the end of the file put back.
+  const clockMoved = { value: false }
   const untap = tapLogs(entry => void logs.push(entry))
 
   try {
@@ -279,6 +281,10 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       logs.length = 0
     })
     afterAll(release)
+    afterAll(() => {
+      if (clockMoved.value)
+        setSystemTime()
+    })
   }
   catch {}
 
@@ -433,28 +439,35 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         const cursors = new Map(scheduledOf(app).map(entry => [entry, Date.now()]))
         let fired = 0
 
-        for (;;) {
-          let soonest: { entry: ReturnType<typeof scheduledOf>[number], at: number } | undefined
+        clockMoved.value = true
 
-          for (const [entry, from] of cursors) {
-            const at = entry.next(from)
+        try {
+          for (;;) {
+            let soonest: { entry: ReturnType<typeof scheduledOf>[number], at: number } | undefined
 
-            if (at !== null && at <= target && (!soonest || at < soonest.at))
-              soonest = { entry, at }
+            for (const [entry, from] of cursors) {
+              const at = entry.next(from)
+
+              if (at !== null && at <= target && (!soonest || at < soonest.at))
+                soonest = { entry, at }
+            }
+
+            if (!soonest)
+              break
+
+            if (++fired > MAX_ADVANCE_RUNS)
+              throw new Error(`kay: advancing ${String(by)} fires more than ${MAX_ADVANCE_RUNS} scheduled runs; advance in smaller steps`)
+
+            cursors.set(soonest.entry, soonest.at)
+            setSystemTime(soonest.at)
+            await soonest.entry.fire()
           }
-
-          if (!soonest)
-            break
-
-          if (++fired > MAX_ADVANCE_RUNS)
-            throw new Error(`kay: advancing ${String(by)} fires more than ${MAX_ADVANCE_RUNS} scheduled runs; advance in smaller steps`)
-
-          cursors.set(soonest.entry, soonest.at)
-          setSystemTime(soonest.at)
-          await soonest.entry.fire()
+        }
+        finally {
+          // Where the span ends, a throw or the cap included.
+          setSystemTime(target)
         }
 
-        setSystemTime(target)
         await drainQueues()
 
         return fired
@@ -500,6 +513,12 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       },
       close: async () => {
         forget()
+
+        if (clockMoved.value) {
+          setSystemTime()
+          clockMoved.value = false
+        }
+
         setSiteFiles(undefined, ownFiles)
         untap()
 

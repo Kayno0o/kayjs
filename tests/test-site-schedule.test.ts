@@ -73,7 +73,19 @@ describe('site.advance()', () => {
     expect(ran.filter(name => name === 'quick')).toHaveLength(120)
   })
 
-  it('refuses a span firing past the cap', async () => {
+  it('refuses a span firing past the cap, the clock landing on the target all the same', async () => {
+    setSystemTime(new Date('2030-01-01T00:00:00Z'))
     await expect(site.advance('30d')).rejects.toThrow('smaller steps')
+    expect(new Date().toISOString().slice(0, 10)).toBe('2030-01-31')
+  })
+
+  it('puts the clock back when the site closes', async () => {
+    const timed = await testSite({ dirs: { routes, api }, islands: false })
+    const real = Date.now()
+
+    await timed.advance('365d')
+    expect(Date.now() - real).toBeGreaterThan(300 * 86_400_000)
+    await timed.close()
+    expect(Math.abs(Date.now() - real)).toBeLessThan(10_000)
   })
 })

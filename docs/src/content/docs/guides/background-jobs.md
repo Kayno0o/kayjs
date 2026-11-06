@@ -59,7 +59,9 @@ The job is called with the signal, so a job with an optional first parameter get
 
 A boot run happens wherever the server starts, so also at each restart of `kay dev`.
 
-In tests, `site.runSchedule('@hourly')` from `kay/test` runs that schedule's job once, now, and `site.advance('1h')` moves the clock with `setSystemTime` from `bun:test` and runs each schedule at every instant it falls due on the way, then the queue jobs now due. Both resolve with how many scheduled runs they fired. Call `setSystemTime()` in `afterEach` to put the clock back.
+In tests, `site.runSchedule('@hourly')` from `kay/test` runs that schedule's job once, now, and `site.advance('1h')` moves the clock with `setSystemTime` from `bun:test` and runs each schedule at every instant it falls due on the way, then the queue jobs now due. Both resolve with how many scheduled runs they fired.
+
+Every schedule matching the text runs, and a job a schedule enqueued runs at the end of the span. The clock stays moved for the rest of the test, and closing the site or the end of the file puts it back; `setSystemTime()` does it sooner.
 
 ## Long-running work
 
