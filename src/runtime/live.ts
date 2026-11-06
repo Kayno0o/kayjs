@@ -780,9 +780,9 @@ export type ApiCallOptions<Module, Path, M> = ApiRequest<Module, Path, M> & {
   progress?: ((sent: number) => void) | undefined
 }
 
-// What an answer reads back as: an object as JSON, a Date in it as its ISO text, while a number or a boolean arrives as the text Elysia sends, and nothing as ''.
+// What an answer reads back as: an object as JSON, a Date in it as its ISO text, while a number or a boolean arrives as the text Elysia sends, `null` as `null` and nothing (`undefined`, a 204) as ''.
 // A file arrives as a Blob, or as text when its type is text; a Response the route built is read by its type, which the route's type does not say.
-export type Answered<Value> = unknown extends Value ? unknown : Value extends EventStream<unknown> ? never : Value extends Response ? unknown : Value extends Blob ? Blob | string : Value extends string ? Value : Value extends number | boolean | bigint ? string : Value extends null | undefined | void ? '' : Jsonified<Value>
+export type Answered<Value> = unknown extends Value ? unknown : Value extends EventStream<unknown> ? never : Value extends Response ? unknown : Value extends Blob ? Blob | string : Value extends string ? Value : Value extends number | boolean | bigint ? string : Value extends null ? null : Value extends undefined | void ? '' : Jsonified<Value>
 export type ApiAnswer<Module, Path, M> = Answered<Received<MethodRoute<Module, Path, Chosen<M>>>>
 
 // Calls a route of a module under `src/api`, from an event handler or any code running in the browser, typed from the route: resolves with what it answered, and throws an `ApiError` when it refused.

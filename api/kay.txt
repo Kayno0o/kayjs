@@ -148,7 +148,7 @@ interface ActionSuccessDetail
 type Answer<Output> = Output extends AsyncIterable<infer Value> ? ActionStream<Value> : Output
 
 [.] Answered
-type Answered<Value> = unknown extends Value ? unknown : Value extends EventStream<unknown> ? never : Value extends Response ? unknown : Value extends Blob ? Blob | string : Value extends string ? Value : Value extends number | boolean | bigint ? string : Value extends null | undefined | void ? '' : Jsonified<Value>
+type Answered<Value> = unknown extends Value ? unknown : Value extends EventStream<unknown> ? never : Value extends Response ? unknown : Value extends Blob ? Blob | string : Value extends string ? Value : Value extends number | boolean | bigint ? string : Value extends null ? null : Value extends undefined | void ? '' : Jsonified<Value>
 
 [.] ApiAnswer
 type ApiAnswer<Module, Path, M> = Answered<Received<MethodRoute<Module, Path, Chosen<M>>>>

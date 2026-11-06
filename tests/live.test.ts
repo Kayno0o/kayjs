@@ -847,6 +847,19 @@ describe('call()', () => {
     expect(await call(notes, '/:id', { method: 'delete', params: { id: added.id } })).toBe('true')
   })
 
+  it('hands an island the null a route answered, typed as null, and an empty answer as \'\'', async () => {
+    const active = await call(notes, '/active')
+    const later = await call(notes, '/active-later')
+    const typed: { run: string } | null = active
+    const typedLater: { run: string } | null = later
+    const empty: '' = await call(notes, '/touch', { method: 'post' })
+
+    expect(typed).toBeNull()
+    expect(typedLater).toBeNull()
+    expect(empty).toBe('')
+    expect(await call(notes, '/gone')).toBe('')
+  })
+
   it('throws an ApiError with the status and message of a refusal, and status 0 when no answer came', async () => {
     const missing = call(notes, '/:id', { method: 'patch', params: { id: 404 }, body: { title: 'x' } })
 
