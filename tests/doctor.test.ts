@@ -214,6 +214,30 @@ describe('kay doctor', () => {
     })
   })
 
+  it('ends the database check within its timeout against a server that accepts and never answers, and prints no password', async () => {
+    const stalled = Bun.listen({ hostname: '127.0.0.1', port: 0, socket: { data: () => undefined, open: () => undefined } })
+
+    try {
+      const started = Date.now()
+      const result = await doctor(await project(), [], { DATABASE_URL: `postgres://u:s3cr3tpass@127.0.0.1:${stalled.port}/db` })
+
+      expect(Date.now() - started).toBeLessThan(15_000)
+      expect(result.check('database')).toMatchObject({ ok: false, message: expect.stringContaining('did not answer within 3 s') })
+      expect(result.stdout).not.toContain('s3cr3tpass')
+    }
+    finally {
+      stalled.stop(true)
+    }
+
+    const refused = await busyPort('127.0.0.1')
+
+    refused.release()
+
+    const down = await doctor(await project(), [], { DATABASE_URL: `postgres://u:s3cr3tpass@127.0.0.1:${refused.port}/db` })
+
+    expect(down.stdout).not.toContain('s3cr3tpass')
+  })
+
   describe('env', () => {
     const files = { 'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({\n  DATABASE_URL: s.String(),\n  API_KEY: s.String(),\n  SESSION_SECRET: s.String({ default: \'dev\', requiredInProduction: true }),\n  PORT: s.Integer({ default: 8080 }),\n}))\n' }
 

@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { findUp } from '@kaynooo/cli-kit'
+import { within } from '@kaynooo/utils/promise'
 import { SQL } from 'bun'
 import { Database } from 'bun:sqlite'
 import { version as runningVersion } from '../../package.json'
@@ -37,6 +38,7 @@ const BUILDS = [{ dir: `${KAY_DIR}/client`, fix: 'run `kay build`' }, { dir: `${
 const MANIFEST_RETRY_MS = 150
 // How long the database named by DATABASE_URL has to answer.
 const DATABASE_TIMEOUT_S = 3
+const DATABASE_FIX = 'start the database, or fix DATABASE_URL in the shell or in .env'
 const DEFAULT_PORTS: Record<string, string> = { 'http:': '80', 'https:': '443' }
 const DEFAULT_PORT = 3000
 const LINE_BREAK = /\r?\n/
@@ -218,17 +220,34 @@ async function databaseCheck(fromDotenv: string | undefined): Promise<Check> {
     const sql = new SQL(url, { max: 1, connectionTimeout: DATABASE_TIMEOUT_S, idleTimeout: 1 })
 
     try {
-      await sql`select 1`
+      // A server that accepts the connection and never answers is bounded here, as `connectionTimeout` bounds only the connect.
+      if (await within(Promise.resolve(sql`select 1`), DATABASE_TIMEOUT_S * 1000, 'timeout' as const) === 'timeout')
+        return { name: 'database', ok: false, message: `DATABASE_URL did not answer within ${DATABASE_TIMEOUT_S} s`, fix: DATABASE_FIX }
     }
     finally {
-      await sql.close()
+      await within(sql.close(), DATABASE_TIMEOUT_S * 1000, 'timeout' as const)
     }
 
     return { name: 'database', ok: true, message: 'DATABASE_URL answers' }
   }
   catch (error) {
-    return { name: 'database', ok: false, message: `DATABASE_URL does not answer: ${firstLine(error)}`, fix: 'start the database, or fix DATABASE_URL in the shell or in .env' }
+    return { name: 'database', ok: false, message: `DATABASE_URL does not answer: ${withoutSecrets(firstLine(error), url)}`, fix: DATABASE_FIX }
   }
+}
+
+// The url and its password, which a driver's error may echo, left out of a message that is printed and put in JSON.
+function withoutSecrets(message: string, url: string): string {
+  const secrets = [url]
+
+  try {
+    const { password } = new URL(url)
+
+    if (password !== '')
+      secrets.push(password, decodeURIComponent(password))
+  }
+  catch {}
+
+  return secrets.reduce((text, secret) => text.replaceAll(secret, secret === url ? '<DATABASE_URL>' : '***'), message)
 }
 
 // The variables the project's `.env` files set, the first file winning as Bun reads them; a variable with no value counts as unset.
