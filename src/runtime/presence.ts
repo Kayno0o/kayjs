@@ -1,5 +1,6 @@
 import { NON_ROOT_TRAILING_SLASH, withoutBase } from './base'
 import { hold, live, wanted } from './live-value'
+import { randomId } from './random-id'
 import { currentServerScope } from './reactive'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
@@ -41,7 +42,7 @@ function pagePath(): string {
 // Opens the connection's tab for a presence key, and names this tab to the server.
 function holdConnection(): void {
   hold.open ??= () => [...wanted.keys()].some(key => key.startsWith(`["${PRESENCE_LIVE_ID}",`))
-  hold.tab ??= Array.from(crypto.getRandomValues(new Uint8Array(12)), byte => byte.toString(16).padStart(2, '0')).join('')
+  hold.tab ??= randomId(12)
 }
 
 // Who else has a room open, in an island: `presence(`entry:${id}`, { name })` lists the others' members, `presence()` counts the tabs on the page.

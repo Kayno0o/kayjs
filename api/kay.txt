@@ -867,6 +867,9 @@ interface QueuedJob<Payload = unknown, Progress = unknown>
   runAt: number
   status: "running" | "waiting"
 
+[.] randomId
+function randomId(bytes?: number): string
+
 [.] RateKey
 type RateKey = (ctx: RateKeyContext) => string | undefined | Promise<string | undefined>
 

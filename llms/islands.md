@@ -157,6 +157,8 @@ ul(id={id} hidden={!open()})
   slot
 ```
 
+`randomId(bytes = 16)` from `kay` gives random hex (`2 * bytes` characters) for a name that must not repeat across visits, such as an idempotency key or a tab name; unlike `crypto.randomUUID()` it works on an insecure page (http on a home network). It differs on every render, so it belongs in an island or a handler, not in a page that is compressed once.
+
 ### Read an element's size
 
 `elementSize()` from `kay` gives an element's width and height as reactive values, observed for as long as the island lives:

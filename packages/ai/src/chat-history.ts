@@ -1,4 +1,5 @@
 import type { AiMessage, ChatMessage } from './types'
+import { randomId } from 'kay'
 import { usableSources } from './chat-sources'
 
 // The most characters a send posts unless the chat is told otherwise, under the 50,000 `ask` takes by default.
@@ -148,5 +149,5 @@ export function keepPending(key: string, id: string | undefined): void {
 
 // A random name for a reply: `crypto.randomUUID` needs a secure page, which a chat on a home network over http is not.
 export function newReplyId(): string {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('')
+  return randomId()
 }

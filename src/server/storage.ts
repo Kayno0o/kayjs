@@ -9,6 +9,7 @@ import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { FILES_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
+import { randomId } from '../runtime/random-id'
 import { typeOfName } from './file-type'
 import { dominantColor, imageColors } from './image-color'
 import { drawing, imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
@@ -283,7 +284,7 @@ export const files = {
     const size = SIZED.test(extension) ? await imageSize(stored) : undefined
     // Read once here and kept in the key, so a page paints it with no lookup, whatever the store.
     const color = size?.animated === false && extension !== 'avif' && imageColors() ? await drawing(async () => dominantColor(stored, MAX_UPLOAD_PIXELS)) : undefined
-    const id = options.id ?? Buffer.from(crypto.getRandomValues(new Uint8Array(10))).toString('hex')
+    const id = options.id ?? randomId(10)
     const key = `${options.private === true ? PRIVATE : ''}${options.folder === undefined ? '' : `${options.folder}/`}${id}${size ? `.${size.width}x${size.height}${color === undefined ? '' : `-${color}`}` : ''}.${extension}`
     const store = await activeStore()
 

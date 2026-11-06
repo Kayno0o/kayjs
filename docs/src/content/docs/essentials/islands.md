@@ -261,6 +261,8 @@ if open()
   p(id={id}) More about it
 ```
 
+`randomId(bytes = 16)` from `kay` gives random hex, `2 * bytes` characters long, for a name that must not repeat across visits, such as an idempotency key. Unlike `crypto.randomUUID()` it also works on an insecure page, such as http on a home network. It differs on every call, so use it in an island or a handler.
+
 ## Page navigation
 
 A page with an island or a form swaps the next page in without a reload.

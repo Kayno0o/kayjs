@@ -13,6 +13,7 @@ import { trackCalls, whenIdle } from './call-result'
 import { durationSeconds, isZeroDuration } from './duration'
 import { leave, mayLeave, navigation, prefetched } from './navigation'
 import { pageData } from './page-data'
+import { randomId } from './random-id'
 import { getOwner, liveOwner, ownSignal, released, undoable, untrack } from './reactive'
 import { reload } from './stale'
 import { FAILURE_HEADER, OUTCOME_SCRIPT, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
@@ -31,7 +32,7 @@ const superseding = new WeakSet<object>()
 const networkFailures = new WeakSet<object>()
 
 function idempotencyKey(): string {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('')
+  return randomId()
 }
 
 // The calls of an action, or of one `track()` handle, that `queue` orders: `tail` settles when the last `serial` call is done, `latest` is the call in flight a newer one aborts.
