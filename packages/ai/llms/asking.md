@@ -139,7 +139,7 @@ ai({
 ```
 
 - `backoff` is the wait before the second request, doubled for each after it and shortened by up to half at random. A `Retry-After` the provider sent is waited instead, and one past `maxWait` is not waited at all: the next fallback is asked at once, else the error is thrown.
-- `ask(prompt, { retry, fallback })` replaces the one of `ai()` as a whole (`fallback: []` for none). The fake answering under `bun test` is not retried and does not fall back unless the ask itself names `retry`, so a test of an error path keeps failing: `fakeAi.fail(error)` then `fakeAi.reply('ok')` with `ask(..., { retry: { backoff: '1ms' } })` scripts a failure then a success.
+- `ask(prompt, { retry, fallback })` replaces the one of `ai()` as a whole (`fallback: []` for none). The fake answering under `bun test` ignores the `retry` and `fallback` of `ai()`, as it ignores its hooks: it is retried only when the ask itself names `retry`, and falls back only on a `fallback` the ask itself gives, so a test of an error path keeps failing: `fakeAi.fail(error)` then `fakeAi.reply('ok')` with `ask(..., { retry: { backoff: '1ms' } })` scripts a failure then a success.
 - Every request is a step of `await reply.steps`, the failed ones too: `{ provider, model, attempt, failed }` names who took it, `attempt` counting the requests of the round and `failed` the error kind (undefined for the one that answered). `onStep` and `onError` run for each failed request; the failure that ends the reply is told to `onError` once, as it fails the reply.
 - A tool loop retries each of its rounds on its own, so a round that fails after earlier ones streamed is asked again.
 

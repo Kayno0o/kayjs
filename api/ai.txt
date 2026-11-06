@@ -400,8 +400,6 @@ interface Passage
 
 [.] Piece
 type Piece = {
-  served: Served
-} | {
   text: string
 } | {
   reasoning: string
@@ -509,12 +507,6 @@ interface RetryOptions
 
 [.] Script
 type Script = Scripted | ((asked: Asked) => Scripted)
-
-[.] Served
-interface Served
-  attempt: number
-  model: string
-  provider: string
 
 [.] Source
 interface Source

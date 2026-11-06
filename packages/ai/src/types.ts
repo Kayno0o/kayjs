@@ -150,8 +150,7 @@ export type Finish = 'stop' | 'length' | 'filtered' | 'steps'
 // `toolUse` is a provider's finished tool call, which the loop answers and the reply never shows; `tool` is a call as the reply shows it, sent again as its status changes; `step` is a request to the model that ended, which `reply.steps` lists.
 // `restart` drops the text so far: the tool loop sends it for a `schema` reply when a step that wrote some went on to call tools, as only the text of the last step is the object.
 // `reasoning` is a part of the model's thinking as it streams, never mixed into `text`; `thinking` is a finished block of it, which the loop sends back with the calls and the reply never shows.
-// `served` is sent by the retry layer before the first piece of content: which provider and model answered, and on which request of the round.
-export type Piece = { served: Served } | { text: string } | { reasoning: string } | { thinking: Thinking } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: AiToolCall } | { step: Step } | { restart: true }
+export type Piece = { text: string } | { reasoning: string } | { thinking: Thinking } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: AiToolCall } | { step: Step } | { restart: true }
 
 // Who answered a request: the provider and model that did, and how many requests the round took to get there (1 when the first answered).
 export interface Served {
@@ -159,6 +158,9 @@ export interface Served {
   model: string
   attempt: number
 }
+
+// What the retry layer sends the loop: a provider's pieces, after a `served` that comes before the first piece of content.
+export type Inner = Piece | { served: Served }
 
 export interface Provider {
   readonly name: string
@@ -303,9 +305,9 @@ export interface FallbackModel {
 
 // Retry and fallback, set once in `ai({ ... })` and replaced as a whole by the same names in `ask(..., { ... })`.
 export interface Resilience {
-  // Asks again after a failure before the first piece of the reply, 2 requests per model by default; `false` never retries. A request that already streamed something is never asked again. Under `bun test` the fake is not retried unless the ask itself names `retry`.
+  // Asks again after a failure before the first piece of the reply, 2 requests per model by default; `false` never retries. A request that already streamed something is never asked again. The fake is not retried unless the ask itself names `retry`, and the `ai()` settings are not used for it.
   retry?: false | RetryOptions | undefined
-  // The models asked in turn once the one before kept failing with `unavailable`, `rate-limited`, `timeout` or `network`, each with its own `retry`: `[]` for none. The `ai()` list is not used for the fake, as its hooks are not.
+  // The models asked in turn once the one before kept failing with `unavailable`, `rate-limited`, `timeout` or `network`, each with its own `retry`: `[]` for none. The fake falls back only on a list the ask itself gives.
   fallback?: readonly FallbackModel[] | undefined
 }
 

@@ -1,5 +1,6 @@
 import type { AiErrorKind } from './errors'
-import type { AskHooks, FallbackModel, Piece, Provider, ProviderRequest, Resilience, RetryOptions, Step } from './types'
+import type { Streams } from './loop'
+import type { AskHooks, FallbackModel, Inner, Provider, ProviderRequest, Resilience, RetryOptions, Step } from './types'
 import { sleep } from '@kaynooo/utils'
 import { configError, durationSeconds } from 'kay/library'
 import { given } from './config'
@@ -98,30 +99,33 @@ function waitFor(error: AiError, made: number, { backoff, maxWait }: Policy): nu
   if (error.retryAfter !== undefined) {
     const asked = error.retryAfter * 1000
 
-    return asked > maxWait ? undefined : asked
+    // Never shorter than the provider asked, a little longer so asks told the same do not return together.
+    return asked > maxWait ? undefined : asked * (1 + Math.random() * JITTER / 5)
   }
 
   return Math.min(maxWait, backoff * 2 ** (made - 1)) * (1 - Math.random() * JITTER)
 }
 
 // What the model said or did that the reply shows or the loop acts on: a request that sent any is never asked again.
-function streamed(piece: Piece): boolean {
+function streamed(piece: Inner): boolean {
   return 'text' in piece || 'reasoning' in piece || 'thinking' in piece || 'toolUse' in piece
 }
 
-async function* attempting(targets: Target[], request: ProviderRequest, signal: AbortSignal, policy: Policy | undefined, onError: AskHooks['onError']): AsyncGenerator<Piece> {
+async function* attempting(targets: Target[], request: ProviderRequest, signal: AbortSignal, policy: Policy | undefined, onError: AskHooks['onError']): AsyncGenerator<Inner> {
   const attempts = policy?.attempts ?? 1
   let made = 0
 
   for (const [index, target] of targets.entries()) {
     const lastTarget = index === targets.length - 1
 
+    signal.throwIfAborted()
+
     for (let at = 1; at <= attempts; at++) {
       made++
 
       const began = performance.now()
       const stream = target.provider.stream({ ...request, model: target.model }, signal)[Symbol.asyncIterator]()
-      const held: Piece[] = []
+      const held: Inner[] = []
       let failure: AiError | undefined
 
       // Pieces are held until the first one the reply shows, so a request that fails before it leaves nothing behind.
@@ -148,9 +152,14 @@ async function* attempting(targets: Target[], request: ProviderRequest, signal: 
       }
 
       if (failure === undefined) {
-        yield { served: { provider: target.provider.name, model: target.model, attempt: made } }
-        yield* held
-        yield* { [Symbol.asyncIterator]: () => stream }
+        try {
+          yield { served: { provider: target.provider.name, model: target.model, attempt: made } }
+          yield* held
+          yield* { [Symbol.asyncIterator]: () => stream }
+        }
+        finally {
+          await stream.return?.()
+        }
 
         return
       }
@@ -175,8 +184,8 @@ async function* attempting(targets: Target[], request: ProviderRequest, signal: 
 }
 
 // The provider an ask is sent through: the model asked, then each fallback, each retried as the plan says. A request that fails before the first piece of the reply is asked again; one that streamed something never is.
-export function resilient(provider: Provider, model: string, plan: Plan, onError: AskHooks['onError']): Provider {
+export function resilient(provider: Provider, model: string, plan: Plan, onError: AskHooks['onError']): Streams {
   const targets: Target[] = [{ provider, model }, ...plan.fallback.map(entry => ({ provider: entry.provider === undefined ? provider : given(entry.provider), model: entry.model }))]
 
-  return { name: provider.name, model: provider.model, accepts: provider.accepts, stream: (request, signal) => attempting(targets, request, signal, plan.policy, onError) }
+  return { name: provider.name, stream: (request, signal) => attempting(targets, request, signal, plan.policy, onError) }
 }

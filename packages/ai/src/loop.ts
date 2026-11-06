@@ -1,5 +1,5 @@
 import type { LibraryTool } from 'kay/library'
-import type { AiToolCall, Confirm, Finish, Piece, Provider, ProviderMessage, ProviderRequest, Served, Step, Thinking, ToolOutcome, ToolUse, Usage } from './types'
+import type { AiToolCall, Confirm, Finish, Inner, Piece, ProviderMessage, ProviderRequest, Served, Step, Thinking, ToolOutcome, ToolUse, Usage } from './types'
 import { logFrom } from 'kay'
 import { spend, ticketAllows, ticketFor } from './approval'
 import { ticketsIn } from './approval-marker'
@@ -8,6 +8,12 @@ import { AiError } from './errors'
 import { MAX_ARGUMENTS, MAX_CALLS_PER_STEP, MAX_STREAMED_CALLS, MAX_THINKING } from './tool-limits'
 
 const log = logFrom('kayjs-ai')
+
+// What the loop asks: a provider, or the layer retrying one.
+export interface Streams {
+  readonly name: string
+  stream: (request: ProviderRequest, signal: AbortSignal) => AsyncIterable<Inner>
+}
 
 export const MAX_RESULT = 20_000
 const MAX_NAME = 64
@@ -153,7 +159,7 @@ function stepOf(began: number, ended: number, first: number | undefined, used: P
 }
 
 // Passes the pieces of one request through and ends them with the `step` it made, for a reply that asks the model once. `asked` is who was asked, which the retry layer replaces with who answered.
-export async function* single(pieces: AsyncIterable<Piece>, asked: Served): AsyncGenerator<Piece> {
+export async function* single(pieces: AsyncIterable<Inner>, asked: Served): AsyncGenerator<Piece> {
   const began = performance.now()
   const used: Partial<Usage> = {}
   let first: number | undefined
@@ -185,7 +191,7 @@ const USAGE_FIELDS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWr
 
 // Asks the provider, answers the tools the model calls as the visitor, and asks again with their results until the model answers in text or `maxSteps` requests were made.
 // Text of one step is separated from the next by a blank line, and the token counts are the sum of the steps.
-export async function* converse(provider: Provider, base: ProviderRequest, offered: Offered[], maxSteps: number, request: Request | undefined, signal: AbortSignal, confirm?: Confirm | false): AsyncGenerator<Piece> {
+export async function* converse(provider: Streams, base: ProviderRequest, offered: Offered[], maxSteps: number, request: Request | undefined, signal: AbortSignal, confirm?: Confirm | false): AsyncGenerator<Piece> {
   const tools = new Map(offered.map(item => [item.name, item]))
   const specs = offered.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))
   const messages: ProviderMessage[] = [...base.messages]

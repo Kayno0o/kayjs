@@ -277,7 +277,7 @@ ai({
 
 `await reply.steps` lists every request, the failed ones too, with the `provider`, `model` and `attempt` of each and the error kind in `failed`. `onStep` and `onError` run for each of them.
 
-Under `bun test` the fake is not retried unless the ask names `retry`. Script `fakeAi.fail(error)` then `fakeAi.reply('ok')` to test a failure followed by a success.
+Under `bun test` the fake ignores the `retry` and `fallback` of `ai()`: it is retried only when the ask names `retry`, and falls back only on a `fallback` the ask gives. Script `fakeAi.fail(error)` then `fakeAi.reply('ok')` to test a failure followed by a success.
 
 ### Thinking
 
