@@ -169,10 +169,18 @@ export function unknownConfigKeys(config: object): string[] {
 
       const found = nearest(key, Object.keys(known))
       const removed = path === '' && Object.hasOwn(REMOVED_KEYS, key) ? REMOVED_KEYS[key] : undefined
-      const near = removed ?? found
-      const hint = removed === undefined ? `, did you mean \`${path}${near}\`?` : `, moved to \`${removed}\``
+      // A typo of a name that moved is offered with where it lives now.
+      const oldName = removed === undefined && found === undefined && path === '' ? nearest(key, Object.keys(REMOVED_KEYS)) : undefined
+      let hint = ''
 
-      problems.push(`\`${path}${key}\`${near === undefined ? '' : hint}`)
+      if (removed !== undefined)
+        hint = `, moved to \`${removed}\``
+      else if (found !== undefined)
+        hint = `, did you mean \`${path}${found}\`?`
+      else if (oldName !== undefined)
+        hint = `, did you mean \`${oldName}\`, moved to \`${REMOVED_KEYS[oldName]}\`?`
+
+      problems.push(`\`${path}${key}\`${hint}`)
     }
   }
 
