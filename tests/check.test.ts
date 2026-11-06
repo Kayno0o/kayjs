@@ -4763,7 +4763,7 @@ describe.concurrent('kay check, unused code', () => {
   it('clears the terminal before each check with --watch', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p a\n' })
     let output = ''
-    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '--watch'], { terminal: { data: (_terminal, data) => {
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '--watch'], { env: { ...process.env, KIT_MODE: 'terminal' }, terminal: { data: (_terminal, data) => {
       output += new TextDecoder().decode(data)
     } } })
     const printed = async (times: number, text: string) => {
