@@ -4764,7 +4764,7 @@ describe.concurrent('kay check, unused code', () => {
     const root = await scratchProject({ 'src/a.kay': 'p a\n' })
     let output = ''
     // A terminal draws only in the kit's terminal mode and in colour, which an agent's variable or a kayCheck run earlier in this worker (NO_COLOR) would turn off.
-    const env = { ...process.env, KIT_MODE: 'terminal' }
+    const env: Record<string, string | undefined> = { ...process.env, KIT_MODE: 'terminal' }
 
     delete env.NO_COLOR
     delete env.NODE_DISABLE_COLORS
