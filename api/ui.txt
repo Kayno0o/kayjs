@@ -2627,6 +2627,20 @@ component default
 
 [./theme-toggle.kay] default
 component default
+  class?: string | undefined | {
+  root?: string | undefined | {
+    root?: string | undefined;
+    option?: string | undefined;
+    input?: string | undefined;
+    label?: string | undefined;
+    icon?: string | undefined | {
+      root?: string | undefined;
+    };
+    link?: string | undefined;
+    field?: string | undefined;
+    heading?: string | undefined;
+  };
+}
   cookie?: string | undefined
   label?: string | undefined
   modes?: readonly (Mode | ThemeMode)[] | undefined
