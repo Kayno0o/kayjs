@@ -27,8 +27,8 @@ class Agent {
   private nextId = 0
 
   // `shared` for the one a whole file uses, which a test timing out must not take down.
-  constructor(cwd: string, shared = false) {
-    this.process = shared ? spawnSuiteServer([process.execPath, cli, 'mcp'], { cwd, stdin: 'pipe' }) : Bun.spawn([process.execPath, cli, 'mcp'], { cwd, stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' })
+  constructor(cwd: string, shared = false, args: string[] = []) {
+    this.process = shared ? spawnSuiteServer([process.execPath, cli, 'mcp', ...args], { cwd, stdin: 'pipe' }) : Bun.spawn([process.execPath, cli, 'mcp', ...args], { cwd, stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' })
     void this.listen()
   }
 
@@ -349,7 +349,7 @@ describe.concurrent('kay mcp', () => {
     const { result } = await agent.request('tools/list')
     const tools = result?.tools as { name: string, inputSchema: { type: string }, annotations: object }[]
 
-    expect(tools.map(tool => tool.name)).toEqual(['check', 'routes', 'explain', 'docs', 'render', 'screenshot', 'doctor', 'fmt', 'generate', 'add', 'test', 'env', 'i18n_missing', 'a11y', 'dev_errors'])
+    expect(tools.map(tool => tool.name)).toEqual(['check', 'routes', 'explain', 'docs', 'render', 'screenshot', 'doctor', 'fmt', 'generate', 'add', 'test', 'build', 'types', 'fix', 'upgrade', 'lint', 'env', 'i18n_missing', 'a11y', 'dev_errors'])
     expect(tools.every(tool => tool.inputSchema.type === 'object' && 'readOnlyHint' in tool.annotations)).toBe(true)
   })
 
@@ -610,7 +610,7 @@ describe.concurrent('kay mcp', () => {
     expect(env?.structuredContent).toBeDefined()
     expect(missing?.content).toBeDefined()
     expect(tested?.isError).toBe(false)
-    expect(JSON.stringify(tested?.content)).toContain('1 pass')
+    expect(tested?.structuredContent).toEqual({ code: 0, failed: [] })
   })
 
   it('refuses a resource it does not list, whatever the path says', async () => {
@@ -709,5 +709,166 @@ describe.concurrent('kay mcp', () => {
 
     expect(await own.close()).toBe(0)
     expect((await reply).result?.structuredContent).toHaveProperty('routes')
+  })
+})
+
+describe('kay mcp tools that write', () => {
+  let app: string
+  let writer: Agent
+  let reader: Agent
+
+  const call = async (who: Agent, name: string, args: object = {}) => (await who.request('tools/call', { name, arguments: args })).result as { isError?: boolean, content: { text: string }[], structuredContent?: Record<string, unknown> }
+
+  beforeAll(async () => {
+    app = await scratchDir('mcp-write-')
+    await Bun.write(join(app, 'tsconfig.json'), tsconfig)
+    await Bun.write(join(app, 'package.json'), '{ "name": "mcp-write", "type": "module", "dependencies": { "kay": "*" } }\n')
+    await Bun.write(join(app, 'src/routes/index.kay'), 'p Home\n')
+    writer = new Agent(app, false, ['--write'])
+    reader = new Agent(app)
+  })
+
+  afterAll(async () => {
+    await writer.close()
+    await reader.close()
+    await rm(app, { recursive: true, force: true })
+  })
+
+  it('refuses to apply on a server started without --write, and writes nothing', async () => {
+    for (const [name, args] of [['generate', { kind: 'page', name: 'refused', apply: true }], ['add', { features: ['tailwind'], apply: true }], ['fix', { apply: true }], ['upgrade', { apply: true }], ['lint', { apply: true }]] as const) {
+      const refused = await call(reader, name, args)
+
+      expect(refused.isError).toBe(true)
+      expect(refused.content[0]!.text).toContain('--write')
+    }
+
+    expect(await Bun.file(join(app, 'src/routes/refused.kay')).exists()).toBe(false)
+  })
+
+  it('takes apply as a boolean only', async () => {
+    expect((await call(writer, 'generate', { kind: 'page', name: 'x', apply: 'yes' })).isError).toBe(true)
+  })
+
+  it('previews a generated file by default, and writes it with apply, never over a file that exists', async () => {
+    const preview = await call(writer, 'generate', { kind: 'page', name: 'contact' })
+
+    expect(preview.structuredContent).toMatchObject({ dryRun: true })
+    expect(await Bun.file(join(app, 'src/routes/contact.kay')).exists()).toBe(false)
+
+    const applied = await call(writer, 'generate', { kind: 'page', name: 'contact', apply: true })
+
+    expect(applied.isError).toBeFalsy()
+    expect(await Bun.file(join(app, 'src/routes/contact.kay')).exists()).toBe(true)
+
+    await Bun.write(join(app, 'src/routes/contact.kay'), 'p Mine\n')
+    expect((await call(writer, 'generate', { kind: 'page', name: 'contact', apply: true })).isError).toBe(true)
+    expect(await Bun.file(join(app, 'src/routes/contact.kay')).text()).toBe('p Mine\n')
+  })
+
+  it('keeps a generated name inside the app and out of a shell', async () => {
+    const outside = join(app, '..', 'escaped.kay')
+
+    for (const name of ['../../escaped', '/tmp/escaped', '$(touch pwned)', '`touch pwned`', '; touch pwned', '--help'])
+      await call(writer, 'generate', { kind: 'page', name, apply: true })
+
+    expect(await Bun.file(outside).exists()).toBe(false)
+    expect(await Bun.file(join(app, 'pwned')).exists()).toBe(false)
+    expect(await Bun.file('/tmp/escaped.kay').exists()).toBe(false)
+  })
+
+  it('fixes a deprecated form only with apply, and previews it before', async () => {
+    const source = '--- server\nimport { context } from \'kay\'\n\nexport const Theme = context(\'light\')\n---\np x\n'
+
+    await Bun.write(join(app, 'src/routes/theme.kay'), source)
+
+    const preview = await call(writer, 'fix')
+
+    expect(preview.isError).toBeFalsy()
+    expect(await Bun.file(join(app, 'src/routes/theme.kay')).text()).toBe(source)
+
+    await call(writer, 'fix', { apply: true })
+    expect(await Bun.file(join(app, 'src/routes/theme.kay')).text()).toContain('createContext')
+  })
+
+  it('previews adding a feature with nothing installed, and refuses a feature list that smuggles a flag', async () => {
+    expect((await call(writer, 'add', { features: ['tailwind,--help'] })).isError).toBe(true)
+    expect((await call(writer, 'add', { features: [] })).isError).toBe(true)
+    // The fixture's home page is not what `kay new` wrote, so the preview answers why nothing could be added.
+    expect((await call(writer, 'add', { features: ['tailwind'] })).structuredContent).toMatchObject({ errors: 1, problems: [{ message: expect.stringContaining('nothing was written') }] })
+  })
+
+  it('builds, and writes the types', async () => {
+    const built = await call(writer, 'build')
+
+    expect(built.structuredContent).toHaveProperty('problems')
+    expect((await call(writer, 'types')).structuredContent).toMatchObject({ dir: '.kay/types' })
+  }, 120_000)
+
+  it('lists the failed tests with where they are, and the run\'s output when none can be listed', async () => {
+    await Bun.write(join(app, 'tests/mixed.test.ts'), 'import { describe, expect, it } from \'bun:test\'\n\ndescribe(\'group\', () => {\n  it(\'adds\', () => expect(1 + 1).toBe(3))\n  it(\'passes\', () => {})\n})\n\nit(\'throws\', () => {\n  throw new Error(\'boom\\nline 2\')\n})\n')
+    await Bun.write(join(app, 'tests/broken.test.ts'), 'import \'./missing\'\n')
+
+    const mixed = await call(writer, 'test', { files: ['tests/mixed.test.ts'] })
+
+    expect(mixed.isError).toBe(true)
+    expect(mixed.structuredContent).toMatchObject({ code: 1, failed: [{ file: 'tests/mixed.test.ts', name: 'group > adds', at: 'tests/mixed.test.ts:4', message: expect.stringContaining('Expected: 3') }, { name: 'throws', at: 'tests/mixed.test.ts:8', message: 'boom\nline 2' }] })
+    expect(mixed.structuredContent).not.toHaveProperty('summary')
+
+    const broken = await call(writer, 'test', { files: ['tests/broken.test.ts'] })
+
+    expect(broken.isError).toBe(true)
+    expect(broken.structuredContent).toMatchObject({ code: 1 })
+
+    const passed = await call(writer, 'test', { files: ['tests/mixed.test.ts'], name: 'passes' })
+
+    expect(passed.structuredContent).toMatchObject({ code: 0, failed: [] })
+    // The report file does not stay in the project, and the name pattern is no shell command.
+    expect(readdirSync(join(app, '.kay/mcp'))).toEqual([])
+    await call(writer, 'test', { name: '"; touch pwned #' })
+    expect(await Bun.file(join(app, 'pwned')).exists()).toBe(false)
+    expect((await call(writer, 'test', { files: ['../outside'] })).isError).toBe(true)
+  }, 120_000)
+
+  it('lints with the project\'s keslint, capped, paths kept inside the project', async () => {
+    const bin = join(app, 'node_modules/.bin/keslint')
+    const messages = Array.from({ length: 250 }, (_, index) => ({ ruleId: 'no-var', severity: index === 0 ? 2 : 1, message: 'Unexpected var', line: index + 1, column: 1 }))
+
+    await Bun.write(bin, `#!/usr/bin/env bun\nawait Bun.write(${JSON.stringify(join(app, 'lint-args.json'))}, JSON.stringify(process.argv.slice(2)))\nconsole.log(JSON.stringify([{ filePath: ${JSON.stringify(join(app, 'src/a.ts'))}, messages: ${JSON.stringify(messages)} }]))\n`)
+    await Bun.$`chmod +x ${bin}`
+
+    const linted = await call(writer, 'lint', { paths: ['src'] })
+
+    expect(linted.structuredContent).toMatchObject({ errors: 1, warnings: 249, omitted: 50 })
+    expect(linted.structuredContent!.problems).toHaveLength(200)
+    expect((linted.structuredContent!.problems as object[])[0]).toEqual({ file: 'src/a.ts', line: 1, column: 1, severity: 'error', code: 'no-var', message: 'Unexpected var' })
+    expect(await Bun.file(join(app, 'lint-args.json')).json()).toEqual(['--format', 'json', './src'])
+
+    await call(writer, 'lint', { apply: true })
+    expect(await Bun.file(join(app, 'lint-args.json')).json()).toEqual(['--fix', '--format', 'json', '.'])
+    expect((await call(writer, 'lint', { paths: ['../x'] })).isError).toBe(true)
+  })
+
+  it('waits for the dev errors to change and settle, answering the list as it stands when nothing changes', async () => {
+    await mkdir(join(app, '.kay/dev'), { recursive: true })
+
+    const file = join(app, '.kay/dev/errors.json')
+
+    await Bun.write(file, JSON.stringify({ errors: [{ kind: 'request', message: 'before' }] }))
+
+    const waiting = call(writer, 'dev_errors', { waitMs: 20_000 })
+
+    await Bun.sleep(300)
+    await Bun.write(file, JSON.stringify({ errors: [{ kind: 'request', message: 'first' }] }))
+    await Bun.sleep(150)
+    await Bun.write(file, JSON.stringify({ errors: [] }))
+
+    const changed = await waiting
+
+    expect(changed.structuredContent).toMatchObject({ errors: [], waited: true })
+
+    const quiet = await call(writer, 'dev_errors', { waitMs: 500 })
+
+    expect(quiet.structuredContent).toMatchObject({ errors: [], waited: false })
+    expect((await call(writer, 'dev_errors', { waitMs: 10_000_000 })).isError).toBe(true)
   })
 })

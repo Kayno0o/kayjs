@@ -717,7 +717,7 @@ The command lists each file it rewrote, and a file it could not read, which make
 claude mcp add kay -- bunx kay mcp
 ```
 
-`kay mcp` serves the project to an agent as an [MCP](https://modelcontextprotocol.io) server over stdio. The agent calls kay's commands as typed tools instead of running them in a shell. Nothing is set up in the app.
+`kay mcp --write` also lets the tools apply what they preview. `kay mcp` serves the project to an agent as an [MCP](https://modelcontextprotocol.io) server over stdio. The agent calls kay's commands as typed tools instead of running them in a shell. Nothing is set up in the app.
 
 Another client takes the same command in its MCP config, such as `.mcp.json` at the project's root.
 
@@ -735,17 +735,24 @@ Another client takes the same command in its MCP config, such as `.mcp.json` at 
 | `screenshot` | `kay screenshot` on `path`, with `width`, `height`, `scheme`, `fullPage` and `cookies` (as `name=value`). Answers the document, then an image per shot; `diff: true` adds the diff image against the shot before |
 | `doctor` | `kay doctor --format json`. `port` is the port to check |
 | `fmt` | `kay fmt --check --format json`: the files not formatted, writing none. `paths` narrows it |
-| `generate` | `kay generate --dry-run --format json` on `kind` and `name`, with `fields` and `plural`: the files it would write |
-| `add` | `kay add --dry-run --format json` on `features`: what it would write, installing nothing |
-| `test` | `kay test`, with `files` and a `name` pattern: the report, as an error when a test fails |
+| `generate` | `kay generate --dry-run --format json` on `kind` and `name`, with `fields` and `plural`: the files it would write. With `apply: true`, it writes them, never over a file that exists |
+| `add` | `kay add --dry-run --format json` on `features`: what it would write, installing nothing. With `apply: true`, it writes the files and `package.json`, and you run `bun install` after |
+| `fix` | `kay check --fix --dry-run --format json`: the problems with a safe fix. With `apply: true`, it rewrites the files |
+| `upgrade` | `kay upgrade --dry-run --format json`: the plan. With `apply: true`, it changes `package.json`, installs and rewrites the source |
+| `lint` | `kay lint` with the project's `keslint`, answered as `{ errors, warnings, problems }` capped at 200 problems. `paths` narrows it; `apply: true` adds `--fix` |
+| `build` | `kay build --format json`, with `static` and `denyWarnings` |
+| `types` | `kay types --format json` |
+| `test` | `kay test`, with `files` and a `name` pattern: `{ code, failed }`, each failed test with its `file`, `name`, `message` and `at`. An error when a test fails |
 | `env` | `kay env --format json` |
 | `i18n_missing` | `kay i18n missing --format json`, for one `locale` or all |
 | `a11y` | `kay a11y --dry-run --format json`, with `standard`. Needs Chrome |
-| `dev_errors` | The errors a running `kay dev` met, from [`.kay/dev/errors.json`](#errors-without-a-browser) |
+| `dev_errors` | The errors a running `kay dev` met, from [`.kay/dev/errors.json`](#errors-without-a-browser). `waitMs` first waits for the next change to settle, so an edit is answered by what it caused |
 
 The resources are `kay://llms.txt`, the index to start from, one `kay://llms/<file>.md` for each guide of kay's `llms/`, and `kay://<library>/llms.txt` with `kay://<library>/<file>.md` for each `@kaynooo/kayjs-*` library the project installed, at its installed version.
 
 Each tool runs its command in a child process, so a call costs what the command does. Calls run one at a time, in the order they came.
+
+A tool that changes the project previews by default. Its `apply: true` is refused unless the client starts the server as `kay mcp --write`, so an agent writes only where the person who registered it allowed it. Every path an argument names must be inside the project, arguments reach the command as a list and never through a shell, and a long answer is cut.
 
 ## Quiet and plain output
 

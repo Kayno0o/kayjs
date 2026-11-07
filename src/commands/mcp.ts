@@ -6,13 +6,13 @@ import { projectCapabilities, stopChildren } from '../mcp/tools'
 // How long calls in flight get to answer once the client closed its input.
 const SHUTDOWN_GRACE_MS = 10_000
 
-// Serves the project at the current directory to an agent as MCP tools and resources, over stdio: the agent's client starts it, from the project's root.
+// Serves the project at the current directory to an agent as MCP tools and resources, over stdio: the agent's client starts it, from the project's root. With `--write`, the tools that preview a change apply it.
 export const mcp: Command = {
-  usage: 'mcp [--stdio]',
-  options: { stdio: { type: 'boolean' } },
+  usage: 'mcp [--stdio] [--write]',
+  options: { stdio: { type: 'boolean' }, write: { type: 'boolean' } },
   positionals: 0,
-  run: async () => {
-    const { tools, resources } = await projectCapabilities(process.cwd())
+  run: async ({ values }) => {
+    const { tools, resources } = await projectCapabilities(process.cwd(), { write: values.write === true })
 
     // Stopped by its client, it takes the commands it started along.
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {

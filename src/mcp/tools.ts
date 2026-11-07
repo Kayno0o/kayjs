@@ -1,6 +1,6 @@
 import type { Content, Resource, Tool, ToolResult } from './protocol'
 import { existsSync } from 'node:fs'
-import { readdir } from 'node:fs/promises'
+import { mkdir, readdir, rm } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { KAY_DIR } from '../build/assets'
@@ -26,6 +26,22 @@ const CONTENT_TYPE = /^content-type:\s*([^;\s]+)/im
 const TEXT_TYPE = /^(?:text\/|application\/(?:json|xml|javascript|ecmascript|x-www-form-urlencoded|graphql|yaml|.+\+(?:json|xml)))/i
 const HEADING = /^(#{1,2}) (.+)$/gm
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+// A tool that previews and, with `apply`, writes into the project.
+const WRITING = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+const APPLY = { type: 'boolean', description: 'Write the change instead of previewing it. Needs the server started as `kay mcp --write`.' }
+// What a `test` or a `lint` answer lists, the rest being counted.
+const MAX_LISTED = 200
+// A failure's message, which a long diff would otherwise stretch.
+const MAX_MESSAGE = 4000
+// The longest a call to `dev_errors` waits for the next change.
+const MAX_WAIT_MS = 120_000
+// How often the errors file is read while waiting, and how long it must stay unchanged to count as settled.
+const WAIT_POLL_MS = 100
+const WAIT_SETTLE_MS = 400
+const XML_ENTITY = /&(#x?[0-9a-f]+|amp|lt|gt|quot|apos);/gi
+const TEST_CASE = /<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g
+const XML_ATTRIBUTE = /([\w:-]+)="([^"]*)"/g
+const FAILURE = /<(?:failure|error)\b([^>]*)>/
 
 // The commands running for a call.
 const children = new Set<Bun.Subprocess>()
@@ -33,6 +49,7 @@ const children = new Set<Bun.Subprocess>()
 let queue = Promise.resolve()
 // Set once the commands are stopped for good, so that a call still waiting its turn does not start one.
 let stopped = false
+const isStopped = () => stopped
 
 interface Run {
   code: number
@@ -45,13 +62,28 @@ interface Run {
 }
 
 // The tools and resources of the project at `root`, which is where each tool's `kay` command runs.
-export async function projectCapabilities(root: string): Promise<{ tools: Tool[], resources: Resource[] }> {
-  return { tools: tools(root), resources: await resources(root) }
+// `write` lets the tools that change the project apply what they preview: the client opts in with `kay mcp --write`.
+export async function projectCapabilities(root: string, { write = false }: { write?: boolean } = {}): Promise<{ tools: Tool[], resources: Resource[] }> {
+  return { tools: tools(root, write), resources: await resources(root) }
 }
 
-function tools(root: string): Tool[] {
+function tools(root: string, write: boolean): Tool[] {
   const kay = async (args: string[]) => run(root, args)
   const document = async (args: string[]) => jsonResult(await kay(args))
+
+  // `apply` turns a preview into the change, and only a server started with `--write` does it.
+  const applying = (args: Record<string, unknown>): boolean => {
+    if (args.apply === undefined || args.apply === false)
+      return false
+
+    if (args.apply !== true)
+      throw new Error('apply takes true or false')
+
+    if (!write)
+      throw new Error('apply changes the project, and this server was started without `--write`: the client starts it as `kay mcp --write` to allow it')
+
+    return true
+  }
 
   return [
     {
@@ -243,8 +275,8 @@ function tools(root: string): Tool[] {
     },
     {
       name: 'generate',
-      title: 'Preview a generated file',
-      description: 'Lists the files `kay generate` would write for a page, component, island, action, api, guard or resource, writing none: `kay generate --dry-run --format json`. Answers `{ kind, name, written, dryRun }`, `written` being the files it would create. Run `kay generate` in a shell to write them.',
+      title: 'Generate a file',
+      description: 'Lists the files `kay generate` would write for a page, component, island, action, api, guard or resource, writing none: `kay generate --dry-run --format json`. Answers `{ kind, name, written, dryRun }`, `written` being the files it would create. With `apply: true`, writes them, never over a file that exists; that needs the server started as `kay mcp --write`.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -252,13 +284,15 @@ function tools(root: string): Tool[] {
           name: { type: 'string', description: 'The name, such as `about` or `post-card`.' },
           fields: { type: 'array', items: { type: 'string' }, description: 'For a resource, its fields each as `name:type`.' },
           plural: { type: 'string', description: 'For a resource, the plural of its name.' },
+          apply: APPLY,
         },
         required: ['kind', 'name'],
         additionalProperties: false,
       },
-      annotations: READ_ONLY,
+      annotations: WRITING,
       run: async (args) => {
         const { kind, name } = args
+        const apply = applying(args)
         const plural = optionalString(args.plural, 'plural')
 
         if (typeof kind !== 'string' || !(KINDS as readonly string[]).includes(kind))
@@ -273,28 +307,29 @@ function tools(root: string): Tool[] {
         if (kind !== 'resource' && (fields.length > 0 || plural !== undefined))
           throw new Error('fields and plural are for a resource')
 
-        return document(['generate', '--dry-run', '--format', 'json', ...plural === undefined ? [] : [`--plural=${plural}`], '--', kind, name, ...fields])
+        return document(['generate', ...apply ? [] : ['--dry-run'], '--format', 'json', ...plural === undefined ? [] : [`--plural=${plural}`], '--', kind, name, ...fields])
       },
     },
     {
       name: 'add',
-      title: 'Preview adding features',
-      description: 'Lists what `kay add` would write to add features such as `tailwind`, `auth` or `mail` to the app, writing and installing nothing: `kay add --dry-run --format json`. Run `kay add` in a shell to apply it.',
-      inputSchema: { type: 'object', properties: { features: { type: 'array', items: { type: 'string' }, minItems: 1, description: 'The features to add.' } }, required: ['features'], additionalProperties: false },
-      annotations: READ_ONLY,
+      title: 'Add features',
+      description: 'Lists what `kay add` would write to add features such as `tailwind`, `auth` or `mail` to the app, writing and installing nothing: `kay add --dry-run --format json`. With `apply: true`, writes the files and the dependencies into `package.json` but installs nothing, so run `bun install` after; that needs the server started as `kay mcp --write`.',
+      inputSchema: { type: 'object', properties: { features: { type: 'array', items: { type: 'string' }, minItems: 1, description: 'The features to add.' }, apply: APPLY }, required: ['features'], additionalProperties: false },
+      annotations: { ...WRITING, destructiveHint: true },
       run: async (args) => {
         const features = stringList(args.features, 'features')
+        const apply = applying(args)
 
         if (features.length === 0 || features.some(feature => feature.includes(',')))
           throw new Error('features takes a list of features, one each, none holding a comma')
 
-        return document(['add', '--dry-run', '--no-install', '--format', 'json', '--', features.join(',')])
+        return document(['add', ...apply ? [] : ['--dry-run'], '--no-install', '--format', 'json', '--', features.join(',')])
       },
     },
     {
       name: 'test',
       title: 'Run the tests',
-      description: 'Runs the project\'s tests as `kay test` does (`bun test` with kay\'s preload), and answers what it printed: the report on stderr, then stdout, as an error result when a test fails. A test may write to the database it is given, so this is not a read-only call.',
+      description: 'Runs the project\'s tests as `kay test` does (`bun test` with kay\'s preload) and answers `{ code, failed, summary }`: each failed test with its `file`, `name`, `message` and `at` (`file:line` of the test), capped at 200. `summary` is what the run printed, only when no failed test could be listed (a file that does not load, a crash). An error result when a test fails. A test may write to the database it is given, so this is not a read-only call.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -307,9 +342,86 @@ function tools(root: string): Tool[] {
       run: async (args) => {
         const files = stringList(args.files, 'files').map(path => insideProject(root, path))
         const name = optionalString(args.name, 'name')
-        const result = await kay(['test', ...name === undefined ? [] : [`--test-name-pattern=${name}`], ...files.map(file => `./${file}`)])
+        const report = join(KAY_DIR, 'mcp', `test-${crypto.randomUUID()}.xml`)
 
-        return { content: [{ type: 'text', text: `kay test exited ${result.code}\n${[result.stderr.trim(), result.stdout.trim()].filter(Boolean).join('\n')}`.trim() }], isError: result.code !== 0 }
+        await mkdir(join(root, KAY_DIR, 'mcp'), { recursive: true })
+
+        try {
+          const result = await kay(['test', '--reporter=junit', `--reporter-outfile=${report}`, ...name === undefined ? [] : [`--test-name-pattern=${name}`], ...files.map(file => `./${file}`)])
+          const failed = failures(await reportText(join(root, report)))
+          const listed = failed.slice(0, MAX_LISTED)
+          const summary = failed.length === 0 && result.code !== 0 ? [result.stderr.trim(), result.stdout.trim()].filter(Boolean).join('\n') : undefined
+          const document = { code: result.code, failed: listed, ...failed.length > listed.length && { omitted: failed.length - listed.length }, ...summary !== undefined && { summary } }
+
+          return { ...jsonText(document), isError: result.code !== 0 }
+        }
+        finally {
+          await rm(join(root, report), { force: true })
+        }
+      },
+    },
+    {
+      name: 'build',
+      title: 'Build the app',
+      description: 'Builds the app as `kay build --format json` does, checking it first, and answers its document: `{ errors, warnings, problems }`, the routes and the size of what it wrote. It writes `.kay` and, with `static`, `dist`; a problem found is a result, not a failure of the tool. A call takes as long as the build.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          static: { type: 'boolean', description: 'Write the whole site to `dist` for a host with no server.' },
+          denyWarnings: { type: 'boolean', description: 'Count warnings as failures.' },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      run: async args => document(['build', ...args.static === true ? ['--static'] : [], ...args.denyWarnings === true ? ['--deny-warnings'] : [], '--format', 'json']),
+    },
+    {
+      name: 'types',
+      title: 'Write the types',
+      description: 'Writes the types of the project (routes, locals, the shadow types of the .kay files) into `.kay/types` as `kay types --format json` does, so an editor or `tsc` run after it sees them. Answers `{ files, dir }`.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      run: async () => document(['types', '--format', 'json']),
+    },
+    {
+      name: 'fix',
+      title: 'Apply the safe fixes',
+      description: 'Lists the problems `kay check --fix` would fix with their safe fixes, writing none (`--dry-run`), and with `apply: true` rewrites the files; that needs the server started as `kay mcp --write`. Answers the check\'s document, `{ errors, warnings, problems }`, as it stands after the fixes (or as they would leave it).',
+      inputSchema: { type: 'object', properties: { apply: APPLY }, additionalProperties: false },
+      annotations: { ...WRITING, destructiveHint: true },
+      run: async args => document(['check', '--fix', ...applying(args) ? [] : ['--dry-run'], '--format', 'json']),
+    },
+    {
+      name: 'upgrade',
+      title: 'Upgrade kay',
+      description: 'Plans the `kay upgrade` of kay and its libraries to their latest versions and of the old forms the minors crossed deprecated, writing nothing (`--dry-run`); with `apply: true` it changes `package.json`, installs and rewrites the source, which needs the server started as `kay mcp --write`. Reads the registry. Answers its document.',
+      inputSchema: { type: 'object', properties: { apply: APPLY }, additionalProperties: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+      run: async args => document(['upgrade', ...applying(args) ? [] : ['--dry-run'], '--format', 'json']),
+    },
+    {
+      name: 'lint',
+      title: 'Lint the project',
+      description: 'Lints the project with its own `keslint` (`kay lint`), writing no file, and answers `{ errors, warnings, problems }`, each problem with its file, line, column, severity, code and message, capped at 200. With `apply: true`, also fixes what it can (`--fix`); that needs the server started as `kay mcp --write`. A problem is a result, not a failure of the tool.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          paths: { type: 'array', items: { type: 'string' }, description: 'Files or directories in the project to lint, relative to the project root; the whole project by default.' },
+          apply: APPLY,
+        },
+        additionalProperties: false,
+      },
+      annotations: WRITING,
+      run: async (args) => {
+        const paths = stringList(args.paths, 'paths').map(path => insideProject(root, path) || '.')
+        const apply = applying(args)
+        const result = await kay(['lint', ...apply ? ['--fix'] : [], '--format', 'json', ...paths.length === 0 ? ['.'] : paths.map(path => `./${path}`)])
+        const summary = lintSummary(result.stdout, root)
+
+        if (summary === undefined)
+          return { content: [{ type: 'text', text: [result.stderr.trim(), result.stdout.trim()].filter(Boolean).join('\n') || 'The command printed nothing.' }], isError: true }
+
+        return jsonText(summary)
       },
     },
     {
@@ -350,26 +462,20 @@ function tools(root: string): Tool[] {
     {
       name: 'dev_errors',
       title: 'Read the dev server\'s errors',
-      description: 'Reads the errors a running `kay dev` met, from `.kay/dev/errors.json`: why the server failed to boot, type errors the check beside it found, requests that threw and errors islands met in the browser, each with its message, report and where the project\'s own code threw. An error leaves the list once the file compiles or the request answers again. Answers an empty list when `kay dev` has met none or has not run.',
-      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      description: 'Reads the errors a running `kay dev` met, from `.kay/dev/errors.json`: why the server failed to boot, type errors the check beside it found, requests that threw and errors islands met in the browser, each with its message, report and where the project\'s own code threw. An error leaves the list once the file compiles or the request answers again. Answers an empty list when `kay dev` has met none or has not run. With `waitMs`, first waits for the next change of the list and for it to settle, so an edit is answered by what it caused; `waited` says whether it changed before the wait ran out.',
+      inputSchema: { type: 'object', properties: { waitMs: { type: 'integer', minimum: 1, maximum: MAX_WAIT_MS, description: 'How long to wait, at most, for the list to change after this call.' } }, additionalProperties: false },
       annotations: READ_ONLY,
-      run: async () => {
+      run: async (args) => {
+        const { waitMs } = args
+
+        if (waitMs !== undefined && (typeof waitMs !== 'number' || !Number.isInteger(waitMs) || waitMs < 1 || waitMs > MAX_WAIT_MS))
+          throw new Error(`waitMs takes a whole number of milliseconds up to ${MAX_WAIT_MS}`)
+
         const file = Bun.file(join(root, DEV_ERRORS))
+        const changed = waitMs === undefined ? undefined : await nextChange(file, waitMs)
+        const answer = await devErrors(file)
 
-        if (!await file.exists())
-          return jsonText({ errors: [], note: `${DEV_ERRORS} does not exist: \`kay dev\` has not run in this project, or has met no error since.` })
-
-        try {
-          const document: unknown = await file.json()
-
-          if (typeof document !== 'object' || document === null || Array.isArray(document))
-            throw new Error('Not a JSON object')
-
-          return jsonText(document)
-        }
-        catch {
-          return { content: [{ type: 'text', text: `${DEV_ERRORS} is not valid JSON; \`kay dev\` may be writing it, call again.` }], isError: true }
-        }
+        return changed === undefined || answer.structuredContent === undefined ? answer : jsonText({ ...answer.structuredContent, waited: changed })
       },
     },
   ]
@@ -510,8 +616,129 @@ function signalGroup(child: Bun.Subprocess, signal: NodeJS.Signals): void {
   }
 }
 
-function truncate(text: string): string {
-  return text.length > MAX_OUTPUT ? `${text.slice(0, MAX_OUTPUT)}\n[truncated at ${MAX_OUTPUT} characters]` : text
+// The errors file as a result: its document, an empty list when there is none, an error result for a file being written.
+async function devErrors(file: Bun.BunFile): Promise<ToolResult> {
+  if (!await file.exists())
+    return jsonText({ errors: [], note: `${DEV_ERRORS} does not exist: \`kay dev\` has not run in this project, or has met no error since.` })
+
+  try {
+    const document: unknown = await file.json()
+
+    if (typeof document !== 'object' || document === null || Array.isArray(document))
+      throw new Error('Not a JSON object')
+
+    return jsonText(document)
+  }
+  catch {
+    return { content: [{ type: 'text', text: `${DEV_ERRORS} is not valid JSON; \`kay dev\` may be writing it, call again.` }], isError: true }
+  }
+}
+
+// Whether the errors file changed within `ms`, and then stayed unchanged for a moment, as `kay dev` writes it more than once for one edit. Answers as soon as it settles, or when the time is up.
+async function nextChange(file: Bun.BunFile, ms: number): Promise<boolean> {
+  const read = async () => await file.exists() ? file.text() : undefined
+  const start = await read()
+  const until = Date.now() + ms
+  let latest = start
+  let changedAt: number | undefined
+
+  while (!isStopped() && Date.now() < until) {
+    await Bun.sleep(WAIT_POLL_MS)
+
+    const now = await read()
+
+    if (now !== latest) {
+      latest = now
+      changedAt = Date.now()
+    }
+    else if (changedAt !== undefined && Date.now() - changedAt >= WAIT_SETTLE_MS) {
+      return true
+    }
+  }
+
+  return changedAt !== undefined
+}
+
+// A report the run did not write, as it stopped before, is empty.
+async function reportText(path: string): Promise<string> {
+  try {
+    return await Bun.file(path).text()
+  }
+  catch {
+    return ''
+  }
+}
+
+// The failed tests of a junit report: `at` is where the test is declared, the message what the failure said.
+function failures(xml: string): { file: string, name: string, message: string, at: string }[] {
+  const failed: { file: string, name: string, message: string, at: string }[] = []
+
+  for (const [, attributes = '', body = ''] of xml.matchAll(TEST_CASE)) {
+    const failure = FAILURE.exec(body)
+
+    if (failure === null)
+      continue
+
+    const test = xmlAttributes(attributes)
+    const { message = '', type = 'Error' } = xmlAttributes(failure[1] ?? '')
+    const file = test.file ?? ''
+
+    failed.push({ file, name: test.classname === undefined || test.classname === '' ? test.name ?? '' : `${test.classname} > ${test.name}`, message: truncate(message === '' ? type : message, MAX_MESSAGE), at: test.line === undefined ? file : `${file}:${test.line}` })
+  }
+
+  return failed
+}
+
+function xmlAttributes(text: string): Record<string, string | undefined> {
+  const found: Record<string, string> = {}
+
+  for (const [, name = '', value = ''] of text.matchAll(XML_ATTRIBUTE)) {
+    found[name] = value.replaceAll(XML_ENTITY, (_, entity: string) => {
+      if (entity.startsWith('#'))
+        return String.fromCodePoint(entity[1] === 'x' ? Number.parseInt(entity.slice(2), 16) : Number(entity.slice(1)))
+
+      return { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'' }[entity.toLowerCase()] ?? entity
+    })
+  }
+
+  return found
+}
+
+// An ESLint JSON report as the problems a `check` lists, the project's own paths relative; undefined for output that is no report.
+function lintSummary(stdout: string, root: string): { errors: number, warnings: number, problems: object[], omitted?: number } | undefined {
+  let report: unknown
+
+  try {
+    report = JSON.parse(stdout)
+  }
+  catch {
+    return undefined
+  }
+
+  if (!Array.isArray(report))
+    return undefined
+
+  const problems: object[] = []
+  let errors = 0
+  let warnings = 0
+
+  for (const entry of report as { filePath?: string, messages?: { ruleId?: string | null, severity?: number, message?: string, line?: number, column?: number }[] }[]) {
+    for (const message of entry.messages ?? []) {
+      if (message.severity === 2)
+        errors++
+      else
+        warnings++
+
+      if (problems.length < MAX_LISTED)
+        problems.push({ file: entry.filePath === undefined ? '' : relative(root, entry.filePath), line: message.line ?? 0, column: message.column ?? 0, severity: message.severity === 2 ? 'error' : 'warning', code: message.ruleId ?? '', message: truncate(message.message ?? '', MAX_MESSAGE) })
+    }
+  }
+
+  return { errors, warnings, problems, ...errors + warnings > problems.length && { omitted: errors + warnings - problems.length } }
+}
+
+function truncate(text: string, max = MAX_OUTPUT): string {
+  return text.length > max ? `${text.slice(0, max)}\n[truncated at ${max} characters]` : text
 }
 
 // A command under `--format json` leaves one document on stdout whatever its exit code, a problem found included; one that could not run also says why on stderr, and without a document nothing ran.
