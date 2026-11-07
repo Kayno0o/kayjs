@@ -3,7 +3,7 @@ import type { AnyElysia } from 'elysia'
 import type { BudgetConfig } from './build/budget'
 import type { Listed as RouteListing } from './commands/routes'
 import type { LintLevels } from './compiler/lints'
-import type { Highlighter } from './content/markdown'
+import type { Highlighter, MarkdownTransform } from './content/markdown'
 import type { ActionHooks, ActionProtect, ProtectionMessages } from './runtime/action'
 import type { ByteSize } from './runtime/byte-size'
 import type { Duration } from './runtime/duration'
@@ -399,6 +399,8 @@ export interface OfflineConfig {
 export interface MarkdownConfig {
   // Highlights code blocks when the entries compile, at build time, such as with Shiki: `(code, language) => html`, the whole `<pre>`.
   highlight?: Highlighter | undefined
+  // Rewrites the HTML Markdown renders for each entry, `(html, entry) => html` with `entry` the `{ file, slug, locale }`, once as the entries compile: add `rel` to links, shift headings, turn `:::note` into an admonition. It runs before headings are read and code is highlighted, and a loader's untrusted body is sanitized after it. Leave `<kay-component>` elements as they are.
+  transform?: MarkdownTransform | undefined
   // Whether a heading links to its own anchor, on by default; `false` leaves the heading's text plain, with its id.
   headingLinks?: boolean | undefined
   // Words a minute an entry's `readingTime` counts at, 230 by default.

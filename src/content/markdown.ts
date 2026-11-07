@@ -39,6 +39,20 @@ export interface CompiledMarkdown {
   words: number
 }
 
+// The entry a transform is run for: its file, the slug without its locale, and the locale of a localized collection's entry.
+export interface MarkdownSource {
+  file: string
+  slug: string
+  locale?: string | undefined
+}
+
+// Rewrites the HTML Markdown renders for an entry, such as to add `rel` to links, shift headings or turn `:::note` into an admonition: it gets the HTML before headings are read and code is highlighted, and gives it back.
+// Component elements (`<kay-component>`) must stay as they are; a loader's untrusted body is sanitized after it.
+export type MarkdownTransform = (html: string, entry: MarkdownSource) => string | Promise<string>
+
+// A transform bound to its entry.
+export type BoundTransform = (html: string) => string | Promise<string>
+
 // Turns a code block into highlighted HTML at build time, such as with Shiki: the whole `<pre>`, given the code and its fence's language.
 export type Highlighter = (code: string, language: string | undefined) => string | Promise<string>
 
@@ -118,11 +132,47 @@ export function splitFrontmatter(source: string): { frontmatter: string | undefi
 
 // The body as HTML split around its components, headings anchored, and code highlighted when a highlighter is given.
 // Component tags are swapped for placeholder elements first, so Markdown passes them through whatever their attributes hold, and code never holds one.
-export async function compileMarkdown(body: string, bodyLine: number, highlight?: Highlighter, headingLinks = true, sanitize = false): Promise<CompiledMarkdown> {
+export async function compileMarkdown(body: string, bodyLine: number, highlight?: Highlighter, headingLinks = true, sanitize = false, transform?: BoundTransform): Promise<CompiledMarkdown> {
   const { text, components } = extractComponents(body, bodyLine)
-  const { html, headings } = await renderedMarkdown(text, { highlight, headingLinks, sanitize })
+  const { html, headings } = await renderedMarkdown(text, { highlight, headingLinks, sanitize, transform })
 
   return { segments: componentSegments(html, components), headings, words: countWords(html) }
+}
+
+// The entry a localized collection's slug names: `fr/hello` is the locale `fr` and the slug `hello`.
+export function markdownSource(file: string, slug: string, localized: boolean): MarkdownSource {
+  const split = slug.indexOf('/')
+
+  return localized && split !== -1 ? { file, slug: slug.slice(split + 1), locale: slug.slice(0, split) } : { file, slug }
+}
+
+// The transform tied to the entry it runs for, or undefined without one: a throw, a rejection or a result that is no text fails as a MarkdownError naming the file, and so does one that drops or adds a component element, which would leave the entry's components out of step with its text.
+export function boundTransform(transform: MarkdownTransform | undefined, source: MarkdownSource): BoundTransform | undefined {
+  if (!transform)
+    return undefined
+
+  return async (html) => {
+    let result: unknown
+
+    try {
+      result = await transform(html, source)
+    }
+    catch (error) {
+      throw new MarkdownError(`${source.file}: the markdown transform threw: ${error instanceof Error ? error.message : String(error)}`, 1)
+    }
+
+    if (typeof result !== 'string')
+      throw new MarkdownError(`${source.file}: the markdown transform gave ${result === null ? 'null' : typeof result}, where it gives the HTML as text`, 1)
+
+    if (placeholdersOf(result) !== placeholdersOf(html))
+      throw new MarkdownError(`${source.file}: the markdown transform dropped, added or moved a <kay-component> element, which stands for a component of the entry: leave them as they are`, 1)
+
+    return result
+  }
+}
+
+function placeholdersOf(html: string): string {
+  return html.match(PLACEHOLDER_TAG)?.join('') ?? ''
 }
 
 // The words an entry's reader sees in Markdown's HTML: tags and entities set aside, code included.
@@ -172,13 +222,30 @@ export function sanitizedHtml(html: string): string {
 
 // The HTML an entry's Markdown body puts on the page, each component standing as a `<kay-component>` element around what it wraps, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components kay cannot read.
 // kept: free
-export async function bodyHtml(body: string): Promise<string> {
+// Given the `collection` the body belongs to, as exported from the content config, it goes through that collection's `transform` as the build does, so a preview matches the page.
+export async function bodyHtml(body: string, entry: { collection?: string | undefined, slug?: string | undefined, locale?: string | undefined } = {}): Promise<string> {
   const { text, components } = extractComponents(body, 1)
-  const { html } = await renderedMarkdown(text)
+  const { html } = await renderedMarkdown(text, { transform: await collectionTransform(entry) })
 
   componentSegments(html, components)
 
   return html
+}
+
+async function collectionTransform({ collection, slug = '', locale }: { collection?: string | undefined, slug?: string | undefined, locale?: string | undefined }): Promise<BoundTransform | undefined> {
+  if (collection === undefined)
+    return undefined
+
+  // Loaded on demand: the compiler reads this module too, in processes with neither Bun nor the content store.
+  const { registeredCollections } = await import('./edit-registry')
+  const found = registeredCollections().find(([exported]) => exported === collection)?.[1]
+
+  if (!found)
+    return undefined
+
+  const { markdownOf } = await import('./load')
+
+  return boundTransform(markdownOf(found.options).transform, { file: `${collection}/${slug}`, slug, locale })
 }
 
 export interface RenderedMarkdown {
@@ -191,17 +258,19 @@ export interface RenderedMarkdown {
 // A link leaving the site opens in a new tab, as in templates, unless the config keeps the same tab.
 // The highlighter gets the fence's language as written, so for a user's text it falls back on one it does not know rather than throw.
 // kept: free
-export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter | undefined, headingLinks?: boolean | undefined } = {}): Promise<RenderedMarkdown> {
-  const rendered = await renderedMarkdown(markdown, options)
+export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter | undefined, headingLinks?: boolean | undefined, transform?: ((html: string) => string | Promise<string>) | undefined } = {}): Promise<RenderedMarkdown> {
+  const rendered = await renderedMarkdown(markdown, { ...options, transform: options.transform && boundTransform(async html => options.transform!(html), { file: 'renderMarkdown', slug: '' }) })
 
   return { html: outsideLinks(rendered.html), headings: rendered.headings }
 }
 
 // The HTML of `renderMarkdown` before its links leaving the site are written: an entry's body compiles once, and its links are written as each page renders against its site.
-async function renderedMarkdown(markdown: string, options: { highlight?: Highlighter | undefined, headingLinks?: boolean | undefined, sanitize?: boolean | undefined } = {}): Promise<RenderedMarkdown> {
+async function renderedMarkdown(markdown: string, options: { highlight?: Highlighter | undefined, headingLinks?: boolean | undefined, sanitize?: boolean | undefined, transform?: BoundTransform | undefined } = {}): Promise<RenderedMarkdown> {
   const links = options.headingLinks !== false
   // Always rendered with anchors, which tell Markdown's headings from raw `<h2 id>` tags; they are taken off after when `headingLinks` is false.
-  const rendered = Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } })
+  const bare = Bun.markdown.html(markdown, { ...MARKDOWN_OPTIONS, headings: { ids: true, autolink: true } })
+  // The transform comes first, so a loader's untrusted text is sanitized after it and a heading it shifts is read as shifted.
+  const rendered = options.transform ? await options.transform(bare) : bare
   let html = labelTasks(withImageDefaults(options.sanitize === true ? sanitizedComponents(rendered) : rendered))
   const headings: Heading[] = []
   let plain = ''

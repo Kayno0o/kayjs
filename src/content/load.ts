@@ -1,6 +1,6 @@
 import type { Mode } from '../project'
 import type { LinkedImage } from './images'
-import type { CompiledMarkdown, Heading, Highlighter, Segment } from './markdown'
+import type { CompiledMarkdown, Heading, Highlighter, MarkdownTransform, Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
@@ -14,7 +14,7 @@ import { modeOf, cacheDir as projectCache } from '../project'
 import { imageColors } from '../server/image-color'
 import { projectSource } from '../server/source'
 import { linkImages, statOf } from './images'
-import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
+import { boundTransform, compileMarkdown, MarkdownError, markdownSource, splitFrontmatter } from './markdown'
 import { ContentError } from './validate'
 
 type ContentMode = Pick<Mode, 'dev' | 'prebuilt'>
@@ -75,6 +75,7 @@ export interface MarkdownSettings {
   headingLinks?: boolean | undefined
   readingSpeed?: number | undefined
   imageSizes?: string | undefined
+  transform?: MarkdownTransform | undefined
 }
 
 export const DEFAULT_READING_SPEED = 230
@@ -89,13 +90,13 @@ export function setMarkdownDefaults(settings: MarkdownSettings | undefined): voi
 }
 
 // A collection's Markdown settings over the config's.
-export function markdownOf(options: MarkdownSettings): { highlight: Highlighter | undefined, headingLinks: boolean, readingSpeed: number, imageSizes: string | undefined } {
+export function markdownOf(options: MarkdownSettings): { highlight: Highlighter | undefined, headingLinks: boolean, readingSpeed: number, imageSizes: string | undefined, transform: MarkdownTransform | undefined } {
   const readingSpeed = options.readingSpeed ?? defaults.readingSpeed ?? DEFAULT_READING_SPEED
 
   if (!(Number.isFinite(readingSpeed) && readingSpeed > 0))
     throw new KayError('content-api-misuse', `kay: readingSpeed is ${readingSpeed}: it is a number of words a minute above 0`)
 
-  return { highlight: options.highlight ?? defaults.highlight, headingLinks: options.headingLinks ?? defaults.headingLinks ?? true, readingSpeed, imageSizes: options.imageSizes ?? defaults.imageSizes }
+  return { highlight: options.highlight ?? defaults.highlight, headingLinks: options.headingLinks ?? defaults.headingLinks ?? true, readingSpeed, imageSizes: options.imageSizes ?? defaults.imageSizes, transform: options.transform ?? defaults.transform }
 }
 
 let place: { root: string, base: string, config?: string | undefined } | undefined
@@ -185,7 +186,7 @@ export interface LoadOptions extends MarkdownSettings {
 }
 
 // The entries `kay build` compiled ahead when there are some, read from their files otherwise.
-export async function loadEntries(dir: string, { highlight, live = false, localized = false, headingLinks = true }: LoadOptions = {}): Promise<RawEntry[]> {
+export async function loadEntries(dir: string, { highlight, live = false, localized = false, headingLinks = true, transform }: LoadOptions = {}): Promise<RawEntry[]> {
   if (!live) {
     const built = await builtEntries(dir)
 
@@ -193,7 +194,7 @@ export async function loadEntries(dir: string, { highlight, live = false, locali
       return built
   }
 
-  return compileDirectory(dir, highlight, localized, headingLinks)
+  return compileDirectory(dir, highlight, localized, headingLinks, transform)
 }
 
 export function manifestFile(base: string, dir: string): string {
@@ -218,13 +219,13 @@ async function builtEntries(dir: string): Promise<RawEntry[] | undefined> {
   return undefined
 }
 
-async function compileDirectory(dir: string, highlight: Highlighter | undefined, localized: boolean, headingLinks: boolean): Promise<RawEntry[]> {
+async function compileDirectory(dir: string, highlight: Highlighter | undefined, localized: boolean, headingLinks: boolean, transform: MarkdownTransform | undefined): Promise<RawEntry[]> {
   const root = rootOf()
   const absolute = collectionFolder(dir)
   const cacheDir = projectCache(root, 'content')
-  // Bun's Markdown output, the highlighter's source and the modules the content config imports are part of every key; a highlighter whose output changes with none of them, such as a new theme passed in, needs the cache cleared.
-  const imported = highlight === undefined ? '' : await importedSource(root, [place?.config, join(root, 'kay.config.ts')])
-  const salt = Bun.hash(`${CACHE_VERSION}:${localized}:${headingLinks}:${imageColors()}:${compilerFingerprint()}:${highlight?.toString() ?? ''}:${imported}`).toString(36)
+  // Bun's Markdown output, the highlighter's and the transform's source and the modules the content config imports are part of every key; a highlighter whose output changes with none of them, such as a new theme passed in, needs the cache cleared.
+  const imported = highlight === undefined && transform === undefined ? '' : await importedSource(root, [place?.config, join(root, 'kay.config.ts')])
+  const salt = Bun.hash(`${CACHE_VERSION}:${localized}:${headingLinks}:${imageColors()}:${compilerFingerprint()}:${highlight?.toString() ?? ''}:${transform?.toString() ?? ''}:${imported}`).toString(36)
   const files = await entryFiles(absolute)
   const problems: ContentProblem[] = []
   const entries: RawEntry[] = []
@@ -272,7 +273,7 @@ async function compileDirectory(dir: string, highlight: Highlighter | undefined,
       }
 
       try {
-        const entry = await compileEntry(name, file, source, highlight, { path, folder: absolute, root, localized, headingLinks })
+        const entry = await compileEntry(name, file, source, highlight, transform, { path, folder: absolute, root, localized, headingLinks })
 
         await writeAtomically(cacheFile, JSON.stringify({ salt, stamp, at: Date.now(), hash, entry } satisfies CachedEntry))
 
@@ -314,14 +315,16 @@ export interface LoadedBodies {
 
 // A loader collection's Markdown bodies, compiled as a folder's entries are and kept in one file per collection under `.kay/cache/content`, while the build is not prebuilt and no draft preview is read.
 // A body is reused while its source, the collection's Markdown settings, the highlighter with the modules the config imports, kay's compiler and Bun's version are as they were; a fresh compile is the fallback for all else.
-export async function loadedBodies(name: string, markdown: { highlight: Highlighter | undefined, headingLinks: boolean }, sanitize: boolean, preview: boolean): Promise<LoadedBodies> {
+export async function loadedBodies(name: string, markdown: { highlight: Highlighter | undefined, headingLinks: boolean, transform?: MarkdownTransform | undefined }, sanitize: boolean, preview: boolean, localized = false): Promise<LoadedBodies> {
+  const compiling = async (slug: string, body: string) => compileMarkdown(body, 1, markdown.highlight, markdown.headingLinks, sanitize, boundTransform(markdown.transform, markdownSource(`${name}/${slug}`, slug, localized)))
+
   if (contentMode().prebuilt || preview)
-    return { compile: async (_, body) => compileMarkdown(body, 1, markdown.highlight, markdown.headingLinks, sanitize), save: () => undefined }
+    return { compile: compiling, save: () => undefined }
 
   const root = rootOf()
   const cacheDir = projectCache(root, 'content')
-  const imported = markdown.highlight === undefined ? '' : await importedSource(root, [place?.config, join(root, 'kay.config.ts')])
-  const key = Bun.hash(`${CACHE_VERSION}:${markdown.headingLinks}:${sanitize}:${compilerFingerprint()}:${markdown.highlight?.toString() ?? ''}:${imported}`).toString(36)
+  const imported = markdown.highlight === undefined && markdown.transform === undefined ? '' : await importedSource(root, [place?.config, join(root, 'kay.config.ts')])
+  const key = Bun.hash(`${CACHE_VERSION}:${markdown.headingLinks}:${sanitize}:${localized}:${compilerFingerprint()}:${markdown.highlight?.toString() ?? ''}:${markdown.transform?.toString() ?? ''}:${imported}`).toString(36)
   const slot = { file: join(cacheDir, `${Bun.hash(name).toString(36)}.loaded.json`), key }
   const known = new Map(Object.entries(await readCacheEntry<LoadedCache>(slot) ?? {}))
   const kept = new Map<string, LoadedCache[string]>()
@@ -340,7 +343,7 @@ export async function loadedBodies(name: string, markdown: { highlight: Highligh
         return cached.compiled
       }
 
-      const compiled = await compileMarkdown(body, 1, markdown.highlight, markdown.headingLinks, sanitize)
+      const compiled = await compiling(slug, body)
 
       kept.set(slug, { hash, compiled })
       changed = true
@@ -527,7 +530,7 @@ function fieldsOf(source: string, name: string, body: string | undefined, frontm
   return frontmatter === undefined ? {} : fieldLines(frontmatter, false, 1)
 }
 
-async function compileEntry(name: string, file: string, source: string, highlight: Highlighter | undefined, where: { path: string, folder: string, root: string, localized: boolean, headingLinks: boolean }): Promise<RawEntry> {
+async function compileEntry(name: string, file: string, source: string, highlight: Highlighter | undefined, transform: MarkdownTransform | undefined, where: { path: string, folder: string, root: string, localized: boolean, headingLinks: boolean }): Promise<RawEntry> {
   const { data, body, bodyLine, frontmatter } = parseEntry(name, source)
   const lines = fieldsOf(source, name, body, frontmatter)
   const slug = entrySlug(name, data, where.localized, lines.slug ?? 1)
@@ -535,7 +538,7 @@ async function compileEntry(name: string, file: string, source: string, highligh
   if (body === undefined)
     return { slug, file, data, lines }
 
-  const compiled = await compileMarkdown(body, bodyLine!, highlight, where.headingLinks)
+  const compiled = await compileMarkdown(body, bodyLine!, highlight, where.headingLinks, false, boundTransform(transform, markdownSource(file, slug, where.localized)))
   const { segments, images, missing, unreadable } = await linkImages(compiled.segments, where.path, where.folder, where.root)
 
   return {

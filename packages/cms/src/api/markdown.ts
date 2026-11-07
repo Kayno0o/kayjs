@@ -31,7 +31,7 @@ const markdown = api({ maxSize: MAX_MARKDOWN })
   .onError(({ error, status }) => error instanceof UnknownCollectionError ? status(404, error.message) : undefined)
   .post('/', async ({ body, request, status }) => {
     try {
-      const html = (await bodyHtml(body.markdown)).replace(COMPONENT_TAGS, '')
+      const html = (await bodyHtml(body.markdown, { collection: body.collection, slug: body.slug, locale: body.locale })).replace(COMPONENT_TAGS, '')
       const aside = await setCodeAside(html)
       const place = body.collection !== undefined && body.slug !== undefined ? { collection: body.collection, slug: body.slug, locale: body.locale } : undefined
       const loaded = await sanitizedOnPage(body.collection)

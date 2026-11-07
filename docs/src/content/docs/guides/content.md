@@ -203,7 +203,7 @@ Without a later `>`, a tag such as `<Chart stray` at the end of a body stays tex
 
 ## Highlighting code
 
-You can set `highlight`, `headingLinks`, `readingSpeed` and `imageSizes` once for every collection, under `markdown` in `kay.config.ts`. A collection's own option of the same name wins. `headingLinks: false` leaves a heading's text without a link to itself.
+You can set `highlight`, `transform`, `headingLinks`, `readingSpeed` and `imageSizes` once for every collection, under `markdown` in `kay.config.ts`. A collection's own option of the same name wins. `headingLinks: false` leaves a heading's text without a link to itself.
 
 ```ts
 export default defineConfig({
@@ -243,6 +243,31 @@ div(innerHTML={snippet})
 `renderMarkdown(text, { highlight })` does the same for a whole text, such as a note, and resolves with `{ html, headings }`. Its HTML is the writer's, so a user's goes through `sanitizeHtml` before it is rendered.
 
 A link in an entry's Markdown that leaves your site opens in a new tab, as it does in a template ([Links to other sites](/essentials/templates#links-to-other-sites)).
+
+## Changing the HTML Markdown renders
+
+Markdown has no admonitions, footnotes or link rewriting of its own. A `transform` gets the HTML an entry renders to and gives it back changed, so you add the step you need. Set it in `markdown` in `kay.config.ts` for every collection, or on one collection, where it wins.
+
+```ts
+export const docs = collection('content/docs', {
+  schema,
+  transform: (html, entry) => html
+    // Links to a sibling file become links to its page.
+    .replace(/href="\.\/([^"#]*)\.md"/g, 'href="/docs/$1"')
+    // A heading one level down, as the page already has its own `h1`.
+    .replace(/<(\/?)h([1-5])/g, (_, close, level) => `<${close}h${Number(level) + 1}`)
+    // `:::note` ... `:::` as an admonition.
+    .replace(/<p>:::(\w+)\n([\s\S]*?)\n:::<\/p>/g, '<aside class="admonition $1">$2</aside>'),
+})
+```
+
+It runs once as the entry compiles, so it costs nothing per request. It gets the HTML before the headings are read and code is highlighted: a heading it moves is listed at its new level, and the highlighter has the last word on code blocks, which it sees as `<pre><code class="language-ts">`. A heading is `<h2 id="slug"><a href="#slug">Text</a></h2>`; keep that shape. The `entry` is `{ file, slug, locale }`, the locale set for an entry of a localized collection, so a label can follow it.
+
+A component written in the Markdown stands as a `<kay-component>` element in that HTML. Leave them as they are: a transform that drops, adds or moves one fails the entry. A transform that throws, or gives something other than text, fails it too, with an error naming the entry's file.
+
+The HTML you write is as raw as the Markdown's own. For a collection with a `load` function, whose bodies are sanitized unless it is `trusted`, the transform runs first and the result is sanitized, so an admonition's `class` is dropped there. Links you write to your own pages get the base and the locale like any other.
+
+Pass the same function to `renderMarkdown(text, { transform })` to render a runtime text the same way. Your CMS's preview applies the collection's transform too.
 
 ## Entry URLs
 
@@ -438,7 +463,7 @@ export const news = collection({
 
 ### Caches
 
-Each Markdown entry compiles once, and the result is kept in `.kay/cache/content`. A change to an entry recompiles that entry only. A change to a module the content config imports recompiles every entry when the collection has a highlighter. The Markdown bodies of a collection with a `load` function are kept there too, in one file for the collection.
+Each Markdown entry compiles once, and the result is kept in `.kay/cache/content`. A change to an entry recompiles that entry only. A change to a module the content config imports recompiles every entry when the collection has a highlighter or a `transform`, and a change to the transform's own source does the same. The Markdown bodies of a collection with a `load` function are kept there too, in one file for the collection.
 
 A highlighter whose output changes with no change to its source needs that folder cleared. That is a new theme passed in, or a `.kay` or JSON file it reads. Only `.ts` and `.js` modules are watched.
 

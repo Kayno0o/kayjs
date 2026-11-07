@@ -1657,7 +1657,7 @@ function formatDiagnostic(source: string, filename: string, diagnostic: Diagnost
 function blocks<const Types extends Record<string, AnyObject>>(types: Types, options?: Omit<ArrayOptions, "x-kay"> | undefined): TArray<TUnion<BlockVariants<Types>[]>>
 
 [./content] bodyHtml
-function bodyHtml(body: string): Promise<string>
+function bodyHtml(body: string, entry?: { collection?: string | undefined; slug?: string | undefined; locale?: string | undefined; }): Promise<string>
 
 [./content] collection
 function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never, const Formats extends FeedFormat | readonly FeedFormat[] = "rss">(source: ContentLoader<Stored<(Schema & {
@@ -1738,6 +1738,7 @@ interface CollectionOptions<Schema extends TSchema, Routed extends boolean = boo
   single?: boolean | undefined
   sort?: ((a: Entry<(Schema & { params: []; })["static"]>, b: Entry<(Schema & { params: []; })["static"]>) => number) | undefined
   title?: string | undefined
+  transform?: MarkdownTransform | undefined
   trusted?: boolean | undefined
   unpublishAt?: DateField<(Schema & { params: []; })["static"]> | undefined
   url?: ((entry: { slug: string; locale?: string | undefined; data: (Schema & { params: []; })["static"]; }) => string) | undefined
@@ -1990,6 +1991,15 @@ class MarkdownError
 [./content] markdownField
 function markdownField(options?: ElysiaStringOptions | undefined): TString
 
+[./content] MarkdownSource
+interface MarkdownSource
+  file: string
+  locale?: string | undefined
+  slug: string
+
+[./content] MarkdownTransform
+type MarkdownTransform = (html: string, entry: MarkdownSource) => string | Promise<string>
+
 [./content] Migration
 type Migration = (data: Record<string, unknown>) => Record<string, unknown>
 
@@ -2030,7 +2040,11 @@ interface RenderedMarkdown
   html: string
 
 [./content] renderMarkdown
-function renderMarkdown(markdown: string, options?: { highlight?: Highlighter | undefined; headingLinks?: boolean | undefined; }): Promise<RenderedMarkdown>
+function renderMarkdown(markdown: string, options?: {
+  highlight?: Highlighter | undefined;
+  headingLinks?: boolean | undefined;
+  transform?: ((html: string) => Promise<string> | string) | undefined;
+}): Promise<RenderedMarkdown>
 
 [./content] repositoryRoot
 function repositoryRoot(): string

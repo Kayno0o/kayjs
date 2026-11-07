@@ -505,9 +505,9 @@ describe('Markdown settings', () => {
     const highlight = (code: string) => `<pre class="mine">${code}</pre>`
 
     try {
-      expect(markdownOf({})).toEqual({ highlight: undefined, headingLinks: true, readingSpeed: 230, imageSizes: undefined })
+      expect(markdownOf({})).toEqual({ highlight: undefined, headingLinks: true, readingSpeed: 230, imageSizes: undefined, transform: undefined })
       setMarkdownDefaults({ highlight, headingLinks: false, readingSpeed: 460 })
-      expect(markdownOf({})).toEqual({ highlight, headingLinks: false, readingSpeed: 460, imageSizes: undefined })
+      expect(markdownOf({})).toEqual({ highlight, headingLinks: false, readingSpeed: 460, imageSizes: undefined, transform: undefined })
       expect(markdownOf({ headingLinks: true, readingSpeed: 100 })).toMatchObject({ headingLinks: true, readingSpeed: 100 })
 
       const [fromConfig] = await collection('posts', { schema }).all()

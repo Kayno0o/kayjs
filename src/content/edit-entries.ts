@@ -18,7 +18,7 @@ import { CRLF, DELETE, folderOf, indexes, LEADING_NEWLINE, MARKDOWN, SLASHES, SP
 import { entryPath } from './entry-route'
 import { ContentChangedError, contentKey } from './key'
 import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, sourcePath, STAMP_SETTLED_MS, translationKey, writableFolder } from './load'
-import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
+import { boundTransform, compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { migrateData } from './migrate'
 import { referencesIn } from './references'
 import { takeTurn } from './turns'
@@ -210,7 +210,7 @@ export async function entryIssues(name: string, collection: Collection<unknown>,
 
   issues.push(...placeIssues(collection, at), ...await indexIssues(collection, at))
 
-  const compiled = body === undefined ? undefined : await compiledBody(collection, body, message => issues.push({ ...at, path: '', body: true, message }))
+  const compiled = body === undefined ? undefined : await compiledBody(collection, body, at, message => issues.push({ ...at, path: '', body: true, message }))
 
   // A CMS edits entries whose data is an object of fields, as `entries()` reads them back.
   if (isFields(data))
@@ -829,10 +829,10 @@ function draftOf(collection: Collection<unknown>, entry: Omit<SourceEntry, 'draf
   return isDraft(draft as ((entry: Entry<unknown>) => boolean) | string, read)
 }
 
-async function compiledBody(collection: Collection<unknown>, body: string, report: (message: string) => void): Promise<CompiledMarkdown | undefined> {
+async function compiledBody(collection: Collection<unknown>, body: string, at: { collection: string, slug: string, locale?: string | undefined }, report: (message: string) => void): Promise<CompiledMarkdown | undefined> {
   try {
-    const { highlight, headingLinks } = markdownOf(collection.options)
-    const compiled = await compileMarkdown(body, 1, highlight, headingLinks, collection.loader !== undefined && collection.options.trusted !== true)
+    const { highlight, headingLinks, transform } = markdownOf(collection.options)
+    const compiled = await compileMarkdown(body, 1, highlight, headingLinks, collection.loader !== undefined && collection.options.trusted !== true, boundTransform(transform, { file: `${at.collection}/${at.slug}`, slug: at.slug, locale: at.locale }))
 
     for (const { component, line } of unknownComponents(compiled.segments, collection.components))
       report(`uses <${component}> on line ${line}, which the collection's components do not name`)
