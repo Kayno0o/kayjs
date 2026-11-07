@@ -269,7 +269,8 @@ pgDescribe('pgData', () => {
     })()
 
     try {
-      await waitFor(building, 'the first build')
+      // The build starts after two replicas connected and ran their first statements, which a host at a load of 47 takes more than 10 s over (the CI run 5660 failed here); the code has no event for its start, so the wait takes the test's whole 60 s.
+      await waitFor(building, 'the first build', 45_000)
       // Nothing happens: the adds stay held for as long as the first build runs, which is until the snapshot is released.
       await Bun.sleep(1500)
       expect(added).toBe(0)
@@ -283,7 +284,7 @@ pgDescribe('pgData', () => {
     await adds
     expect(await rows(sql, 'SELECT id FROM kay_jobs WHERE job_key = \'same\'')).toHaveLength(1)
     expect(await rows(sql, 'SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(\'kay_jobs_key\')')).toEqual([{ indisvalid: true }])
-  })
+  }, 60_000)
 
   pgIt('takes the indexes over from a replica holding the lock that builds nothing', async () => {
     const sql = await fresh()

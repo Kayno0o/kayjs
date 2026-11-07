@@ -217,12 +217,60 @@ export function trackStatements(): void {
 
     if (run?.over)
       statement.cancel()
-    else
-      run?.statements.add(statement)
 
-    return then.apply(this, args)
+    const result = then.apply(this, args)
+
+    if (run === undefined)
+      return result
+
+    const tracked = cancelledUntilSettled(statement, result)
+
+    if (run.over)
+      tracked.cancel()
+    else
+      run.statements.add(tracked)
+
+    return result
   }
   /* eslint-enable kaynooo/no-then */
+}
+
+// How often a cancel the server may have missed is sent again, and for how long.
+const RECANCEL_MS = 250
+const RECANCEL_FOR_MS = 15_000
+
+// A cancel is a request to the statement's backend, which drops it unless a statement is running there: one sent before the server began the statement, as on a loaded host where the backend was not scheduled yet, is lost and the statement runs to its end.
+// So `cancel` goes on being sent until the statement settles.
+function cancelledUntilSettled(statement: { cancel: () => void }, settling: unknown): { cancel: () => void } {
+  let settled = false
+  let timer: ReturnType<typeof setInterval> | undefined
+
+  const settle = () => {
+    settled = true
+    clearInterval(timer)
+  }
+
+  // The statement's own `then` returned this promise, so it settles with the statement.
+  // eslint-disable-next-line kaynooo/no-then -- two handlers, one for each way a statement ends
+  void Promise.resolve(settling).then(settle, settle)
+
+  return {
+    cancel() {
+      if (settled || timer !== undefined)
+        return
+
+      const until = performance.now() + RECANCEL_FOR_MS
+
+      statement.cancel()
+      timer = setInterval(() => {
+        if (settled || performance.now() > until)
+          return settle()
+
+        statement.cancel()
+      }, RECANCEL_MS)
+      timer.unref()
+    },
+  }
 }
 
 // What a query resolves with, its rows typed.

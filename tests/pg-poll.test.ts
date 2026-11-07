@@ -146,6 +146,23 @@ describe('the shared event poller', () => {
     expect(await activeAfterCancel(sql, 'SELECT pg_sleep(14)')).toBe(0)
   })
 
+  pgIt('cancels again a statement whose first cancel the server missed', async () => {
+    const { sql } = await postgres()
+    const slow = sql`SELECT pg_sleep(15)`
+    const cancel = slow.cancel.bind(slow)
+    let sent = 0
+
+    // The server drops a cancel that reaches a backend before it began the statement, as a loaded host makes happen: the first one is lost.
+    slow.cancel = () => {
+      if (++sent > 1)
+        void cancel()
+    }
+
+    await expect(timeLimited(async () => Promise.all([slow, sql`SELECT 1/0`]), 5000, 'the read')).rejects.toThrow()
+    expect(await activeAfterCancel(sql, 'SELECT pg_sleep(15)')).toBe(0)
+    expect(sent).toBeGreaterThan(1)
+  })
+
   it('does not run a task again before its last run ended', async () => {
     const clock = virtualClock()
     const counter = counted({ db: async () => ({}) as SQL })
