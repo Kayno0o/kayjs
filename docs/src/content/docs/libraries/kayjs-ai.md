@@ -38,6 +38,19 @@ Then pick a provider with environment variables:
 - `AI_BASE_URL` uses any server that speaks the OpenAI API, such as Ollama at `http://localhost:11434/v1`.
 - `AI_MODEL` is the model to ask. It is required in production, and no model name is built in.
 
+To use a cheap model for some work and a strong one for the rest, name them in `ai()` and pass the name. A name `models` does not list is read as a model id.
+
+```ts
+ai({
+  models: { fast: 'claude-haiku-4-5', smart: { model: 'gpt-5', provider: openai({ apiKey }) } },
+  default: 'smart',
+})
+
+const title = await ask(`Title for: ${text}`, { model: 'fast' })
+```
+
+An entry is a model id, or `{ model, provider }` to use another provider. An `ask` with no `model` uses `default` instead of `AI_MODEL`. Name a model `imageAlt` to draft alt text with it, or `translate` for `kay i18n translate`; without them both use the default. With no `models`, the environment above is all you need.
+
 For Mistral, set `AI_BASE_URL=https://api.mistral.ai/v1`, put its key in `OPENAI_API_KEY` and set `AI_MODEL` to a dated model such as `mistral-small-2603`. Avoid an alias like `mistral-small-latest`: it moves to the next model, and you pay that model's price. Nothing else is needed.
 
 With both keys set, add `AI_PROVIDER=anthropic` or `openai` to say which one to use. kay stops rather than guess which account to bill. With `AI_PROVIDER=anthropic`, `AI_BASE_URL` is the root of a proxy for Anthropic. `AI_PROVIDER=openai` needs `OPENAI_API_KEY` unless `AI_BASE_URL` names a server.

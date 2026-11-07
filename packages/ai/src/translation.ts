@@ -1,5 +1,6 @@
 // The translating itself: texts sent to a model as numbered JSON, and every text of its reply checked against its source before anything is kept.
 import { ask } from './ask'
+import { roleModel } from './models'
 
 // A text to translate: what the reply must keep of it depends on its kind. A message may hold `{placeholders}` and `<tag>`s, Markdown has link targets and code fences.
 export interface Unit {
@@ -104,7 +105,7 @@ export async function translateUnits(units: Unit[], { from, into, signal }: Tran
   let problems: string[] = []
 
   for (let attempt = 0; attempt < ATTEMPTS && pending.length > 0; attempt++) {
-    const reply = ask(JSON.stringify(Object.fromEntries(pending.map(unit => [unit.id, unit.text]))), { system: systemPrompt(from, into, problems, pending), maxTokens: MAX_TOKENS, temperature: 0, signal })
+    const reply = ask(JSON.stringify(Object.fromEntries(pending.map(unit => [unit.id, unit.text]))), { system: systemPrompt(from, into, problems, pending), maxTokens: MAX_TOKENS, temperature: 0, signal, ...roleModel('translate') })
     const text = await reply
     const [finish, usage] = await Promise.all([reply.finish, reply.usage])
 

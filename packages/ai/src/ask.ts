@@ -15,6 +15,7 @@ import { hooksFor, requested } from './hooks'
 import { keep, keptFor, markEnded, stopKept } from './kept'
 import { guarded, visitorOf } from './limits'
 import { converse, single } from './loop'
+import { defaultNamed, named } from './models'
 import { outputSchema } from './output-schema'
 import { createReply } from './reply'
 import { conversationCallOf, replacesOf, replyCallOf } from './resume'
@@ -283,8 +284,10 @@ function remembered(made: AiReply, options: AskOptions, call: ReplyCall | undefi
 
 function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchema | undefined, call: ReplyCall | undefined, replayed = false): AiReply {
   const messages = messagesOf(prompt, replayed)
-  const { provider, model: configured } = options.provider === undefined ? choose() : { provider: given(options.provider), model: options.provider.model }
-  const model = options.model ?? configured ?? options.provider?.model
+  const chosen = options.model === undefined ? defaultNamed() : named(options.model)
+  const handmade = options.provider ?? chosen?.provider
+  const { provider, model: configured } = handmade === undefined ? choose() : { provider: given(handmade), model: handmade.model }
+  const model = chosen?.model ?? options.model ?? configured ?? handmade?.model
 
   if (model === undefined)
     throw configError('ai', 'model', 'no model to ask; set AI_MODEL or pass { model }')

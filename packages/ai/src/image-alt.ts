@@ -10,6 +10,7 @@ import { IMPORTED, libraryCacheSlot, readCacheEntry, serverRoot, writeCacheEntry
 import { ask } from './ask'
 import { choose } from './config'
 import { fakeAi } from './fake'
+import { roleModel } from './models'
 
 const LIBRARY = 'kayjs-ai'
 // Part of what a draft is made from, so a changed prompt drafts again.
@@ -38,7 +39,7 @@ function systemPrompt(language: string | undefined): string {
 // One short alt text for an image, over `ask` with a `schema`: the fake answers under `bun test`, and a provider that does not see images fails the call.
 export async function describeImage(image: AiAttachment, options: DescribeImageOptions = {}): Promise<string> {
   const messages: AiMessage[] = [{ role: 'user', content: 'Write the alt text of this image.', attachments: [image] }]
-  const { alt } = await ask(messages, { schema: ALT, system: systemPrompt(options.language), maxTokens: 300, temperature: 0, ...options.signal === undefined ? {} : { signal: options.signal } })
+  const { alt } = await ask(messages, { schema: ALT, system: systemPrompt(options.language), maxTokens: 300, temperature: 0, ...roleModel('imageAlt'), ...options.signal === undefined ? {} : { signal: options.signal } })
 
   return alt.trim()
 }

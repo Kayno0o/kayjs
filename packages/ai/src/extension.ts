@@ -8,6 +8,7 @@ import { recordedAsks } from './dev-log'
 import { configureHooks } from './hooks'
 import { draftProblems, noModelProblems, startDrafting, writeImageAlts, writeKeptImageAlts } from './image-alt'
 import { configureLimits, limitsInEffect } from './limits'
+import { configureModels } from './models'
 import { configureResilience } from './retry'
 
 // The provider and model an ask would use now, or why none can be chosen.
@@ -22,7 +23,7 @@ function providerNow(): { provider: string, model: string | null } | { error: st
   }
 }
 
-const KNOWN_OPTIONS: Record<keyof AiOptions, true> = { rateLimit: true, budget: true, key: true, conversations: true, imageAlt: true, onRequest: true, onStep: true, onToolCall: true, onFinish: true, onError: true, retry: true, fallback: true }
+const KNOWN_OPTIONS: Record<keyof AiOptions, true> = { rateLimit: true, budget: true, key: true, conversations: true, imageAlt: true, models: true, default: true, onRequest: true, onStep: true, onToolCall: true, onFinish: true, onError: true, retry: true, fallback: true }
 
 // Lists the variables `ask` reads in `kay.config.ts`'s `extensions`, so `kay env` shows them without the app wiring them, holds the limit and budget every `ask` counts against, adds `kay i18n translate` and the dev tool's AI tab, and with `imageAlt` drafts the `alt` of the imported images a page shows with none; `ask` works without it, unlimited in development and under the production defaults otherwise.
 export function ai(options: AiOptions = {}): KayExtension {
@@ -31,6 +32,7 @@ export function ai(options: AiOptions = {}): KayExtension {
   configureLimits(options)
   configureHooks(options)
   configureResilience(options)
+  configureModels(options)
 
   const imageAlt = options.imageAlt === true || typeof options.imageAlt === 'object'
 

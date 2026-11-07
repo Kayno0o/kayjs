@@ -29,12 +29,14 @@ interface AiMessage
   sources?: readonly Source[] | undefined
 
 [.] AiOptions
-interface AiOptions extends AskHooks, Resilience
+interface AiOptions extends AskHooks, Resilience, ModelsOptions
   budget?: BudgetOptions | false | undefined
   conversations?: ConversationStore | undefined
+  default?: string | undefined
   fallback?: readonly FallbackModel[] | undefined
   imageAlt?: boolean | undefined | { reviewed?: string[] | undefined; }
   key?: ((request: Request) => Promise<string | undefined> | string | undefined) | undefined
+  models?: Record<string, NamedModel> | undefined
   onError?: ((error: unknown) => unknown) | undefined
   onFinish?: ((done: FinishHookCall) => unknown) | undefined
   onRequest?: ((call: RequestHookCall) => Promise<RequestHookChange | undefined | void> | RequestHookChange | undefined | void) | undefined
@@ -379,6 +381,14 @@ type Message = AiMessage
 function mocked<const Schema extends TSchema, const Honeypot extends string = never>(action: ServerAction<Schema, unknown, Honeypot>, run: (input: (Schema & {
   params: [];
 })["static"], context: FunctionToolContext) => unknown): FunctionTool
+
+[.] ModelsOptions
+interface ModelsOptions
+  default?: string | undefined
+  models?: Record<string, NamedModel> | undefined
+
+[.] NamedModel
+type NamedModel = string | { model: string, provider?: Provider | undefined }
 
 [.] openai
 function openai(options?: OpenAiOptions): Provider

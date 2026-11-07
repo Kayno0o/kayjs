@@ -80,6 +80,8 @@ In the island, `const stream = await reply({ messages })` resolves with an `Acti
 - `AI_MODEL`: the default model, `ask(..., { model })` overrides it. Required in production, which `kay env` shows as such once `ai()` is in `extensions`.
 - `AI_PROVIDER` (`anthropic` or `openai`): only needed when both keys are set, as `ask` throws rather than pick an account to bill.
 
+Several models: name them once in `ai()` and pass the name. `ai({ models: { fast: 'claude-haiku-4-5', smart: { model: 'gpt-5', provider: openai({ apiKey }) } }, default: 'smart' })` makes `ask(x, { model: 'fast' })` ask Haiku, a plain `ask(x)` the `default` (in place of `AI_MODEL`), and a name that `models` does not list stays a model id. An entry is an id, or `{ model, provider }` to go to another provider (an `ask({ provider })` still wins). The names `imageAlt` and `translate` are the model `ai({ imageAlt })` drafts alt text with and `kay i18n translate` asks; without them both ask the default. The environment stays enough on its own: with no `models`, nothing changes.
+
 Mistral: `AI_BASE_URL=https://api.mistral.ai/v1`, its key in `OPENAI_API_KEY`, `AI_MODEL=mistral-small-2603`. Pin a dated model id: an alias such as `mistral-small-latest` moves to the next model and bills at its price. Nothing else is set: kay drops the `stream_options` Mistral refuses, reads its array content for the text, and counts the usage it sends unasked.
 
 `transcribe()`, `speak()` and `embed()` read their own variables (`AI_AUDIO_URL`, `AI_EMBED_URL`, a model each, `AI_VOICE`): [Speech and embeddings](speech-and-embeddings.md).

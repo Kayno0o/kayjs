@@ -313,7 +313,7 @@ export interface Resilience {
 
 export interface AskOptions extends AskHooks, Resilience {
   system?: string | undefined
-  // The model for this reply, `AI_MODEL` when left out.
+  // The model for this reply: its id, or a name from `ai({ models })`; `ai({ default })` or `AI_MODEL` when left out.
   model?: string | undefined
   // 4096 by default, as Anthropic requires one.
   maxTokens?: number | undefined

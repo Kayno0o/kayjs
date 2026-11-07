@@ -2,6 +2,7 @@ import type { Duration, RateLimit, RateStore } from 'kay'
 import type { Limiter } from 'kay/library'
 import type { ConversationStore } from './conversation-store'
 import type { AiLimit } from './errors'
+import type { ModelsOptions } from './models'
 import type { AskHooks, Piece, Resilience, Usage } from './types'
 import process from 'node:process'
 import { logFrom } from 'kay'
@@ -35,7 +36,7 @@ export interface BudgetOptions {
   store?: RateStore | undefined
 }
 
-export interface AiOptions extends AskHooks, Resilience {
+export interface AiOptions extends AskHooks, Resilience, ModelsOptions {
   // In production 20 asks per visitor every 10 minutes unless set; `false` lifts it. A list is each counted apart, an ask refused past any of them.
   rateLimit?: AskLimit | AskLimit[] | false | undefined
   // In production 100,000 tokens per visitor and 2,000,000 in all every day unless set; `false` lifts it. A budget set without a `total` logs a warning at boot in production.
