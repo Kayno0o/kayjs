@@ -12,10 +12,10 @@ import { wording } from 'kay/words'
 // 'kui-side-nav' stays as the component's name for an app's CSS. From lg the nav is a column, narrowed to a rail of icons when collapsed; below it the nav gives way to a button opening the same lists in a SidePanel.
 const look = recipe({
   parts: {
-    root: 'kui-side-nav flex flex-col',
+    root: 'kui-side-nav flex flex-col max-lg:flex-row max-lg:flex-wrap max-lg:items-center',
     menu: 'lg:hidden',
     nav: 'group/side flex min-h-0 flex-1 flex-col gap-4 data-[panel]:max-lg:hidden w-60 data-[collapsed]:w-14 transition-[width] max-lg:w-full',
-    header: 'px-3',
+    header: 'min-w-0 overflow-hidden px-3',
     group: 'flex flex-col gap-1',
     heading: 'px-3 text-xs uppercase tracking-label text-muted group-data-[collapsed]/side:sr-only',
     list: 'flex flex-col gap-1',
@@ -27,7 +27,7 @@ const look = recipe({
     badge: 'rounded-full bg-surface-strong px-1.5 text-xs tabular-nums text-muted group-data-[collapsed]/side:hidden',
     // The links under a link, shown whether or not the link is the page on screen; a rail leaves them out.
     children: 'flex flex-col gap-1 ps-4 group-data-[collapsed]/side:hidden',
-    footer: 'mt-auto px-3',
+    footer: 'mt-auto min-w-0 overflow-hidden px-3',
     toggle: 'self-end max-lg:hidden',
     panel: 'flex flex-col gap-4',
     status: 'px-3 text-sm text-muted',
@@ -187,9 +187,6 @@ snippet destination(entry: NavLink, inPanel: boolean)
       | {inside(entry)}
 snippet lists(inPanel: boolean)
   nav(part="nav" id={inPanel ? `${navId}-panel` : navId} aria-label={label} data-collapsed={folded() && !inPanel ? '' : undefined} data-panel={panel && !inPanel ? '' : undefined})
-    if header
-      div(part="header")
-        | {header}
     if pending()
       p(part="status" role="status") {loadingLabel}
     if failed()
@@ -212,14 +209,15 @@ snippet lists(inPanel: boolean)
                   for child of entry.children key={child.href}
                     li(part="item")
                       | {destination(child, inPanel)}
-    if footer
-      div(part="footer")
-        | {footer}
     if collapsible && !inPanel
       button.kui-icon-btn(part="toggle" type="button" aria-label={folded() ? expandLabel : collapseLabel} aria-expanded={folded() ? 'false' : 'true'} aria-controls={navId} data-tooltip={folded() ? expandLabel : collapseLabel} data-size="md" data-variant="ghost" data-tone="neutral" onClick={fold})
         Icon(icon="chevron" part="toggleIcon")
+// The header and the footer are drawn once, around the nav, so a block's ids stay unique whether the nav is in place or in the panel; a narrow screen keeps them beside the button.
 // The nav is a column from lg, hidden below it where the button opens the same lists in a panel.
 div(part="root" {...rest})
+  if header
+    div(part="header")
+      | {header}
   | {lists(false)}
   if panel
     button.kui-icon-btn(part="menu" type="button" aria-label={menuLabel} aria-haspopup="dialog" data-tooltip={menuLabel} data-size="md" data-variant="ghost" data-tone="neutral" onClick={() => setOpen(true)})
@@ -228,3 +226,6 @@ div(part="root" {...rest})
       // kay-allow unreachable-click -- the click comes from a link inside, which the keyboard follows
       div(part="panel" onClick={followed})
         | {lists(true)}
+  if footer
+    div(part="footer")
+      | {footer}

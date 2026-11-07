@@ -25,4 +25,8 @@ SideNav#panel(groups={groups} current="https://example.com/home" label="Panel" o
 SideNav#later(groups={async () => groups} current="https://example.com/home" label="Later" panel={false})
 SideNav#broken(links={async () => { throw new Error('no') }} current="https://example.com/home" label="Broken" panel={false})
 SideNav#folded(groups={groups} current="https://example.com/home" label="Folded" collapsed={true})
+  @header
+    p brand
+  @footer
+    p user
 SiteNav#site(links={[{ href: 'https://example.com/a', label: 'A', badge: 2 }, { href: 'https://example.com/b', label: 'B', disabled: true }]} current="https://example.com/a" label="Site")

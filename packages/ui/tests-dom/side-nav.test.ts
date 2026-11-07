@@ -53,8 +53,8 @@ test('the blocks replace the text, the headings and fill the header and the foot
   expect(page.querySelector('#block a em')?.textContent).toBe('Home!')
   expect(page.querySelector('#block [data-part="icon"]')).not.toBeNull()
   expect(page.querySelector('#block [data-part="heading"] strong')?.textContent).toBe('Main!')
-  expect(page.querySelector('#block [data-part="header"]')?.textContent).toBe('header')
-  expect(page.querySelector('#block [data-part="footer"]')?.textContent).toBe('footer')
+  expect(page.querySelector('#block')?.parentElement?.querySelector('[data-part="header"]')?.textContent).toBe('header')
+  expect(page.querySelector('#block')?.parentElement?.querySelector('[data-part="footer"]')?.textContent).toBe('footer')
   expect(page.querySelector('#block [data-part="toggle"]')).toBeNull()
 })
 
@@ -114,4 +114,15 @@ test('the panel is not read as a rail when the page collapsed the desktop nav', 
   expect(inside.hasAttribute('data-collapsed')).toBe(false)
   expect(page.querySelector('#folded')?.hasAttribute('data-collapsed')).toBe(true)
   expect(page.querySelector('[data-part="root"][data-collapsed]')).toBeNull()
+})
+
+test('the header and the footer are drawn once, beside the nav and the panel', async () => {
+  const page = await root()
+  const folded = page.querySelector('#folded')!.parentElement!
+
+  folded.querySelector<HTMLButtonElement>('[data-part="menu"]')!.click()
+  await settle()
+  expect(folded.querySelectorAll('[data-part="header"]')).toHaveLength(1)
+  expect(folded.querySelectorAll('[data-part="footer"]')).toHaveLength(1)
+  expect(page.querySelectorAll('#folded-panel [data-part="header"], #folded-panel [data-part="footer"]')).toHaveLength(0)
 })
