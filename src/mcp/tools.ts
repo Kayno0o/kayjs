@@ -483,6 +483,27 @@ function tools(root: string, write: boolean): Tool[] {
         return changed === undefined || answer.structuredContent === undefined ? answer : jsonText({ ...answer.structuredContent, waited: changed })
       },
     },
+    {
+      name: 'not_found',
+      title: 'List the pages visitors found nothing at',
+      description: 'Lists the paths visitors asked for and found no page at, most hit first, from the database the production server keeps them in, as `kay not-found --format json` does: `{ missing, total }`, each path with its `hits`, `firstAt` and `lastAt` (epoch milliseconds), the `referrers` it was linked from and the `target` kay suggests with its `reason`. A path a redirect already answers is left out. Reads only; adding a redirect is `kay not-found --redirect` by hand. Answers an empty list when nothing is recorded. At most 200 paths come back, `total` says how many there were.',
+      inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: MAX_LISTED, description: `How many paths to list, at most ${MAX_LISTED} (the default).` } }, additionalProperties: false },
+      annotations: READ_ONLY,
+      run: async (args) => {
+        const { limit = MAX_LISTED } = args
+
+        if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > MAX_LISTED)
+          throw new Error(`limit takes a whole number from 1 to ${MAX_LISTED}`)
+
+        const result = jsonResult(await kay(['not-found', '--format', 'json']))
+        const { missing } = (result.structuredContent ?? {}) as { missing?: unknown[] }
+
+        if (result.isError || !Array.isArray(missing))
+          return result
+
+        return jsonText({ missing: missing.slice(0, limit), total: missing.length })
+      },
+    },
   ]
 }
 

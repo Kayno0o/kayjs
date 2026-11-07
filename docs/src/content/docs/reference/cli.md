@@ -747,6 +747,9 @@ Another client takes the same command in its MCP config, such as `.mcp.json` at 
 | `i18n_missing` | `kay i18n missing --format json`, for one `locale` or all |
 | `a11y` | `kay a11y --dry-run --format json`, with `standard`. Needs Chrome |
 | `dev_errors` | The errors a running `kay dev` met, from [`.kay/dev/errors.json`](#errors-without-a-browser). `waitMs` first waits for the next change to settle, so an edit is answered by what it caused |
+| `not_found` | `kay not-found --format json`: `{ missing, total }`, the paths visitors found nothing at, most hit first, each with `hits`, `firstAt`, `lastAt`, `referrers` and the suggested `target`, from the same database the command reads. It writes nothing. `limit` lists fewer than the 200 it caps at |
+
+The server offers tools and resources only. It has no prompts, which would repeat what `AGENTS.md` and the server's own instructions already tell an agent, and no resource subscriptions: the resources are the guides, which do not change while the server runs, and what does change (check problems, the dev server's errors) is read through `check` and `dev_errors`, whose `waitMs` waits for the next change.
 
 The resources are `kay://llms.txt`, the index to start from, one `kay://llms/<file>.md` for each guide of kay's `llms/`, and `kay://<library>/llms.txt` with `kay://<library>/<file>.md` for each `@kaynooo/kayjs-*` library the project installed, at its installed version.
 

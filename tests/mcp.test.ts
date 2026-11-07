@@ -3,6 +3,7 @@ import { mkdir, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { missingStore } from '../src/server/not-found'
 import { alive } from './alive'
 import { eventually } from './helpers/eventually'
 import { spawnSuiteServer } from './listening'
@@ -349,7 +350,7 @@ describe.concurrent('kay mcp', () => {
     const { result } = await agent.request('tools/list')
     const tools = result?.tools as { name: string, inputSchema: { type: string }, annotations: object }[]
 
-    expect(tools.map(tool => tool.name)).toEqual(['check', 'routes', 'explain', 'docs', 'render', 'screenshot', 'doctor', 'fmt', 'generate', 'add', 'test', 'build', 'types', 'fix', 'upgrade', 'lint', 'env', 'i18n_missing', 'a11y', 'dev_errors'])
+    expect(tools.map(tool => tool.name)).toEqual(['check', 'routes', 'explain', 'docs', 'render', 'screenshot', 'doctor', 'fmt', 'generate', 'add', 'test', 'build', 'types', 'fix', 'upgrade', 'lint', 'env', 'i18n_missing', 'a11y', 'dev_errors', 'not_found'])
     expect(tools.every(tool => tool.inputSchema.type === 'object' && 'readOnlyHint' in tool.annotations)).toBe(true)
   })
 
@@ -903,5 +904,59 @@ describe('kay mcp tools that write', () => {
 
     expect(quiet.structuredContent).toMatchObject({ errors: [], waited: false })
     expect((await call(writer, 'dev_errors', { waitMs: 10_000_000 })).isError).toBe(true)
+  })
+})
+
+describe('kay mcp not_found', () => {
+  let app: string
+  let reader: Agent
+  const file = () => join(app, 'data', 'not-found.sqlite')
+
+  const call = async (args: object = {}) => (await reader.request('tools/call', { name: 'not_found', arguments: args })).result as { isError?: boolean, content: { text: string }[], structuredContent?: { missing: { path: string, hits: number, lastAt: number, referrers: { host: string }[] }[], total: number } }
+
+  beforeAll(async () => {
+    app = await scratchDir('mcp-not-found-')
+    await Bun.write(join(app, 'tsconfig.json'), tsconfig)
+    await Bun.write(join(app, 'src/routes/index.kay'), 'p Home\n')
+    reader = new Agent(app)
+  })
+
+  afterAll(async () => {
+    await reader.close()
+    await rm(app, { recursive: true, force: true })
+  })
+
+  it('answers an empty list while nothing is recorded, and creates no database', async () => {
+    const result = await call()
+
+    expect(result.isError).toBeFalsy()
+    expect(result.structuredContent).toEqual({ missing: [], total: 0 })
+    expect(await Bun.file(file()).exists()).toBe(false)
+  })
+
+  it('lists the recorded paths most hit first and caps them, changing nothing', async () => {
+    const store = missingStore(file())
+    const never = () => undefined
+
+    for (let index = 0; index < 205; index++)
+      store.hit(`/old-${index}`, undefined, never)
+
+    store.hit('/popular', 'blog.example', never)
+    store.hit('/popular', 'blog.example', never)
+    store.close()
+
+    const before = new Bun.CryptoHasher('sha256').update(await Bun.file(file()).bytes()).digest('hex')
+    const all = await call()
+
+    expect(all.structuredContent!.total).toBe(206)
+    expect(all.structuredContent!.missing).toHaveLength(200)
+    expect(all.structuredContent!.missing[0]).toMatchObject({ path: '/popular', hits: 2, referrers: [{ host: 'blog.example' }] })
+    expect(typeof all.structuredContent!.missing[0]!.lastAt).toBe('number')
+    expect((await call({ limit: 3 })).structuredContent!.missing).toHaveLength(3)
+
+    for (const limit of [0, 201, 1.5, '3'])
+      expect((await call({ limit })).isError).toBe(true)
+
+    expect(new Bun.CryptoHasher('sha256').update(await Bun.file(file()).bytes()).digest('hex')).toBe(before)
   })
 })

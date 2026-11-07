@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- The MCP tool `not_found` lists the paths visitors found nothing at, as `kay not-found --format json` does (`{ missing, total }`, capped at 200, reading only) ([MCP commands](editor-and-agent-commands.md)).
 - kayjs-ui IconPicker takes its icons as one `OptionsSource`: `icons` is a set, a promise or a function of `{ q, limit, offset }`, `search` is deprecated (`deprecated-icon-picker-search`, fixed by `kay upgrade`), and `onLoad(icons, query)` joins `onError({ error, query })` ([IconPicker](../packages/ui/llms/pickers.md)).
 - kayjs-ui Tabs and Steps take an `OptionsSource` as `tabs` and `steps` (a list, a promise or a function), busy under `loadingLabel` until it answers and saying `failureLabel` with a `retryLabel` button when it fails, with `onLoad` and `onError` ([Tabs](../packages/ui/llms/tables-navigation-and-layout.md), [Steps](../packages/ui/llms/forms-and-steps.md)).
 - kayjs-ui RadioGroup, Segmented and ChipGroup take an `OptionsSource` as `options` (a list, a promise or a function), busy under `loadingLabel` until it answers and saying `failureLabel` with a `retryLabel` button when it fails, with `onLoad` and `onError` ([RadioGroup, Segmented, ChipGroup](../packages/ui/llms/forms.md)).
