@@ -9,6 +9,32 @@ let mounted: Mounted | undefined
 afterEach(() => mounted?.unmount())
 
 describe('ContactForm and SubscribeForm', () => {
+  test('onSent is heard when onSend throws', async () => {
+    const heard: string[] = []
+    const listener = (event: ErrorEvent) => event.preventDefault()
+
+    window.addEventListener('error', listener)
+
+    try {
+      mounted = await mountComponent(MailForms, {
+        onSend: () => {
+          heard.push('send')
+
+          throw new Error('first')
+        },
+        onError: () => undefined,
+        old: { contact: { onSent: () => heard.push('sent') } },
+      })
+      click(mounted.root.querySelector('#sent'))
+      await settle()
+    }
+    finally {
+      window.removeEventListener('error', listener)
+    }
+
+    expect(heard).toEqual(['send', 'sent'])
+  })
+
   test('onSent still hears the result, after onSend', async () => {
     const heard: string[] = []
 

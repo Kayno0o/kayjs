@@ -1003,7 +1003,7 @@ class Validator {
         // `onSave` of a SaveForm with an `action` hears its result since 1.92, where it replaced the `action`: a function taking no parameter is the old call, which the form no longer makes instead of the action. A reference, or a function reading its parameter, is left alone, as it may be the new hook.
         if (saveCall && others.has('action')) {
           if (attribute.kind === 'expression' && NO_PARAMETER_FUNCTION.test(this.text(attribute.expression)))
-            this.lint(attribute.name, 'deprecated-hook-names', `\`onSave\` beside an \`action\` on \`${element.name}\` hears the action's result since kayjs-ui 1.92, where it replaced the \`action\`: this function takes no parameter, so it was the call that does the save`, { help: 'Write `save` for the call that does the save, without the `action`, or `onSave={result => ...}` to hear the result' })
+            this.lint(attribute.name, 'deprecated-hook-names', `\`onSave\` beside an \`action\` on \`${element.name}\` only hears the action's result since kayjs-ui 1.92: if this was the call that does the save, write it \`save\``, { help: 'If it does the save, write `save` and drop the `action`; if it hears the result, nothing changes' })
 
           continue
         }

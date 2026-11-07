@@ -1,6 +1,7 @@
 ---
 import type { Action, FormFailure } from 'kay'
 import { effect, untrack } from 'kay'
+import { hear } from './hear'
 
 // Reports how a form posting to `action` went to the app, drawing nothing. ContactForm and SubscribeForm render it only when given `onSend`, `onSent` or `onError`, so a form that asks for neither stays static and ships no JavaScript.
 // The callbacks are not named `on*`: an `onX` attribute on a component makes the component passing it an island, which the forms rendering this would then be even with no callback given.
@@ -16,14 +17,7 @@ effect(() => {
   const done = action.succeeded()
 
   if (done) {
-    untrack(() => {
-      try {
-        whenSent?.(done.data)
-      }
-      finally {
-        whenSentOld?.(done.data)
-      }
-    })
+    untrack(() => hear(() => whenSent?.(done.data), () => whenSentOld?.(done.data)))
   }
 })
 

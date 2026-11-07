@@ -3,6 +3,7 @@ import type { Action, Answer, FailureData, JSX, Success } from 'kay'
 import { carrySchema, effect, guardLeave, onCleanup, onMount, recipe, shortcut, signal } from 'kay'
 import Button from './button.kay'
 import type { FormValidation } from './forms'
+import { hear } from './internal/hear'
 import { callAction, checkSchema, checkSent, formIssues, leftField, showIssues } from './forms'
 import { holdDefaults, onFormReset } from './form-reset'
 import { toast } from './toast'
@@ -256,14 +257,8 @@ async function submit(event: SubmitEvent) {
   if (saved)
     toast.success(saved)
 
-  if (!run) {
-    try {
-      onSave?.(done.result as Answer<Success<Output>>)
-    }
-    finally {
-      onSaved?.(done.result as Answer<Success<Output>>)
-    }
-  }
+  if (!run)
+    hear(() => onSave?.(done.result as Answer<Success<Output>>), () => onSaved?.(done.result as Answer<Success<Output>>))
 }
 
 // The form's methods are called through its prototype, as a control named `requestSubmit` or `reset` takes their place on the form.

@@ -1662,6 +1662,16 @@ describe('deprecated-hook-names in a template', () => {
     expect(found('Save(action={add} onSave={function () { run() }})')).toEqual([{ at: 'onSave', fix: undefined, safe: undefined }])
   })
 
+  it('words the onSave beside an action for both readings', () => {
+    const source = `---\n${imports}---\nSave(action={add} onSave={() => toast.info('Saved')})\n`
+    const [diagnostic] = compileKay(source, 'hooks.kay', { check: true }).diagnostics.filter(d => d.code === 'deprecated-hook-names')
+
+    expect(diagnostic!.message).toContain('only hears the action\'s result')
+    expect(diagnostic!.message).toContain('if this was the call that does the save, write it `save`')
+    expect(diagnostic!.help).toContain('if it hears the result, nothing changes')
+    expect(diagnostic!.fixes).toBeUndefined()
+  })
+
   it('points to the save rename from an onSaved beside an onSave with no action', () => {
     const source = `---\n${imports}---\nSave(dirty={true} onSave={run} onSaved={done})\n`
     const hints = compileKay(source, 'hooks.kay', { check: true }).diagnostics.filter(d => d.code === 'deprecated-hook-names').map(d => [source.slice(d.start, d.end), d.help])

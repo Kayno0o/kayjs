@@ -41,7 +41,6 @@ const { action, nameLabel = wording('ui.contactForm.name', wording('mail.contact
   rows?: number | undefined
 }>()
 
-
 // Server actions carry their schema; the consent checkbox is drawn when `consent: true` marked the field.
 const asksConsent = () => consent ?? (action as { schema?: { properties?: Record<string, Record<string, unknown> | undefined> } }).schema?.properties?.consent?.['x-kay-consent'] === true
 ---

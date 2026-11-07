@@ -4,6 +4,7 @@ import { carrySchema, effect, recipe, signal, uid } from 'kay'
 import Button from './button.kay'
 import Dialog from './dialog.kay'
 import type { FormValidation } from './forms'
+import { hear } from './internal/hear'
 import { callAction, checkSchema, checkSent, formIssues, leftField, showIssues } from './forms'
 import type { OverlaySize } from './overlay'
 import { wording } from 'kay/words'
@@ -95,13 +96,13 @@ async function submit(event: SubmitEvent) {
     return
 
   // Outside the call's `try`, so a page failing to patch the saved result in surfaces as the bug it is rather than as a refused save.
+  // The dialog closes whatever the hooks do: the save went through.
   try {
-    onSave?.(done.result)
+    hear(() => onSave?.(done.result), () => onSaved?.(done.result))
   }
   finally {
-    onSaved?.(done.result)
+    onOpenChange(false)
   }
-  onOpenChange(false)
 }
 
 async function leave(event: FocusEvent) {

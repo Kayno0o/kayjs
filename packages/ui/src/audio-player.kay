@@ -5,6 +5,7 @@ import { effect, memo, onCleanup, onMount, recipe, signal } from 'kay'
 import { chapterAt, clock, cueAt, cuesByChapter, lockScreen, previousStart } from './audio'
 import CollapsibleSection from './collapsible-section.kay'
 import IconButton from './icon-button.kay'
+import { hear } from './internal/hear'
 import { tabOf } from './outside'
 import { rangeTrack } from './range-track'
 import { attempt } from './toast'
@@ -121,12 +122,7 @@ const marked = () => length() > 0 ? chapters.map((chapter, index) => ({ chapter,
 function finished() {
   playing = false
 
-  try {
-    onEnd?.()
-  }
-  finally {
-    onEnded?.()
-  }
+  hear(() => onEnd?.(), () => onEnded?.())
 }
 
 function echoed(seconds: number) {

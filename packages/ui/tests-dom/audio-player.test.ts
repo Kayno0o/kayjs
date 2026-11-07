@@ -121,6 +121,29 @@ test('onEnded still hears the end of the audio', async () => {
   expect(events).toEqual(['ended', 'legacy ended'])
 })
 
+test('onEnded still hears the end when onEnd throws', async () => {
+  const { root } = await players()
+  const errors: unknown[] = []
+  const listener = (event: ErrorEvent) => {
+    event.preventDefault()
+    errors.push(event.error ?? event.message)
+  }
+
+  events.push('boom')
+  window.addEventListener('error', listener)
+
+  try {
+    root.querySelector('#legacy audio')!.dispatchEvent(new Event('ended'))
+    await settle()
+  }
+  finally {
+    window.removeEventListener('error', listener)
+  }
+
+  expect(events).toEqual(['boom', 'ended', 'legacy ended'])
+  expect(errors.map(error => String(error))).toEqual([expect.stringContaining('first')])
+})
+
 test('tells onPlay, onPause, onEnd and onError as the audio moves through them', async () => {
   const { audio, part } = await players()
 

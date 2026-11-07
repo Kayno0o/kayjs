@@ -2,6 +2,7 @@
 import type { Action, Answer, FailureData, JSX, Success } from 'kay'
 import { recipe, signal } from 'kay'
 import type { FormValidation } from './forms'
+import { hear } from './internal/hear'
 import { callAction, checkSchema, checkSent, formIssues, leftField, showIssues } from './forms'
 import { toast } from './toast'
 import { wording } from 'kay/words'
@@ -56,12 +57,7 @@ async function submit(event: SubmitEvent) {
   if (saved)
     toast.success(saved)
 
-  try {
-    onSave?.(done.result)
-  }
-  finally {
-    onSaved?.(done.result)
-  }
+  hear(() => onSave?.(done.result), () => onSaved?.(done.result))
 }
 
 async function leave(event: FocusEvent) {
