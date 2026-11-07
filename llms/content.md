@@ -154,6 +154,23 @@ export const posts = collection('content/posts', {
 })
 ```
 
+### Point at another collection's entry
+
+`reference('authors')` from `kay/content` is a field holding the slug of an entry of the collection exported as `authors`, also in a list (`s.Array(reference('authors'))`), an object or a `blocks()` item. `kay check` and `kay build` fail on a slug that collection has no entry for (any locale's, in a localized one), or on a collection the content config does not export, naming the file and the line of the field; a write through `saveEntry` and `showDraft` refuses it as an issue at the field's path. A collection with a loader is not read by the check, so a reference to it is checked only when written.
+
+`resolve(slug, collection)` from `kay/content` gives the entry, or undefined for a null, undefined or hidden one (a draft in production), and an array of slugs gives the entries found, in order. In a localized collection it reads as `get` does, the request's locale with the default locale's as fallback:
+
+```kay
+--- server
+import { resolve } from 'kay/content'
+import { authors, posts } from '../../content.config'
+
+const post = await posts.get(ctx.params.slug) ?? ctx.notFound()
+const author = await resolve(post.data.author, authors)
+---
+p {author?.data.name}
+```
+
 ### Render Markdown a user writes
 
 `markdownHtml(text)` from `kay/markdown` renders it as it comes, in an island too, as a `SafeHtml`.  Under Tailwind's preflight such text shows unstyled: with kayjs-ui the container takes `class="kui-prose"`. In an island marked (about 15 KB gzip) loads on the first call outside hydration: the text shows as written until it arrives, then a template or effect that called it runs again formatted, and a failed load leaves the text as written. While an island hydrates, that text as written stands in for markup the server drew formatted, which `property` leaves in place, written again after hydration (by an effect running for another value, or from a `memo` that cached it) too, and marked waits for the text to change or be written again, so a page whose Markdown never changes never loads it; a component that changes the HTML before writing it returns the stand-in as it is when `isHeldMarkdown(html)` from `kay/markdown` is true, which is always false on the server. `markdownLoaded()` from `kay/markdown` tells whether marked has arrived, so a component linking words in the HTML reads them from the Markdown itself until then, as the text as written shows no code apart; a template or effect reading it runs again once marked has loaded, it loads nothing, and it is always true on the server. A call outside a template or effect, such as a click handler, awaits `markdownReady()` from `kay/markdown` first, and an island about to stream Markdown starts the load early with `void markdownReady()`, as kayjs-ai's Chat does on send.

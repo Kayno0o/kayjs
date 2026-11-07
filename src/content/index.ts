@@ -36,6 +36,7 @@ export type { Migration } from './migrate'
 export { convertField, renameField, setField } from './migrate'
 export type { Page, Paginated } from './paginate'
 export { isPaginated, paginate } from './paginate'
+export { resolve } from './references'
 
 // kept: free
 export const COLLECTION = Symbol.for('kay.collection')

@@ -20,6 +20,7 @@ import { ContentChangedError, contentKey } from './key'
 import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, sourcePath, STAMP_SETTLED_MS, translationKey, writableFolder } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { migrateData } from './migrate'
+import { referencesIn } from './references'
 import { takeTurn } from './turns'
 import { dataIssues, decodeEntries, unknownComponents, withDefaults } from './validate'
 
@@ -202,7 +203,7 @@ export async function translations(name: string): Promise<TranslationIndex> {
 
 // Where an entry an editor wrote fails its collection: a slug naming another place, or another file than its own in a folder, a new `a/index` included, a locale the site does not serve, a locale missing from a localized collection's entry or given to another's, the schema, or a component its body uses that the collection does not name.
 // A body's issue is flagged `body`, a slug's or a locale's `key`, apart from a data field of that name; the body comes back compiled when it compiles.
-export async function entryIssues(name: string, collection: Collection<unknown>, entry: WrittenEntry, replacing?: string): Promise<{ issues: DraftIssue[], compiled?: CompiledMarkdown | undefined }> {
+export async function entryIssues(name: string, collection: Collection<unknown>, entry: WrittenEntry, replacing?: string, alongside: { collection: string, slug: string }[] = []): Promise<{ issues: DraftIssue[], compiled?: CompiledMarkdown | undefined }> {
   const { slug, locale, data, body } = entry
   const at = { collection: name, slug, ...locale !== undefined && { locale } }
   const issues: DraftIssue[] = []
@@ -217,8 +218,10 @@ export async function entryIssues(name: string, collection: Collection<unknown>,
   else
     issues.push({ ...at, path: '', message: `holds ${valueKind(data)} as its data, not an object of fields` })
 
-  if (isFields(data))
+  if (isFields(data)) {
     issues.push(...await uniqueIssues(name, collection, at, data, replacing))
+    issues.push(...await referenceIssues(collection, at, data, [at, ...alongside]))
+  }
 
   return { issues, compiled }
 }
@@ -243,6 +246,31 @@ async function uniqueIssues(name: string, collection: Collection<unknown>, at: {
   return issues
 }
 
+// Each `reference()` field naming a slug its collection has no entry for, or a collection the content config does not export; the entries of a collection are read once per call. The entries written together count as held, the one being written included, so an entry may name itself and a batch its own members.
+async function referenceIssues(collection: Collection<unknown>, at: { collection: string, slug: string, locale?: string }, data: Record<string, DataValue>, written: { collection: string, slug: string }[]): Promise<DraftIssue[]> {
+  const issues: DraftIssue[] = []
+  const slugs = new Map<string, Set<string>>()
+
+  for (const use of referencesIn(collection.options.schema, data)) {
+    if (!registeredCollections().some(([name]) => name === use.collection)) {
+      issues.push({ ...at, path: use.path, message: `references the collection ${use.collection}, which the content config does not export` })
+
+      continue
+    }
+
+    if (written.some(entry => entry.collection === use.collection && entry.slug === use.slug))
+      continue
+
+    if (!slugs.has(use.collection))
+      slugs.set(use.collection, new Set((await entries(use.collection)).map(entry => entry.slug)))
+
+    if (!slugs.get(use.collection)!.has(use.slug))
+      issues.push({ ...at, path: use.path, message: `references ${use.slug}, which ${use.collection} has no entry for` })
+  }
+
+  return issues
+}
+
 // The top-level fields declared `unique`, those of an `Intersect`'s members as well.
 function uniqueFields(schema: TSchema): string[] {
   const { properties = {}, allOf = [] } = schema as { properties?: Record<string, { 'x-kay-unique'?: boolean }>, allOf?: TSchema[] }
@@ -251,16 +279,16 @@ function uniqueFields(schema: TSchema): string[] {
 }
 
 // The file holding a folder collection's entry as the editor wrote it, for a CMS to commit, or where it fails the collection; kay writes nothing.
-// An entry the folder holds keeps its file and format, its body too when none is given; a new one is Markdown when it has a body or the folder holds Markdown, JSON otherwise. `create` refuses an entry the folder already holds. `replacing` is the slug of the entry this one takes the place of, as when a slug is renamed: its values do not count as taken for a `unique` field, and the new file has its file's format.
+// An entry the folder holds keeps its file and format, its body too when none is given; a new one is Markdown when it has a body or the folder holds Markdown, JSON otherwise. `create` refuses an entry the folder already holds. `replacing` is the slug of the entry this one takes the place of, as when a slug is renamed: its values do not count as taken for a `unique` field, and the new file has its file's format. `alongside` lists the entries committed with this one, which a `reference()` may name before they exist.
 // kept: request
-export async function entrySource(name: string, slug: string, data: unknown, options: { locale?: string | undefined, body?: string | undefined, create?: boolean | undefined, replacing?: string | undefined } = {}): Promise<{ file: EntryFile } | { issues: DraftIssue[] }> {
+export async function entrySource(name: string, slug: string, data: unknown, options: { locale?: string | undefined, body?: string | undefined, create?: boolean | undefined, replacing?: string | undefined, alongside?: { collection: string, slug: string }[] | undefined } = {}): Promise<{ file: EntryFile } | { issues: DraftIssue[] }> {
   const collection = collectionNamed(name)
 
   if (collection.dir === undefined)
     throw new KayError('content-api-misuse', `kay: entrySource() writes a folder collection's files, and ${name} is loaded: saveEntry() hands its entries to its loader's save`)
 
   const entry = { slug, data, ...options.locale !== undefined && { locale: options.locale }, ...options.body !== undefined && { body: options.body } }
-  const { issues } = await entryIssues(name, collection, entry, options.replacing)
+  const { issues } = await entryIssues(name, collection, entry, options.replacing, options.alongside)
 
   if (issues.length > 0)
     return { issues }
@@ -429,7 +457,7 @@ export async function saveEntries(name: string, written: WrittenEntry[]): Promis
     const checked: WrittenEntry[] = []
 
     for (const entry of written) {
-      const { issues } = await entryIssues(name, collection, entry)
+      const { issues } = await entryIssues(name, collection, entry, undefined, written.map(each => ({ collection: name, slug: each.slug })))
 
       if (issues.length > 0)
         return { issues }

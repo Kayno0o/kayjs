@@ -333,6 +333,27 @@ for code of post.translations ?? []
 
 Either method takes a locale as its last argument. Outside a request, `all()` gives every locale's entries and `get(slug, locale)` reads that locale's entry alone, with no fallback.
 
+## Entries that point at entries
+
+`reference('authors')` makes a field hold the slug of an entry of the `authors` collection. It works in a list, an object or a block too.
+
+`kay check` and `kay build` fail on a slug that collection has no entry for. The message names the file and the line of the field. In a localized collection, an entry of any locale counts. A save through a CMS is refused the same way, at the field's path.
+
+`resolve(slug, collection)` reads the entry that a field points at. It gives undefined for no slug or a hidden entry, and the entries found for a list of slugs.
+
+```kay
+--- server
+import { resolve } from 'kay/content'
+import { authors, posts } from '../../content.config'
+
+const post = await posts.get(ctx.params.slug) ?? ctx.notFound()
+const author = await resolve(post.data.author, authors)
+---
+p {author?.data.name}
+```
+
+A collection filled by a loader is not read by `kay check`, so a reference to it is checked only when an entry is written.
+
 ## Collections from a CMS
 
 When the entries live in a headless CMS, an API or a database, pass a loader instead of a folder. The collection is read, typed and used the same way, and is cached for the `ttl`.

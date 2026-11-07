@@ -774,7 +774,7 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
     return refused(target, wording('cms.store.renameReferred', '{slug} is referred to by {names}, which cannot be saved here: change them to name the new slug first', { slug: ref.slug, names: unsavable.slice(0, REFERRERS_NAMED).join(', ') + (unsavable.length > REFERRERS_NAMED ? ', ...' : '') }), 'slug')
 
   const together = collection.kind === 'folder' && settings().files.together === true
-  const joined = together ? await joinedFiles(plan) : []
+  const joined = together ? await joinedFiles(plan, target) : []
   const moved = collection.kind === 'loaded' ? await renameLoaded(collection, existing, target, { version, required, keepPairing }) : await renameFile(collection, existing, target, data, { author, version, required, also: joined.map(each => each.change) })
 
   if (!('saved' in moved))
@@ -803,14 +803,14 @@ async function renameOne(ref: EntryRef, slug: string, { author, version, require
 }
 
 // The files of the entries to point, to commit with the move; one whose new data the collection refuses is left to be saved on its own, which says why.
-async function joinedFiles(plan: Pointing[]): Promise<{ pointing: Pointing, change: FileChange & { text: string } }[]> {
+async function joinedFiles(plan: Pointing[], renamed: { collection: string, slug: string }): Promise<{ pointing: Pointing, change: FileChange & { text: string } }[]> {
   const files: { pointing: Pointing, change: FileChange & { text: string } }[] = []
 
   for (const pointing of plan) {
     if (pointing.collection.kind !== 'folder' || pointing.version === undefined)
       continue
 
-    const source = await entrySource(pointing.ref.collection, pointing.ref.slug, pointing.data, { locale: pointing.ref.locale, body: pointing.body })
+    const source = await entrySource(pointing.ref.collection, pointing.ref.slug, pointing.data, { locale: pointing.ref.locale, body: pointing.body, alongside: [renamed] })
 
     if ('issues' in source)
       continue

@@ -1814,6 +1814,10 @@ function entrySource(name: string, slug: string, data: unknown, options?: {
   body?: string | undefined;
   create?: boolean | undefined;
   replacing?: string | undefined;
+  alongside?: undefined | {
+    collection: string;
+    slug: string;
+  }[];
 }): Promise<{
   file: EntryFile;
 } | {
@@ -2006,6 +2010,10 @@ function renderMarkdown(markdown: string, options?: { highlight?: Highlighter | 
 
 [./content] repositoryRoot
 function repositoryRoot(): string
+
+[./content] resolve
+function resolve<Data, Routed extends boolean>(slugs: null | readonly string[] | undefined, target: Target<Data, Routed>): Promise<EntryOf<Data, Routed>[]>
+function resolve<Data, Routed extends boolean>(slug: null | string | undefined, target: Target<Data, Routed>): Promise<EntryOf<Data, Routed> | undefined>
 
 [./content] RoutedEntry
 type RoutedEntry<Data> = Entry<Data> & { url: string }
