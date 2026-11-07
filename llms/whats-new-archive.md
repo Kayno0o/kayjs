@@ -30,6 +30,9 @@ What each release before 1.91 added, and the end of a newest release that was cu
 - kayjs-ui's `ThemeToggle` switches light, dark and system, keeps the choice in a cookie and puts it on `<html>` as `data-theme`, and `scheme()` writes it from the first render so the page never flashes the other scheme: [ThemeToggle](../packages/ui/llms/setup.md).
 - The 1.88 deprecations are gone: the flat config keys (`routesDir`, `compress`, `navigation` and the rest, now `dirs`, `serve`, `observe`, `client` and `limits`), the AsyncRoomStore, AsyncRooms and StoreRooms types, and a number of seconds for `lifetime` and `durationWords`; the root of kayjs-mail and kayjs-ai no longer exports the store names that moved in 1.88: [Upgrading](upgrading.md).
 
+- kayjs-ui's `ui()` Toaster and TooltipHost give way to the ones an app renders itself whichever hydrates first, so a Toaster with a `limit` never shows more toasts than it, `fallback` marking the extension's own ([kayjs-ui setup](../packages/ui/llms/setup.md)).
+- A `reference('authors')` field is checked: `kay check` and `kay build` fail on a slug the collection has no entry for, naming the file and line, and `saveEntry` and `showDraft` refuse it at the field's path; `resolve(slug, collection)` from `kay/content` reads the referenced entry, or the entries of a list of slugs ([content](content.md#point-at-another-collections-entry)).
+
 ## 1.90.0
 
 - kayjs-ui fields share one `onInput` (live) and `onChange` (committed) convention: MarkdownEditor gains `onChange`, DateInput, TimeInput and ColorInput gain `onInput`, and Select, RadioGroup, Segmented, IconPicker pass the picked option as a second argument, ChipGroup and MultiSelect the picked options: [Forms](../packages/ui/llms/forms.md).

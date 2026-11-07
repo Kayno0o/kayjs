@@ -27,8 +27,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ui LoadMore and WhenVisible stop loading once the sentinel is out of view under a Table (or any scroll box as tall as its content): they watch the nearest ancestor that really overflows, else the viewport ([kayjs-ui](../packages/ui/llms/charts-drag-and-media.md)).
 - `kay new --with` and `--without` take every feature `kay add` takes, `ai`, `mail`, `cms` and `ui` included, listed in the interactive checklist from the same table; `kay new --with ui,mail` writes what `kay new` then `kay add ui,mail` writes ([project-new-and-add](project-new-and-add.md)).
 - `kay check` flags a Menu entry's `danger: true` as `deprecated-menu-danger`, with a safe fix to `tone: 'danger'` that `kay upgrade` applies ([deprecated lints](deprecated-lints.md), [kayjs-ui menus](../packages/ui/llms/pickers.md)).
-- kayjs-ui's `ui()` Toaster and TooltipHost give way to the ones an app renders itself whichever hydrates first, so a Toaster with a `limit` never shows more toasts than it, `fallback` marking the extension's own ([kayjs-ui setup](../packages/ui/llms/setup.md)).
-- A `reference('authors')` field is checked: `kay check` and `kay build` fail on a slug the collection has no entry for, naming the file and line, and `saveEntry` and `showDraft` refuse it at the field's path; `resolve(slug, collection)` from `kay/content` reads the referenced entry, or the entries of a list of slugs ([content](content.md#point-at-another-collections-entry)).
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
 
@@ -47,6 +45,6 @@ The rest of this release is in [What's new, older releases](whats-new-archive.md
 - `validate` (or `validate="blur"`) on a `form(action={add})` shows the schema's refusals as text in the FormFields of the form instead of the browser's bubble: [actions](actions.md#forms).
 - The FormFields (and Checkboxes, Toggles) a static page gives kayjs-ui's Form, SaveForm or FormDialog as children show a refused call's message with JavaScript, with no island of yours holding the fields: [forms](../packages/ui/llms/forms-and-steps.md).
 - Environment variable names follow one rule (kay `KAY_`, a prefix per library, vendors' own names kept, [Environment](environment.md)): `KAYJS_AUTH_DATABASE_URL` is `AUTH_DATABASE_URL` and `MAIL_INBOUND_SECRET` is `MAIL_EVENTS_INBOUND`, the old names read until 1.94 with a boot warning, and `kay env` reports one it finds.
-- The forms 1.87 deprecated are gone, with their ten `deprecated-*` lints: `fileStore`, kayjs-auth's flat account methods, `revalidate`, `keep` and `keepFailed` for lifetimes, `onFailed`, `onSelect` on a Table, TreeView or Timeline, `.answer`, `refusalMessage`, `StreamStatus`, `ResourceStatus`, `ResourceFailure` and `api({ errorShape })`: [upgrading](upgrading.md#the-forms-187-deprecated-are-gone).
+- The forms 1.87 deprecated are gone, with their ten `deprecated-*` lints: `fileStore`, kayjs-auth's flat account methods, `revalidate`, `keep` and `keepFailed` for lifetimes, `onFailed`, `onSelect` on a Table, TreeView or Timeline, `.answer`, `refusalMessage`, `StreamStatus`, `ResourceStatus`, `ResourceFailure` and `api({ errorShape })`: [upgrading](upgrading-archive.md).
 
 Releases before 1.91 are in [What's new, older releases](whats-new-archive.md).
