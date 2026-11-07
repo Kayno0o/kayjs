@@ -8,7 +8,7 @@ const live = socket(board, '/')
 const present = signal({ names: [] as string[], guests: 0 })
 
 // A notice someone pinned shows on this page at once: the page is rendered afresh around this island, which keeps its connection.
-live.on(message => dispatch(message, {
+live.onData(({ value: message }) => dispatch(message, {
   posted: ({ notice }) => {
     if (notice.author !== me)
       toast.info(`${notice.author} pinned "${notice.title}"`)
