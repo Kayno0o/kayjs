@@ -8,6 +8,8 @@ import { liveOwner, onCleanupOf } from './reactive'
 export interface Caller {
   owner: Owner | undefined
   arrivals: number | undefined
+  // Set by a call that streams: runs when a stream that failed is called again and starts being read, so the call counts as running again and settles with the new run.
+  retried?: (stream: ActionStream<unknown> & Settles) => void
 }
 
 // Where the stream a streaming action answered a call with takes a callback, handed how it ended once it did.

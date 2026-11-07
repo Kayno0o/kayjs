@@ -1,6 +1,7 @@
 import type { Caller, Settles } from './action-owner'
 import type { Action, ActionStream, CallOptions, CallQueue, Outcome, Refreshable, TrackedCall } from './action-shared'
 import type { Duration } from './duration'
+import type { ConnectionStatus } from './live'
 import { encodeCall } from './action-encode'
 import { ActionError, ActionRedirectError } from './action-error'
 import { withFields } from './action-form'
@@ -326,14 +327,24 @@ export function callable(url: () => string): { call: (input: never, options?: Ca
       release?.()
       release = undefined
 
-      streaming = onStreamEnd(answer, (status) => {
+      const streamEnded = (status: ConnectionStatus) => {
         if (status === 'done') {
           called(page, { action: url(), succeeded: true, data: untrack((answer as ActionStream<unknown>).last) }, turn)
           refreshPage()
         }
 
         shift(-1)
-      })
+      }
+
+      streaming = onStreamEnd(answer, streamEnded)
+
+      if (streaming) {
+        // A retry of the stream is the call running again.
+        caller.retried = (again) => {
+          shift(1)
+          again[SETTLED](streamEnded)
+        }
+      }
 
       if (!streaming) {
         called(page, { action: url(), succeeded: true, data: answer }, turn)
@@ -444,6 +455,13 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
   if (typeof location !== 'undefined')
     sent[PAGE_HEADER] = location.pathname + location.search
 
+  // The timeout of a call counts for its first answer; a stream retried later is not cut by a timer that was cleared once the call returned.
+  let first = true
+  const sentOnce = () => {
+    if (first)
+      onSent()
+  }
+
   // fetch tells nothing of an upload's progress, which a call carrying files reports.
   const send = async (solution: string | undefined) => {
     const headers = solution === undefined ? sent : { ...sent, [WORK_HEADER]: solution }
@@ -454,7 +472,7 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
 
     // A signal aborted already sends nothing.
     if (signal?.aborted !== true)
-      onSent()
+      sentOnce()
 
     try {
       return await (files && upload ? upload.uploaded('POST', withBase(url), headers, files, onProgress, signal) : fetch(withBase(url), { method: 'POST', headers, body, ...signal && { signal } }))
@@ -488,6 +506,7 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
 
   const response = await answered()
 
+  first = false
   void skew(response)
 
   return readActionResponse(response, url, left, caller, async () => {
@@ -539,7 +558,10 @@ export async function readActionResponse<Output>(response: Response, action: str
 
         throw new TypeError(`kay: ${action} did not stream when it was called again`)
       },
-      begun: (again: ActionStream<unknown> & Settles) => closeWithCaller(again, caller),
+      begun: (again: ActionStream<unknown> & Settles) => {
+        closeWithCaller(again, caller)
+        caller?.retried?.(again)
+      },
     }
     const stream = (await import('./action-stream')).actionStream(response, SETTLED, () => new ActionError(500, '', {}, undefined, `The stream of ${action} failed after its first value`), retrying)
 

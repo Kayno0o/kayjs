@@ -65,6 +65,18 @@ describe('deprecated-stream-on', () => {
     }
   })
 
+  it('leaves a name that is assigned again alone', async () => {
+    const again = 'import { stream } from \'kay\'\nimport * as api from \'./api\'\n\nlet feed = stream(api, \'/feed\')\n\nfeed = emitter()\nfeed.on(v => v)\n'
+    const root = await project({ 'src/again.ts': again })
+
+    try {
+      expect(await streamOn(root, {})).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('honours the level', async () => {
     const source = 'import { stream } from \'kay\'\nimport * as api from \'./api\'\n\nconst feed = stream(api, \'/feed\')\n\nfeed.on(item => item)\n'
     const root = await project({ 'src/feed.ts': source })

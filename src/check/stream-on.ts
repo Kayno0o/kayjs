@@ -50,6 +50,9 @@ function bindings(program: Program): Map<string, number> {
       for (const param of node.params)
         add(param)
     }
+    else if (node.type === 'AssignmentExpression') {
+      add(node.left)
+    }
     else if (node.type === 'CatchClause') {
       add(node.param)
     }

@@ -1,7 +1,9 @@
+import type { Caller, Settles } from '../src/runtime/action-owner'
+import type { ActionStream } from '../src/runtime/action-shared'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { flush, root } from '../src/runtime'
-import { SETTLED } from '../src/runtime/action'
+import { ActionError, readActionResponse, SETTLED } from '../src/runtime/action'
 import { actionStream } from '../src/runtime/action-stream'
 import { ApiError } from '../src/runtime/api-error'
 import { ending, onData } from '../src/runtime/connection'
@@ -413,6 +415,52 @@ describe('an action\'s stream', () => {
       acted.retry()
       acted[SETTLED](status => void ends.push(status))
       await eventually(() => expect(ends).toEqual(['failed', 'done']))
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+})
+
+describe('retry() of a stream a call answered with', () => {
+  const failing = () => new Response(`data: ${stringify(1)}\n`, { headers: { 'content-type': 'text/event-stream' } })
+
+  it('calls the action again, tells the call a new run began, and reads a new answer into the same stream', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const retried: unknown[] = []
+      const caller: Caller = { owner: undefined, arrivals: undefined, retried: stream => void retried.push(stream) }
+      const stream = await readActionResponse<ActionStream<number>>(failing(), '/_kay/actions/reply', undefined, caller, async () => answer(7, 8))
+      const ends: string[] = []
+
+      await eventually(() => expect(stream.status()).toBe('failed'))
+      stream.retry()
+      ;(stream as unknown as Settles)[SETTLED](status => void ends.push(status))
+      await eventually(() => expect(stream.status()).toBe('done'))
+      expect(retried).toEqual([stream])
+      expect(stream.last()).toBe(8)
+      expect(ends).toEqual(['done'])
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  it('fails with the ActionError of a refused retry, and with an error for an answer that does not stream', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const answers = [new Response('Not yours', { status: 403 }), new Response('plain', { status: 200 })]
+      const stream = await readActionResponse<ActionStream<number>>(failing(), '/_kay/actions/reply', undefined, undefined, async () => answers.shift()!)
+
+      await eventually(() => expect(stream.status()).toBe('failed'))
+      stream.retry()
+      await eventually(() => expect(stream.error()).toMatchObject({ status: 403 }))
+      expect(stream.error()).toBeInstanceOf(ActionError)
+      stream.retry()
+      await eventually(() => expect(stream.error()?.status).toBe(0))
+      expect(stream.status()).toBe('failed')
     }
     finally {
       logged.mockRestore()
