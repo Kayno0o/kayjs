@@ -345,6 +345,11 @@ describe('attempt', () => {
       expect(await said(new ActionError(500, 'Boom', { '': 'Schema words' }))).toEqual(['Schema words'])
     })
 
+    test('toasts a field message the route named when it gave no words of its own', async () => {
+      expect(await said(new ApiError(422, 'Invalid', { errors: { name: 'Name is required' } }, { name: 'Name is required' }))).toEqual(['Name is required'])
+      expect(await said(new ApiError(500, 'Boom', undefined, { name: 'Name is required' }))).toEqual(['Could not delete'])
+    })
+
     test('toasts the route\'s own words for a refusal, as for an action\'s', async () => {
       expect(await said(new ApiError(409, 'Still referenced', 'Still referenced'))).toEqual(['Still referenced'])
       expect(await said(new ApiError(422, 'Name is required', { message: 'Name is required' }))).toEqual(['Name is required'])
@@ -458,6 +463,23 @@ describe('callAction reading a refusal without `refused`', () => {
     expect(await run('Name taken')).toEqual(['Name taken'])
     expect(await run({ error: 'Branch is behind' })).toEqual(['Branch is behind'])
     expect(await run({ message: 'Locked' })).toEqual(['Locked'])
+  })
+
+  test('reads the errors and data of any ApiError of a 4xx, and keeps `failure` for no answer and a 5xx', async () => {
+    const issues = signal<Record<string, string>>({})
+    const throwing = (error: Error) => async () => Promise.reject(error)
+
+    for (const [error, expected] of [
+      [new ApiError(422, 'Invalid', undefined, { name: 'Name is required' }), ['Name is required']],
+      [new ApiError(0, 'Failed to fetch', undefined, { '': 'Down' }), ['Could not save']],
+      [new ApiError(503, 'Unavailable', undefined, { '': 'Down' }), ['Could not save']],
+    ] as const) {
+      toasts.set([])
+      await callAction(form, throwing(error) as never, issues, 'Could not save')
+
+      expect(shown().map(({ message }) => message)).toEqual(expected as unknown as string[])
+      toasts.set([])
+    }
   })
 
   test('falls back to `failure` for a code, several lines, markup or no words', async () => {

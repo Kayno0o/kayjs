@@ -1,7 +1,7 @@
-import type { Action, CallOptions, InputOf } from 'kay'
+import type { Action, CallOptions, InputOf, LoadStatus, Source } from 'kay'
 import type { SortState } from './table'
 import type { AttemptOptions } from './toast'
-import { effect, signal, untrack } from 'kay'
+import { ApiError, effect, signal, untrack } from 'kay'
 import { attempt } from './toast'
 
 // What a source resolves to: the rows of the next page, or `undefined` for a page that failed, such as the result of an `attempt` that toasted. A throw fails the page too.
@@ -62,13 +62,17 @@ export type ActionSource<Row, Target extends Action<never, unknown>> = {
 
 export type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & (LoadSource<Row> | ActionSource<Row, Target>)
 
-export interface InfiniteList<Row> {
+export interface InfiniteList<Row> extends Source<LoadStatus> {
   // The rows loaded so far, the first page first.
   rows: () => Row[]
   // Whether the last page was short, so no more exist.
   ended: () => boolean
-  // Whether the last page failed, which waits for `retry` rather than loading another.
+  // `loading` while a page is on its way, `failed` once the last page failed, else `ready`.
+  status: () => LoadStatus
+  // Whether the last page failed, which waits for `retry` rather than loading another. Same as `error() !== undefined`.
   failed: () => boolean
+  // The failure of the last page, an `ApiError`: the one the source threw, else status 0 with the words of a page that toasted its own failure. Kept until a page lands.
+  error: () => ApiError | undefined
   // Whether a page is on its way.
   pending: () => boolean
   // Loads the next page; nothing while a page is on its way, the list is ended or a failure waits for `retry`.
@@ -87,12 +91,20 @@ export interface InfiniteList<Row> {
   // A method for the same reason as `patch`.
   // eslint-disable-next-line ts/method-signature-style
   reload(rows?: Row[]): Promise<void>
-  // Loads again the page that failed; nothing when no page failed.
+  // Loads again the page that failed; nothing when no page failed. Answers when the page landed, which a Source's `retry` returning nothing leaves to those that ask.
+  // eslint-disable-next-line ts/no-misused-promises
   retry: () => Promise<void>
   // Changes the loaded row `key` reads as `id`, from the fields to merge over it or a function returning the row; `undefined` changes nothing, so the answer of an `attempt` that failed passes as is. Answers whether a loaded row matched, which needs the `key` option.
   // A method, so a list of one row type still passes where `InfiniteList<unknown>` is expected, as `LoadMore` takes it.
   // eslint-disable-next-line ts/method-signature-style
   patch(id: unknown, change: RowChange<Row> | undefined): boolean
+}
+
+// What `LoadMore` needs of a list: the rows and where they end, `more` to ask for the next page, and the shared `status`, `pending`, `error` and `retry` of a Source, so a list of your own draws the same end as an `infiniteList`.
+export interface LoadMoreSource extends Source<LoadStatus> {
+  rows: () => readonly unknown[]
+  ended: () => boolean
+  more: () => unknown
 }
 
 // What `patch` applies to a row: the fields to merge over it, or a function of the row returning the row.
@@ -142,13 +154,21 @@ function loadFromAction<Row, Target extends Action<never, unknown>>(source: Acti
 export function infiniteList<Row, Target extends Action<never, unknown> = never>(given: Row[] | (() => Row[]), options: InfiniteListOptions<Row, Target>): InfiniteList<Row> {
   const { key, pageSize: size } = options
   const first = typeof given === 'function' ? untrack(given) : given
+  const unloaded = typeof (options as { failure?: unknown }).failure === 'string' ? (options as { failure: string }).failure : ((options as { failure?: AttemptOptions }).failure?.failure ?? 'The page could not be loaded.')
   const load = options.load === undefined ? loadFromAction(options, size) : options.load
   let sort = options.sort
   let filter = filterOf(options.filter)
   const rows = signal(first)
   const ended = signal(first.length < size)
-  const failed = signal(false)
+  const error = signal<ApiError | undefined>(undefined)
+  const failed = () => error() !== undefined
   const pending = signal(false)
+  const status = (): LoadStatus => {
+    if (pending())
+      return 'loading'
+
+    return failed() ? 'failed' : 'ready'
+  }
   const shown = new Set<unknown>(key === undefined ? [] : first.map(key))
   let fetched = first.length
   let lastFetched = first.at(-1)
@@ -174,7 +194,7 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
         return
 
       if (page === undefined) {
-        failed.set(true)
+        error.set(new ApiError(0, unloaded))
 
         return
       }
@@ -185,7 +205,7 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
       fetched += page.length
       lastFetched = page.at(-1) ?? lastFetched
       ended.set(page.length < size)
-      failed.set(false)
+      error.set(undefined)
 
       // A row is fresh when adding its key grows the set of keys shown.
       const fresh = key === undefined ? page : page.filter(row => shown.size < shown.add(key(row)).size)
@@ -198,9 +218,9 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
         rows.set(current => [...current, ...fresh])
       }
     }
-    catch {
+    catch (thrown) {
       if (mine === order)
-        failed.set(true)
+        error.set(thrown instanceof ApiError ? thrown : new ApiError(0, thrown instanceof Error ? thrown.message : String(thrown), undefined, {}, { cause: thrown }))
     }
     finally {
       if (mine === order) {
@@ -226,7 +246,7 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
     fetched = 0
     lastFetched = undefined
     ended.set(false)
-    failed.set(false)
+    error.set(undefined)
     pending.set(true)
 
     // Waits a tick, so a sort and a filter asked for one after the other load a single first page; a `more` in that tick loads that page itself.
@@ -304,7 +324,7 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
       fetched = got.length
       lastFetched = last
       ended.set(done)
-      failed.set(false)
+      error.set(undefined)
       rows.set(fresh)
     }
     catch {
@@ -331,7 +351,7 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
     }
 
     ended.set(next.length < size)
-    failed.set(false)
+    error.set(undefined)
     pending.set(false)
     rows.set(next)
   }
@@ -379,5 +399,5 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
   const more = async () => failed() ? undefined : loadPage()
   const retry = async () => failed() ? loadPage() : undefined
 
-  return { rows, ended, failed, pending, more, retry, reload, sort: () => sort, sortBy, filter: () => filter, filterBy, restart, patch }
+  return { rows, ended, status, failed, error, pending, more, retry, reload, sort: () => sort, sortBy, filter: () => filter, filterBy, restart, patch }
 }

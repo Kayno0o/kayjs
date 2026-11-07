@@ -394,7 +394,10 @@ function refusalOfApi<Data>(error: ApiError, refused: ((data: Data) => string | 
   // An answer that is text, null or a Blob has no fields for `refused` to read.
   const said = typeof error.data === 'object' && error.data !== null && !(error.data instanceof Blob) ? readRefused(refused, error.data as Data) : undefined
 
-  return [said, error.status < 500 ? answerMessage(error.data) : undefined].find(message => message !== undefined && message !== '')
+  // The messages the route gave for named fields count as its words too; the form-wide one under '' is the route's own text, already read from `data`.
+  const named = Object.entries(error.errors).find(([name, message]) => name !== '' && message !== '')?.[1]
+
+  return [said, error.status < 500 ? answerMessage(error.data) : undefined, error.status < 500 ? named : undefined].find(message => message !== undefined && message !== '')
 }
 
 // A `refused` that throws on data it did not expect says nothing, so `failure` is toasted and the caller is not left waiting; the throw goes to the console, as a bug in the app's own code.

@@ -160,8 +160,9 @@ type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chev
 function infiniteList<Row, Target extends Action<never, unknown> = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
 
 [.] InfiniteList
-interface InfiniteList<Row>
+interface InfiniteList<Row> extends Source<LoadStatus>
   ended: () => boolean
+  error: () => ApiError<unknown> | undefined
   failed: () => boolean
   filter: () => ListFilter
   filterBy: (filter: Partial<ListFilter>) => Promise<void>
@@ -174,6 +175,7 @@ interface InfiniteList<Row>
   rows: () => Row[]
   sort: () => SortState | undefined
   sortBy: (sort: SortState | undefined) => Promise<void>
+  status: () => LoadStatus
 
 [.] InfiniteListOptions
 type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & (LoadSource<Row> | ActionSource<Row, Target>)
@@ -1789,7 +1791,7 @@ component default
   announced?: string | undefined;
 }
   failureLabel?: string | undefined
-  list: InfiniteList<unknown>
+  list: LoadMoreSource
   loadedLabel?: ((count: number) => string) | string | undefined
   loadingLabel?: string | undefined
   margin?: number | undefined
@@ -2039,7 +2041,9 @@ component default
   label?: string | undefined
   onDismiss?: (() => unknown) | undefined
   open?: boolean | undefined
+  retryLabel?: string | undefined
   size?: "md" | "sm" | undefined
+  source?: Pick<Source<"closed" | "connecting" | "done" | "failed" | "idle" | "loading" | "open" | "ready">, "error" | "pending" | "retry"> | undefined
   tone?: "accent" | "danger" | "info" | "neutral" | "success" | "warning" | undefined
 
 [./page-header.kay] default

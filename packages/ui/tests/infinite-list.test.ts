@@ -1,6 +1,6 @@
 import type { InfinitePage, PageAt } from '../src/infinite-list'
 import { describe, expect, test } from 'bun:test'
-import { flush, signal } from 'kay'
+import { ApiError, flush, signal } from 'kay'
 import { infiniteList } from '../src/infinite-list'
 
 interface Ban {
@@ -107,6 +107,36 @@ describe('infiniteList', () => {
     expect(asked.map(at => at.offset)).toEqual([3, 3, 3])
     expect(list.failed()).toBe(false)
     expect(list.rows()).toHaveLength(6)
+  })
+
+  test('is a Source: status loading, ready then failed, with the thrown ApiError as error() until a page lands', async () => {
+    const { load } = source(new ApiError(503, 'Unavailable'), new Error('down'), undefined, bans(4, 3))
+    const list = infiniteList(bans(1, 3), { pageSize: 3, load })
+
+    expect([list.status(), list.pending(), list.error()]).toEqual(['ready', false, undefined])
+
+    const asking = list.more()
+
+    expect(list.status()).toBe('loading')
+
+    await asking
+
+    expect(list.status()).toBe('failed')
+    expect(list.error()).toBeInstanceOf(ApiError)
+    expect(list.error()?.status).toBe(503)
+
+    await list.retry()
+
+    expect(list.error()).toMatchObject({ status: 0, message: 'down' })
+
+    await list.retry()
+
+    expect(list.error()).toMatchObject({ status: 0 })
+    expect(list.failed()).toBe(true)
+
+    await list.retry()
+
+    expect([list.status(), list.error(), list.failed()]).toEqual(['ready', undefined, false])
   })
 
   test('a row already shown is dropped by its key, and the offset still counts it', async () => {

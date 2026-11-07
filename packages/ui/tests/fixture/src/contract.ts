@@ -252,7 +252,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'icon': { icon, label: 'Add' },
   'image-cropper': { src: '/map.png' },
   'line-chart': { labels: ['a', 'b'], series: [{ name: 'Visits', values: [1, 2] }], label: 'Visits' },
-  'load-more': { list: { rows: () => [], ended: () => false, failed: () => false, pending: () => false, retry: noop, loadMore: noop } },
+  'load-more': { list: { rows: () => [], ended: () => false, status: () => 'ready', error: () => undefined, pending: () => false, retry: noop, more: noop } },
   'markdown-editor': { 'value': '# Hi', 'aria-label': 'Body' },
   'masonry': { items: [1, 2], key: (item: number) => item, tile: (item: number) => String(item) },
   'map-view': { label: 'Route', lines: [[[48.85, 2.35], [48.86, 2.36]]] },

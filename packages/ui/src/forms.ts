@@ -1,5 +1,5 @@
 import type { Action, Answer, FailureData, Signal, Success } from 'kay'
-import { ActionError, createContext, describeField, effect, focusInvalid, formErrors, markInvalid, uid, untrack } from 'kay'
+import { ActionError, ApiError, createContext, describeField, effect, focusInvalid, formErrors, markInvalid, uid, untrack } from 'kay'
 import { liveElements } from './field-look'
 import { answerMessage } from './internal/answer-message'
 import { toast } from './toast'
@@ -179,11 +179,13 @@ export async function callAction<Output>(form: HTMLFormElement, action: Action<n
       console.error('kayjs-ui: an onError callback threw', thrown)
     }
 
-    const read = error instanceof ActionError && error.data !== undefined ? refused?.(error.data as FailureData<Output>) : undefined
+    // An action's refusal, or a route's 4xx an app's own code threw: both carry `errors` and `data`. A call with no answer and a 5xx keep `failure`.
+    const failed = error instanceof ActionError || (error instanceof ApiError && error.status !== 0 && error.status < 500) ? error : undefined
+    const read = failed?.data !== undefined ? refused?.(failed.data as FailureData<Output>) : undefined
     // As in `attempt`, a `refused` saying nothing leaves the words of the data itself.
-    const said = read === undefined || read === '' ? answerMessage(error instanceof ActionError ? error.data : undefined) : read
+    const said = read === undefined || read === '' ? answerMessage(failed?.data) : read
 
-    await refuse(form, { ...error instanceof ActionError ? error.errors : {}, ...messagesOf(said) }, issues, failure)
+    await refuse(form, { ...failed?.errors, ...messagesOf(said) }, issues, failure)
 
     return undefined
   }

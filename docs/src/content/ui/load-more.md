@@ -51,3 +51,9 @@ A `load` that throws, or resolves `undefined` as an `attempt` does once it toast
 `button` swaps the sentinel for a "Load more" button, `moreLabel` its text, for a page whose footer must stay within reach. Once a page adds rows, a status only screen readers hear says how many ("3 more loaded"); `loadedLabel` is a function of that count replacing the text.
 
 `loadingLabel`, `failureLabel` and `retryLabel` replace the English texts; the loading row is a `status` and the failure an `alert`, so screen readers announce both. `margin` is WhenVisible's, 600 pixels by default.
+
+## Any list that is a source
+
+`infiniteList` is a source like a `resource` or a `stream`: `list.status()` is `loading`, `failed` or `ready`, and `list.error()` is the last page's failure as an `ApiError`, kept until a page lands. `list.retry()` loads the page again, and `failed()` still reads `error() !== undefined`.
+
+`LoadMore(list={...})` takes any object with `rows`, `ended` and `more` that is also a source, so a list of your own draws the same sentinel, status and alert. `Notice(source={list})` shows the error with its retry anywhere on the page.

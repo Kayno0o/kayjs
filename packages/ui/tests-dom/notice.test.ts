@@ -1,5 +1,6 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
+import { ApiError, signal } from 'kay'
 import { mountComponent, settle } from 'kay/test'
 import Notices from '../tests/fixture/src/components/notices.kay'
 import { click } from './dom'
@@ -14,7 +15,7 @@ afterEach(() => {
 })
 
 async function root() {
-  mounted = await mountComponent(Notices, { onDismiss: () => dismissed++ })
+  mounted = await mountComponent(Notices, { onDismiss: () => dismissed++, sourced: { error: () => undefined, pending: () => false, retry: () => undefined } })
 
   return mounted.root
 }
@@ -77,4 +78,39 @@ test('a caller\'s hidden attribute still hides a notice that is not controlled',
   const page = await root()
 
   expect(page.querySelector<HTMLElement>('#forced-hidden')!.hasAttribute('hidden')).toBe(true)
+})
+
+test('a source shows its error with a retry, hides on success, and the button waits while it is pending', async () => {
+  const error = signal<ApiError | undefined>(undefined)
+  const pending = signal(false)
+  let retried = 0
+
+  mounted = await mountComponent(Notices, { onDismiss: () => undefined, sourced: { error, pending, retry: () => retried++ } })
+
+  const notice = () => mounted!.root.querySelector<HTMLElement>('#sourced .kui-notice')!
+
+  expect(notice().hidden).toBe(true)
+
+  error.set(new ApiError(503, 'Unavailable'))
+  await settle()
+
+  expect(notice().hidden).toBe(false)
+  expect(notice().getAttribute('role')).toBe('alert')
+  expect(notice().textContent).toContain('Unavailable')
+
+  const retry = notice().querySelector<HTMLButtonElement>('button')!
+
+  click(retry)
+
+  expect(retried).toBe(1)
+
+  pending.set(true)
+  await settle()
+
+  expect(notice().querySelector<HTMLButtonElement>('button')!.disabled).toBe(true)
+
+  error.set(undefined)
+  await settle()
+
+  expect(notice().hidden).toBe(true)
 })

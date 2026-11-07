@@ -1290,8 +1290,9 @@ type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chev
 function infiniteList<Row, Target extends Action<never, unknown> = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
 
 [./lib/index] InfiniteList
-interface InfiniteList<Row>
+interface InfiniteList<Row> extends Source<LoadStatus>
   ended: () => boolean
+  error: () => ApiError<unknown> | undefined
   failed: () => boolean
   filter: () => ListFilter
   filterBy: (filter: Partial<ListFilter>) => Promise<void>
@@ -1304,6 +1305,7 @@ interface InfiniteList<Row>
   rows: () => Row[]
   sort: () => SortState | undefined
   sortBy: (sort: SortState | undefined) => Promise<void>
+  status: () => LoadStatus
 
 [./lib/index] InfiniteListOptions
 type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & (LoadSource<Row> | ActionSource<Row, Target>)
@@ -1791,8 +1793,9 @@ type ActionSource<Row, Target extends Action<never, unknown>> = {
 function infiniteList<Row, Target extends Action<never, unknown> = never>(given: (() => Row[]) | Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
 
 [./lib/infinite-list] InfiniteList
-interface InfiniteList<Row>
+interface InfiniteList<Row> extends Source<LoadStatus>
   ended: () => boolean
+  error: () => ApiError<unknown> | undefined
   failed: () => boolean
   filter: () => ListFilter
   filterBy: (filter: Partial<ListFilter>) => Promise<void>
@@ -1805,6 +1808,7 @@ interface InfiniteList<Row>
   rows: () => Row[]
   sort: () => SortState | undefined
   sortBy: (sort: SortState | undefined) => Promise<void>
+  status: () => LoadStatus
 
 [./lib/infinite-list] InfiniteListOptions
 type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & (LoadSource<Row> | ActionSource<Row, Target>)
@@ -1816,6 +1820,12 @@ type InfinitePage<Row> = Row[] | undefined
 interface ListFilter
   fields: Record<string, string>
   text: string
+
+[./lib/infinite-list] LoadMoreSource
+interface LoadMoreSource extends Source<LoadStatus>
+  ended: () => boolean
+  more: () => unknown
+  rows: () => readonly unknown[]
 
 [./lib/infinite-list] LoadSource
 interface LoadSource<Row>

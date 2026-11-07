@@ -1,8 +1,9 @@
 ---
+import type { Source } from 'kay'
 import { signal } from 'kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 
-const { onDismiss } = props<{ onDismiss: () => void }>()
+const { onDismiss, sourced } = props<{ onDismiss: () => void, sourced: Pick<Source, 'error' | 'pending' | 'retry'> }>()
 
 const shown = signal(true)
 ---
@@ -25,3 +26,5 @@ Notice#forced-hidden(label="Forced" hidden)
   button#show(type="button" onClick={() => shown = true}) Show
 #hidden
   Notice(label="Hidden" open={false})
+#sourced
+  Notice(source={sourced})
