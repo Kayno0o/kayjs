@@ -12,7 +12,7 @@ export class EmailMethods {
     return (await load.email()).sendVerification(this.state)
   }
 
-  // Spends a verification link's token in the browser signed in as the account, that registered it or that proved its password, or given the account's password: `{ ok: false, error: 'confirm' }` asks for one of them, the link still usable.
+  // Spends a verification link's token in the browser signed in as the account, that registered it or that proved its password, or given the account's password: `{ ok: false, error: { code: 'confirm' } }` asks for one of them, the link still usable.
   async verify(token: string, password?: string): Promise<VerifyEmailResult> {
     return (await load.email()).verifyEmail(this.state, token, password)
   }

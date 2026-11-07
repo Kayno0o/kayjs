@@ -70,7 +70,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   oauth?: Record<string, OAuthApp> | undefined
   // Asked with every provider account before any user is touched; false refuses the sign-in, as an allowlist does.
   allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
-  // Whether visitors make their own accounts, by registering, as a guest or with a provider account no user has linked: on by default, `false` closes it. Then registering and `signInAsGuest` answer `{ ok: false, error: 'off' }`, users come from `auth.admin.createUser` alone, and the prebuilt pages offer no registering. `true` is the default and works until 1.93: leave it out.
+  // Whether visitors make their own accounts, by registering, as a guest or with a provider account no user has linked: on by default, `false` closes it. Then registering and `signInAsGuest` answer `{ ok: false, error: { code: 'off' } }`, users come from `auth.admin.createUser` alone, and the prebuilt pages offer no registering. `true` is the default and works until 1.93: leave it out.
   signUp?: boolean | undefined
   // Called once a new user exists, to create the app's own records for them. It gets one object: `user`, and the provider's `profile` for a sign-up by a provider account.
   onSignUp?: ((event: { user: User, profile: Profile | undefined }) => void | Promise<void>) | undefined
@@ -113,7 +113,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   rateLimit?: LimitsOption | undefined
   // Passkeys are made for `site`'s host and its origin; `rpId` widens them to a parent domain, `origins` lists every origin the site's pages are served from, and `rpName` is the name the authenticator shows (`name` by default). `userVerification` is how hard answering a second factor with a passkey asks for a PIN or a biometric, `'preferred'` by default: adding a passkey, signing in with one and re-proving always require it, as a passkey alone is two factors.
   passkeys?: { rpId?: string, origins?: string[], rpName?: string, userVerification?: 'required' | 'preferred' | 'discouraged' } | false | undefined
-  // Password sign-in, registering, resets and changes; `false` answers `{ ok: false, error: 'off' }` from their methods and hides them from the prebuilt pages. On by default; `true` works until 1.93, leave it out.
+  // Password sign-in, registering, resets and changes; `false` answers `{ ok: false, error: { code: 'off' } }` from their methods and hides them from the prebuilt pages. On by default; `true` works until 1.93, leave it out.
   password?: boolean | undefined
   // Sign-in links and codes mailed to the address (they need `email`); `false` answers `off` from their methods and the pages show none. On by default; `true` works until 1.93, leave it out.
   magicLink?: boolean | undefined
