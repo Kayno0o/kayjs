@@ -5,6 +5,7 @@ import { describe, expect, it } from 'bun:test'
 import { applySafeFixes, check } from '../src/check'
 import { moduleImportEdits } from '../src/check/missing-imports'
 import { compileKay } from '../src/compiler'
+import { parseExpanded } from '../src/compiler/markdown-block'
 import { scratchDir } from './scratch'
 
 const page = 'src/routes/page.kay'
@@ -28,6 +29,32 @@ describe('the implicit-import lint', () => {
     expect(fixed('---\r\nconst a = signal(0)\r\n---\r\np {a()}\r\n')).toBe('---\r\nimport { signal } from \'kay\'\r\n\r\nconst a = signal(0)\r\n---\r\np {a()}\r\n')
     expect(fixed('p {uid()}\r\n')).toBe('---\r\nimport { uid } from \'kay\'\r\n---\r\np {uid()}\r\n')
     expect(moduleImportEdits('import { x } from \'./x\'\r\n', new Map([['kay', ['signal']]]))[0]!.text).toBe('import { signal } from \'kay\'\r\n')
+  })
+
+  it('writes the import below a directive prologue, and a blank line only when the code has none', () => {
+    expect(fixed('---\n\'use strict\'\nconst a = signal(0)\n---\np {a()}\n')).toBe('---\n\'use strict\'\nimport { signal } from \'kay\'\n\nconst a = signal(0)\n---\np {a()}\n')
+    expect(fixed('--- module\n/// <reference types="bun" />\n"use client"\n\nexport const a = signal(0)\n---\np {a}\n')).toBe('--- module\n/// <reference types="bun" />\n"use client"\nimport { signal } from \'kay\'\n\nexport const a = signal(0)\n---\np {a}\n')
+    expect(fixed('---\n\nconst a = signal(0)\n---\np {a()}\n')).toBe('---\nimport { signal } from \'kay\'\n\nconst a = signal(0)\n---\np {a()}\n')
+    expect(moduleImportEdits('#!/usr/bin/env bun\n\'use strict\'\n\nexport const a = signal(0)\n', new Map([['kay', ['signal']]]))).toEqual([{ start: 32, end: 32, text: 'import { signal } from \'kay\'\n' }])
+    expect(moduleImportEdits('/// <reference types="bun" />\nexport const a = signal(0)\n', new Map([['kay', ['signal']]]))).toEqual([{ start: 30, end: 30, text: 'import { signal } from \'kay\'\n\n' }])
+  })
+
+  it('reports a name at its first use even when that use is a spread', () => {
+    const source = '---\nconst a = { ...signal(0) }\nconst b = x.signal\n---\np {a}\n'
+    const [lint] = found(source)
+
+    expect(source.slice(lint!.start, lint!.end)).toBe('signal')
+    expect(lint!.start).toBe(source.indexOf('...signal') + 3)
+    expect(found('---\nconst b = x.signal\nconst c = o?.signal\n---\np {b}\n')).toEqual([])
+  })
+
+  it('maps an insertion in a markdown block only where its lowering begins', () => {
+    const { expansion } = parseExpanded('markdown\n  # Hello {uid()}\n')
+    const inside = [...new Array(expansion!.source.length).keys()].find(offset => expansion!.real(offset) === 0 && offset > 0)
+
+    expect(expansion!.exact({ start: 0, end: 0 })).toEqual({ start: 0, end: 0 })
+    expect(inside).toBeDefined()
+    expect(expansion!.exact({ start: inside!, end: inside! })).toBeUndefined()
   })
 
   it('says nothing of a name already imported, aliased, type-only imported, declared or only written in a string, a comment or a key', () => {

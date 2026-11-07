@@ -8,6 +8,18 @@ const HOMES: Readonly<Record<string, string>> = { t: 'kay/i18n' }
 const homeOf = (name: string) => HOMES[name] ?? 'kay'
 
 const STARTS_WITH_IMPORT = /^\s*import\b/
+const STARTS_BLANK = /^[ \t]*\r?\n/
+const PROLOGUE_LINE = /^(?:#!.*|\/\/\/\s*<reference\b.*|[ \t]*(['"])use [\w -]+\1[ \t]*(?:;[ \t]*)?)(?:\r?\n|$)/
+
+// How far a module's prologue reaches: the shebang, the `/// <reference>` directives and the `'use strict'` or `"use client"` directives it opens with, which an import goes below.
+export function prologueLength(text: string): number {
+  let end = 0
+
+  for (let line = PROLOGUE_LINE.exec(text); line && line[0] !== ''; line = PROLOGUE_LINE.exec(text.slice(end)))
+    end += line[0].length
+
+  return end
+}
 
 // The text with every comment, string and template literal blanked to spaces, so a search for a name finds code and the offsets stay the file's.
 function masked(text: string): string {
@@ -52,7 +64,7 @@ function masked(text: string): string {
 
 // Where the first of `names` is used in `spans`: in the code if it can be found there, else anywhere in the text.
 function firstUse(source: string, spans: Span[], names: string[]): Span | undefined {
-  const pattern = new RegExp(`(?<![\\w$.])(?:${names.join('|')})(?![\\w$])`, 'g')
+  const pattern = new RegExp(`(?:(?<![\\w$.])|(?<=\\.\\.\\.))(?:${names.join('|')})(?![\\w$])`, 'g')
 
   for (const code of [true, false]) {
     let best: Span | undefined
@@ -92,10 +104,12 @@ export function importEdits(file: KayFile, fence: Span | undefined, imports: rea
 
   if (lines.length > 0) {
     const eol = file.source.includes('\r\n') ? '\r\n' : '\n'
-    const at = fence?.start ?? file.templateStart
     const body = fence === undefined ? '' : file.source.slice(fence.start, fence.end)
-    // A blank line sets the imports off from the code that follows.
-    const apart = body.trim() !== '' && !STARTS_WITH_IMPORT.test(body) ? eol : ''
+    const skip = prologueLength(body)
+    const at = (fence?.start ?? file.templateStart) + skip
+    const rest = body.slice(skip)
+    // A blank line sets the imports off from the code that follows, unless the code already starts with one.
+    const apart = rest.trim() !== '' && !STARTS_WITH_IMPORT.test(rest) && !STARTS_BLANK.test(rest) ? eol : ''
 
     edits.push({ start: at, end: at, text: fence ? `${lines.join(eol)}${eol}${apart}` : `---${eol}${lines.join(eol)}${eol}---${eol}` })
   }

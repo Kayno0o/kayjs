@@ -12,7 +12,7 @@ export const BINDABLE_TYPE = 'Bindable'
 export const REMOVED_PROP_TYPES = new Set(['Signal', 'Memo'])
 // What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
 // Each name written as a name of its own, not a member or part of a longer one.
-export const KAY_NAME = new RegExp(`(?<![\\w$.])(?:${KAY_VALUES.join('|')})(?![\\w$])`, 'g')
+export const KAY_NAME = new RegExp(`(?:(?<![\\w$.])|(?<=\\.\\.\\.))(?:${KAY_VALUES.join('|')})(?![\\w$])`, 'g')
 
 export interface PropsBinding {
   // Name of a destructured prop, its key on the props object, and its default value when it has one.

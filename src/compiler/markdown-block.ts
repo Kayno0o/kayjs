@@ -137,8 +137,8 @@ export class Expansion {
     if (span.start === span.end) {
       const region = this.madeUpAt(span.start)
 
-      // An insertion where a block's lowering begins goes before the block in the file.
-      return region && span.start > region.start ? undefined : { start: this.real(span.start), end: this.real(span.start) }
+      // An insertion in text the lowering made up has no place in the file, except one where the block's lowering begins, which goes before the block.
+      return region === undefined || span.start === region.start ? { start: this.real(span.start), end: this.real(span.start) } : undefined
     }
 
     const [piece, ...rest] = this.split(span)

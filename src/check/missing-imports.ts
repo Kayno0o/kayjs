@@ -1,14 +1,14 @@
 import type { CheckDiagnostic } from '.'
 import type { Fix, Span } from '../compiler/ast'
 import { extname } from 'node:path'
-import { importEdits } from '../compiler/implicit-imports'
+import { importEdits, prologueLength } from '../compiler/implicit-imports'
 import { offsetAt } from '../compiler/mapping'
 import { parseExpanded } from '../compiler/markdown-block'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 import { unknownName } from './export-homes'
 
 const FIRST_IMPORT = /^import\b/m
-const SHEBANG = /^#!.*\n/
+const STARTS_BLANK = /^[ \t]*\r?\n/
 const IMPORT_FROM = /^import[^\n]*from\s*(['"])[^\n]*$/m
 const TRAILING_COMMA = /,$/
 // Names common enough in an app that a missing one is as likely a local forgotten as kay's: their import is offered, never applied unasked.
@@ -40,11 +40,11 @@ export function moduleImportEdits(source: string, wanted: ReadonlyMap<string, st
 
   if (lines.length > 0) {
     const imports = FIRST_IMPORT.exec(source)
-    const at = imports?.index ?? SHEBANG.exec(source)?.[0].length ?? 0
-
+    const at = imports?.index ?? prologueLength(source)
     const eol = source.includes('\r\n') ? '\r\n' : '\n'
+    const rest = source.slice(at)
 
-    edits.push({ start: at, end: at, text: `${lines.join(eol)}${eol}${imports ? '' : eol}` })
+    edits.push({ start: at, end: at, text: `${lines.join(eol)}${eol}${imports || rest.trim() === '' || STARTS_BLANK.test(rest) ? '' : eol}` })
   }
 
   return edits
