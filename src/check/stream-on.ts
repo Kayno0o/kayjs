@@ -126,8 +126,9 @@ export async function streamOpen(root: string, options: CheckOptions): Promise<C
         if (argument.type === 'ArrowFunctionExpression' && (argument.params.length === 0 || argument.params[0]?.type === 'ObjectPattern'))
           return
 
+        // A function reference may take either form, which the call site does not tell.
         if (argument.type === 'Identifier') {
-          report(here, base + end, message, help, [{ start: here, end: base + end, text: `({ reconnected }) => ${argument.name}(reconnected)` }])
+          report(here, base + end, message, help, null)
 
           return
         }
@@ -141,6 +142,10 @@ export async function streamOpen(root: string, options: CheckOptions): Promise<C
 
           return
         }
+
+        // An annotation naming an object is the new form.
+        if (param && annotated(param) && text.slice(param.start, param.end).includes('{'))
+          return
 
         report(here, base + end, message, help, null)
       })
