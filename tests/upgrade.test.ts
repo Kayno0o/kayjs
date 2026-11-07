@@ -782,7 +782,12 @@ describe('the deprecations', () => {
     const [major, minor] = minorOf(version)!
     // Past their three minors, kept until the old form they recognise goes: when one does, its line goes from this list and its lint from LINTS.
     const overdue = new Set<string>()
-    const past = Object.entries(LINTS).filter(([, lint]) => {
+    // Kept to 2.0 on purpose: the old form it recognises works until then (#2595 box 14 removes both).
+    const untilTwo = new Set(['deprecated-local-state'])
+    const past = Object.entries(LINTS).filter(([name, lint]) => {
+      if (untilTwo.has(name))
+        return false
+
       const since = minorOf((lint as { since?: string }).since ?? '')
 
       return since !== undefined && (since[0] < major || since[1] + 3 < minor)

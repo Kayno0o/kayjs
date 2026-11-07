@@ -339,8 +339,9 @@ class Collection<Row extends object, Key extends keyof Row & string> {
   private readonly failed = listenerSet<{ error: ApiError }>()
   // The issues already told, by id; undefined until the first read, which tells none of those kept from an earlier visit.
   private told: Set<number> | undefined
-  // Whether this run sent a write or took the server's rows in, so `onSync` has something to tell.
-  private moved = false
+  // The reads of the database begun, and the latest whose result was shown.
+  private turns = 0
+  private shown = 0
   private offline = false
   private paused = false
   private failures = 0
@@ -502,6 +503,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
   // Reads the rows, the queue's size and the issues of this collection from the database into the signals.
   private async reload(): Promise<void> {
+    const turn = ++this.turns
     const db = await database()
     const tx = db.transaction(['rows', 'outbox', 'issues'])
     const only = IDBKeyRange.only(this.c)
@@ -510,6 +512,13 @@ class Collection<Row extends object, Key extends keyof Row & string> {
       request(tx.objectStore('outbox').index('c').count(only)),
       request(tx.objectStore('issues').index('c').getAll(only)) as Promise<(Omit<LocalIssue<Row>, 'message' | 'createdAt'> & { c: string, message?: string, createdAt?: Date, at?: number })[]>,
     ])
+
+    // A read that began earlier and ended later is older than the one already shown.
+    if (turn < this.shown)
+      return
+
+    this.shown = turn
+
     const live = rows.filter(record => !record.gone)
 
     this.view[1]({ list: live.map(record => record.row as Row), byKey: new Map(live.map(record => [record.k, record.row as Row])) })
@@ -523,7 +532,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     this.told = new Set(held.map(issue => issue.id))
     this.problems[1](held)
 
-    if (seen !== undefined) {
+    if (seen !== undefined && !this.ended) {
       for (const issue of held) {
         if (!seen.has(issue.id))
           this.raised.emit({ issue })
@@ -605,18 +614,20 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
     clearTimeout(this.timer)
     this.paused = false
-    this.moved = false
+
+    // Whether this run sent a write or took the server's rows in, so `onSync` has something to tell.
+    let moved = false
 
     await quiet(async () => locked(async () => {
-      await this.advance()
+      moved = await this.advance()
 
       if (refresh && !this.offline && !this.paused)
-        await this.refresh()
+        moved = await this.refresh() || moved
     }))
 
     this.schedule()
 
-    if (this.moved && this.state[0]() === 'synced')
+    if (moved && !this.ended && this.state[0]() === 'synced')
       this.synced.emit({ rows: this.view[0]().list })
   }
 
@@ -656,7 +667,10 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     return request(db.transaction('outbox').objectStore('outbox').index('c').get(IDBKeyRange.only(this.c))) as Promise<Entry | undefined>
   }
 
-  private async advance(): Promise<void> {
+  // Whether it settled a write.
+  private async advance(): Promise<boolean> {
+    let moved = false
+
     for (;;) {
       let entry = await this.first()
 
@@ -682,10 +696,12 @@ class Collection<Row extends object, Key extends keyof Row & string> {
         break
       }
 
-      this.moved = true
+      moved = true
     }
 
     await this.reload()
+
+    return moved
   }
 
   // Sends one write as the action's own call would, with its write id for the server to run it once; undefined when the server could not be reached or asked to wait.
@@ -849,8 +865,8 @@ class Collection<Row extends object, Key extends keyof Row & string> {
       issues.delete(key)
   }
 
-  // Takes the server's rows in, leaving any row with a write queued.
-  private async refresh(): Promise<void> {
+  // Takes the server's rows in, leaving any row with a write queued; whether it did.
+  private async refresh(): Promise<boolean> {
     const seen = this.changes
     let server: readonly Row[]
     const controller = new AbortController()
@@ -871,7 +887,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
       this.noticed(true)
       this.fail(apiErrorOf(cause))
 
-      return
+      return false
     }
     finally {
       clearTimeout(waiting)
@@ -882,7 +898,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
     // A write was made or settled while the server answered: its rows are older than the queue, and the next sync reads again.
     if (seen !== this.changes)
-      return
+      return false
 
     const db = await database()
     const tx = db.transaction(['rows', 'outbox'], 'readwrite')
@@ -909,7 +925,8 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
     await finished(tx)
     await this.reload()
-    this.moved = true
     announce(this.c)
+
+    return true
   }
 }
