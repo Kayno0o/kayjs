@@ -327,7 +327,7 @@ class RequestSession<Data extends object> implements Session<Data> {
 
   async regenerate(): Promise<void> {
     await this.load()
-    this.retired = this.id
+    this.retired ??= this.id
     this.id = undefined
     this.started = undefined
     this.changed = true
