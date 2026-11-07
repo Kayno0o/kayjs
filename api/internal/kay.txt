@@ -1217,7 +1217,7 @@ interface Parsed
   values: Record<string, boolean | string | string[] | undefined>
 
 [./library] parseEvents
-function parseEvents<End>(body: ReadableStream<Uint8Array<ArrayBufferLike>>, signal: AbortSignal, onEvent: (event: string, data: string) => End | undefined): Promise<End | undefined>
+function parseEvents<End>(body: ReadableStream<Uint8Array<ArrayBufferLike>>, signal: AbortSignal, onEvent: (event: string, data: string, id?: string | undefined) => End | undefined): Promise<End | undefined>
 
 [./library] PgJobsSource
 type PgJobsSource = PgSource

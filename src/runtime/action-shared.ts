@@ -216,7 +216,7 @@ export interface Failure<Data> {
 export type Success<Output> = Exclude<Output, Failure<unknown>>
 
 // What a call to a handler returning an async iterable resolves with: its values read as they come, typed.
-export interface ActionStream<T> extends Omit<EventReader<T>, 'retry'> {
+export interface ActionStream<T> extends Omit<EventReader<T>, 'retry' | 'onOpen'> {
   // Resolves with the last value once the stream ran to its end, undefined when it sent none; rejects with an `ActionError` when it failed, and an `AbortError` when it was closed first.
   ended: () => Promise<T | undefined>
 }

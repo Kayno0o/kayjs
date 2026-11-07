@@ -10,6 +10,8 @@ import { encodeValue, unsendable } from '../runtime/wire'
 const HEARTBEAT_MS = 5000
 const HEARTBEAT = new TextEncoder().encode(':\n\n')
 
+const ID_REFUSED = /[\r\n\0]/
+
 // The streams being read, each with what ends it cleanly: a stop ends them all first, as one that never ends would keep the server from stopping.
 const draining = new Set<() => void>()
 
@@ -44,11 +46,16 @@ export class StreamRefusedError extends KayError {
 // What a stream reads: an iterable, or a function making one from a signal aborted when the browser goes away, which a source blocked on a quiet feed passes to what it waits on.
 type Source<T> = AsyncIterable<T> | Iterable<T> | ((signal: AbortSignal) => AsyncIterable<T> | Iterable<T>)
 
+export interface EventStreamOptions<T> {
+  // The id each event carries, which a browser sends back as `Last-Event-ID` when it reconnects, the route reading it from `request.headers` to continue after it. A line break or NUL in one fails the stream.
+  id?: (value: T) => string | number
+}
+
 // Answers with a server-sent event per value `source` gives, which `stream()` reads typed in an island: values cross as island props do, Dates, Maps and Sets included.
 // The source is read one value per value the browser takes, and stopped when it goes away; a source that throws ends the stream as failed, the error logged.
-export function eventStream<T>(source: Source<T>): EventStream<T> {
+export function eventStream<T>(source: Source<T>, options: EventStreamOptions<T> = {}): EventStream<T> {
   const reporter = { report: (error: unknown) => kayLog('error', 'an event stream failed', error) }
-  const response = new Response(eventBody(localizedSource(source), error => reporter.report(error)), { headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' } })
+  const response = new Response(eventBody(localizedSource(source), error => reporter.report(error), options.id), { headers: { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' } })
 
   streamReporters.set(response, reporter)
 
@@ -84,7 +91,7 @@ function localizedIterable<T>(source: AsyncIterable<T> | Iterable<T>, state: Non
 }
 
 // The body of an event stream, a source's failure handed to `report`.
-export function eventBody<T>(source: Source<T>, report: (error: unknown) => void): ReadableStream<Uint8Array> {
+export function eventBody<T>(source: Source<T>, report: (error: unknown) => void, id?: (value: T) => string | number): ReadableStream<Uint8Array> {
   let iterator: AsyncIterator<T> | Iterator<T> | undefined
   let heartbeat: ReturnType<typeof setInterval> | undefined
   let cancelled = false
@@ -145,7 +152,7 @@ export function eventBody<T>(source: Source<T>, report: (error: unknown) => void
         if (next.done)
           finish(controller, END_EVENT)
         else
-          controller.enqueue(encoder.encode(`data: ${encodeEvent(next.value)}\n\n`))
+          controller.enqueue(encoder.encode(`${idLine(id, next.value)}data: ${encodeEvent(next.value)}\n\n`))
       }
       catch (error) {
         if (cancelled)
@@ -173,6 +180,19 @@ export function eventBody<T>(source: Source<T>, report: (error: unknown) => void
       void iterator?.return?.()
     },
   }, { highWaterMark: 0 })
+}
+
+// The `id:` line of an event, none when the stream gives no ids: a line break would end the field and a NUL makes a browser ignore it.
+function idLine<T>(id: ((value: T) => string | number) | undefined, value: T): string {
+  if (!id)
+    return ''
+
+  const text = String(id(value))
+
+  if (ID_REFUSED.test(text))
+    throw new TypeError('kay: an event stream id cannot hold a line break or a NUL')
+
+  return `id: ${text}\n`
 }
 
 function encodeEvent(value: unknown): string {

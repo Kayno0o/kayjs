@@ -131,7 +131,7 @@ interface ActionStartDetail
   data: FormData
 
 [.] ActionStream
-interface ActionStream<T> extends Omit<EventReader<T>, 'retry'>
+interface ActionStream<T> extends Omit<EventReader<T>, 'retry' | 'onOpen'>
   close: () => void
   ended: () => Promise<T | undefined>
   error: () => ApiError<unknown> | undefined
@@ -375,6 +375,7 @@ interface EventReader<T> extends Source<ConnectionStatus>
   error: () => ApiError<unknown> | undefined
   last: () => T | undefined
   on: (listener: (value: T) => void) => () => void
+  onOpen: (listener: (reconnected: boolean) => void) => () => void
   pending: () => boolean
   retry: () => void
   status: () => ConnectionStatus
@@ -1193,7 +1194,7 @@ interface Socket<Send, Receive> extends Source<SocketStatus>
   error: () => ApiError<unknown> | undefined
   last: () => Receive | undefined
   on: (listener: (message: Receive) => void) => () => void
-  onOpen: (listener: () => void) => () => void
+  onOpen: (listener: (reconnected: boolean) => void) => () => void
   pending: () => boolean
   retry: () => void
   send: (message: Send) => void
@@ -1238,6 +1239,7 @@ interface StreamRun<T, Options> extends EventReader<T>
   error: () => ApiError<unknown> | undefined
   last: () => T | undefined
   on: (listener: (value: T) => void) => () => void
+  onOpen: (listener: (reconnected: boolean) => void) => () => void
   pending: () => boolean
   retry: () => void
   start: (...[options]: Optional<Options>) => void
@@ -2588,7 +2590,11 @@ interface EnqueueOptions
 function enterPreview(ctx: { cookies: CookieMap; request: Request; }, options?: { edit?: boolean; }): string
 
 [./server] eventStream
-function eventStream<T>(source: Source<T>): EventStream<T>
+function eventStream<T>(source: Source<T>, options?: EventStreamOptions<T>): EventStream<T>
+
+[./server] EventStreamOptions
+interface EventStreamOptions<T>
+  id?: (value: T) => number | string
 
 [./server] EveryOptions
 type EveryOptions = ScheduleEveryOptions

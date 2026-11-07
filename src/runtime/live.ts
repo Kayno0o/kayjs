@@ -107,8 +107,8 @@ export interface Socket<Send, Receive> extends Source<SocketStatus> {
   status: () => SocketStatus
   // Called with every message received; returns what stops it.
   on: (listener: (message: Receive) => void) => () => void
-  // Called each time the connection opens, a reconnect included, before what was queued goes: where a client joins its rooms again. Returns what stops it.
-  onOpen: (listener: () => void) => () => void
+  // Called each time the connection opens, a reconnect included, before what was queued goes: where a client joins its rooms again, or refetches what it missed (`reconnected` is true after the first open). Returns what stops it.
+  onOpen: (listener: (reconnected: boolean) => void) => () => void
   // Closes for good: no reconnecting after.
   close: () => void
 }
@@ -119,6 +119,8 @@ export interface EventReader<T> extends Source<ConnectionStatus> {
   // `idle` until a stream opened with `start: false` starts, `done` once it ran to its end, `failed` when it was refused or its source threw, `closed` once `close()` was called.
   status: () => ConnectionStatus
   on: (listener: (value: T) => void) => () => void
+  // Called each time the stream opens, a reconnect included (`reconnected` is true after the first open): where an island refetches what a drop may have lost, when the route sends no ids to resume from. Returns what stops it.
+  onOpen: (listener: (reconnected: boolean) => void) => () => void
   close: () => void
 }
 
@@ -161,10 +163,11 @@ export function dispatch<Message extends { type: string }, Handlers extends { [T
 // A websocket that reconnects after a drop, waiting longer each time, until `close()`; `connect` gives none where there is nothing to connect from.
 export function openSocket<Send, Receive>(connect: () => WebSocket | undefined): Socket<Send, Receive> & { start: () => void } {
   const link = connection<Receive>(start, true)
-  const opened = listenerSet<undefined>()
+  const opened = listenerSet<boolean>()
   const queued: string[] = []
   let current: WebSocket | undefined
   let closed = false
+  let opens = 0
 
   function start() {
     if (closed || current)
@@ -179,7 +182,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined):
     ws.addEventListener('open', () => {
       link.reset()
       link.set('open')
-      opened.emit(undefined)
+      opened.emit(opens++ > 0)
 
       for (const message of queued.splice(0))
         ws.send(message)
@@ -253,15 +256,25 @@ async function refusalOf(response: Response): Promise<ApiError> {
   return new ApiError(response.status, message, data, { '': message })
 }
 
-// An event stream read as it arrives, through `request`; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is; with `retryRefused`, a response that is not ok is tried again after the backoff too, as a stream across a restart needs.
-// `start()` opens it once; given a request, it opens a new run of it, closing the one going and forgetting its last value.
-export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response>, reconnect: boolean, idle = false, retryRefused = false): EventReader<T> & { start: (next?: (signal: AbortSignal) => Promise<Response>) => void } {
+// The header a reconnecting stream sends so its route can continue after the last event it took, none when that id is not one a header carries.
+const HEADER_SAFE = /^[\x20-\x7E]+$/
+
+export function resumeHeaders(lastEventId: string | undefined): Record<string, string> {
+  return lastEventId !== undefined && HEADER_SAFE.test(lastEventId) ? { 'last-event-id': lastEventId } : {}
+}
+
+// An event stream read as it arrives, through `request`, given the id of the last event taken to send as `resumeHeaders` does; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is; with `retryRefused`, a response that is not ok is tried again after the backoff too, as a stream across a restart needs.
+// `start()` opens it once; given a request, it opens a new run of it, closing the one going and forgetting its last value and its last id.
+export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: string) => Promise<Response>, reconnect: boolean, idle = false, retryRefused = false): EventReader<T> & { start: (next?: (signal: AbortSignal, lastEventId?: string) => Promise<Response>) => void } {
   let run: AbortController | undefined
   let started = false
+  let lastId: string | undefined
+  let opens = 0
 
+  const opened = listenerSet<boolean>()
   const link = connection<T>(() => void read(run!), reconnect, idle)
 
-  const onEvent = (event: string, data: string): ConnectionStatus | undefined => {
+  const onEvent = (event: string, data: string, id?: string): ConnectionStatus | undefined => {
     if (event === END_EVENT)
       return 'done'
 
@@ -285,6 +298,10 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
 
     // Only a stream that delivered something counts as back, so one dropping as soon as it opens keeps backing off.
     link.reset()
+
+    if (id !== undefined)
+      lastId = id === '' ? undefined : id
+
     link.receive(value)
 
     return undefined
@@ -295,7 +312,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
     let failure: ApiError | undefined
 
     try {
-      const response = await request(controller.signal)
+      const response = await request(controller.signal, lastId)
 
       if (controller.signal.aborted) {
         void response.body?.cancel()
@@ -321,6 +338,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
       }
       else {
         link.set('open')
+        opened.emit(opens++ > 0)
         ended = await parseEvents(response.body, controller.signal, onEvent)
       }
     }
@@ -344,8 +362,11 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
       else if (started)
         return
 
-      if (next && started)
+      if (next && started) {
         link.forget()
+        lastId = undefined
+        opens = 0
+      }
 
       started = true
       link.stop()
@@ -365,6 +386,7 @@ export function readEvents<T>(request: (signal: AbortSignal) => Promise<Response
       void read(run)
     }),
     on: link.on,
+    onOpen: opened.on,
     close: () => {
       link.stop()
       link.set('closed')
@@ -492,13 +514,16 @@ export interface StreamRun<T, Options> extends EventReader<T> {
 // An async iterable read as it arrives, from the moment the island is in the page.
 function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): EventReader<unknown> {
   const link = connection<unknown>(() => void read(), false)
+  const opened = listenerSet<boolean>()
   const controller = new AbortController()
+  let opens = 0
 
   async function read() {
     if (controller.signal.aborted)
       return
 
     link.set('open')
+    opened.emit(opens++ > 0)
 
     try {
       for await (const value of source(controller.signal)) {
@@ -528,7 +553,7 @@ function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): Event
   })
   onCleanup(close)
 
-  return { last: link.last, status: link.status, pending: link.pending, error: link.error, retry: () => link.retry(() => void read()), on: link.on, close }
+  return { last: link.last, status: link.status, pending: link.pending, error: link.error, retry: () => link.retry(() => void read()), on: link.on, onOpen: opened.on, close }
 }
 
 // Reads a route of a module under `src/api` answering with `eventStream()` from an island, once it is in the page, or with `start: false` each time `start()` is called: each value typed as the route sends it, Dates, Maps and Sets included.
@@ -549,7 +574,7 @@ export function stream(module: unknown, path?: string, options?: UrlInput & { me
   const opened = (given: UrlInput | undefined) => {
     const init = streamRequest(given)
 
-    return async (signal: AbortSignal) => fetch(withBase(routeUrl(module, path, given)), { ...init, signal })
+    return async (signal: AbortSignal, lastEventId?: string) => fetch(withBase(routeUrl(module, path, given)), { ...init, headers: { ...init.headers, ...resumeHeaders(lastEventId) }, signal })
   }
 
   // A refused param throws at the call and not inside the request, where a GET stream would retry it.

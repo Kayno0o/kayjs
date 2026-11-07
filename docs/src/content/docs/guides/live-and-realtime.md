@@ -253,6 +253,20 @@ A source that waits on a quiet feed never gets to stop by itself, so give `event
 export default api().get('/news', () => eventStream(signal => watchNews(signal)))
 ```
 
+A browser that loses the connection opens it again, and what the route sent in between is lost unless it can continue where the visitor stopped.
+
+Give each event an id with `eventStream(source, { id })`. `stream()` remembers the id of the last event it took and sends it back as the `Last-Event-ID` header when it reconnects, also after the server restarted. The route reads it from `request.headers` and starts after it. The header is plain text from the browser, so check it and start over when it means nothing.
+
+```ts
+export default api().get('/news', ({ request }) => {
+  const after = Number(request.headers.get('last-event-id'))
+
+  return eventStream(signal => newsSince(Number.isSafeInteger(after) ? after : 0, signal), { id: item => item.seq })
+})
+```
+
+A route with no ids can still tell the island to catch up. `stream()` and `socket()` have `onOpen`, whose argument is true on every open after the first, so `news.onOpen(reconnected => reconnected && refetch())` loads again what a drop may have lost.
+
 ```kay
 ---
 import { stream } from 'kay'

@@ -58,6 +58,23 @@ export default api()
 
 A source blocked on a quiet feed is freed by a signal: pass a function, `eventStream(signal => watch(signal))`, and its `signal` aborts when the visitor leaves, to hand to what the source waits on. An action's handler reads the same from `ctx.request.signal`.
 
+#### Resume after a drop
+
+`eventStream(source, { id })` sends `id(value)` with each event. `stream()` keeps the id of the last event it took and sends it as `Last-Event-ID` when it reconnects, after a drop or a refused attempt while the server restarts, so the route continues after it:
+
+```ts
+export default api().get('/feed', ({ request }) => {
+  const after = Number(request.headers.get('last-event-id'))
+
+  return eventStream(signal => feedSince(Number.isSafeInteger(after) ? after : 0, signal), { id: item => item.seq })
+})
+```
+
+- The header is the browser's text and reaches the route as it came: parse it, and fall back to the start when it is missing, not a value the route knows or older than it keeps.
+- An id with a line break or NUL fails the stream; an id a header cannot carry (outside printable ASCII) is not sent back.
+- A route with no `id` sends none, and `stream()` reconnects as before. A new `start()` of a `start: false` stream forgets the id.
+- To catch up without ids, `feed.onOpen(reconnected => reconnected && refetch())` runs on every open after the first.
+
 ### Stream an action's answer
 
 An action whose handler is an `async function*` streams its answer to the island calling it: [Stream an answer to an island](actions-from-islands.md#stream-an-answer-to-an-island).
@@ -92,13 +109,14 @@ button(onClick={() => messages.send({ text: text() })}) Send
 - What is sent before the connection opens goes once it does, the last 50 messages kept while it is down; after `close()` nothing is.
 - A connection that drops reconnects, waiting longer each time up to 30 seconds, less up to half of that at random so the clients a restart dropped come back apart, and not while the tab is hidden or offline, unless the server closed it with code 1000; a visible tab the browser calls offline still tries each minute, as `navigator.onLine` can be wrong, and the clients a network coming back wakes together reconnect up to half a second apart.
 - `close()` closes it for good.
-- `onOpen(listener)` is called each time the connection opens, a reconnect included, before what was queued goes.
+- `onOpen(listener)` is called each time the connection opens, a reconnect included, before what was queued goes; its argument is `true` after the first open, so `onOpen(reconnected => reconnected && refetch())` catches up on what the drop lost. `stream()` has the same `onOpen`.
 - A client joining rooms by message joins them there, `messages.onOpen(() => messages.send({ type: 'join', room }))`, so it is back in them after a drop.
 - `stream(module, path, options)` reads one of its routes answering with `eventStream()`, with `last()`, `on()` and `status()` the same way.
 - Its `status()` is `done` once the stream ran to its end and `failed` when a guard or the route refused it or its source threw, `error()` then an `ApiError` with the refusal's `status`, `message` and `data`.
 - Every source an island reads, `resource`, `stream`, `socket`, `track()` and `call.track`, shares `status()`, `pending()` (loading or connecting), `error()` (the last failure as an `ApiError`, kept until the next success) and `retry()` (tries again now, skipping any backoff, and does nothing unless it failed or waits to reconnect), so one block shows any of them: `if source.error() as error` then `p {error.message}` and `button(onClick={source.retry} disabled={source.pending()}) Retry`. `LoadStatus` (`idle`, `loading`, `ready`, `failed`) and `ConnectionStatus` (`idle`, `connecting`, `open`, `done`, `failed`, `closed`) from `kay` type them.
 - `{ method: 'post', body }` reads a route taking a body, such as an AI answer.
 - A GET stream that drops reconnects; any other ends as failed.
+- `stream()` sends `Last-Event-ID` when it reconnects to a route whose `eventStream(source, { id })` gave ids, and has `onOpen(listener)` as `socket()` does ([resume after a drop](#resume-after-a-drop)).
 - `stream(module, path, { start: false })` stays `idle` until a handler calls `start(options)`, typed by the route.
 - Each start opens a run with those params, query and body, which may hold a `File` or be a `FormData`, closing the one going and forgetting its `last()`.
 - `close()` aborts the request, which stops the route's source; a later `start()` opens it again.

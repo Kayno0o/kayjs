@@ -4,8 +4,9 @@ const LINE_BREAK = /\r\n|\r(?!$)|\n/
 const LEADING_SPACE = /^ /
 
 // Reads `text/event-stream` blocks, a `data` field over several lines joined with line breaks, comments skipped; resolves with what an event returned to end the stream, or undefined when the body ran out first.
+// An event gets the `id` field of its block as a third argument, undefined when it has none, and an `id` holding a NUL is ignored, as the standard asks.
 // Aborting cancels the body, which stops the source on the server even where fetch would leave the body open.
-export async function parseEvents<End>(body: ReadableStream<Uint8Array>, signal: AbortSignal, onEvent: (event: string, data: string) => End | undefined): Promise<End | undefined> {
+export async function parseEvents<End>(body: ReadableStream<Uint8Array>, signal: AbortSignal, onEvent: (event: string, data: string, id?: string) => End | undefined): Promise<End | undefined> {
   const reader = body.getReader()
   const cancel = async () => {
     try {
@@ -22,6 +23,7 @@ export async function parseEvents<End>(body: ReadableStream<Uint8Array>, signal:
   let buffer = ''
   let event = ''
   let data: string[] = []
+  let id: string | undefined
 
   try {
     for (;;) {
@@ -42,10 +44,11 @@ export async function parseEvents<End>(body: ReadableStream<Uint8Array>, signal:
           return undefined
 
         if (line === '') {
-          const ended = data.length > 0 || event !== '' ? onEvent(event, data.join('\n')) : undefined
+          const ended = data.length > 0 || event !== '' ? onEvent(event, data.join('\n'), id) : undefined
 
           event = ''
           data = []
+          id = undefined
 
           if (ended !== undefined) {
             await reader.cancel()
@@ -67,6 +70,8 @@ export async function parseEvents<End>(body: ReadableStream<Uint8Array>, signal:
           event = text
         else if (field === 'data')
           data.push(text)
+        else if (field === 'id' && !text.includes('\0'))
+          id = text
       }
     }
   }
