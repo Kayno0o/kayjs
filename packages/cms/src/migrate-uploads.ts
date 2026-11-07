@@ -141,7 +141,7 @@ async function point(ref: EntryRef, swaps: ReadonlyMap<string, string>): Promise
       return false
 
     const { version } = now
-    const outcome = await saveEntry({ ...ref, data, body }, { version, verb: 'update', bodyKept: true })
+    const outcome = await saveEntry({ ...ref, data, body }, { version, verb: 'update', bodyKept: true, unasked: true })
 
     if ('saved' in outcome)
       return true
