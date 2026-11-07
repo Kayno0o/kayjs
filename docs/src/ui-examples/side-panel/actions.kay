@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'

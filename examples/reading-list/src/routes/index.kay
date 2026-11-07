@@ -1,5 +1,5 @@
 --- server
-import { s } from 'kay'
+import { action, s } from 'kay'
 import { addBook, listBooks } from '../books'
 
 export const add = action(s.Object({

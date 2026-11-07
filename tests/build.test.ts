@@ -1058,8 +1058,8 @@ describe('kay build checks the project first', () => {
       'kay.config.ts': 'export default { site: \'https://example.com\', favicon: false, seo: { description: \'The site\' }, lints: { \'missing-share-image\': \'allow\', \'unstructured-page\': \'allow\' }, i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', messages: \'src/messages\' } }\n',
       'src/messages/en.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ title: \'About\' })\n',
       'src/messages/fr.ts': 'import { defineMessages } from \'kay/i18n\'\n\nexport default defineMessages({ title: \'A propos\' })\n',
-      'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="description" content="Home page")\na(href="/about") {t(\'title\')}\n',
-      'src/routes/about.kay': '--- server\nexport const page = { prerender: true }\n---\nhead\n  title {t(\'title\')}\n  meta(name="description" content="About page")\np About\n',
+      'src/routes/index.kay': '--- server\nimport { t } from \'kay/i18n\'\n\nexport const page = { prerender: true }\n---\nhead\n  title Home\n  meta(name="description" content="Home page")\na(href="/about") {t(\'title\')}\n',
+      'src/routes/about.kay': '--- server\nimport { t } from \'kay/i18n\'\n\nexport const page = { prerender: true }\n---\nhead\n  title {t(\'title\')}\n  meta(name="description" content="About page")\np About\n',
     })
 
     const built = await build(root)

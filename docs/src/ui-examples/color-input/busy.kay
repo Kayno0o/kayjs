@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
 
 const light = signal('#ff8800')

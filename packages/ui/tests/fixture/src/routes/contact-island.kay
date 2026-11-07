@@ -1,5 +1,5 @@
 --- server
-import { s } from 'kay'
+import { action, s } from 'kay'
 
 export const contact = action(s.Object({
   name: s.String({ minLength: 2, maxLength: 100 }),

@@ -11,9 +11,9 @@ import { defineConfig, pages, session } from 'kay/server'
 import { collection } from 'kay/content'
 ```
 
-Inside a `.kay` file, everything `kay` exports needs no import, nor do `props` and the translation `t`. Everything from another entry is imported, and components, such as `T`, are always imported. A type is imported with `import type`.
+A name is imported where it is used, in a `.kay` file and in a `.ts` file alike; only `props` needs no import. A type is imported with `import type`. Until 1.95 kay still adds the import of a `kay` value and of `t` that a `.kay` file uses without one, and `kay check` warns with `implicit-import`; `kay upgrade` and `kay check --fix` write the lines, and the same fix writes the import of any name a `kay/*` entry exports.
 
-In a `.ts` file nothing is added. `kay/server` also exports `s`, so a server module imports `defineEnv` and `s` from one path. A module an island also imports takes `s` from `kay`, which has the lighter browser build. A name only a template reads, such as `route` in a link, is imported too.
+`kay/server` also exports `s`, so a server module imports `defineEnv` and `s` from one path. A module an island also imports takes `s` from `kay`, which has the lighter browser build.
 
 ## kay
 

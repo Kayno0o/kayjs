@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
 
 const planets = [

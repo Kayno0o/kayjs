@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 
 const received = signal<string[]>([])

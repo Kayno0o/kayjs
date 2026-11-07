@@ -459,7 +459,7 @@ describe('kay lsp', () => {
   it('reports a bind: on a prop not typed Bindable at the attribute', async () => {
     await editor.open('site/src/routes/about.kay')
 
-    const diagnostics = await editor.change('site/src/routes/about.kay', '---\nimport List from \'../components/list.kay\'\n\nconst items = signal([1])\n---\nList(bind:items={items} show={String})\n', 5)
+    const diagnostics = await editor.change('site/src/routes/about.kay', '---\nimport List from \'../components/list.kay\'\nimport { signal } from \'kay\'\nconst items = signal([1])\n---\nList(bind:items={items} show={String})\n', 5)
 
     expect(brief(diagnostics).map(d => [d.start.line, d.code])).toEqual([[5, 2345], [5, 2345]])
   })
@@ -506,7 +506,7 @@ describe('kay lsp', () => {
     const checked = (await check(join(workspace, 'site'))).filter(diagnostic => diagnostic.file === join(workspace, page)).map(asPublished)
 
     // The index of a positionally keyed for whose rows do not read it is no unread name.
-    expect(published.map(([line, severity, code]) => [line, severity, code])).toEqual([[7, 2, 'positional-key'], [9, 2, 'positional-key'], [13, 1, 2774]])
+    expect(published.map(([line, severity, code]) => [line, severity, code])).toEqual([[4, 2, 'implicit-import'], [7, 2, 'positional-key'], [9, 2, 'positional-key'], [13, 1, 2774]])
     expect(published).toEqual(checked)
     // That index renames with its key.
     expect(spots((await editor.rename(page, 9, 10, 'index'))[page]!)).toEqual([[9, 10, 11], [9, 26, 27]])
@@ -640,6 +640,20 @@ describe('kay lsp imports', () => {
 
     expect(await fixes('Badge\n', 3)).toEqual([{ title: 'Add import from "../badge.kay"', text: '---\nimport Badge from \'../badge.kay\'\n---\nBadge\n' }])
     expect(await fixes('---\nimport { signal } from \'kay\'\n---\nBadge\n', 4)).toEqual([{ title: 'Add import from "../badge.kay"', text: '---\nimport { signal } from \'kay\'\nimport Badge from \'../badge.kay\'\n---\nBadge\n' }])
+  })
+
+  it('offers the import of a name kay adds as a quick fix, and in the fixes of the whole file', async () => {
+    const source = '---\nconst count = signal(0)\n---\np {count()} {t(\'hi\')}\n'
+    const diagnostics = await editor.change(page, source, 5)
+    const lint = diagnostics.filter(diagnostic => diagnostic.code === 'implicit-import')
+    const range = { start: { line: 1, character: 14 }, end: { line: 1, character: 20 } }
+    const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range, context: { diagnostics: lint } })
+    const all = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range, context: { diagnostics: lint, only: ['source.fixAll'] } })
+    const written = '---\nimport { signal } from \'kay\'\nimport { t } from \'kay/i18n\'\n\nconst count = signal(0)\n---\np {count()} {t(\'hi\')}\n'
+
+    expect(lint).toHaveLength(1)
+    expect(actions.map(action => applyEdits(source, action.edit!.changes![editor.uri(page)]!))).toContain(written)
+    expect(all.map(action => applyEdits(source, action.edit!.changes![editor.uri(page)]!))).toEqual([written])
   })
 
   it('reports a browser-only global read while rendering next to the type errors, fixed with an effect or `--- client`', async () => {

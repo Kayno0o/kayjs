@@ -63,6 +63,8 @@ export function starterFiles(setup: Setup): Record<string, string> {
   return {
     'src/components/header.kay': header(setup),
     'src/components/counter.kay': `---
+import { signal } from 'kay'
+
 const { start } = props<{ start: number }>()
 const count = signal(start)
 ---

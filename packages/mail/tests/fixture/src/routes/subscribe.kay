@@ -1,4 +1,5 @@
 --- server
+import { action } from 'kay'
 import { hear, mail } from '../mail'
 import Counted from '../mails/counted-confirm.kay'
 import SubscribeForm from '@kaynooo/kayjs-mail/subscribe-form.kay'

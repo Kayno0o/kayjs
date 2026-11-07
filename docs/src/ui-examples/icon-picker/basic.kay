@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
 import type { IconChoice } from '@kaynooo/kayjs-ui'
 import Bell from '~icons/tabler/bell'

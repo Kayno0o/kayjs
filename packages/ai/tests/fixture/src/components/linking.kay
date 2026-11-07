@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import { reply } from '../routes/chat.kay'
 import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
 

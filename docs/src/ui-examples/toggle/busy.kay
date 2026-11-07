@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))

@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'
 
 const planets = [

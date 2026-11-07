@@ -1,4 +1,5 @@
 --- server
+import { action } from 'kay'
 import { contactForm, mailer } from '@kaynooo/kayjs-mail'
 import { delivery } from '../counter'
 

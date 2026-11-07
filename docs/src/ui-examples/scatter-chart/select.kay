@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
 
 const points = [

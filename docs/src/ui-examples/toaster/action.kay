@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import { toast } from '@kaynooo/kayjs-ui'
 

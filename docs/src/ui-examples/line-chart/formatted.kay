@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
 
 const labels = [

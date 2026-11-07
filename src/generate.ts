@@ -27,7 +27,7 @@ const TABLES_FILE = 'src/db/tables.ts'
 const SERVER_FENCE = '--- server'
 const ANY_FENCE = /^---(?:\s|$)/
 const IMPORT_END = /^(?:import\s.*\sfrom\s.*|\}\s*from\s.*)$/
-const S_IMPORT = /^import\s*\{[^}]*\bs\b[^}]*\}\s*from\s*['"]kay['"]/m
+const KAY_IMPORT = /^import\s*\{([^}]*)\}\s*from\s*['"]kay['"]/gm
 const DYNAMIC = /[[(]/
 const LEADING_DIGIT = /^\d/
 const DASH_LETTER = /-(\w)/g
@@ -89,7 +89,7 @@ function actionFiles(segments: readonly string[], tests: boolean, auth: boolean)
   const folder = segments.slice(0, -1).join('/')
   const file = `src/routes/${folder === '' ? '' : `${folder}/`}_actions.kay`
   const files: Record<string, string> = {
-    [file]: `--- server\nimport { s } from 'kay'\n\n${ACTION_BODY(name)}`,
+    [file]: `--- server\nimport { action, s } from 'kay'\n\n${ACTION_BODY(name)}`,
   }
 
   if (tests && !auth) {
@@ -142,7 +142,7 @@ export function generatedFiles(kind: Exclude<Kind, 'resource'>, name: string, pr
     case 'component':
       return { [`src/components/${segments.join('/')}.kay`]: '---\nconst { label } = props<{ label: string }>()\n---\np {label}\n' }
     case 'island':
-      return { [`src/components/${segments.join('/')}.kay`]: '---\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) Clicked {count()} times\n' }
+      return { [`src/components/${segments.join('/')}.kay`]: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) Clicked {count()} times\n' }
     case 'action':
       return actionFiles(segments, project.tests, project.auth)
     case 'api':
@@ -266,10 +266,14 @@ function appendedAction(path: string, existing: string, name: string): string | 
   if (names.declared.has(name))
     throw new Error(`kay generate: nothing was written, ${path} already declares or imports \`${name}\``)
 
-  if (!S_IMPORT.test(existing)) {
+  // The action it calls and the schema it builds, imported by the file or added.
+  const imported = new Set([...existing.matchAll(KAY_IMPORT)].flatMap(found => found[1]!.split(',').map(specifier => specifier.trim())))
+  const missing = ['action', 's'].filter(word => !imported.has(word))
+
+  if (missing.length > 0) {
     const after = lines.findLastIndex(line => IMPORT_END.test(line))
 
-    lines.splice(Math.max(after + 1, 1), 0, 'import { s } from \'kay\'', ...after === -1 ? [''] : [])
+    lines.splice(Math.max(after + 1, 1), 0, `import { ${missing.join(', ')} } from 'kay'`, ...after === -1 ? [''] : [])
   }
 
   return `${lines.join(eol).trimEnd()}${eol}${eol}${ACTION_BODY(name)}`.replaceAll(LINE_BREAKS, eol)

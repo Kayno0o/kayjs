@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 
 const PERIODS = [

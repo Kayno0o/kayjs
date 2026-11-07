@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
 import type { RangeValue } from '@kaynooo/kayjs-ui'
 

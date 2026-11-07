@@ -1,4 +1,6 @@
 ---
+import { ctx } from 'kay'
+
 const { role } = props<{ role?: string | undefined }>()
 ---
 // A guest is no signed-in user. `ctx.user` and `ctx.can` are read ahead of the render of each page reaching this component, so it shows in the first bytes.

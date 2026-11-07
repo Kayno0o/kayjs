@@ -1,6 +1,6 @@
 --- server
 import { ask, chatMessages } from '@kaynooo/kayjs-ai'
-import { s } from 'kay'
+import { action, s } from 'kay'
 
 // Says one word and keeps working until the visitor stops it, so a test speaks while a reply is under way.
 async function* held() {

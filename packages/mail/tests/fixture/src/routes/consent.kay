@@ -1,6 +1,6 @@
 --- server
 import { contactForm, mailer } from '@kaynooo/kayjs-mail'
-import { s } from 'kay'
+import { action, s } from 'kay'
 
 const down = mailer({ from: 'Fixture <hello@fixture.test>' })
 

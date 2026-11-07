@@ -1,5 +1,5 @@
 --- server
-import { localPath } from 'kay'
+import { action, localPath } from 'kay'
 import { formatDate } from 'kay/i18n'
 import { wording } from 'kay/words'
 import Message from '../../components/message.kay'

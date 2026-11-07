@@ -1353,7 +1353,7 @@ describe('signal writes', () => {
     const checked = compileKay(source, 'test.kay', { check: true })
 
     for (const { tsx: code, diagnostics } of [runs, served, checked]) {
-      expect(diagnostics.map(d => d.message)).toEqual([])
+      expect(diagnostics.filter(d => d.code !== 'implicit-import').map(d => d.message)).toEqual([])
       expect(parser.parseSync('test.tsx', code).errors).toEqual([])
     }
 

@@ -1,6 +1,6 @@
 --- server
 import type { Progress } from '@kaynooo/kayjs-ai'
-import { s } from 'kay'
+import { action, s } from 'kay'
 import { testing } from '../testing'
 
 const sources = [{ n: 1, title: 'Tides', href: 'https://example.com/tides' }, { n: 2, title: 'Moon', href: '/moon' }]

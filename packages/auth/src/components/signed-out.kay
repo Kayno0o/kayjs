@@ -1,3 +1,6 @@
+---
+import { ctx } from 'kay'
+---
 // A visitor with no account, or a guest.
 if !ctx.user
   slot

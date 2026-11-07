@@ -1,4 +1,5 @@
 --- server
+import { action } from 'kay'
 import { localize } from 'kay/i18n'
 import { signOutOf } from '../access'
 import { EDITOR_COOKIE, HINT_COOKIE } from '../page-link'

@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import RecordButton from '@kaynooo/kayjs-ui/record-button.kay'
 import { sizeText } from 'kay/words'
 

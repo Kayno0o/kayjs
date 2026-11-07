@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
 
 const days = signal([1, 3])

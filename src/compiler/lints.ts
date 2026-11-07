@@ -472,6 +472,14 @@ export const LINTS = {
     wrong: '---\nimport Picker from \'./picker.kay\'\n\nconst { format } = props<{ format: (value: string) => string }>()\n---\nPicker(format={format})',
     right: '--- island\nimport Picker from \'./picker.kay\'\n\nconst { format } = props<{ format: (value: string) => string }>()\n---\nPicker(format={format})',
   },
+  'implicit-import': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.92',
+    summary: 'A value of `kay` that a component reads with no import (`signal`, `uid`, `route`), or `t` of `kay/i18n`, which kay imported for the file. Every name is imported where it is used since 1.92, in a `.kay` file and in a `.ts` module alike, so code moves between the two unchanged and the import line shows what makes a component an island. The compiler adds the imports until 1.95. One diagnostic per fence, at the first use, and the fix writes the names into the `kay` import the fence has, else as an import of their own at its start, opening a `---` fence for a template with no script. `kay check --fix` also writes the import of any other name a `kay/*` entry exports (`files`, `cached`, `pages`) that a `.kay` or `.ts` file uses with none.',
+    wrong: '---\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
+    right: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}',
+  },
   'promoted-island': {
     level: 'warn',
     group: 'deprecated',

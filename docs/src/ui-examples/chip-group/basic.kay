@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
 
 const decks = signal(['films'])

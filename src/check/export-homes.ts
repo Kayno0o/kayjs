@@ -53,13 +53,17 @@ function exportHomes(): Map<string, string> {
   return homes
 }
 
-// What to tell a user whose code reads a name nothing declares, when a module of kay exports it.
-export function unknownNameHelp(message: string): string | undefined {
+// The name a "Cannot find name" message is about and the entry of kay that exports it, when one does.
+export function unknownName(message: string): { name: string, entry: string } | undefined {
   const name = UNKNOWN_NAME.exec(message)?.[1]
   const entry = name === undefined ? undefined : exportHomes().get(name)
 
-  if (name === undefined || entry === undefined)
-    return undefined
+  return name === undefined || entry === undefined ? undefined : { name, entry }
+}
 
-  return `did you mean \`${name}\` from \`${entry}\`? Add \`import { ${name} } from '${entry}'\``
+// What to tell a user whose code reads a name nothing declares, when a module of kay exports it.
+export function unknownNameHelp(message: string): string | undefined {
+  const found = unknownName(message)
+
+  return found === undefined ? undefined : `did you mean \`${found.name}\` from \`${found.entry}\`? Add \`import { ${found.name} } from '${found.entry}'\``
 }

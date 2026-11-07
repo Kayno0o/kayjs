@@ -1,4 +1,5 @@
 --- server
+import { action } from 'kay'
 import { contactForm } from '@kaynooo/kayjs-mail'
 
 export const contact = action(...contactForm({ enqueue: async () => undefined as never }, { honeypot: 'nectar', consent: true }))

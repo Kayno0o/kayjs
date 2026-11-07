@@ -1,4 +1,5 @@
 ---
+import { memo, signal } from 'kay'
 import Masonry from '@kaynooo/kayjs-ui/masonry.kay'
 
 const notes = [

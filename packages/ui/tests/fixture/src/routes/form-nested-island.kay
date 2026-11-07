@@ -1,5 +1,5 @@
 --- server
-import { s } from 'kay'
+import { action, s } from 'kay'
 
 export const nested = action(s.Object({ name: s.String({ minLength: 2, maxLength: 100 }) }), async () => undefined, { protect: { honeypot: 'website', minTime: '3s' } })
 --- script

@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 
 const { onDismiss } = props<{ onDismiss: () => void }>()

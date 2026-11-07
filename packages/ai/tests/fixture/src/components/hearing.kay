@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import { reply } from '../routes/chat.kay'
 import Chat from '@kaynooo/kayjs-ai/chat.kay'
 

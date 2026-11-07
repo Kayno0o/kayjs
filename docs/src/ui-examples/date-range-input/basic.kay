@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
 import type { DateRange } from '@kaynooo/kayjs-ui'
 

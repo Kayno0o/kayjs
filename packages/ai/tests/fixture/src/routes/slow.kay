@@ -1,5 +1,5 @@
 --- server
-import { s } from 'kay'
+import { action, s } from 'kay'
 
 const PACE_MS = 50
 const STEPS = 200

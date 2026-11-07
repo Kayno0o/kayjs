@@ -17,6 +17,7 @@ import { authErrorKind } from './auth-error'
 import { diagnoseShadow, ownFile, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { unknownNameHelp } from './export-homes'
 import { generatedProblem } from './generated'
+import { addImportFixes } from './missing-imports'
 import { configProblems, contentChecks, lintConfigTypeError, projectProblems, withoutMissingCaptcha } from './project'
 import { writeShadowTypes } from './shadow-types'
 import { parseTscOutput, resolvedConfig, tsgoCode, tsgoDiagnostic, typecheck } from './tsgo'
@@ -230,6 +231,7 @@ async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory)
   }
 
   diagnostics.push(...problems)
+  await addImportFixes(diagnostics)
 
   // A failing run that reported nothing must not pass for a clean one.
   if (code !== 0 && printed.length === 0 && errors.trim() === '')

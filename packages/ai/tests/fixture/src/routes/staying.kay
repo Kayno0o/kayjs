@@ -1,6 +1,6 @@
 --- server
 import { ask } from '@kaynooo/kayjs-ai'
-import { s } from 'kay'
+import { action, s } from 'kay'
 import { testing } from '../testing'
 
 // A chat whose reply goes on after the visitor left, asked of the provider a test sets.

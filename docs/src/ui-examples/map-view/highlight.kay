@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import MapView from '@kaynooo/kayjs-ui/map-view.kay'
 
 const legs = {

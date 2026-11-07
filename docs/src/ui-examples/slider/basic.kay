@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Slider from '@kaynooo/kayjs-ui/slider.kay'
 
 const delay = signal(200)

@@ -1,4 +1,5 @@
 --- server
+import { action } from 'kay'
 import { formatRelativeTime, localize } from 'kay/i18n'
 import { wording } from 'kay/words'
 import { schemas } from '../../forms'

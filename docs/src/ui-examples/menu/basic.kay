@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Menu from '@kaynooo/kayjs-ui/menu.kay'
 import type { MenuEntry } from '@kaynooo/kayjs-ui'
 import Pencil from '~icons/tabler/pencil'

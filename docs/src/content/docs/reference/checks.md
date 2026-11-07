@@ -133,6 +133,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `one-way-hreflang` | warn | seo | Alternates that do not point back at each other |
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
 | `promoted-island` | warn | deprecated | A static component passing an island a function or a block with parameters, which the build still turns into an island on its own; `--- island` says so, and the promotion goes in 1.95 |
+| `implicit-import` | warn | deprecated | A `kay` value or `t` used with no import, which kay adds until 1.95; the fix writes the import into the fence (`kay check --fix` also writes any `kay/*` import a file lacks) |
 | `island-comment` | warn | deprecated | `// kay-island` or `// kay-static` in a script, now the fence line `--- island` or `--- static`; the comment works until 1.95 |
 | `deprecated-icon-picker-search` | warn | deprecated | A kayjs-ui IconPicker `search`, now a function `icons` handed `{ q, limit, offset }`; the old prop works until 1.95 |
 | `deprecated-menu-danger` | warn | deprecated | A kayjs-ui Menu entry flagged `danger: true`, now `tone: 'danger'`; the flag works until 2.0.0 |

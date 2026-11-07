@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import type { Column } from '@kaynooo/kayjs-ui'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'

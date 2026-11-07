@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
 
 const moons = [

@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
 import { toast } from '@kaynooo/kayjs-ui'

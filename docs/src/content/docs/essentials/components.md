@@ -50,9 +50,11 @@ p {greeting}
 Badge(label="new")
 ```
 
-Everything `kay` exports needs no import in a script or a server fence: `signal`, `memo`, `persisted`, `navigate`, `s`, `action` and the rest, as well as `props` and the translation `t`. A name only the template reads, such as `route` in a link, is imported too.
+Import what you use, as in any TypeScript module: `signal`, `memo`, `persisted`, `navigate`, `s` and `action` from `kay`, `t` from `kay/i18n`, `cached` from `kay/cache`. `props` is the one name that needs no import. `kay check` names the entry when you forget, and `kay check --fix` or your editor's quick fix writes the import.
 
-Import what comes from another entry, such as `cached` from `kay/cache`, and `kay check` names the entry when you forget. [Modules](/reference/modules) says which entry holds what. A script using only helpers that compute the same on both sides, such as `route`, `apiUrl` or `withBase`, keeps the component static: [Islands](/essentials/islands) lists them.
+[Modules](/reference/modules) says which entry holds what. A script importing only helpers that compute the same on both sides, such as `route`, `apiUrl` or `withBase`, keeps the component static: [Islands](/essentials/islands) lists them.
+
+Until 1.95 kay still adds the import of a `kay` value or of `t` that a component uses without one, and `kay check` warns with `implicit-import`. `kay upgrade` writes the missing lines in one run.
 
 ## Props
 

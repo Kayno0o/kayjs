@@ -566,7 +566,7 @@ describe('constant-signal', () => {
   })
 
   it('reports a signal kay imports by itself too, and one a prop takes the value of', () => {
-    expect(lints('---\nconst title = signal(\'Todos\')\n---\nh1 {title()}\n')).toEqual([{ code: 'constant-signal', severity: 'warning', at: 'title' }])
+    expect(lints('---\nconst title = signal(\'Todos\')\n---\nh1 {title()}\n')).toEqual([{ code: 'constant-signal', severity: 'warning', at: 'title' }, { code: 'implicit-import', severity: 'warning', at: 'signal' }])
     expect(lints(script('const open = signal(false)', 'Child(open={open()})\np {open()}'))).toEqual([{ code: 'constant-signal', severity: 'warning', at: 'open' }])
   })
 

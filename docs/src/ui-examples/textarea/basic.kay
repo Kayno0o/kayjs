@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 
 const note = signal('Pack the telescope.')

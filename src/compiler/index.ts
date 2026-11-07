@@ -14,6 +14,7 @@ import { browserReads } from './browser'
 import { generate, isInteractive, islandCause, islandMessages, lineOf, promotionSite } from './codegen'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, openRedirects, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
 import { cwd, iconSetsOf, scopeStorage } from './host'
+import { implicitImports } from './implicit-imports'
 import { causeSummary, describeCause } from './island-cause'
 import { commentLint, islandComment, islandPin, markerMismatch } from './island-marker'
 import { applyLints, templateLints } from './lints'
@@ -354,6 +355,9 @@ export function compileKay(original: string, filename: string, options: CompileO
 
   if (checked && comment !== undefined)
     diagnostics.push(commentLint(file, comment))
+
+  if (checked && !unparsed)
+    diagnostics.push(...implicitImports(file, script, server, found.plan.translates, options.contextModule !== undefined))
 
   if (file.client && file.module)
     diagnostics.push({ ...file.client, code: 'fence-invalid', message: 'A `--- client` component has no `--- module` fence', note: 'the server loads only its live imports, so its exports would be missing there', help: 'put the shared values in a `.ts` module' })

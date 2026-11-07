@@ -1,4 +1,5 @@
 ---
+import { memo, signal } from 'kay'
 import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
 
 const moons = signal([{ name: 'Io', on: true }, { name: 'Europa', on: false }, { name: 'Ganymede', on: true }])

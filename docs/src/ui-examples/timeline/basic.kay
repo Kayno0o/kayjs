@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import type { TimelineEntry } from '@kaynooo/kayjs-ui'
 import Timeline from '@kaynooo/kayjs-ui/timeline.kay'
 

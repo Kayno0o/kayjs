@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
 
 const headers = signal([{ name: 'Cache-Control', value: 'no-store' }])

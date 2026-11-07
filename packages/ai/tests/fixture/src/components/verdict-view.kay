@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import type { ActionStream } from 'kay'
 import type { DeepPartial } from '@kaynooo/kayjs-ai'
 import type { verdict } from '../answers'

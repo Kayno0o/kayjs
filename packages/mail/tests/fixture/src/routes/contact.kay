@@ -1,5 +1,5 @@
 --- server
-import { s } from 'kay'
+import { action, s } from 'kay'
 import { contactForm } from '@kaynooo/kayjs-mail'
 import { mail } from '../mail'
 

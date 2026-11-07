@@ -134,8 +134,12 @@ export class Expansion {
 
   // The span as is in the file when the lowering made up none of it, so an edit to it can be made to the file.
   exact(span: Span): Span | undefined {
-    if (span.start === span.end)
-      return this.madeUpAt(span.start) ? undefined : { start: this.real(span.start), end: this.real(span.start) }
+    if (span.start === span.end) {
+      const region = this.madeUpAt(span.start)
+
+      // An insertion where a block's lowering begins goes before the block in the file.
+      return region && span.start > region.start ? undefined : { start: this.real(span.start), end: this.real(span.start) }
+    }
 
     const [piece, ...rest] = this.split(span)
 

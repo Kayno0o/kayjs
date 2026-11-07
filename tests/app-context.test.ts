@@ -108,7 +108,7 @@ describe('the app\'s src/context.ts', () => {
     const root = await fixtureCopy('app-context')
 
     await Bun.write(resolve(root, 'tsconfig.json'), await Bun.file('tests/fixtures/action-streams/tsconfig.json').text())
-    await Bun.write(resolve(root, 'src/routes/typed.kay'), 'p#typed {ctx.plan.length} {ctx.cartCount.toFixed(0)}\n')
+    await Bun.write(resolve(root, 'src/routes/typed.kay'), '---\nimport { ctx } from \'kay\'\n---\np#typed {ctx.plan.length} {ctx.cartCount.toFixed(0)}\n')
     await Bun.write(resolve(root, 'src/routes/untyped.kay'), 'p#untyped {ctx.nope}\n')
 
     const { output, report } = await kayCheck([root])

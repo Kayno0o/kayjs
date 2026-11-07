@@ -1,5 +1,5 @@
 --- server
-import { s } from 'kay'
+import { action, s } from 'kay'
 import { BOARD, board } from '../board'
 import { db } from '../db'
 import { Notice } from '../db/notice'

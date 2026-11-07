@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'

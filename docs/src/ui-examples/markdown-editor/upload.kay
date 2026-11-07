@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 
 const body = signal('')

@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 
 const KINDS = [

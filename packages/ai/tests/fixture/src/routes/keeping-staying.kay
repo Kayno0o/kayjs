@@ -1,6 +1,6 @@
 --- server
 import { ask, chatMessages } from '@kaynooo/kayjs-ai'
-import { s } from 'kay'
+import { action, s } from 'kay'
 import { testing } from '../testing'
 
 // Keeps the conversation on the server, its reply going on once the visitor left, asked of the provider a test sets.

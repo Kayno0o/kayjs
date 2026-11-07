@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
 
 const start = signal('09:30')

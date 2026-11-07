@@ -182,7 +182,7 @@ describe('a template reading ctx', () => {
 
     await Bun.write(resolve(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [{ name: \'values\', context: \'./lib/context.ts\' }] })\n')
     await Bun.write(resolve(root, 'tsconfig.json'), await Bun.file('tests/fixtures/action-streams/tsconfig.json').text())
-    await Bun.write(resolve(root, 'src/routes/typed.kay'), 'p#typed {ctx.user?.name}\n')
+    await Bun.write(resolve(root, 'src/routes/typed.kay'), '---\nimport { ctx } from \'kay\'\n---\np#typed {ctx.user?.name}\n')
     await Bun.write(resolve(root, 'src/routes/untyped.kay'), 'p#untyped {ctx.nope}\n')
 
     const { output, report } = await kayCheck([root])

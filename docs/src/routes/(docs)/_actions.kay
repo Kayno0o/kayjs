@@ -1,7 +1,7 @@
 --- server
 import { ask } from '@kaynooo/kayjs-ai'
 import { s } from 'kay'
-import { logFrom } from 'kay'
+import { action, logFrom } from 'kay'
 import { partOfPage, readPage, searchPages, systemPrompt } from '../../chat-corpus'
 
 // The tools' own limits sit well above what one question needs, so the chat's `ai({ rateLimit })` is what a visitor meets first.

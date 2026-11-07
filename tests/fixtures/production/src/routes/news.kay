@@ -1,5 +1,5 @@
 --- server
-import { s } from 'kay'
+import { s, action } from 'kay'
 import { invalidatePage } from 'kay/cache'
 import { news } from '../news'
 

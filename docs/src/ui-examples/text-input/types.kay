@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 
 const email = signal('')

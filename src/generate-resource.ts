@@ -162,7 +162,7 @@ function actionsFile(names: Names, fields: readonly Field[]): string {
   const list = `/${names.folder}`
 
   return `--- server
-import { s } from 'kay'
+import { action, s } from 'kay'
 import { db } from '../../db'
 import { ${names.pascal} } from '../../db/${names.slug}'
 

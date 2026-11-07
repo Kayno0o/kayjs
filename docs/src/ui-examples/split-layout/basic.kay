@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
 
 const moons = ['Io', 'Europa', 'Ganymede', 'Callisto']

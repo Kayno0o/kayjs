@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
 import type { MediaItem } from '@kaynooo/kayjs-ui'
 

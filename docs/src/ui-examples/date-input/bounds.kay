@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
 
 const day = signal('')

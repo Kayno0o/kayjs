@@ -89,7 +89,7 @@ it('adds an action to an existing _actions.kay that holds a server fence alone',
   await createProject(dir, { kay: '^1.0.0', features: PRESETS.server.features })
   await generate(dir, 'action', 'team/first')
 
-  expect(await Bun.file(actions).text()).toStartWith('--- server\nimport { s } from \'kay\'\n')
+  expect(await Bun.file(actions).text()).toStartWith('--- server\nimport { action, s } from \'kay\'\n')
 
   expect((await generate(dir, 'action', 'team/second', { dryRun: true })).written).toEqual(['src/routes/team/_actions.kay', 'tests/action-team-second.test.ts'])
   expect(await Bun.file(actions).text()).not.toContain('second')
@@ -98,7 +98,7 @@ it('adds an action to an existing _actions.kay that holds a server fence alone',
 
   const text = await Bun.file(actions).text()
 
-  expect(text.match(/import \{ s \}/g)).toHaveLength(1)
+  expect(text.match(/import \{ action, s \}/g)).toHaveLength(1)
   expect(text).toContain('export const first = action(')
   expect(text).toContain('\n\nexport const second = action(')
   expect(text.endsWith(')\n')).toBe(true)
@@ -109,11 +109,11 @@ it('adds an action to an existing _actions.kay that holds a server fence alone',
 
   await Bun.write(actions, '--- server\nexport const legacy = action(s.Object({}), () => 1)\n')
   await generate(dir, 'action', 'team/third')
-  expect(await Bun.file(actions).text()).toStartWith('--- server\nimport { s } from \'kay\'\n\nexport const legacy')
+  expect(await Bun.file(actions).text()).toStartWith('--- server\nimport { action, s } from \'kay\'\n\nexport const legacy')
 
   await Bun.write(actions, '--- server\r\nimport { a } from \'a\'\r\nexport function* team() {}\r\n')
   await generate(dir, 'action', 'team/crlf')
-  expect(await Bun.file(actions).text()).toStartWith('--- server\r\nimport { a } from \'a\'\r\nimport { s } from \'kay\'\r\nexport function* team() {}\r\n\r\nexport const crlf = action(')
+  expect(await Bun.file(actions).text()).toStartWith('--- server\r\nimport { a } from \'a\'\r\nimport { action, s } from \'kay\'\r\nexport function* team() {}\r\n\r\nexport const crlf = action(')
   expect(await Bun.file(actions).text()).not.toMatch(/[^\r]\n/)
   await expect(generate(dir, 'action', 'team/team')).rejects.toThrow('already exports `team`')
 

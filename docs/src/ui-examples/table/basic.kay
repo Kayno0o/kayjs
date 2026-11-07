@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import type { Column, SortState } from '@kaynooo/kayjs-ui'
 

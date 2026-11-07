@@ -1,4 +1,5 @@
 --- island
+import { signal } from 'kay'
 import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 

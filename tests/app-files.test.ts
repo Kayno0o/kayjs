@@ -216,7 +216,7 @@ describe('the files an extension names in appFiles', () => {
   }, 60_000)
 
   it('reach an extension\'s API module exporting a function, which kay check types: its routes are linked to and called from an island, and one building no Elysia instance is refused', async () => {
-    const island = (path: string) => `---\nimport { call } from 'kay'\nimport features from '../../lib/api/features'\n\nconst names = signal('')\n---\nbutton(onClick={async () => names = (await call(features, '${path}')).extensions.join(', ')}) Load\np {names()}\n`
+    const island = (path: string) => `---\nimport { call, signal } from 'kay'\nimport features from '../../lib/api/features'\n\nconst names = signal('')\n---\nbutton(onClick={async () => names = (await call(features, '${path}')).extensions.join(', ')}) Load\np {names()}\n`
     const root = await written(app({
       'src/routes/index.kay': 'a(href="/api/probe/features") features\n',
       'src/components/features.kay': island('/'),

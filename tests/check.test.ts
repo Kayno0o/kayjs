@@ -1727,7 +1727,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[6, 'TS2322'], [8, 'TS2339']])
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[2, 'implicit-import'], [6, 'TS2322'], [8, 'TS2339']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -1738,7 +1738,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/routes/index.kay': '--- server\nimport { s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String({ maxLength: 9 }) }), async ({ title }) => title.length)\n---\n---\nconst count = signal(0)\nconst label: string = count()\n\neffect(() => count.set(c => c + 1))\n---\nform(action={add})\n  input(name="title" aria-label="Title")\np {label}\n' })
 
     try {
-      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[8, 'TS2322']])
+      expect((await check(root)).map(d => [d.line, d.code])).toEqual([[4, 'implicit-import'], [7, 'implicit-import'], [8, 'TS2322']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -3300,8 +3300,8 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
       'src/routes/[org]/items/[id=integer]/[[slug]].kay': page,
       'src/routes/[org]/_layout.kay': '--- server\nimport { action } from \'kay\'\n\nexport const own = action(async (ctx) => ctx.params.anything)\n---\nslot\n',
       'src/routes/_actions.kay': '--- server\nimport { action } from \'kay\'\n\nexport const shared = action(async (ctx) => ctx.params.anything)\n',
-      'src/routes/many/[id].kay': '--- server\nexport const page = { prerender: true }, first = action(async ctx => ctx.params.id.toUpperCase()), second = action(async ctx => ctx.params.nope)\n---\np hi\n',
-      'src/routes/plain.kay': '--- server\nexport const hello = action(async (ctx) => ctx.params.nothing)\n---\np hi\n',
+      'src/routes/many/[id].kay': '--- server\nimport { action } from \'kay\'\n\nexport const page = { prerender: true }, first = action(async ctx => ctx.params.id.toUpperCase()), second = action(async ctx => ctx.params.nope)\n---\np hi\n',
+      'src/routes/plain.kay': '--- server\nimport { action } from \'kay\'\n\nexport const hello = action(async (ctx) => ctx.params.nothing)\n---\np hi\n',
     })
 
     try {
@@ -3309,8 +3309,8 @@ describe.concurrent('kay check, what the server refuses at boot', () => {
 
       expect(diagnostics.map(d => [d.file.slice(root.length + 1), d.line, d.code])).toEqual([
         ['src/routes/[org]/items/[id=integer]/[[slug]].kay', 8, 'TS2339'],
-        ['src/routes/many/[id].kay', 2, 'TS2339'],
-        ['src/routes/plain.kay', 2, 'TS2339'],
+        ['src/routes/many/[id].kay', 4, 'TS2339'],
+        ['src/routes/plain.kay', 4, 'TS2339'],
       ])
     }
     finally { await rm(root, { recursive: true, force: true }) }
@@ -3927,7 +3927,7 @@ describe.concurrent('kay check, unused code', () => {
         [22, 'This `match` has no `else` and leaves "b" | "c" out'],
         [25, 'This `match` has no `else` and leaves "v" out'],
       ])
-      expect(await check(root, { lints: { 'incomplete-match': 'allow' } })).toEqual([])
+      expect((await check(root, { lints: { 'incomplete-match': 'allow' } })).map(d => d.code)).toEqual(['implicit-import'])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -3985,7 +3985,7 @@ describe.concurrent('kay check, unused code', () => {
     try {
       const found = (await check(root)).map(d => [d.line, d.message, d.help])
 
-      expect(found).toEqual([[5, expect.stringContaining('Cannot find name \'cached\''), 'did you mean `cached` from `kay/cache`? Add `import { cached } from \'kay/cache\'`']])
+      expect(found).toEqual([[4, expect.stringContaining('`uid` is used with no import'), expect.stringContaining('import { uid } from \'kay\'')], [5, expect.stringContaining('Cannot find name \'cached\''), 'did you mean `cached` from `kay/cache`? Add `import { cached } from \'kay/cache\'`']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -4166,7 +4166,7 @@ describe.concurrent('kay check, unused code', () => {
   })
 
   it('does not warn of an island\'s for over objects with no id and no key, which the runtime matches through edits', async () => {
-    const list = '---\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts()\n    li {post.title}\n  for post of posts()\n    li {post.slug}\n  for todo of todos()\n    li {todo.title}\n  for tag of tags()\n    li {tag}\n  for post of posts() key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts = []; todos = []; tags = [] }}) Clear\n'
+    const list = '---\nimport { signal } from \'kay\'\n\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts()\n    li {post.title}\n  for post of posts()\n    li {post.slug}\n  for todo of todos()\n    li {todo.title}\n  for tag of tags()\n    li {tag}\n  for post of posts() key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts = []; todos = []; tags = [] }}) Clear\n'
     const root = await scratchProject({
       'src/components/list.kay': list,
       // A page renders once, so its rows are never matched again.

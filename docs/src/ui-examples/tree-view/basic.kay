@@ -1,4 +1,5 @@
 ---
+import { signal } from 'kay'
 import type { TreeNode } from '@kaynooo/kayjs-ui'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 
