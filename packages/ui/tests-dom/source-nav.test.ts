@@ -101,3 +101,14 @@ test('the arrow keys move over loaded tabs', async () => {
 
   expect(part('tabs', 'tab').map(one => one.getAttribute('aria-selected'))).toEqual(['true', 'false'])
 })
+
+test('a plain list draws at once, with no loading state', async () => {
+  mounted = await mountComponent(SourceNav, { tabs: TABS, steps: STEPS, calls: [] })
+
+  const root = mounted.root
+
+  expect(root.querySelector('#tabs')!.getAttribute('aria-busy')).toBeNull()
+  expect(root.querySelectorAll('#tabs [data-part=tab]')).toHaveLength(2)
+  expect(root.querySelectorAll('#steps [data-part=item]')).toHaveLength(3)
+  expect(root.querySelector('[data-part=status]')).toBeNull()
+})
