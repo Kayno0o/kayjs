@@ -67,8 +67,8 @@ const dirs: string[] = []
 export function cleanUpAfterFile(): void {
   afterAll(async () => {
     await Promise.all(dirs.splice(0).map(async dir => rm(dir, { recursive: true, force: true })))
-    // Each client closed once, its queries given two seconds.
-    await Promise.all([...new Set(clients.splice(0))].map(async client => client.close({ timeout: 2 })))
+    // Each client closed once, its queries given two seconds; a connection the server killed never settles its close (Bun 1.4), so it is left after three.
+    await Promise.all([...new Set(clients.splice(0))].map(async client => Promise.race([client.close({ timeout: 2 }), Bun.sleep(3000)])))
 
     if (databaseUrl !== undefined) {
       const admin = new SQL(Object.assign(new URL(url!.href), { pathname: '/postgres' }).href)
