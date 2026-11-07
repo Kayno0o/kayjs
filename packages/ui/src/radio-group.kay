@@ -4,6 +4,9 @@ import { postedValue, recipe, uid, untrack } from 'kay'
 import type { NullOption } from './null-option'
 import { controlledRadios } from './controlled-radios'
 import { RADIO_INVALID } from './field-look'
+import { loadOptions } from './options-source'
+import type { OptionsSource } from './options-source'
+import { wording } from 'kay/words'
 import { sentOption } from './refill'
 
 // 'kui-radio-group' stays as the component's name for an app's CSS; the group is named so a choice reads its busy state.
@@ -15,12 +18,21 @@ const look = recipe({
     input: `m-0 size-4 shrink-0 cursor-[inherit] accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${RADIO_INVALID}`,
     label: 'text-sm text-foreground',
     description: 'pl-6 text-xs text-muted',
+    status: 'm-0 text-xs text-muted',
+    retry: 'cursor-pointer self-start text-xs text-accent underline',
   },
 })
 
-const { options, value, label, name, invalid, disabled = false, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value, label, name, invalid, disabled = false, loadingLabel = wording('ui.radioGroup.loading', 'Loading…'), retryLabel = wording('ui.radioGroup.retry', 'Try again'), failureLabel = wording('ui.radioGroup.failure', 'Could not load the options'), onLoad, onError, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
   // `description` is a quieter line under the label, which screen readers hear after it; `disabled` keeps that option from being picked.
-  options: readonly { value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }[] & NullOption<Value, Held>
+  // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the group busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected.
+  options: OptionsSource<{ value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }> & NullOption<Value, Held>
+  loadingLabel?: string | undefined
+  retryLabel?: string | undefined
+  failureLabel?: string | undefined
+  // Called with each answer of a function or promise `options`, and with what it rejected with.
+  onLoad?: ((options: readonly { value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }[], query: string) => unknown) | undefined
+  onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // The option picked to start with, or `null` for none; a group whose parent passes another follows it. Left out, the first option that is not disabled when the group is drawn starts picked, which a form reset goes back to.
   value?: Held | undefined
   // Names the group for screen readers; omit it and pass `aria-label` or `aria-labelledby` instead, such as inside a FormField that names it.
@@ -41,15 +53,17 @@ const { options, value, label, name, invalid, disabled = false, onChange, option
 }>()
 
 // A group with no callback is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
-// kay-allow once-read-prop: the option a group without a `value` starts on is chosen when it is created
-const first = options.find(option => !option.disabled)?.value ?? null
-const sent = onChange ? undefined : postedValue(name, value === undefined ? first : value)
+const source = loadOptions<{ value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }>(() => options, { onLoad, onError, label: 'RadioGroup' })
+const list = source.options
+// The option a group without a `value` starts on: the first that is not disabled, once the options are there.
+const first = () => list().find(option => !option.disabled)?.value ?? null
+const sent = onChange ? undefined : postedValue(name, value === undefined ? first() : value)
 
 const { group, picked, busy, ref, pick } = controlledRadios({
   control: 'RadioGroup',
   input: '[data-part=input]',
-  options: () => options,
-  value: () => sentOption(sent, options, value === undefined ? first : value),
+  options: list,
+  value: () => sentOption(sent, list(), value === undefined ? first() : value),
   name: () => name,
   onChange: () => onChange as ((value: string | number | null, option: unknown) => unknown) | undefined,
   appRef: rest.ref,
@@ -58,11 +72,11 @@ const { group, picked, busy, ref, pick } = controlledRadios({
 const prefix = uid()
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field. The description sits beside the label, not inside it, so the option is named by its label alone.
-div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-busy={busy() ? 'true' : undefined})
-  for option, index of options key={option.value}
+div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-busy={busy() || source.loading() ? 'true' : undefined})
+  for option, index of list() key={option.value}
     div(part="radio")
       label(part="choice")
-        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, options, value === undefined ? first : value))} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
+        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, list(), value === undefined ? first() : value))} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} aria-describedby={option.description ? `${prefix}-${index}` : undefined} onChange={() => pick(option.value)})
         span(part="label")
           if drawRow
             | {drawRow(option)}
@@ -70,3 +84,9 @@ div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-in
             | {option.label}
       if option.description
         span(part="description" id={`${prefix}-${index}`}) {option.description}
+  if source.loading()
+    p(part="status" role="status") {loadingLabel}
+  if source.failed()
+    p(part="status" role="alert") {failureLabel}
+    if source.retryable()
+      button(part="retry" type="button" onClick={source.retry}) {retryLabel}

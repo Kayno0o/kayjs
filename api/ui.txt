@@ -1042,16 +1042,28 @@ component default
   icon?: string | undefined | {
     root?: string | undefined;
   };
+  status?: string | undefined;
+  retry?: string | undefined;
   field?: string | undefined;
   heading?: string | undefined;
 }
   disabled?: boolean | undefined
+  failureLabel?: string | undefined
   invalid?: boolean | undefined
   label: string
+  loadingLabel?: string | undefined
   name?: string | undefined
   onChange?: ((value: Value[], options: { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[]) => unknown) | undefined
+  onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
+  onLoad?: ((options: readonly {
+  value: Value;
+  label: string;
+  icon?: IconProps | IconSlot | undefined;
+  disabled?: boolean | undefined;
+}[], query: string) => unknown) | undefined
   option?: ((option: { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }) => Element) | undefined
-  options: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[]
+  options: OptionsSource<{ value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }>
+  retryLabel?: string | undefined
   showLabel?: boolean | undefined
   value?: readonly Value[] | undefined
 
@@ -2094,10 +2106,14 @@ component default
   input?: string | undefined;
   label?: string | undefined;
   description?: string | undefined;
+  status?: string | undefined;
+  retry?: string | undefined;
 }
   disabled?: boolean | undefined
+  failureLabel?: string | undefined
   invalid?: boolean | undefined
   label?: string | undefined
+  loadingLabel?: string | undefined
   name?: string | undefined
   onChange?: ((value: (null extends Held ? Held & null : never) | Value, option: undefined | {
   value: Value;
@@ -2105,8 +2121,11 @@ component default
   description?: string | undefined;
   disabled?: boolean | undefined;
 }) => unknown) | undefined
+  onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
+  onLoad?: ((options: readonly { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }[], query: string) => unknown) | undefined
   option?: ((option: { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }) => Element) | undefined
-  options: readonly { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }[] & NullOption<Value, Held>
+  options: OptionsSource<{ value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }> & NullOption<Value, Held>
+  retryLabel?: string | undefined
   value?: Held | undefined
 
 [./range-input.kay] default
@@ -2325,12 +2344,16 @@ component default
     root?: string | undefined;
   };
   link?: string | undefined;
+  status?: string | undefined;
+  retry?: string | undefined;
   field?: string | undefined;
   heading?: string | undefined;
 }
   disabled?: boolean | undefined
+  failureLabel?: string | undefined
   invalid?: boolean | undefined
   label: string
+  loadingLabel?: string | undefined
   name?: string | undefined
   onChange?: ((value: (null extends Held ? Held & null : never) | Value, option: undefined | {
   value: Value;
@@ -2338,11 +2361,19 @@ component default
   icon?: IconProps | IconSlot | undefined;
   disabled?: boolean | undefined;
 }) => unknown) | undefined
+  onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
+  onLoad?: ((options: readonly {
+  value: Value;
+  label: string;
+  icon?: IconProps | IconSlot | undefined;
+  disabled?: boolean | undefined;
+}[], query: string) => unknown) | undefined
   option?: ((option: { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }) => Element) | undefined
-  options: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[] & NullOption<Value, Held>
+  options: OptionsSource<{ value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }> & NullOption<Value, Held>
   orientation?: "horizontal" | "vertical" | undefined
   param?: string | undefined
   paramDefault?: number | string | undefined
+  retryLabel?: string | undefined
   showLabel?: boolean | undefined
   value?: Held | undefined
 
@@ -2832,6 +2863,8 @@ component default
       root?: string | undefined;
     };
     link?: string | undefined;
+    status?: string | undefined;
+    retry?: string | undefined;
     field?: string | undefined;
     heading?: string | undefined;
   };

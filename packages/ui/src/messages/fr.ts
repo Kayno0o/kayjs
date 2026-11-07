@@ -35,6 +35,7 @@ export default defineMessages({
       previous: 'Diapositive précédente',
       slide: 'Diapositive {n} sur {count}',
     },
+    chipGroup: { failure: 'Impossible de charger les options', loading: 'Chargement…', retry: 'Réessayer' },
     combobox: {
       create: 'Créer « {text} »',
       empty: 'Aucune correspondance',
@@ -135,6 +136,7 @@ export default defineMessages({
     },
     notice: { dismiss: 'Fermer' },
     pagination: { label: 'Pagination', next: 'Suivant', previous: 'Précédent' },
+    radioGroup: { failure: 'Impossible de charger les options', loading: 'Chargement…', retry: 'Réessayer' },
     rangeInput: { from: '{label} de', to: '{label} à' },
     recordButton: {
       cancelled: 'Enregistrement annulé',
@@ -162,6 +164,7 @@ export default defineMessages({
       saving: 'Enregistrement…',
     },
     scatterChart: { empty: 'Aucune donnée pour le moment.' },
+    segmented: { failure: 'Impossible de charger les options', loading: 'Chargement…', retry: 'Réessayer' },
     select: { failure: 'Impossible de charger les options', loading: 'Chargement…' },
     sideNav: { collapse: 'Réduire le menu', expand: 'Déployer le menu', failure: 'Chargement impossible.', loading: 'Chargement…', menu: 'Menu', retry: 'Réessayer' },
     sidePanel: { close: 'Fermer', resize: 'Redimensionner' },

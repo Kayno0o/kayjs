@@ -2152,6 +2152,7 @@ interface LoadedOptions<Option>
   loading: () => boolean
   options: () => readonly Option[]
   retry: () => void
+  retryable: () => boolean
 
 [./lib/options-source] loadOptions
 function loadOptions<Option>(given: () => OptionsSource<Option, OptionsQuery>, hooks: OptionsHooks<Option>): LoadedOptions<Option>

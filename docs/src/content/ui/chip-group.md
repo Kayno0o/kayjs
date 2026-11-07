@@ -16,6 +16,10 @@ A `value` may be numbers, such as weekdays from `Date.getDay()`: `onChange` hear
 
 `disabled` greys out every chip, as on [Toggle](/ui/toggle) and [Button](/ui/button). An option's own `disabled` still applies when the group's is false.
 
+## Options from an action
+
+`options` can be a promise of the options or a function returning them, such as an action. It is asked in the browser: the group is busy and shows `loadingLabel` meanwhile, and `failureLabel` with a `retryLabel` button if it fails; a promise cannot be asked again, so it has no button. `onLoad(options, query)` and `onError({ error, query })` follow the answer. Without a `value`, the first option that is not disabled is picked once they arrive.
+
 ## Async change
 
 Return a promise from `onChange` to hold the group busy until it settles. If the promise rejects or resolves to `false`, the previous pick is put back, so a refused change never shows as made.

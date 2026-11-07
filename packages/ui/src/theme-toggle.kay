@@ -20,7 +20,7 @@ interface Mode {
 
 interface Option { value: ThemeMode, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }
 
-const { modes = ['system', 'light', 'dark'], value, label = wording('ui.themeToggle.label', 'Theme'), showLabel = false, cookie = THEME_COOKIE, onChange, option, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { modes = ['system', 'light', 'dark'], value, label = wording('ui.themeToggle.label', 'Theme'), showLabel = false, cookie = THEME_COOKIE, onChange, option, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
   // The choices, in this order: a mode (`'system'`, `'light'` or `'dark'`), or `{ value, label?, icon? }` to word or draw one yourself. All three by default, each with its icon and a `ui.themeToggle.*` word.
   modes?: readonly (ThemeMode | Mode)[] | undefined
   // The mode, when the app holds it (a signed-in visitor's saved preference): the toggle follows it and writes no cookie, `onChange` being where the app saves a pick. Left out, the visitor's choice is kept in the cookie.

@@ -43,7 +43,9 @@ export interface LoadedOptions<Option> {
   loading: () => boolean
   // Whether the last question was refused, until the next one is asked.
   failed: () => boolean
-  // Asks the same question again; a promise cannot be asked twice, so a rejected one stays failed.
+  // Whether `retry` can ask again: a function can, a promise cannot be asked twice.
+  retryable: () => boolean
+  // Asks the same question again.
   retry: () => void
 }
 
@@ -110,6 +112,7 @@ export function loadOptions<Option>(given: () => OptionsSource<Option>, hooks: O
     },
     loading,
     failed,
+    retryable: () => typeof given() === 'function',
     retry: () => attempt.set(attempt() + 1),
   }
 }

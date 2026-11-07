@@ -7,6 +7,9 @@ import type { NullOption } from './null-option'
 import { controlledRadios } from './controlled-radios'
 import { GROUP_INVALID, LABEL_TEXT } from './field-look'
 import { sentOption } from './refill'
+import { loadOptions } from './options-source'
+import type { OptionsSource } from './options-source'
+import { wording } from 'kay/words'
 import { paramChange } from './param-change'
 import { paramPick } from './param-value'
 import Icon from './icon.kay'
@@ -22,12 +25,21 @@ const look = recipe({
     link: 'absolute inset-0 overflow-hidden text-transparent no-underline outline-none',
     field: 'inline-flex flex-col items-start gap-1',
     heading: LABEL_TEXT,
+    retry: 'cursor-pointer self-center text-xs text-accent underline',
+    status: 'self-center px-2 text-xs text-muted',
   },
 })
 
-const { options, value, label, showLabel = false, name, invalid, param, paramDefault, disabled = false, orientation = 'horizontal', onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value, label, showLabel = false, name, invalid, param, paramDefault, disabled = false, orientation = 'horizontal', loadingLabel = wording('ui.segmented.loading', 'Loading…'), retryLabel = wording('ui.segmented.retry', 'Try again'), failureLabel = wording('ui.segmented.failure', 'Could not load the options'), onLoad, onError, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
   // `icon` sits before the label; `disabled` keeps that option from being picked.
-  options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[] & NullOption<Value, Held>
+  // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the group busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected.
+  options: OptionsSource<{ value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }> & NullOption<Value, Held>
+  loadingLabel?: string | undefined
+  retryLabel?: string | undefined
+  failureLabel?: string | undefined
+  // Called with each answer of a function or promise `options`, and with what it rejected with.
+  onLoad?: ((options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[], query: string) => unknown) | undefined
+  onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it. Left out, the first option that is not disabled when the group is drawn starts picked, which a form reset goes back to.
   value?: Held | undefined
   // Names the group for screen readers.
@@ -56,18 +68,20 @@ const { options, value, label, showLabel = false, name, invalid, param, paramDef
 }>()
 
 // A group with no callback or param is plain: a refused post of its form, which the server renders it for, gives its choice back in place of its own.
-// kay-allow once-read-prop: the option a group without a `value` starts on is chosen when it is created
-const first = options.find(option => !option.disabled)?.value ?? null
-const sent = onChange || param !== undefined ? undefined : postedValue(name, value === undefined ? first : value)
+const source = loadOptions<{ value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }>(() => options, { onLoad, onError, label: 'Segmented' })
+const list = source.options
+// The option a group without a `value` starts on: the first that is not disabled, once the options are there.
+const first = () => list().find(option => !option.disabled)?.value ?? null
+const sent = onChange || param !== undefined ? undefined : postedValue(name, value === undefined ? first() : value)
 
 // The option the group starts on and follows: the app's `value`, else the one a param holds, else the first.
-const start = () => value === undefined ? paramPick(options, param, paramDefault) ?? first : value
+const start = () => value === undefined ? paramPick(list(), param, paramDefault) ?? first() : value
 
 const { group, picked, busy, ref, pick } = controlledRadios({
   control: 'Segmented',
   input: '[data-part=input]',
-  options: () => options,
-  value: () => sentOption(sent, options, start()),
+  options: list,
+  value: () => sentOption(sent, list(), start()),
   name: () => name ?? param,
   onChange: () => paramChange(param, paramDefault, onChange as ((value: string | number | null, option: unknown) => unknown) | undefined),
   appRef: rest.ref,
@@ -102,10 +116,10 @@ const heading = showLabel ? uid() : undefined
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field.
 snippet radios()
-  div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() ? 'true' : undefined})
-    for option of options key={option.value}
+  div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() || source.loading() ? 'true' : undefined})
+    for option of list() key={option.value}
       label(part="option")
-        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, options, start()))} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => pick(option.value)})
+        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === sentOption(sent, list(), start()))} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onChange={() => pick(option.value)})
         span(part="label")
           if drawRow
             | {drawRow(option)}
@@ -115,6 +129,12 @@ snippet radios()
             | {option.label}
           if param !== undefined && !disabled && !option.disabled
             a(part="link" {...optionLink(option.value)} tabindex="-1" aria-hidden="true" draggable="false" aria-current={picked() === option.value ? 'true' : undefined} onClick={event => follow(event, option.value)}) {option.label}
+    if source.loading()
+      p(part="status" role="status") {loadingLabel}
+    if source.failed()
+      p(part="status" role="alert") {failureLabel}
+      if source.retryable()
+        button(part="retry" type="button" onClick={source.retry}) {retryLabel}
 if showLabel
   div(part="field")
     span(part="heading" id={heading}) {label}

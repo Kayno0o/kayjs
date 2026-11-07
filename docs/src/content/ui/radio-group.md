@@ -20,6 +20,10 @@ Use [Segmented](/ui/segmented) for a compact row of options.
 
 Put the group in a [FormField](/ui/form-field) with `group` and the same `name`: the message refused for that field shows under the options, and each radio is marked invalid. The legend names the group, so leave `label` out there.
 
+## Options from an action
+
+`options` can be a promise of the options or a function returning them, such as an action. It is asked in the browser: the group is busy and shows `loadingLabel` meanwhile, and `failureLabel` with a `retryLabel` button if it fails; a promise cannot be asked again, so it has no button. `onLoad(options, query)` and `onError({ error, query })` follow the answer. Without a `value`, the first option that is not disabled is picked once they arrive.
+
 ## Async change
 
 Return a promise from `onChange` to hold the group busy until it settles. If the promise rejects or resolves to `false`, the previous pick is put back.

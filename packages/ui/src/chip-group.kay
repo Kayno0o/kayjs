@@ -7,6 +7,9 @@ import { changeAccepted } from './change'
 import { GROUP_INVALID, LABEL_TEXT } from './field-look'
 import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 import Icon from './icon.kay'
+import { loadOptions } from './options-source'
+import type { OptionsSource } from './options-source'
+import { wording } from 'kay/words'
 
 const NONE: readonly never[] = []
 
@@ -20,12 +23,21 @@ const look = recipe({
     icon: 'size-3.5 shrink-0',
     field: 'flex flex-col gap-1',
     heading: LABEL_TEXT,
+    retry: 'cursor-pointer self-center text-xs text-accent underline',
+    status: 'self-center text-xs text-muted',
   },
 })
 
-const { options, value = NONE, label, showLabel = false, name, invalid, disabled = false, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value = NONE, label, showLabel = false, name, invalid, disabled = false, loadingLabel = wording('ui.chipGroup.loading', 'Loading…'), retryLabel = wording('ui.chipGroup.retry', 'Try again'), failureLabel = wording('ui.chipGroup.failure', 'Could not load the options'), onLoad, onError, onChange, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'onLoad' | 'onError'> & {
   // `icon` sits before the label; `disabled` keeps that chip as it is.
-  options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
+  // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the group busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected.
+  options: OptionsSource<{ value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }>
+  loadingLabel?: string | undefined
+  retryLabel?: string | undefined
+  failureLabel?: string | undefined
+  // Called with each answer of a function or promise `options`, and with what it rejected with.
+  onLoad?: ((options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[], query: string) => unknown) | undefined
+  onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // The options picked to start with, in any order, none when left out; a group whose parent passes others follows them.
   value?: readonly Value[] | undefined
   // Names the group for screen readers.
@@ -47,13 +59,15 @@ const { options, value = NONE, label, showLabel = false, name, invalid, disabled
   option?: Snippet<[option: { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }]> | undefined
 }>()
 
+const source = loadOptions<{ value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }>(() => options, { onLoad, onError, label: 'ChipGroup' })
+const list = source.options
 const group = name ?? uid()
 // The heading's id while `showLabel` writes it, which then names the group in place of `aria-label`.
 const heading = showLabel ? uid() : undefined
 // Held as string or number: a signal cannot take a type parameter that might be a function.
 // A group with no callback is plain: a refused post of its form, which the server renders it for, gives its choices back in place of its own.
 const sent = onChange ? undefined : postedValues(name, value)
-const picked = signal<readonly (string | number)[]>(sent === undefined ? value : options.map(one => one.value).filter(one => sent.includes(String(one))))
+const picked = signal<readonly (string | number)[]>(sent === undefined ? value : list().map(one => one.value).filter(one => sent.includes(String(one))))
 const busy = signal(false)
 let root: HTMLElement | undefined
 // How often the parent's `value` reached the group, so a change under way knows whether the parent answered it.
@@ -93,7 +107,7 @@ async function pick(next: Value[]) {
   picked = next
 
   // Put back unless the parent set `value` meanwhile, which has the last word.
-  if (!(await changeAccepted('ChipGroup', () => onChange?.(next, options.filter(one => next.includes(one.value))), busy.set)) && synced === syncedBefore) {
+  if (!(await changeAccepted('ChipGroup', () => onChange?.(next, list().filter(one => next.includes(one.value))), busy.set)) && synced === syncedBefore) {
     picked = before
     check(before)
   }
@@ -102,7 +116,7 @@ async function pick(next: Value[]) {
 }
 
 function toggle(input: HTMLInputElement, option: Value) {
-  void pick(options.map(one => one.value).filter(one => one === option ? input.checked : picked().includes(one)))
+  void pick(list().map(one => one.value).filter(one => one === option ? input.checked : picked().includes(one)))
 }
 
 const ref = startRef<HTMLElement>(element => root = element, rest.ref)
@@ -110,7 +124,7 @@ const ref = startRef<HTMLElement>(element => root = element, rest.ref)
 // A reset puts the boxes back on their defaults, which the app's `onChange` then hears of; one meeting a change under way waits for it.
 const resetting = resetWhenIdle(busy, () => {
   const ticked = new Set(boxes().filter(box => box.defaultChecked).map(box => box.value))
-  const next = options.map(one => one.value).filter(one => ticked.has(String(one)))
+  const next = list().map(one => one.value).filter(one => ticked.has(String(one)))
 
   check(next)
 
@@ -122,8 +136,8 @@ onFormReset(() => root, resetting.reset)
 ---
 // Real checkboxes drawn as chips, so the group submits like any other field and Space toggles the focused chip. A click while a change is under way ticks nothing.
 snippet chips()
-  div(part="root" {...rest} ref={ref} role="group" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-busy={busy() ? 'true' : undefined})
-    for option of options key={option.value}
+  div(part="root" {...rest} ref={ref} role="group" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-invalid={invalid ? 'true' : rest['aria-invalid']} aria-busy={busy() || source.loading() ? 'true' : undefined})
+    for option of list() key={option.value}
       label(part="chip")
         input(part="input" ref={element => element.defaultChecked = untrack(() => picked().includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={disabled || option.disabled} aria-label={drawRow ? option.label : undefined} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})
         span(part="label")
@@ -133,6 +147,12 @@ snippet chips()
             if option.icon
               Icon(icon={option.icon} part="icon")
             | {option.label}
+    if source.loading()
+      p(part="status" role="status") {loadingLabel}
+    if source.failed()
+      p(part="status" role="alert") {failureLabel}
+      if source.retryable()
+        button(part="retry" type="button" onClick={source.retry}) {retryLabel}
 if showLabel
   div(part="field")
     span(part="heading" id={heading}) {label}

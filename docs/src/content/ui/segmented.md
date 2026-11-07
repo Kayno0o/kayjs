@@ -28,6 +28,10 @@ To offer "none" as a choice of its own, give an option `value: null` when `value
 
 When `value` is typed to allow `null`, `onChange` is typed to hear `null` too, which is what a form reset sends a group that started with none picked. A group whose `value` is never `null` keeps `onChange: (value: Value) => ...`.
 
+## Options from an action
+
+`options` can be a promise of the options or a function returning them, such as an action. It is asked in the browser: the group is busy and shows `loadingLabel` meanwhile, and `failureLabel` with a `retryLabel` button if it fails; a promise cannot be asked again, so it has no button. `onLoad(options, query)` and `onError({ error, query })` follow the answer. Without a `value`, the first option that is not disabled is picked once they arrive.
+
 ## Async change
 
 Return a promise from `onChange` to hold the group busy until it settles. If the promise rejects or resolves to `false`, the previous option is put back, so a refused change never shows as made.
