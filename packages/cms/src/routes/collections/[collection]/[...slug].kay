@@ -16,7 +16,7 @@ const { prefix, collection, review } = screen
 const entry = collection.problem === undefined ? screen.entry ?? ctx.notFound() : undefined
 const presence = entry ? await entryPresence(ctx, collection.name, entry) : undefined
 const translations = entry ? await entryTranslations(collection, entry, ctx.query.compare) : undefined
-const denied = await denials(ctx)
+const denied = await denials(ctx, { collection: collection.name, entry })
 const title = collectionTitle(collection)
 const name = ctx.query.locale === undefined ? ctx.params.slug : `${ctx.params.slug} (${ctx.query.locale})`
 ---

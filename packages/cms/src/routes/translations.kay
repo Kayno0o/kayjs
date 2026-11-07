@@ -4,11 +4,12 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { wording } from 'kay/words'
 import TranslationReport from '../components/translation-report.kay'
+import { reachOf } from '../access'
 import { adminTitle } from '../listing'
 import { screenPath } from '../paths'
 import { translationsScreen } from '../screens'
 
-const { prefix, collections } = await translationsScreen()
+const { prefix, collections } = await translationsScreen(await reachOf(ctx))
 ---
 head
   title {adminTitle(wording('cms.locales.title', 'Translations'))}

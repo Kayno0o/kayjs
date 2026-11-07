@@ -28,7 +28,7 @@ const note = signal('')
 const sending = signal(false)
 
 const waiting = () => draft && review?.status === 'review'
-const reason = () => dirty ? wording('cms.share.dirty', 'Save or reset your edits first') : undefined
+const reason = () => denied.edit ?? (dirty ? wording('cms.share.dirty', 'Save or reset your edits first') : undefined)
 
 async function sendBack(): Promise<void> {
   if (note().trim() === '' || sending())

@@ -3,7 +3,7 @@ import { s } from 'kay'
 import { api } from 'kay/server'
 import { wording } from 'kay/words'
 import { memberOfRequest } from '../access'
-import { actors, authors, linkReaders } from '../authors'
+import { actors, authors, linkReaders, stamped } from '../authors'
 import { SINGLE_SLUG } from '../listing'
 import { withHold } from '../publishing'
 import { readReview, viewOf } from '../review'
@@ -38,7 +38,7 @@ export default api()
 
     return screen.entry ? { collection: screen.collection, entry: screen.entry, review: review && viewOf(review, await memberOfRequest(request)) } : status(404, wording('cms.store.noEntry', 'No entry {slug} in {collection}', { slug: params.slug, collection: params.collection }))
   }, { query: locale })
-  .post('/:collection/:slug', async ({ params, body, request }) => saveEntry({ collection: params.collection, slug: params.slug, locale: body.locale, data: await withHold(request, params.collection, body.data), body: body.body }, { create: body.create, version: body.version, required: true, author: authors.get(request) }), {
+  .post('/:collection/:slug', async ({ params, body, request }) => saveEntry({ collection: params.collection, slug: params.slug, locale: body.locale, data: stamped(request, await withHold(request, params.collection, body.data)), body: body.body }, { create: body.create, version: body.version, required: true, author: authors.get(request) }), {
     body: s.Object({
       locale: s.Optional(s.String()),
       data: s.Record(s.String(), s.Unknown()),

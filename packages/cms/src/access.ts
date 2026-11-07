@@ -1,6 +1,6 @@
 import type { GuardContext } from 'kay'
 import type { Passwords } from './password'
-import type { CmsAction } from './roles'
+import type { CmsAction, Role } from './roles'
 import { localPath } from 'kay'
 import { keyedDigest, READ_METHODS } from 'kay/library'
 import { wording } from 'kay/words'
@@ -43,6 +43,16 @@ const ACTION_NAMES: Record<CmsAction, () => string> = {
 }
 
 const members = new WeakMap<Request, Promise<Member | undefined>>()
+// The person once read, for a refusal that words itself by what they may reach.
+const known = new WeakMap<Request, Member | undefined>()
+
+async function resolved(ctx: GuardContext): Promise<Member | undefined> {
+  const member = await readMember(ctx)
+
+  known.set(ctx.request, member)
+
+  return member
+}
 
 // Who is signed in on this request, from the password guard when it let the request in, else from kayjs-auth's session; read once per request.
 export async function memberOf(ctx: GuardContext): Promise<Member | undefined> {
@@ -51,7 +61,7 @@ export async function memberOf(ctx: GuardContext): Promise<Member | undefined> {
   if (cached)
     return cached
 
-  const found = readMember(ctx)
+  const found = resolved(ctx)
 
   members.set(ctx.request, found)
 
@@ -94,10 +104,94 @@ export async function whoOf(ctx: GuardContext): Promise<string> {
   return keyedDigest('cms-editor', JSON.stringify([member?.name ?? '', member?.email ?? '']))
 }
 
-// The actions the signed-in person may not do, each with the reason a disabled control gives; empty when the app lists no roles.
-export type Denials = Partial<Record<CmsAction, string>>
+// What a person does: an action of `cms({ roles })`, or what editing needs. `read` opens a collection's screens and entries, `edit` writes an entry, and `move` reorders a collection, which rewrites the order of entries beside the one moved.
+export type Doing = CmsAction | 'read' | 'edit' | 'move'
 
-function deniedTo(member: Member | undefined): Denials {
+// What a person does it to. Without a collection it is the site's own: the redirects, the media library, the activity log, which a role limited to collections or to its own entries does not reach.
+export interface Target {
+  collection?: string | undefined
+  // The entry concerned, `data` being what it holds now, none for an entry that is not there. Left out when the act is not about one entry: opening a collection, a new entry, an upload.
+  entry?: { data?: Record<string, unknown> | undefined } | undefined
+}
+
+// The text a role's `own` field is compared with: the person's kayjs-auth id, else their email, else their name; empty for a person the guard did not name.
+export function ownerKey(member: Member | undefined): string {
+  const key = member?.id ?? member?.email ?? member?.name
+
+  return key ?? ''
+}
+
+// Whether an entry's field names the person: a text or a number equal to their key, or a list holding one.
+function written(field: unknown, key: string): boolean {
+  if (key === '')
+    return false
+
+  if (Array.isArray(field))
+    return field.some(item => written(item, key))
+
+  return (typeof field === 'string' || typeof field === 'number') && String(field) === key
+}
+
+// Whether a role reaches a collection.
+export function reaches(role: Role, collection: string): boolean {
+  return role.collections === undefined || role.collections.has(collection)
+}
+
+function admits(role: Role, doing: Doing, target: Target, member: Member | undefined): boolean {
+  if (doing !== 'read' && doing !== 'edit' && doing !== 'move' && !role.actions.has(doing))
+    return false
+
+  if (target.collection === undefined)
+    return role.collections === undefined && role.own === undefined
+
+  if (!reaches(role, target.collection))
+    return false
+
+  if (role.own === undefined || doing === 'read')
+    return true
+
+  if (doing === 'move')
+    return false
+
+  return target.entry === undefined || written(target.entry.data?.[role.own], ownerKey(member))
+}
+
+// Whether the person may do it, the guard having let them in: everyone may when the app lists no roles; a person none of whose roles is listed only edits and reads; else one of their roles must reach the collection, hold the action and, when it is limited to their own entries, the entry must be theirs.
+export function allows(member: Member | undefined, doing: Doing, target: Target = {}): boolean {
+  const { roles } = settings()
+
+  if (roles === undefined)
+    return true
+
+  const held = (member?.held ?? []).flatMap(name => roles.get(name) ?? [])
+
+  if (held.length === 0 && (doing === 'read' || doing === 'edit' || doing === 'move'))
+    return true
+
+  return held.some(role => admits(role, doing, target, member))
+}
+
+// The field a new entry of the collection is written with the person in, and the value an existing one keeps: for a person whose roles reach the collection only through an `own` field. None when a role of theirs changes any entry of it.
+export function ownerStamp(member: Member | undefined, collection: string, entry: Target['entry']): { field: string, value: unknown } | undefined {
+  const { roles } = settings()
+  const reaching = (member?.held ?? []).flatMap(name => roles?.get(name) ?? []).filter(role => reaches(role, collection))
+  const own = reaching.find(role => role.own !== undefined)?.own
+  const key = ownerKey(member)
+
+  if (own === undefined)
+    return undefined
+
+  if (entry === undefined)
+    return key === '' ? undefined : { field: own, value: key }
+
+  // An existing entry keeps its writer unless a broader role holds it.
+  return reaching.some(role => role.own === undefined) ? undefined : { field: own, value: entry.data?.[own] }
+}
+
+// The things the signed-in person may not do, each with the reason a disabled control gives; empty when the app lists no roles. `edit` is set for what they may not change at all, `move` for reordering a collection.
+export type Denials = Partial<Record<CmsAction | 'edit' | 'move', string>>
+
+function deniedTo(member: Member | undefined, target: Target = {}): Denials {
   const { roles } = settings()
   const found: Denials = {}
 
@@ -105,20 +199,33 @@ function deniedTo(member: Member | undefined): Denials {
     return found
 
   for (const action of ACTIONS) {
-    if (!member?.held.some(role => roles.get(role)?.has(action)))
+    if (!allows(member, action, target))
       found[action] = refusal(action)
   }
+
+  if (target.collection !== undefined && !allows(member, 'edit', target))
+    found.edit = refusal('edit', allows(member, 'read', target))
+
+  if (target.collection !== undefined && !allows(member, 'move', target))
+    found.move = refusal('move')
 
   return found
 }
 
-export async function denials(ctx: GuardContext): Promise<Denials> {
-  return deniedTo(settings().roles === undefined ? undefined : await memberOf(ctx))
+export async function denials(ctx: GuardContext, target?: Target): Promise<Denials> {
+  return deniedTo(settings().roles === undefined ? undefined : await memberOf(ctx), target)
 }
 
 // The same for a request the api guard has read the person of (it does for `/editor/can`, the one route that asks), as an API route has no guard context.
-export async function denialsOf(request: Request): Promise<Denials> {
-  return deniedTo(await members.get(request))
+export async function denialsOf(request: Request, target?: Target): Promise<Denials> {
+  return deniedTo(await members.get(request), target)
+}
+
+// Whether the signed-in person's roles reach a collection, for a screen that lists collections.
+export async function reachOf(ctx: GuardContext): Promise<(collection: string) => boolean> {
+  const member = await memberOf(ctx)
+
+  return collection => allows(member, 'read', { collection })
 }
 
 // Who the api guard read the person of for this request, the one it reads for an entry's read when `cms({ fourEyes })` is on.
@@ -126,24 +233,27 @@ export async function memberOfRequest(request: Request): Promise<Member | undefi
   return members.get(request)
 }
 
-function refusal(action: CmsAction): string {
-  return wording('cms.guard.forbidden', 'Your role may not do this: {action}', { action: ACTION_NAMES[action]() })
+// The reason for what a person may not do; for `read` and `edit`, whether the collection is out of their reach or the entry is another's.
+function refusal(doing: Doing, reachable = false): string {
+  if (doing === 'read')
+    return wording('cms.guard.outOfReach', 'Your role does not reach this collection')
+
+  if (doing === 'edit')
+    return reachable ? wording('cms.guard.notYours', 'Your role may only change the entries you wrote') : refusal('read')
+
+  if (doing === 'move')
+    return wording('cms.guard.moveOwn', 'Your role may only change the entries you wrote, and moving one changes the others')
+
+  return wording('cms.guard.forbidden', 'Your role may not do this: {action}', { action: ACTION_NAMES[doing]() })
 }
 
-// Whether the signed-in person may do an action: everyone the guard admits may when the app lists no roles, and nobody may when it lists some and none of the person's roles allows it.
-export async function may(ctx: GuardContext, action: CmsAction): Promise<boolean> {
-  const { roles } = settings()
-
-  if (roles === undefined)
-    return true
-
-  const member = await memberOf(ctx)
-
-  return member?.held.some(role => roles.get(role)?.has(action)) ?? false
+// Whether the signed-in person may do it: see `allows`.
+export async function may(ctx: GuardContext, doing: Doing, target?: Target): Promise<boolean> {
+  return settings().roles === undefined || allows(await memberOf(ctx), doing, target)
 }
 
-export function forbidden(ctx: GuardContext, action: CmsAction): never {
-  return ctx.deny(403, refusal(action))
+export function forbidden(ctx: GuardContext, doing: Doing, target?: Target): never {
+  return ctx.deny(403, refusal(doing, doing === 'edit' && target !== undefined && allows(known.get(ctx.request), 'read', target)))
 }
 
 // Where an anonymous visitor goes to sign in and return to `back`: the cms's own screen for a password guard, else kayjs-auth's sign-in page, else nowhere.

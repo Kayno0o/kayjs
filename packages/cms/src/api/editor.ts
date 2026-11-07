@@ -1,3 +1,4 @@
+import { s } from 'kay'
 import { keepCookiesPrivate, overHttps } from 'kay/library'
 import { api } from 'kay/server'
 import { wording } from 'kay/words'
@@ -20,11 +21,11 @@ export default api()
     return { label: wording('cms.page.edit', 'Edit this page'), href: screenPath(settings().prefix, '/page') }
   })
   // What the signed-in person's role may not do, with the reason, so the controls for it are disabled; empty when the app lists no roles. The server refuses it all the same. The screens' prefix is where the page editor leads after it deletes the entry its page shows.
-  .get('/can', async ({ request, set }) => {
+  .get('/can', async ({ request, query, set }) => {
     set.headers['cache-control'] = 'no-store'
 
-    return { denied: await denialsOf(request), prefix: settings().prefix }
-  })
+    return { denied: await denialsOf(request, query.collection === undefined ? undefined : { collection: query.collection }), prefix: settings().prefix }
+  }, { query: s.Object({ collection: s.Optional(s.String()) }) })
   // What an editor's browser runs on each page, the same bytes for everyone and no secret in them; the guard leaves it open so a stale hint is found and cleared.
   .get('/module.js', ({ set }) => {
     set.headers['content-type'] = 'text/javascript; charset=utf-8'

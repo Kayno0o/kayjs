@@ -194,7 +194,7 @@ export async function replaceImage(drafts: Drafts, bar: Pick<ImageBar, 'entry' |
   const release = IN_LIST.test(bar.path) ? holdEntry(marker) : undefined
 
   try {
-    const denied = await uploadDenied()
+    const denied = await uploadDenied(marker.collection)
 
     if (denied !== undefined) {
       toast.error(denied)

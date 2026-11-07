@@ -8,7 +8,7 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import { wording } from 'kay/words'
 import EntryEdited from '../components/entry-edited.kay'
 import Refused from '../components/refused.kay'
-import { denials } from '../access'
+import { denials, reachOf } from '../access'
 import { hiddenOf } from '../hidden'
 import { collections } from '../kay/content'
 import { activityPath, adminTitle, collectionTitle, groupCollections, problemId } from '../listing'
@@ -21,7 +21,7 @@ const all = await collections()
 const localized = all.some(collection => collection.localized && (collection.locales?.length ?? 0) > 1)
 const logged = all.some(collection => hiddenOf(collection.name, 'activity') !== undefined)
 const denied = await denials(ctx)
-const groups = groupCollections(await indexRows(), row => row.layout)
+const groups = groupCollections(await indexRows(await reachOf(ctx)), row => row.layout)
 ---
 head
   title {adminTitle(wording('cms.admin.content', 'Content'))}

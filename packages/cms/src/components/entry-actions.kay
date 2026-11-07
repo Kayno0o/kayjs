@@ -65,5 +65,11 @@ else if form.ends() as at
     ResetButton(disabled={form.saving()} onReset={form.reset})
   if !entry && !form.collection.single
     Button(href={collectionPath(form.prefix, form.collection.name)} label={wording('cms.entry.cancel', 'Cancel')} variant="ghost")
-    Button(label={wording('cms.entry.createAndAdd', 'Create and add another')} disabled={!form.canSave()} onClick={form.saveAndAdd})
-  Button(type="submit" label={form.saving() ? wording('cms.entry.saving', 'Saving…') : entry ? wording('cms.entry.save', 'Save') : wording('cms.entry.create', 'Create')} tone="accent" busy={form.saving()} disabled={!form.canSave()})
+    if denied.edit as reason
+      Refused(label={wording('cms.entry.createAndAdd', 'Create and add another')} reason={reason})
+    else
+      Button(label={wording('cms.entry.createAndAdd', 'Create and add another')} disabled={!form.canSave()} onClick={form.saveAndAdd})
+  if denied.edit as reason
+    Refused(label={entry ? wording('cms.entry.save', 'Save') : wording('cms.entry.create', 'Create')} reason={reason} tone="accent")
+  else
+    Button(type="submit" label={form.saving() ? wording('cms.entry.saving', 'Saving…') : entry ? wording('cms.entry.save', 'Save') : wording('cms.entry.create', 'Create')} tone="accent" busy={form.saving()} disabled={!form.canSave()})

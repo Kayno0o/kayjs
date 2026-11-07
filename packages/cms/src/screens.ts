@@ -1,3 +1,4 @@
+import type { Member } from './access'
 import type { Activity } from './activity'
 import type { Change } from './changes'
 import type { Edit } from './history'
@@ -5,6 +6,7 @@ import type { CollectionInfo, EntryRef, GivenLayout, ScreenCollection, SourceEnt
 import type { EntryRow, ListView } from './listing'
 import type { ReviewView, Viewer } from './review'
 import type { EntryTranslations, PairedEntry, TranslationRow } from './translations'
+import { allows } from './access'
 import { activityOf } from './activity'
 import { changesBetween } from './changes'
 import { countEntries } from './counts'
@@ -55,17 +57,32 @@ export async function collectionScreen(name: string): Promise<{ prefix: string, 
 }
 
 // What a collection's list reads, `q` being the search, `status` the status kept, `sort` a column's key with its `dir`ection, and `page` from 1: undefined for a collection the site lacks.
-export async function listScreen({ collection: name, q = '', page = 1, status, sort, dir }: { collection: string, q?: string | undefined, page?: number | undefined, status?: ListView['status'], sort?: string | undefined, dir?: ListView['direction'] }): Promise<ListScreen | undefined> {
+// `viewer` is the signed-in person, whose roles may keep them from changing some of the entries: those rows come back `locked`.
+export async function listScreen({ collection: name, q = '', page = 1, status, sort, dir }: { collection: string, q?: string | undefined, page?: number | undefined, status?: ListView['status'], sort?: string | undefined, dir?: ListView['direction'] }, viewer?: Member): Promise<ListScreen | undefined> {
   const collection = await findCollection(name)
 
   if (!collection)
     return undefined
 
   const { prefix, pageSize } = settings()
+  const read = new Map<string, SourceEntry>()
 
-  const listed = await pageRows(collection, q, page, async filter => entries(collection.name, filter), versionOf, pageSize, { status, sort, direction: dir, translations: async () => translations(collection.name), edits: readEdits })
+  const listed = await pageRows(collection, q, page, async (filter) => {
+    const found = await entries(collection.name, filter)
 
-  return { prefix, collection, ...listed, rows: await withReviews(collection, listed.rows) }
+    for (const entry of found)
+      read.set(JSON.stringify([entry.slug, entry.locale]), entry)
+
+    return found
+  }, versionOf, pageSize, { status, sort, direction: dir, translations: async () => translations(collection.name), edits: readEdits })
+
+  const rows = listed.rows.map((row) => {
+    const entry = read.get(JSON.stringify([row.slug, row.locale]))
+
+    return entry !== undefined && !allows(viewer, 'edit', { collection: collection.name, entry }) ? { ...row, locked: true as const } : row
+  })
+
+  return { prefix, collection, ...listed, rows: await withReviews(collection, rows) }
 }
 
 // The rows with where their drafts stand in review, for a collection that can be reviewed.
@@ -145,10 +162,10 @@ export interface TranslationsScreen {
 }
 
 // What the translations report reads: per localized collection of two locales or more, the entries missing a locale or holding a text still as the default locale's.
-export async function translationsScreen(): Promise<TranslationsScreen> {
+export async function translationsScreen(reaches: (collection: string) => boolean = () => true): Promise<TranslationsScreen> {
   const found: TranslationsScreen['collections'] = []
 
-  for (const info of await collections()) {
+  for (const info of (await collections()).filter(each => reaches(each.name))) {
     const collection = await findCollection(info.name)
 
     if (!collection?.localized || (collection.locales?.length ?? 0) < 2 || collection.problem !== undefined)
@@ -175,10 +192,10 @@ export interface IndexRow {
 }
 
 // What the content list reads: each collection with where it opens, where a new entry goes and how many entries wait in draft or for their date. A count that fails to read is left out, as the list must open whatever one collection does.
-export async function indexRows(): Promise<IndexRow[]> {
+export async function indexRows(reaches: (collection: string) => boolean = () => true): Promise<IndexRow[]> {
   const { prefix, layouts } = settings()
 
-  return Promise.all((await collections()).map(async (collection) => {
+  return Promise.all((await collections()).filter(collection => reaches(collection.name)).map(async (collection) => {
     const href = await openPath(collection)
     const layout = layouts.get(collection.name)
     const counted = collection.problem === undefined && !collection.single && (collection.draftField !== undefined || collection.publishField !== undefined)

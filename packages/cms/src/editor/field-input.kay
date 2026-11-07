@@ -51,7 +51,7 @@ if (field.kind === 'markdown')
   guardLeave(uploading)
 
 // Whether the role may upload an image dropped or pasted into a Markdown box.
-const uploadRefused = field.kind === 'markdown' ? uploadRefusal() : () => undefined
+const uploadRefused = field.kind === 'markdown' ? uploadRefusal(entry.collection) : () => undefined
 const markdown = markdownOptions.use()
 
 const touched = signal(false)

@@ -5,7 +5,7 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import Pagination from '@kaynooo/kayjs-ui/pagination.kay'
 import { s } from 'kay'
 import { wording } from 'kay/words'
-import { denials } from '../../../access'
+import { denials, memberOf } from '../../../access'
 import EntryTable from '../../../components/entry-table.kay'
 import { adminTitle, collectionTitle, newEntryPath, statusParam, trashPath, viewHref } from '../../../listing'
 import { listScreen, openPath } from '../../../screens'
@@ -15,12 +15,12 @@ export const page = { query: s.Object({ q: s.Optional(s.String()), page: s.Optio
 const search = ctx.query.q ?? ''
 const status = statusParam(ctx.query.status)
 const direction: 'asc' | 'desc' = ctx.query.dir === 'desc' ? 'desc' : 'asc'
-const { prefix, collection, ...listed } = await listScreen({ collection: ctx.params.collection, q: search, page: ctx.query.page, status, sort: ctx.query.sort, dir: direction }) ?? ctx.notFound()
+const { prefix, collection, ...listed } = await listScreen({ collection: ctx.params.collection, q: search, page: ctx.query.page, status, sort: ctx.query.sort, dir: direction }, await memberOf(ctx)) ?? ctx.notFound()
 
 if (collection.single && collection.problem === undefined)
   ctx.redirect(await openPath(collection))
 
-const denied = await denials(ctx)
+const denied = await denials(ctx, { collection: collection.name })
 const url = ctx.url
 const sort = ctx.query.sort
 const title = collectionTitle(collection)

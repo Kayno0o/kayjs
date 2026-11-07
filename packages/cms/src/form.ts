@@ -250,7 +250,7 @@ export function cmsEntryForm({ prefix, collection, entry, locale, copy, source, 
   // `ends` reads the clock, so this follows the date passing.
   const ended = () => endsAt() !== undefined && ends() === undefined
   // A text that does not parse keeps Save enabled, so pressing it says what to fix.
-  const canSave = () => !saving() && stranded() === undefined && (first === undefined || drafts.changed(ref) || drafts.blocked(ref).length > 0)
+  const canSave = () => denied?.edit === undefined && !saving() && stranded() === undefined && (first === undefined || drafts.changed(ref) || drafts.blocked(ref).length > 0)
 
   const lastSave = signal<SavedState>()
   const onSaved = savedHandler(() => stored()?.url, saved => lastSave.set(saved), rebuildFinished)

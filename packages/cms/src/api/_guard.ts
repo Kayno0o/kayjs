@@ -1,15 +1,14 @@
 import type { Guard, GuardContext } from 'kay'
-import type { CmsAction } from '../roles'
 import { apiUrl, guard } from 'kay'
 import { editSessionAdmitted, READ_METHODS, underKayDev } from 'kay/library'
 import { editedEntry, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
-import { forbidden, may, memberOf, refusalStatus, routePath } from '../access'
+import { memberOf, reaches, refusalStatus, routePath } from '../access'
 import { authOf, organizationMembers, siteRoleHolders } from '../auth-like'
 import { actors, authors, linkReaders, testAddresses } from '../authors'
 import { admitEditor } from '../editor-names'
 import { log } from '../log'
-import { leavesPublication, restrain } from '../publishing'
+import { decoded, enforceRoles } from '../role-check'
 import { settings } from '../settings'
 import devApi from './dev'
 import iconsApi from './icons'
@@ -48,16 +47,6 @@ function ownPath(path: string, root: string | undefined): string {
   return at < 0 ? '' : path.slice(at + root.length)
 }
 
-// A path segment as the route reads it, or as written when it is not valid.
-function decoded(segment: string): string {
-  try {
-    return decodeURIComponent(segment)
-  }
-  catch {
-    return segment
-  }
-}
-
 // Leaving edit mode writes nothing, so an edit link alone may do it; `/entries/preview/exit` is a save to a collection named preview.
 const LEAVING = /^\/preview\/exit$/
 
@@ -72,48 +61,16 @@ const PAGE_LINK_MODULE = /^\/editor\/module\.js$/
 // What the dev tool's tab reads, which answers under `kay dev` alone and holds the edit mode's state and the tab's texts.
 const DEV_STATE = /^\/dev$/
 const EDITOR_CAN = /^\/editor\/can$/
-
-// What a role may be limited from, by the route: publishing, deleting, uploading and the redirects, which a rename makes.
-// Sharing a draft shows what is not published, so it is a publisher's.
-const PUBLISH = /^\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish|share)$/
-// Mailing a list shows and sends what an editor wrote to everyone on it, so it is a publisher's, the preview and the test included.
-const NEWSLETTER = /^\/newsletter\/[^/]+\/[^/]+\/(?:preview|test|send)$/
-// The test send, whose collection tells where it goes.
+// The test send of a newsletter, whose collection tells where it goes.
 const NEWSLETTER_TEST = /^\/newsletter\/([^/]+)\/[^/]+\/test$/
-// Sending a draft for review is any editor's; approving it, which publishes, or sending it back is a reviewer's.
-const SUBMIT = /^\/entries\/[^/]+\/[^/]+\/submit$/
-const REVIEW = /^\/entries\/[^/]+\/[^/]+\/(?:approve|send-back)$/
-const ENTRY_RENAME = /^\/entries\/[^/]+\/[^/]+\/rename$/
-const REDIRECTS = /^\/redirects(?:\/|$)/
-const UPLOAD = /^\/files\/[^/]+$/
-const MEDIA_RENAME = /^\/files\/media\/rename$/
-const RESTORE = /^\/(?:history\/[^/]+\/[^/]+|trash\/[^/]+\/[^/]+)\/restore$/
-const UNUSED_UPLOADS = /^\/files\/unused\/delete$/
-// Erasing an entry's history, or an editor's name from it, removes what a delete kept.
-const ERASE = /^\/history\/(?:[^/]+\/[^/]+\/erase|forget-editor)$/
-
-// Which action of `cms({ roles })` a request needs, from its method and path as the router reads them.
-function actionOf(method: string, path: string): CmsAction | undefined {
-  if (REDIRECTS.test(path) || (method === 'POST' && ENTRY_RENAME.test(path)))
-    return 'redirects'
-
-  if ((method === 'DELETE' && ENTRY.test(path)) || UNUSED_UPLOADS.test(path) || (method === 'POST' && ERASE.test(path)))
-    return 'delete'
-
-  if (method === 'POST' && (PUBLISH.test(path) || NEWSLETTER.test(path)))
-    return 'publish'
-
-  if (method === 'POST' && REVIEW.test(path))
-    return 'review'
-
-  return method === 'POST' && (UPLOAD.test(path) || MEDIA_RENAME.test(path)) ? 'upload' : undefined
-}
+// Sending a draft for review, approving it or sending it back: whose act it is gets noted.
+const REVIEWED = /^\/entries\/([^/]+)\/([^/]+)\/(submit|approve|send-back)$/
 
 // Finds who is behind a review request, and for a submission whom it is told to: the other holders of a reviewing site role, and of a reviewing organization role in the submitter's organizations.
-async function noteActor(ctx: GuardContext, submitting: boolean): Promise<void> {
+async function noteActor(ctx: GuardContext, submitting: boolean, collection: string | undefined): Promise<void> {
   const member = await memberOf(ctx)
   const auth = authOf(ctx)
-  const reviewing = [...settings().roles ?? []].filter(([, actions]) => actions.has('review')).map(([role]) => role)
+  const reviewing = [...settings().roles ?? []].filter(([, role]) => role.actions.has('review') && (collection === undefined || reaches(role, collection))).map(([name]) => name)
   let reviewers: string[] = []
 
   try {
@@ -211,27 +168,16 @@ export default guard(async (ctx) => {
     if (path === '')
       return ctx.deny(403, wording('cms.guard.unplaced', 'The cms could not place this request among its routes'))
 
-    const needed = actionOf(method, path)
-
-    // Restoring undoes an edit or a delete, which any editor may; what it restores never publishes or withdraws for a role that may not.
-    const restoring = method === 'POST' && RESTORE.test(path)
-
-    if (restoring && !await may(ctx, 'publish'))
-      restrain(ctx.request)
-
-    if (needed !== undefined && !await may(ctx, needed))
-      return forbidden(ctx, needed)
-
-    // A save that flips the draft flag or a publish date is a publish as much as the route is.
-    if (method === 'POST' && needed === undefined && !await may(ctx, 'publish') && !await leavesPublication(ctx.request, path))
-      return forbidden(ctx, 'publish')
+    await enforceRoles(ctx, path)
   }
 
   if (method === 'POST') {
     const path = ownPath(routePath(ctx.url), root)
 
-    if (SUBMIT.test(path) || REVIEW.test(path))
-      await noteActor(ctx, SUBMIT.test(path))
+    const [, collection, , verb] = REVIEWED.exec(path) ?? []
+
+    if (verb !== undefined)
+      await noteActor(ctx, verb === 'submit', decoded(collection!))
   }
 
   const [, testing] = method === 'POST' ? NEWSLETTER_TEST.exec(ownPath(routePath(ctx.url), root)) ?? [] : []

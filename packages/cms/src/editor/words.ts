@@ -104,6 +104,7 @@ export const AFTER_LOAD: readonly string[] = [
   'cms.file.upload',
   'cms.file.uploadMany',
   'cms.file.uploading',
+  'cms.guard.notYours',
   'cms.history.notRestored',
   'cms.history.restoreFailure',
   'cms.history.restored',

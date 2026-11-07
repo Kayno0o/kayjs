@@ -242,9 +242,12 @@ export default defineMessages({
     },
     guard: {
       forbidden: 'Votre rôle ne permet pas de : {action}',
+      moveOwn: 'Votre rôle ne modifie que les entrées que vous avez écrites, et en déplacer une change les autres',
       needsGuard: 'Enregistrer demande cms({ role }) ou cms({ guard })',
       notEditing: 'Pas en mode édition',
       notOnPage: 'Cette entrée n\'est sur aucune des pages ouvertes en mode édition',
+      notYours: 'Votre rôle ne modifie que les entrées que vous avez écrites',
+      outOfReach: 'Votre rôle n\'a pas accès à cette collection',
       signedOut: 'Connectez-vous pour continuer',
       unplaced: 'Le cms ne peut pas situer cette requête parmi ses routes',
     },

@@ -9,7 +9,7 @@ import { trashScreen } from '../../screens'
 
 const { prefix, collection, rows } = await trashScreen(ctx.params.collection) ?? ctx.notFound()
 const title = collectionTitle(collection)
-const denied = await denials(ctx)
+const denied = await denials(ctx, { collection: collection.name })
 ---
 head
   title {adminTitle(wording('cms.trash.pageTitle', 'Trash - {collection}', { collection: title }))}

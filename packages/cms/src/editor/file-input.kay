@@ -32,7 +32,7 @@ const accept = signal<string>()
 const maxSize = signal<number>()
 
 // Why the signed-in person's role may not upload, when it may not; the zone is then disabled with this as its tooltip.
-const denied = uploadRefusal()
+const denied = uploadRefusal(collection)
 
 // The uploads already stored, listed when the picker is first opened; undefined until then.
 const stored = signal<{ path: string, name: string }[]>()

@@ -11,7 +11,7 @@ import { collectionScreen, openPath, translationStart, writtenSlug } from '../..
 export const page = { query: s.Object({ locale: s.Optional(s.String()), from: s.Optional(s.String()), fromLocale: s.Optional(s.String()) }) }
 
 const { prefix, collection } = await collectionScreen(ctx.params.collection) ?? ctx.notFound()
-const denied = await denials(ctx)
+const denied = await denials(ctx, { collection: collection.name })
 const locale = ctx.query.locale
 const start = ctx.query.from === undefined || ctx.query.fromLocale === undefined ? {} : await translationStart(collection, ctx.query.from, ctx.query.fromLocale)
 

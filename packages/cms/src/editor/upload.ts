@@ -43,31 +43,37 @@ function track(change: 1 | -1): void {
   running += change
 }
 
-let denial: Promise<string | undefined> | undefined
+const denials = new Map<string, Promise<string | undefined>>()
 
-// Why the signed-in person's role may not upload, asked again once the last answer is in, so a role changed meanwhile shows without a reload; fields mounting together share one question. undefined when it may, or when it could not be asked, the server then refusing in its own words.
-export async function uploadDenied(): Promise<string | undefined> {
-  denial ??= (async () => {
-    try {
-      return (await call(editorApi, '/can')).denied.upload
-    }
-    catch {
-      return undefined
-    }
-    finally {
-      denial = undefined
-    }
-  })()
+// Why the signed-in person's role may not upload into a collection, asked again once the last answer is in, so a role changed meanwhile shows without a reload; fields mounting together share one question. undefined when it may, or when it could not be asked, the server then refusing in its own words.
+export async function uploadDenied(collection: string): Promise<string | undefined> {
+  let denial = denials.get(collection)
+
+  if (denial === undefined) {
+    denial = (async () => {
+      try {
+        return (await call(editorApi, '/can', { query: { collection } })).denied.upload
+      }
+      catch {
+        return undefined
+      }
+      finally {
+        denials.delete(collection)
+      }
+    })()
+
+    denials.set(collection, denial)
+  }
 
   return denial
 }
 
-// The reason uploads are refused to the signed-in person's role, filled in once the server has said; a control offering an upload reads it.
-export function uploadRefusal(): Signal<string | undefined> {
+// The reason uploads are refused to the signed-in person's role in a collection, filled in once the server has said; a control offering an upload reads it.
+export function uploadRefusal(collection: string): Signal<string | undefined> {
   const reason = signal<string>()
 
   void (async () => {
-    reason.set(await uploadDenied())
+    reason.set(await uploadDenied(collection))
   })()
 
   return reason

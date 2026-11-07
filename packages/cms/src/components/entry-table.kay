@@ -68,6 +68,10 @@ const columns: Column<EntryRow>[] = [
   ...(actions.size === 0 ? [] : [{ key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true } satisfies Column<EntryRow>]),
 ]
 
+// Why a role may not do this to a row: an entry that is another's keeps it from all of it.
+const notYours = () => wording('cms.guard.notYours', 'Your role may only change the entries you wrote')
+const deniedFor = (row: EntryRow): Denials => row.locked ? { ...denied, edit: notYours(), publish: notYours(), delete: notYours(), redirects: notYours() } : denied
+
 const ref = (row: EntryRow) => ({ collection: collection.name, slug: row.slug, locale: row.locale })
 const keyOf = (row: EntryRow) => row.locale === undefined ? row.slug : `${row.slug}@${row.locale}`
 // Only the first rows of a page watch their entry.
@@ -144,26 +148,33 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
       .kcms-row-actions
         if actions.has('move')
           if row.move as place
-            Button(label={wording('cms.table.moveUp', 'Up')} aria-label={wording('cms.table.moveUpAria', 'Move {title} up', { title: row.title })} disabled={!place.up} onClick={() => move(row, 'up')})
-            Button(label={wording('cms.table.moveDown', 'Down')} aria-label={wording('cms.table.moveDownAria', 'Move {title} down', { title: row.title })} disabled={!place.down} onClick={() => move(row, 'down')})
+            if denied.move as reason
+              Refused(label={wording('cms.table.moveUp', 'Up')} reason={reason})
+              Refused(label={wording('cms.table.moveDown', 'Down')} reason={reason})
+            else
+              Button(label={wording('cms.table.moveUp', 'Up')} aria-label={wording('cms.table.moveUpAria', 'Move {title} up', { title: row.title })} disabled={!place.up} onClick={() => move(row, 'up')})
+              Button(label={wording('cms.table.moveDown', 'Down')} aria-label={wording('cms.table.moveDownAria', 'Move {title} down', { title: row.title })} disabled={!place.down} onClick={() => move(row, 'down')})
         if actions.has('publish') && row.draft && collection.draftField !== undefined
-          if denied.publish !== undefined
-            Refused(label={wording('cms.entry.publish', 'Publish')} reason={denied.publish})
+          if deniedFor(row).publish as reason
+            Refused(label={wording('cms.entry.publish', 'Publish')} reason={reason})
           else
             Button(label={wording('cms.entry.publish', 'Publish')} aria-label={wording('cms.table.publish', 'Publish {title}', { title: row.title })} onClick={() => publish(row)})
-        if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined && denied.publish !== undefined
-          Refused(label={wording('cms.entry.unpublish', 'Unpublish')} reason={denied.publish})
+        if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined && deniedFor(row).publish !== undefined
+          Refused(label={wording('cms.entry.unpublish', 'Unpublish')} reason={deniedFor(row).publish})
         else if actions.has('unpublish') && !row.draft && row.problem === undefined && collection.draftField !== undefined
           ConfirmDelete(tone="neutral" triggerLook="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.entry.unpublishMessage', 'Unpublish {title}? Visitors stop seeing it until you publish it again.', { title: row.title })} failureLabel={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => unpublish(row)})
         if actions.has('duplicate') && !collection.single && row.problem === undefined
-          Button(label={wording('cms.table.duplicate', 'Duplicate')} aria-label={wording('cms.table.duplicateAria', 'Duplicate {title}', { title: row.title })} onClick={() => copy(row)})
+          if deniedFor(row).edit as reason
+            Refused(label={wording('cms.table.duplicate', 'Duplicate')} reason={reason})
+          else
+            Button(label={wording('cms.table.duplicate', 'Duplicate')} aria-label={wording('cms.table.duplicateAria', 'Duplicate {title}', { title: row.title })} onClick={() => copy(row)})
         if actions.has('rename') && !collection.single && row.problem === undefined
-          RowRename(collection={collection} row={row} denied={denied})
+          RowRename(collection={collection} row={row} denied={deniedFor(row)})
         if actions.has('editOnPage')
           if row.url as url
             Button(href={onPagePath(prefix, url)} label={wording('cms.entry.editOnPage', 'Edit on page')} aria-label={wording('cms.table.editOnPage', 'Edit on page: {title}', { title: row.title })})
-        if actions.has('delete') && denied.delete !== undefined
-          Refused(icon="delete" label={wording('cms.table.delete', 'Delete {title}', { title: row.title })} reason={denied.delete} size="sm" variant="ghost")
+        if actions.has('delete') && deniedFor(row).delete !== undefined
+          Refused(icon="delete" label={wording('cms.table.delete', 'Delete {title}', { title: row.title })} reason={deniedFor(row).delete} size="sm" variant="ghost")
         else if actions.has('delete')
           ConfirmDelete(message={deleteMessage(row.title, row.url, 'table', referrers()[row.slug])} onOpenChange={open => open && askReferrers(row)} label={wording('cms.table.delete', 'Delete {title}', { title: row.title })} failureLabel={wording('cms.save.deleteFailure', 'Could not delete')} size="sm" variant="ghost" onConfirm={() => remove(row)})
   @empty

@@ -107,6 +107,28 @@ The actions are `publish` (publish, unpublish, and any save that changes the dra
 
 A person's roles add up, and one whose roles are not listed can only edit. With kayjs-auth the roles are the user's, with its hierarchy, so `admin` holding `editor` counts. A refused action answers 403 and says which action the role lacks. The screens show its button disabled, with that sentence as a tooltip. A role without `publish` sees the draft flag and the publish and end dates of an entry read-only, and one without `upload` gets no image drop or paste in a Markdown box.
 
+A role can also be limited to some collections and to the entries its holder wrote:
+
+```ts
+cms({
+  guard: auth.guard({ require: 'staff' }),
+  roles: {
+    publisher: ['publish'],
+    blogger: { collections: ['posts'], own: 'author', actions: ['upload'] },
+  },
+})
+```
+
+`collections` lists the collections the role reaches. In any other the role sees no screen, no entry and no upload, and the content list leaves it out.
+
+`own` names a field of the entry that holds its writer, the signed-in person's id with kayjs-auth, else their email, else their name. The role then changes only the entries whose field matches. It can still read the others, with their buttons disabled and the reason as a tooltip.
+
+A new entry is written with the field set to the person, and a save never changes it, so declare the field in the collection's schema. An entry whose field is empty belongs to nobody, and only a role without `own` can change it.
+
+The server checks both on every route, not just in the screens. A person with several roles can do what any one of them allows. A role written as a list still reaches everything, so an existing config works unchanged.
+
+What belongs to the whole site, the redirects, renaming a file in the media library and the unused uploads, needs a role without these limits. Renaming an entry rewrites the entries that point at it, so it is refused unless the role may change every one of them.
+
 A role without `publish` can still add an entry to a collection that has a publish date and no draft flag. The server holds it back with a far publish date until a publisher sets one.
 
 A key of `roles` written `org:<role>` is a role held in any kayjs-auth organization the person belongs to, and `org:<organization>:<role>` one in that organization. They count with the organization's own hierarchy.

@@ -5,6 +5,7 @@ import type { ScreenCollection, StoredEntry } from '../kay/contract'
 import type { EntryPresence as Editors } from '../presence'
 import type { ReviewView } from '../review'
 import type { EntryTranslations, PairedEntry } from '../translations'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import EntryFields from '../editor/entry-fields.kay'
 import { cmsEntryForm } from '../form'
 import EntryActions from './entry-actions.kay'
@@ -29,6 +30,8 @@ form.kcms-entry-editor(novalidate aria-busy={form.saving()} onSubmit={event => {
       EntryActions(form={form} denied={denied})
   if form.review() as stage
     EntryReviewLog(review={stage} draft={form.isDraft()})
+  if denied?.edit as reason
+    Notice(tone="info" label={reason})
   if presence
     EntryPresence(room={presence.room} member={presence.member})
   if translations && entry
@@ -46,7 +49,7 @@ form.kcms-entry-editor(novalidate aria-busy={form.saving()} onSubmit={event => {
         a(href={gone.to}) {wording('cms.entry.deletedLeave', 'Go to the collection')}
   else
     // Locked while a save is on its way, so what is typed meanwhile is not left out of it.
-    fieldset.kcms-entry-fields(disabled={form.saving()})
+    fieldset.kcms-entry-fields(disabled={form.saving() || denied?.edit !== undefined})
       EntryIdentity(form={form})
       EntryFields(form={form})
   if translations?.compare as other

@@ -17,6 +17,9 @@ import type { BulkAction } from '../editor/bulk'
 // `denied`, from `denials`, disables the buttons for what the signed-in person's role may not do.
 const { collection, rows, actions, clear, denied = {} } = props<{ denied?: Denials, collection: ScreenCollection, rows: EntryRow[], actions: ReadonlySet<string>, clear: () => void }>()
 
+// A selection holding an entry that is another's cannot be published, unpublished or deleted by a role limited to its own entries: the server would refuse those rows one by one.
+const blocked = (): Denials => rows.some(row => row.locked) ? { ...denied, publish: wording('cms.guard.notYours', 'Your role may only change the entries you wrote'), delete: wording('cms.guard.notYours', 'Your role may only change the entries you wrote') } : denied
+
 // Only the rows an action fits: a draft is published and a published entry unpublished, as the row buttons offer, and a broken entry is neither.
 const fitting = (action: BulkAction) => rows.filter(row => action === 'delete' || (row.problem === undefined && row.draft === (action === 'publish')))
 const targets = (action: BulkAction) => fitting(action).map(row => ({ ref: { collection: collection.name, slug: row.slug, locale: row.locale }, version: row.version }))
@@ -61,15 +64,15 @@ async function run(action: BulkAction): Promise<void> {
 }
 ---
 if actions.has('publish') && drafts() && fitting('publish').length > 0
-  if denied.publish !== undefined
-    Refused(label={wording('cms.entry.publish', 'Publish')} reason={denied.publish})
+  if blocked().publish !== undefined
+    Refused(label={wording('cms.entry.publish', 'Publish')} reason={blocked().publish})
   else
     Button(label={wording('cms.entry.publish', 'Publish')} onClick={() => run('publish')})
-if actions.has('unpublish') && drafts() && fitting('unpublish').length > 0 && denied.publish !== undefined
-  Refused(label={wording('cms.entry.unpublish', 'Unpublish')} reason={denied.publish})
+if actions.has('unpublish') && drafts() && fitting('unpublish').length > 0 && blocked().publish !== undefined
+  Refused(label={wording('cms.entry.unpublish', 'Unpublish')} reason={blocked().publish})
 else if actions.has('unpublish') && drafts() && fitting('unpublish').length > 0
   ConfirmDelete(tone="neutral" triggerLook="button" label={wording('cms.entry.unpublish', 'Unpublish')} message={wording('cms.bulk.unpublishMessage', fitting('unpublish').length === 1 ? 'Unpublish 1 entry? Visitors stop seeing it until you publish it again.' : 'Unpublish {count} entries? Visitors stop seeing them until you publish them again.', { count: fitting('unpublish').length })} failureLabel={wording('cms.entry.unpublishFailure', 'Could not unpublish')} onConfirm={() => run('unpublish')})
-if actions.has('delete') && denied.delete !== undefined
-  Refused(label={wording('cms.bulk.delete', 'Delete')} reason={denied.delete} tone="danger")
+if actions.has('delete') && blocked().delete !== undefined
+  Refused(label={wording('cms.bulk.delete', 'Delete')} reason={blocked().delete} tone="danger")
 else if actions.has('delete')
   ConfirmDelete(triggerLook="button" label={wording('cms.bulk.delete', 'Delete')} message={bulkDeleteMessage(rows.length, referrers())} onOpenChange={open => open && askReferrers()} failureLabel={wording('cms.save.deleteFailure', 'Could not delete')} onConfirm={() => run('delete')})
