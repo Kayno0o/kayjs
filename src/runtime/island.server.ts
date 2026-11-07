@@ -305,7 +305,7 @@ function serializeProps(what: string, props: object, slots: [string, string][]):
       const reason = refusedAction(value)
 
       if (reason !== undefined || !isAction(value))
-        throw new IslandPropsError(`${what}, so it renders as an island: its \`${key}\` prop is ${reason ?? `a ${typeof value}`} and cannot reach the browser; pass it from a component of its own, which then renders as an island in its place`)
+        throw new IslandPropsError(`${what}, so it renders as an island: its \`${key}\` prop is ${reason ?? `a ${typeof value}`} and cannot reach the browser; ${reason === undefined ? 'write `--- island` in the component passing it, which then renders as an island and sends its own props in its place, or pass the island data (`kay check` reports it as `island-prop`)' : 'pass it from a component of its own, which then renders as an island in its place'}`)
 
       if (rendered)
         rendered.actions ??= `${what}, so it renders as an island: its \`${key}\` prop is an action`

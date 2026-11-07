@@ -21,9 +21,7 @@ type CheckedHtml<Markup> = [UnsafeHtml<Markup>] extends [never] ? unknown : {
 }
 
 [.] FunctionProp
-type FunctionProp<Component> = Component extends IslandBrand ? {
-  kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place'
-} : 0
+type FunctionProp<Component, Lint extends string = 'island-prop'> = Component extends IslandBrand ? { kayLint: Lint, kayAlways: true, kayError: Unsendable } : 0
 
 [.] HandedPart
 type HandedPart<Component, Name extends string> = PartClass<Component> extends infer Class ? Class extends object ? Name extends keyof Class ? Class[Name] : never : never : never

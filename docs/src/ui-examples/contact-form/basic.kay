@@ -1,5 +1,4 @@
 ---
-// kay-allow-file promoted-island
 import { actionStub } from 'kay/internal'
 import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
 

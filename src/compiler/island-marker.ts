@@ -1,4 +1,4 @@
-import type { Diagnostic, KayFile, Span } from './ast'
+import type { Diagnostic, Fix, KayFile, Span } from './ast'
 import { codeOf } from './script-fence'
 
 // `// kay-island` or `// kay-static` on a line of its own in a script or a module fence: the form that `--- island` and `--- static` replace, read for three minors and rewritten by `kay upgrade`.
@@ -79,6 +79,26 @@ function rewrite(file: KayFile, comment: IslandComment): Diagnostic['fixes'] {
 
 export function commentLint(file: KayFile, comment: IslandComment): Diagnostic {
   return { start: comment.start, end: comment.end, code: 'island-comment', message: `\`// kay-${comment.kind}\` is written \`--- ${comment.kind}\` on the fence line since 1.92`, note: 'a fence line is parsed, where the comment was matched in the source text', help: `write \`--- ${comment.kind}\` in place of \`---\` and delete the comment`, fixes: rewrite(file, comment), checkOnly: true }
+}
+
+// The fix of a component passing an island what only an island is sent: its script fence line written `--- island`, a fence opened for a template with none, a `--- static` made `--- island`. None for a component that is an island already or one that renders on the server only.
+export function islandFence(file: KayFile): Fix | undefined {
+  const title = 'Write `--- island`'
+
+  if (file.server !== undefined || file.client !== undefined || file.pin?.kind === 'island')
+    return undefined
+
+  if (file.pin !== undefined)
+    return { title, edits: [{ start: file.pin.start, end: file.pin.end, text: 'island' }] }
+
+  const line = file.scriptLine
+
+  if (line === undefined)
+    return { title, edits: [{ start: 0, end: 0, text: '--- island\n---\n' }] }
+
+  const named = SCRIPT_HEADER.exec(file.source.slice(line.start, line.end))
+
+  return named === null ? undefined : { title, edits: [{ start: line.start, end: line.start + named[0].length, text: '--- island' }] }
 }
 
 // A pin on a page, a layout or a special page: they render on the server and are never islands.

@@ -66,7 +66,7 @@ describe('--- island', () => {
 
     expect(compiled.island).toBeDefined()
     expect(compiled.promote).toBeUndefined()
-    expect(promotedChecks(pinned).filter(diagnostic => diagnostic.code === 'promoted-island')).toEqual([])
+    expect(promotedChecks(pinned)).toEqual([])
   })
 
   it('stays static in a page, a layout or a special page, and says so', () => {
@@ -118,16 +118,13 @@ describe('--- static', () => {
     expect(pins('--- static\nlet node\n---\ndiv(ref={node})\n')).toHaveLength(1)
   })
 
-  it('is an error where a component is promoted, naming what it passes and to which component', () => {
+  it('is never promoted, so what it passes an island that cannot be sent is the `island-prop` error of the types', () => {
     const source = promoting.replace('---\n', '--- static\n')
-    const promoted = (text: string) => promotedChecks(text).filter(diagnostic => diagnostic.code === 'static-pin')
-    const found = promoted(source)
 
-    expect(found.map(diagnostic => slice(source, diagnostic))).toEqual(['Picker'])
-    expect(found[0]!.message).toContain('`format` passed to Picker, line 5')
-    expect(found[0]!.checkOnly).toBeUndefined()
-    expect(promoted('--- static\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n')[0]!.message).toContain('a block taking parameters passed to Picker')
+    expect(promotedChecks(source)).toEqual([])
     expect(pins(source)).toEqual([])
+    expect(browserRole(source, part)).toBeUndefined()
+    expect(compileKay(source, part, { output: 'html', hydratable: true }).promote).toBeUndefined()
   })
 
   it('is an error for a live value, and not for a route file, which is never an island', () => {
@@ -217,8 +214,7 @@ describe('island-comment', () => {
     const contradicted = `---\n// kay-static\nconst a = 1\n---\n${handler}`
 
     expect(pins(contradicted).map(diagnostic => slice(contradicted, diagnostic))).toEqual(['onClick'])
-    expect(promotedChecks(`---\n// kay-island\n${promoting.slice(4)}`).filter(diagnostic => diagnostic.code === 'promoted-island')).toEqual([])
-    expect(promotedChecks(`---\n// kay-static\n${promoting.slice(4)}`).filter(diagnostic => diagnostic.code === 'static-pin')).toHaveLength(1)
+    expect(browserRole(`---\n// kay-static\n${promoting.slice(4)}`, part)).toBeUndefined()
   })
 })
 

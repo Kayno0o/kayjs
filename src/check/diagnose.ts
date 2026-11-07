@@ -1,16 +1,19 @@
 // What kay makes of a diagnostic tsgo reports, the same in `kay check` and in the editor: dropped, or with its code, severity, message, help and place in the .kay source.
 import type { KayLibrary } from '../build/libraries'
-import type { Span } from '../compiler/ast'
+import type { Fix, Span } from '../compiler/ast'
 import type { LintLevel, LintName } from '../compiler/lints'
 import type { I18nConfig } from '../config'
 import type { RouteMount } from '../server/routes'
 import type { ShadowFile } from './shadow'
 import { existsSync, realpathSync } from 'node:fs'
-import { dirname, relative, resolve, sep } from 'node:path'
+import { basename, dirname, relative, resolve, sep } from 'node:path'
 import { KAY_FILE } from '../build/files'
 import { libraryOf, packageRoot } from '../build/libraries'
+import { ROUTE_FILES } from '../compiler'
+import { islandFence, islandPin } from '../compiler/island-marker'
 import { typeLint } from '../compiler/lints'
 import { WRITABLE } from '../compiler/names'
+import { parseKay } from '../compiler/parser'
 import { UNSERVED_MESSAGE } from '../runtime/checks'
 import { localePrefixes, localeSettings } from '../server/i18n'
 import { authErrorKind } from './auth-error'
@@ -55,6 +58,7 @@ export interface Diagnosed {
   help?: string
   // Where the .kay source has it, undefined where nothing there stands for it.
   span: Span | undefined
+  fixes?: Fix[] | undefined
   // Code nothing reads, which an editor fades.
   unread?: true
 }
@@ -74,6 +78,34 @@ const PROP_BEFORE = /([\w$:-]+)=\{\s*$/
 // The attribute a value is handed as, read off the source before it.
 function propBefore(source: string, span: Span | undefined): string | undefined {
   return span === undefined ? undefined : PROP_BEFORE.exec(source.slice(Math.max(0, span.start - 80), span.start))?.[1]
+}
+
+const PLAIN_NAME = /^[\w$:-]+$/
+
+// What a function written in an attribute or a block with parameters is called: the type holds the prop as `0`, so the name is the one the check stands at.
+function blockName(message: string, source: string, span: Span | undefined): string | undefined {
+  const written = span === undefined ? undefined : source.slice(span.start, span.end)
+
+  return written !== undefined && PLAIN_NAME.test(written) && message.includes('kayAlways: true') && !message.includes('kayPath') ? written : undefined
+}
+
+// What an island-prop or promoted-island lint offers: `--- island` on the component, which is safe where the value is always a function; `said` where the old `// kay-island` comment, which works for three minors, already accepts the promotion.
+function unsendableFix(lint: NonNullable<ReturnType<typeof typeLint>>, shadow: ShadowFile): Pick<Diagnosed, 'fixes' | 'help'> | 'said' | undefined {
+  if (lint.code !== 'island-prop' && lint.code !== 'promoted-island')
+    return undefined
+
+  const file = parseKay(shadow.source)
+  const route = file.server !== undefined || ROUTE_FILES.has(basename(shadow.file))
+
+  if (lint.code === 'promoted-island' && islandPin(file)?.kind === 'island')
+    return 'said'
+
+  if (route)
+    return { help: 'a page, a layout or a special page is never an island: pass the island data, or go through a component of its own written `--- island`' }
+
+  const fix = islandFence(file)
+
+  return fix === undefined ? undefined : { fixes: [{ ...fix, safe: lint.always === true }] }
 }
 
 // A block with no parameters is markup, so one a component calls with values is a type error on `Element`: the help names the parameters its prop is typed with.
@@ -98,13 +130,15 @@ function blockWithoutParameters(diagnostic: TsgoDiagnostic, source: string, span
 export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, levelAt: (lint: LintName, offset: number) => LintLevel): Diagnosed | undefined {
   const span = sourceSpan(shadow, diagnostic.start, diagnostic.end, 'loose')
   const offset = span?.start ?? 0
-  const lint = typeLint(diagnostic.message, propBefore(shadow.source, span))
+  const lint = typeLint(diagnostic.message, propBefore(shadow.source, span) ?? blockName(diagnostic.message, shadow.source, span))
 
   // A lint the types find, as `uncalled-signal`.
   if (lint) {
     const level = levelAt(lint.code, offset)
 
-    return level === 'allow' ? undefined : { ...lint, severity: severityOf(level), span }
+    const offered = level === 'allow' ? undefined : unsendableFix(lint, shadow)
+
+    return level === 'allow' || offered === 'said' ? undefined : { ...lint, severity: severityOf(level), span, ...offered }
   }
 
   // A kayjs-auth result's `error` compared with a kind, which `kay check` also fixes and the editor reports as it stands.

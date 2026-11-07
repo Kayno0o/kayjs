@@ -136,7 +136,7 @@ describe('kay explain', () => {
     const [heading, blank, ...rows] = lintList('islands').split('\n')
 
     expect([heading, blank]).toEqual([`islands: ${LINT_GROUPS.islands}`, ''])
-    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['invalid-nesting', 'positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-marker', 'promoted-island', 'hydration-mismatch', 'unowned-effect'])
+    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['invalid-nesting', 'positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-marker', 'island-prop', 'hydration-mismatch', 'unowned-effect'])
   })
 
   it('explains a lint with an example it reports and the same written right, indented as code, and every lint\'s examples hold', () => {

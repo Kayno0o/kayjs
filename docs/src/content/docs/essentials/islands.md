@@ -64,15 +64,17 @@ An effect made with no owner, at the top of a module, after an `await` or in a t
 
 `kay build` lists every island under the JavaScript it ships. Each line gives the first thing that made it one, such as `onClick, line 4` or `bind:value, line 9`.
 
-A static component that passes an island a function is listed too, as `format passed to Picker, line 8`. That prop may turn it into an island, which the page decides as it renders.
+A static component that passes an island a function is listed too, as `format passed to Picker, line 8`. That prop may turn it into an island, which the page decides as it renders, and which stops working in 1.95.
 
-`kay check` warns of such a component as `promoted-island`, naming the call: data built by a list method (`map`, `filter`, `Array.from`) or by a function of the script returning data, and an `~icons/` import of an icon set the project installs, are not functions, while a function read off a global, `Math.max` or `console.log`, and an icon of a set that is not installed are.
+`kay check` reads what a component passes an island from its types. A value typed as a function, a symbol, a class instance or an object holding a function (a `Column` with a `sortValue`), or a block with parameters, cannot be sent to the browser: it is the error `island-prop` at that prop, naming the field.
 
-A value read from an object of strings, numbers or `~icons/` imports of an installed set that another module of the app exports as a literal is data too (`LABEL[kind]`, `ICONS[app.id]`): an `export const`, a `const` listed in `export { LABEL }`, a default export, a re-export of one, or a `.json` file. So is a list built from one, `APPS.map(app => ({ ...app, icon: ICONS[app.id] }))`.
+A component the build still promotes to an island for it gets the deprecation `promoted-island` instead, with the same fix. An action, a Date, a list built by `map` or a call returning a string is data and says nothing, nor does a value typed `any` or `unknown`.
+
+`--- island` is the fix, applied by `kay check --fix` where the value is always a function and offered where its type is a union holding one, as the component may be static on some pages. A page, a layout or a special page is never an island: pass the island data, or go through a component of its own. When the check was skipped, rendering throws an `IslandPropsError` naming the prop and the same fix.
 
 Write `--- island` in place of `---` to say it is meant. The component is then an island on every page that renders it, with no promotion to decide. A generic one reads `--- island <T extends Row>`.
 
-Write `--- static` to say it is not. If anything in the component would make it an island, an `onClick`, a `signal`, or a function it hands to another component, `kay check` and `kay build` stop with the error `static-pin` at that line, naming what it is. A pin does not change what a page, a layout or a special page is: they are never islands, and `--- island` on one is reported as `island-marker`.
+Write `--- static` to say it is not. If anything in the component would make it an island, an `onClick` or a `signal`, `kay check` and `kay build` stop with the error `static-pin` at that line, naming what it is. A pinned component is never promoted, so a function it hands an island is `island-prop`. A pin does not change what a page, a layout or a special page is: they are never islands, and `--- island` on one is reported as `island-marker`.
 
 The comments `// kay-island` and `// kay-static` on a line of their own still work for a few minors. `kay upgrade` writes them as the fence lines, and `island-comment` warns of the old form until then.
 

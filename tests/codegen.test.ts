@@ -523,8 +523,8 @@ describe('elements', () => {
     const source = '---\nimport List from \'./list.kay\'\n---\nList(items={[1]})\n  @row(n)\n    li {n}'
 
     expect(compileKay(source, '_layout.kay', { check: true }).tsx).toContain('<List items={[1]} {...KayFunctionProp(List)(0)} row={n => <li>{n}</li>} />')
-    // A component renders as an island in its place should List be one, so what it passes is not sent as it is.
-    expect(compileKay(source, 'test.kay', { check: true }).tsx).toContain('<List items={[1]} row={n => <li>{n}</li>} />')
+    // A component the build promotes to an island in its place should List be one is checked the same, as the deprecated lint.
+    expect(compileKay(source, 'test.kay', { check: true }).tsx).toContain('<List items={[1]} {...KayPromotedFunctionProp(List)(0)} row={n => <li>{n}</li>} />')
   })
 
   it('renders a block prop through a named slot, the lines under a slot standing in when there is none', () => {

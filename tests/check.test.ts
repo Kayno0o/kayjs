@@ -170,13 +170,13 @@ describe('kay check', () => {
       { file: 'broken/src/routes/head.kay', line: 2, column: 8, code: 'TS2322', message: expect.stringContaining('nmae') },
       { file: 'broken/src/routes/lazy.kay', line: 4, column: 57, code: 'TS2322', message: '`TodoItem` does not take `hydrate`' },
       { file: 'broken/src/routes/links.kay', line: 6, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /form/extra') },
-      { file: 'broken/src/routes/links.kay', line: 9, column: 39, code: 'TS2345', message: expect.stringContaining('A layout, or a page with a server fence, sends an island its props serialized') },
-      { file: 'broken/src/routes/links.kay', line: 9, column: 64, code: 'TS2345', message: expect.stringContaining('A layout, or a page with a server fence, sends an island its props serialized') },
+      { file: 'broken/src/routes/links.kay', line: 9, column: 39, code: 'island-prop', message: '`formatter.format`, `formatter.formatRange`, `formatter.formatRangeToParts` and more are functions, and an island is sent its props as data' },
+      { file: 'broken/src/routes/links.kay', line: 9, column: 64, code: 'island-prop', message: '`format` is a function, and an island is sent its props as data' },
       { file: 'broken/src/routes/links.kay', line: 14, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /api/feed.json') },
       { file: 'broken/src/routes/links.kay', line: 15, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /api/import') },
       { file: 'broken/src/routes/links.kay', line: 16, column: 9, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /docs/guide.txt') },
-      { file: 'broken/src/routes/links.kay', line: 18, column: 4, code: 'TS2345', message: expect.stringContaining('A layout, or a page with a server fence, sends an island its props serialized') },
-      { file: 'broken/src/routes/links.kay', line: 20, column: 13, code: 'TS2345', message: expect.stringContaining('A layout, or a page with a server fence, sends an island its props serialized') },
+      { file: 'broken/src/routes/links.kay', line: 18, column: 4, code: 'island-prop', message: '`label` is a function, and an island is sent its props as data' },
+      { file: 'broken/src/routes/links.kay', line: 20, column: 13, code: 'island-prop', message: '`format`, `formatter.format`, `formatter.formatRange` and more are functions, and an island is sent its props as data' },
       { file: 'broken/src/routes/redirects.kay', line: 5, column: 78, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /form/extra') },
       { file: 'broken/src/routes/redirects.kay', line: 8, column: 16, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /moved/away') },
       { file: 'broken/src/todo-item.kay', line: 7, column: 14, code: 'TS2551', message: 'Property \'titel\' does not exist on type \'Todo\'. Did you mean \'title\'?' },
@@ -184,7 +184,6 @@ describe('kay check', () => {
       { file: 'broken/src/todo-list.kay', line: 5, column: 3, code: 'TS2741', message: expect.stringContaining('Property \'todo\' is missing') },
       { file: 'broken/src/main.ts', line: 3, column: 38, code: 'TS2741', message: expect.stringContaining('\'done\' is missing') },
       { file: 'broken/src/routes/_guard.ts', line: 5, column: 14, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /sign/in') },
-      { file: 'broken/src/routes/generic.kay', line: 6, column: 1, code: 'promoted-island', message: 'This component may render as an island: `show` passed to List, line 6, when its props cannot be sent as data' },
     ])
   })
 
@@ -928,7 +927,7 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('reports a component promoted to an island, unless it says so with `// kay-island` or `--- island`, and a pin static on one', async () => {
+  it('reports a component promoted to an island, unless it says so with `// kay-island` or `--- island`, and an `island-prop` error for one pinned static', async () => {
     const component = (marker: string) => `---\n${marker}import Child from './island.kay'\nfunction pick() {}\n---\nChild(format={pick})\n`
     const root = await scratchProject({
       'src/routes/index.kay': '---\nimport Bare from \'../components/bare.kay\'\nimport Said from \'../components/said.kay\'\nimport Denied from \'../components/denied.kay\'\nimport Fenced from \'../components/fenced.kay\'\nimport Pinned from \'../components/pinned.kay\'\nimport Plain from \'../components/plain.kay\'\n---\nBare\nSaid\nDenied\nFenced\nPinned\nPlain\n',
@@ -943,12 +942,12 @@ describe.concurrent('kay check, edge cases', () => {
     })
 
     try {
-      const found = (await check(root)).filter(d => d.code === 'promoted-island' || d.code === 'static-pin')
+      const found = (await check(root)).filter(d => d.code === 'promoted-island' || d.code === 'island-prop' || d.code === 'static-pin')
 
-      expect(found.map(d => [d.code, d.file.slice(root.length + 1), d.message.slice(0, 35)]).toSorted()).toEqual([
-        ['promoted-island', 'src/components/bare.kay', 'This component may render as an isl'],
-        ['static-pin', 'src/components/denied.kay', 'This component is pinned `// kay-st'],
-        ['static-pin', 'src/components/pinned.kay', 'This component is pinned `--- stati'],
+      expect(found.map(d => [d.code, d.file.slice(root.length + 1)]).toSorted()).toEqual([
+        ['island-prop', 'src/components/denied.kay'],
+        ['island-prop', 'src/components/pinned.kay'],
+        ['promoted-island', 'src/components/bare.kay'],
       ])
       expect((await check(root, { lints: { 'promoted-island': 'allow' } })).filter(d => d.code === 'promoted-island')).toEqual([])
     }
@@ -967,14 +966,14 @@ describe.concurrent('kay check, edge cases', () => {
     try {
       const found = (await check(root)).filter(d => d.code === 'promoted-island')
 
-      expect(found.map(d => [d.file.slice(root.length + 1), d.message.slice(0, 38)])).toEqual([['src/components/parent.kay', 'This component may render as an island']])
+      expect(found.map(d => [d.file.slice(root.length + 1), d.message.slice(0, 38)])).toEqual([['src/components/parent.kay', 'This component renders as an island wh']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
     }
   })
 
-  it('reports a component passing an island what a call may return as a function, and none passing data built by a call, an icon import or a predicate callback', async () => {
+  it('reports a component passing an island what the types show as a function, and none passing data built by a call, an icon import or a predicate callback', async () => {
     const data: Record<string, [script: string, call: string]> = {
       mapped: ['const links = [\'a\', \'b\'].map(name => ({ href: `/${name}`, label: name }))', 'Child(format={links})'],
       panel: ['const panel = (color: string) => { const svg = `<svg fill="${color}"/>`; return `data:${svg}` }\nconst slides = [{ src: panel(\'red\') }]', 'Child(format={slides})'],
@@ -1054,8 +1053,10 @@ describe.concurrent('kay check, edge cases', () => {
 
     try {
       const found = (await check(root)).filter(d => d.code === 'promoted-island')
+      // The build still promotes these on the call, but their types say a string, `unknown` or `any`, so the types report none (the render, not `kay check`, finds the function a call returns).
+      const typedAsData = new Set(['builtMap', 'concat', 'model', 'passthrough', 'uninstalled', 'uninstalledMap'])
 
-      expect(found.map(d => d.file.slice(root.length + 1)).sort()).toEqual(Object.keys(functions).map(name => `src/components/${name}.kay`).sort())
+      expect(found.map(d => d.file.slice(root.length + 1)).sort()).toEqual(Object.keys(functions).filter(name => !typedAsData.has(name)).map(name => `src/components/${name}.kay`).sort())
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -2622,13 +2623,11 @@ describe.concurrent('kay check, edge cases', () => {
     })
 
     try {
-      const sent = 'A layout, or a page with a server fence, sends an island its props serialized'
-
-      expect((await check(root)).filter(d => d.code !== 'promoted-island').map(d => [d.file.slice(root.length + 1), d.line, d.column, d.message.includes(sent)])).toEqual([
-        ['src/routes/index.kay', 10, 62, true],
-        ['src/routes/index.kay', 11, 6, true],
-        ['src/routes/index.kay', 12, 14, true],
-        ['src/routes/index.kay', 13, 14, true],
+      expect((await check(root)).filter(d => d.code !== 'promoted-island').map(d => [d.file.slice(root.length + 1), d.line, d.column, d.code])).toEqual([
+        ['src/routes/index.kay', 10, 62, 'island-prop'],
+        ['src/routes/index.kay', 11, 6, 'island-prop'],
+        ['src/routes/index.kay', 12, 14, 'island-prop'],
+        ['src/routes/index.kay', 13, 14, 'island-prop'],
       ])
     }
     finally {
@@ -2681,7 +2680,7 @@ describe.concurrent('kay check, edge cases', () => {
     })
 
     try {
-      const found = (await check(root)).filter(d => d.code?.startsWith('TS')).map(d => [d.file.slice(d.file.lastIndexOf('/') + 1), d.line, d.message.includes('sends an island its props serialized'), d.message.includes('kayPath: "[].sortValue"')])
+      const found = (await check(root)).filter(d => d.code?.startsWith('TS') || d.code === 'island-prop').map(d => [d.file.slice(d.file.lastIndexOf('/') + 1), d.line, d.code === 'island-prop', d.message.includes('`columns[].sortValue`')])
 
       expect(found).toEqual([
         ['panel.kay', 16, true, true],
@@ -2706,7 +2705,7 @@ describe.concurrent('kay check, edge cases', () => {
     })
 
     try {
-      expect((await check(root)).filter(d => d.code?.startsWith('TS')).map(d => d.line)).toEqual([9, 12])
+      expect((await check(root)).filter(d => d.code === 'island-prop').map(d => d.line)).toEqual([9, 12])
     }
     finally {
       await rm(root, { recursive: true, force: true })

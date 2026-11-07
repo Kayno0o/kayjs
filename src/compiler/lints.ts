@@ -464,11 +464,20 @@ export const LINTS = {
     wrong: '---\n// kay-island\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}',
     right: '--- island\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}',
   },
-  'promoted-island': {
-    level: 'warn',
+  'island-prop': {
+    level: 'deny',
     group: 'islands',
     typed: true,
-    summary: 'A static component that may render as an island because it passes one a function or a block taking parameters, which cannot be serialized: when the render finds one, its own props travel to the browser and it hydrates; a value that serializes, such as an action, leaves it static. `--- island` in the component makes it one.',
+    summary: 'A component that is not an island passing one a value its type says cannot be sent: a function (a callback, a signal), a block taking parameters, a symbol, or an object holding either, such as a `Column` with a `sortValue` function. An island is sent its props serialized into the page, so only data crosses; an action, a Date or a Map does. The types decide, so a value typed `any` or `unknown` is not reported, nor a call returning data. The fix writes `--- island` on the component, applied by `kay check --fix` where the value is always a function and offered, not applied, where its type is a union holding one; a page or a layout is never an island, so it passes the island data or goes through a component of its own. Rendering throws an `IslandPropsError` for the same value, naming the fix.',
+    wrong: '---\nimport Picker from \'./picker.kay\'\n\nconst { format } = props<{ format: (value: string) => string }>()\n---\nPicker(format={format})',
+    right: '--- island\nimport Picker from \'./picker.kay\'\n\nconst { format } = props<{ format: (value: string) => string }>()\n---\nPicker(format={format})',
+  },
+  'promoted-island': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.92',
+    typed: true,
+    summary: 'A static component that passes an island a function or a block taking parameters, which cannot be sent as data, so the render makes it an island itself when it meets one: a component that is an island or not depending on what a page gives it. Since 1.92 `--- island` says it, and a component without it is an `island-prop` error. The promotion works until 1.95. The fix writes `--- island`, applied by `kay upgrade` where the value is always a function or the block takes parameters, and offered, not applied, where its type is a union holding a function, as the component is static on the pages that pass data. A value the type shows is data, such as an action, reports nothing.',
     wrong: '---\nimport Picker from \'./picker.kay\'\n\nfunction shout(value: string) {\n  return value.toUpperCase()\n}\n---\nPicker(format={shout})',
     right: '--- island\nimport Picker from \'./picker.kay\'\n\nfunction shout(value: string) {\n  return value.toUpperCase()\n}\n---\nPicker(format={shout})',
   },
@@ -1224,6 +1233,8 @@ export interface TypeLint {
   message: string
   note: string
   help: string
+  // The value is a function whatever else its type allows, so the fix of an `island-prop` or a `promoted-island` is safe.
+  always?: boolean
 }
 
 const INCOMPLETE_MATCH = 'IncompleteMatch<'
@@ -1232,14 +1243,55 @@ const TRUNCATED = / \| \.\.\. (\d+) more \.\.\. \| /g
 const HANDED_SIGNAL = 'kayLint: "uncalled-signal"'
 const SECRET_PROP = 'kayLint: "secret-prop"'
 const CUT_PATHS = /\.\.\. \d+ more/
+const PATHS_SHOWN = 3
+const UNSENDABLE = /kayLint: "(island-prop|promoted-island)"/
+const ALWAYS = 'kayAlways: true'
 const SECRET_PATHS = /kayPath: ((?:"[^"]*"|\.\.\. \d+ more \.\.\.)(?: \| (?:"[^"]*"|\.\.\. \d+ more \.\.\.))*)/
 
 function secretPath(prop: string | undefined, path: string): string {
   return prop === undefined ? path : `${prop}${path.startsWith('[') ? '' : '.'}${path}`
 }
 
+// What an island is refused, naming the paths of the functions the type holds when it gives them.
+function unsendable(lint: 'island-prop' | 'promoted-island', message: string, prop: string | undefined): TypeLint {
+  const found = SECRET_PATHS.exec(message)?.[1]
+  const always = message.includes(ALWAYS)
+  const cut = found !== undefined && CUT_PATHS.test(found)
+  // An empty path is the prop itself.
+  const named = (found?.split(' | ').filter(path => path.startsWith('"')).map(path => path.length > 2 ? secretPath(prop, path.slice(1, -1)) : prop) ?? []).filter(path => path !== undefined)
+  const subject = prop === undefined ? 'a value' : `\`${prop}\``
+  // A prop whose type only allows a function is one; a union holding one may be.
+  const single = always || named[0] !== prop ? 'is a function' : 'may be a function'
+  const verb = named.length > 1 || cut ? 'are functions' : single
+  const shown = named.slice(0, PATHS_SHOWN).map(path => `\`${path}\``).join(', ')
+  const holds = named.length > 0 ? `${shown}${cut || named.length > PATHS_SHOWN ? ' and more' : ''} ${verb}` : `${subject} ${always ? 'is a function' : 'holds what is not data'}`
+
+  if (lint === 'promoted-island') {
+    return {
+      code: lint,
+      message: `This component renders as an island when it is passed what an island is sent: ${holds}, which cannot be sent as data`,
+      note: 'a component that is an island or not by what it is given was deprecated in 1.92 and goes in 1.95; the render hydrated it only when it met such a value',
+      help: 'write `--- island` in place of `---`, or pass the island data',
+      always,
+    }
+  }
+
+  return {
+    code: lint,
+    message: `${holds}, and an island is sent its props as data`,
+    note: 'an island\'s props are serialized into the page: plain objects, arrays, Dates, Maps, Sets, bigints, URLs, RegExps and actions, but no functions, symbols or class instances',
+    help: 'write `--- island` in place of `---` on this component, so it is an island itself, or pass the island data',
+    always,
+  }
+}
+
 // `prop` is the attribute the value is handed as, which the type does not carry.
 export function typeLint(message: string, prop?: string): TypeLint | undefined {
+  const refused = UNSENDABLE.exec(message)?.[1]
+
+  if (refused !== undefined)
+    return unsendable(refused as 'island-prop' | 'promoted-island', message, prop)
+
   if (message.includes(SECRET_PROP)) {
     const found = SECRET_PATHS.exec(message)?.[1]
     const listed = found?.split(' | ').filter(path => path.startsWith('"') && path.length > 2).map(path => secretPath(prop, path.slice(1, -1)))

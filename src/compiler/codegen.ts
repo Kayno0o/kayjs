@@ -267,7 +267,8 @@ class ModuleShell {
     return this.jsxTemplate ??= new JsxTemplate(this.b, this.src, this.facts, {
       check: this.mode === 'check',
       staticLoops: this.staticLoops,
-      sendsIslandProps: this.kind === 'static' || this.kind === 'twin',
+      sendsIslandProps: this.kind === 'static' || this.kind === 'twin' || this.kind === 'promotable' || this.kind === 'promotable twin',
+      promoted: this.kind === 'promotable' || this.kind === 'promotable twin',
       plain: this.plainNames(),
       ownMarkup: this.ownMarkup(),
     }, this.sites)

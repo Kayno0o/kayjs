@@ -23,6 +23,8 @@ export interface JsxOptions {
   staticLoops: boolean
   // The props passed an island reach the browser as they are written, so `kay check` asserts they can.
   sendsIslandProps: boolean
+  // The component is a static one the build still promotes to an island when it passes a function, so what it passes an island that cannot be sent is the deprecated `promoted-island` and not an `island-prop` error.
+  promoted: boolean
   // Names the script declares as plain data written out, which an island prop check takes as serializable whatever type the declaration gives them.
   plain: ReadonlySet<string>
   // Whether a name at an offset is bound to a project file imported as text, which `innerHTML` takes as it takes markup written out.
@@ -923,7 +925,7 @@ export class JsxTemplate {
       if (!element.component || !this.options.sendsIslandProps)
         return false
 
-      b.add('{...KayProp(').addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
+      b.add(`{...${this.propCheck}(`).addSource(element.tag).add(')((').addSource(attribute.expression).add('))}')
 
       return true
     }
@@ -981,7 +983,7 @@ export class JsxTemplate {
     this.attributeName(attribute).add('={')
 
     for (const part of sent.parts) {
-      b.addSource({ start: at, end: start + part.start }).add('KayProp(').addSource(element.tag).add(')((').addSource({ start: start + part.start, end: start + part.end }).add('))')
+      b.addSource({ start: at, end: start + part.start }).add(`${this.propCheck}(`).addSource(element.tag).add(')((').addSource({ start: start + part.start, end: start + part.end }).add('))')
       at = start + part.end
     }
 
@@ -1010,9 +1012,13 @@ export class JsxTemplate {
     return this.b.addSource(attribute.name)
   }
 
+  private get propCheck(): string {
+    return this.options.promoted ? 'KayPromotedProp' : 'KayProp'
+  }
+
   // Reports a function passed to an island, `0` standing for the prop.
   private emitFunctionPropCheck(element: ElementNode, name: Span) {
-    this.b.add('{...KayFunctionProp(').addSource(element.tag).add(')(').wrap(name, () => this.b.add('0')).add(')}')
+    this.b.add(`{...${this.options.promoted ? 'KayPromotedFunctionProp' : 'KayFunctionProp'}(`).addSource(element.tag).add(')(').wrap(name, () => this.b.add('0')).add(')}')
   }
 
   // `bind:value={name}` reads the signal and writes it back from the matching input event.
