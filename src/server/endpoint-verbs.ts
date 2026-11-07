@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 // Apart from `./endpoints` so `kay check` reads an endpoint file's exports without loading the server.
 // The methods an endpoint file may export a handler for, in the order `Allow` lists them.
 export const ENDPOINT_VERBS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const
@@ -28,4 +30,14 @@ export function allowedVerbs(served: Iterable<string>): EndpointVerb[] {
   const own = new Set(served)
 
   return ENDPOINT_VERBS.filter(verb => own.has(verb) || verb === 'OPTIONS' || (verb === 'HEAD' && own.has('GET')))
+}
+
+// The methods an endpoint file exports, read from its source.
+export function fileVerbs(file: string): EndpointVerb[] {
+  try {
+    return exportedNames(readFileSync(file, 'utf8')).filter(isEndpointVerb)
+  }
+  catch {
+    return []
+  }
 }

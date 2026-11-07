@@ -6,13 +6,12 @@ import type { ApiModule } from '../server/api-modules'
 import type { Endpoint, Route } from '../server/routes'
 import type { ContentChecks } from './project'
 import type { ShadowTypes } from './shadow-types'
-import { readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { SCRIPT_FILE } from '../build/files'
 import { settingsReplacements } from '../build/libraries'
 import { CONFIG_FILE } from '../config'
 import { projectPaths } from '../project'
-import { exportedNames, isEndpointVerb } from '../server/endpoint-verbs'
+import { ENDPOINT_VERBS, fileVerbs } from '../server/endpoint-verbs'
 import { matcherSource } from './shadow'
 
 export const SETTINGS_CHECK = 'kay-settings.ts'
@@ -68,12 +67,7 @@ export function settingsCheck(root: string, settings: Record<string, string>, di
   ])
 }
 
-// The methods an endpoint file exports, or GET when it exports none so the missing handler is reported at the file.
-function servedVerbs(file: string): string[] {
-  const verbs = exportedNames(readFileSync(file, 'utf8')).filter(isEndpointVerb)
-
-  return verbs.length > 0 ? verbs : ['GET']
-}
+const NO_VERB = `a handler for a method, ${ENDPOINT_VERBS.slice(0, -1).join(', ')} or ${ENDPOINT_VERBS.at(-1)}: export function GET(ctx: EndpointContext) { return 'text' }`
 
 // Each default export the server calls, a guard's, an API module's or a matcher's, assigned to the type it is called as, so a wrong one is a type error at its file rather than a refusal at boot.
 export function exportsCheck(root: string, routesDir: string, routes: Route[], api: ApiModule[], endpoints: Endpoint[]): Assertions<{ file: string, wanted: string }> {
@@ -86,7 +80,13 @@ export function exportsCheck(root: string, routesDir: string, routes: Route[], a
       : { file: module.file, type: 'AnyElysia | ((app: ExtensionApp) => AnyElysia | Promise<AnyElysia>)', wanted: 'an Elysia instance by default, or a function of the ExtensionApp building one: export default (app: ExtensionApp) => api().get(\'/\', () => ...)' }),
     ...[...matchers].map(file => ({ file, type: '(value: string) => unknown', wanted: 'a matcher by default: export default (value: string) => value or undefined' })),
     // Its context is the app's to type, `EndpointContext<{ slug: string }>`; what it returns is checked.
-    ...endpoints.flatMap(endpoint => servedVerbs(endpoint.file).map(verb => ({ file: endpoint.file, type: '(ctx: never) => EndpointBody | Promise<EndpointBody>', wanted: `a ${verb} handler: export function ${verb}(ctx: EndpointContext) { return 'text' }`, named: verb }))),
+    ...endpoints.flatMap((endpoint) => {
+      const type = '(ctx: never) => EndpointBody | Promise<EndpointBody>'
+      const verbs = fileVerbs(endpoint.file)
+
+      // A file exporting none is reported at its import of GET, naming them all.
+      return verbs.length === 0 ? [{ file: endpoint.file, type, wanted: NO_VERB, named: 'GET' }] : verbs.map(verb => ({ file: endpoint.file, type, wanted: `a ${verb} handler: export function ${verb}(ctx: EndpointContext) { return 'text' }`, named: verb }))
+    }),
   ]
   const kayTypes = [...guards.size > 0 ? ['Guard'] : [], ...endpoints.length > 0 ? ['EndpointBody'] : []]
 

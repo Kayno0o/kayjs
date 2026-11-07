@@ -27,6 +27,7 @@ import { BUILD_FAILURE, clientOptionsKey, fromManifest, readManifest } from './c
 import { recordTypeErrors } from './dev-errors'
 import { redirectedBy } from './dev-notes'
 import { editorCommand } from './editor'
+import { fileVerbs } from './endpoint-verbs'
 import { readCapped } from './errors'
 import { hostName, isLocalHost } from './host-allowlist'
 import { localeCopies } from './i18n'
@@ -801,7 +802,8 @@ export function devRoutes(root: string, pages: ServedRoute[], endpoints: Endpoin
   for (const endpoint of endpoints) {
     const path = endpointPath(endpoint)
 
-    listed.push({ kind: 'endpoint', method: 'GET', path, file: shown(endpoint.file), href: href(path) })
+    for (const verb of fileVerbs(endpoint.file))
+      listed.push({ kind: 'endpoint', method: verb, path, file: shown(endpoint.file), href: verb === 'GET' ? href(path) : undefined })
   }
 
   for (const module of mounted) {

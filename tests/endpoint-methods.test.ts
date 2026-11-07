@@ -1,8 +1,10 @@
 import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { claimEndpoints } from '../src/server/endpoint-claims'
 import { exportedEndpoints } from '../src/server/endpoints'
 import { scanEndpoints } from '../src/server/routes'
+import { ServedPaths } from '../src/server/served-paths'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -12,7 +14,8 @@ const ORIGIN = 'https://app.example.com'
 const HEADER = 'import type { EndpointContext } from \'kay\'\nimport { s } from \'kay\'\n\n'
 const FILES: Record<string, string> = {
   'routes/index.kay': 'h1 Home\n',
-  'routes/_404.kay': 'h1 Custom missing\n',
+  'routes/_404.kay': '--- server\nconst { locale } = ctx\n---\nh1 Custom missing {locale}\n',
+  'routes/typed.txt.ts': `${HEADER}export const GET = () => new Response('x', { headers: { 'x-got': 'yes' } })\n`,
   'routes/hook.txt.ts': `${HEADER}export const GET = () => 'got'\nexport const POST = async ({ request }: EndpointContext) => \`posted \${await request.text()}\`\nexport const PUT = () => 'put'\nexport const PATCH = () => 'patched'\nexport const DELETE = () => new Response(null, { status: 204 })\n`,
   'routes/only-post.txt.ts': `${HEADER}export const POST = () => 'only'\n`,
   'routes/head.txt.ts': `${HEADER}export const GET = () => 'body'\nexport const HEAD = () => new Response(null, { headers: { 'x-head': 'own' } })\n`,
@@ -26,6 +29,8 @@ const FILES: Record<string, string> = {
   'routes/missing.txt.ts': `${HEADER}export const GET = ({ notFound }: EndpointContext) => notFound()\n`,
   'routes/guarded/_guard.ts': 'import { guard } from \'kay\'\n\nexport default guard(({ request, deny, cookies }) => {\n  cookies.set(\'seen\', \'1\')\n\n  if (!request.headers.has(\'authorization\'))\n    deny(401, \'Sign in first\')\n})\n',
   'routes/guarded/data.txt.ts': `${HEADER}export const POST = () => 'data'\n`,
+  'routes/guarded/gone.txt.ts': `${HEADER}export const GET = ({ notFound }: EndpointContext) => notFound()\n`,
+  'routes/guarded/limited.txt.ts': `${HEADER}export const page = { rateLimit: { max: 1, window: '1m' } }\n\nexport const POST = () => 'counted'\n`,
 }
 
 let dir = ''
@@ -33,6 +38,7 @@ let plain: App
 let mounted: App
 let localized: App
 let dev: App
+let wide: App
 
 beforeAll(async () => {
   dir = await scratchDir('endpoint-methods-')
@@ -44,6 +50,7 @@ beforeAll(async () => {
   mounted = await pages({ ...base, base: '/blog', trailingSlash: 'always' })
   localized = await pages({ ...base, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
   dev = await pages({ ...base, dev: true })
+  wide = await pages({ ...base, cors: { origins: '*' } })
 })
 
 afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -96,6 +103,7 @@ describe('an endpoint file exporting more than GET', () => {
     expect([head.status, head.body]).toEqual([200, ''])
     expect((await call(plain, '/head.txt', { method: 'HEAD' })).headers.get('x-head')).toBe('own')
     expect((await call(plain, '/head.txt')).body).toBe('body')
+    expect((await call(plain, '/typed.txt', { method: 'HEAD' })).headers.get('x-got')).toBe('yes')
   })
 
   it('answers OPTIONS with Allow, or with its own OPTIONS', async () => {
@@ -110,6 +118,32 @@ describe('an endpoint file exporting more than GET', () => {
 
     expect([refused.status, refused.body, refused.headers.get('set-cookie')?.startsWith('seen=1')]).toEqual([401, 'Sign in first', true])
     expect((await call(plain, '/guarded/data.txt', { method: 'POST', headers: { authorization: 'x' } })).body).toBe('data')
+  })
+
+  it('runs the guards before answering 405, so a caller they refuse learns nothing of the methods', async () => {
+    const refused = await call(plain, '/guarded/data.txt')
+
+    expect([refused.status, refused.headers.get('allow')]).toEqual([401, null])
+    expect((await call(plain, '/guarded/data.txt', { headers: { authorization: 'x' } })).status).toBe(405)
+  })
+
+  it('serves no path under a locale prefix, which endpoints leave alone', async () => {
+    expect((await call(localized, '/fr/hook.txt')).status).toBe(404)
+    expect((await call(localized, '/hook.txt')).body).toBe('got')
+  })
+
+  it('stops the server for a method another route already serves at its path', async () => {
+    const endpoints = (await scanEndpoints(join(dir, 'routes'))).filter(({ pattern }) => pattern === '/hook.txt')
+    const claimed = (method: string) => () => {
+      const paths = new ServedPaths()
+
+      paths.claim({ path: '/hook.txt', owner: 'api/hook.ts', kind: 'api', method })
+      claimEndpoints(paths, endpoints, dir)
+    }
+
+    expect(claimed('POST')).toThrow('both serve POST /hook.txt')
+    expect(claimed('DELETE')).toThrow('both serve DELETE /hook.txt')
+    expect(claimed('TRACE')).not.toThrow()
   })
 
   it('boots a file exporting no verb with an error naming them', async () => {
@@ -161,6 +195,21 @@ describe('the settings of an endpoint file', () => {
     expect((await call(plain, '/shared.txt', { method: 'POST', headers: { 'origin': 'https://evil.example', 'sec-fetch-site': 'cross-site' } })).status).toBe(403)
   })
 
+  it('leaves the app\'s `cors` to API modules, an endpoint granting through its own `page.cors` alone', async () => {
+    const headers = { origin: ORIGIN }
+
+    expect((await call(wide, '/hook.txt', { headers })).headers.get('access-control-allow-origin')).toBeNull()
+    expect((await call(wide, '/shared.txt', { headers })).headers.get('access-control-allow-origin')).toBe(ORIGIN)
+  })
+
+  it('counts no allowance for a caller the guards refuse', async () => {
+    for (let attempt = 0; attempt < 3; attempt++)
+      expect((await call(plain, '/guarded/limited.txt', { method: 'POST' })).status).toBe(401)
+
+    expect((await call(plain, '/guarded/limited.txt', { method: 'POST', headers: { authorization: 'x' } })).body).toBe('counted')
+    expect((await call(plain, '/guarded/limited.txt', { method: 'POST', headers: { authorization: 'x' } })).status).toBe(429)
+  })
+
   it('refuses a cross-site browser post to a file with no `cors`, and accepts a webhook with no Origin', async () => {
     expect((await call(plain, '/hook.txt', { method: 'POST', body: 'a', headers: { 'origin': 'https://evil.example', 'sec-fetch-site': 'cross-site' } })).status).toBe(403)
     expect((await call(plain, '/hook.txt', { method: 'POST', body: 'a' })).status).toBe(200)
@@ -181,6 +230,23 @@ describe('a 404 from an endpoint file', () => {
 
       expect([text.status, text.body]).toEqual([404, 'Not Found'])
     }
+  })
+
+  it('keeps the cookies the guards set, on the plain 404 and on the page', async () => {
+    const auth = { authorization: 'x' }
+    const plainText = await call(plain, '/guarded/gone.txt', { headers: auth })
+    const page = await call(plain, '/guarded/gone.txt', { headers: { ...auth, ...html } })
+
+    expect([plainText.status, plainText.body, plainText.headers.get('set-cookie')?.startsWith('seen=1')]).toEqual([404, 'Not Found', true])
+    expect([page.status, page.body.includes('Custom missing'), page.headers.get('set-cookie')?.startsWith('seen=1')]).toEqual([404, true, true])
+  })
+
+  it('renders the page a path nothing serves gets, in the visitor\'s locale', async () => {
+    const headers = { ...html, 'accept-language': 'fr' }
+    const ordinary = await call(localized, '/nothing-here', { headers })
+    const page = await call(localized, '/items/a.csv', { headers })
+
+    expect([page.status, page.body]).toEqual([404, ordinary.body])
   })
 
   it('covers a notFound() thrown by the handler too', async () => {

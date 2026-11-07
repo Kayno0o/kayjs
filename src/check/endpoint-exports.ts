@@ -18,7 +18,7 @@ export async function endpointExports(options: CheckOptions, { endpoints }: Serv
 
     return strayExports(exportedNames(source)).map(({ name, meant }): CheckDiagnostic => ({
       file,
-      ...positionAt(source, Math.max(source.search(new RegExp(`\\b${name}\\b`)), 0)),
+      ...positionAt(source, Math.max(source.indexOf(name), 0)),
       code: 'endpoint-export',
       severity: level === 'warn' ? 'warning' : 'error',
       message: `\`${name}\` is exported by an endpoint file but is no method, so the server never calls it`,

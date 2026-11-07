@@ -43,7 +43,7 @@ interface ServedEndpoint extends Omit<Endpoint, 'guards'> {
   query: unknown
   // Its `page.rateLimit`, each counted under its own name.
   limits: { name: string, limit: RateLimit }[]
-  // Its `page.cors`, else the app's; undefined for none.
+  // Its `page.cors`; undefined for none.
   cors: CorsRule | undefined
   maxSize: ByteSize | undefined
 }
@@ -56,17 +56,17 @@ interface EndpointRequest {
 
 const TEXT = 'text/plain; charset=utf-8'
 const HTML = /\btext\/html\b/
+const KAY_PREFIX = /^kay: /
 
 // Each endpoint at its path, answering every method: its own handlers, and 405 with `Allow` for the rest. Endpoints whose router paths only differ by the extension of their last param share one route, which picks the one whose extension the path ends in.
 // Gives back the body limit of each endpoint, by the method and path pattern it answers.
 export async function serveEndpoints(app: Elysia, endpoints: Endpoint[], options: ActionOptions): Promise<RouteBodyLimit[]> {
   const routes = new Map<string, ServedEndpoint[]>()
-  const appCors = options.cors === undefined ? undefined : corsRule(options.cors)
   const limits: RouteBodyLimit[] = []
 
   for (const endpoint of endpoints) {
     const key = routerKey(endpoint.pattern)
-    const served = await loadEndpoint(endpoint, options.requireGuards, appCors)
+    const served = await loadEndpoint(endpoint, options.requireGuards)
 
     routes.set(key, [...routes.get(key) ?? [], served])
     limits.push({ method: 'ALL', path: endpoint.pattern, ...endpoint.suffix !== undefined && { suffix: endpoint.suffix }, limit: served.maxSize === undefined ? undefined : { bytes: served.maxSize, refuse: refusing(served.cors) } })
@@ -123,7 +123,7 @@ async function timedOut(request: Request, { onError }: ActionOptions, run: () =>
   }
 }
 
-async function loadEndpoint(endpoint: Endpoint, required: boolean | undefined, appCors: CorsRule | undefined): Promise<ServedEndpoint> {
+async function loadEndpoint(endpoint: Endpoint, required: boolean | undefined): Promise<ServedEndpoint> {
   const module = await importModule<Record<string, unknown>>(endpoint.file)
   const handlers = new Map(ENDPOINT_VERBS.flatMap(verb => typeof module[verb] === 'function' ? [[verb, module[verb] as Handler] as const] : []))
 
@@ -147,17 +147,22 @@ async function loadEndpoint(endpoint: Endpoint, required: boolean | undefined, a
     type: Bun.file(`file${endpoint.suffix ?? basename(endpoint.pattern).slice(basename(endpoint.pattern).indexOf('.'))}`).type,
     query: settings.query,
     limits,
-    cors: ownCors(settings.cors, appCors),
+    cors: corsOf(endpoint.file, settings.cors),
     maxSize: settings.maxSize,
   }
 }
 
-// The file's own `cors` rule, none for `false`, else the app's.
-function ownCors(own: EndpointSettings['cors'], appCors: CorsRule | undefined): CorsRule | undefined {
-  if (own === undefined)
-    return appCors
+// The file's own `cors` rule: an endpoint opts in through its `page`, the app's `cors` covering API modules alone, so a cookie-personalised answer is never granted by a setting meant for the API.
+function corsOf(file: string, own: EndpointSettings['cors']): CorsRule | undefined {
+  if (own === undefined || own === false)
+    return undefined
 
-  return own === false ? undefined : corsRule(own)
+  try {
+    return corsRule(own)
+  }
+  catch (error) {
+    throw new KayError('route-invalid', `kay: the cors of ${file} is invalid: ${error instanceof Error ? error.message.replace(KAY_PREFIX, '') : String(error)}`)
+  }
 }
 
 // The answer of the method asked, then the grant of the file's `cors` on it, whatever the answer is.
@@ -185,8 +190,8 @@ function granted(cors: CorsRule | undefined, request: Request, response: Respons
   return response
 }
 
-// A preflight and a method the file lacks first, before any guard: a browser sends no credentials with the first, and the second needs none to be told what is served.
-// Then the guards, as for a page; what they set, and what the endpoint sets through its `cookies` and `headers`, goes out with its answer, a redirect, a denial or a 404 it throws included.
+// A preflight first, before any guard, as a browser sends no credentials with it.
+// Then the guards, as for a page, so a caller they refuse learns nothing of the methods served; what they set, and what the endpoint sets through its `cookies` and `headers`, goes out with its answer, a redirect, a denial or a 404 it throws included.
 async function respond(endpoint: ServedEndpoint, context: EndpointRequest, params: Record<string, string>, options: ActionOptions): Promise<Response> {
   const { request } = context
   const { cors } = endpoint
@@ -198,9 +203,6 @@ async function respond(endpoint: ServedEndpoint, context: EndpointRequest, param
   const verb = request.method === 'HEAD' && !endpoint.handlers.has('HEAD') ? 'GET' : request.method
   const handler = isEndpointVerb(verb) ? endpoint.handlers.get(verb) : undefined
 
-  if (!handler)
-    return request.method === 'OPTIONS' ? new Response(null, { status: 204, headers: { allow: allow.join(', ') } }) : new Response('Method Not Allowed', { status: 405, headers: { 'content-type': TEXT, 'allow': allow.join(', ') } })
-
   // Before the guards, so a library reading the session for them, such as kayjs-auth, knows the origin is let in.
   if (cors && corsAdmits(cors, request))
     admitCrossSite(request)
@@ -209,6 +211,9 @@ async function respond(endpoint: ServedEndpoint, context: EndpointRequest, param
 
   if (passed instanceof Response)
     return markedPrivate(passed, request)
+
+  if (!handler)
+    return markedPrivate(request.method === 'OPTIONS' ? new Response(null, { status: 204, headers: { allow: allow.join(', ') } }) : new Response('Method Not Allowed', { status: 405, headers: { 'content-type': TEXT, 'allow': allow.join(', ') } }), request)
 
   // A browser lets any page post a form to any host, the user's cookies attached; a request with neither header, such as a webhook, is no browser's.
   if (crossSiteRefused(request))
@@ -312,7 +317,7 @@ async function notFound(plain: Response, context: EndpointRequest, options: Acti
     return plain
 
   for (const [name, value] of plain.headers) {
-    if (name === 'set-cookie')
+    if (name === 'set-cookie' || name === 'vary')
       page.headers.append(name, value)
     else if (name !== 'content-type' && name !== 'content-length')
       page.headers.set(name, value)
@@ -352,16 +357,16 @@ export async function exportedEndpoints(root: string, endpoints: Endpoint[], req
     const file = relative(root, endpoint.file)
 
     try {
-      const module = await importModule<{ GET?: unknown }>(endpoint.file)
-
-      if (typeof module.GET !== 'function')
-        continue
-
       if (endpoint.guards.length > 0)
         throw new KayError('export-guard', 'a guard covers it, and only a server can run one per request')
 
       if (required === true && endpoint.open !== true)
         throw new KayError('export-guard', 'requireGuards is on and no guard covers it; set `guards: false` in `export const page` to export it')
+
+      const module = await importModule<{ GET?: unknown }>(endpoint.file)
+
+      if (typeof module.GET !== 'function')
+        continue
 
       const prerender = pageSetting(module, 'prerender')
       const listed = prerender === undefined && endpoint.params.length === 0 ? true : prerender
