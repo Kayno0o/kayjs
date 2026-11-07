@@ -680,7 +680,7 @@ it('adds the ui extension with no line in the layout or the stylesheet', async (
 
     const config = await Bun.file(join(dir, 'kay.config.ts')).text()
 
-    expect(config).toContain('import { ui } from \'@kaynooo/kayjs-ui/extension\'')
+    expect(config).toContain('import { ui } from \'@kaynooo/kayjs-ui\'')
     expect(config).toContain('extensions: [ui()]')
     expect((await addFeatures(dir, ['ui'], { install: false })).written).toEqual([])
   }

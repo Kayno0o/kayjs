@@ -638,6 +638,9 @@ interface TreeNode<Id extends TreeId = string>
   menu?: readonly MenuEntry[] | undefined
   newTab?: NewTab | undefined
 
+[.] ui
+function ui(): KayExtension<AnyElysia>
+
 [.] uiDefaults
 const uiDefaults: UiSettings
 

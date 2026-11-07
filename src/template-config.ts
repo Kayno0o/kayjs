@@ -10,7 +10,7 @@ export function config({ has, settings }: Setup): string {
 
   return lines(
     has('auth') && 'import { auth } from \'@kaynooo/kayjs-auth\'',
-    has('auth') && 'import { ui } from \'@kaynooo/kayjs-ui/extension\'',
+    has('auth') && 'import { ui } from \'@kaynooo/kayjs-ui\'',
     !server && base !== undefined && 'import process from \'node:process\'',
     'import { defineConfig } from \'kay/server\'',
     '',

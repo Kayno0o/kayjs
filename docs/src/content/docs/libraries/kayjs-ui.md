@@ -16,7 +16,7 @@ bun add @kaynooo/kayjs-ui @iconify-json/tabler
 ```ts
 // kay.config.ts
 import { defineConfig } from 'kay/server'
-import { ui } from '@kaynooo/kayjs-ui/extension'
+import { ui } from '@kaynooo/kayjs-ui'
 
 export default defineConfig({ extensions: [ui()] })
 ```
