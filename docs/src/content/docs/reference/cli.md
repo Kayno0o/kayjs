@@ -54,7 +54,7 @@ kay new my-app --template app --without docker
 | Option | Effect |
 | --- | --- |
 | `--template blank\|server\|site\|app` | The preset: one bare static page, an Elysia server (the default), a static site, or a server with kayjs-auth sign-in and a websocket island |
-| `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests` |
+| `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests`; `ai`, `mail`, `cms` and `ui` install the library and run `kay add` on the new project, so they need the network |
 | `--without <features>` | Drops features from the preset |
 | `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow |
 | `--agents none` | Leaves out `AGENTS.md`, `CLAUDE.md` and `.mcp.json` |

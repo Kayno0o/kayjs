@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { checklist, select } from '@kaynooo/cli-kit/prompt'
+import { addFeatures } from './add'
 import { nativeExe } from './compiler/native-typescript'
+import { FEATURE_NAMES, FEATURES } from './features'
 import { AGENT_FILES, agentsFile, CLAUDE_FILE, MCP_FILE, templateFiles } from './templates'
 
 // The kay this command runs from: a git checkout, which a new project depends on a packed copy of, or the published package.
@@ -21,26 +23,10 @@ const RUNNER_LABEL = /^[\w.:-]+$/
 
 export const HOSTS: readonly Host[] = ['forgejo', 'github']
 
+export { FEATURE_NAMES, FEATURES }
 export type { Feature, Host }
 
 export type Preset = 'blank' | 'server' | 'site' | 'app'
-
-// In the order the picker lists them, each with what it cannot go without.
-export const FEATURES: Record<Feature, { description: string, needs: readonly Feature[] }> = {
-  server: { description: 'an Elysia server, run in production as one executable; off, a static site built to dist', needs: [] },
-  starter: { description: 'a header, a 404 page, and a home page greeting from the server with a counter island', needs: [] },
-  tailwind: { description: 'Tailwind over the Catppuccin Mocha palette', needs: [] },
-  accents: { description: 'an accent picker in the header, kept in a cookie', needs: ['starter', 'tailwind'] },
-  eslint: { description: 'ESLint through @kaynooo/eslint, .kay fences and template expressions included', needs: [] },
-  tests: { description: 'kay test through kay/test, with a first test', needs: [] },
-  ci: { description: 'a Forgejo or GitHub workflow checking, linting and testing the server, or publishing the static site to Pages', needs: [] },
-  docker: { description: 'a Dockerfile and compose.prod.yaml running the executable, or nginx serving the static site', needs: [] },
-  auth: { description: 'kayjs-auth: sign-in, register and account pages on kay sessions, every page behind a signed-in user, its users in a SQLite file', needs: ['server', 'tailwind'] },
-  postgres: { description: 'kayjs-auth\'s users in Postgres instead of SQLite: a compose stack for development, roles and migrations as an owner', needs: ['auth'] },
-  ws: { description: 'an API module over a websocket, with an island counting the visitors online', needs: ['server'] },
-}
-
-export const FEATURE_NAMES = Object.keys(FEATURES) as Feature[]
 
 const SITE: readonly Feature[] = ['starter', 'tailwind', 'accents', 'eslint', 'tests', 'ci', 'docker']
 
@@ -69,6 +55,12 @@ export interface NewOptions {
   agents?: boolean | undefined
   // Lists the files without writing any, nor packing a checkout of kay into `vendor`.
   dryRun?: boolean | undefined
+  // Installs the packages of the library features (`kay add`'s install), which a test turns off.
+  install?: boolean | undefined
+  // The executable that installs them, `bun` itself unless a test stands in for it.
+  bun?: string | undefined
+  // Receives what the library features say the author still has to decide, as `kay add` prints it.
+  notes?: string[] | undefined
 }
 
 // What checking or unchecking a feature leaves checked: checking takes what it needs along, unchecking drops what needs it.
@@ -150,6 +142,8 @@ export async function refuseTarget(target: string): Promise<void> {
 export async function createProject(target: string, options: NewOptions = {}): Promise<string[]> {
   const dir = resolve(target)
   const features = new Set(options.features ?? PRESETS.server.features)
+  // `auth` is written by the templates, so it is not added a second time.
+  const libraries = FEATURE_NAMES.filter(name => features.has(name) && name !== 'auth' && FEATURES[name].packages !== undefined)
 
   for (const feature of features) {
     const missing = FEATURES[feature].needs.filter(need => !features.has(need))
@@ -171,13 +165,42 @@ export async function createProject(target: string, options: NewOptions = {}): P
   }
 
   if (options.dryRun === true)
-    return Object.keys(files).sort()
+    return [...new Set([...Object.keys(files), ...await librariesDryRun(files, libraries, options)])].sort()
 
   // The database credentials in .env are for its owner's eyes only from the moment it is written, which Bun.write cannot do as it ignores a mode.
   await mkdir(dir, { recursive: true })
   await Promise.all(Object.entries(files).map(async ([path, content]) => path === '.env' ? writeFile(join(dir, path), content, { mode: 0o600 }) : Bun.write(join(dir, path), content)))
 
-  return Object.keys(files).sort()
+  if (libraries.length === 0)
+    return Object.keys(files).sort()
+
+  // The same run as `kay add` on the project just written, which installs the libraries before it can ask them what they write.
+  const added = await addFeatures(dir, libraries, { install: options.install, bun: options.bun })
+
+  options.notes?.push(...added.notes)
+
+  return [...new Set([...Object.keys(files), ...added.written])].sort()
+}
+
+// The files the library features would write on top of `files`, planned in a scratch copy of the project: nothing is installed, so the libraries are read from beside kay.
+async function librariesDryRun(files: Record<string, string>, libraries: readonly Feature[], options: NewOptions): Promise<string[]> {
+  if (libraries.length === 0)
+    return []
+
+  const scratch = await mkdtemp(join(tmpdir(), 'kay-new-'))
+
+  try {
+    await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(scratch, path), content)))
+
+    const planned = await addFeatures(scratch, libraries, { dryRun: true, resolveFrom: KAY_ROOT })
+
+    options.notes?.push(...planned.notes)
+
+    return planned.written
+  }
+  finally {
+    await rm(scratch, { recursive: true, force: true })
+  }
 }
 
 // Every file of a project with these features in `dir`, named after it; run from a checkout of kay, packs it into `dir/vendor` for the project to depend on.

@@ -15,7 +15,7 @@ import { nativeExe } from '../src/compiler/native-typescript'
 import { loadConfig } from '../src/config-loader'
 import { formatFiles } from '../src/format'
 import { projectCapabilities } from '../src/mcp/tools'
-import { createProject, detectHost, FEATURE_NAMES, PRESETS, toggle } from '../src/new'
+import { createProject, detectHost, FEATURE_NAMES, FEATURES, PRESETS, toggle } from '../src/new'
 import { SEARCH_MANIFEST } from '../src/runtime/search'
 import { agentsFile, TAILWIND_CLASS_REGEX } from '../src/templates'
 import { listeningPort } from './listening'
@@ -203,8 +203,8 @@ async function installKay(dir: string) {
   }
 }
 
-// Each feature alone, and the app with each one left out, or put in where the app lacks it.
-const VARIANTS = FEATURE_NAMES.flatMap(feature => [[`${feature} alone`, toggle(new Set(), feature)], [PRESETS.app.features.includes(feature) ? `the app without ${feature}` : `the app with ${feature}`, toggle(new Set(PRESETS.app.features), feature)]] as const)
+// Each feature alone, and the app with each one left out, or put in where the app lacks it. The library features, which `kay new` installs, are covered by add.test.ts.
+const VARIANTS = FEATURE_NAMES.filter(feature => feature === 'auth' || FEATURES[feature].packages === undefined).flatMap(feature => [[`${feature} alone`, toggle(new Set(), feature)], [PRESETS.app.features.includes(feature) ? `the app without ${feature}` : `the app with ${feature}`, toggle(new Set(PRESETS.app.features), feature)]] as const)
 // Installed and type-checked besides the four presets, each linted and tested on the files it generates differently from every preset (`ownFiles`): the app without auth writes none, so it is only checked. With them, server runs with auth and ws (app), with ws alone (the app without auth) and with neither (server); starter and tailwind each run with accents (server) and without (the app without tailwind, the app without starter); server, starter and tailwind each run absent, and the tests of a project with neither a server nor the starter pages run in eslint and tests alone. ci and docker write only text files.
 const INSTALLED: [string, ReadonlySet<Feature>][] = [
   ['the app without starter', toggle(new Set(PRESETS.app.features), 'starter')],
@@ -584,7 +584,7 @@ describe('kay command line', () => {
       expect((await kay(['new', 'lean', '--kay', '^1.0.0', '--without', 'docker,ci'], dir)).code).toBe(0)
       expect(await readdir(join(dir, 'lean'))).not.toEqual(expect.arrayContaining(['Dockerfile']))
       expect(await Bun.file(join(dir, 'lean/src/server.ts')).exists()).toBe(true)
-      expect(await kay(['new', 'unknown', '--with', 'bogus'], dir)).toEqual({ stdout: '', stderr: 'kay new: bogus is none of the features server, starter, tailwind, accents, eslint, tests, ci, docker, auth, postgres, ws\n', code: 1 })
+      expect(await kay(['new', 'unknown', '--with', 'bogus'], dir)).toEqual({ stdout: '', stderr: 'kay new: bogus is none of the features server, starter, tailwind, accents, eslint, tests, ci, docker, auth, postgres, ws, ai, mail, cms, ui\n', code: 1 })
       expect(await kay(['new', 'both', '--with', 'docker', '--without', 'ci,docker'], dir)).toEqual({ stdout: '', stderr: 'kay new: docker is in both --with and --without\n', code: 1 })
       expect(await kay(['new', 'static', '--kay', '^1.0.0', '--template', 'site', '--with', 'auth'], dir)).toEqual({ stdout: '', stderr: 'kay: auth needs server: add --with server, or drop it with --without auth\n', code: 1 })
       expect(await kay(['new', 'unstyled', '--kay', '^1.0.0', '--without', 'tailwind'], dir)).toEqual({ stdout: '', stderr: 'kay: accents needs tailwind: add --with tailwind, or drop it with --without accents\n', code: 1 })

@@ -1,4 +1,4 @@
-export type Feature = 'server' | 'starter' | 'tailwind' | 'accents' | 'eslint' | 'tests' | 'ci' | 'docker' | 'auth' | 'postgres' | 'ws'
+export type Feature = 'server' | 'starter' | 'tailwind' | 'accents' | 'eslint' | 'tests' | 'ci' | 'docker' | 'auth' | 'postgres' | 'ws' | 'ai' | 'mail' | 'cms' | 'ui'
 
 // What kay.config.ts sets beyond the features, for a project migrated from a site that already had them.
 export interface ConfigSettings {

@@ -4,8 +4,9 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
 import process from 'node:process'
 import { isDeepStrictEqual } from 'node:util'
+import { FEATURE_NAMES, FEATURES } from './features'
 import { insertImport } from './imports'
-import { FEATURE_NAMES, FEATURES, originHost, projectFiles } from './new'
+import { originHost, projectFiles } from './new'
 
 // Files whose lines are a set: a feature adds the lines the file lacks and keeps the rest.
 const LINE_FILES = new Set(['.gitignore', '.dockerignore'])
@@ -66,19 +67,8 @@ export interface LibraryFeature {
 }
 
 // The libraries that register features: `kay add ai` adds their packages, the first of which is asked what to write through its `/add` module. A kayjs package takes kay's own minor, any other the range kay itself uses.
-export const LIBRARIES: Record<string, string[]> = {
-  ai: ['@kaynooo/kayjs-ai'],
-  mail: ['@kaynooo/kayjs-mail'],
-  cms: ['@kaynooo/kayjs-cms', '@kaynooo/kayjs-ui', '@iconify-json/tabler'],
-  ui: ['@kaynooo/kayjs-ui', '@iconify-json/tabler'],
-  auth: ['@kaynooo/kayjs-auth', '@kaynooo/kayjs-ui', '@iconify-json/tabler', '@kaynooo/pg-orm'],
-}
-
-// The core features a library needs, and the libraries it brings along: kayjs-auth's pages are drawn with kayjs-ui, which is mounted once for the whole app.
-const LIBRARY_NEEDS: Record<string, { features: readonly Feature[], libraries: readonly string[] }> = {
-  ui: { features: ['tailwind'], libraries: [] },
-  auth: { features: ['server', 'tailwind'], libraries: ['ui'] },
-}
+// What it needs and brings along come from the same table as `kay new`'s: kayjs-auth's pages are drawn with kayjs-ui, which is mounted once for the whole app.
+export const LIBRARIES: Record<string, readonly string[]> = Object.fromEntries(FEATURE_NAMES.flatMap(name => FEATURES[name].packages === undefined ? [] : [[name, FEATURES[name].packages]]))
 
 export interface AddResult {
   written: string[]
@@ -482,15 +472,22 @@ async function restoreAndThrow(dir: string, kept: Map<string, Buffer | undefined
   throw error
 }
 
-async function loadLibrary(dir: string, name: string, project: LibraryProject): Promise<LibraryFeature> {
-  let path: string
-
+function resolveIn(specifier: string, dir: string): string | undefined {
   try {
-    path = Bun.resolveSync(`${LIBRARIES[name]![0]!}/add`, dir)
+    return Bun.resolveSync(specifier, dir)
   }
   catch {
-    throw new Error(`kay add: ${LIBRARIES[name]![0]!} is not installed, and --no-install or --dry-run keeps kay add from installing it: it has to be installed to say what it writes`)
+    return undefined
   }
+}
+
+// The library's `add` export is resolved from the project, else from `from`: where a dry run of `kay new` finds the libraries kay itself sits beside, as the project has none yet.
+async function loadLibrary(dir: string, name: string, project: LibraryProject, from?: string): Promise<LibraryFeature> {
+  const specifier = `${LIBRARIES[name]![0]!}/add`
+  const path = resolveIn(specifier, dir) ?? (from === undefined ? undefined : resolveIn(specifier, from))
+
+  if (path === undefined)
+    throw new Error(`kay add: ${LIBRARIES[name]![0]!} is not installed, and --no-install or --dry-run keeps kay add from installing it: it has to be installed to say what it writes`)
 
   const module = await import(path) as { default?: LibraryFeature | ((project: LibraryProject) => LibraryFeature) }
   const feature = typeof module.default === 'function' ? module.default(project) : module.default
@@ -585,12 +582,12 @@ function applyEdit(edit: LibraryEdit, library: string, plan: Plan, text: string 
 }
 
 // Asks each installed library what it writes, adding its files, its changes, its extension and its notes to the plan.
-async function planLibraries(dir: string, libraries: readonly string[], plan: Plan): Promise<void> {
+async function planLibraries(dir: string, libraries: readonly string[], plan: Plan, from?: string): Promise<void> {
   const { manifest: onDiskManifest } = await readManifest(dir)
 
   for (const library of libraries) {
     const project = await projectOf(dir, plan, onDiskManifest)
-    const feature = await loadLibrary(dir, library, project)
+    const feature = await loadLibrary(dir, library, project, from)
 
     for (const [path, content] of Object.entries(feature.files ?? {})) {
       const disk = await read(join(dir, path))
@@ -667,7 +664,7 @@ async function addLibraries(dir: string, core: readonly Feature[], libraries: re
       next.writes.set('package.json', `${JSON.stringify(current, null, 2)}\n`)
     }
 
-    await planLibraries(dir, libraries, next)
+    await planLibraries(dir, libraries, next, options.resolveFrom)
     failIfConflicts(next)
 
     return next
@@ -697,11 +694,13 @@ export interface AddOptions {
   install?: boolean | undefined
   // The executable that runs `add` and `install`, `bun` itself unless a test stands in for it.
   bun?: string | undefined
+  // A folder to find a library's `add` export from when the project has not installed it, which only a dry run reads.
+  resolveFrom?: string | undefined
 }
 
 // The libraries with the ones they bring along, each once, a library after those it brings.
 function withBrought(libraries: readonly string[]): string[] {
-  const all = [...new Set(libraries.flatMap(library => [...LIBRARY_NEEDS[library]?.libraries ?? [], library]))]
+  const all = [...new Set(libraries.flatMap(library => [...FEATURES[library as Feature].brings ?? [], library]))]
 
   // The mail library goes first: kayjs-auth wires its mailer when src/mail.ts exists.
   return [...all.filter(library => library === 'mail'), ...all.filter(library => library !== 'mail')]
@@ -712,7 +711,7 @@ async function requireFeatures(dir: string, core: readonly Feature[], libraries:
   const wanted = new Set([...await detectFeatures(dir), ...core])
 
   for (const library of libraries) {
-    const missing = (LIBRARY_NEEDS[library]?.features ?? []).filter(need => !wanted.has(need))
+    const missing = FEATURES[library as Feature].needs.filter(need => !wanted.has(need))
 
     if (missing.length > 0)
       throw new Error(`kay add: ${library} needs ${missing.join(' and ')}: run \`kay add ${[...missing, library].join(',')}\` to add them together`)
@@ -721,13 +720,13 @@ async function requireFeatures(dir: string, core: readonly Feature[], libraries:
 
 // Adds the features to the project in `dir`: the files and edits `kay new --with` would have made, then the install. Nothing is written when a file does not have the shape `kay new` writes; the error says what to change by hand.
 export async function addFeatures(dir: string, names: readonly string[], options: AddOptions = {}): Promise<AddResult> {
-  const unknown = names.find(name => !FEATURE_NAMES.includes(name as Feature) && !Object.hasOwn(LIBRARIES, name))
+  const unknown = names.find(name => !FEATURE_NAMES.includes(name as Feature))
 
   if (unknown !== undefined)
-    throw new Error(`kay add: ${unknown} is none of the features ${[...FEATURE_NAMES, ...Object.keys(LIBRARIES)].join(', ')}`)
+    throw new Error(`kay add: ${unknown} is none of the features ${FEATURE_NAMES.join(', ')}`)
 
   // A library's name wins over a core feature's: `auth` is kayjs-auth.
-  const core = names.filter((name): name is Feature => FEATURE_NAMES.includes(name as Feature) && !Object.hasOwn(LIBRARIES, name))
+  const core = names.filter((name): name is Feature => !Object.hasOwn(LIBRARIES, name))
   const libraries = withBrought(names.filter(name => Object.hasOwn(LIBRARIES, name)))
   let plan = await planCore(dir, core)
 

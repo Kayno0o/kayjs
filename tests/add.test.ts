@@ -916,3 +916,60 @@ it('never writes back the CLAUDE.md and .mcp.json the app deleted', async () => 
     await rm(join(dir, '..'), { recursive: true, force: true })
   }
 })
+
+// A `bun` that links the workspace copies of the libraries into node_modules, as `bun add` would have left them.
+async function linkingBun(root: string): Promise<{ bun: string, calls: () => Promise<string[]> }> {
+  return stubBun(root, `mkdir -p node_modules/@kaynooo\nfor library in ui mail cms ai; do ln -sfn '${repo}'/packages/$library node_modules/@kaynooo/kayjs-$library; done`)
+}
+
+it('writes with kay new --with the files kay add writes to the project kay new made without them', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    const { bun } = await linkingBun(root)
+    const together = join(root, 'together/app')
+    const apart = join(root, 'apart/app')
+    const notes: string[] = []
+
+    const files = await createProject(together, { kay: '^1.0.0', features: [...PRESETS.server.features, 'ui', 'mail'], bun, notes })
+    const core = await createProject(apart, { kay: '^1.0.0', features: PRESETS.server.features })
+    const added = await addFeatures(apart, ['ui', 'mail'], { bun })
+    const read = async (dir: string) => Object.fromEntries(await Promise.all(files.map(async path => [path, await content(dir, path)] as const)))
+
+    expect([...new Set([...core, ...added.written])].toSorted()).toEqual(files)
+    expect(await read(together)).toEqual(await read(apart))
+    expect(await Bun.file(join(together, 'kay.config.ts')).text()).toContain('ui()')
+    expect(notes.length).toBeGreaterThan(0)
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('lists in a dry run the files a real kay new --with writes, library features included', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    const { bun } = await linkingBun(root)
+    const features: Feature[] = [...PRESETS.server.features, 'ui', 'mail', 'ai']
+    const planned = await createProject(join(root, 'dry/app'), { features, dryRun: true })
+    const written = await createProject(join(root, 'real/app'), { kay: '^1.0.0', features, bun })
+
+    expect(planned).toEqual(written)
+    expect(existsSync(join(root, 'dry'))).toBe(false)
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('refuses a library feature missing what it needs in kay new, as kay add does', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    await expect(createProject(join(root, 'app'), { kay: '^1.0.0', features: ['server', 'ui'] })).rejects.toThrow('kay: ui needs tailwind: add --with tailwind, or drop it with --without ui')
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})

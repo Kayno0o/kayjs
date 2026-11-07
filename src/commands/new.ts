@@ -91,12 +91,13 @@ export const scaffold: Command = {
         return 1
       }
 
-      const files = await createProject(dir, { kay: typeof values.kay === 'string' ? values.kay : undefined, features, host: forge === undefined ? await detectHost(dir) : forge as Host, runner: typeof values.runner === 'string' ? values.runner : undefined, agents: values.agents === undefined, dryRun })
+      const notes: string[] = []
+      const files = await createProject(dir, { notes, kay: typeof values.kay === 'string' ? values.kay : undefined, features, host: forge === undefined ? await detectHost(dir) : forge as Host, runner: typeof values.runner === 'string' ? values.runner : undefined, agents: values.agents === undefined, dryRun })
 
       const editors = dryRun ? [] : await setUpEditors(dir, wanted.filter(name => name !== 'none') as Editor[], values.editor === undefined && yes !== true && format === 'text' && isInteractive())
 
       if (format === 'json') {
-        printDocument({ dir, features, files, dryRun, editors })
+        printDocument({ dir, features, files, dryRun, editors, notes })
 
         return 0
       }
@@ -110,6 +111,11 @@ export const scaffold: Command = {
           console.log(`  ${path}`)
 
         return 0
+      }
+
+      if (values.quiet !== true) {
+        for (const note of notes)
+          console.log(`\n  ${note}`)
       }
 
       // With Postgres, the database runs in the container its compose.dev.yaml describes, with kayjs-auth's first migration generated and applied before the first start; SQLite is a file kayjs-auth creates itself.
