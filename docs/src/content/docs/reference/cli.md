@@ -717,7 +717,7 @@ The command lists each file it rewrote, and a file it could not read, which make
 claude mcp add kay -- bunx kay mcp
 ```
 
-`kay mcp --write` also lets the tools apply what they preview. `kay mcp` serves the project to an agent as an [MCP](https://modelcontextprotocol.io) server over stdio. The agent calls kay's commands as typed tools instead of running them in a shell. Nothing is set up in the app.
+`kay mcp` serves the project to an agent as an [MCP](https://modelcontextprotocol.io) server over stdio. The agent calls kay's commands as typed tools instead of running them in a shell. Nothing is set up in the app. Started as `kay mcp --write`, it also lets the tools apply what they preview.
 
 Another client takes the same command in its MCP config, such as `.mcp.json` at the project's root.
 
@@ -739,10 +739,10 @@ Another client takes the same command in its MCP config, such as `.mcp.json` at 
 | `add` | `kay add --dry-run --format json` on `features`: what it would write, installing nothing. With `apply: true`, it writes the files and `package.json`, and you run `bun install` after |
 | `fix` | `kay check --fix --dry-run --format json`: the problems with a safe fix. With `apply: true`, it rewrites the files |
 | `upgrade` | `kay upgrade --dry-run --format json`: the plan. With `apply: true`, it changes `package.json`, installs and rewrites the source |
-| `lint` | `kay lint` with the project's `keslint`, answered as `{ errors, warnings, problems }` capped at 200 problems. `paths` narrows it; `apply: true` adds `--fix` |
-| `build` | `kay build --format json`, with `static` and `denyWarnings` |
+| `lint` | `kay lint` with the project's `keslint`, answered as `{ errors, warnings, problems }` capped at 200 problems, with `omitted` counting the rest. `paths` narrows it; `apply: true` adds `--fix` |
+| `build` | `kay build --format json`, with `denyWarnings`. A plain build writes `.kay`; `static: true` replaces `dist` and needs `kay mcp --write` |
 | `types` | `kay types --format json` |
-| `test` | `kay test`, with `files` and a `name` pattern: `{ code, failed }`, each failed test with its `file`, `name`, `message` and `at`. An error when a test fails |
+| `test` | `kay test`, with `files` and a `name` pattern: `{ code, failed }`, each failed test with its `file`, `name`, `message` and `at`, capped at 200 with `omitted` counting the rest, and `summary` holding the output when no failed test could be listed. An error when a test fails |
 | `env` | `kay env --format json` |
 | `i18n_missing` | `kay i18n missing --format json`, for one `locale` or all |
 | `a11y` | `kay a11y --dry-run --format json`, with `standard`. Needs Chrome |
@@ -752,7 +752,7 @@ The resources are `kay://llms.txt`, the index to start from, one `kay://llms/<fi
 
 Each tool runs its command in a child process, so a call costs what the command does. Calls run one at a time, in the order they came.
 
-A tool that changes the project previews by default. Its `apply: true` is refused unless the client starts the server as `kay mcp --write`, so an agent writes only where the person who registered it allowed it. Every path an argument names must be inside the project, arguments reach the command as a list and never through a shell, and a long answer is cut.
+A tool that changes the project previews by default, and a long `waitMs` of `dev_errors` can outlast a client's request timeout. Its `apply: true` is refused unless the client starts the server as `kay mcp --write`, so an agent writes only where the person who registered it allowed it. Every path an argument names must be inside the project, arguments reach the command as a list and never through a shell, and a long answer is cut.
 
 ## Quiet and plain output
 

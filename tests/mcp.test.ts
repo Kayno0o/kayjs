@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, readlinkSync } from 'node:fs'
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
@@ -846,6 +846,39 @@ describe('kay mcp tools that write', () => {
     await call(writer, 'lint', { apply: true })
     expect(await Bun.file(join(app, 'lint-args.json')).json()).toEqual(['--fix', '--format', 'json', '.'])
     expect((await call(writer, 'lint', { paths: ['../x'] })).isError).toBe(true)
+  })
+
+  it('refuses a link that leads out of the project, for lint and test', async () => {
+    const outside = await scratchDir('mcp-outside-')
+
+    try {
+      await Bun.write(join(outside, 'x.ts'), 'var x = 1\n')
+      await symlink(outside, join(app, 'linked'))
+
+      for (const [name, args] of [['lint', { paths: ['linked'], apply: true }], ['lint', { paths: ['linked/x.ts'] }], ['test', { files: ['linked'] }]] as const) {
+        const refused = await call(writer, name, args)
+
+        expect(refused.isError).toBe(true)
+        expect(refused.content[0]!.text).toContain('not a file or directory inside the project')
+      }
+    }
+    finally {
+      await rm(outside, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses a static build without --write, and keeps a message holding > or a huge entity whole', async () => {
+    const refused = await call(reader, 'build', { static: true })
+
+    expect(refused.isError).toBe(true)
+    expect(refused.content[0]!.text).toContain('--write')
+    expect(await Bun.file(join(app, 'dist')).exists()).toBe(false)
+
+    await Bun.write(join(app, 'tests/angle.test.ts'), 'import { expect, it } from \'bun:test\'\n\nit(\'compares\', () => expect(1 > 2).toBe(true))\nit(\'text\', () => {\n  throw new Error(\'a > b &#x110000;\')\n})\n')
+
+    const listed = await call(writer, 'test', { files: ['tests/angle.test.ts'] })
+
+    expect(listed.structuredContent).toMatchObject({ failed: [{ name: 'compares', at: 'tests/angle.test.ts:3' }, { name: 'text', message: expect.stringContaining('a > b') }] })
   })
 
   it('waits for the dev errors to change and settle, answering the list as it stands when nothing changes', async () => {

@@ -1,5 +1,5 @@
 import type { Content, Resource, Tool, ToolResult } from './protocol'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -39,9 +39,9 @@ const MAX_WAIT_MS = 120_000
 const WAIT_POLL_MS = 100
 const WAIT_SETTLE_MS = 400
 const XML_ENTITY = /&(#x?[0-9a-f]+|amp|lt|gt|quot|apos);/gi
-const TEST_CASE = /<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g
+const TEST_CASE = /<testcase\b((?:"[^"]*"|[^>"])*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g
 const XML_ATTRIBUTE = /([\w:-]+)="([^"]*)"/g
-const FAILURE = /<(?:failure|error)\b([^>]*)>/
+const FAILURE = /<(?:failure|error)\b((?:"[^"]*"|[^>"])*)>/
 
 // The commands running for a call.
 const children = new Set<Bun.Subprocess>()
@@ -363,17 +363,22 @@ function tools(root: string, write: boolean): Tool[] {
     {
       name: 'build',
       title: 'Build the app',
-      description: 'Builds the app as `kay build --format json` does, checking it first, and answers its document: `{ errors, warnings, problems }`, the routes and the size of what it wrote. It writes `.kay` and, with `static`, `dist`; a problem found is a result, not a failure of the tool. A call takes as long as the build.',
+      description: 'Builds the app as `kay build --format json` does, checking it first, and answers its document: `{ errors, warnings, problems }`, the routes and the size of what it wrote. It writes `.kay`; with `static` it replaces `dist`, which needs the server started as `kay mcp --write`. A problem found is a result, not a failure of the tool. A call takes as long as the build.',
       inputSchema: {
         type: 'object',
         properties: {
-          static: { type: 'boolean', description: 'Write the whole site to `dist` for a host with no server.' },
+          static: { type: 'boolean', description: 'Replace `dist` with the whole site, for a host with no server. Needs the server started as `kay mcp --write`.' },
           denyWarnings: { type: 'boolean', description: 'Count warnings as failures.' },
         },
         additionalProperties: false,
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-      run: async args => document(['build', ...args.static === true ? ['--static'] : [], ...args.denyWarnings === true ? ['--deny-warnings'] : [], '--format', 'json']),
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+      run: async (args) => {
+        if (args.static === true && !write)
+          throw new Error('static replaces dist, and this server was started without `--write`: the client starts it as `kay mcp --write` to allow it')
+
+        return document(['build', ...args.static === true ? ['--static'] : [], ...args.denyWarnings === true ? ['--deny-warnings'] : [], '--format', 'json'])
+      },
     },
     {
       name: 'types',
@@ -463,7 +468,7 @@ function tools(root: string, write: boolean): Tool[] {
       name: 'dev_errors',
       title: 'Read the dev server\'s errors',
       description: 'Reads the errors a running `kay dev` met, from `.kay/dev/errors.json`: why the server failed to boot, type errors the check beside it found, requests that threw and errors islands met in the browser, each with its message, report and where the project\'s own code threw. An error leaves the list once the file compiles or the request answers again. Answers an empty list when `kay dev` has met none or has not run. With `waitMs`, first waits for the next change of the list and for it to settle, so an edit is answered by what it caused; `waited` says whether it changed before the wait ran out.',
-      inputSchema: { type: 'object', properties: { waitMs: { type: 'integer', minimum: 1, maximum: MAX_WAIT_MS, description: 'How long to wait, at most, for the list to change after this call.' } }, additionalProperties: false },
+      inputSchema: { type: 'object', properties: { waitMs: { type: 'integer', minimum: 1, maximum: MAX_WAIT_MS, description: 'How long to wait, at most, for the list to change after this call. A long wait can outlast the client\'s own request timeout.' } }, additionalProperties: false },
       annotations: READ_ONLY,
       run: async (args) => {
         const { waitMs } = args
@@ -694,8 +699,11 @@ function xmlAttributes(text: string): Record<string, string | undefined> {
 
   for (const [, name = '', value = ''] of text.matchAll(XML_ATTRIBUTE)) {
     found[name] = value.replaceAll(XML_ENTITY, (_, entity: string) => {
-      if (entity.startsWith('#'))
-        return String.fromCodePoint(entity[1] === 'x' ? Number.parseInt(entity.slice(2), 16) : Number(entity.slice(1)))
+      if (entity.startsWith('#')) {
+        const code = entity[1] === 'x' ? Number.parseInt(entity.slice(2), 16) : Number(entity.slice(1))
+
+        return code <= 0x10_FFFF ? String.fromCodePoint(code) : '�'
+      }
 
       return { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'' }[entity.toLowerCase()] ?? entity
     })
@@ -798,6 +806,12 @@ function insideProject(root: string, path: string): string {
 
   if (!existsSync(absolute))
     throw new Error(`${path} does not exist`)
+
+  // A link inside the project can lead out of it; where the path really lands is what must be inside.
+  const real = relative(realpathSync(root), realpathSync(absolute))
+
+  if (isAbsolute(real) || real.split(sep)[0] === '..')
+    throw new Error(`${path} is not a file or directory inside the project`)
 
   return inside
 }
