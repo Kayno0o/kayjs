@@ -1,6 +1,7 @@
 import type { Piece, Provider, RequestHookCall } from '../src'
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { s } from 'kay'
+import { useAppOnError } from '../../../src/server/report'
 import { ai, AiError, ask, fakeAi, ground, tool } from '../src'
 import { forgetCounts } from '../src/limits'
 
@@ -51,11 +52,11 @@ function echo(seen: { messages: string[], system: (string | undefined)[] } = { m
   }
 }
 
-describe('onRequest', () => {
+describe('beforeRequest', () => {
   it('may change the messages and the system prompt the provider is sent', async () => {
     const provider = echo()
 
-    ai({ onRequest: ({ messages }) => ({ messages: messages.map(message => ({ ...message, content: message.content.replace('secret', '***') })), system: 'be brief' }) })
+    ai({ beforeRequest: ({ messages }) => ({ messages: messages.map(message => ({ ...message, content: message.content.replace('secret', '***') })), system: 'be brief' }) })
 
     expect(await ask('my secret', { provider, system: 'long' })).toBe('echo:my ***')
     expect(provider.seen).toEqual({ messages: ['my ***'], system: ['be brief'] })
@@ -64,7 +65,7 @@ describe('onRequest', () => {
   it('is given the messages, the system prompt, the model and the options of the ask', async () => {
     const calls: RequestHookCall[] = []
 
-    ai({ onRequest: (call) => {
+    ai({ beforeRequest: (call) => {
       calls.push(call)
     } })
 
@@ -77,7 +78,7 @@ describe('onRequest', () => {
   it('leaves what it does not return as it was', async () => {
     const provider = echo()
 
-    ai({ onRequest: () => ({ system: 'added' }) })
+    ai({ beforeRequest: () => ({ system: 'added' }) })
     await ask('hi', { provider, system: 'old' })
 
     expect(provider.seen).toEqual({ messages: ['hi'], system: ['added'] })
@@ -87,9 +88,9 @@ describe('onRequest', () => {
     const provider = echo()
     const errors: unknown[] = []
 
-    ai({ onRequest: () => {
+    ai({ beforeRequest: () => {
       throw new AiError('invalid', 'moderated')
-    }, onError: error => errors.push(error) })
+    }, onError: ({ error }) => errors.push(error) })
 
     await expect(Promise.resolve(ask('bad', { provider }))).rejects.toThrow('moderated')
     expect(provider.seen.messages).toEqual([])
@@ -97,22 +98,22 @@ describe('onRequest', () => {
     expect(errors[0]).toBeInstanceOf(AiError)
   })
 
-  it('may be async, and one given to the ask replaces the one of ai()', async () => {
+  it('may be async, and one given to the ask runs after the one of ai()', async () => {
     const provider = echo()
     const heard: string[] = []
 
-    ai({ onRequest: () => {
+    ai({ beforeRequest: () => {
       heard.push('global')
     } })
 
-    await ask('hi', { provider, onRequest: async () => {
+    await ask('hi', { provider, beforeRequest: async () => {
       await Bun.sleep(1)
       heard.push('own')
 
       return { messages: [{ role: 'user', content: 'changed' }] }
     } })
 
-    expect(heard).toEqual(['own'])
+    expect(heard).toEqual(['global', 'own'])
     expect(provider.seen.messages).toEqual(['changed'])
   })
 
@@ -121,7 +122,7 @@ describe('onRequest', () => {
       yield { text: 'ok' }
     } }
 
-    ai({ budget: { tokens: 100, window: '1m' }, onRequest: ({ messages }) => messages[0]!.content === 'hi' ? { messages: [{ role: 'user', content: 'x'.repeat(400) }] } : undefined })
+    ai({ budget: { tokens: 100, window: '1m' }, beforeRequest: ({ messages }) => messages[0]!.content === 'hi' ? { messages: [{ role: 'user', content: 'x'.repeat(400) }] } : undefined })
 
     // 400 characters stand for 100 input tokens when the provider counts none: the short original would have counted 2 in all.
     await ask('hi', { provider, key: 'visitor' })
@@ -129,7 +130,7 @@ describe('onRequest', () => {
   })
 
   it('is not counted against the budget when it refuses', async () => {
-    ai({ budget: { tokens: 100, window: '1m' }, onRequest: () => {
+    ai({ budget: { tokens: 100, window: '1m' }, beforeRequest: () => {
       throw new AiError('invalid', 'no')
     } })
 
@@ -138,22 +139,22 @@ describe('onRequest', () => {
   })
 
   it('refuses a request it grew past maxInputChars', async () => {
-    ai({ onRequest: () => ({ messages: [{ role: 'user', content: 'x'.repeat(100) }] }) })
+    ai({ beforeRequest: () => ({ messages: [{ role: 'user', content: 'x'.repeat(100) }] }) })
 
     await expect(Promise.resolve(ask('hi', { provider: echo(), maxInputChars: 50 }))).rejects.toMatchObject({ kind: 'too-long' })
   })
 
   it('refuses an answer that is neither nothing nor { messages, system }', async () => {
-    ai({ onRequest: () => 'text' as never })
+    ai({ beforeRequest: () => 'text' as never })
 
-    await expect(Promise.resolve(ask('hi', { provider: echo() }))).rejects.toThrow('onRequest returns')
+    await expect(Promise.resolve(ask('hi', { provider: echo() }))).rejects.toThrow('beforeRequest returns')
   })
 
   it('applies to a structured ask and to the system prompt of ground()', async () => {
     const provider = echo()
     const grounded = ground([{ title: 'T', href: '/t', text: 'body' }], item => item)
 
-    ai({ onRequest: ({ system }) => ({ system: `${system ?? ''} audited` }) })
+    ai({ beforeRequest: ({ system }) => ({ system: `${system ?? ''} audited` }) })
 
     await ask('hi', { provider, system: grounded.system, sources: grounded.sources })
     expect(provider.seen.system[0]).toEndWith(' audited')
@@ -161,14 +162,14 @@ describe('onRequest', () => {
   })
 })
 
-describe('onStep, onToolCall, onFinish', () => {
+describe('onStep, onToolCall, onSuccess', () => {
   it('fire once per request, per call state and per reply', async () => {
     const events: string[] = []
 
     ai({
       onStep: step => events.push(`step ${step.calls.length} ${step.finish}`),
       onToolCall: call => events.push(`call ${call.name} ${call.status}`),
-      onFinish: done => events.push(`finish ${done.text} ${done.usage?.inputTokens} ${done.steps.length} ${done.finish} ${done.stopped}`),
+      onSuccess: done => events.push(`finish ${done.text} ${done.usage?.inputTokens} ${done.steps.length} ${done.finish} ${done.stopped}`),
     })
 
     const reply = ask('go', { provider: echo(undefined, 1), tools: [looked] })
@@ -182,7 +183,7 @@ describe('onStep, onToolCall, onFinish', () => {
   it('fire for a reply read twice only once', async () => {
     let finished = 0
 
-    ai({ onFinish: () => {
+    ai({ onSuccess: () => {
       finished++
     } })
 
@@ -202,7 +203,7 @@ describe('onStep, onToolCall, onFinish', () => {
       await new Promise(resolve => signal.addEventListener('abort', resolve))
     } }
 
-    ai({ onFinish: result => done.push(result) })
+    ai({ onSuccess: result => done.push(result) })
 
     const reply = ask('hi', { provider: slow })
 
@@ -219,7 +220,7 @@ describe('onStep, onToolCall, onFinish', () => {
       throw new AiError('unavailable', 'down')
     } }
 
-    ai({ onFinish: () => heard.push('finish'), onError: error => heard.push(`error ${(error as AiError).kind}`) })
+    ai({ onSuccess: () => heard.push('finish'), onError: ({ error }) => heard.push(`error ${(error as AiError).kind}`) })
 
     await expect(Promise.resolve(ask('hi', { provider: broken }))).rejects.toThrow('down')
     expect(heard).toEqual(['error unavailable'])
@@ -232,7 +233,7 @@ describe('onStep, onToolCall, onFinish', () => {
       onStep: () => {
         throw new Error('step')
       },
-      onFinish: async () => Promise.reject(new Error('finish')),
+      onSuccess: async () => Promise.reject(new Error('finish')),
     })
 
     try {
@@ -244,13 +245,13 @@ describe('onStep, onToolCall, onFinish', () => {
     }
   })
 
-  it('are replaced hook by hook by the ones of the ask', async () => {
+  it('are added to by the ones of the ask', async () => {
     const heard: string[] = []
 
-    ai({ onFinish: () => heard.push('global finish'), onStep: () => heard.push('global step') })
-    await ask('hi', { provider: echo(), onFinish: () => heard.push('own finish') })
+    ai({ onSuccess: () => heard.push('global finish'), onStep: () => heard.push('global step') })
+    await ask('hi', { provider: echo(), onSuccess: () => heard.push('own finish') })
 
-    expect(heard).toEqual(['global step', 'own finish'])
+    expect(heard).toEqual(['global step', 'global finish', 'own finish'])
   })
 })
 
@@ -260,12 +261,12 @@ describe('the fake', () => {
 
     const heard: string[] = []
 
-    ai({ onFinish: () => heard.push('global') })
+    ai({ onSuccess: () => heard.push('global') })
     fakeAi.reply('one')
     fakeAi.reply('two')
 
     expect(await ask('hi')).toBe('one')
-    expect(await ask('hi', { onFinish: () => heard.push('own') })).toBe('two')
+    expect(await ask('hi', { onSuccess: () => heard.push('own') })).toBe('two')
     expect(heard).toEqual(['own'])
   })
 })
@@ -277,9 +278,9 @@ describe('structured asks and failed calls', () => {
       yield { text: '{"a":1}' }
     } }
 
-    ai({ onRequest: () => {
+    ai({ beforeRequest: () => {
       heard.push('request')
-    }, onFinish: () => heard.push('finish') })
+    }, onSuccess: () => heard.push('finish') })
 
     expect(await ask('hi', { provider: json, schema: s.Object({ a: s.Number() }) })).toEqual({ a: 1 })
     expect(heard).toEqual(['request', 'finish'])
@@ -302,5 +303,111 @@ describe('structured asks and failed calls', () => {
     }
 
     expect(statuses).toEqual(['running', 'failed'])
+  })
+})
+
+describe('the hook convention', () => {
+  it('gives every hook the context of the request, and tells onError an object', async () => {
+    const seen: unknown[] = []
+    const broken: Provider = { name: 'broken', model: 'm', async* stream() {
+      throw new AiError('invalid', 'no')
+    } }
+
+    ai({
+      beforeRequest: ({ context }) => {
+        seen.push(Object.keys(context).sort())
+      },
+      onError: failure => seen.push(failure),
+    })
+
+    await expect(Promise.resolve(ask('hi', { provider: broken }))).rejects.toThrow('no')
+    expect(seen[0]).toEqual(['ip', 'locale', 'request', 'userAgent', 'userId'])
+    expect(seen[1]).toMatchObject({ error: { kind: 'invalid' }, context: { request: undefined } })
+  })
+
+  it('refuses the ask on false with a refusal, calling onError and never asking the provider', async () => {
+    const provider = echo()
+    const errors: unknown[] = []
+
+    ai({ beforeRequest: () => false, onError: ({ error }) => errors.push(error) })
+
+    await expect(Promise.resolve(ask('hi', { provider }))).rejects.toMatchObject({ [Symbol.for('kay.refused')]: { status: 403 } })
+    expect(provider.seen.messages).toEqual([])
+    expect(errors).toHaveLength(1)
+  })
+
+  it('runs beforeRequest, the onRequest it was before 1.92, then the ask\'s, each seeing what the one before changed', async () => {
+    const provider = echo()
+    const seen: string[] = []
+
+    ai({
+      onRequest: ({ system }) => {
+        seen.push(`old ${system}`)
+
+        return { system: 'old' }
+      },
+      beforeRequest: ({ system }) => {
+        seen.push(`new ${system}`)
+
+        return { system: 'new' }
+      },
+    })
+
+    await ask('hi', { provider, system: 'asked', beforeRequest: ({ system }) => {
+      seen.push(`own ${system}`)
+    } })
+
+    expect(seen).toEqual(['new asked', 'old new', 'own old'])
+    expect(provider.seen.system).toEqual(['old'])
+  })
+
+  it('still runs onFinish beside onSuccess, and tells neither of a failed reply', async () => {
+    const heard: string[] = []
+    const broken: Provider = { name: 'broken', model: 'm', async* stream() {
+      throw new AiError('invalid', 'no')
+    } }
+
+    ai({ onSuccess: () => heard.push('success'), onFinish: () => heard.push('finish') })
+
+    await ask('hi', { provider: echo() })
+    expect(heard).toEqual(['success', 'finish'])
+
+    await expect(Promise.resolve(ask('hi', { provider: broken }))).rejects.toThrow('no')
+    expect(heard).toEqual(['success', 'finish'])
+  })
+
+  it('reports a hook that throws with its source and still runs the next one', async () => {
+    const sources: (string | undefined)[] = []
+    const heard: string[] = []
+
+    const log = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    useAppOnError(({ source }) => {
+      sources.push(source)
+    })
+
+    ai({
+      onStep: () => {
+        throw new Error('step')
+      },
+      onSuccess: async () => Promise.reject(new Error('success')),
+    })
+
+    try {
+      await ask('hi', { provider: echo(), onStep: () => heard.push('own step'), onSuccess: () => heard.push('own success') })
+      await Bun.sleep(10)
+    }
+    finally {
+      log.mockRestore()
+    }
+
+    expect(heard).toEqual(['own step', 'own success'])
+    expect(sources.sort()).toEqual(['ai.onStep', 'ai.onSuccess'])
+  })
+
+  it('accepts the new names in ai() and refuses one that is no function', () => {
+    expect(() => ai({ beforeRequest: 'no' as never })).toThrow('beforeRequest')
+    expect(() => ai({ onSuccess: 'no' as never })).toThrow('onSuccess')
+    expect(() => ai({ beforeRequest: () => undefined, onSuccess: () => undefined })).not.toThrow()
   })
 })

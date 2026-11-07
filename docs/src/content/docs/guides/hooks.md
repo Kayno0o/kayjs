@@ -8,7 +8,9 @@ Kay and its libraries let you react to what they do with callbacks called hooks.
 
 ## What this release ships
 
-This release ships the helpers libraries build hooks with, `refuse()`, and the `source` that `onError` receives. kayjs-auth's hooks follow the rule (`onEvent`, `beforeDelete` and `onSignUp`, which get a `context` with the `actor`); the others keep their names for now, such as `onRequest` in kayjs-ai. Queues, workflows and schedules already follow the rule. Later releases rename them to this rule, each with a `kay upgrade` fix. New hooks follow it from the start.
+This release ships the helpers libraries build hooks with, `refuse()`, and the `source` that `onError` receives. kayjs-auth's and kayjs-ai's hooks follow the rule (`onEvent`, `beforeDelete` and `onSignUp` in auth, which get a `context` with the `actor`; `beforeRequest`, `onSuccess` and `onError` in ai); the others keep their names for now.
+
+Queues, workflows and schedules already follow the rule. Later releases rename them to this rule, each with a `kay upgrade` fix. New hooks follow it from the start.
 
 ## Names
 

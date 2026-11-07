@@ -1,6 +1,10 @@
+ai [.] AiOptions
+ai [.] AskHooks
+ai [.] AskOptions
 ai [.] ConversationStore
 ai [.] ConversationSummary
 ai [.] StoredConversation
+ai [.] StructuredAskOptions
 ai [.] sqliteConversations
 auth [.] AcceptResult
 auth [.] AdminAuditLogResult

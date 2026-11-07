@@ -12,6 +12,10 @@ interface HookRenames {
   from: (source: string) => boolean
   // The functions whose options hold the hooks.
   calls: readonly string[]
+  // The position of the options object in a call, for the functions that take it after another argument (`ask(prompt, { ... })`); the first by default.
+  argument?: Readonly<Record<string, number>>
+  // The group's `onError` is told `{ error, context }` since the release, where it was told the error itself.
+  errorShape?: true
   // The file whose `export const hooks` holds the same keys, relative to the project.
   hooksFile?: string
   renames: Readonly<Record<string, string>>
@@ -32,9 +36,19 @@ const HOOK_RENAMES: readonly HookRenames[] = [
     changed: ['onDelete'],
     until: '1.95',
   },
+  {
+    library: 'kayjs-ai',
+    from: source => source === '@kaynooo/kayjs-ai' || source.startsWith('@kaynooo/kayjs-ai/'),
+    calls: ['ai', 'ask'],
+    argument: { ask: 1 },
+    // `beforeRequest` and `onSuccess` run where `onRequest` and `onFinish` did, in the same order and with the same refusals, so the rename keeps what the hook does.
+    renames: { onRequest: 'beforeRequest', onFinish: 'onSuccess' },
+    errorShape: true,
+    until: '1.95',
+  },
 ]
 
-const OLD_HOOK = new RegExp(`\\b(?:${[...new Set(HOOK_RENAMES.flatMap(({ renames }) => Object.keys(renames)))].join('|')})\\b`)
+const OLD_HOOK = new RegExp(`\\b(?:${[...new Set(HOOK_RENAMES.flatMap(({ renames, errorShape }) => [...Object.keys(renames), ...errorShape === true ? ['onError'] : []]))].join('|')})\\b`)
 
 type Member = ObjectExpression['properties'][number]
 
@@ -54,9 +68,34 @@ export async function hookNames(root: string, options: CheckOptions): Promise<Ch
     return []
 
   return scan(root, options, 'deprecated-hook-names', OLD_HOOK, ({ file, parsed, report }) => {
-    for (const { ast, base } of parsed) {
+    for (const { ast, base, text: source } of parsed) {
       const rename = (object: ObjectExpression, group: HookRenames, what: string) => {
         const members = object.properties.filter(isNamed)
+
+        for (const member of group.errorShape === true ? members : []) {
+          if (nameOf(member) !== 'onError')
+            continue
+
+          const hook = unwrapped(member.value)
+          const written = hook.type === 'ArrowFunctionExpression' || hook.type === 'FunctionExpression'
+          const param = written ? hook.params[0] : undefined
+
+          // A function with no parameter, or one that destructures its argument, reads nothing of the error itself.
+          if (written && (param === undefined || param.type !== 'Identifier'))
+            continue
+
+          let edits: { start: number, end: number, text: string }[] | null = null
+
+          // A typed parameter is left to the app, as the pattern would have to carry the type.
+          if (param?.type === 'Identifier' && param.typeAnnotation == null) {
+            const pattern = param.name === 'error' ? '{ error }' : `{ error: ${param.name} }`
+            const bare = hook.type === 'ArrowFunctionExpression' && source.slice(0, param.start).trimEnd().at(-1) !== '('
+
+            edits = [{ start: base + param.start, end: base + param.end, text: bare ? `(${pattern})` : pattern }]
+          }
+
+          report(base + member.key.start, base + member.key.end, `\`onError\` of ${what} is told \`{ error, context }\` since 1.92 and no longer the error itself, so every hook is told one object`, written ? 'write `({ error }) =>`, or `({ error: name }) =>` for another name' : 'the hook is not written here: read `error` of its argument', edits)
+        }
 
         for (const member of members) {
           const old = nameOf(member)
@@ -83,7 +122,8 @@ export async function hookNames(root: string, options: CheckOptions): Promise<Ch
             const called = imported.find(({ call, locals, namespaces }) => callee.type === 'Identifier'
               ? locals.has(callee.name)
               : callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.property.type === 'Identifier' && callee.property.name === call && namespaces.has(callee.object.name))
-            const given = called && node.arguments[0] ? unwrapped(node.arguments[0]) : undefined
+            const argument = called ? node.arguments[group.argument?.[called.call] ?? 0] : undefined
+            const given = argument ? unwrapped(argument) : undefined
 
             if (called && given?.type === 'ObjectExpression')
               rename(given, group, `\`${called.call}()\` of ${group.library}`)

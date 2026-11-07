@@ -63,3 +63,54 @@ describe('deprecated-hook-names', () => {
     }
   })
 })
+
+const AI = 'import { ai, ask } from \'@kaynooo/kayjs-ai\'\n'
+
+describe('deprecated-hook-names for kayjs-ai', () => {
+  it('renames onRequest and onFinish, wraps the argument of onError, and leaves what is not ai\'s', async () => {
+    const call = `${AI}\nai({ onRequest: ({ messages }) => ({ messages }), onFinish: done => bill(done), onError: error => report(error) })\nawait ask('hi', { onFinish: log, onError: function (e) { report(e) } })\n`
+    const named = `${AI}\nai({ onError: error => report(error), onRequest() {} })\n`
+    const namespaced = 'import * as kayjs from \'@kaynooo/kayjs-ai\'\n\nkayjs.ask(\'hi\', { onFinish: log })\n'
+    const fresh = `${AI}\nai({ beforeRequest: check, onSuccess: log, onError: ({ error }) => report(error), onError2: 1 })\nai({ onError: () => alert() })\n`
+    const reference = `${AI}\nai({ onError: report })\n`
+    const typed = `${AI}\nai({ onError: (error: unknown) => report(error) })\n`
+    const clash = `${AI}\nai({ onRequest: old, beforeRequest: next })\n`
+    const mine = 'import { ai, ask } from \'./mine\'\n\nai({ onRequest: check, onFinish: log, onError: report })\nask(\'hi\', { onFinish: log })\n'
+    const root = await project({ 'src/call.ts': call, 'src/named.ts': named, 'src/namespaced.ts': namespaced, 'src/fresh.ts': fresh, 'src/reference.ts': reference, 'src/typed.ts': typed, 'src/clash.ts': clash, 'src/mine.ts': mine })
+
+    try {
+      const found = await hookNames(root, {})
+
+      expect(found.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.line, diagnostic.fixes === undefined]).sort()).toEqual([
+        ['src/call.ts', 3, false],
+        ['src/call.ts', 3, false],
+        ['src/call.ts', 3, false],
+        ['src/call.ts', 4, false],
+        ['src/call.ts', 4, false],
+        ['src/clash.ts', 3, true],
+        ['src/named.ts', 3, false],
+        ['src/named.ts', 3, false],
+        ['src/namespaced.ts', 3, false],
+        ['src/reference.ts', 3, true],
+        ['src/typed.ts', 3, true],
+      ].sort())
+
+      // Every rename keeps what the hook does, so every fix is a safe one.
+      expect(found.every(diagnostic => diagnostic.fixes === undefined || diagnostic.fixes[0]?.safe !== false)).toBe(true)
+
+      await applySafeFixes(root, found)
+      expect(await Bun.file(join(root, 'src/call.ts')).text()).toBe(`${AI}\nai({ beforeRequest: ({ messages }) => ({ messages }), onSuccess: done => bill(done), onError: ({ error }) => report(error) })\nawait ask('hi', { onSuccess: log, onError: function ({ error: e }) { report(e) } })\n`)
+      expect(await Bun.file(join(root, 'src/named.ts')).text()).toBe(`${AI}\nai({ onError: ({ error }) => report(error), beforeRequest() {} })\n`)
+      expect(await Bun.file(join(root, 'src/namespaced.ts')).text()).toBe(namespaced.replace('onFinish', 'onSuccess'))
+      expect(await Bun.file(join(root, 'src/fresh.ts')).text()).toBe(fresh)
+      expect(await Bun.file(join(root, 'src/reference.ts')).text()).toBe(reference)
+      expect(await Bun.file(join(root, 'src/typed.ts')).text()).toBe(typed)
+      expect(await Bun.file(join(root, 'src/clash.ts')).text()).toBe(clash)
+      expect(await Bun.file(join(root, 'src/mine.ts')).text()).toBe(mine)
+      expect((await hookNames(root, {})).map(diagnostic => diagnostic.file.slice(root.length + 1)).sort()).toEqual(['src/clash.ts', 'src/reference.ts', 'src/typed.ts'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})

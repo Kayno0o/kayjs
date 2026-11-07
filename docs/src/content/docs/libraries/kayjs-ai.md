@@ -655,11 +655,13 @@ Under `bun test` the fake answers all three. Embeddings are stable vectors built
 
 ## Hooks around every ask
 
-To log asks with their usage, redact or moderate what leaves, bill a tenant or trace tool calls, set hooks once in `ai({ ... })` instead of wrapping `ask`: `onRequest({ messages, system, model, options })` before the provider is called, `onStep(step)` after each request, `onToolCall(call)` as each tool starts and ends, `onFinish({ text, usage, steps, finish, stopped })` once the reply ends, and `onError(error)` when it fails.
+To log asks with their usage, redact or moderate what leaves, bill a tenant or trace tool calls, set hooks once in `ai({ ... })` instead of wrapping `ask`: `beforeRequest({ messages, system, model, options, context })` before the provider is called, `onStep(step)` after each request, `onToolCall(call)` as each tool starts and ends, `onSuccess({ text, usage, steps, finish, stopped, context })` once the reply ends, and `onError({ error, context })` when it fails.
 
-`onRequest` may return `{ messages, system }` to send those instead, or throw an `AiError` to refuse the ask before anything is sent or counted. The others only notify: a throw in one is logged and the reply goes on.
+Each gets the `context` of the request being answered.
 
-The same names in `ask(..., { onFinish })` replace the one of `ai()` for that ask. The hooks of `ai()` skip the fake that answers in tests, so a test does not write a bill, while a hook given to the ask itself runs.
+`beforeRequest` may return `{ messages, system }` to send those instead, return `false`, or throw an `AiError` to refuse the ask before anything is sent or counted. The others only notify: a throw in one is logged and the reply goes on.
+
+The same names in `ask(..., { onSuccess })` run after the one of `ai()` for that ask, they do not replace it. `onRequest` and `onFinish` are the names before 1.92 and work until 1.95. The hooks of `ai()` skip the fake that answers in tests, so a test does not write a bill, while a hook given to the ask itself runs.
 
 <ReadMore href="/llms/kayjs-ai-hooks">What each hook gets, and when it runs.</ReadMore>
 

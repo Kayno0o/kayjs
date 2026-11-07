@@ -21,6 +21,14 @@ Every failed kayjs-auth result is `{ ok: false, error }` with `error` the `Error
 
 `kay check` cannot find the change of `onSignUp`: a throw in it used to fail `password.register`, `signInAsGuest` and the OAuth callback after the user was written, and is now logged, reported to the app's `onError` with source `auth.onSignUp`, and the sign-up stands. A hook that relied on the throw to refuse a sign-up checks in `allow`, or deletes the user itself. A throw in `onEvent` was already logged; it is reported to `onError` with source `auth.onEvent` too.
 
+### kayjs-ai hooks follow the hook convention, `onError` is told an object
+
+`onRequest` is `beforeRequest` and `onFinish` is `onSuccess`, `onError(error)` is `onError({ error, context })`, and every hook of `ai()` and `ask()` gets a `context` (kay's `HookContext`) beside its fields. `beforeRequest` also refuses with `false` (a 403, as `refuse()`). The old `onRequest` and `onFinish` work until 1.95, run after the new names when both are set, and `kay check` flags them as `deprecated-hook-names`; `kay upgrade` renames them in the options written out at a call of `ai()` or `ask()`, and wraps the argument of an `onError` written there as an arrow or a function: `error => report(error)` becomes `({ error }) => report(error)`.
+
+`kay check` cannot find an `onError` that is a reference (`onError: report`), a function with a typed parameter, or one set through a variable: it reports them with no fix, and the hook is told `{ error, context }` where it was told the error, so read `error` of its argument.
+
+A hook given to `ask(prompt, { onSuccess })` no longer replaces the one of `ai()` of the same name: both run, the one of `ai()` first. An app that relied on the replacement to switch a bill or an audit off for one ask sets it from one place instead (an option of its own that the hook reads). A throw in `onStep`, `onToolCall`, `onSuccess` or `onError` is still logged and never fails the reply, and is now also handed to the app's `onError` with source `ai.onStep`, `ai.onToolCall`, `ai.onSuccess` or `ai.onError`.
+
 ### kay `QueuedJob.runAt` is a `Date`
 
 The jobs `jobs(queue)` follows in an island carry `runAt` as a `Date` where they carried milliseconds: read `job.runAt.getTime()` for the number. The `JobStore` interface keeps milliseconds. No lint can see it: a type changing under a property is not visible to `kay check`.

@@ -3,7 +3,7 @@ import type { HeldCall } from './conversation'
 import type { Offered } from './loop'
 import type { Replaces } from './resume'
 import type { AiMessage, AiReply, AskOptions, FunctionTool, Piece, Provider, ProviderMessage, ProviderRequest, ReplyOf, StructuredAskOptions, Timeouts, ToolAction } from './types'
-import { actionTool, byteSize, configError, currentRequest, durationSeconds, jsonSchemaOf, refundRateLimit } from 'kay/library'
+import { actionTool, byteSize, configError, currentRequest, durationSeconds, hookContext, jsonSchemaOf, refundRateLimit } from 'kay/library'
 import { attachmentsOf, checkAccepted, DEFAULT_MAX_ATTACHMENT_BYTES, estimatedChars, mediaChars, readAttachments, toolChars } from './attachments'
 import { choose, given } from './config'
 import { conversationReply, heldCall, heldReply } from './conversation'
@@ -295,7 +295,7 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchem
 
   const hooks = hooksFor(options, provider)
   // The provider the requests go through, which asks again or elsewhere after a failure before the first piece.
-  const sturdy = resilient(provider, model, planFor(options, provider), hooks.onError)
+  const sturdy = resilient(provider, model, planFor(options, provider), hooks)
   const answering = currentRequest()
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS
   const described = answer === undefined ? undefined : answerSchema(answer)
@@ -319,7 +319,7 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchem
   let offered: Offered[] = []
   let maxSteps = DEFAULT_MAX_STEPS
 
-  // What goes to the provider for these messages and this system prompt; `onRequest` may change both, so it is built again for what it returns.
+  // What goes to the provider for these messages and this system prompt; `beforeRequest` may change both, so it is built again for what it returns.
   const plan = (current: AiMessage[], system: string | undefined) => {
     const attached = current.some(message => message.attachments !== undefined)
     // Without attachments the messages are a provider's as they are; with them the request is completed once they are read.
@@ -367,11 +367,11 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchem
   }
 
   const about = { ...first.about }
-  const onRequest = hooks.onRequest
+  const before = hooks.beforeRequest
 
-  // `onRequest` runs before the limits count the ask, so what they and the dev tool see is the request it left, once.
+  // `beforeRequest` runs before the limits count the ask, so what they and the dev tool see is the request it left, once.
   async function* changed(signal: AbortSignal): AsyncGenerator<Piece> {
-    const change = await requested(onRequest!, { messages: messages.map(message => ({ ...message })), system: options.system, model: first.about.model, options })
+    const change = await requested(before, { messages: messages.map(message => ({ ...message })), system: options.system, model: first.about.model, options }, await hooks.context ?? await hookContext())
     let used = first
 
     if (signal.aborted)
@@ -389,5 +389,5 @@ function reply(prompt: string | AiMessage[], options: AskOptions, answer: TSchem
     yield* used.open(signal)
   }
 
-  return createReply(signal => recorded(onRequest === undefined ? first.open(signal) : changed(signal), about, signal), signals, undefined, outlive, ended, extras)
+  return createReply(signal => recorded(before.length === 0 ? first.open(signal) : changed(signal), about, signal), signals, undefined, outlive, ended, extras)
 }

@@ -1,6 +1,7 @@
 import type { AiErrorKind } from './errors'
+import type { Hooks } from './hooks'
 import type { Streams } from './loop'
-import type { AskHooks, FallbackModel, Inner, Provider, ProviderRequest, Resilience, RetryOptions, Step } from './types'
+import type { FallbackModel, Inner, Provider, ProviderRequest, Resilience, RetryOptions, Step } from './types'
 import { sleep } from '@kaynooo/utils'
 import { configError, durationSeconds } from 'kay/library'
 import { given } from './config'
@@ -112,7 +113,7 @@ function streamed(piece: Inner): boolean {
   return 'text' in piece || 'reasoning' in piece || 'thinking' in piece || 'toolUse' in piece
 }
 
-async function* attempting(targets: Target[], request: ProviderRequest, signal: AbortSignal, policy: Policy | undefined, onError: AskHooks['onError']): AsyncGenerator<Inner> {
+async function* attempting(targets: Target[], request: ProviderRequest, signal: AbortSignal, policy: Policy | undefined, hooks: Hooks): AsyncGenerator<Inner> {
   const attempts = policy?.attempts ?? 1
   let made = 0
 
@@ -174,7 +175,7 @@ async function* attempting(targets: Target[], request: ProviderRequest, signal: 
       if (wait === undefined && lastTarget)
         throw failure
 
-      tell('onError', onError, failure)
+      tell('onError', hooks.onError, { error: failure }, await hooks.context)
 
       if (wait === undefined)
         break
@@ -185,7 +186,7 @@ async function* attempting(targets: Target[], request: ProviderRequest, signal: 
 }
 
 // The provider an ask is sent through: the model asked, then each fallback, each retried as the plan says. A request that fails before the first piece of the reply is asked again; one that streamed something never is.
-export function resilient(provider: Provider, model: string, plan: Plan, onError: AskHooks['onError']): Streams {
+export function resilient(provider: Provider, model: string, plan: Plan, hooks: Hooks): Streams {
   const targets: Target[] = [{ provider, model }, ...plan.fallback.map((entry) => {
     const chosen = named(entry.model)
     const own = entry.provider ?? chosen?.provider
@@ -193,5 +194,5 @@ export function resilient(provider: Provider, model: string, plan: Plan, onError
     return { provider: own === undefined ? provider : given(own), model: chosen?.model ?? entry.model }
   })]
 
-  return { name: provider.name, stream: (request, signal) => attempting(targets, request, signal, plan.policy, onError) }
+  return { name: provider.name, stream: (request, signal) => attempting(targets, request, signal, plan.policy, hooks) }
 }

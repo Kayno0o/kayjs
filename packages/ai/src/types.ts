@@ -1,6 +1,6 @@
 import type { Action, Duration, Static } from 'kay'
 import type { IconProps } from 'kay/icons'
-import type { ByteSize, TSchema } from 'kay/library'
+import type { BeforeHook, ByteSize, Hook, TSchema } from 'kay/library'
 import type { StoredFile } from './attachments'
 import type { AiErrorKind } from './errors'
 
@@ -273,18 +273,27 @@ export interface FinishHookCall {
   stopped: boolean
 }
 
-// Hooks around an ask, set once in `ai({ ... })` and replaced one by one by the same names in `ask(..., { ... })`. A throw in a hook that only notifies is logged and never fails the reply.
+// What `onError` is given: the error the reply's readers get, or a request that failed and was retried or fell back.
+export interface ErrorHookCall {
+  error: unknown
+}
+
+// Hooks around an ask, set once in `ai({ ... })` and added to by the same names in `ask(..., { ... })`: the hooks of `ai()` run first, then the ask's. Each is given `context`, the request being answered. A throw in a hook that only notifies is reported with source `ai.<hook>` and never fails the reply.
 export interface AskHooks {
-  // Called before the provider is asked, after the input-length check, and before the limits count the ask: may return the `messages` and `system` to send instead (redact, add context), or throw an `AiError` (or any error) to refuse the ask, which fails the reply with it and calls `onError`.
-  onRequest?: ((call: RequestHookCall) => RequestHookChange | undefined | void | Promise<RequestHookChange | undefined | void>) | undefined
+  // Called before the provider is asked, after the input-length check, and before the limits count the ask: may return the `messages` and `system` to send instead (redact, add context), return `false` to refuse the ask, or throw an `AiError` (or `refuse()`, or any error) to refuse it, which fails the reply with it and calls `onError`.
+  beforeRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
   // Called after each request of the reply to the provider, a tool loop making one per round.
-  onStep?: ((step: Step) => unknown) | undefined
+  onStep?: Hook<Step> | undefined
   // Called as each tool call starts (`running`) and again as it ends (`done` or `failed`).
-  onToolCall?: ((call: AiToolCall) => unknown) | undefined
+  onToolCall?: Hook<AiToolCall> | undefined
   // Called once the reply ended, finished, cut short or stopped (`stopped`).
-  onFinish?: ((done: FinishHookCall) => unknown) | undefined
-  // Called when the reply fails, with the error its readers get.
-  onError?: ((error: unknown) => unknown) | undefined
+  onSuccess?: Hook<FinishHookCall> | undefined
+  // Called when the reply fails, with the error its readers get, and for each failed request that was retried or fell back.
+  onError?: Hook<ErrorHookCall> | undefined
+  // `beforeRequest` before 1.92, still run, after it.
+  onRequest?: BeforeHook<RequestHookCall, RequestHookChange> | undefined
+  // `onSuccess` before 1.92, still run, after it.
+  onFinish?: Hook<FinishHookCall> | undefined
 }
 
 // How a request that fails before streaming anything is asked again: an `unavailable`, `rate-limited`, `timeout` or `network` error is retried, a refused key or request never is.

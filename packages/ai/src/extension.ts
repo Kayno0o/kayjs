@@ -24,7 +24,7 @@ function providerNow(): { provider: string, model: string | null } | { error: st
   }
 }
 
-const KNOWN_OPTIONS: Record<keyof AiOptions, true> = { rateLimit: true, budget: true, key: true, conversations: true, imageAlt: true, models: true, default: true, onRequest: true, onStep: true, onToolCall: true, onFinish: true, onError: true, retry: true, fallback: true }
+const KNOWN_OPTIONS: Record<keyof AiOptions, true> = { rateLimit: true, budget: true, key: true, conversations: true, imageAlt: true, models: true, default: true, beforeRequest: true, onRequest: true, onStep: true, onToolCall: true, onSuccess: true, onFinish: true, onError: true, retry: true, fallback: true }
 
 // Lists the variables `ask` reads in `kay.config.ts`'s `extensions`, so `kay env` shows them without the app wiring them, holds the limit and budget every `ask` counts against, adds `kay i18n translate` and the dev tool's AI tab, and with `imageAlt` drafts the `alt` of the imported images a page shows with none; `ask` works without it, unlimited in development and under the production defaults otherwise.
 export function ai(options: AiOptions = {}): KayExtension {

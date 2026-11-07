@@ -61,7 +61,7 @@ export function notes({ beforeSave, onSave }: NotesOptions) {
 
 ### What ships
 
-This release ships the helpers (`dispatch()`, `decide()`, `hookContext()`, `HookContext`, `Hook`, `BeforeHook`), `refuse()` and `ErrorShape` (from `kay` too), and `source` on `observe.onError` of `kay.config.ts`. `dispatch()` was `notify()` before 1.92, which now names only the inbox of `kay/server`. kayjs-auth's hooks follow it (`onEvent`, `beforeDelete`, `onSignUp`, [below](#kayjs-auth)); the other hooks that exist today keep their names (kayjs-ai's `onRequest` and `onFinish`, kayjs-ui's `onSaved`); queues, workflows and schedules already follow the rule (`onStart`, `onSuccess`, `onRetry`, `onError`). Later releases rename them to the rule and list each rename in [Upgrading](upgrading.md) with a `kay upgrade` fix. New hooks follow the rule from the start.\n
+This release ships the helpers (`dispatch()`, `decide()`, `hookContext()`, `HookContext`, `Hook`, `BeforeHook`), `refuse()` and `ErrorShape` (from `kay` too), and `source` on `observe.onError` of `kay.config.ts`. `dispatch()` was `notify()` before 1.92, which now names only the inbox of `kay/server`. kayjs-auth's and kayjs-ai's hooks follow it (`onEvent`, `beforeDelete`, `onSignUp`, [below](#kayjs-auth); `beforeRequest`, `onSuccess`, `onError`, [kayjs-ai](#kayjs-ai)); the other hooks that exist today keep their names (kayjs-ui's `onSaved`); queues, workflows and schedules already follow the rule (`onStart`, `onSuccess`, `onRetry`, `onError`). Later releases rename them to the rule and list each rename in [Upgrading](upgrading.md) with a `kay upgrade` fix. New hooks follow the rule from the start.\n
 ### The rule
 
 - `onX` runs after X happened and only observes: what it returns is ignored. X is the verb of the transition in its base form, as the DOM names events: `onSave`, `onSend`, `onDelete`, `onSubscribe`. Never a participle (`onSaved`, `onSent`, `onFailed`).
@@ -134,3 +134,9 @@ A library extends it with what it knows. `hookContext()` builds it from the requ
 - `onEvent({ event, user, context, ...fields })` is the catch-all of the account's audit events (source `auth.onEvent`). `onAuthEvent` is the name before 1.92 and runs beside it until 1.95.
 - `beforeDelete({ user, context })` runs before an account is erased, by the user, an admin or the prune; `false` or `refuse()` keeps it, and `account.delete` and `admin.deleteUser` answer `{ ok: false, error: { code: 'refused', status, message } }` (source `auth.beforeDelete` for a throw, which refuses with 500). `onDelete` is the name before 1.92; it keeps its meaning (before the erase, a throw keeps the account), runs after `beforeDelete`, and works until 1.95.
 - `onSignUp({ user, profile, context })` is observed: a throw is reported with source `auth.onSignUp` and the sign-up stands. It used to fail the call after the user was written.
+
+### kayjs-ai
+
+- `ai({ beforeRequest, onStep, onToolCall, onSuccess, onError })` and the same keys in `ask(prompt, { ... })`, each told its fields and `context: HookContext` ([details](../packages/ai/llms/hooks.md)). `beforeRequest` may change the request, refuse with `false` or throw (an `AiError` or `refuse()`), and fails closed; the others only observe, are not waited for, and a throw is reported with source `ai.onStep`, `ai.onToolCall`, `ai.onSuccess` or `ai.onError`.
+- `onError({ error, context })` is told an object, where it was told the error before 1.92 (a `kay upgrade` fix wraps the parameter).
+- A hook given to `ask()` adds to the one of `ai()` of the same name, `ai()`'s first, instead of replacing it. `onRequest` and `onFinish` are the names before 1.92 and run beside the new ones until 1.95.
