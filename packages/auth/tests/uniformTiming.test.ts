@@ -125,7 +125,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
       global[LOG_SINK] = sink
     }
 
-    expect(logged).toContainEqual(['error', 'onAuthEvent failed for sign-in-failed', expect.objectContaining({ message: 'hook down' }), undefined, 'kayjs-auth'])
+    expect(logged).toContainEqual(['error', 'auth.onEvent failed', expect.objectContaining({ message: 'hook down' }), undefined, 'kay'])
   })
 
   test('the lockout answer does not wait on the holder\'s notice, held address or not', async () => {

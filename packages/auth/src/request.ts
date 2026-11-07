@@ -387,7 +387,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     await this.leave()
   }
 
-  // Signs this session out without a word to `onAuthEvent`, the admin behind an impersonation too.
+  // Signs this session out without a word to `onEvent`, the admin behind an impersonation too.
   private async leave(): Promise<void> {
     const signedIn = await this.session.get('auth')
 

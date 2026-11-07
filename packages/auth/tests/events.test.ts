@@ -85,7 +85,7 @@ describe('onAuthEvent', () => {
     expect(said().at(-1)).toEqual(['sign-in-failed', { method: 'two-factor' }])
   })
 
-  test('an onAuthEvent that throws is logged, and the sign-in goes on', async () => {
+  test('an onAuthEvent that throws is logged as auth.onEvent, and the sign-in goes on', async () => {
     const { browser } = testApp({
       onAuthEvent: () => {
         throw new Error('down')
@@ -106,7 +106,7 @@ describe('onAuthEvent', () => {
     }
 
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
-    expect(logged).toContainEqual(['error', expect.stringMatching(/^onAuthEvent failed for /), expect.objectContaining({ message: 'down' }), undefined, 'kayjs-auth'])
+    expect(logged).toContainEqual(['error', 'auth.onEvent failed', expect.objectContaining({ message: 'down' }), undefined, 'kay'])
   })
 
   test('reads the fields of every kind of event off its detail', () => {

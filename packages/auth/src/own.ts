@@ -38,7 +38,7 @@ const PRESETS = {
 } as unknown as Record<string, (options: ProviderOptions) => OAuthApp['provider']>
 
 /** The hooks an app keeps in `src/auth.ts` as `export const hooks`, or hands to `auth({ hooks })`. */
-export type AuthHooks = Partial<Pick<AuthOptions<AuthSessionData, string>, 'allow' | 'authorize' | 'exportData' | 'locate' | 'onAuthEvent' | 'onDelete' | 'onSignUp' | 'profileFields'>>
+export type AuthHooks = Partial<Pick<AuthOptions<AuthSessionData, string>, 'allow' | 'authorize' | 'exportData' | 'locate' | 'onAuthEvent' | 'onDelete' | 'onEvent' | 'beforeDelete' | 'onSignUp' | 'profileFields'>>
 
 /** Where kayjs-auth keeps its data when `store` is left out: a pg-orm database at `url`, the database of the app's `store` in kay.config.ts when it names one, else a SQLite file `data/auth.sqlite` (`data/auth.db` where an app already has it). */
 export interface StoreUrl {

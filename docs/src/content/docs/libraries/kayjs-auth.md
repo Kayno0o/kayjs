@@ -44,7 +44,7 @@ export default defineConfig({
 - To use your app's pg-orm database, give `store: async () => pgAuth((await import('./src/db')).db)`; `store` also takes `{ url }` or a store.
 - Mail goes through `mail.enqueue` of `src/mail.ts` when it exports `mail` (kayjs-mail, themed when `mail()` is in `kay.config.ts`). `email: false` sends none, and an `email` of your own replaces it.
 - `oauth: { github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` from the environment, and `kay env` lists them. The presets are github, discord, google, microsoft and gitlab. An object adds `label`, `scopes` or `keepTokens`, and `clientId` and `clientSecret` skip the environment.
-- Hooks such as `onSignUp` and `onDelete` are options too, and win over the file. Hooks that need your database go in an optional `src/auth.ts` that exports `hooks` (`satisfies AuthHooks`), which kay finds by itself, or in `hooks: () => import('./src/auth')`. An executable from `kay build --compile` carries both files, and `kay dev` reloads them when you edit, add or remove one.
+- Hooks such as `onSignUp` and `beforeDelete` are options too, and win over the file. Hooks that need your database go in an optional `src/auth.ts` that exports `hooks` (`satisfies AuthHooks`), which kay finds by itself, or in `hooks: () => import('./src/auth')`. An executable from `kay build --compile` carries both files, and `kay dev` reloads them when you edit, add or remove one.
 - The prebuilt pages are on under `prefix` (`/auth`), and `home` (`/`) is where sign-ins and sign-outs go. `pages: false` leaves them out.
 
 Every page, action and guard can now read `ctx.locals.auth`, typed. A file of yours at a page's path, such as `src/routes/auth/sign-in.kay`, replaces that page.
@@ -166,7 +166,7 @@ The patch is all or nothing: one field the schema refuses, or a result over 16 K
 
 `user().providers` holds the id each linked provider gave the user, such as `user.providers.discord?.id`.
 
-It is read for `user()` and `requireUser()` and for the hooks (`onSignUp`, `profileFields`, `onDelete`, `exportData`, `admin`, `onAuthEvent`). Guards, gates, `authorize`, the admin's lists and results such as `password.register` give a `BareUser`, which has no `providers`, so they cost no query.
+It is read for `user()` and `requireUser()` and for the hooks (`onSignUp`, `profileFields`, `beforeDelete`, `exportData`, `admin`, `onEvent`). Guards, gates, `authorize`, the admin's lists and results such as `password.register` give a `BareUser`, which has no `providers`, so they cost no query.
 
 `user()` returns provider ids, so a route that sends `await auth.user()` whole to the client now sends them too: pick the fields to show.
 
@@ -285,7 +285,7 @@ The page a visitor asked for survives registering, the mailed verification and r
 
 With a mailer, it signs no one in until the address is verified. It answers a held address as a free one and mails its holder instead.
 
-To keep the time the same too, your `onSignUp` hook, and the `onDelete` of an unverified account that a new registration replaces, run after the response is sent. `password.register` may return before they have finished.
+To keep the time the same too, your `onSignUp` hook, and the `beforeDelete` of an unverified account that a new registration replaces, run after the response is sent. `password.register` may return before they have finished.
 
 Set `email: { requireVerified: false }` to sign in at once. It answers `'taken'` for a held address, which tells anyone which addresses have an account.
 
@@ -305,7 +305,7 @@ form(action={start})
   button Continue as a guest
 ```
 
-When the guest registers, the account keeps their id, so the app's data stays theirs. `user.guest` is `true` until then. A guest whose session ends is left in the store, and `admin.listUsers` shows them, until they are deleted: 30 days after they were made by default, or `guests: { maxAge: '7d' }` in `authCore`. Only a guest with no session left goes, and `onDelete` is called as for any user.
+When the guest registers, the account keeps their id, so the app's data stays theirs. `user.guest` is `true` until then. A guest whose session ends is left in the store, and `admin.listUsers` shows them, until they are deleted: 30 days after they were made by default, or `guests: { maxAge: '7d' }` in `authCore`. Only a guest with no session left goes, and `beforeDelete` is called as for any user.
 
 An account registered and never verified goes the same way, 30 days after it was made, when `requireVerified` is on, as nobody can sign in to it. Set `email: { unverifiedMaxAge: '7d' }` to change that, or to turn it on without `requireVerified`, where an account never verified may be in use and goes once its session ends. An account with a session, a linked provider or a role beyond `defaultRoles` stays.
 
@@ -506,22 +506,22 @@ The pieces behind `auth.hasRole` and `auth.gate()` are exported for an app that 
 
 ## Events and the audit log
 
-`onAuthEvent` hears what happens to an account, such as a sign-in, a failed sign-in, a role granted or a ban.
+`onEvent` hears what happens to an account, such as a sign-in, a failed sign-in, a role granted or a ban. It was `onAuthEvent` before 1.92, which works until 1.95 and which `kay upgrade` renames.
 
 ```ts
 authCore({
   // ...
   audit: true,
-  onAuthEvent: (info) => {
+  onEvent: (info) => {
     if (info.event === 'sign-in-failed')
       console.warn(info.user.email, info.method, info.context.ip)
   },
 })
 ```
 
-It gets one object: `event`, `user`, `context` and the fields of that event, such as the `method` of a sign-in, the `role` of a role granted or the `organizationId` of an organization's. `context` is `{ ip, userAgent, actor }`. `actor` is the admin when an admin did it.
+It gets one object: `event`, `user`, `context` and the fields of that event, such as the `method` of a sign-in, the `role` of a role granted or the `organizationId` of an organization's. `context` is an `AuthHookContext`: kay's `request`, `ip`, `userAgent`, `userId` and `locale`, and the `actor`, the admin when an admin did it. A throw is logged and reported to your `onError` with source `auth.onEvent`; it never fails the sign-in.
 
-A failed sign-in is reported after the response is sent. Your `onAuthEvent` and the audit log can be slow without telling anyone which addresses have an account.
+A failed sign-in is reported after the response is sent. Your `onEvent` and the audit log can be slow without telling anyone which addresses have an account.
 
 With `audit: true`, the same events are kept in the store for a year. Pass `audit: { maxAge: '90d' }` to change it.
 
@@ -550,6 +550,12 @@ if (found.ok) {
 - `admin.grantRole(id, role)` and `admin.revokeRole(id, role)` take a role your `roles` option declares. If two admins revoke each other's role at the same moment, at least one stays an admin, and a revoke that would have left none is undone and answers `last-admin`. Two admins deleting their own accounts at the same moment are held to the same rule, which needs an `admin` option that reads the user's roles.
 - `admin.ban(id, { reason, until })` bars the user from signing in and signs them out everywhere. `until` leaves it for good when left out. `admin.unban(id)` lifts it. An admin cannot ban themselves or another admin.
 - `admin.deleteUser(id)` deletes the user as `account.delete` does, notifications and mailing lists included (for a verified address). An organization the user solely owns with other members passes to its longest-standing member, who is told by mail and by an `organization-handed-over` event, so an abandoned account can always be removed.
+
+`beforeDelete({ user, context })` runs before any account is deleted, by the user, an admin or the prune, to remove the app's own records for them.
+
+It can keep the account: return `false`, or throw `refuse('Ada has open orders', { status: 409 })` from `kay`, and `account.delete` and `admin.deleteUser` answer `{ ok: false, error: { code: 'refused', status, message } }`. Any other throw refuses with 500 and is reported with the source `auth.beforeDelete`. A guest or an unverified account the prune cannot delete stays and is tried again at the next run.
+
+`onDelete` is the name before 1.92 and runs after `beforeDelete`.
 - `admin.impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `admin.stopImpersonating()` signs back in as themselves.
 - `admin.auditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
 

@@ -313,6 +313,7 @@ export default defineMessages({
       'self': 'Impossible sur votre propre compte.',
       'last-admin': 'Vous êtes le seul administrateur : nommez-en un autre d’abord.',
       'last-owner': 'Vous êtes le seul propriétaire d’une organisation qui a d’autres membres : nommez d’abord un autre propriétaire.',
+      'refused': 'Ce compte ne peut pas être supprimé pour le moment.',
       'not-found': 'Introuvable.',
       'label': 'Donnez un nom au jeton.',
       'scope': 'Choisissez ce que le jeton peut faire.',

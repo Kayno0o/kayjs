@@ -5,10 +5,11 @@ import type { AuthSessionData, Core } from './core'
 import type { EmailOptions } from './email'
 import type { AuthPagesConfig, PagesHandle } from './pages'
 import type { AuthStore, LinkType, TokenType } from './store'
-import { asConfigError, configError, configuredSite, durationSeconds, kv } from 'kay/library'
+import { asConfigError, configError, configuredSite, decide, dispatch, durationSeconds, kv } from 'kay/library'
 import { accessOf } from './access'
 import { pwnedPassword } from './breached'
 import { proofOfWork } from './captcha'
+import { authContext } from './events'
 import { forwardOf } from './forwardAuth'
 import { guardOf } from './guards'
 import { deriveKeys } from './keys'
@@ -66,6 +67,26 @@ export function tokenLifetimes(maxAge: EmailOptions['maxAge']): Record<TokenType
 // A hook of the options as the positional function the core calls, given its event object.
 function hooked<Args extends unknown[], Result>(hook: ((...args: never[]) => Result) | undefined, event: (...args: Args) => object): ((...args: Args) => Result) | undefined {
   return hook && ((...args: Args) => hook(event(...args) as never))
+}
+
+// `onSignUp` as the flows call it: told through `dispatch`, so a throw is reported and never fails the sign-up that happened.
+function signUpHook(hook: AuthOptions<AuthSessionData, string>['onSignUp']): Core['onSignUp'] {
+  return hook && (async (user, profile) => dispatch('auth.onSignUp', [hook as never], { user, profile }, { context: await authContext() }))
+}
+
+// `beforeDelete` as the erase asks it: a refusal answers the failure of kind `refused`, carrying the status and message the hook gave.
+function deleteHook(hook: AuthOptions<AuthSessionData, string>['beforeDelete']): Core['beforeDelete'] {
+  return hook && (async (user, actor) => {
+    const answer = await decide('auth.beforeDelete', [hook as never], { user }, await authContext(actor))
+
+    if ('refused' in answer) {
+      const { status, message, errors, data } = answer.refused
+
+      return { code: 'refused', status, message, errors, data }
+    }
+
+    return undefined
+  })
 }
 
 // The seconds of a lifetime option, rounded up to whole ones as a cookie's Max-Age and the stored lifetimes take them.
@@ -270,13 +291,15 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     access: access as unknown as Access<string>,
     ...admin !== undefined && { admin: async user => access.authorize(user, admin, 'write', {}) },
     guard: guardOptions => guardOf(core, guardOptions),
-    onSignUp: hooked(options.onSignUp, (user, profile) => ({ user, profile })),
+    onSignUp: signUpHook(options.onSignUp),
     onProviderProfile: hooked(options.profileFields, (user, profile) => ({ user, profile })),
     userData: options.user && userDataRules(options.user),
+    beforeDelete: deleteHook(options.beforeDelete),
     onDelete: hooked(options.onDelete, user => ({ user })),
     guestMaxAge: options.guests === undefined ? DEFAULT_GUEST_MAX_AGE : wholeSeconds(options.guests.maxAge, 'guests.maxAge'),
     unverifiedMaxAge: unverifiedMaxAge(options.email),
     onExport: hooked(options.exportData, user => ({ user })),
+    onEvent: options.onEvent,
     onAuthEvent: options.onAuthEvent,
     organizations: options.organizations && organizationsCore(options.organizations, access),
     pruned: { at: 0 },

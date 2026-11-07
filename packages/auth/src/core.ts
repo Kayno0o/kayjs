@@ -5,7 +5,7 @@ import type { Access } from './access'
 import type { CaptchaOptions } from './captcha'
 import type { EmailCore, PendingCode } from './email'
 import type { AuthEventInfo } from './events'
-import type { AuthFailed } from './failure'
+import type { AuthFailed, AuthFailure } from './failure'
 import type { ForwardAuthCore } from './forwardAuth'
 import type { Keys } from './keys'
 import type { ResolvedLimits } from './limits'
@@ -91,7 +91,7 @@ export interface BareUser<Data extends object = Record<string, unknown>> {
   data: Data
 }
 
-// A user with the provider accounts linked to them, `providers` holding the id each gave: what `auth.user()`, `requireUser()` and the app's hooks (`onSignUp`, `onProviderProfile`, `onDelete`, `onExport`, `admin`, `onAuthEvent`) receive.
+// A user with the provider accounts linked to them, `providers` holding the id each gave: what `auth.user()`, `requireUser()` and the app's hooks (`onSignUp`, `onProviderProfile`, `onDelete`, `onExport`, `admin`, `onEvent`) receive.
 export interface User<Data extends object = Record<string, unknown>> extends BareUser<Data> {
   providers: Record<string, { id: string }>
 }
@@ -174,13 +174,16 @@ export interface Core {
   // The data to keep on the user, laid over what they hold; nothing keeps it as is.
   onProviderProfile?: ((user: User, profile: Profile) => unknown) | undefined
   userData?: UserDataRules | undefined
+  // Asked before the erase, with the user and who acts when it is not them: a refusal keeps the account.
+  beforeDelete?: ((user: User, actor: User | null) => Promise<AuthFailure<'refused'> | undefined>) | undefined
   onDelete?: ((user: User) => void | Promise<void>) | undefined
   // Seconds a guest is kept once their sessions are gone.
   guestMaxAge: number
   // Seconds an account registered and never verified is kept, where unverified accounts cannot sign in; for good when undefined.
   unverifiedMaxAge?: number | undefined
   onExport?: ((user: User) => unknown) | undefined
-  onAuthEvent?: ((info: AuthEventInfo) => void | Promise<void>) | undefined
+  onEvent?: ((info: AuthEventInfo) => unknown) | undefined
+  onAuthEvent?: ((info: AuthEventInfo) => unknown) | undefined
   organizations?: OrganizationsCore | undefined
   // Kept with the `audit` option: entries live `maxAge` seconds.
   audit?: { maxAge: number, prunedAt: number, ip: 'full' | 'truncated', sweep?: Maintenance | undefined } | undefined

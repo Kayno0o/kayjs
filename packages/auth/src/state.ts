@@ -23,7 +23,7 @@ export interface RequestState {
   complete: (record: UserRecord, redirect: string, method: string) => Promise<{ ok: true, redirect: string } | AuthFailed<'banned'>>
   // Signs `record` in under a new session id, with no ban check: for a flow that checked already, as a second factor does.
   establish: (record: UserRecord, method: string) => Promise<void>
-  // Signs this session out, telling `onAuthEvent`.
+  // Signs this session out, telling `onEvent`.
   signOut: () => Promise<void>
   // Takes `record` as the user this request is, as when an admin starts acting as them.
   adopt: (record: UserRecord) => void

@@ -1,9 +1,10 @@
+import type { HookContext } from 'kay/library'
 import type { Core, User } from './core'
 import type { SecurityEvent } from './mail'
 import type { RequestState } from './state'
 import type { AuditCursor, UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
-import { configError, maintenance } from 'kay/library'
+import { configError, dispatch, hookContext, maintenance } from 'kay/library'
 import { truncatedAddress } from './address'
 import { linkedUser } from './core'
 import { log } from './log'
@@ -14,13 +15,13 @@ const OAUTH_PREFIX = 'oauth:'
 // The audit log is pruned of what outlived its age at most this often.
 const AUDIT_PAGE_MAX = 200
 
-// What happens to an account without changing what protects it, handed to `onAuthEvent` but never mailed. An admin's doing, a role or a ban, or a manager's in an organization, names them in the context's `actor`.
+// What happens to an account without changing what protects it, handed to `onEvent` but never mailed. An admin's doing, a role or a ban, or a manager's in an organization, names them in the context's `actor`.
 // An organization event's detail is its id, then the roles given for `member-joined` and `member-roles-changed`.
 export type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-started' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-changed' | 'oauth-client-approved' | 'oauth-client-revoked'
 
 export type AuthEvent = SecurityEvent | ActivityEvent
 
-// What each event says besides who it happened to and where from, as `onAuthEvent` hears it.
+// What each event says besides who it happened to and where from, as `onEvent` hears it.
 export interface EventFields {
   // `method` is how: `password`, `register`, `reset-password`, `magic-link`, `email-code`, `passkey`, `guest`, `app` (the app called `auth.signIn`), `oauth` with the `provider`, or `unknown`.
   'signed-in': { method: string, provider?: string }
@@ -62,14 +63,23 @@ export interface EventFields {
   'organization-handed-over': { organizationId: string }
 }
 
-// An event as `onAuthEvent` hears it: the event, who it happened to, where from and its own fields, such as the `role` of a `role-granted`.
+// An event as `onEvent` hears it: the event, who it happened to, where from and its own fields, such as the `role` of a `role-granted`.
 export type AuthEventInfo = { [Event in AuthEvent]: { event: Event, user: User, context: EventContext } & EventFields[Event] }[AuthEvent]
 
-// Where an event came from: the request's address and browser, and who acted when it was not the user, such as an admin.
-export interface EventContext {
+// What every hook of kayjs-auth is told about where it runs: kay's `HookContext`, and who acted when it was not the user, such as an admin.
+export interface AuthHookContext extends HookContext {
+  actor: User | null
+}
+
+// Where an event came from: the context of the hook, with the address and browser the event was kept with, empty when it happened outside a request.
+export interface EventContext extends AuthHookContext {
   ip: string
   userAgent: string
-  actor: User | null
+}
+
+// The context of a hook of kayjs-auth, read from the request being answered.
+export async function authContext(actor: User | null = null): Promise<AuthHookContext> {
+  return { ...await hookContext(), actor }
 }
 
 // One line of the audit log.
@@ -146,7 +156,7 @@ export async function impersonatorOf(state: RequestState): Promise<string | unde
   return state.via() === 'bearer' ? undefined : (await state.session.get('auth'))?.impersonator?.user
 }
 
-// Hands `event` to the app's `onAuthEvent` and to the audit log when it is kept. A failure is logged, not thrown: what happened is done by then.
+// Hands `event` to the app's `onEvent` and `onAuthEvent` and to the audit log when it is kept. A failure is logged, not thrown: what happened is done by then.
 // While an admin acts as a user, whatever happens is the admin's doing, named as the actor.
 export async function report(state: RequestState, record: UserRecord, event: AuthEvent, detail?: string, by?: UserRecord): Promise<void> {
   const impersonator = await impersonatorOf(state)
@@ -157,15 +167,15 @@ export async function report(state: RequestState, record: UserRecord, event: Aut
 
 // `report` for what happens outside a request, as a hand-over when a prune deletes an account: `where` is empty, so the entry names no address or browser.
 export async function reportFrom(core: Core, where: { address: string, userAgent: string }, record: UserRecord, event: AuthEvent, detail?: string, actor?: UserRecord): Promise<void> {
-  if (core.onAuthEvent) {
+  if (core.onEvent || core.onAuthEvent) {
     try {
       const user = await linkedUser(core, record)
-      const context: EventContext = { ip: where.address, userAgent: where.userAgent, actor: actor ? await linkedUser(core, actor) : null }
+      const context: EventContext = { ...await authContext(actor ? await linkedUser(core, actor) : null), ip: where.address, userAgent: where.userAgent }
 
-      await core.onAuthEvent({ event, user, context, ...eventFields(event, detail) } as AuthEventInfo)
+      await dispatch('auth.onEvent', [core.onEvent, core.onAuthEvent] as never, { event, user, ...eventFields(event, detail) }, { context })
     }
     catch (error) {
-      log.error(`onAuthEvent failed for ${event}`, error)
+      log.error(`onEvent failed for ${event}`, error)
     }
   }
 

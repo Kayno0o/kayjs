@@ -7,7 +7,7 @@ import { AUTH_LINK_KINDS, AUTH_MAIL_WORDING, AUTH_NOTICE_KINDS } from 'kay/libra
 import { language, pickLocale } from './locale'
 import { log } from './log'
 
-// A change to what protects an account, mailed to its verified address and given to `onAuthEvent`.
+// A change to what protects an account, mailed to its verified address and given to `onEvent`.
 export type SecurityEvent = AuthNoticeKind
 
 // What a mail is about: a link to follow, news of a change to the account, an invitation to join an organization, or a registration for an address that has an account already.

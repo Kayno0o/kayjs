@@ -395,8 +395,12 @@ function authGate<P, G extends string, S extends string = string>(deps: GateDeps
 [.] authGuard
 function authGuard(options?: GuardOptions): Guard<void>
 
+[.] AuthHookContext
+interface AuthHookContext extends HookContext
+  actor: User<Record<string, unknown>> | null
+
 [.] AuthHooks
-type AuthHooks = Partial<Pick<AuthOptions<AuthSessionData, string>, 'allow' | 'authorize' | 'exportData' | 'locate' | 'onAuthEvent' | 'onDelete' | 'onSignUp' | 'profileFields'>>
+type AuthHooks = Partial<Pick<AuthOptions<AuthSessionData, string>, 'allow' | 'authorize' | 'exportData' | 'locate' | 'onAuthEvent' | 'onDelete' | 'onEvent' | 'beforeDelete' | 'onSignUp' | 'profileFields'>>
 
 [.] AuthMailer
 interface AuthMailer
@@ -436,6 +440,7 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   allow?: ((profile: Profile) => Promise<boolean> | boolean) | undefined
   audit?: boolean | undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; ip?: "full" | "truncated"; }
   authorize?: ((user: BareUser<Record<string, unknown>> | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
+  beforeDelete?: ((event: { user: User<Record<string, unknown>>; context: AuthHookContext; }) => Promise<false | void> | false | void) | undefined
   breachedPasswords?: ((password: string) => Promise<boolean> | boolean) | boolean | undefined
   captcha?: CaptchaOptions | false | undefined
   defaultRoles?: NoInfer<Role>[] | undefined
@@ -449,9 +454,10 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   name?: string | undefined
   oauth?: Record<string, OAuthApp> | undefined
   oauthServer?: boolean | undefined | { fetch?: ((url: string) => Promise<Response>) | undefined; defaultScopes?: readonly Scope[] | undefined; }
-  onAuthEvent?: ((info: AuthEventInfo) => Promise<void> | void) | undefined
+  onAuthEvent?: ((info: AuthEventInfo) => unknown) | undefined
   onDelete?: ((event: { user: User<Record<string, unknown>>; }) => Promise<void> | void) | undefined
-  onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; }) => Promise<void> | void) | undefined
+  onEvent?: ((info: AuthEventInfo) => unknown) | undefined
+  onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; context: AuthHookContext; }) => unknown) | undefined
   organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
   pages?: AuthPagesConfig | boolean | undefined
   passkeys?: false | undefined | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "discouraged" | "preferred" | "required"; }
@@ -1047,13 +1053,13 @@ const DEFAULT_LIMITS: {
 const defaultTemplates: Templates
 
 [.] DeleteAccountResult
-type DeleteAccountResult = { ok: true } | AuthFailed<ProofFailure | 'last-admin' | 'last-owner'>
+type DeleteAccountResult = { ok: true } | AuthFailed<ProofFailure | 'last-admin' | 'last-owner' | 'refused'>
 
 [.] DeleteOrganizationResult
 type DeleteOrganizationResult = { ok: true } | AuthFailed<OrganizationFailure | 'impersonating'>
 
 [.] DeleteResult
-type DeleteResult = { ok: true } | AuthFailed<AdminChangeFailure | 'self' | 'admin'>
+type DeleteResult = { ok: true } | AuthFailed<AdminChangeFailure | 'self' | 'admin' | 'refused'>
 
 [.] DeletionImpact
 interface DeletionImpact
@@ -1091,7 +1097,7 @@ interface EmailOptions
 type EnableTwoFactorResult = { ok: true, recoveryCodes: string[] } | AuthFailed<'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited'>
 
 [.] EventContext
-interface EventContext
+interface EventContext extends AuthHookContext
   actor: User<Record<string, unknown>> | null
   ip: string
   userAgent: string
@@ -1507,6 +1513,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   allow?: ((profile: Profile) => Promise<boolean> | boolean) | undefined
   audit?: boolean | undefined | { maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; ip?: "full" | "truncated"; }
   authorize?: ((user: BareUser<Record<string, unknown>> | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
+  beforeDelete?: ((event: { user: User<Record<string, unknown>>; context: AuthHookContext; }) => Promise<false | void> | false | void) | undefined
   breachedPasswords?: ((password: string) => Promise<boolean> | boolean) | boolean | undefined
   captcha?: CaptchaOptions | false | undefined
   cookie?: string | undefined
@@ -1518,7 +1525,7 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   guests?: undefined | { maxAge: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w`; }
   home?: string | undefined
   hooks?: (() => Promise<{
-  hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "allow" | "authorize" | "exportData" | "locate" | "onAuthEvent" | "onDelete" | "onSignUp" | "profileFields">>;
+  hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "allow" | "authorize" | "beforeDelete" | "exportData" | "locate" | "onAuthEvent" | "onDelete" | "onEvent" | "onSignUp" | "profileFields">>;
 }>) | undefined
   locate?: ((ip: string) => Promise<null | string | undefined> | null | string | undefined) | undefined
   magicLink?: boolean | undefined
@@ -1526,9 +1533,10 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   name?: string | undefined
   oauth?: Record<string, OAuthApp | PresetApp | true> | undefined
   oauthServer?: boolean | undefined | { fetch?: ((url: string) => Promise<Response>) | undefined; defaultScopes?: readonly Scope[] | undefined; }
-  onAuthEvent?: ((info: AuthEventInfo) => Promise<void> | void) | undefined
+  onAuthEvent?: ((info: AuthEventInfo) => unknown) | undefined
   onDelete?: ((event: { user: User<Record<string, unknown>>; }) => Promise<void> | void) | undefined
-  onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; }) => Promise<void> | void) | undefined
+  onEvent?: ((info: AuthEventInfo) => unknown) | undefined
+  onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; context: AuthHookContext; }) => unknown) | undefined
   organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
   pages?: Pick<AuthPagesConfig, "main" | "profile" | "remember"> | boolean | undefined
   passkeys?: false | undefined | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "discouraged" | "preferred" | "required"; }

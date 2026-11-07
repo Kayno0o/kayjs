@@ -34,7 +34,7 @@ export type BanResult = { ok: true, user: ManagedUser } | AuthFailed<AdminChange
 
 export type UnbanResult = { ok: true, user: ManagedUser } | AuthFailed<AdminChangeFailure>
 
-export type DeleteResult = { ok: true } | AuthFailed<AdminChangeFailure | 'self' | 'admin'>
+export type DeleteResult = { ok: true } | AuthFailed<AdminChangeFailure | 'self' | 'admin' | 'refused'>
 
 export function managedUser(record: UserRecord): ManagedUser {
   return {
@@ -256,7 +256,7 @@ export async function unbanUser(state: RequestState, userId: string): Promise<Un
   return { ok: true, user: managedUser(updated) }
 }
 
-// Deletes the user with everything kayjs-auth keeps for them, calls `onDelete` and mails them the account-deleted notice. Another admin is refused: revoke their role first. An organization the user solely owns with other members passes to its longest-standing member, its new owner told, so an abandoned account is never a dead end.
+// Deletes the user with everything kayjs-auth keeps for them, asks `beforeDelete`, calls `onDelete` and mails them the account-deleted notice. Another admin is refused: revoke their role first. An organization the user solely owns with other members passes to its longest-standing member, its new owner told, so an abandoned account is never a dead end.
 export async function deleteUser(state: RequestState, userId: string): Promise<DeleteResult> {
   const acting = await changingAdmin(state)
 

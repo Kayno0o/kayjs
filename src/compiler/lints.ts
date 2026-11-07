@@ -892,6 +892,15 @@ export const LINTS = {
     wrong: '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\n\nexport const read = (scan: File) => ask([{ role: \'user\', content: \'Read this\', attachments: [scan] }], { maxAttachmentBytes: 5_000_000 })\n---\np x',
     right: '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\n\nexport const read = (scan: File) => ask([{ role: \'user\', content: \'Read this\', attachments: [scan] }], { maxSize: \'5mb\' })\n---\np x',
   },
+  'deprecated-hook-names': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.92',
+    site: true,
+    summary: 'A hook under the name it had before kay and its libraries named their hooks by one rule, `onX` after a transition and `beforeX` when it can refuse it: kayjs-auth\'s `onAuthEvent` is `onEvent` and its `onDelete`, which runs before the account goes and can keep it, is `beforeDelete`, which also gets `context` and refuses with `false` or `refuse()`. The old names work until 1.95. Found in the options object written out at a call of `auth`, `authCore` or `createAuth` read from `@kaynooo/kayjs-auth` and in the `export const hooks` of `src/auth.ts`, not in an object held in a variable or spread; the fix renames the key, and a key written beside its new name is reported with no fix.',
+    wrong: '--- server\nimport { auth } from \'@kaynooo/kayjs-auth\'\n\nexport const users = auth({ onAuthEvent: info => console.log(info.event) })\n---\np x',
+    right: '--- server\nimport { auth } from \'@kaynooo/kayjs-auth\'\n\nexport const users = auth({ onEvent: info => console.log(info.event) })\n---\np x',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

@@ -64,21 +64,25 @@ export async function deletionImpact(state: RequestState): Promise<DeletionImpac
   return { deleted: owned.filter(organization => organization.alone).map(organization => organization.name), blocked: owned.filter(organization => !organization.alone).map(organization => organization.name) }
 }
 
-// Deletes the user with everything kayjs-auth keeps for them, and their notifications and mailing list rows. The app's records go first, so an `onDelete` that throws leaves the account in place, to delete again. The audit log keeps what happened under a new random name, without the addresses, browsers and details that lead back to the user, and the provider tokens held are revoked upstream.
+// Deletes the user with everything kayjs-auth keeps for them, and their notifications and mailing list rows. The app's `beforeDelete` is asked first and can refuse, and its records go before the erase, so an `onDelete` that throws leaves the account in place, to delete again. The audit log keeps what happened under a new random name, without the addresses, browsers and details that lead back to the user, and the provider tokens held are revoked upstream.
 // For an account nobody leaves, as an unverified one a registration replaces or a guest past `guests.maxAge`: the address's invitations stay for whoever proves it, and no mail goes out to them, only to the new owner of an organization handed over.
 // An organization it solely owned with other members passes to its longest-standing member, as it cannot be refused.
 export async function eraseUser(core: Core, record: UserRecord): Promise<void> {
-  await eraseThen(core, record, true)
+  const erased = await eraseThen(core, record, true)
+
+  // Kept as an `onDelete` that throws keeps it: the caller leaves the account to be tried again.
+  if (!erased.ok)
+    throw new Error(`beforeDelete refused to delete ${record.id}: ${erased.error.message}`)
 }
 
-// `eraseUser` for a user who goes, by their own hand or an admin's (`actor`): the invitations to their address go too, and the account-deleted notice is mailed. Refused with `last-owner` while they are the only owner of an organization with other members, unless `handOver` is set, as for an admin who cannot name an owner: the organization then passes to its longest-standing member. An organization they are alone in goes with them.
-export async function eraseLeavingUser(state: RequestState, record: UserRecord, options: { actor?: UserRecord, handOver: true }): Promise<{ ok: true }>
-export async function eraseLeavingUser(state: RequestState, record: UserRecord, options?: { actor?: UserRecord, handOver?: false }): Promise<{ ok: true } | AuthFailed<'last-owner'>>
-export async function eraseLeavingUser(state: RequestState, record: UserRecord, options: { actor?: UserRecord, handOver?: boolean } = {}): Promise<{ ok: true } | AuthFailed<'last-owner'>> {
+// `eraseUser` for a user who goes, by their own hand or an admin's (`actor`): the invitations to their address go too, and the account-deleted notice is mailed. Refused with `refused` when `beforeDelete` says so, and with `last-owner` while they are the only owner of an organization with other members, unless `handOver` is set, as for an admin who cannot name an owner: the organization then passes to its longest-standing member. An organization they are alone in goes with them.
+export async function eraseLeavingUser(state: RequestState, record: UserRecord, options: { actor?: UserRecord, handOver: true }): Promise<{ ok: true } | AuthFailed<'refused'>>
+export async function eraseLeavingUser(state: RequestState, record: UserRecord, options?: { actor?: UserRecord, handOver?: false }): Promise<{ ok: true } | AuthFailed<'last-owner' | 'refused'>>
+export async function eraseLeavingUser(state: RequestState, record: UserRecord, options: { actor?: UserRecord, handOver?: boolean } = {}): Promise<{ ok: true } | AuthFailed<'last-owner' | 'refused'>> {
   const { store } = state.core
   const { actor, handOver = false } = options
 
-  return eraseThen(state.core, record, handOver, async () => {
+  return eraseThen(state.core, record, handOver, actor, async () => {
     if (record.email !== null && record.email !== '' && store.invitations) {
       for (const invitation of await store.invitations.listByEmail(record.email))
         await store.invitations.delete(invitation.id)
@@ -90,11 +94,16 @@ export async function eraseLeavingUser(state: RequestState, record: UserRecord, 
 
 // `afterDelete` runs once the user is gone, and what it records is forgotten after it. The audit log forgets the user before and after, and a failure of either fails the erase, so none of their data stays behind unreported; only the first leaves the account to delete again.
 // A throwing `afterDelete` fails the erase too, but only once the hand-over and the second strip have run.
-async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afterDelete?: () => Promise<void>): Promise<{ ok: true } | AuthFailed<'last-owner'>> {
+async function eraseThen(core: Core, record: UserRecord, handOver: boolean, actor?: UserRecord, afterDelete?: () => Promise<void>): Promise<{ ok: true } | AuthFailed<'last-owner' | 'refused'>> {
   const { store } = core
 
   if (!handOver && (await soleOwned(core, record)).some(organization => !organization.alone))
     return failed('last-owner')
+
+  const refusal = await core.beforeDelete?.(await linkedUser(core, record), actor ? await linkedUser(core, actor) : null)
+
+  if (refusal)
+    return { ok: false, error: refusal }
 
   const owners = await owning(core, record)
   const pseudonym = crypto.randomUUID()
@@ -184,7 +193,7 @@ async function settle(core: Core, ids: string[]): Promise<void> {
   }
 }
 
-// Reports the hand-over to the new owner's `onAuthEvent` and audit log and mails them, after the organization is theirs; a failure here is logged, as the hand-over is done.
+// Reports the hand-over to the new owner's `onEvent` and audit log and mails them, after the organization is theirs; a failure here is logged, as the hand-over is done.
 async function tellNewOwner(core: Core, organizationId: string, userId: string): Promise<void> {
   try {
     const owner = await core.store.users.get(userId)

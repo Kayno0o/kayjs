@@ -6,7 +6,7 @@ import type { IssueTokenResult, TokenOptions } from './bearer'
 import type { CaptchaOptions } from './captcha'
 import type { AuthSessionData, BareUser, OAuthApp, Profile, User } from './core'
 import type { EmailOptions } from './email'
-import type { AuthEventInfo } from './events'
+import type { AuthEventInfo, AuthHookContext } from './events'
 import type { ForwardAuthOptions, ForwardDomains } from './forwardAuth'
 import type { ScopeRequirement } from './gate'
 import type { RouteGuardOptions } from './guards'
@@ -72,21 +72,25 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
   // Whether visitors make their own accounts, by registering, as a guest or with a provider account no user has linked: on by default, `false` closes it. Then registering and `signInAsGuest` answer `{ ok: false, error: { code: 'off' } }`, users come from `auth.admin.createUser` alone, and the prebuilt pages offer no registering. `true` is the default and works until 1.93: leave it out.
   signUp?: boolean | undefined
-  // Called once a new user exists, to create the app's own records for them. It gets one object: `user`, and the provider's `profile` for a sign-up by a provider account.
-  onSignUp?: ((event: { user: User, profile: Profile | undefined }) => void | Promise<void>) | undefined
+  // Called once a new user exists, to create the app's own records for them. It gets one object: `user`, the provider's `profile` for a sign-up by a provider account, and `context`. A throw is logged and reported to the app's `onError` with source `auth.onSignUp`, and never fails the sign-up.
+  onSignUp?: ((event: { user: User, profile: Profile | undefined, context: AuthHookContext }) => unknown) | undefined
   // Called with the provider's profile whenever one answers for a user: every OAuth sign-in, the first included after `onSignUp`, and a link.
   // What the app keeps on each user, an object schema such as `s.Object({ avatar: s.Optional(s.String()) })`: `auth.user()` returns it typed as `data`, `profileFields` fills it, and a store keeps it as JSON.
   user?: (TSchema & { static: UserData }) | undefined
   // Called on every provider sign-in, the first and a link included, with `{ user, profile }`: the user as the app has them and the provider's profile. It runs before any second factor. What it returns is laid over `user().data`, only the fields `user` declares, and kept when the result fits the schema; return nothing to keep what is there, such as an avatar.
   profileFields?: ((event: { user: User<UserData>, profile: Profile }) => { [Field in keyof UserData]?: UserData[Field] | undefined } | void | Promise<{ [Field in keyof UserData]?: UserData[Field] | undefined } | void>) | undefined
-  // Called once a user is deleted, to delete the app's own records for them.
+  // Called before a user is deleted, with `{ user, context }`, to delete the app's own records for them or to keep the account: `false`, or throwing `refuse(message)`, refuses, and `account.delete` and `admin.deleteUser` answer `{ ok: false, error: { code: 'refused', status, message } }`. A throw of any other kind refuses with 500 and is reported with source `auth.beforeDelete`. An account no one asked to delete, a stale guest or unverified one, stays and is tried again the next run.
+  beforeDelete?: ((event: { user: User, context: AuthHookContext }) => void | false | Promise<void | false>) | undefined
+  /** @deprecated Since 1.92, `beforeDelete`; the old name works until 1.95, and runs after `beforeDelete`, before the erase, a throw keeping the account. */
   onDelete?: ((event: { user: User }) => void | Promise<void>) | undefined
-  // Deletes a guest whose account is older than `maxAge` (a string such as '30d') and who has no session left, calling `onDelete` as for any user; 30 days by default.
+  // Deletes a guest whose account is older than `maxAge` (a string such as '30d') and who has no session left, calling `beforeDelete` as for any user; 30 days by default.
   guests?: { maxAge: Duration } | undefined
   // What the app keeps about a user, added to their `exportData()` as `app`: their posts, their orders. Called with `{ user }`.
   exportData?: ((event: { user: User }) => unknown) | undefined
-  // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own. It gets one object: `event`, `user`, `context` (where from, and who acted when not the user), and the fields of its kind, such as the `role` of a `role-granted` or the `method` of a `signed-in`.
-  onAuthEvent?: ((info: AuthEventInfo) => void | Promise<void>) | undefined
+  // Called with every change to what protects an account, the ones mailed to the user, and with every sign-in, sign-out and failed sign-in of a known account, for an audit log of the app's own. A throw is logged and reported with source `auth.onEvent`. It gets one object: `event`, `user`, `context` (where from, and who acted when not the user), and the fields of its kind, such as the `role` of a `role-granted` or the `method` of a `signed-in`.
+  onEvent?: ((info: AuthEventInfo) => unknown) | undefined
+  /** @deprecated Since 1.92, `onEvent`; the old name works until 1.95. */
+  onAuthEvent?: ((info: AuthEventInfo) => unknown) | undefined
   // Keeps the same events in the store's audit log, for `auditLog()`; `maxAge` a string such as '365d', a year by default. Each entry keeps the address cut to its /24 (IPv4) or /48 (IPv6) unless `ip` is 'full'.
   audit?: boolean | { maxAge?: Duration, ip?: 'full' | 'truncated' } | undefined
   // What a bearer token may be limited to, such as `['posts:read', 'posts:write']`: a route asks for one with `scope:`.

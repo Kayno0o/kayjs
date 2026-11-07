@@ -61,7 +61,7 @@ export function notes({ beforeSave, onSave }: NotesOptions) {
 
 ### What ships
 
-This release ships the helpers (`dispatch()`, `decide()`, `hookContext()`, `HookContext`, `Hook`, `BeforeHook`), `refuse()` and `ErrorShape` (from `kay` too), and `source` on `observe.onError` of `kay.config.ts`. `dispatch()` was `notify()` before 1.92, which now names only the inbox of `kay/server`. The hooks that exist today keep their names (`onAuthEvent`, kayjs-ai's `onRequest` and `onFinish`, kayjs-ui's `onSaved`); queues, workflows and schedules already follow the rule (`onStart`, `onSuccess`, `onRetry`, `onError`). Later releases rename them to the rule and list each rename in [Upgrading](upgrading.md) with a `kay upgrade` fix. New hooks follow the rule from the start.\n
+This release ships the helpers (`dispatch()`, `decide()`, `hookContext()`, `HookContext`, `Hook`, `BeforeHook`), `refuse()` and `ErrorShape` (from `kay` too), and `source` on `observe.onError` of `kay.config.ts`. `dispatch()` was `notify()` before 1.92, which now names only the inbox of `kay/server`. kayjs-auth's hooks follow it (`onEvent`, `beforeDelete`, `onSignUp`, [below](#kayjs-auth)); the other hooks that exist today keep their names (kayjs-ai's `onRequest` and `onFinish`, kayjs-ui's `onSaved`); queues, workflows and schedules already follow the rule (`onStart`, `onSuccess`, `onRetry`, `onError`). Later releases rename them to the rule and list each rename in [Upgrading](upgrading.md) with a `kay upgrade` fix. New hooks follow the rule from the start.\n
 ### The rule
 
 - `onX` runs after X happened and only observes: what it returns is ignored. X is the verb of the transition in its base form, as the DOM names events: `onSave`, `onSend`, `onDelete`, `onSubscribe`. Never a participle (`onSaved`, `onSent`, `onFailed`).
@@ -127,3 +127,10 @@ A library extends it with what it knows. `hookContext()` builds it from the requ
 
 - `session({ onCreate, onDestroy })` (source `session.onCreate`, `session.onDestroy`) are told `({ id, context })`, `id` being the stored session's id (undefined for a session kept in the cookie). `onCreate` runs after the response that sets a visitor's first data; `onDestroy` after `destroy()`, a session left with no data or one past its absolute lifetime. A forged or expired cookie being cleared tells nothing, and `regenerate()` neither: it is the same session going on. Both feed `kay_session_events_total{event}` (`created`, `destroyed`).
 - A `FileStore` takes `onWrite({ key, size, private, context })` and `onDelete({ key, context })` (source `files.onWrite`, `files.onDelete`), as options of `diskFiles(dir, hooks)`, `memoryFiles(hooks)` and `s3Files({ ... })`, or as keys of a store of the app's own: [files](files.md#stores). They feed `kay_file_events_total{event}` (`written`, `deleted`).
+
+### kayjs-auth
+
+- `auth({ onEvent, beforeDelete, onSignUp })`, flat keys or the `hooks` of `src/auth.ts`, each told its fields and `context: AuthHookContext`, kay's `HookContext` plus `actor: User | null` (the admin or manager who acted, else `null`).
+- `onEvent({ event, user, context, ...fields })` is the catch-all of the account's audit events (source `auth.onEvent`). `onAuthEvent` is the name before 1.92 and runs beside it until 1.95.
+- `beforeDelete({ user, context })` runs before an account is erased, by the user, an admin or the prune; `false` or `refuse()` keeps it, and `account.delete` and `admin.deleteUser` answer `{ ok: false, error: { code: 'refused', status, message } }` (source `auth.beforeDelete` for a throw, which refuses with 500). `onDelete` is the name before 1.92; it keeps its meaning (before the erase, a throw keeps the account), runs after `beforeDelete`, and works until 1.95.
+- `onSignUp({ user, profile, context })` is observed: a throw is reported with source `auth.onSignUp` and the sign-up stands. It used to fail the call after the user was written.

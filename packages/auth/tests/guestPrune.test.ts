@@ -13,7 +13,7 @@ afterEach(() => {
   setSystemTime()
 })
 
-async function setup(options: { store?: AuthStore, onDelete?: (user: User) => void | Promise<void> } = {}) {
+async function setup(options: { store?: AuthStore, onDelete?: (user: User) => void | Promise<void>, beforeDelete?: (user: User) => false | undefined } = {}) {
   const store = options.store ?? memoryAuthStore()
   const deleted: string[] = []
   const heard: AuthEventInfo[] = []
@@ -24,6 +24,7 @@ async function setup(options: { store?: AuthStore, onDelete?: (user: User) => vo
     onAuthEvent: (info) => {
       heard.push(info)
     },
+    beforeDelete: ({ user }) => options.beforeDelete?.(user),
     onDelete: async ({ user }) => {
       deleted.push(user.id)
       await options.onDelete?.(user)
@@ -101,6 +102,19 @@ describe('pruning guests', () => {
 
     expect(deleted.sort()).toEqual(['free', 'stuck'])
     expect(await store.users.get('stuck')).toBeDefined()
+    expect(await store.users.get('free')).toBeUndefined()
+  })
+
+  test('a guest beforeDelete refuses stays and the others go', async () => {
+    const { store, deleted, start, prune } = await setup({ beforeDelete: user => user.id === 'kept' ? false : undefined })
+
+    for (const id of ['kept', 'free'])
+      await store.users.create(userRecord({ id, guest: true, createdAt: new Date(start - 1000) }))
+
+    await prune(MAX_AGE_MS + PRUNE_EVERY_MS)
+
+    expect(deleted).toEqual(['free'])
+    expect(await store.users.get('kept')).toBeDefined()
     expect(await store.users.get('free')).toBeUndefined()
   })
 

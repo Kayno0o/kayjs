@@ -152,6 +152,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `deprecated-auth-options` | warn | deprecated | A kayjs-auth feature that is on by default, written `feature: true`: `password`, `magicLink`, `twoFactor` and `signUp` of `auth()` or `createAuth()`, and `pages` of `auth()`. A default-on feature is switched off with `false` or tuned with an object, so `true` is left out. The old form works until 1.93. `kay upgrade` drops the property. |
 | `deprecated-escape-option` | warn | deprecated | The escape of kayjs-auth's `auth()` under its name before 1.91: `plugin: false` is `server: false`, as `mail({ server: false })` is. Works until 1.94. The fix renames the key. |
 | `deprecated-size-limits` | warn | deprecated | A size limit under its name before 1.90: the `maxAttachmentBytes` of a kayjs-ai `ask`, the `maxFileSize` of its Chat, now `maxSize`, and an extension's `maxSize` map, now `maxSizeByPath` |
+| `deprecated-hook-names` | warn | deprecated | A hook under its name before kay and its libraries named their hooks by one rule, since 1.92: kayjs-auth's `onAuthEvent` is `onEvent`, and its `onDelete`, which runs before the account goes and can keep it, is `beforeDelete`. The old names work until 1.95. `kay upgrade` renames the key in the options written out at a call of `auth`, `authCore` or `createAuth` and in the `export const hooks` of `src/auth.ts`; a key set beside its new name is reported with no fix. |
 
 ## Errors
 

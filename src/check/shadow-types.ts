@@ -38,6 +38,7 @@ import { endpointExports } from './endpoint-exports'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
 import { unguardedRoutes, unguardedTools } from './guards'
+import { hookNames } from './hook-names'
 import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
 import { libraryNames, pgLoaderSource } from './library-names'
@@ -157,6 +158,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => streamOn(root, options),
   async ({ root, options }) => streamOpen(root, options),
   async ({ root, options }) => sizeLimits(root, options),
+  async ({ root, options }) => hookNames(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

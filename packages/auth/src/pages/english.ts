@@ -27,6 +27,7 @@ export const ERRORS = {
   'self': 'You cannot do this to your own account.',
   'last-admin': 'You are the only admin: make someone else an admin first.',
   'last-owner': 'You are the only owner of an organization with other members: make another member an owner first.',
+  'refused': 'This account cannot be deleted right now.',
   'not-found': 'Not found.',
   'label': 'Give the token a name.',
   'scope': 'Choose what the token is allowed to do.',

@@ -108,7 +108,7 @@ if failure
 
 ### Security mails
 
-A change to what protects an account is mailed to its verified address, never an unverified one, and handed to `onAuthEvent` (see Events and the audit log). A mailer or an `onAuthEvent` that throws is logged, never turned into a failed sign-in:
+A change to what protects an account is mailed to its verified address, never an unverified one, and handed to `onEvent` (see Events and the audit log). A mailer or an `onEvent` that throws is logged, never turned into a failed sign-in:
 
 - `new-sign-in`: a device or network the account had not used before; the first sign-in has nothing to compare against. The mail links to `sessionsPage` when the app has one.
 - `sign-in-locked`: too many wrong passwords or second-factor codes were tried on the account, mailed at most once a day per account (see Limits).
