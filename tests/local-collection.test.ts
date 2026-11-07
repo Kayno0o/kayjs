@@ -712,11 +712,20 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
 
     await page.evaluate(() => {
       document.cookie = 'readfail=; path=/; max-age=0'
+      // Each render ends in one state, which never says `synced` beside the read's error.
+      const seen = window as unknown as { mixed: boolean }
+
+      seen.mixed = false
+      new MutationObserver(() => {
+        if (document.querySelector('.status')?.textContent === 'synced' && document.querySelector('p.error')?.textContent !== '')
+          seen.mixed = true
+      }).observe(document.body, { subtree: true, childList: true, characterData: true })
     })
     await page.click('button.retry')
     await page.waitUntil(() => document.querySelector('.status')?.textContent === 'synced')
 
     expect(await page.text('p.error')).toBe('')
+    expect(await page.evaluate(() => (window as unknown as { mixed: boolean }).mixed)).toBe(false)
     expect((await hooks(page))[1]).not.toBe('0')
   }, 60_000)
 

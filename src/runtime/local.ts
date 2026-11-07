@@ -495,7 +495,8 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
     if (this.paused)
       this.state[1]('signed-out')
-    else if (this.offline)
+    // A read of the server that failed holds `offline` until one succeeds, so `synced` never shows beside its `error()`.
+    else if (this.offline || this.unread)
       this.state[1]('offline')
     else
       this.state[1](count > 0 ? 'unsynced' : 'synced')
@@ -895,6 +896,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
     this.unread = false
     this.failure[1](undefined)
+    this.show()
 
     // A write was made or settled while the server answered: its rows are older than the queue, and the next sync reads again.
     if (seen !== this.changes)
