@@ -60,19 +60,25 @@ A source blocked on a quiet feed is freed by a signal: pass a function, `eventSt
 
 #### Resume after a drop
 
-`eventStream(source, { id })` sends `id(value)` with each event. `stream()` keeps the id of the last event it took and sends it as `Last-Event-ID` when it reconnects, after a drop or a refused attempt while the server restarts, so the route continues after it:
+`eventStream(source, { id })` sends `id(value)` with each event. `stream()` keeps the id of the last event it took and sends it as `Last-Event-ID` when it reconnects, after a drop or a 502, 503 or 504 while the server restarts (any other refusal, a 401 or 404, ends the stream as failed), so the route continues after it:
 
 ```ts
-export default api().get('/feed', ({ request }) => {
-  const after = Number(request.headers.get('last-event-id'))
+import { api, eventStream, lastEventId } from 'kay/server'
 
-  return eventStream(signal => feedSince(Number.isSafeInteger(after) ? after : 0, signal), { id: item => item.seq })
+const DIGITS = /^\d{1,15}$/
+
+export default api().get('/feed', ({ request }) => {
+  const sent = lastEventId(request)
+  const after = sent !== undefined && DIGITS.test(sent) ? Number(sent) : 0
+
+  return eventStream(signal => feedSince(after, signal), { id: item => item.seq })
 })
 ```
 
-- The header is the browser's text and reaches the route as it came: parse it, and fall back to the start when it is missing, not a value the route knows or older than it keeps.
-- An id with a line break or NUL fails the stream; an id a header cannot carry (outside printable ASCII) is not sent back.
+- `lastEventId(request)` gives the header only when it is printable ASCII with no space at either end and at most 1 KB, else `undefined`. It is still the browser's text: parse it strictly, as above, and start from the beginning when it is missing or names nothing the route keeps.
+- An id that is not printable ASCII, has a space at either end or exceeds 1 KB fails the stream, as the browser would not send it back.
 - A route with no `id` sends none, and `stream()` reconnects as before. A new `start()` of a `start: false` stream forgets the id.
+- Ids do not survive a page swap or a reload: a new mount starts with no id, so the route sends from the beginning.
 - To catch up without ids, `feed.onOpen(reconnected => reconnected && refetch())` runs on every open after the first.
 
 ### Stream an action's answer

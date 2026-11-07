@@ -2839,6 +2839,9 @@ interface KvStore extends StoreBase
   ping?: (() => unknown) | undefined
   set: (key: string, value: string, ttlMs?: number | undefined) => MaybePromise<void>
 
+[./server] lastEventId
+function lastEventId(request: Request): string | undefined
+
 [./server] limiter
 function limiter({ max, window, name, ...rest }: LimiterOptions): Limiter
 

@@ -8,7 +8,7 @@
     "files": 2
   },
   "live-values": {
-    "gzip": 14117,
+    "gzip": 14286,
     "files": 4
   },
   "bench-products": {
@@ -20,7 +20,7 @@
     "files": 2
   },
   "form-only": {
-    "gzip": 2810,
+    "gzip": 2813,
     "files": 1
   }
 }

@@ -1,8 +1,8 @@
 import { describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { root } from '../src/runtime'
+import { flush, root } from '../src/runtime'
 import { API_MOUNT, openSocket, readEvents, stream } from '../src/runtime/live'
-import { eventStream } from '../src/server/event-stream'
+import { eventStream, lastEventId } from '../src/server/event-stream'
 
 async function until(ready: () => boolean): Promise<void> {
   for (let waited = 0; !ready(); waited += 5) {
@@ -34,7 +34,7 @@ describe('eventStream ids', () => {
     expect(await eventStream([1]).text()).not.toContain('id:')
   })
 
-  it.each(['a\nb', 'a\rb', 'a\0b'])('fails the stream rather than let the id %j end its field', async (hostile) => {
+  it.each(['a\nb', 'a\rb', 'a\0b', ' a', 'a ', 'é', 'x'.repeat(1025)])('fails the stream rather than send the id %j, which the browser would not send back', async (hostile) => {
     const text = await eventStream([1], { id: () => hostile }).text()
 
     expect(text).toContain('event: error')
@@ -42,19 +42,20 @@ describe('eventStream ids', () => {
   })
 
   it('lets a route continue after the Last-Event-ID the browser sent, however hostile its text', async () => {
-    const seen: (string | null)[] = []
+    const seen: (string | undefined)[] = []
     const app = new Elysia().get('/api/feed', ({ request }) => {
-      seen.push(request.headers.get('last-event-id'))
+      seen.push(lastEventId(request))
 
       return eventStream([1], { id: value => value })
     })
     const huge = 'x'.repeat(8_000)
 
-    for (const sent of ['7', '', '../../etc', '<script>', huge])
+    for (const sent of ['7', '', ' 7', '7 ', 'é', huge])
       await app.handle(new Request('http://localhost/api/feed', { headers: { 'last-event-id': sent } }))
 
     await app.handle(new Request('http://localhost/api/feed'))
-    expect(seen).toEqual(['7', '', '../../etc', '<script>', huge, null])
+    // A header value is trimmed on its way, so the spaces around a 7 never reach the route.
+    expect(seen).toEqual(['7', undefined, '7', '7', undefined, undefined, undefined])
   })
 })
 
@@ -80,15 +81,15 @@ describe('a stream reconnecting', () => {
     expect(sent).toEqual([undefined, '3', '3'])
   })
 
-  it('keeps the id across a refused attempt, as a server restarting refuses', async () => {
+  // The ids sent with each request while the answers are read one after another, the last of which ends the stream.
+  async function idsSent(...answers: Response[]): Promise<(string | undefined)[]> {
     const restore = instantRetries()
     const sent: (string | undefined)[] = []
-    const answers = [body('id: 5\ndata: [1]\n\n'), new Response(null, { status: 503 }), body('id: 6\ndata: [2]\n\nevent: end\ndata:\n\n')]
     const reader = readEvents<number>(async (_signal, lastEventId) => {
       sent.push(lastEventId)
 
       return answers.shift()!
-    }, true, false, true)
+    }, true)
 
     try {
       reader.start()
@@ -98,25 +99,46 @@ describe('a stream reconnecting', () => {
       restore()
     }
 
-    expect(sent).toEqual([undefined, '5', '5'])
+    return sent
+  }
+
+  it('keeps an id across later events that carry none', async () => {
+    expect(await idsSent(body('id: 3\ndata: [1]\n\ndata: [2]\n\n'), body('event: end\ndata:\n\n'))).toEqual([undefined, '3'])
   })
 
-  it('forgets the id when a new run starts, and when the server resets it with an empty one', async () => {
+  it('takes the id of a block with no event or data, as the standard does', async () => {
+    expect(await idsSent(body('id: 8\n\n'), body('event: end\ndata:\n\n'))).toEqual([undefined, '8'])
+  })
+
+  it('forgets the id an empty one resets', async () => {
+    expect(await idsSent(body('id: 4\ndata: [1]\n\nid:\ndata: [2]\n\n'), body('event: end\ndata:\n\n'))).toEqual([undefined, undefined])
+  })
+
+  it.each(['has space ', ' has', 'é', 'x'.repeat(1025)])('does not send back the id %j', async (hostile) => {
+    expect(await idsSent(body(`id: ${hostile}\ndata: [1]\n\n`), body('event: end\ndata:\n\n'))).toEqual([undefined, undefined])
+  })
+
+  it('sends back an id of 1 KB', async () => {
+    const longest = 'x'.repeat(1024)
+
+    expect(await idsSent(body(`id: ${longest}\ndata: [1]\n\n`), body('event: end\ndata:\n\n'))).toEqual([undefined, longest])
+  })
+
+  it('forgets the id when a new run starts', async () => {
     const sent: (string | undefined)[] = []
     const reader = readEvents<number>(async (_signal, lastEventId) => {
       sent.push(lastEventId)
 
       return body('id: 4\ndata: [1]\n\nevent: end\ndata:\n\n')
     }, false, true)
-    const again = async (_signal: AbortSignal, lastEventId?: string) => {
-      sent.push(lastEventId)
-
-      return body('event: end\ndata:\n\n')
-    }
 
     reader.start()
     await until(() => reader.status() === 'done')
-    reader.start(again)
+    reader.start(async (_signal, lastEventId) => {
+      sent.push(lastEventId)
+
+      return body('event: end\ndata:\n\n')
+    })
     await until(() => sent.length === 2 && reader.status() === 'done')
     expect(sent).toEqual([undefined, undefined])
   })
@@ -164,30 +186,135 @@ describe('a stream reconnecting', () => {
 
 describe('stream() of a route', () => {
   const feed = { [API_MOUNT]: '/api/feed' }
+  const lazy = () => root(() => stream(feed as never, '/' as never, { start: false }) as unknown as { start: () => void, status: () => string, close: () => void })
 
-  it('sends Last-Event-ID on its reconnect, a plain header-safe id only', async () => {
-    const restore = instantRetries()
-    const headers: (string | null)[] = []
-    const answers = [body('id: 12\ndata: [1]\n\n'), body('id: é\ndata: [2]\n\n'), body('event: end\ndata:\n\n')]
-    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async (_url: unknown, init?: RequestInit) => {
-      headers.push(new Headers(init?.headers).get('last-event-id'))
+  // Every request the fetch sees, answered one after another.
+  function served(...answers: Response[]): { headers: (string | null)[], urls: string[], restore: () => void } {
+    const seen = { headers: [] as (string | null)[], urls: [] as string[] }
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation((async (url: unknown, init?: RequestInit) => {
+      seen.urls.push(String(url))
+      seen.headers.push(new Headers(init?.headers).get('last-event-id'))
 
       return answers.shift()!
     }) as typeof fetch)
 
+    return { ...seen, restore: () => fetched.mockRestore() }
+  }
+
+  it('sends Last-Event-ID on its reconnect, and none for an id a header cannot carry', async () => {
+    const restore = instantRetries()
+    const fetched = served(body('id: 12\ndata: [1]\n\n'), body('id: é\ndata: [2]\n\n'), body('event: end\ndata:\n\n'))
+
     try {
-      const reader = root(() => stream(feed as never, '/' as never, { start: false }) as unknown as { start: () => void, status: () => string })
+      const reader = lazy()
 
       reader.start()
       await until(() => reader.status() === 'done')
     }
     finally {
       restore()
-      fetched.mockRestore()
+      fetched.restore()
     }
 
-    // An id a header cannot carry is not sent, rather than throw from fetch and never reconnect.
-    expect(headers).toEqual([null, '12', null])
+    expect(fetched.headers).toEqual([null, '12', null])
+  })
+
+  it.each([502, 503, 504])('waits out a %i while the server restarts and resumes after the id it kept', async (status) => {
+    const restore = instantRetries()
+    const fetched = served(body('id: 5\ndata: [1]\n\n'), new Response(null, { status }), body('id: 6\ndata: [2]\n\nevent: end\ndata:\n\n'))
+
+    try {
+      const reader = lazy()
+
+      reader.start()
+      await until(() => reader.status() === 'done')
+    }
+    finally {
+      restore()
+      fetched.restore()
+    }
+
+    expect(fetched.headers).toEqual([null, '5', '5'])
+  })
+
+  it.each([400, 401, 403, 404, 500])('fails for good on a %i', async (status) => {
+    const restore = instantRetries()
+    const fetched = served(body('id: 5\ndata: [1]\n\n'), new Response(null, { status }), body('event: end\ndata:\n\n'))
+    let reader: ReturnType<typeof lazy>
+
+    try {
+      reader = lazy()
+      reader.start()
+      await until(() => reader.status() === 'failed')
+      await Bun.sleep(20)
+    }
+    finally {
+      restore()
+      fetched.restore()
+    }
+
+    expect(fetched.headers).toEqual([null, '5'])
+  })
+
+  it('forgets the id when start() opens a new run', async () => {
+    const fetched = served(body('id: 5\ndata: [1]\n\nevent: end\ndata:\n\n'), body('event: end\ndata:\n\n'))
+
+    try {
+      const reader = lazy()
+
+      reader.start()
+      await until(() => reader.status() === 'done')
+      reader.start()
+      await until(() => fetched.headers.length === 2)
+    }
+    finally {
+      fetched.restore()
+    }
+
+    expect(fetched.headers).toEqual([null, null])
+  })
+
+  it('does not reconnect once closed or unmounted with an id held', async () => {
+    const fetched = served(body('id: 5\ndata: [1]\n\n'), body('event: end\ndata:\n\n'))
+
+    try {
+      const [reader, dispose] = root(dispose => [stream(feed as never, '/' as never, { start: false }) as unknown as { start: () => void, status: () => string }, dispose] as const)
+
+      reader.start()
+      await until(() => fetched.headers.length === 1)
+      await until(() => reader.status() === 'connecting')
+      dispose()
+      // Longer than the first backoff, which is at most half a second.
+      await Bun.sleep(700)
+      expect(reader.status()).toBe('closed')
+    }
+    finally {
+      fetched.restore()
+    }
+
+    expect(fetched.headers).toEqual([null])
+  })
+
+  it('reaches the route under the base of the site, the header with it', async () => {
+    const fetched = served(body('id: 5\ndata: [1]\n\n'), body('event: end\ndata:\n\n'))
+    const restore = instantRetries()
+
+    ;(globalThis as { document?: unknown }).document = { querySelector: () => ({ content: '/docs' }) }
+
+    try {
+      const reader = lazy()
+
+      reader.start()
+      await until(() => reader.status() === 'done')
+    }
+    finally {
+      delete (globalThis as { document?: unknown }).document
+      restore()
+      fetched.restore()
+    }
+
+    expect(fetched.urls).toEqual(['/docs/api/feed', '/docs/api/feed'])
+    expect(fetched.headers).toEqual([null, '5'])
   })
 })
 
@@ -223,11 +350,28 @@ describe('socket() onOpen', () => {
 })
 
 describe('stream(source) onOpen', () => {
-  it('has the method, called as the source starts', () => {
-    const reader = root(() => stream(async function* () {
-      yield 1
-    }))
+  it('tells the first open from the one after a failure and a retry', async () => {
+    ;(globalThis as { document?: unknown }).document = { querySelector: () => null }
 
-    expect(typeof reader.onOpen).toBe('function')
+    try {
+      let calls = 0
+      const reader = root(() => stream(async function* () {
+        if (calls++ === 0)
+          throw new Error('dropped')
+
+        yield 1
+      }))
+      const opened: boolean[] = []
+
+      reader.onOpen(reconnected => opened.push(reconnected))
+      flush()
+      await until(() => reader.status() === 'failed')
+      reader.retry()
+      await until(() => opened.length === 2)
+      expect(opened).toEqual([false, true])
+    }
+    finally {
+      delete (globalThis as { document?: unknown }).document
+    }
   })
 })

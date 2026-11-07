@@ -2,7 +2,7 @@ import type { EventReader } from '../runtime/live'
 import type { SiteScope } from './site-scope'
 import type { TestSite } from './site-types'
 import { joinBase } from '../runtime/base'
-import { openSocket, readEvents, resumeHeaders, routeUrl, streamRequest } from '../runtime/live'
+import { openSocket, readEvents, resumeHeaders, routeUrl, streamRequest, whileRestarting } from '../runtime/live'
 import { effect, root as reactiveRoot } from '../runtime/reactive'
 import { withKept } from './cookies'
 import { NativeFetch, NativeWebSocket } from './natives'
@@ -67,7 +67,7 @@ export function socketsOf({ defaults, keyHeader, base, jar, send, listening, con
     stream: (module, path, ...[options]) => {
       const url = routeUrl(module, path, options as Parameters<typeof routeUrl>[2])
       const init = streamRequest(options)
-      const reader = readEvents(async (signal, lastEventId) => send(url, { ...init, headers: { ...init.headers, ...resumeHeaders(lastEventId), ...options?.headers }, signal }), init.method === 'GET')
+      const reader = readEvents(async (signal, lastEventId) => send(url, { ...init, headers: { ...init.headers, ...resumeHeaders(lastEventId), ...options?.headers }, signal }), init.method === 'GET', false, init.method === 'GET' && whileRestarting)
       const tested = Object.assign(reader, inbox(reader))
       const finished = new Promise<unknown[]>((resolve) => {
         reactiveRoot(dispose => effect(() => {

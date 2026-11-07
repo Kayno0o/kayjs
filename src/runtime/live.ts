@@ -4,7 +4,7 @@ import { withBase } from './base'
 import { trackCalls } from './call-result'
 import { connection, listenerSet } from './connection'
 import { effect, onCleanup, onMount, ownSignal, untrack } from './reactive'
-import { parseEvents } from './sse'
+import { parseEvents, sendableId } from './sse'
 import { decodeServerValue } from './wire'
 
 // Set by the server on every module it mounts under `/api`, and by the browser build on the stub standing in for one: where the module's routes are served.
@@ -256,16 +256,17 @@ async function refusalOf(response: Response): Promise<ApiError> {
   return new ApiError(response.status, message, data, { '': message })
 }
 
-// The header a reconnecting stream sends so its route can continue after the last event it took, none when that id is not one a header carries.
-const HEADER_SAFE = /^[\x20-\x7E]+$/
-
+// The header a reconnecting stream sends so its route can continue after the last event it took, which `readEvents` keeps only when `sendableId` accepts it.
 export function resumeHeaders(lastEventId: string | undefined): Record<string, string> {
-  return lastEventId !== undefined && HEADER_SAFE.test(lastEventId) ? { 'last-event-id': lastEventId } : {}
+  return lastEventId === undefined ? {} : { 'last-event-id': lastEventId }
 }
 
-// An event stream read as it arrives, through `request`, given the id of the last event taken to send as `resumeHeaders` does; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is; with `retryRefused`, a response that is not ok is tried again after the backoff too, as a stream across a restart needs.
+// The statuses of a server or a proxy that is restarting (502, 503, 504), which a GET stream waits out where any other refusal ends it.
+export const whileRestarting = (status: number) => status > 501 && status < 505
+
+// An event stream read as it arrives, through `request`, given the id of the last event taken to send as `resumeHeaders` does; a GET stream that drops reconnects, a stream that ran to its end or failed stays as it is; with `retryRefused`, a response that is not ok (or, given a function, one whose status it accepts) is tried again after the backoff too, as a stream across a restart needs.
 // `start()` opens it once; given a request, it opens a new run of it, closing the one going and forgetting its last value and its last id.
-export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: string) => Promise<Response>, reconnect: boolean, idle = false, retryRefused = false): EventReader<T> & { start: (next?: (signal: AbortSignal, lastEventId?: string) => Promise<Response>) => void } {
+export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: string) => Promise<Response>, reconnect: boolean, idle = false, retryRefused: boolean | ((status: number) => boolean) = false): EventReader<T> & { start: (next?: (signal: AbortSignal, lastEventId?: string) => Promise<Response>) => void } {
   let run: AbortController | undefined
   let started = false
   let lastId: string | undefined
@@ -273,6 +274,11 @@ export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: strin
 
   const opened = listenerSet<boolean>()
   const link = connection<T>(() => void read(run!), reconnect, idle)
+
+  // An empty id resets it, as the standard says, and so does one the next request could not send.
+  const remember = (id: string) => {
+    lastId = sendableId(id) ? id : undefined
+  }
 
   const onEvent = (event: string, data: string, id?: string): ConnectionStatus | undefined => {
     if (event === END_EVENT)
@@ -300,7 +306,7 @@ export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: strin
     link.reset()
 
     if (id !== undefined)
-      lastId = id === '' ? undefined : id
+      remember(id)
 
     link.receive(value)
 
@@ -327,7 +333,7 @@ export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: strin
         if (controller.signal.aborted)
           return
 
-        if (!retryRefused) {
+        if (retryRefused === false || (retryRefused !== true && !retryRefused(response.status))) {
           link.fail(refusal)
 
           return
@@ -339,7 +345,7 @@ export function readEvents<T>(request: (signal: AbortSignal, lastEventId?: strin
       else {
         link.set('open')
         opened.emit(opens++ > 0)
-        ended = await parseEvents(response.body, controller.signal, onEvent)
+        ended = await parseEvents(response.body, controller.signal, onEvent, remember)
       }
     }
     catch (thrown) {
@@ -581,7 +587,8 @@ export function stream(module: unknown, path?: string, options?: UrlInput & { me
   if (!lazy && typeof document !== 'undefined')
     routeUrl(module, path, options)
 
-  const reader = readEvents(opened(options), (options?.method ?? 'get') === 'get', lazy)
+  const reconnect = (options?.method ?? 'get') === 'get'
+  const reader = readEvents(opened(options), reconnect, lazy, reconnect && whileRestarting)
 
   onMount(() => {
     if (!lazy && typeof document !== 'undefined')

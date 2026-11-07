@@ -255,13 +255,16 @@ export default api().get('/news', () => eventStream(signal => watchNews(signal))
 
 A browser that loses the connection opens it again, and what the route sent in between is lost unless it can continue where the visitor stopped.
 
-Give each event an id with `eventStream(source, { id })`. `stream()` remembers the id of the last event it took and sends it back as the `Last-Event-ID` header when it reconnects, also after the server restarted. The route reads it from `request.headers` and starts after it. The header is plain text from the browser, so check it and start over when it means nothing.
+Give each event an id with `eventStream(source, { id })`. `stream()` remembers the id of the last event it took and sends it back as the `Last-Event-ID` header when it reconnects, also after the server restarted (a 502, 503 or 504 is waited out, any other refusal ends the stream). The route reads it with `lastEventId(request)` and starts after it. An id must be printable ASCII of at most 1 KB with no space at either end, or the stream fails, as the browser would not send it back.
+
+The header is plain text from the browser, so parse it strictly and start over when it means nothing. A page swap or a reload starts a new stream with no id.
 
 ```ts
 export default api().get('/news', ({ request }) => {
-  const after = Number(request.headers.get('last-event-id'))
+  const sent = lastEventId(request)
+  const after = sent !== undefined && /^\d{1,15}$/.test(sent) ? Number(sent) : 0
 
-  return eventStream(signal => newsSince(Number.isSafeInteger(after) ? after : 0, signal), { id: item => item.seq })
+  return eventStream(signal => newsSince(after, signal), { id: item => item.seq })
 })
 ```
 

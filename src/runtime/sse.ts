@@ -3,10 +3,17 @@ const LINE_BREAK = /\r\n|\r(?!$)|\n/
 // The one space a field's value may start with, which is not part of it.
 const LEADING_SPACE = /^ /
 
+// An id a browser can send back as `Last-Event-ID`: printable ASCII, no space at either end, at most 1 KB. Shared by the server writing ids and the client sending them, so one never writes what the other would drop.
+const SENDABLE_ID = /^[\x21-\x7E](?:[\x20-\x7E]{0,1022}[\x21-\x7E])?$/
+
+export function sendableId(id: string): boolean {
+  return SENDABLE_ID.test(id)
+}
+
 // Reads `text/event-stream` blocks, a `data` field over several lines joined with line breaks, comments skipped; resolves with what an event returned to end the stream, or undefined when the body ran out first.
-// An event gets the `id` field of its block as a third argument, undefined when it has none, and an `id` holding a NUL is ignored, as the standard asks.
+// An event gets the `id` field of its block as a third argument, undefined when it has none, and an `id` holding a NUL is ignored, as the standard asks. A block with an `id` and no event or data goes to `onId` alone, as the standard sets the last id without dispatching.
 // Aborting cancels the body, which stops the source on the server even where fetch would leave the body open.
-export async function parseEvents<End>(body: ReadableStream<Uint8Array>, signal: AbortSignal, onEvent: (event: string, data: string, id?: string) => End | undefined): Promise<End | undefined> {
+export async function parseEvents<End>(body: ReadableStream<Uint8Array>, signal: AbortSignal, onEvent: (event: string, data: string, id?: string) => End | undefined, onId?: (id: string) => void): Promise<End | undefined> {
   const reader = body.getReader()
   const cancel = async () => {
     try {
@@ -44,7 +51,11 @@ export async function parseEvents<End>(body: ReadableStream<Uint8Array>, signal:
           return undefined
 
         if (line === '') {
-          const ended = data.length > 0 || event !== '' ? onEvent(event, data.join('\n'), id) : undefined
+          const dispatched = data.length > 0 || event !== ''
+          const ended = dispatched ? onEvent(event, data.join('\n'), id) : undefined
+
+          if (!dispatched && id !== undefined)
+            onId?.(id)
 
           event = ''
           data = []

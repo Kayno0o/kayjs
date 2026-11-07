@@ -4,13 +4,12 @@ import { KayError } from '../compiler/errors'
 import { END_EVENT, ERROR_EVENT } from '../runtime/live'
 import { localeState, runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
+import { sendableId } from '../runtime/sse'
 import { encodeValue, unsendable } from '../runtime/wire'
 
 // Bun closes a connection idle for 10 s by default, and proxies after a minute or so: a comment line now and then keeps a quiet stream open.
 const HEARTBEAT_MS = 5000
 const HEARTBEAT = new TextEncoder().encode(':\n\n')
-
-const ID_REFUSED = /[\r\n\0]/
 
 // The streams being read, each with what ends it cleanly: a stop ends them all first, as one that never ends would keep the server from stopping.
 const draining = new Set<() => void>()
@@ -47,7 +46,7 @@ export class StreamRefusedError extends KayError {
 type Source<T> = AsyncIterable<T> | Iterable<T> | ((signal: AbortSignal) => AsyncIterable<T> | Iterable<T>)
 
 export interface EventStreamOptions<T> {
-  // The id each event carries, which a browser sends back as `Last-Event-ID` when it reconnects, the route reading it from `request.headers` to continue after it. A line break or NUL in one fails the stream.
+  // The id each event carries, which a browser sends back as `Last-Event-ID` when it reconnects, the route reading it with `lastEventId(request)` to continue after it. An id the browser would not send back fails the stream: printable ASCII, no space at either end, at most 1 KB.
   id?: (value: T) => string | number
 }
 
@@ -182,17 +181,24 @@ export function eventBody<T>(source: Source<T>, report: (error: unknown) => void
   }, { highWaterMark: 0 })
 }
 
-// The `id:` line of an event, none when the stream gives no ids: a line break would end the field and a NUL makes a browser ignore it.
+// The `id:` line of an event, none when the stream gives no ids: a line break would end the field, a NUL makes a browser ignore it, and the client sends back only what `sendableId` accepts.
 function idLine<T>(id: ((value: T) => string | number) | undefined, value: T): string {
   if (!id)
     return ''
 
   const text = String(id(value))
 
-  if (ID_REFUSED.test(text))
-    throw new TypeError('kay: an event stream id cannot hold a line break or a NUL')
+  if (!sendableId(text))
+    throw new TypeError('kay: an event stream id must be printable ASCII of at most 1 KB with no space at either end')
 
   return `id: ${text}\n`
+}
+
+// The `Last-Event-ID` a browser sent when it reconnected, as the text `eventStream`'s `id` gave; undefined when there is none or it is not one a browser could have been given (hostile input), so the route starts from the beginning.
+export function lastEventId(request: Request): string | undefined {
+  const sent = request.headers.get('last-event-id')
+
+  return sent !== null && sendableId(sent) ? sent : undefined
 }
 
 function encodeEvent(value: unknown): string {
