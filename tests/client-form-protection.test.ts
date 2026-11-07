@@ -19,7 +19,7 @@ const HONEYPOT = '<input name="website" type="text" tabindex="-1"'
 
 // What a browser reads from the action's own URL, as kay's script does for a form an island built.
 async function fields(site: { fetch: (path: string) => Promise<Response> }, url: string): Promise<{ html: string, response: Response }> {
-  const response = await site.fetch(url)
+  const response = await site.fetch(url.replace('/_kay/action/', '/_kay/fields/'))
 
   return { html: ((await response.json()) as { html: string }).html, response }
 }
@@ -46,7 +46,7 @@ describe('the protection a form built in the browser asks its action for', () =>
   })
 
   it('answers 404 for an address that is no action\'s', async () => {
-    expect((await site.fetch('/_kay/action/src/routes/index.kay/nothing')).status).toBe(404)
+    expect((await site.fetch('/_kay/fields/src/routes/index.kay/nothing')).status).toBe(404)
   })
 
   it('has its stamp accepted once minTime passed, and refuses it sooner, as the server rendered form\'s is', async () => {

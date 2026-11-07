@@ -563,7 +563,7 @@ The third argument of `action` protects it from scripts.
 
 These checks sit under `protect` in the action's third argument, beside `maxSize`, `messages` and `tool`. `rateLimit` answers 429 past `max` posts per `window`. `honeypot` names a hidden field that kay renders for you and bots fill in. `minTime` refuses a form posted sooner than that after its page rendered.
 
-A form an island builds in the browser gets its honeypot and its stamp from the action's own address when it takes focus, so it needs nothing from you and a page without such a form loads no more.
+A form an island builds in the browser gets its honeypot and its stamp from the server when it takes focus, so it needs nothing from you and a page without such a form loads no more.
 
 `minTime` checks a form posted without JavaScript or by the page swap, and an island's call carries no stamp. Write `minTime: { after: '3s', plain: true }` to check only the plain post. The page swap and an island's call then go through, which suits a form whose script already proves something, such as a proof of work.
 

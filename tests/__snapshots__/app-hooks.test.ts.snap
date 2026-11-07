@@ -442,6 +442,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
   "routes": [
     "GET /ext",
     "GET /_kay/*",
+    "GET /_kay/fields/src/routes/index.kay/add",
     "POST /_kay/action/src/routes/index.kay/add",
     "OPTIONS /api/items/",
     "OPTIONS /api/items/*",
@@ -762,6 +763,7 @@ exports[`the hooks pagesApp registers runs with the app's own hooks set, in the 
   "routes": [
     "GET /ext",
     "GET /_kay/*",
+    "GET /_kay/fields/src/routes/index.kay/add",
     "POST /_kay/action/src/routes/index.kay/add",
     "GET /api/items/",
     "POST /api/items/",
@@ -957,6 +959,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
   "routes": [
     "GET /ext",
     "GET /_kay/*",
+    "GET /_kay/fields/src/routes/index.kay/add",
     "POST /_kay/action/src/routes/index.kay/add",
     "GET /api/items/",
     "POST /api/items/",
@@ -1273,6 +1276,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "GET /_kay/dev/routes",
     "GET /ext",
     "GET /_kay/*",
+    "GET /_kay/fields/src/routes/index.kay/add",
     "POST /_kay/action/src/routes/index.kay/add",
     "GET /api/items/",
     "POST /api/items/",
@@ -1439,6 +1443,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
   "routes": [
     "GET /_kay/env.js",
     "GET /_kay/*",
+    "GET /_kay/fields/src/routes/index.kay/add",
     "POST /_kay/action/src/routes/index.kay/add",
     "GET /api/items/",
     "POST /api/items/",
@@ -1860,6 +1865,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "GET /_kay/env.js",
     "GET /ext",
     "GET /_kay/*",
+    "GET /_kay/fields/src/routes/index.kay/add",
     "POST /_kay/action/src/routes/index.kay/add",
     "GET /api/items/",
     "POST /api/items/",

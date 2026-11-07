@@ -2,6 +2,7 @@
 const ISLAND = 'slot[data-component]'
 const STAMP_FIELD = 'kay_since'
 
+// The address a form posts to, with its GET asking for the fields at `/_kay/fields/` instead (`FIELDS_PREFIX` in `server/actions.ts`).
 // What a form an island builds in the browser asks its action for, so it carries what the server writes into the forms it renders: the honeypot and the stamp `minTime` reads.
 // A form the server rendered holds both already, and one outside an island is always the server's.
 const OWN = `input[name="${STAMP_FIELD}"], input[data-1p-ignore]`
@@ -59,7 +60,7 @@ async function fieldsOf(path: string): Promise<string> {
 }
 
 async function read(path: string): Promise<string> {
-  const response = await fetch(path, { headers: { accept: 'application/json' } })
+  const response = await fetch(path.replace('/_kay/action/', '/_kay/fields/'), { headers: { accept: 'application/json' } })
 
   if (!response.ok)
     throw new Error(String(response.status))
