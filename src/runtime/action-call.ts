@@ -445,7 +445,7 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
     (data, release, take) => {
       const held = onStreamEnd(data, release)
 
-      // A stream retried is in flight again until it ends once more.
+      // A stream retried is in flight again until it ends once more: `take()` first, as the end that follows may come at once.
       if (held) {
         (data as ActionStream<unknown>).onOpen(() => {
           take()

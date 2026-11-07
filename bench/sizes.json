@@ -1,6 +1,6 @@
 {
   "static": {
-    "gzip": 9219,
+    "gzip": 9218,
     "files": 3
   },
   "i18n-links": {
@@ -8,19 +8,19 @@
     "files": 2
   },
   "live-values": {
-    "gzip": 14518,
+    "gzip": 14287,
     "files": 4
   },
   "bench-products": {
-    "gzip": 10760,
+    "gzip": 10759,
     "files": 2
   },
   "bench-table": {
-    "gzip": 13415,
+    "gzip": 13412,
     "files": 2
   },
   "form-only": {
-    "gzip": 2811,
+    "gzip": 2813,
     "files": 1
   }
 }

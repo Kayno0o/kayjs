@@ -5,7 +5,7 @@ import { eventually } from './helpers/eventually'
 
 // What a retried action stream does to the call that made it (#2804 slice 4): a tracked handle counts it in flight again, and the call timeout does not cut the new post.
 
-interface Stream { pending: () => boolean, status: () => string, last: () => number | undefined, retry: () => void }
+interface Stream { error: () => unknown, pending: () => boolean, status: () => string, last: () => number | undefined, retry: () => void }
 type Tracked = ((input: object) => Promise<{ ok: true, data: Stream }>) & { pending: () => boolean }
 type Stub = ((input: object, options?: { timeout?: string }) => Promise<Stream>) & { track: () => Tracked }
 
@@ -109,5 +109,25 @@ describe('a stream retried', () => {
     await eventually(() => expect(stream.status()).toBe('done'), 2000)
     expect(stream.last()).toBe(9)
     expect(server.aborted()).toBe(0)
+  })
+})
+
+describe('a stream retried whose post fails', () => {
+  it('leaves a track() handle released, as the call never ran again', async () => {
+    mocks.push(spyOn(console, 'error').mockImplementation(() => undefined))
+
+    const first = open()
+
+    serve([first.response, () => new Response('Not yours', { status: 403 })])
+
+    const run = stub().track()
+    const { data: stream } = await run({})
+
+    first.drop()
+    await eventually(() => expect(stream.status()).toBe('failed'))
+    stream.retry()
+    await eventually(() => expect(stream.error()).toMatchObject({ status: 403 }))
+    expect(stream.status()).toBe('failed')
+    expect(run.pending()).toBe(false)
   })
 })
