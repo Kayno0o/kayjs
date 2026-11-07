@@ -15,6 +15,8 @@ interface HookRenames {
   // The file whose `export const hooks` holds the same keys, relative to the project.
   hooksFile?: string
   renames: Readonly<Record<string, string>>
+  // The renamed hooks whose new name also changes what they do, so the fix is offered but not applied by `kay upgrade`.
+  changed?: readonly string[]
   until: string
 }
 
@@ -26,6 +28,8 @@ const HOOK_RENAMES: readonly HookRenames[] = [
     calls: ['auth', 'authCore', 'createAuth'],
     hooksFile: 'src/auth.ts',
     renames: { onAuthEvent: 'onEvent', onDelete: 'beforeDelete' },
+    // `beforeDelete` is cut off after 10 s, refuses on `false` and on a throw, where `onDelete` waited and propagated.
+    changed: ['onDelete'],
     until: '1.95',
   },
 ]
@@ -44,7 +48,7 @@ function nameOf(member: ObjectProperty): string {
 }
 
 // The hooks of kay's libraries under the names they had before the convention of `llms/hooks.md`: `onAuthEvent` and `onDelete` of kayjs-auth are `onEvent` and `beforeDelete`.
-// Found in the options object written out at a call of the library's function, and in the `hooks` an app keeps in `src/auth.ts`. The fix renames the key, a shorthand `{ onDelete }` becoming `{ beforeDelete: onDelete }`; a key written beside its new name is reported with no fix, as the new one wins.
+// Found in the options object written out at a call of the library's function, and in the `hooks` an app keeps in `src/auth.ts`. The fix renames the key (`onDelete` is left to you, as `beforeDelete` is cut off after 10 s and refuses on `false` or a throw where `onDelete` waited and propagated), a shorthand `{ onDelete }` becoming `{ beforeDelete: onDelete }`; a key written beside its new name is reported with no fix, as the new one wins.
 export async function hookNames(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   if (lintLevel('deprecated-hook-names', options.lints) === 'allow')
     return []
@@ -66,7 +70,7 @@ export async function hookNames(root: string, options: CheckOptions): Promise<Ch
           const quote = key.type === 'Literal' ? key.raw?.[0] ?? '\'' : ''
           const text = member.shorthand ? `${name}: ${old}` : `${quote}${name}${quote}`
 
-          report(base + key.start, base + key.end, `\`${old}\` of ${what} is \`${name}\` since 1.92, so every hook is \`onX\` after a transition and \`beforeX\` when it can refuse it; the old name works until ${group.until}`, clash ? `\`${name}\` is set beside it, which wins: drop \`${old}\`` : `write \`${name}\``, clash ? null : [{ start: base + key.start, end: base + (member.shorthand ? member.value.end : key.end), text }])
+          report(base + key.start, base + key.end, `\`${old}\` of ${what} is \`${name}\` since 1.92, so every hook is \`onX\` after a transition and \`beforeX\` when it can refuse it; the old name works until ${group.until}`, clash ? `\`${name}\` is set beside it, which wins: drop \`${old}\`` : `write \`${name}\``, clash ? null : [{ start: base + key.start, end: base + (member.shorthand ? member.value.end : key.end), text }], group.changed?.includes(old) !== true)
         }
       }
 

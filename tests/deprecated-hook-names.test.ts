@@ -43,16 +43,19 @@ describe('deprecated-hook-names', () => {
         ['src/shorthand.ts', 5, false],
       ].sort())
 
+      // `onDelete` changes what it does under its new name, so its fix is not a safe one.
+      expect(found.filter(diagnostic => diagnostic.fixes?.[0]?.safe === false).map(diagnostic => diagnostic.file.slice(root.length + 1)).sort()).toEqual(['src/auth.ts', 'src/call.ts', 'src/core.ts', 'src/routes/fence.kay', 'src/shorthand.ts'])
+
       await applySafeFixes(root, found)
-      expect(await Bun.file(join(root, 'src/call.ts')).text()).toBe(call.replace('onAuthEvent', 'onEvent').replace('onDelete', 'beforeDelete'))
-      expect(await Bun.file(join(root, 'src/core.ts')).text()).toBe(core.replace('onDelete()', 'beforeDelete()').replace('\'onAuthEvent\'', '\'onEvent\''))
+      expect(await Bun.file(join(root, 'src/call.ts')).text()).toBe(call.replace('onAuthEvent', 'onEvent'))
+      expect(await Bun.file(join(root, 'src/core.ts')).text()).toBe(core.replace('\'onAuthEvent\'', '\'onEvent\''))
       expect(await Bun.file(join(root, 'src/namespaced.ts')).text()).toBe(namespaced.replace('onAuthEvent', 'onEvent'))
-      expect(await Bun.file(join(root, 'src/shorthand.ts')).text()).toBe(shorthand.replace('auth({ onDelete })', 'auth({ beforeDelete: onDelete })'))
-      expect(await Bun.file(join(root, 'src/routes/fence.kay')).text()).toBe(fence.replace('onDelete', 'beforeDelete'))
-      expect(await Bun.file(join(root, 'src/auth.ts')).text()).toBe(hooks.replace('onAuthEvent', 'onEvent').replace('onDelete', 'beforeDelete'))
+      expect(await Bun.file(join(root, 'src/shorthand.ts')).text()).toBe(shorthand)
+      expect(await Bun.file(join(root, 'src/routes/fence.kay')).text()).toBe(fence)
+      expect(await Bun.file(join(root, 'src/auth.ts')).text()).toBe(hooks.replace('onAuthEvent', 'onEvent'))
       expect(await Bun.file(join(root, 'src/clash.ts')).text()).toBe(clash)
       expect(await Bun.file(join(root, 'src/mine.ts')).text()).toBe(mine)
-      expect((await hookNames(root, {})).map(diagnostic => diagnostic.file.slice(root.length + 1))).toEqual(['src/clash.ts'])
+      expect((await hookNames(root, {})).map(diagnostic => diagnostic.file.slice(root.length + 1)).sort()).toEqual(['src/auth.ts', 'src/call.ts', 'src/clash.ts', 'src/core.ts', 'src/routes/fence.kay', 'src/shorthand.ts'])
       expect(await hookNames(root, { lints: { 'deprecated-hook-names': 'allow' } })).toEqual([])
     }
     finally {
