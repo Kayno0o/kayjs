@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { renderOnServer } from '../../../src/runtime/reactive'
-import { askOptions, isRemote, loadOptions } from '../src/options-source'
+import { askOptions, isRemote, loadOptions, searchOptions } from '../src/options-source'
 
 test('a list is drawn as is, a function or a promise has to be asked', async () => {
   expect(isRemote([1])).toBe(false)
@@ -33,4 +33,34 @@ test('on the server a list is drawn and a function is never called', () => {
 
   expect(seen).toEqual({ list: [1, 2], listLoading: false, asked: [], askedLoading: true })
   expect(calls).toBe(0)
+})
+
+test('searchOptions answers none below minLength, keeps only the latest question, and drops a stale one', async () => {
+  const waiting: { q: string, resolve: (answer: number[]) => void }[] = []
+  const loads: string[] = []
+  const search = searchOptions<number>(() => async ({ q }) => new Promise<number[]>((resolve) => {
+    waiting.push({ q, resolve })
+  }), { minLength: () => 2, onLoad: (options, query) => loads.push(`${query}:${options.length}`), label: 'Test' })
+
+  await search.load('a')
+  expect(search.answered()).toBe('a')
+  expect(waiting).toEqual([])
+
+  const first = search.load('ab')
+  const second = search.load('abc')
+
+  waiting[1]!.resolve([1, 2])
+  await second
+  waiting[0]!.resolve([9])
+  await first
+  expect(search.found()).toEqual([1, 2])
+  expect(search.answered()).toBe('abc')
+
+  const dropped = search.load('abcd')
+
+  search.stale()
+  waiting[2]!.resolve([7])
+  await dropped
+  expect(search.answered()).toBe('abc')
+  expect(loads).toEqual(['abc:2'])
 })

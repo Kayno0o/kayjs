@@ -2152,6 +2152,9 @@ type NullOption<Value, Held> = null extends Value ? null extends Held ? '' exten
   'a null option needs a value typed to allow null': never
 } : unknown
 
+[./lib/options-source] afterPause
+function afterPause<Value>(read: () => Value, run: (value: Value) => void, { skip, immediate }?: { skip?: () => boolean; immediate?: () => boolean; }): void
+
 [./lib/options-source] askOptions
 function askOptions<Option, Query extends OptionsQuery = OptionsQuery>(source: OptionsSource<Option, Query>, q: string, more?: Omit<Query, "q"> | undefined): PromiseLike<readonly Option[]> | readonly Option[]
 
@@ -2182,6 +2185,28 @@ interface OptionsQuery
 
 [./lib/options-source] OptionsSource
 type OptionsSource<Option, Query extends OptionsQuery = OptionsQuery> = readonly Option[] | PromiseLike<readonly Option[]> | ((input: Query) => readonly Option[] | PromiseLike<readonly Option[]>)
+
+[./lib/options-source] SEARCH_PAUSE_MS
+const SEARCH_PAUSE_MS: 200
+
+[./lib/options-source] SearchedOptions
+interface SearchedOptions<Option>
+  answered: Signal<string | undefined>
+  failed: Signal<boolean>
+  found: Signal<readonly Option[]>
+  load: (query: string) => Promise<void>
+  stale: () => void
+
+[./lib/options-source] searchOptions
+function searchOptions<Option>(given: () => OptionsSource<Option, OptionsQuery>, hooks: {
+  minLength: () => number;
+  onLoad?: ((options: readonly Option[], query: string) => unknown) | undefined;
+  onError?: ((failure: {
+    error: unknown;
+    query: string;
+  }) => unknown) | undefined;
+  label: string;
+}): SearchedOptions<Option>
 
 [./lib/outside] isExternal
 function isExternal(href: string): boolean

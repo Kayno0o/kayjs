@@ -5,15 +5,14 @@ import type { JSX, Snippet } from 'kay'
 import type { OptionsSource } from './options-source'
 import type { MultiSelectOption } from './multi-select'
 import type { PopoverPlacement } from './popover'
-import { effect, onCleanup, postedValues, recipe, signal, untrack } from 'kay'
+import { effect, postedValues, recipe, signal } from 'kay'
 import { stepIndex } from './cycle'
-import { askOptions, isRemote } from './options-source'
+import { afterPause, isRemote, searchOptions } from './options-source'
 import { defaultKept, onFormReset, startRef } from './form-reset'
 import Icon from './icon.kay'
 import { pickedLabels, pickedShown, selectionSummary, toggledValue } from './multi-select'
 import Popover from './popover.kay'
 import { wording } from 'kay/words'
-import { safely } from './safely'
 import { labelText } from './label-text'
 
 // The checkbox's own ring is too small to find, so the row the keyboard stands on takes the menu's tint and accent bar; forced colours paint the transparent outline instead.
@@ -36,8 +35,6 @@ const look = recipe({
   },
 })
 
-// A remote search waits for a pause in typing.
-const DEBOUNCE_MS = 200
 
 // Past this many options the panel opens on a search box.
 const SEARCH_FROM = 8
@@ -120,13 +117,18 @@ effect(() => {
 
 // kay-allow once-read-prop: a list or a loader is chosen when the component is created
 const remote = isRemote(options)
-const found = signal<readonly MultiSelectOption<Value>[]>([])
-// The text the answer held in `found` is for, and whether the last ask was rejected.
-const answered = signal<string | undefined>(undefined)
-const failed = signal(false)
 // Every option an answer listed, so a value picked from one answer keeps its label once a later search no longer lists it.
 const seen = signal<readonly MultiSelectOption<Value>[]>([])
-let request = 0
+// The text the answer in `found` is for, and whether the last ask was rejected.
+const { found, answered, failed, load, stale } = searchOptions<MultiSelectOption<Value>>(() => options, {
+  minLength: () => minLength,
+  onLoad: (answer, text) => {
+    seen = [...seen().filter(option => !answer.some(entry => entry.value === option.value)), ...answer]
+    onLoad?.(answer, text)
+  },
+  onError,
+  label: 'MultiSelect',
+})
 
 const listed = (): readonly MultiSelectOption<Value>[] => isRemote(options) ? found() : options
 
@@ -166,53 +168,11 @@ const status = () => {
 }
 
 
-// Only the latest question lands: an answer arriving after a newer key press is dropped.
-async function load(text: string) {
-  const mine = ++request
-
-  if (!isRemote(options) || text.trim().length < minLength) {
-    found = []
-    answered = text
-
-    return
-  }
-
-  try {
-    const answer = await askOptions(options, text)
-
-    if (mine !== request)
-      return
-
-    found = answer
-    seen = [...seen().filter(option => !answer.some(entry => entry.value === option.value)), ...answer]
-    answered = text
-    failed = false
-    safely(() => onLoad?.(answer, text), 'kayjs-ui: a MultiSelect onLoad')
-  }
-  catch (error) {
-    if (mine === request) {
-      console.error('kayjs-ui: a MultiSelect could not load its options', error)
-      found = []
-      answered = text
-      failed = true
-      safely(() => onError?.({ error, query: text }), 'kayjs-ui: a MultiSelect onError')
-    }
-  }
-}
 
 const opened = signal(false)
 
 // The search waits for a pause in typing; the first ask is at once, when the panel opens.
-effect(() => {
-  const text = query()
-
-  if (!remote || !opened())
-    return
-
-  const timer = setTimeout(() => void load(text), untrack(() => answered() === undefined) ? 0 : DEBOUNCE_MS)
-
-  onCleanup(() => clearTimeout(timer))
-})
+afterPause(query, text => void load(text), { skip: () => !remote || !opened(), immediate: () => answered() === undefined })
 
 function set(next: Value[]) {
   picked = next
@@ -252,8 +212,8 @@ function toggled(isOpen: boolean) {
   }
   else {
     query = ''
-    request++
-    answered = undefined
+    stale()
+    answered.set(undefined)
   }
 
   onOpenChange?.(isOpen)

@@ -1,4 +1,4 @@
-import { effect, signal, untrack } from 'kay'
+import { effect, onCleanup, signal, untrack } from 'kay'
 import { safely } from './safely'
 
 // What a function source is asked: the text typed so far, empty for a control with no search.
@@ -115,4 +115,77 @@ export function loadOptions<Option>(given: () => OptionsSource<Option>, hooks: O
     retryable: () => typeof given() === 'function',
     retry: () => attempt.set(attempt() + 1),
   }
+}
+
+// A search waits this long after the last key.
+export const SEARCH_PAUSE_MS = 200
+
+// Runs `run` with what `read` gave once it has stayed the same for the pause in typing, `immediate` asking at once instead; `skip` is read in the same effect, so a state it reads starts the wait again when it changes. Call it where an effect may be created.
+export function afterPause<Value>(read: () => Value, run: (value: Value) => void, { skip, immediate }: { skip?: () => boolean, immediate?: () => boolean } = {}): void {
+  effect(() => {
+    const value = read()
+
+    if (skip?.())
+      return
+
+    const timer = setTimeout(run, untrack(() => immediate?.()) ? 0 : SEARCH_PAUSE_MS, value)
+
+    onCleanup(() => clearTimeout(timer))
+  })
+}
+
+export interface SearchedOptions<Option> {
+  // The last answer, empty before the first lands and after a failure.
+  found: ReturnType<typeof signal<readonly Option[]>>
+  // The text the answer held in `found` is for, none before the first lands.
+  answered: ReturnType<typeof signal<string | undefined>>
+  // Whether the last question was refused.
+  failed: ReturnType<typeof signal<boolean>>
+  // Asks the source for `query`: a list, or a text shorter than `minLength`, answers with none. Only the latest question lands.
+  load: (query: string) => Promise<void>
+  // Drops the question still on its way, as a new key press does: its answer is for an older text.
+  stale: () => void
+}
+
+// What Combobox and MultiSelect ask on each pause in typing: the same question as `loadOptions`, but driven by the control, which decides when to ask, so the state is handed back to be reset between questions.
+export function searchOptions<Option>(given: () => OptionsSource<Option>, hooks: { minLength: () => number, onLoad?: ((options: readonly Option[], query: string) => unknown) | undefined, onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined, label: string }): SearchedOptions<Option> {
+  const found = signal<readonly Option[]>(NONE)
+  const answered = signal<string | undefined>(undefined)
+  const failed = signal(false)
+  let request = 0
+
+  async function load(query: string) {
+    const mine = ++request
+    const source = untrack(given)
+
+    if (!isRemote(source) || query.trim().length < untrack(hooks.minLength)) {
+      found.set(NONE)
+      answered.set(query)
+
+      return
+    }
+
+    try {
+      const answer = await askOptions(source, query)
+
+      if (mine !== request)
+        return
+
+      found.set(answer)
+      answered.set(query)
+      failed.set(false)
+      safely(() => hooks.onLoad?.(answer, query), `kayjs-ui: a ${hooks.label} onLoad`)
+    }
+    catch (error) {
+      if (mine === request) {
+        console.error(`kayjs-ui: a ${hooks.label} could not load its options`, error)
+        found.set(NONE)
+        answered.set(query)
+        failed.set(true)
+        safely(() => hooks.onError?.({ error, query }), `kayjs-ui: a ${hooks.label} onError`)
+      }
+    }
+  }
+
+  return { found, answered, failed, load, stale: () => void ++request }
 }

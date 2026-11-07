@@ -3,12 +3,11 @@ import type { FieldSize } from './field-look'
 import { fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import type { JSX, Snippet } from 'kay'
 import type { ComboboxOption, ComboboxOptions } from './combobox'
-import { effect, onCleanup, recipe, signal, uid, untrack } from 'kay'
-import { askOptions, isRemote } from './options-source'
+import { effect, recipe, signal, uid, untrack } from 'kay'
+import { afterPause, isRemote, searchOptions } from './options-source'
 import { enabledIndex, exactOption, matchingOptions, offersCreate } from './combobox'
 import { defaultKept, onFormReset, startRef } from './form-reset'
 import { wording } from 'kay/words'
-import { safely } from './safely'
 import { labelText } from './label-text'
 
 // 'kui-field-input' is the field's name for the skins and an app's CSS, which the input takes its look from.
@@ -25,8 +24,6 @@ const look = recipe({
   },
 })
 
-// A remote search waits this long after the last key.
-const DEBOUNCE_MS = 200
 
 const { size = 'md', invalid, id, options, value = '', valueLabel, label, name, minLength = 1, create = false, createLabel, loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), empty, failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, open, onOpenChange, onChange, onCreate, onInput, onLoad, onError, option: drawRow, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'size' | 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'onInput' | 'onLoad' | 'onError' | 'disabled' | 'role' | 'minLength'> & {
   // The input's size: `md` by default, `sm` and `lg` change its padding and type.
@@ -88,14 +85,19 @@ const text = signal(sent ?? startLabel())
 const picked = signal<ComboboxOption<Value> | undefined>(startOption() ?? (value ? { value: value as Value, label: startLabel() } : undefined))
 const opened = signal(false)
 const active = signal(-1)
-const found = signal<readonly ComboboxOption<Value>[]>([])
-// The text the answers held in `found` are for.
-const answered = signal<string | undefined>(undefined)
-const failed = signal(false)
+// The text the answers held in `found` are for. Only the latest question lands: an answer arriving after a newer key press is dropped.
+const { found, answered, failed, load, stale } = searchOptions<ComboboxOption<Value>>(() => options, {
+  minLength: () => minLength,
+  onLoad: (answer, query) => {
+    active = -1
+    onLoad?.(answer, query)
+  },
+  onError,
+  label: 'Combobox',
+})
 // Set once the browser runs, so the first render is the page without JavaScript: the text posts as it is and the browser's own suggestions apply, which the listbox drawn here replaces.
 const enhanced = signal(false)
 let input: HTMLInputElement | undefined
-let request = 0
 
 effect(() => {
   const next = value
@@ -167,39 +169,6 @@ const status = () => {
 }
 
 
-// Only the latest question lands: an answer arriving after a newer key press is dropped.
-async function load(query: string) {
-  const mine = ++request
-
-  if (!isRemote(options) || query.trim().length < minLength) {
-    found = []
-    answered = query
-
-    return
-  }
-
-  try {
-    const answer = await askOptions(options, query)
-
-    if (mine !== request)
-      return
-
-    found = answer
-    answered = query
-    failed = false
-    active = -1
-    safely(() => onLoad?.(answer, query), 'kayjs-ui: a Combobox onLoad')
-  }
-  catch (error) {
-    if (mine === request) {
-      console.error('kayjs-ui: a Combobox could not load its options', error)
-      found = []
-      answered = query
-      failed = true
-      safely(() => onError?.({ error, query }), 'kayjs-ui: a Combobox onError')
-    }
-  }
-}
 
 // What the page was last told, so a change it made itself is not echoed back.
 let told = untrack(() => opened())
@@ -226,28 +195,19 @@ effect(() => {
 })
 
 // The search waits for a pause in typing; a list filters at once.
-effect(() => {
-  const query = text()
-
-  if (!untrack(() => opened()) || !remote)
-    return
-
-  const timer = setTimeout(() => void load(query), DEBOUNCE_MS)
-
-  onCleanup(() => clearTimeout(timer))
-})
+afterPause(text, query => void load(query), { skip: () => !untrack(() => opened()) || !remote })
 
 // A new key drops the rows and the answer still on its way: they are for an older text.
 function type(next: string) {
-  request++
+  stale()
   opened = true
   text = next
   active = -1
-  failed = false
+  failed.set(false)
   onInput?.(next)
 
   if (remote)
-    found = []
+    found.set([])
 
   if (picked()) {
     picked = undefined

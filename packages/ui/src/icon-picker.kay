@@ -2,18 +2,18 @@
 import type { JSX, Snippet } from 'kay'
 import type { IconChoice, IconQuery } from './icon-picker'
 import type { OptionsSource } from './options-source'
-import { batch, effect, flush, onCleanup, postedValue, recipe, signal } from 'kay'
+import { batch, effect, flush, postedValue, recipe, signal } from 'kay'
 import { fieldInvalid, keepInvalid } from './field-look'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { defaultKept, onFormReset } from './form-reset'
 import { nameOf } from './icon-picker'
-import { askOptions } from './options-source'
+import { afterPause, askOptions } from './options-source'
 import { safely } from './safely'
 import { wording } from 'kay/words'
 
 const PAGE_SIZE = 50
-const DEBOUNCE_MS = 200
+
 
 const look = recipe({ parts: { root: 'kui-icon-picker', search: '', grid: 'kui-icon-grid', option: 'kui-icon-grid-option', empty: 'kui-icon-grid-empty', bar: 'kui-icon-grid-bar', selection: 'kui-icon-grid-selection', clear: 'kui-icon-grid-clear', error: 'kui-icon-grid-error', more: 'kui-icon-grid-more' } })
 
@@ -99,13 +99,8 @@ effect(() => {
     picked = next
 })
 
-effect(() => {
-  const next = typed()
-  // A new search starts back on its first page; the same one, such as on the first run, keeps the pages shown.
-  const timer = setTimeout(() => next !== query() && query.set(next), DEBOUNCE_MS)
-
-  onCleanup(() => clearTimeout(timer))
-})
+// A new search starts back on its first page; the same one, such as on the first run, keeps the pages shown.
+afterPause(typed, (next) => { if (next !== query()) query = next })
 
 effect(() => void load(query(), 0))
 
