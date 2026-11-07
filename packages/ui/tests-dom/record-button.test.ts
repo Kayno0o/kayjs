@@ -1,5 +1,5 @@
 import type { Mounted } from 'kay/test'
-import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test'
+import { afterEach, beforeAll, beforeEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import RecordButton from '../src/record-button.kay'
 import { click } from './dom'
@@ -20,12 +20,14 @@ class FakeTrack extends EventTarget {
 }
 
 class FakeRecorder extends EventTarget {
+  // The list of the test that installed this class, so a recorder a slow microphone opens after its test ended is not counted by the next.
+  static into: { state: string }[] = []
   state = 'inactive'
   mimeType = 'audio/webm;codecs=opus'
 
   constructor(readonly stream: { getTracks: () => FakeTrack[] }) {
     super()
-    recorders.push(this)
+    ;(this.constructor as typeof FakeRecorder).into.push(this)
   }
 
   start() {
@@ -64,18 +66,27 @@ function stream() {
   return { getTracks: () => [track], getAudioTracks: () => [track] }
 }
 
+// The recorder loads its recording code with a dynamic import, which reads a file the first time: a press settled on one macrotask can come before it under load.
+beforeAll(async () => {
+  await import('../src/recording')
+})
+
 beforeEach(() => {
   recorders = []
   tracks = []
   chunk = ['voice']
   held = undefined
   microphone(async () => stream())
-  ;(globalThis as { MediaRecorder?: unknown }).MediaRecorder = FakeRecorder
+  ;(globalThis as { MediaRecorder?: unknown }).MediaRecorder = class extends FakeRecorder {
+    static override into = recorders
+  }
 })
 
-afterEach(() => {
+afterEach(async () => {
   mounted?.unmount()
   mounted = undefined
+  // Lets a microphone still opening land, and be released by the unmounted button, before the next test starts.
+  await settle()
   Reflect.deleteProperty(globalThis, 'MediaRecorder')
   Reflect.deleteProperty(globalThis, 'isSecureContext')
 
