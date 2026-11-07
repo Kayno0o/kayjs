@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import ThemeToggle from '@kaynooo/kayjs-ui/theme-toggle.kay'
 import Sun from '~icons/tabler/sun'
 ---

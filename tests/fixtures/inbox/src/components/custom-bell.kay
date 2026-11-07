@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import { signal, untrack } from 'kay'
 import BellInbox from '@kaynooo/kayjs-ui/bell-inbox.kay'
 

@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
 
 // Commits drawn by the `@option` snippet: the title, then the author and a monospace sha.

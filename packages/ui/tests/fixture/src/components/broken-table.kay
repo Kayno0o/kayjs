@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import { infiniteList } from '@kaynooo/kayjs-ui'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 

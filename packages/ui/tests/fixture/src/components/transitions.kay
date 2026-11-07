@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'

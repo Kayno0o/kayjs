@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import { infiniteList } from '@kaynooo/kayjs-ui'
 import Carousel from '@kaynooo/kayjs-ui/carousel.kay'
 import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'

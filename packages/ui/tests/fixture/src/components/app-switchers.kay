@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import type { SwitcherApp } from '@kaynooo/kayjs-ui'
 import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
 

@@ -1,8 +1,7 @@
----
+--- island
 import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 
-// kay-island
 const { onOpenChange, onReady } = props<{ onOpenChange: (open: boolean) => void, onReady: (set: (open: boolean) => void) => void }>()
 
 const menu = signal(false)

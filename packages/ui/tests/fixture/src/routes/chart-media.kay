@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import '../app.css'
 import ImageCropper from '@kaynooo/kayjs-ui/image-cropper.kay'
 import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'

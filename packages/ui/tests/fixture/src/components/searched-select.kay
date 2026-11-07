@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import type { OptionsSource } from '@kaynooo/kayjs-ui'
 import Select from '@kaynooo/kayjs-ui/select.kay'
 import { signal } from 'kay'

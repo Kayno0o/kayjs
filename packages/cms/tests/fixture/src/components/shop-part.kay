@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import type { ScreenCollection } from '@kaynooo/kayjs-cms'
 import EntryField from '@kaynooo/kayjs-cms/entry-field.kay'
 import { cmsEntryForm } from '@kaynooo/kayjs-cms/form'

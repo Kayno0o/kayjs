@@ -1,8 +1,7 @@
----
+--- island
 import SideNav from '@kaynooo/kayjs-ui/side-nav.kay'
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 
-// kay-island
 const { onCollapsedChange, onOpenChange } = props<{ onCollapsedChange: (collapsed: boolean) => void, onOpenChange: (open: boolean) => void }>()
 
 const groups = [

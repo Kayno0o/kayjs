@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import type { MultiSelectOption } from '@kaynooo/kayjs-ui'
 import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
 import MultiSelect from '@kaynooo/kayjs-ui/multi-select.kay'

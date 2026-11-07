@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import Steps from '@kaynooo/kayjs-ui/steps.kay'
 import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
 

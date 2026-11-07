@@ -1,9 +1,7 @@
----
+--- island
 import Breadcrumb from '@kaynooo/kayjs-ui/breadcrumb.kay'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
 import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
-
-// kay-island
 
 const links = [
   { href: 'https://example.com/a', label: 'Overview', icon: 'success' },

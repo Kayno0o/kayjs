@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import { signal } from 'kay'
 import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
 

@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
 
 // What the tests read back: each tab shown.

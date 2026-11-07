@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import '../app.css'
 import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
 

@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import type { MenuEntry } from '@kaynooo/kayjs-ui'
 import { signal } from 'kay'
 import Button from '@kaynooo/kayjs-ui/button.kay'
