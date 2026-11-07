@@ -18,4 +18,6 @@ Below `lg` the nav gives way to a menu button opening the same lists in a [SideP
 
 `@link(link)` draws the text of each link, `@heading(group)` the heading of each group, `@header` sits above the lists and `@footer` under them, pinned to the bottom. The parts are `root`, `menu`, `nav`, `header`, `group`, `heading`, `list`, `item`, `link`, `icon`, `initial`, `text`, `badge`, `children`, `footer`, `toggle`, `panel`, `status`, `retry` and `toggleIcon`.
 
-SideNav is an island: it holds the collapsed and open state. `links` and `groups` may be a function or a promise of the list, loaded once the island runs, with a loading row and a failure row with a retry; pass the array to have it drawn from the first paint.
+SideNav is an island: it holds the collapsed and open state.
+
+`links` and `groups` may be a function or a promise of the list, loaded once the island runs, with a loading row and a failure row with a retry; pass the array to have it drawn from the first paint.

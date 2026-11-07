@@ -2371,6 +2371,8 @@ component default
   link?: string | undefined;
   nav?: string | undefined;
   header?: string | undefined;
+  status?: string | undefined;
+  retry?: string | undefined;
   group?: string | undefined;
   heading?: string | undefined;
   list?: string | undefined;
@@ -2382,6 +2384,7 @@ component default
     root?: string | undefined;
   };
   menu?: string | undefined;
+  panel?: string | undefined;
 }
   collapseLabel?: string | undefined
   collapsed?: boolean | undefined
@@ -2389,19 +2392,22 @@ component default
   collapsible?: boolean | undefined
   current: URL | string
   expandLabel?: string | undefined
+  failureLabel?: string | undefined
   footer?: Element
-  groups?: readonly SideNavGroup[] | undefined
+  groups?: (() => Promise<readonly SideNavGroup[]> | readonly SideNavGroup[]) | Promise<readonly SideNavGroup[]> | readonly SideNavGroup[] | undefined
   header?: Element
   heading?: ((group: SideNavGroup) => Element) | undefined
   id?: string | undefined
   label: string
   link?: ((link: NavLink) => Element) | undefined
-  links?: readonly NavLink[] | undefined
+  links?: (() => Promise<readonly NavLink[]> | readonly NavLink[]) | Promise<readonly NavLink[]> | readonly NavLink[] | undefined
+  loadingLabel?: string | undefined
   menuLabel?: string | undefined
   onCollapsedChange?: ((collapsed: boolean) => unknown) | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
   panel?: boolean | undefined
+  retryLabel?: string | undefined
 
 [./side-panel.kay] default
 component default
