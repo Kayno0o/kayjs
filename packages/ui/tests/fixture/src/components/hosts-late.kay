@@ -7,6 +7,8 @@ const app = signal(false)
 ---
 button#saved(onClick={() => toast.success('Saved')}) Save
 button#mount(onClick={() => app = true}) Mount
+button#unmount(onClick={() => app = false}) Unmount
+button#again(onClick={() => toast.info('Again', { duration: false })}) Again
 Toaster(fallback)
 if app()
   Toaster(position="top-left")

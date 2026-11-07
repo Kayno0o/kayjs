@@ -188,3 +188,22 @@ test('the extension\'s fallback Toaster gives way to an app\'s own that mounts a
   expect(toasters.map(item => item.getAttribute('data-position'))).toEqual(['top-left'])
   expect([...root.querySelectorAll('.kui-toast [data-part=message]')].map(item => item.textContent)).toEqual(['Saved'])
 })
+
+test('the fallback Toaster takes the toasts over, none lost or doubled, once the app\'s own unmounts', async () => {
+  mounted = await mountComponent(HostsLate)
+  const { root } = mounted
+  const messages = () => [...root.querySelectorAll('.kui-toast [data-part=message]')].map(item => item.textContent)
+
+  click(root.querySelector('#mount'))
+  await settle()
+  click(root.querySelector('#saved'))
+  click(root.querySelector('#again'))
+  await settle()
+  expect(root.querySelector('.kui-toaster')?.getAttribute('data-position')).toBe('top-left')
+
+  click(root.querySelector('#unmount'))
+  await settle()
+
+  expect([...root.querySelectorAll('.kui-toaster')].map(item => item.getAttribute('data-position'))).toEqual(['bottom-right'])
+  expect(messages()).toEqual(['Saved', 'Again'])
+})

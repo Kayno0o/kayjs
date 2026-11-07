@@ -19,7 +19,7 @@ const { showDelay = '80ms', hideDelay = '150ms', fallback = false, ...rest } = p
   showDelay?: Duration | undefined
   // How long a tooltip lingers once the pointer leaves, long enough by default for it to cross the gap onto the tooltip, which stays while hovered.
   hideDelay?: Duration | undefined
-  // The extension's own host, which gives way to the app's whichever hydrates first.
+  // For an extension's own host only (the one `ui()` mounts): it gives way to every other TooltipHost, whichever hydrates first, so an app setting it on its own loses it.
   fallback?: boolean | undefined
 }>()
 
