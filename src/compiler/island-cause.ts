@@ -1,11 +1,11 @@
 import type { Span } from './ast'
 
 // What makes a component an island, or may make a static one render as one: where it sits in the file and what it is, for the editor, `kay build`, `kay explain island` and the dev tool to say the same thing.
-export type IslandCauseKind = 'client' | 'attribute' | 'value' | 'live' | 'prop' | 'spread' | 'block'
+export type IslandCauseKind = 'client' | 'island' | 'attribute' | 'value' | 'live' | 'prop' | 'spread' | 'block'
 
 export interface IslandCause {
   kind: IslandCauseKind
-  // The attribute (`onClick`, `bind:value`, `ref`), the `kay` value (`signal`), the live value or the prop; `--- client` for the fence, empty for a spread or a block.
+  // The attribute (`onClick`, `bind:value`, `ref`), the `kay` value (`signal`), the live value or the prop; `--- client` or `--- island` for the fence, empty for a spread or a block.
   name: string
   // Where it is in the file, which the editor reveals.
   span: Span
@@ -22,6 +22,8 @@ export function describeCause(cause: IslandCause): string {
   switch (cause.kind) {
     case 'client':
       return 'a `--- client` fence'
+    case 'island':
+      return 'a `--- island` fence'
     case 'attribute':
       return `\`${cause.name}\`, line ${cause.line}`
     case 'value':
@@ -40,6 +42,7 @@ export function describeCause(cause: IslandCause): string {
 // What the cause is, in a few words.
 export const CAUSE_KINDS: Record<IslandCauseKind, string> = {
   client: 'a `--- client` fence: the component renders in the browser only',
+  island: 'a `--- island` fence: the author pinned the component as an island',
   attribute: 'an `on*`, `bind:` or `ref` attribute: the browser handles it',
   value: 'a `kay` value of the browser, such as `signal` or `effect`, that its script uses',
   live: 'a live value its script imports: the browser follows it',
@@ -49,7 +52,7 @@ export const CAUSE_KINDS: Record<IslandCauseKind, string> = {
 }
 
 // The rule, as `kay explain island` says it.
-export const ISLAND_RULE = 'A component is an island when it needs the browser: an `on*`, `bind:` or `ref` in its template, a browser value of `kay` in its script, a live value it imports or a `--- client` fence; what an island renders is part of it. A static component that passes a component a function, a spread or a block taking parameters renders as an island too, when the build finds the chunk reachable.'
+export const ISLAND_RULE = 'A component is an island when it needs the browser: an `on*`, `bind:` or `ref` in its template, a browser value of `kay` in its script, a live value it imports, or a `--- client` or `--- island` fence; what an island renders is part of it. A static component that passes a component a function, a spread or a block taking parameters renders as an island too, when the build finds the chunk reachable.'
 
 // The `data-why` of an island in development, one line the dev tool shows.
 export function causeSummary(cause: IslandCause, promoted: boolean): string {

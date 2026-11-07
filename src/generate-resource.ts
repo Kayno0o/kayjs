@@ -283,8 +283,7 @@ function tableComponent(names: Names, fields: readonly Field[]): string {
   const { row, pascal, plural, folder, slug } = names
   const columns = fields.map(({ name, label, type }, index) => `  { key: '${name}', header: '${label}', sortValue: true${index === 0 ? ', cell: true' : ''}${type === 'int' || type === 'float' ? ', numeric: true' : ''} },`).join('\n')
 
-  return `---
-// kay-island
+  return `--- island
 import type { Column } from '@kaynooo/kayjs-ui'
 import type { InferEntity } from '@kaynooo/pg-orm'
 import type { ${pascal} } from '../db/${slug}'

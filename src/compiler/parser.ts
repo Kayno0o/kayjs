@@ -4,8 +4,10 @@ import { scanClassName } from './class-name'
 import { parseExpression } from './estree'
 import { Scanner } from './scanner'
 
-// `--- server`, `--- client`, `--- script`, `--- module`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
+// `--- server`, `--- client`, `--- island`, `--- static`, `--- script`, `--- module`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
 const FENCE = /---(?:([ \t]*)([a-z]+)(?:[ \t]+<(.*)>)?|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
+// The names a script fence takes beside none: `client` renders in the browser only, `island` and `static` pin the role.
+const SCRIPT_FENCES: ReadonlySet<string> = new Set(['client', 'script', 'island', 'static'])
 const CLOSING_FENCE = /^---(?:[ \t]*$|[ \t]*[a-z<])/gm
 const BARE_LINE = /^---[ \t]*$/
 const CLOSING_LINE = /---[ \t]*(?=\r?\n|$)/y
@@ -99,13 +101,15 @@ export function parseKay(source: string): KayFile {
   const fences: Partial<Record<'script' | 'server' | 'module' | 'style', Span>> = {}
   let typeParameters: Span | undefined
   let client: Span | undefined
+  let pin: KayFile['pin']
+  let scriptLine: Span | undefined
   let templateStart = 0
   let unclosedServer: Diagnostic | undefined
   let serverFence: Span | undefined
   // The bare `---` closing a named fence while no script fence is open yet, which a later bare `---` was meant to be the script fence of.
   let bareClosing: Span | undefined
 
-  // Fences come first, in any order: `---` or `--- script` holds the component script, `--- client` one rendering in the browser only, `--- server` the code that runs on the server only, `--- module` the module-level code, which exports values.
+  // Fences come first, in any order: `---` or `--- script` holds the component script, `--- client` one rendering in the browser only, `--- island` and `--- static` pin its role, `--- server` the code that runs on the server only, `--- module` the module-level code, which exports values.
   // A labeled fence line also closes the fence before it, so `--- server` code can run straight into `--- script`.
   while (true) {
     BLANK_LINES.lastIndex = templateStart
@@ -116,7 +120,7 @@ export function parseKay(source: string): KayFile {
     if (!fence)
       break
 
-    const kind = fence[2] === undefined || fence[2] === 'client' || fence[2] === 'script' ? 'script' : fence[2]
+    const kind = fence[2] === undefined || SCRIPT_FENCES.has(fence[2]) ? 'script' : fence[2]
     const spaced = fence[1] !== ''
     const bodyStart = fence.index + fence[0].length
 
@@ -136,7 +140,7 @@ export function parseKay(source: string): KayFile {
     }
 
     if (!spaced || (kind !== 'script' && kind !== 'server' && kind !== 'module' && kind !== 'style')) {
-      diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` or `--- script` for the component script, `--- client` for one rendering in the browser only, `--- server` for server code, `--- module` for module-level code that exports values, or `--- style` for CSS scoped to the component' })
+      diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `Unknown fence \`${fence[0].trim()}\``, help: 'use `---` or `--- script` for the component script, `--- client` for one rendering in the browser only, `--- island` or `--- static` to pin its role, `--- server` for server code, `--- module` for module-level code that exports values, or `--- style` for CSS scoped to the component' })
     }
     else if (fences[kind]) {
       diagnostics.push({ start: fence.index, end: bodyStart - 1, code: 'fence-invalid', message: `A file has one ${kind === 'script' ? 'script' : `\`--- ${kind}\``} fence` })
@@ -157,8 +161,13 @@ export function parseKay(source: string): KayFile {
       if (parameters)
         typeParameters = { start: parameters[0], end: parameters[1] }
 
+      scriptLine = { start: fence.index, end: bodyStart - 1 }
+
       if (fence[2] === 'client')
         client = { start: fence.indices![2]![0], end: fence.indices![2]![1] }
+
+      if (fence[2] === 'island' || fence[2] === 'static')
+        pin = { kind: fence[2], start: fence.indices![2]![0], end: fence.indices![2]![1] }
     }
   }
 
@@ -168,7 +177,7 @@ export function parseKay(source: string): KayFile {
   if (bareClosing)
     explainSecondFence(source, bareClosing, diagnostics)
 
-  return { source, script: fences.script, server: fences.server, serverFence, module: fences.module, style: fences.style, typeParameters, client, templateStart, template, diagnostics, unclosedServer }
+  return { source, script: fences.script, server: fences.server, serverFence, module: fences.module, style: fences.style, typeParameters, client, pin, scriptLine, templateStart, template, diagnostics, unclosedServer }
 }
 
 // A bare `---` in the template after a named fence closed by a bare `---`: the first bare line closed that fence, so the author meant the second fence as the script, which takes `--- script` once a named fence is there.

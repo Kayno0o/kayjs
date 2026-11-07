@@ -313,5 +313,5 @@ function probedPackages(source: string): string[] {
 
   const script = analyzeScript(file.source, file.script, [], templateReads(file), file.module)
 
-  return isInteractive(file, script) ? packagesToProbe(source, script) : []
+  return isInteractive(file, script) || file.pin?.kind === 'island' ? packagesToProbe(source, script) : []
 }

@@ -584,6 +584,10 @@ export interface KayFile {
   typeParameters?: Span | undefined
   // The `client` of `--- client`: the component renders in the browser only.
   client?: Span | undefined
+  // The `island` or `static` of `--- island` and `--- static`: the author pins the component's role, and the compiler holds it to the pin.
+  pin?: (Span & { kind: 'island' | 'static' }) | undefined
+  // The line opening the script fence, `--- script` or `---`.
+  scriptLine?: Span | undefined
   // Where the template begins, past the fences.
   templateStart: number
   template: Node[]

@@ -1187,10 +1187,13 @@ export function promotionSite(file: KayFile, script: ScriptAnalysis, imported?: 
   return cause
 }
 
-// The first thing that makes a component interactive, so an island: an `on*`, `bind:` or `ref` attribute, a `kay` value of the script, or a `--- client` fence.
+// The first thing that makes a component interactive, so an island: an `on*`, `bind:` or `ref` attribute, a `kay` value of the script, a `--- client` fence or a `--- island` one.
 export function islandCause(file: KayFile, script: ScriptAnalysis): IslandCause | undefined {
   if (file.client !== undefined)
     return { kind: 'client', name: '--- client', span: file.client, line: lineOf(file.source, file.client.start) }
+
+  if (file.pin?.kind === 'island')
+    return { kind: 'island', name: '--- island', span: file.pin, line: lineOf(file.source, file.pin.start) }
 
   let cause: IslandCause | undefined
 

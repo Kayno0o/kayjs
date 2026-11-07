@@ -7,8 +7,7 @@
 `Chat` and `ChatLauncher` take callbacks, so analytics, a badge or a save of the finished turn needs no wrapper around the action. They hold functions, so write them in a component of your own, which renders as an island.
 
 ```kay
----
-// kay-island
+--- island
 import { reply } from '../routes/chat.kay'
 import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---

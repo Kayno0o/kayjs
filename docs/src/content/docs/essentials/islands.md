@@ -70,7 +70,11 @@ A static component that passes an island a function is listed too, as `format pa
 
 A value read from an object of strings, numbers or `~icons/` imports of an installed set that another module of the app exports as a literal is data too (`LABEL[kind]`, `ICONS[app.id]`): an `export const`, a `const` listed in `export { LABEL }`, a default export, a re-export of one, or a `.json` file. So is a list built from one, `APPS.map(app => ({ ...app, icon: ICONS[app.id] }))`.
 
-Write `// kay-island` on a line of its own in the component to say it is meant, or `// kay-static` to say it is not: `kay check` reports a marker the component contradicts as `island-marker`.
+Write `--- island` in place of `---` to say it is meant. The component is then an island on every page that renders it, with no promotion to decide. A generic one reads `--- island <T extends Row>`.
+
+Write `--- static` to say it is not. If anything in the component would make it an island, an `onClick`, a `signal`, or a function it hands to another component, `kay check` and `kay build` stop with the error `static-pin` at that line, naming what it is. A pin does not change what a page, a layout or a special page is: they are never islands, and `--- island` on one is reported as `island-marker`.
+
+The comments `// kay-island` and `// kay-static` on a line of their own still work for a few minors. `kay upgrade` writes them as the fence lines, and `island-comment` warns of the old form until then.
 
 The editor shows a lens on the first line of a component saying whether it is an island and why. A click on it shows the line that decides it.
 

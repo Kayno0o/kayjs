@@ -66,6 +66,11 @@ export const ERRORS = {
     summary: 'A page, layout or special page with a `--- client` fence: they render on the server.',
     fix: { file: 'llms/islands.md', heading: 'Islands' },
   },
+  'static-pin': {
+    group: 'compile',
+    summary: 'A component pinned static, with a `--- static` fence line, that something makes an island: an `on*`, `bind:` or `ref`, a browser value of `kay`, a live value, or a function or a block taking parameters it passes to a component. The error stands at that thing.',
+    fix: { file: 'llms/islands.md', heading: 'Islands' },
+  },
   'browser-only-read': {
     group: 'compile',
     summary: 'A browser-only name such as `window` read while a component renders on the server too; reported by the type check, so a page still runs.',

@@ -121,7 +121,7 @@ describe('Snippet', () => {
     })).toEqual([['src/routes/_layout.kay', 5, 'TS2345']])
     expect(await problems({
       'src/routes/index.kay': '---\nimport Wrap from \'../wrap.kay\'\n---\nWrap\n',
-      'src/wrap.kay': '---\n// kay-island\nimport Toggle from \'./toggle.kay\'\n---\nToggle\n  @row(name)\n    b {name}\n',
+      'src/wrap.kay': '--- island\nimport Toggle from \'./toggle.kay\'\n---\nToggle\n  @row(name)\n    b {name}\n',
       'src/toggle.kay': island,
     })).toEqual([])
   })

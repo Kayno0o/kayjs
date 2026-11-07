@@ -928,24 +928,27 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('reports a component promoted to an island, unless it says so with `// kay-island`, and a `// kay-static` on one', async () => {
+  it('reports a component promoted to an island, unless it says so with `// kay-island` or `--- island`, and a pin static on one', async () => {
     const component = (marker: string) => `---\n${marker}import Child from './island.kay'\nfunction pick() {}\n---\nChild(format={pick})\n`
     const root = await scratchProject({
-      'src/routes/index.kay': '---\nimport Bare from \'../components/bare.kay\'\nimport Said from \'../components/said.kay\'\nimport Denied from \'../components/denied.kay\'\nimport Plain from \'../components/plain.kay\'\n---\nBare\nSaid\nDenied\nPlain\n',
+      'src/routes/index.kay': '---\nimport Bare from \'../components/bare.kay\'\nimport Said from \'../components/said.kay\'\nimport Denied from \'../components/denied.kay\'\nimport Fenced from \'../components/fenced.kay\'\nimport Pinned from \'../components/pinned.kay\'\nimport Plain from \'../components/plain.kay\'\n---\nBare\nSaid\nDenied\nFenced\nPinned\nPlain\n',
       'src/components/bare.kay': component(''),
       'src/components/said.kay': component('// kay-island\n'),
       'src/components/denied.kay': component('// kay-static\n'),
+      'src/components/fenced.kay': '--- island\nimport Child from \'./island.kay\'\nfunction pick() {}\n---\nChild(format={pick})\n',
+      'src/components/pinned.kay': '--- static\nimport Child from \'./island.kay\'\nfunction pick() {}\n---\nChild(format={pick})\n',
       'src/components/plain.kay': '---\nimport Child from \'./plain-child.kay\'\nfunction pick() {}\n---\nChild(format={pick})\n',
       'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { format } = props<{ format: () => void }>()\n---\nbutton(onClick={() => { count++; format() }}) {count()}\n',
       'src/components/plain-child.kay': '---\nconst { format } = props<{ format: () => void }>()\n---\np {format.name}\n',
     })
 
     try {
-      const found = (await check(root)).filter(d => d.code === 'promoted-island' || d.code === 'island-marker')
+      const found = (await check(root)).filter(d => d.code === 'promoted-island' || d.code === 'static-pin')
 
-      expect(found.map(d => [d.code, d.file.slice(root.length + 1), d.message.slice(0, 35)])).toEqual([
+      expect(found.map(d => [d.code, d.file.slice(root.length + 1), d.message.slice(0, 35)]).toSorted()).toEqual([
         ['promoted-island', 'src/components/bare.kay', 'This component renders as an island'],
-        ['island-marker', 'src/components/denied.kay', 'This component renders as an island'],
+        ['static-pin', 'src/components/denied.kay', 'This component is pinned `// kay-st'],
+        ['static-pin', 'src/components/pinned.kay', 'This component is pinned `--- stati'],
       ])
       expect((await check(root, { lints: { 'promoted-island': 'allow' } })).filter(d => d.code === 'promoted-island')).toEqual([])
     }

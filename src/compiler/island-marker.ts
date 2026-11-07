@@ -1,32 +1,91 @@
-import type { Diagnostic, Span } from './ast'
+import type { Diagnostic, KayFile, Span } from './ast'
+import { codeOf } from './script-fence'
 
-// `// kay-island` or `// kay-static` on a line of its own says what the author expects of the component, which `kay check` holds it to.
-const MARKER = /^[ \t]*\/\/[ \t]*kay-(island|static)[ \t]*$/m
+// `// kay-island` or `// kay-static` on a line of its own in a script or a module fence: the form that `--- island` and `--- static` replace, read for three minors and rewritten by `kay upgrade`.
+const MARKER = /^[ \t]*\/\/[ \t]*kay-(island|static)[ \t]*$/gm
 
-export interface IslandMarker extends Span {
-  kind: 'island' | 'static'
+const SCRIPT_HEADER = /^---(?:[ \t]+script)?/
+
+export type PinKind = 'island' | 'static'
+
+// What the author pins a component to, by a fence line or by the old comment.
+export interface IslandPin extends Span {
+  kind: PinKind
+  comment: boolean
 }
 
-export function islandMarker(source: string): IslandMarker | undefined {
-  const found = MARKER.exec(source)
-
-  return found === null ? undefined : { kind: found[1] as IslandMarker['kind'], start: found.index, end: found.index + found[0].length }
+// The comment, whole line from its first space, its end before the line break.
+export interface IslandComment extends Span {
+  kind: PinKind
 }
 
-function mismatch(marker: IslandMarker, message: string, note: string, help: string): Diagnostic {
-  return { start: marker.start, end: marker.end, code: 'island-marker', message, note, help, checkOnly: true }
+// The comment is code only where it opens a comment: the same line inside a template literal or a block comment adds nothing to what `codeOf` keeps.
+function opensComment(text: string, slashes: number, end: number): boolean {
+  return codeOf(text.slice(0, end)).length === codeOf(text.slice(0, slashes)).length + 1
 }
 
-// What a marker says against what makes the component an island, `why` being the first cause when it is one, `promotion` the call that may promote it.
-export function markerMismatch(marker: IslandMarker, role: { route: boolean, island: boolean, why: string | undefined, promotion: string | undefined }): Diagnostic[] {
-  if (marker.kind === 'static')
-    return role.island ? [mismatch(marker, `This component is an island, and \`// kay-static\` says it is not: ${role.why ?? 'a live value'}`, 'it renders on the server and hydrates in the browser', 'delete the marker, or take out what makes it one')] : []
+export function islandComment(file: KayFile): IslandComment | undefined {
+  for (const fence of [file.script, file.module]) {
+    if (fence === undefined)
+      continue
 
-  if (role.route)
-    return [mismatch(marker, 'A page, a layout or a special page renders on the server and is never an island', 'an island is a component a page renders', 'delete the marker, and move what needs the browser to a component of its own')]
+    const text = file.source.slice(fence.start, fence.end)
 
-  if (!role.island && role.promotion === undefined)
-    return [mismatch(marker, 'Nothing makes this component an island, and `// kay-island` says it is one', 'an island has an `on*` handler, a `bind:`, a `ref`, a value used from `kay` or a `--- client` fence', 'delete the marker, or add what the component does in the browser')]
+    for (const found of text.matchAll(MARKER)) {
+      if (opensComment(text, found.index + found[0].indexOf('//'), found.index + found[0].length))
+        return { kind: found[1] as PinKind, start: fence.start + found.index, end: fence.start + found.index + found[0].length }
+    }
+  }
 
-  return []
+  return undefined
+}
+
+// A fence line wins over a comment.
+export function islandPin(file: KayFile, comment: IslandComment | undefined = islandComment(file)): IslandPin | undefined {
+  if (file.pin !== undefined)
+    return { ...file.pin, comment: false }
+
+  return comment === undefined ? undefined : { ...comment, comment: true }
+}
+
+// The fix of the lint: the comment deleted with its line, and the script fence line written with the pin unless a fence line says it or `--- client` is an island already.
+// A static pin the fence cannot take (`--- client`, no script fence, one that is not the comment's) has no fix.
+function rewrite(file: KayFile, comment: IslandComment): Diagnostic['fixes'] {
+  const source = file.source
+  const lineEnd = source[comment.end] === '\r' ? comment.end + 2 : comment.end + 1
+  const deletion = { start: comment.start, end: Math.min(lineEnd, source.length), text: '' }
+  const script = file.script
+
+  if (script === undefined || comment.start < script.start || comment.end > script.end)
+    return undefined
+
+  if (file.pin !== undefined || (file.client !== undefined && comment.kind === 'island'))
+    return [{ title: 'Delete the comment', edits: [deletion], safe: true }]
+
+  const line = file.scriptLine
+
+  if (file.client !== undefined || line === undefined)
+    return undefined
+
+  const header = source.slice(line.start, line.end)
+  const named = SCRIPT_HEADER.exec(header)
+
+  if (named === null)
+    return undefined
+
+  return [{ title: `Write \`--- ${comment.kind}\``, edits: [{ start: line.start, end: line.start + named[0].length, text: `--- ${comment.kind}` }, deletion], safe: true }]
+}
+
+export function commentLint(file: KayFile, comment: IslandComment): Diagnostic {
+  return { start: comment.start, end: comment.end, code: 'island-comment', message: `\`// kay-${comment.kind}\` is written \`--- ${comment.kind}\` on the fence line since 1.92`, note: 'a fence line is parsed, where the comment was matched in the source text', help: `write \`--- ${comment.kind}\` in place of \`---\` and delete the comment`, fixes: rewrite(file, comment), checkOnly: true }
+}
+
+// A pin on a page, a layout or a special page: they render on the server and are never islands.
+export function markerMismatch(pin: IslandPin, route: boolean): Diagnostic[] {
+  if (!route || pin.kind !== 'island')
+    return []
+
+  const written = pin.comment ? '`// kay-island`' : '`--- island`'
+
+  return [{ start: pin.start, end: pin.end, code: 'island-marker', message: `A page, a layout or a special page renders on the server and is never an island, and ${written} says it is one`, note: 'an island is a component a page renders', help: 'delete it, and move what needs the browser to a component of its own', checkOnly: true }]
 }

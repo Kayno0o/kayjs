@@ -15,7 +15,7 @@ import { generate, isInteractive, islandCause, islandMessages, lineOf, promotion
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, onceReadProps, openRedirects, separatePageSettings, serverOnlyImports, unboundedFields, unreturnedFails } from './fence-checks'
 import { cwd, iconSetsOf, scopeStorage } from './host'
 import { causeSummary, describeCause } from './island-cause'
-import { islandMarker, markerMismatch } from './island-marker'
+import { commentLint, islandComment, islandPin, markerMismatch } from './island-marker'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { parseExpanded } from './markdown-block'
@@ -152,6 +152,13 @@ function realCause(cause: IslandCause | undefined, expansion: Expansion | undefi
   return { ...cause, span, line: lineOf(original, span.start) }
 }
 
+// A component pinned static that something makes an island, or would promote to one: the error stands at that thing, so the author sees it.
+function staticPin(comment: boolean, span: Span, cause: IslandCause, island: boolean): Diagnostic {
+  const written = comment ? '`// kay-static`' : '`--- static`'
+
+  return { ...span, message: `This component is pinned ${written}, and ${island ? 'is an island' : 'would render as an island'}: ${describeCause(cause)}`, note: island ? 'it needs the browser, so it renders on the server and hydrates there' : 'it passes a component what only an island can send, so it hydrates itself', help: 'take that out of the component, or pin it `--- island`' }
+}
+
 function liveImport(script: ScriptAnalysis, imported: ImportedSignals | undefined): string | undefined {
   return liveBindings(script, imported)[0]?.local
 }
@@ -165,6 +172,8 @@ function serverNames(server: ServerAnalysis | undefined): string[] | undefined {
 interface Role {
   // A `--- client` component or an interactive one, an island whatever its file.
   always: boolean
+  // A `--- island` fence: an island unless the file is a route file.
+  pinned: boolean
   // It imports a live value, which makes a component that is not a route file an island.
   live: boolean
   // A static component that may be promoted to an island by what it passes.
@@ -193,7 +202,8 @@ function roleOf(original: string, imported: ImportedSignals | undefined, root: s
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root), imported)
   const always = file.client !== undefined || isInteractive(file, script)
-  const role = { always, live: liveImport(script, imported) !== undefined, promotable: !always && promotionSite(file, script, imported) !== undefined, server: file.server !== undefined }
+  const pinned = file.pin?.kind === 'island'
+  const role = { always, pinned, live: liveImport(script, imported) !== undefined, promotable: !always && !pinned && promotionSite(file, script, imported) !== undefined, server: file.server !== undefined }
 
   if (kept) {
     const inner = kept.get(original) ?? new Map<string, Role>()
@@ -207,18 +217,18 @@ function roleOf(original: string, imported: ImportedSignals | undefined, root: s
 
 // Whether a component renders as an island of its own, as compileKay decides it, without generating its code.
 export function rendersAsIsland(original: string, imported?: ImportedSignals, root?: string): boolean {
-  const { always, live, server } = roleOf(original, imported, root)
+  const { always, live, pinned, server } = roleOf(original, imported, root)
 
-  return always || (!server && live)
+  return always || (!server && (live || pinned))
 }
 
 // Whether a component is an island, as `compileKay` decides it, or a static component that may be promoted to one by what it passes, which the build does only when its imports reach an island.
 // A file with a server fence, a layout and a special page are islands only by their own handlers or `client`, never by a package's live value, and never promoted.
 export function browserRole(original: string, filename: string, imported?: ImportedSignals, root?: string): 'island' | 'promotable' | undefined {
-  const { always, live, promotable, server } = roleOf(original, imported, root)
+  const { always, live, pinned, promotable, server } = roleOf(original, imported, root)
   const routeFile = server || ROUTE_FILES.has(basename(filename))
 
-  if (always || (!routeFile && live))
+  if (always || (!routeFile && (live || pinned)))
     return 'island'
 
   return routeFile || !promotable ? undefined : 'promotable'
@@ -236,11 +246,10 @@ export function promotedChecks(original: string, root?: string, imported?: Impor
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root), imported)
   const site = promotionSite(file, script, imported)
-  const marker = islandMarker(source)
-  const announced = site === undefined || marker !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${describeCause(site)}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `// kay-island` in it to say so, or pass the island what can be serialized', checkOnly: true }]
-  const contradicted = marker?.kind === 'static' && site !== undefined ? [{ start: marker.start, end: marker.end, code: 'island-marker', message: `This component renders as an island, and \`// kay-static\` says it does not: ${describeCause(site)}`, note: 'it passes an island what only an island can send', help: 'delete the marker, or pass the island what can be serialized', checkOnly: true }] : []
+  const pin = islandPin(file)
+  const announced = site === undefined || pin !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${describeCause(site)}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `--- island` in place of `---` to say so, or pass the island what can be serialized', checkOnly: true }]
 
-  return [...scriptFences(script).flatMap(fence => serverOnlyImports(fence)), ...announced, ...contradicted]
+  return [...scriptFences(script).flatMap(fence => serverOnlyImports(fence)), ...announced]
 }
 
 // The props of a component's script read once into a value a function or the template reads later, for a component the browser runs that compiling it alone cannot tell is one: the project knows which.
@@ -278,12 +287,16 @@ export function compileKay(original: string, filename: string, options: CompileO
   const failedAt = failed?.code.search(FAILED_FUNCTION) ?? -1
   const failedCode = failed && options.output === 'html' && failedAt >= 0 ? failed.code.slice(failedAt) : undefined
   const live = routeFile ? undefined : liveImport(script, options.importedSignals)
-  const island = client || isInteractive(file, script) || live !== undefined ? islandId(filename, options.root) : undefined
+  const pinned = file.pin?.kind === 'island' && !routeFile
+  const island = client || pinned || isInteractive(file, script) || live !== undefined ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
   const promotion = island === undefined && !routeFile ? promotionSite(file, script, options.importedSignals) : undefined
   const promote = promotion === undefined ? undefined : islandId(filename, options.root)
-  const cause = realCause(island === undefined ? promotion : islandCause(file, script) ?? liveCause(file, script, live), expansion, original)
+  const rawCause = island === undefined ? promotion : islandCause(file, script) ?? liveCause(file, script, live)
+  const cause = realCause(rawCause, expansion, original)
+  const comment = islandComment(file)
+  const pin = islandPin(file, comment)
   const generateOptions = { cause: options.inspect === true && cause !== undefined ? causeSummary(cause, island === undefined) : undefined, classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, promote, output: options.output, failedCode, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerGuards: options.outerGuards, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && (routeFile || options.page === true), pageFile: routeFile || options.page === true, namedRefresh: options.namedRefresh, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: basename(filename) === ERROR_PAGE, cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
@@ -308,6 +321,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     ...coded(server ? separatePageSettings(source, server) : [], 'page-settings-invalid'),
     ...coded(validate(file, script, server, generateOptions), 'template-invalid'),
     ...coded(unparsed ? [] : found.diagnostics, 'signal-misuse'),
+    ...coded(pin?.kind === 'static' && cause !== undefined && rawCause !== undefined && !routeFile ? [staticPin(pin.comment, rawCause.span, cause, island !== undefined)] : [], 'static-pin'),
   ]
 
   // Code that does not parse usually already has a better diagnostic from the fence or the template; this one is what is left when nothing else explains it.
@@ -337,10 +351,11 @@ export function compileKay(original: string, filename: string, options: CompileO
     diagnostics.push(...unboundedFields(server), ...fenceLints, ...browserScript.flatMap(fence => serverOnlyImports(fence)), ...browserScript.includes(script.fence!) ? onceReadProps(script.fence!, script.props, templateWords(file)) : [], ...unusedLints, ...templateLints(file))
   }
 
-  const marker = checked ? islandMarker(source) : undefined
+  if (checked && pin !== undefined)
+    diagnostics.push(...markerMismatch(pin, routeFile))
 
-  if (marker !== undefined)
-    diagnostics.push(...markerMismatch(marker, { route: routeFile, island: island !== undefined, why: cause && describeCause(cause), promotion: promotion && describeCause(promotion) }))
+  if (checked && comment !== undefined)
+    diagnostics.push(commentLint(file, comment))
 
   if (file.client && file.module)
     diagnostics.push({ ...file.client, code: 'fence-invalid', message: 'A `--- client` component has no `--- module` fence', note: 'the server loads only its live imports, so its exports would be missing there', help: 'put the shared values in a `.ts` module' })

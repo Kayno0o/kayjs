@@ -28,7 +28,7 @@ An option can carry a `description`, drawn as a quieter second line under its la
 
 To draw each row yourself, give the Combobox an `@option(option)` block. It replaces the label and description, and the row stays named by the option's label alone, so a screen reader does not read the rest of the block.
 
-A block cannot be sent to the browser as data, so a Combobox given one renders as an island: write `// kay-island` in the component using it.
+A block cannot be sent to the browser as data, so a Combobox given one renders as an island: write `--- island` in place of `---` in the component using it.
 
 ```kay
 Combobox(label="Commit" options={findCommits})
