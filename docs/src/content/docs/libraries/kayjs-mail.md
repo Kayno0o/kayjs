@@ -237,6 +237,25 @@ export const mail = mailer({
 })
 ```
 
+### Hooks
+
+The mailer takes the [hooks](/guides/hooks) `beforeSend`, `onSend`, `onError` and `onSuppress`, each given one object with a `context`:
+
+```ts
+export const mail = mailer({
+  beforeSend: ({ mail }) => (mail.to.some(isTestAddress) ? false : { headers: { ...mail.headers, 'X-App': 'shop' } }),
+  onSend: async ({ mail, delivery }) => saveDelivery(mail.subject, delivery.messageId),
+  onError: ({ mail, error }) => alert(mail.subject, error),
+  onSuppress: ({ address, reason }) => flagUser(address, reason),
+})
+```
+
+`beforeSend` runs once per mail before it is sent, queued or mailed to a list subscriber. It returns the fields to change, `false` to refuse the mail, or throws `refuse()`. A refused `send` or `enqueue` throws that refusal, which an action answers as it answers `ctx.fail`, and nothing goes out.
+
+`onSend` runs once after the server took the mail, from `send`, the queue and a list alike, and `onError` once when a send fails or the queue gives a mail up. Neither is told for a mail whose recipients were all suppressed or for a queued retry, and a hook that throws is logged and never fails the send. A queued mail has no request, so `context.request` is undefined.
+
+`onSuppress` runs when a bounce or complaint, from a provider or a mail server, or `mail.suppress()`, stops an address, with the `source` that reported it.
+
 ### Other transports
 
 By default mails go over SMTP, or to the outbox in development. `transport` takes any `{ send(mail, signal) }` that resolves with a delivery, such as a provider's HTTP API.
@@ -290,6 +309,8 @@ The action checks a one-line `name`, an `email` and a `message` of at most 5000 
 
 Use `labels` to rename a field in the mail. Use `subject` and `view` to replace the subject and the mail's component, which gets `ContactMailProps`, with the site's origin as `site`.
 
+`to` can be a function of the input, to route a message by a `topic` field. `onSend({ input, id })` runs once the mail is queued, to save the message in your database. A throw there is logged and the visitor still sees success. A `beforeSend` of the mailer that refuses the mail makes the form answer that refusal.
+
 ### Spam protection
 
 A message with more than `maxLinks` links (3 by default) is refused. `rateLimit` allows 30 posts and 5 that went through every 10 minutes. `honeypot` is the `website` field, answered as if it worked, and `minTime` is 3 seconds. Set `protection` to replace the limits.
@@ -329,6 +350,8 @@ A visitor types an address and gets a mail with a link, valid for three days. Op
 The form shows a line saying what the address is used for. The form links the `privacy` of `mail.list()`; `privacy="/privacy"` on the form replaces it, and `noticeText` to write your own, with `wordingId` to name its version. The confirmation mail names the site and the list (`title` in `mail.list()`) and links the policy (`privacy` in `mail.list()`).
 
 The page the form was on and the id of the notice are kept with the confirmation date as the proof of consent.
+
+A list takes the hooks `onSubscribe`, `onConfirm` and `onUnsubscribe`, each given `{ list, email }`, and `onBroadcast`, given `{ list, id, sent, failed, unsure }` once a broadcast has gone to every subscriber, to add a confirmed subscriber to a CRM say. `onSubscribe` is told once for a new address, `onUnsubscribe` for the link and `list.unsubscribe()` but not `mail.erase()`. A hook that throws is logged and changes nothing.
 
 Every visitor sees the same answer, whether the address is new, waiting, already listed or refused, so the form tells nothing about who subscribed. A confirmed address is mailed nothing.
 
@@ -379,6 +402,8 @@ A complaint is about the mail it reported, so it stops only bulk mail: a list's 
 Suppressions are kept with the mailing lists, or in your app's database (else `data/mail-list.sqlite`) when there are none, made by the first one. A site on several servers with no list keeps them in Postgres instead, with `mailer({ suppressionStore: pgSuppressions(db) })`, where `db` is what `pgData` takes. `sqliteSuppressions(path)` names another SQLite file, and any object with `suppress`, `suppressed` and `lift` is a store.
 
 A store's `suppressed` answers `StoredSuppression` rows with `suppressedAt` in milliseconds.
+
+The mailer's `onSuppress({ address, reason, source })` is told each time, to flag the user whose address bounced.
 
 Mail servers also answer a failed delivery with a report mail (a DSN). Pipe those, and the replies to your mails, to `POST /_kay/mail/inbound` with `Authorization: Bearer` and `MAIL_EVENTS_INBOUND`. A report suppresses the recipients it names, but only when it returns a mail your app sent to that address, which needs `KAY_SECRET`. Any other message goes to the function you give the mailer:
 

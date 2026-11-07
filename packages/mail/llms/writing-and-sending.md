@@ -151,6 +151,25 @@ export const signUp = action(s.Object({ name: s.String({ maxLength: 100 }), emai
 - Every mail with html goes out with a text part too: the one `text` gives, else one written from the html, links followed by their address, list items dashed, table rows one to a line and a row header written `Label: value`, what the html hides, such as the preheader, left out. `htmlToText(html)` is exported.
 - `send(message)` renders and sends now, resolving with `{ messageId, accepted, rejected, response }`. Each mail sent, from `send` or the queue, logs one line, `A mail sent to 2 recipients at example.com: 250 queued`, with how many recipients the server took, their domains and its answer, and the subject only with `logSubjects: true` (it can hold a visitor's name), so an app logs nothing of its own. These lines go where the app's `log` setting sends kay's, as text headed `kayjs-mail:`, as JSON with `from: 'kayjs-mail'` or to the app's function, under the request being answered. A mail the server takes for some recipients and refuses for others is sent all the same, and logged counting those refused: it is not retried, which would send it again to those who have it. A send that fails logs the mail and the reason before it throws. `enqueue(message, { delay })` renders now and queues it, resolving with the job's id; a failed send is retried as kay's queues retry, 5 attempts by default, each wait twice the last from 10 seconds, and a mail given up after its last attempt is logged naming it and the reason, then handed to `queue.onError` if given. `render(message)` gives the rendered `Mail` without sending it. `drain()` sends every queued mail due, here and now, for a script. `failed()` lists the mails given up on, with why: a mail given up is kept 7 days, not the queue's 30, and without its html, text, headers and attachments (so the link of a reset or a sign-in is not kept with it; the server's error text is not scrubbed, and a refusal may echo a URL), keeping its recipients, subject and the error; set `queue: { failedTtl, redact }` to change either, and the expired ones go on any `enqueue`, `failed()` or `remove()`, not only in a process running the queue. The error is kept as the server worded it, and `onError` gets the whole mail. `remove(id)`, `remove({ recipient })` or `remove(match)` deletes queued and failed mails, a person's to, cc or bcc once they asked to be erased, resolving with how many went.
 
+### Hooks
+
+`mailer({ beforeSend, onSend, onError, onSuppress })` follow kay's [hook convention](../../../llms/hooks.md), each told one object with `context: HookContext`:
+
+```ts
+export const mail = mailer({
+  beforeSend: ({ mail }) => (mail.to.some(isTestAddress) ? false : { headers: { ...mail.headers, 'X-App': 'shop' } }),
+  onSend: async ({ mail, delivery }) => db.insert(deliveries).values({ subject: mail.subject, messageId: delivery.messageId }),
+  onError: ({ mail, error }) => alert(mail.subject, error),
+  onSuppress: ({ address, reason, source }) => flagUser(address, reason),
+})
+```
+
+- `beforeSend({ mail })` runs once per mail, before it is sent, queued or mailed to a list subscriber, with the rendered `Mail`. It returns the fields to change (`headers` replaces the whole record, so spread it), `false`, or throws `refuse(message, { status })`. A refused `send()` or `enqueue()` throws that refusal (403 by default; an action answers it as `ctx.fail`, a contact form too), and nothing is sent or queued. Any other throw refuses with a 500 after it is reported. A refused list mail counts as a delivery that failed. It runs before the queue, so a queued retry does not run it again.
+- `onSend({ mail, delivery })` runs once after the transport took the mail, for `send()`, the queue and a list alike, with the mail as sent (suppressed recipients removed). It is not told for a mail whose recipients were all suppressed, nor for each retry. A queued mail is told outside any request, so `context.request` is undefined.
+- `onError({ mail, error })` runs once when `send()` fails and when the queue gives a mail up after its last attempt; `queue.onError` still gets the job's own fields right after. A refusal by `beforeSend` and a mail a list could not send to one subscriber are not told to it.
+- `onSuppress({ address, reason, source })` runs when an address stops being mailed: a provider's or mail server's bounce or complaint (`source` names it) or `mail.suppress()` (`manual`). The address is the normalised one.
+- An observer that throws is reported with source `mail.onSend`, `mail.onError` or `mail.onSuppress` and never fails the send. `mail()` takes the same keys.
+
 ## Reference
 
 - Mail clients drop stylesheets: a mail's styles live in `style` attributes. The components kayjs-mail ships already do, themed through kay's library settings; Tailwind classes do nothing in a mail.

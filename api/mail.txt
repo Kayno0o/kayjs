@@ -52,6 +52,14 @@ interface Broadcast
   list: string
   message: string
 
+[.] BroadcastEvent
+interface BroadcastEvent extends Pick<BroadcastProgress, 'sent' | 'failed' | 'unsure'>
+  failed: number
+  id: string
+  list: string
+  sent: number
+  unsure: number
+
 [.] BroadcastProgress
 interface BroadcastProgress
   failed: number
@@ -98,10 +106,11 @@ interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, T
   labels?: Partial<Record<keyof Extra & string, string>> | undefined
   maxLength?: number | undefined
   maxLinks?: number | undefined
+  onSend?: Hook<{ input: ContactInput<Extra, Consent>; id: string; }> | undefined
   protection?: (Omit<ActionProtect<Honeypot>, "honeypot"> & Pick<ActionProtection<never>, "maxSize" | "tool">) | undefined
   reach?: string | undefined
   subject?: ((input: ContactInput<Extra, Consent>) => string) | undefined
-  to?: Address | Address[] | undefined
+  to?: ((input: ContactInput<Extra, Consent>) => Address | Address[]) | Address | Address[] | undefined
   view?: ((props: ContactMailProps) => Element) | undefined
 
 [.] cssColors
@@ -161,6 +170,11 @@ interface ListConfirmProps
   site: string
   url: string
 
+[.] ListEvent
+interface ListEvent
+  email: string
+  list: string
+
 [.] ListMessage
 type ListMessage<P extends object = object> = MailMessage<P> extends infer M ? M extends unknown ? Omit<M, 'to' | 'cc' | 'bcc' | 'unsubscribe' | 'attachments'> : never : never
 
@@ -168,6 +182,10 @@ type ListMessage<P extends object = object> = MailMessage<P> extends infer M ? M
 interface ListOptions
   file?: string | undefined
   honeypot?: string | undefined
+  onBroadcast?: Hook<BroadcastEvent> | undefined
+  onConfirm?: Hook<ListEvent> | undefined
+  onSubscribe?: Hook<ListEvent> | undefined
+  onUnsubscribe?: Hook<ListEvent> | undefined
   pace?: undefined | { batch?: number | undefined; every?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined; }
   privacy?: string | undefined
   protection?: (Omit<ActionProtect<string>, "honeypot"> & Pick<ActionProtection<never>, "maxSize" | "tool">) | undefined
@@ -185,6 +203,7 @@ interface ListStore
   confirm: (list: string, id: string, now?: number | undefined, issuedAt?: number | undefined) => MaybePromise<boolean>
   count: (list: string) => MaybePromise<number>
   erase: (email: string) => MaybePromise<number>
+  find?: ((list: string, id: string) => MaybePromise<Subscriber | undefined>) | undefined
   finish: (id: string, now?: number | undefined) => unknown
   forEmail: (email: string) => MaybePromise<Subscriber[]>
   lift?: ((email: string) => MaybePromise<boolean>) | undefined
@@ -238,6 +257,7 @@ type Mailer = Elysia & {
 
 [.] MailerOptions
 interface MailerOptions
+  beforeSend?: BeforeHook<{ mail: Mail; }, Mail> | undefined
   events?: EventSecrets | undefined
   from?: Address | undefined
   fromName?: string | undefined
@@ -246,6 +266,9 @@ interface MailerOptions
   locale?: string | undefined
   logRecipients?: boolean | undefined
   logSubjects?: boolean | undefined
+  onError?: Hook<{ mail: Mail; error: Error; }> | undefined
+  onSend?: Hook<{ mail: Mail; delivery: Delivery; }> | undefined
+  onSuppress?: Hook<{ address: string; reason: SuppressionReason; source: string; }> | undefined
   optional?: boolean | undefined
   queue?: (QueueOptions<Mail> & { name?: string | undefined; }) | undefined
   smtp?: SmtpOverrides | undefined
@@ -255,6 +278,7 @@ interface MailerOptions
 
 [.] MailExtensionOptions
 interface MailExtensionOptions extends MailerOptions
+  beforeSend?: BeforeHook<{ mail: Mail; }, Mail> | undefined
   events?: EventSecrets | undefined
   from?: Address | undefined
   fromName?: string | undefined
@@ -264,6 +288,9 @@ interface MailExtensionOptions extends MailerOptions
   logRecipients?: boolean | undefined
   logSubjects?: boolean | undefined
   module?: string | undefined
+  onError?: Hook<{ mail: Mail; error: Error; }> | undefined
+  onSend?: Hook<{ mail: Mail; delivery: Delivery; }> | undefined
+  onSuppress?: Hook<{ address: string; reason: SuppressionReason; source: string; }> | undefined
   optional?: boolean | undefined
   queue?: (QueueOptions<Mail> & { name?: string | undefined; }) | undefined
   server?: (() => Promise<Mailer>) | false | undefined

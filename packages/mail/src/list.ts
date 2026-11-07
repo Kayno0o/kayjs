@@ -1,12 +1,13 @@
 import type { Elysia, TSchema } from 'elysia'
 import type { ActionContext, ActionProtect, ActionProtection, Duration, Failure, JSX } from 'kay'
+import type { Hook } from 'kay/library'
 import type { SuppressionReason } from './events'
 import type { BroadcastProgress, ListStore, Subscriber } from './list-store'
 import type { SuppressionStore } from './suppressions'
 import type { Address, Mail, MailMessage } from './types'
 import process from 'node:process'
 import { s } from 'kay'
-import { configError, durationSeconds, escapeHtml, keyedDigest, normalizeAddress, trackDetached } from 'kay/library'
+import { configError, dispatch, durationSeconds, escapeHtml, keyedDigest, normalizeAddress, trackDetached } from 'kay/library'
 import { siteOrigin } from 'kay/seo'
 import { rateLimit, renderLocale, renderToString, retryLater } from 'kay/server'
 import { wording } from 'kay/words'
@@ -60,7 +61,29 @@ export interface ListOptions {
   title?: string | undefined
   // The page explaining what is done with the address, a path or a URL: the confirmation mail and the subscribe form of this list link it, so an app declares it once.
   privacy?: string | undefined
+  // Told when an address signs up through the form of this list, once its confirmation is mailed; not for one asking again while pending, nor one confirmed already. A throw is reported and the sign-up stands.
+  onSubscribe?: Hook<ListEvent> | undefined
+  // Told when the address confirms, once. Needs a store with `find`, as `openLists` and `pgLists` have.
+  onConfirm?: Hook<ListEvent> | undefined
+  // Told when the address leaves the list by its unsubscribe link or `list.unsubscribe()`, once. A removal by `mail.erase()`, a bounce or a complaint tells nothing. The link needs a store with `find`.
+  onUnsubscribe?: Hook<ListEvent> | undefined
+  // Told once when a broadcast has been handed to every subscriber, with how many mails went and how many were given up.
+  onBroadcast?: Hook<BroadcastEvent> | undefined
 }
+
+// What the hooks of a list are told about a subscriber, the list's name and the normalised address.
+export interface ListEvent {
+  list: string
+  email: string
+}
+
+// What `onBroadcast` is told: the broadcast `send()` answered, with its progress.
+export interface BroadcastEvent extends Pick<BroadcastProgress, 'sent' | 'failed' | 'unsure'> {
+  list: string
+  id: string
+}
+
+const LIST_HOOKS = ['onSubscribe', 'onConfirm', 'onUnsubscribe', 'onBroadcast'] as const
 
 // The mail sent to a list: a message without recipients, which are the list's.
 export type ListMessage<P extends object = object> = MailMessage<P> extends infer M ? M extends unknown ? Omit<M, 'to' | 'cc' | 'bcc' | 'unsubscribe' | 'attachments'> : never : never
@@ -136,6 +159,7 @@ interface Entry {
   // The store when it is open or its file exists, so a sweep creates no file.
   readonly opened: () => ListStore | undefined
   pace: { batch: number, every: Duration }
+  readonly hooks: Pick<ListOptions, typeof LIST_HOOKS[number]>
 }
 
 // The page the form was on, without its query, which may hold anything; the action's own path when the browser sent no referrer.
@@ -277,6 +301,11 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       },
     }
 
+    for (const hook of LIST_HOOKS) {
+      if (options[hook] !== undefined && typeof options[hook] !== 'function')
+        throw configError('mail', hook, `mail.list(${JSON.stringify(name)}): ${hook} is a function`)
+    }
+
     const pace = { batch: options.pace?.batch ?? 20, every: options.pace?.every ?? '1m' }
 
     if (!Number.isInteger(pace.batch) || pace.batch < 1)
@@ -352,7 +381,8 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
           const locale = await renderLocale()
           const origin = siteOrigin()
           // Derived from the list and the address rather than drawn, so the unsubscribe link of an earlier mail still removes the address after it subscribed again.
-          const subscriber = await lists.get().ask(name, email, keyedDigest('mail-list-id', `${name}\n${email}`), locale, Date.now(), { source: sourceOf(ctx), wording: input.wording })
+          const asked = Date.now()
+          const subscriber = await lists.get().ask(name, email, keyedDigest('mail-list-id', `${name}\n${email}`), locale, asked, { source: sourceOf(ctx), wording: input.wording })
 
           const url = `${origin}${LIST_PATH}/confirm?token=${signToken('confirm', { list: name, id: subscriber.id, locale })}`
           const site = new URL(origin).host
@@ -371,6 +401,10 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
             return ctx.fail(502, wording('mail.list.sendFailed', 'Your subscription could not be started. Please try again later.'))
           }
+
+          // Off the response path, so the answer takes the same time for a new address as for a known one.
+          if (subscriber.status === 'pending' && subscriber.createdAt === asked)
+            await dispatch('mail.list.onSubscribe', [options.onSubscribe], { list: name, email }, { detached: true })
 
           return undefined
         }
@@ -444,13 +478,18 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       async unsubscribe(address) {
         const email = normalizeAddress(address)
 
-        return email !== undefined && await lists.get().removeEmail(name, email)
+        if (email === undefined || !await lists.get().removeEmail(name, email))
+          return false
+
+        await dispatch('mail.list.onUnsubscribe', [options.onUnsubscribe], { list: name, email })
+
+        return true
       },
     }
 
     const opened = (): ListStore | undefined => chosen() ?? stores.existing(file())
 
-    return { list, source: options.store ?? options.file, get lists() {
+    return { list, hooks: options, source: options.store ?? options.file, get lists() {
       return lists.get()
     }, opened, pace }
   }
@@ -525,6 +564,10 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       throw retryLater(pace.every, `the list ${name} paces its mails`)
 
     await lists.finish(id)
+
+    const { sent, failed, unsure } = await lists.progress(stored)
+
+    await dispatch('mail.list.onBroadcast', [entry.hooks.onBroadcast], { list: name, id, sent, failed, unsure })
   }
 
   return {
@@ -596,8 +639,14 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         return { kind: 'unavailable', locale: checked.claims.locale }
 
       try {
+        const before = await store.find?.(checked.claims.list, checked.claims.id)
         // A subscriber that is gone, unsubscribed or erased, answers as a link that does not work.
-        return { kind: await store.confirm(checked.claims.list, checked.claims.id, undefined, checked.claims.issuedAt) ? 'confirmed' : 'invalid', locale: checked.claims.locale }
+        const confirmed = await store.confirm(checked.claims.list, checked.claims.id, undefined, checked.claims.issuedAt)
+
+        if (confirmed && before?.status === 'pending')
+          await dispatch('mail.list.onConfirm', [entries.get(checked.claims.list)?.hooks.onConfirm], { list: checked.claims.list, email: before.email })
+
+        return { kind: confirmed ? 'confirmed' : 'invalid', locale: checked.claims.locale }
       }
       catch (error) {
         log.error('a confirmation link could not be checked against the store of its list', error)
@@ -618,7 +667,10 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
         return { valid: false, unavailable: true, locale: checked.claims.locale }
 
       try {
-        await store.remove(checked.claims.list, checked.claims.id)
+        const before = await store.find?.(checked.claims.list, checked.claims.id)
+
+        if (await store.remove(checked.claims.list, checked.claims.id) && before !== undefined)
+          await dispatch('mail.list.onUnsubscribe', [entries.get(checked.claims.list)?.hooks.onUnsubscribe], { list: checked.claims.list, email: before.email })
       }
       catch (error) {
         log.error('an unsubscribe link could not be applied to the store of its list', error)

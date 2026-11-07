@@ -154,6 +154,11 @@ export function pgLists(source: PgSource): ListStore & { close: () => Promise<vo
 
       return subscriberOf(row)
     },
+    async find(list, id): Promise<Subscriber | undefined> {
+      const [row] = await query<SubscriberRow>('SELECT * FROM kay_mail_subscribers WHERE list = $1 AND id = $2', [list, id])
+
+      return row === undefined ? undefined : subscriberOf(row)
+    },
     async confirm(list, id, now = Date.now(), issuedAt = Number.MAX_SAFE_INTEGER): Promise<boolean> {
       await query('UPDATE kay_mail_subscribers SET status = \'confirmed\', confirmed_at = $3::bigint WHERE list = $1 AND id = $2 AND status = \'pending\' AND created_at <= $4::bigint', [list, id, now, issuedAt])
 

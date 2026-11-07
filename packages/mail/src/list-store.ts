@@ -46,6 +46,8 @@ export interface ListStore {
   sweep: (now?: number) => MaybePromise<void>
   // Whether the subscriber is confirmed after the call; one confirmed already stays as it is. A `issuedAt` confirms only a row asked before it, so the link of an earlier mail cannot confirm a later sign-up.
   confirm: (list: string, id: string, now?: number, issuedAt?: number) => MaybePromise<boolean>
+  // The subscriber of that id on the list, which the `onConfirm` and `onUnsubscribe` hooks of a link need to name the address; a store without it tells them nothing.
+  find?: ((list: string, id: string) => MaybePromise<Subscriber | undefined>) | undefined
   remove: (list: string, id: string) => MaybePromise<boolean>
   removeEmail: (list: string, email: string) => MaybePromise<boolean>
   // Takes the address off every list of the store, with its deliveries; how many rows went.

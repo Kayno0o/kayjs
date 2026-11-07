@@ -1,9 +1,10 @@
 import type { Static, TSchema } from 'elysia'
 import type { ActionContext, ActionProtect, ActionProtection, Failure, JSX } from 'kay'
+import type { Hook } from 'kay/library'
 import type { Mailer } from './mailer'
 import type { Address, MailField } from './types'
 import { s } from 'kay'
-import { configError } from 'kay/library'
+import { configError, dispatch } from 'kay/library'
 import { siteOrigin } from 'kay/seo'
 import { wording } from 'kay/words'
 import { log } from './log'
@@ -39,10 +40,12 @@ export interface ContactOptions<Extra extends Record<string, TSchema> = Record<n
   fields?: Extra | undefined
   // What each of those is called in the mail, the field's name with its words apart and a capital by default.
   labels?: Partial<Record<keyof Extra & string, string>> | undefined
-  // Where the mail goes, the mailer's `to` or `MAIL_TO` when left out.
-  to?: Address | Address[] | undefined
+  // Where the mail goes, the mailer's `to` or `MAIL_TO` when left out; a function of the validated input routes it, such as by a `topic` field.
+  to?: Address | Address[] | ((input: ContactInput<Extra, Consent>) => Address | Address[]) | undefined
   // The mail's subject, the `mail.contact.subject` message by default.
   subject?: ((input: ContactInput<Extra, Consent>) => string) | undefined
+  // Told once the visitor's message is queued, with the validated `input` and the queue's `id` of the mail, to save it in the app's database say. A throw is reported and the visitor still gets their answer.
+  onSend?: Hook<{ input: ContactInput<Extra, Consent>, id: string }> | undefined
   // The mail's own `.kay` view, given `ContactMailProps`, in place of kayjs-mail's.
   view?: ((props: ContactMailProps) => JSX.Element) | undefined
   // How else to reach the site, `hello@example.com` or a phone number, which a refusal due to the mail not going out names after its own words.
@@ -113,10 +116,12 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
     const subject = options.subject?.(input) ?? wording('mail.contact.subject', 'Message from {name}', { name })
     const origin = siteOrigin()
 
+    let id: string
+
     try {
       // From stays the mailer's own address so SPF and DKIM hold; replying goes to the visitor.
-      await mail.enqueue({
-        to: options.to,
+      id = await mail.enqueue({
+        to: typeof options.to === 'function' ? options.to(input) : options.to,
         replyTo: { name, address: email },
         subject,
         view: options.view ?? await defaultView(),
@@ -124,6 +129,10 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
       })
     }
     catch (error) {
+      // A `beforeSend` of the mailer that refused it answers as the form's own failure.
+      if (typeof error === 'object' && error !== null && Symbol.for('kay.refused') in error)
+        throw error
+
       // A delivery that fails is logged and retried by the queue; what stops before it is queued (not configured, a view that does not render) is logged here.
       if (error instanceof MailNotConfiguredError) {
         log.error(error.message, error)
@@ -135,6 +144,8 @@ export function contactForm<const Extra extends Record<string, TSchema> = Record
 
       return ctx.fail(502, reach === undefined ? wording('mail.contact.sendFailed', 'Your message could not be sent. Please try again later.') : wording('mail.contact.sendFailedReach', 'Your message could not be sent. Please try again later, or write to {reach}.', words))
     }
+
+    await dispatch('mail.contact.onSend', [options.onSend], { input, id })
 
     return undefined
   }

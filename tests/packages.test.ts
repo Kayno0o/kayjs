@@ -508,7 +508,7 @@ describe('the naming conventions', () => {
   // An option held in a variable is listed with the names it takes.
   it('give every configError of a library its own name and an option its llms document', async () => {
     const found: string[] = []
-    const variables: Record<string, string[]> = { 'packages/ai/src/hooks.ts': ['beforeRequest', 'onRequest', 'onStep', 'onToolCall', 'onSuccess', 'onFinish', 'onError'] }
+    const variables: Record<string, string[]> = { 'packages/ai/src/hooks.ts': ['beforeRequest', 'onRequest', 'onStep', 'onToolCall', 'onSuccess', 'onFinish', 'onError'], 'packages/mail/src/mailer.ts': ['beforeSend', 'onSend', 'onError', 'onSuppress'], 'packages/mail/src/list.ts': ['onSubscribe', 'onConfirm', 'onUnsubscribe', 'onBroadcast'] }
 
     for (const { library, files } of sources) {
       const docs = (await Promise.all([`packages/${library}/llms.txt`, ...await Array.fromAsync(new Glob(`packages/${library}/llms/*.md`).scan())].map(async file => Bun.file(file).text()))).join('\n')

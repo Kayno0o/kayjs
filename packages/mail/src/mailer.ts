@@ -1,4 +1,4 @@
-import type { Hook } from 'kay/library'
+import type { BeforeHook, Hook } from 'kay/library'
 import type { EnqueueOptions, ExtensionApp, FailedJob, KayExtension, QueueOptions } from 'kay/server'
 import type { EventSecrets, Found, StoredSuppression, Suppression, SuppressionReason } from './events'
 import type { ListOptions, ListRun, ListsHandle, MailingList, Subscription } from './list'
@@ -15,7 +15,7 @@ import { splitList } from '@kaynooo/utils/text'
 import { Elysia } from 'elysia'
 import { s } from 'kay'
 import { direction } from 'kay/i18n'
-import { checkOptionKeys, configError, dispatch, escapeHtml as escape, inFlightWork, KayError, normalizeAddress, underKayDev } from 'kay/library'
+import { checkOptionKeys, configError, decide, dispatch, escapeHtml as escape, inFlightWork, KayError, normalizeAddress, refuse, underKayDev } from 'kay/library'
 import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
@@ -88,6 +88,14 @@ export interface MailerOptions {
   events?: EventSecrets | undefined
   // Called with each reply handed to `/_kay/mail/inbound` (anything but a delivery report, which suppresses its failed recipients instead). A reply carries the `Message-ID` of the mail it answers as `inReplyTo`.
   inbound?: ((reply: MailReply) => Promise<void> | void) | undefined
+  // Runs once per mail before it is sent, queued or mailed to a list subscriber, with the rendered mail: return the fields to change (`{ headers: { ...mail.headers, 'X-App': 'kay' } }`) or `false`, or throw `refuse()`, to refuse it. A refused `send` or `enqueue` throws that refusal and nothing goes out; any other throw refuses with a 500 after it is reported.
+  beforeSend?: BeforeHook<{ mail: Mail }, Mail> | undefined
+  // Told once after a mail was handed to the transport, from `send`, from the queue and from a list: not for a mail whose recipients were all suppressed. A throw is reported and never fails the send. Mails of the queue are told outside any request, so `context.request` is undefined.
+  onSend?: Hook<{ mail: Mail, delivery: Delivery }> | undefined
+  // Told once when `send` fails, and when the queue gives a mail up after its last attempt (`queue.onError` is told right after, with the job's own fields).
+  onError?: Hook<{ mail: Mail, error: Error }> | undefined
+  // Told when an address stops being mailed: a bounce or complaint reported by a provider or a mail server (`source` names it), or `mail.suppress()` (`source` is `manual`).
+  onSuppress?: Hook<{ address: string, reason: SuppressionReason, source: string }> | undefined
   // Lets a server lacking `MAIL_URL` or a sender boot anyway, each send then throwing `MailNotConfiguredError`, for a site whose mail can wait to be set up.
   optional?: boolean | undefined
 }
@@ -141,7 +149,7 @@ interface Owner {
   deliver: (mail: Mail, signal?: AbortSignal) => Promise<Delivery>
   run: (run: ListRun, signal: AbortSignal) => Promise<void>
   redact: (mail: Queued) => Queued
-  failed: (mail: Mail, error: unknown) => void
+  failed: (mail: Mail, error: unknown) => Promise<void>
   // The queue's run hooks, for the mailer that queued the mail, its payload without the internal `via`.
   told: (hook: 'onStart' | 'onSuccess' | 'onRetry' | 'onError', event: QueueEvent) => Promise<void>
 }
@@ -199,6 +207,11 @@ function agreeOnQueue(name: string, store: object | undefined, settings: Record<
 type Queued = Mail & { via?: string | undefined }
 // A mailing list run, with the id of the mailer that queued it.
 type QueuedRun = ListRun & { via?: string | undefined }
+
+// A primitive thrown is wrapped, so a caller and a hook always get an Error.
+function failureOf(error: unknown): Error {
+  return typeof error === 'object' && error !== null ? error as Error : new Error(String(error), { cause: error })
+}
 
 function withoutBody(mail: Queued): Queued {
   return { ...mail, html: undefined, text: '', headers: {}, attachments: [] }
@@ -478,7 +491,7 @@ export async function enqueue<P extends object>(message: MailMessage<P>, options
   return (await registeredOrThrow()).enqueue(message, options)
 }
 
-const KNOWN_OPTIONS: Record<keyof MailExtensionOptions, true> = { module: true, server: true, from: true, fromName: true, to: true, transport: true, smtp: true, locale: true, queue: true, logRecipients: true, logSubjects: true, listStore: true, suppressionStore: true, events: true, inbound: true, optional: true }
+const KNOWN_OPTIONS: Record<keyof MailExtensionOptions, true> = { module: true, server: true, from: true, fromName: true, to: true, transport: true, smtp: true, locale: true, queue: true, logRecipients: true, logSubjects: true, listStore: true, suppressionStore: true, events: true, inbound: true, beforeSend: true, onSend: true, onError: true, onSuppress: true, optional: true }
 
 // Lists the mailer in `kay.config.ts`'s `extensions`, so `pages()` uses it and the server needs no `.use(mail)`; its `mail.auth` and `mail.contact` messages come with the package (`kay.messages`).
 // `mail({ from, locale, ...})` takes the options of `mailer()` and builds it as `pages()` does, with no module, and `mail()` alone uses the `mail` a `src/mail.ts` exports when the app has one. `module` or `server` are for a mailer written by the app elsewhere, loaded only as `pages()` builds the app: a `.kay` mail the module imports while the config loads would come before kay compiles any.
@@ -532,6 +545,11 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
     // Even where mails go to the outbox, so a broken option fails in development rather than in production.
     checkOptions(options.smtp, 'mailer({ smtp })')
+  }
+
+  for (const name of ['beforeSend', 'onSend', 'onError', 'onSuppress'] as const) {
+    if (options[name] !== undefined && typeof options[name] !== 'function')
+      throw configError('mail', name, `mailer({ ${name} }) is a function`)
   }
 
   const described = (mail: Mail): string => options.logSubjects ? quoted(mail.subject) : 'A mail'
@@ -644,6 +662,25 @@ export function mailer(options: MailerOptions = {}): Mailer {
     return { to, error }
   }
 
+  // The mail `beforeSend` lets through, as it changed it; a refusal is thrown as `refuse()` does, so an action answers it.
+  const approve = async (mail: Mail): Promise<Mail> => {
+    if (options.beforeSend === undefined)
+      return mail
+
+    const answer = await decide('mail.beforeSend', [options.beforeSend], { mail })
+
+    if ('refused' in answer)
+      refuse(answer.refused.message, answer.refused)
+
+    return { ...mail, ...answer.change }
+  }
+
+  const sent = async (mail: Mail, delivery: Delivery): Promise<Delivery> => {
+    await dispatch('mail.onSend', [options.onSend], { mail, delivery })
+
+    return delivery
+  }
+
   // The lists are made with `deliver`, which asks them who is suppressed.
   const suppressions: { lists?: ListsHandle } = {}
 
@@ -665,7 +702,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
       if (underKayDev())
         log.info(`${quoted(mail.subject)} to ${recipientsOf(mail).join(', ')} kept in the outbox, shown at /_kay/mail`)
 
-      return delivery
+      return sent(mail, delivery)
     }
 
     const delivery = await transport.send(mail, signal)
@@ -679,16 +716,26 @@ export function mailer(options: MailerOptions = {}): Mailer {
     if (delivery.rejected.length > 0)
       log.warn(`${described(mail)} was refused for ${whom(delivery.rejected)}, and sent to the others`)
 
-    return delivery
+    return sent(mail, delivery)
   }
 
   const lists = createLists({
     configured: () => (configured?.missing() ?? []).length === 0 && !senderless(),
     render,
-    deliver,
+    deliver: async (mail, signal) => deliver(await approve(mail), signal),
   }, { store: options.listStore, suppressions: options.suppressionStore })
 
   suppressions.lists = lists
+
+  // Stops mailing the address and tells onSuppress; whether it was an address.
+  const suppress = async (address: string, reason: SuppressionReason, source: string): Promise<boolean> => {
+    if (!await lists.suppress(address, reason, source))
+      return false
+
+    await dispatch('mail.onSuppress', [options.onSuppress], { address: normalizeAddress(address)!, reason, source })
+
+    return true
+  }
 
   const { name = 'mail', onStart, onSuccess, onRetry, onError, ...queueOptions } = options.queue ?? {}
   const via = crypto.randomUUID()
@@ -697,8 +744,9 @@ export function mailer(options: MailerOptions = {}): Mailer {
     deliver,
     run: async (run, signal) => lists.run(run, signal),
     redact,
-    failed: (mail, error) => {
+    failed: async (mail, error) => {
       log.error(`${described(mail)} to ${whom(recipientsOf(mail))} is given up after its last attempt`, error)
+      await dispatch('mail.onError', [options.onError], { mail, error: failureOf(error) })
     },
     told: async (hook, event) => dispatch(`mail.${hook}`, [({ onStart, onSuccess, onRetry, onError } as Record<typeof hook, Hook<QueueEvent> | undefined>)[hook]], event),
   }
@@ -723,7 +771,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     onError: async (event) => {
       const { via: queuedBy, ...mail } = event.payload
 
-      ownerOf(queuedBy).failed(mail, event.error)
+      await ownerOf(queuedBy).failed(mail, event.error)
       await told('onError')(event)
     },
   })
@@ -735,7 +783,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
   mountEventRoutes(plugin, () => ({
     secrets: () => secretsOf(options.events),
     suppress: async ({ email, reason }: Found, source: string) => {
-      await lists.suppress(email, reason, source)
+      await suppress(email, reason, source)
       log.info(`${source} reported a ${reason}: one address is no longer mailed`)
     },
     reply: options.inbound,
@@ -783,7 +831,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     send: async <P extends object>(message: MailMessage<P>) => inFlightWork(async () => {
       ready(message)
 
-      const mail = await render(message)
+      const mail = await approve(await render(message))
 
       // Here rather than in `deliver`, which the queue runs too: a queued mail's failures are logged by the queue as it retries, and once given up.
       try {
@@ -792,19 +840,22 @@ export function mailer(options: MailerOptions = {}): Mailer {
       catch (error) {
         log.error(`${described(mail)} to ${whom(recipientsOf(mail))} was not sent`, error)
 
-        // A primitive is thrown wrapped, so the caller always catches an Error.
-        throw typeof error === 'object' && error !== null ? error : new Error(String(error), { cause: error })
+        const failure = failureOf(error)
+
+        await dispatch('mail.onError', [options.onError], { mail, error: failure })
+
+        throw failure
       }
     }),
     enqueue: async <P extends object>(message: MailMessage<P>, enqueueOptions?: EnqueueOptions) => inFlightWork(async () => {
       ready(message)
 
-      return jobs.enqueue({ ...await render(message), via }, enqueueOptions)
+      return jobs.enqueue({ ...await approve(await render(message)), via }, enqueueOptions)
     }),
     render,
     list: (listName = 'default', listOptions?: ListOptions) => lists.list(listName, listOptions),
     subscriptions: async (address: string) => lists.subscriptions(address),
-    suppress: async (address: string, reason: SuppressionReason = 'bounce') => lists.suppress(address, reason, 'manual'),
+    suppress: async (address: string, reason: SuppressionReason = 'bounce') => suppress(address, reason, 'manual'),
     unsuppress: async (address: string) => lists.lift(address),
     suppression: async (address: string): Promise<Suppression | undefined> => {
       const found = (await lists.suppressed([address])).values().next().value
@@ -828,7 +879,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     },
   })
 
-  lists.connect({ enqueueMail: async mail => jobs.enqueue({ ...mail, via }), enqueueRun: async (run, key) => listJobs.enqueue({ ...run, via }, { key }), activate: () => listJobs.activate() })
+  lists.connect({ enqueueMail: async mail => jobs.enqueue({ ...await approve(mail), via }), enqueueRun: async (run, key) => listJobs.enqueue({ ...run, via }, { key }), activate: () => listJobs.activate() })
 
   // A getter, since `kay build` leaves a missing variable to throw where it is read.
   return Object.defineProperty(sending, 'configured', { get: () => (configured?.missing() ?? []).length === 0 && !senderless() }) as Mailer
