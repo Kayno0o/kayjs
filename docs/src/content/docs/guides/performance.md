@@ -93,11 +93,11 @@ The tab lists only what the running server serves. The CSP reports route shows w
 
 ## Data
 
-The Data tab shows the rows of your Postgres database. It reads the database `DATABASE_URL` points to, so an app on pg-orm needs no setup, and says so when the app has no Postgres database.
+The Data tab shows the rows of your databases, Postgres or SQLite. It reads the Postgres database `DATABASE_URL` points to, so an app on pg-orm needs no setup, and the SQLite files your app opened or keeps in `data/` (`data/auth.db` of the `app` preset, the files of mail, cms and ai). With more than one, a select above the tables switches between them. With none, it says where it looked.
 
 Pick a table to read its rows, 50 at a time, in the order of its primary key. Long values are cut and a binary column shows its first bytes and its size, so a big table stays light in the browser. `NULL` is shown apart from the text "NULL".
 
-Below the rows, a box runs a query. It takes one `SELECT`, `WITH`, `VALUES` or `TABLE`, runs it in a read-only transaction that gives up after 5 seconds, and shows at most 500 rows, each value cut in the database as in the rows view.
+Below the rows, a box runs a query. It takes one `SELECT`, `WITH`, `VALUES` or `TABLE`, runs it in a read-only transaction (a SQLite file is opened read-only) that gives up after 5 seconds, and shows at most 500 rows, each value cut in the database as in the rows view.
 
 Postgres itself refuses every write. A second statement after a `;`, `SET`, a `U&` escape and a list of functions that act outside the transaction (`set_config`, `pg_terminate_backend`, `pg_read_file` and others) are refused before they reach the database. That list works on the text and is no sandbox: a function it does not name, from an extension or your app, still runs with the rights of the connection. If that matters, give `DATABASE_URL` a role that cannot do it.
 

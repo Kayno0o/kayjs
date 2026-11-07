@@ -1,5 +1,9 @@
+import type { SqliteAnswer, SqliteTask } from './dev-sqlite-worker'
+import { closeSync, openSync, readdirSync, readSync } from 'node:fs'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { SQL } from 'bun'
+import { openedSqlite } from '../runtime/sqlite.server'
 import { isCrossSite } from './actions'
 
 const HEADER = 'x-kay-dev'
@@ -21,6 +25,12 @@ const ESCAPE_PREFIX = /E/i
 const DOLLAR_TAG = /^\$(?:[A-Z_]\w*)?\$/i
 const TRAILING_SEMICOLON = /;\s*$/
 const QUOTE = /"/g
+const SQLITE_URL = /^(?:sqlite:\/\/|file:)(.+)$/
+const SQLITE_FILE = /\.(?:db|sqlite3?)$/i
+const SQLITE_HEADER = 'SQLite format 3\0'
+const DATA_FOLDER = 'data'
+const POSTGRES_ID = 'postgres'
+const SQLITE_PREFIX = 'sqlite:'
 
 export interface DevColumn {
   name: string
@@ -38,8 +48,20 @@ export interface DevTable {
   columns: DevColumn[]
 }
 
+export interface DevDatabase {
+  // `postgres`, or `sqlite:` and the file's path from the app's folder.
+  id: string
+  label: string
+  kind: 'postgres' | 'sqlite'
+}
+
 export interface DevDataOverview {
   configured: boolean
+  databases: DevDatabase[]
+  // The id of the one whose tables are listed.
+  database: string | undefined
+  // Where the tool looked, said when it found no database.
+  searched: string[]
   tables: DevTable[]
 }
 
@@ -84,6 +106,103 @@ export function databaseUrl(): string | undefined {
   const url = process.env.DATABASE_URL
 
   return url !== undefined && POSTGRES_URL.test(url) ? url : undefined
+}
+
+function isSqliteFile(path: string): boolean {
+  let fd: number | undefined
+
+  try {
+    fd = openSync(path, 'r')
+    const head = Buffer.alloc(SQLITE_HEADER.length)
+
+    return readSync(fd, head, 0, head.length, 0) === head.length && head.toString('latin1') === SQLITE_HEADER
+  }
+  catch {
+    return false
+  }
+  finally {
+    if (fd !== undefined)
+      closeSync(fd)
+  }
+}
+
+function dataFiles(root: string): string[] {
+  try {
+    return readdirSync(join(root, DATA_FOLDER)).filter(name => SQLITE_FILE.test(name)).map(name => join(root, DATA_FOLDER, name))
+  }
+  catch {
+    return []
+  }
+}
+
+// What the Data tab can open: the app's Postgres, then every SQLite file the app named in `DATABASE_URL`, opened through `openSqlite` since it started, or kept in its `data` folder. A request only ever names one of these, never a path.
+export function databases(root: string): DevDatabase[] {
+  const found: DevDatabase[] = []
+  const files = new Set<string>()
+
+  if (databaseUrl() !== undefined)
+    found.push({ id: POSTGRES_ID, label: 'Postgres', kind: 'postgres' })
+
+  const named = SQLITE_URL.exec(process.env.DATABASE_URL ?? '')?.[1]
+
+  for (const path of [...named === undefined ? [] : [resolve(root, named)], ...openedSqlite(), ...dataFiles(root)]) {
+    const absolute = resolve(root, path)
+
+    if (!files.has(absolute) && isSqliteFile(absolute)) {
+      files.add(absolute)
+      const shown = relative(root, absolute)
+      const label = shown.startsWith('..') || isAbsolute(shown) ? absolute : shown
+
+      found.push({ id: `${SQLITE_PREFIX}${label}`, label, kind: 'sqlite' })
+    }
+  }
+
+  return found
+}
+
+function searched(root: string): string[] {
+  return [`DATABASE_URL (${process.env.DATABASE_URL === undefined ? 'not set' : 'not a postgres:// or sqlite:// address'})`, `the SQLite files the app opened`, `${join(root, DATA_FOLDER)}/*.db, *.sqlite and *.sqlite3`]
+}
+
+const sqliteFile = (root: string, id: string) => resolve(root, id.slice(SQLITE_PREFIX.length))
+
+// The database a request names (`db`, the first one when it names none), or the response that refuses it.
+function pick(root: string, name: string | null): DevDatabase | Response {
+  const all = databases(root)
+  const chosen = name === null ? all[0] : all.find(({ id }) => id === name)
+
+  return chosen ?? refused(name === null ? `the app has no database: ${searched(root).join(', ')} held none` : `${name} is not a database of the app`, 404)
+}
+
+// One read of a SQLite file in a worker of its own, stopped when it outruns the timeout.
+async function sqlite(path: string, task: SqliteTask): Promise<SqliteAnswer> {
+  const worker = new Worker(new URL('./dev-sqlite-worker.ts', import.meta.url))
+
+  try {
+    return await new Promise<SqliteAnswer>((done) => {
+      const timer = setTimeout(done, QUERY_TIMEOUT_MS, { error: `the query ran longer than ${QUERY_TIMEOUT_MS / 1000} seconds` })
+
+      worker.onmessage = ({ data }: MessageEvent<SqliteAnswer>) => {
+        clearTimeout(timer)
+        done(data)
+      }
+      worker.onerror = (event) => {
+        clearTimeout(timer)
+        done({ error: event.message })
+      }
+      worker.postMessage({ path, task })
+    })
+  }
+  finally {
+    worker.terminate()
+  }
+}
+
+function sqliteResponse(answer: SqliteAnswer): Response {
+  if ('error' in answer)
+    return refused(answer.error, answer.status ?? 400)
+
+  return 'rows' in answer ? Response.json(answer.rows) : Response.json('query' in answer ? answer.query : answer.tables)
 }
 
 function refused(error: string, status = 400): Response {
@@ -142,20 +261,39 @@ function cell(column: DevColumn): string {
   return `CASE WHEN length(${name}::text) > ${CELL_CHARS} THEN left(${name}::text, ${CELL_CHARS}) || '...' ELSE ${name}::text END AS ${name}`
 }
 
-// The tables of the app's database, or that it has none.
-export async function devData(request: Request): Promise<Response> {
+// The databases the app has and the tables of the one asked for (the first by default), or where the tool looked when it found none.
+export async function devData(request: Request, root: string): Promise<Response> {
   const denied = guarded(request)
 
   if (denied)
     return denied
 
-  const url = databaseUrl()
+  const all = databases(root)
 
-  if (url === undefined)
-    return Response.json({ configured: false, tables: [] } satisfies DevDataOverview)
+  if (all.length === 0)
+    return Response.json({ configured: false, databases: [], database: undefined, searched: searched(root), tables: [] } satisfies DevDataOverview)
+
+  const chosen = pick(root, new URL(request.url).searchParams.get('db'))
+
+  if (chosen instanceof Response)
+    return chosen
 
   try {
-    return Response.json({ configured: true, tables: await tables(connection(url)) } satisfies DevDataOverview)
+    let list: DevTable[]
+
+    if (chosen.kind === 'postgres') {
+      list = await tables(connection(databaseUrl()!))
+    }
+    else {
+      const answer = await sqlite(sqliteFile(root, chosen.id), { kind: 'tables' })
+
+      if (!('tables' in answer))
+        return refused('error' in answer ? answer.error : 'the file could not be read', 502)
+
+      list = answer.tables
+    }
+
+    return Response.json({ configured: true, databases: all, database: chosen.id, searched: [], tables: list } satisfies DevDataOverview)
   }
   catch (error) {
     return refused(error instanceof Error ? error.message : String(error), 502)
@@ -163,25 +301,28 @@ export async function devData(request: Request): Promise<Response> {
 }
 
 // One page of a table's rows, `PAGE_ROWS` at a time by the primary key when there is one, never the table whole.
-export async function devRows(request: Request): Promise<Response> {
+export async function devRows(request: Request, root: string): Promise<Response> {
   const denied = guarded(request)
 
   if (denied)
     return denied
 
-  const url = databaseUrl()
-
-  if (url === undefined)
-    return refused('the app has no Postgres database: DATABASE_URL is not set to one', 404)
-
   const params = new URL(request.url).searchParams
+  const chosen = pick(root, params.get('db'))
+
+  if (chosen instanceof Response)
+    return chosen
+
   const page = Number(params.get('page') ?? 0)
 
   if (!Number.isInteger(page) || page < 0 || page > MAX_PAGE)
     return refused('page is a whole number')
 
+  if (chosen.kind === 'sqlite')
+    return sqliteResponse(await sqlite(sqliteFile(root, chosen.id), { kind: 'rows', table: params.get('table') ?? '', page }))
+
   try {
-    const sql = connection(url)
+    const sql = connection(databaseUrl()!)
     const wanted = params.get('table') ?? ''
     const table = (await tables(sql)).find(({ schema, name }) => `${schema}.${name}` === wanted)
 
@@ -316,18 +457,13 @@ export function refusedQuery(text: string): string | undefined {
 }
 
 // Runs the box's query in a read-only transaction under a statement timeout, through a cursor so a large result is never read past `QUERY_ROWS` rows.
-export async function devQuery(request: Request): Promise<Response> {
+export async function devQuery(request: Request, root: string): Promise<Response> {
   const denied = guarded(request)
 
   if (denied)
     return denied
 
-  const url = databaseUrl()
-
-  if (url === undefined)
-    return refused('the app has no Postgres database: DATABASE_URL is not set to one', 404)
-
-  let body: { sql?: unknown }
+  let body: { sql?: unknown, db?: unknown }
 
   try {
     body = await request.json() as typeof body
@@ -344,10 +480,18 @@ export async function devQuery(request: Request): Promise<Response> {
   if (why !== undefined)
     return refused(why)
 
+  const chosen = pick(root, typeof body.db === 'string' ? body.db : null)
+
+  if (chosen instanceof Response)
+    return chosen
+
+  if (chosen.kind === 'sqlite')
+    return sqliteResponse(await sqlite(sqliteFile(root, chosen.id), { kind: 'query', sql: body.sql.replace(TRAILING_SEMICOLON, '') }))
+
   let reserved: Awaited<ReturnType<SQL['reserve']>> | undefined
 
   try {
-    reserved = await connection(url).reserve()
+    reserved = await connection(databaseUrl()!).reserve()
     await reserved.unsafe('BEGIN READ ONLY')
     await reserved.unsafe(`SET LOCAL statement_timeout = ${QUERY_TIMEOUT_MS}`)
     // Postgres refuses to make a transaction read-write once a query has run in it, so no spelling of that switch gets through; the text checks above are only a first refusal.

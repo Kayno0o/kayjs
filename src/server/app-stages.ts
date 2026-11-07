@@ -464,9 +464,9 @@ export async function serveDevRoutes(boot: Boot): Promise<void> {
   app.post(DEV_JOBS_DELETE, async ({ request }) => devJobAction(request, 'delete'))
   app.post(DEV_JOBS_SEND, async ({ request }) => devJobAction(request, 'send'))
   app.post(DEV_JOBS_CANCEL, async ({ request }) => devJobAction(request, 'cancel'))
-  app.get(DEV_DATA, async ({ request }) => devData(request))
-  app.get(DEV_DATA_ROWS, async ({ request }) => devRows(request))
-  app.post(DEV_DATA_QUERY, async ({ request }) => devQuery(request))
+  app.get(DEV_DATA, async ({ request }) => devData(request, root))
+  app.get(DEV_DATA_ROWS, async ({ request }) => devRows(request, root))
+  app.post(DEV_DATA_QUERY, async ({ request }) => devQuery(request, root))
   app.get(DEV_NOT_FOUND, async () => Response.json(await devNotFound(root, redirected)))
   app.post(DEV_NOT_FOUND, async ({ request }) => devRedirect(root, request, redirected))
   app.get(DEV_ROUTES, () => {

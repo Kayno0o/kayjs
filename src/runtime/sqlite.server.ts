@@ -1,12 +1,20 @@
 import type { Database } from 'bun:sqlite'
 import { closeSync, mkdirSync, openSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import process from 'node:process'
+
+const opened = new Set<string>()
+
+// The files this process opened through `openSqlite`, which the dev tool's Data tab lists.
+export function openedSqlite(): ReadonlySet<string> {
+  return opened
+}
 
 // A SQLite file several processes of the machine share, its directory created as needed, as `data/` is on a fresh checkout.
 // A new file is readable by the server's user alone, as are the journal files SQLite makes beside it with its mode.
 export function openSqlite(path: string): Database {
   if (path !== ':memory:' && path !== '') {
+    opened.add(resolve(path))
     mkdirSync(dirname(path), { recursive: true })
     closeSync(openSync(path, 'a', 0o600))
   }

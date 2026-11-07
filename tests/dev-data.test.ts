@@ -1,7 +1,9 @@
 import type { SQL } from 'bun'
 import type { DevDataOverview, DevQueryResult, DevRows } from '../src/server/dev-data'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
+import { Database } from 'bun:sqlite'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { closeDevData, refusedQuery } from '../src/server/dev-data'
 import { cleanUpAfterFile, postgres } from './job-stores'
@@ -15,10 +17,11 @@ cleanUpAfterFile()
 const HEADERS = { 'x-kay-dev': '1' }
 const SCHEMA = `kay_dev_data_${crypto.randomUUID().replaceAll('-', '').slice(0, 10)}`
 
-async function app(options: { dev: boolean, base?: string } = { dev: true }) {
+async function app(options: { dev: boolean, base?: string } = { dev: true }, prepare?: (dir: string) => void) {
   const dir = await scratchDir('dev-data-')
 
   await Bun.write(join(dir, 'routes/index.kay'), 'h1 Home\n')
+  prepare?.(dir)
 
   return pages({ root: dir, dirs: { routes: 'routes' }, prebuilt: false, security: false, ...options })
 }
@@ -29,8 +32,8 @@ async function get(site: App, path: string, headers: Record<string, string> = HE
   return site.handle(new Request(`http://localhost${path}`, { headers }))
 }
 
-async function query(site: App, sql: string, headers: Record<string, string> = HEADERS) {
-  return site.handle(new Request('http://localhost/_kay/dev/data/query', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ sql }) }))
+async function query(site: App, sql: string, headers: Record<string, string> = HEADERS, db?: string) {
+  return site.handle(new Request('http://localhost/_kay/dev/data/query', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ sql, db }) }))
 }
 
 describe('the query box\'s refusals', () => {
@@ -99,13 +102,17 @@ describe('the dev tool\'s database endpoints', () => {
     delete process.env.DATABASE_URL
     const site = await app()
 
-    expect(await (await get(site, '/_kay/dev/data')).json()).toEqual({ configured: false, tables: [] })
+    const overview = await (await get(site, '/_kay/dev/data')).json() as DevDataOverview
+
+    expect(overview).toMatchObject({ configured: false, databases: [], tables: [] })
+    expect(overview.searched.join(' ')).toContain('DATABASE_URL')
+    expect(overview.searched.join(' ')).toContain('data')
     expect((await get(site, '/_kay/dev/data/rows?table=public.users')).status).toBe(404)
     expect((await query(site, 'select 1')).status).toBe(404)
 
     process.env.DATABASE_URL = 'sqlite://data/app.sqlite'
 
-    expect(await (await get(site, '/_kay/dev/data')).json()).toEqual({ configured: false, tables: [] })
+    expect(await (await get(site, '/_kay/dev/data')).json()).toMatchObject({ configured: false, databases: [] })
   })
 
   it('refuses a request without the dev tool\'s header or from another site', async () => {
@@ -139,6 +146,123 @@ describe('the dev tool\'s database endpoints', () => {
     expect(text).toContain('export default')
     expect(text).not.toMatch(/^import /m)
     expect((await get(site, '/_kay/dev/tab/nothing.js')).status).toBe(404)
+  })
+
+  describe('on SQLite', () => {
+    let site: App
+    let dir: string
+
+    beforeAll(async () => {
+      delete process.env.DATABASE_URL
+      site = await app({ dev: true }, (root) => {
+        dir = root
+        mkdirSync(join(root, 'data'))
+        const db = new Database(join(root, 'data/auth.db'), { create: true })
+
+        db.run('CREATE TABLE users (id integer PRIMARY KEY, name text NOT NULL, bio text, avatar blob)')
+        db.run('INSERT INTO users (name, bio, avatar) VALUES (\'Ada\', NULL, x\'0102\')')
+        db.run('INSERT INTO users (name, bio, avatar) VALUES (\'Grace\', ?, randomblob(5000))', ['x'.repeat(1000)])
+        db.run('CREATE TABLE big (id integer PRIMARY KEY, label text)')
+        db.run('WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 10000) INSERT INTO big SELECT i, \'row \' || i FROM n')
+        db.run('CREATE TABLE loose (a, b)')
+        db.run('INSERT INTO loose VALUES (1, 2), (3, 4)')
+        db.close()
+        new Database(join(root, 'data/other.sqlite'), { create: true }).run('CREATE TABLE notes (id integer PRIMARY KEY, body text)')
+        writeFileSync(join(root, 'data/notes.db'), 'not a database')
+        writeFileSync(join(root, 'data/readme.txt'), 'SQLite format 3\0')
+      })
+    })
+
+    const dbQuery = async (sql: string, db = 'sqlite:data/auth.db') => await (await query(site, sql, HEADERS, db)).json() as DevQueryResult & { error?: string }
+    const rows = async (table: string, page = 0, db = 'sqlite:data/auth.db') => await (await get(site, `/_kay/dev/data/rows?db=${encodeURIComponent(db)}&table=${table}&page=${page}`)).json() as DevRows
+
+    it('lists the SQLite files of the data folder, leaving out what is not one', async () => {
+      const overview = await (await get(site, '/_kay/dev/data')).json() as DevDataOverview
+
+      expect(overview.configured).toBe(true)
+      expect(overview.databases.map(({ id }) => id)).toEqual(['sqlite:data/auth.db', 'sqlite:data/other.sqlite'])
+      expect(overview.database).toBe('sqlite:data/auth.db')
+      expect(overview.tables.map(({ name }) => name)).toEqual(['big', 'loose', 'users'])
+      expect(overview.tables.find(({ name }) => name === 'users')!.columns.map(({ name, primary }) => [name, primary])).toEqual([['id', true], ['name', false], ['bio', false], ['avatar', false]])
+    })
+
+    it('opens the database a request names, and refuses a path that is not listed', async () => {
+      const other = await (await get(site, '/_kay/dev/data?db=sqlite:data/other.sqlite')).json() as DevDataOverview
+
+      expect(other.tables.map(({ name }) => name)).toEqual(['notes'])
+      expect((await get(site, '/_kay/dev/data?db=sqlite:../etc/passwd')).status).toBe(404)
+      expect((await get(site, `/_kay/dev/data?db=sqlite:${join(dir, 'data/notes.db')}`)).status).toBe(404)
+      expect((await get(site, '/_kay/dev/data/rows?db=sqlite:data/notes.db&table=main.x')).status).toBe(404)
+      expect((await query(site, 'select 1', HEADERS, 'postgres')).status).toBe(404)
+    })
+
+    it('lists a file named by DATABASE_URL and one outside the data folder', async () => {
+      const named = join(dir, 'elsewhere.sqlite')
+
+      new Database(named, { create: true }).run('CREATE TABLE t (a)')
+      process.env.DATABASE_URL = `sqlite://${named}`
+
+      const overview = await (await get(site, '/_kay/dev/data')).json() as DevDataOverview
+
+      delete process.env.DATABASE_URL
+
+      expect(overview.databases[0]).toEqual({ id: 'sqlite:elsewhere.sqlite', label: 'elsewhere.sqlite', kind: 'sqlite' })
+      expect(overview.tables.map(({ name }) => name)).toEqual(['t'])
+    })
+
+    it('pages a table of 10000 rows 50 at a time', async () => {
+      const first = await rows('main.big')
+
+      expect(first.rows).toHaveLength(50)
+      expect(first.hasMore).toBe(true)
+      expect(first.rows[0]).toEqual(['1', 'row 1'])
+
+      const last = await rows('main.big', 199)
+
+      expect(last.rows.at(-1)).toEqual(['10000', 'row 10000'])
+      expect(last.hasMore).toBe(false)
+      expect((await rows('main.big', 200)).rows).toHaveLength(0)
+      expect((await rows('main.loose')).rows).toEqual([['1', '2'], ['3', '4']])
+    })
+
+    it('cuts a long text at 200 characters, a blob to a hex prefix and shows NULL apart from the text', async () => {
+      const { rows: users } = await rows('main.users')
+
+      expect(users[0]).toEqual(['1', 'Ada', null, '\\x0102 (2 bytes)'])
+      expect(users[1]![2]).toBe(`${'x'.repeat(200)}...`)
+      expect(users[1]![3]).toMatch(/^\\x[0-9a-f]{48}\.\.\. \(5000 bytes\)$/)
+    })
+
+    it('runs a reading query, cut and capped at 500 rows', async () => {
+      expect(await dbQuery('select name, bio from users order by id')).toMatchObject({ columns: ['name', 'bio'], rows: [['Ada', null], ['Grace', `${'x'.repeat(200)}...`]], truncated: false })
+      expect(await dbQuery('select 1 as a, 2 as a')).toMatchObject({ columns: ['a', 'a'], rows: [['1', '2']] })
+
+      const capped = await dbQuery('select * from big')
+
+      expect(capped.rows).toHaveLength(500)
+      expect(capped.truncated).toBe(true)
+    })
+
+    it('refuses what the Postgres box refuses, and every write, whatever the spelling', async () => {
+      for (const sql of ['delete from users', 'select 1; select 2', 'pragma writable_schema = 1', 'attach \'x.db\' as x', 'with a as (select 1) delete from users'])
+        expect((await query(site, sql, HEADERS, 'sqlite:data/auth.db')).status, sql).toBe(400)
+
+      expect((await dbQuery('select * from missing_table')).error).toContain('no such table')
+      expect((await rows('main.users')).rows).toHaveLength(2)
+    })
+
+    it('stops a query that outruns the 5 second timeout', async () => {
+      const slow = await dbQuery('with recursive n(i) as (select 1 union all select i + 1 from n) select count(*) from n')
+
+      expect(slow.error).toContain('longer than 5 seconds')
+      expect((await dbQuery('select 1')).rows).toEqual([['1']])
+    }, 15_000)
+
+    it('answers nothing in production', async () => {
+      const production = await app({ dev: false })
+
+      expect((await get(production, '/_kay/dev/data')).status).toBe(404)
+    })
   })
 
   describe.skipIf(URL_ENV === undefined)('on Postgres', () => {

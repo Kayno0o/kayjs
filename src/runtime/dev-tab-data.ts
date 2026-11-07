@@ -1,11 +1,15 @@
 import type { DevDataOverview, DevQueryResult, DevRows, DevTable } from '../server/dev-data'
 import type { DevTab, DevTool } from './dev-tool'
 
-// The Data tab's code, fetched the first time the tab opens: the tables of the app's database, a page of rows of one, and a box for a read-only query. It imports types only, as the browser loads it as it is.
+// The Data tab's code, fetched the first time the tab opens: the tables of one of the app's databases (Postgres or a SQLite file), a page of rows of one, and a box for a read-only query. It imports types only, as the browser loads it as it is.
 const HEADERS = { 'x-kay-dev': '1' }
 const SAMPLE = 'select * from '
 
-const label = (table: Pick<DevTable, 'schema' | 'name'>) => table.schema === 'public' ? table.name : `${table.schema}.${table.name}`
+const PLAIN_SCHEMAS = new Set(['public', 'main'])
+const POSTGRES_NOTE = 'Postgres refuses every write here and stops a query after 5 seconds. A few functions that act outside the transaction are refused by name; one that is not on that list (an extension\'s, or your own) still runs.'
+const SQLITE_NOTE = 'The file is opened read-only here and a query is stopped after 5 seconds.'
+
+const label = (table: Pick<DevTable, 'schema' | 'name'>) => PLAIN_SCHEMAS.has(table.schema) ? table.name : `${table.schema}.${table.name}`
 
 async function ask<Answer>(url: string, init?: RequestInit): Promise<Answer> {
   const response = await fetch(url, { cache: 'no-store', ...init, headers: { ...HEADERS, ...init?.headers } })
@@ -52,15 +56,19 @@ const failure = (error: unknown) => error instanceof Error ? error.message : Str
 
 export default function dataTab(tool: DevTool, tab: DevTab): () => void {
   const status = tool.make('div', 'note')
+  const databases = tool.make('select', 'tool')
   const picker = tool.make('div', 'chips')
   const rows = tool.make('div', 'stack')
   const input = tool.make('textarea', 'query')
   const run = tool.make('button', 'tool', 'Run query')
   const result = tool.make('div', 'stack')
-  const guarantee = tool.make('div', 'note', 'Postgres refuses every write here and stops a query after 5 seconds. A few functions that act outside the transaction are refused by name; one that is not on that list (an extension\'s, or your own) still runs.')
+  const guarantee = tool.make('div', 'note', POSTGRES_NOTE)
+  let database: string | undefined
   let shown: DevTable | undefined
   let page = 0
+  const dbParam = (separator: string) => database === undefined ? '' : `${separator}db=${encodeURIComponent(database)}`
 
+  databases.setAttribute('aria-label', 'Database')
   input.setAttribute('aria-label', 'Read-only SQL query')
   input.placeholder = 'select * from users limit 10'
   input.spellcheck = false
@@ -71,7 +79,7 @@ export default function dataTab(tool: DevTool, tab: DevTab): () => void {
       return
 
     try {
-      const found = await ask<DevRows>(`/_kay/dev/data/rows?table=${encodeURIComponent(`${shown.schema}.${shown.name}`)}&page=${page}`)
+      const found = await ask<DevRows>(`/_kay/dev/data/rows?table=${encodeURIComponent(`${shown.schema}.${shown.name}`)}&page=${page}${dbParam('&')}`)
       const previous = tool.make('button', 'tool', 'Previous')
       const next = tool.make('button', 'tool', 'Next')
       const actions = tool.make('div', 'actions')
@@ -113,7 +121,7 @@ export default function dataTab(tool: DevTool, tab: DevTab): () => void {
     run.disabled = true
 
     try {
-      const found = await ask<DevQueryResult>('/_kay/dev/data/query', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sql: input.value }) })
+      const found = await ask<DevQueryResult>('/_kay/dev/data/query', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sql: input.value, db: database }) })
 
       result.replaceChildren(found.columns.length === 0 ? tool.make('div', 'note', 'No rows.') : grid(tool, found.columns, found.rows), ...found.truncated ? [tool.make('div', 'note', `Only the first ${found.rows.length} rows are shown.`)] : [])
     }
@@ -130,7 +138,7 @@ export default function dataTab(tool: DevTool, tab: DevTab): () => void {
     const id = ++asked
 
     try {
-      const found = await ask<DevDataOverview>('/_kay/dev/data')
+      const found = await ask<DevDataOverview>(`/_kay/dev/data${dbParam('?')}`)
 
       if (id !== asked)
         return
@@ -138,9 +146,20 @@ export default function dataTab(tool: DevTool, tab: DevTab): () => void {
       picker.replaceChildren()
       tab.count(found.tables.length)
       input.hidden = run.hidden = guarantee.hidden = !found.configured
+      databases.hidden = found.databases.length < 2
+      database = found.database
+      databases.replaceChildren(...found.databases.map((one) => {
+        const option = tool.make('option', '', one.label)
+
+        option.value = one.id
+        option.selected = one.id === found.database
+
+        return option
+      }))
+      guarantee.textContent = found.databases.find(({ id }) => id === found.database)?.kind === 'sqlite' ? SQLITE_NOTE : POSTGRES_NOTE
 
       if (!found.configured) {
-        status.textContent = 'The app has no Postgres database: set DATABASE_URL to a postgres:// address to list its tables here.'
+        status.textContent = `The app has no database the tool can read. It looked in: ${found.searched.join('; ')}.`
         rows.replaceChildren()
 
         return
@@ -163,7 +182,16 @@ export default function dataTab(tool: DevTool, tab: DevTab): () => void {
     }
   }
 
-  tab.panel.append(status, picker, rows, input, run, guarantee, result)
+  databases.onchange = () => {
+    database = databases.value
+    shown = undefined
+    input.value = ''
+    rows.replaceChildren()
+    result.replaceChildren()
+    void list()
+  }
+
+  tab.panel.append(status, databases, picker, rows, input, run, guarantee, result)
 
   return () => void list()
 }
