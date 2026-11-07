@@ -215,7 +215,7 @@ A page that renders a resource shows the value at once. The server asks the rout
 
 The same goes for a route answering `cache-control: private` or `no-store`, one that sets a cookie, and one whose answer is over 64 KB as JSON: they stay `loading` and the browser asks them itself.
 
-Pass `seed: false` to a resource whose route should only be read by the browser itself, because reading it has an effect of its own. A prerendered page asks nothing. An `await` block reads the answers its page was rendered with, so a resource there shares them. A server island asks nothing and renders `loading`, so give its resources a `key` the page does not use.
+Pass `seed: false` to a resource whose route should only be read by the browser itself, because reading it has an effect of its own: it renders `loading` on the server. Every resource reading that route on the page needs it. A prerendered page asks nothing. An `await` block reads the answers its page was rendered with, so a resource there shares them. A server island asks nothing and renders `loading`, so give its resources a `key` the page does not use.
 
 Finding which routes a page reads takes a first render that is thrown away, so the expressions of an `await` block run once for each render, at most three, on a page with a `resource()` that is not prerendered.
 
