@@ -53,7 +53,7 @@ const shown = new Map<string, Shown>()
 
 // A job as its page reads it, or undefined for one whose `live` threw, which is left out rather than shown without what the page reads of it.
 function view(entry: Shown, row: StoredJobState): QueuedJob | undefined {
-  const base = { id: row.id, status: row.status === 'running' ? 'running' as const : 'waiting' as const, attempts: row.attempts, runAt: row.runAt }
+  const base = { id: row.id, status: row.status === 'running' ? 'running' as const : 'waiting' as const, attempts: row.attempts, runAt: new Date(row.runAt) }
   const job: LiveJob = {
     ...row.key !== undefined && { key: row.key },
     ...row.error !== undefined && { error: row.error },

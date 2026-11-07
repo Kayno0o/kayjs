@@ -7,6 +7,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### `resource()` asks its route while the page renders
 
 An island's `resource(api, '/path')` is now asked in process, as the visitor, while the server renders the page, and the island hydrates `ready` instead of rendering `loading` and asking from the browser. A route whose read must happen in the browser, because reading it records something or admits the reader as the cms editor's entry read does, takes `{ seed: false }` to keep the old behaviour: [read a route's answer in an island](api-from-islands.md#read-a-routes-answer-in-an-island).
+### kay `QueuedJob.runAt` is a `Date`
+
+The jobs `jobs(queue)` follows in an island carry `runAt` as a `Date` where they carried milliseconds: read `job.runAt.getTime()` for the number. The `JobStore` interface keeps milliseconds. No lint can see it: a type changing under a property is not visible to `kay check`.
 
 ### kayjs-ai `ConversationSummary.updatedAt` is a `Date`, and a store lists `ConversationRow`
 

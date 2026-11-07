@@ -451,8 +451,10 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
     this.view[1]({ list: live.map(record => record.row as Row), byKey: new Map(live.map(record => [record.k, record.row as Row])) })
     this.count[1](queued)
-    // A record written before `createdAt` has the time in milliseconds as `at`.
-    this.problems[1](issues.map(({ c: _, at, createdAt, ...issue }) => ({ ...issue, message: issueMessage(issue), createdAt: createdAt ?? new Date(at ?? 0) })))
+    // A record written before `createdAt` has the time in milliseconds as `at`; one with neither is dated by this read.
+    const read = new Date()
+
+    this.problems[1](issues.map(({ c: _, at, createdAt, ...issue }) => ({ ...issue, message: issueMessage(issue), createdAt: createdAt ?? (at === undefined ? read : new Date(at)) })))
     this.show(queued)
   }
 

@@ -20,6 +20,7 @@ kay [./server] StoredNotification
 kay [./server] pushSubscriptions
 kay [./test] TestOptions
 kay [.] LocalIssue
+kay [.] QueuedJob
 mail [./sqlite] openLists
 mail [.] ListStore
 mail [.] Suppression

@@ -206,7 +206,7 @@ for job of jobs<{ target: string }>('scans')
   p {job.payload.target}: {job.status}
 ```
 
-Each job is `{ id, key, status, attempts, runAt, error, progress, payload }`, `status` being `'waiting'` or `'running'`, earliest due first and 100 at most. `live: true` sends all of it. A function sends each job's `id`, `status`, `attempts` and `runAt`, and as its `payload` what the function returns. It gets the payload and `{ key, error, progress }` to pick from, so a token in the payload, an address in the key or a run's error message stays on the server unless you return it.
+Each job is `{ id, key, status, attempts, runAt, error, progress, payload }`, `status` being `'waiting'` or `'running'` and `runAt` a `Date`, earliest due first, 100 at most. `live: true` sends all of it. A function sends each job's `id`, `status`, `attempts` and `runAt`, and as its `payload` what the function returns. It gets the payload and `{ key, error, progress }` to pick from, so a token in the payload, an address in the key or an error message stays on the server unless you return it.
 
 The page proves the queue it read, as it does for any live value. Whoever may open the page may follow the list, so the page's guard decides who sees it. A queue without `live` cannot be read at all.
 

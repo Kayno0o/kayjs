@@ -15,8 +15,8 @@ export interface QueuedJob<Payload = unknown, Progress = unknown> {
   status: 'waiting' | 'running'
   // Runs started so far, the one going on included.
   attempts: number
-  // When it is due, in ms since the epoch.
-  runAt: number
+  // When it is due.
+  runAt: Date
   // Why its last run failed, for a job waiting for a retry.
   error?: string
   // What its run last reported.

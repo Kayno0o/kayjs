@@ -79,7 +79,7 @@ describe.each(kinds)('a queue with live, $name', ({ open }) => {
     await listed.enqueue({ n: 1, secret: 's' }, { key: 'one' })
     await listed.enqueue({ n: 2, secret: 's' }, { delay: '1ms' })
     await until(() => following.list().length === 2)
-    expect(following.list()[0]).toEqual({ id: expect.any(String) as string, status: 'waiting', attempts: 0, runAt: expect.any(Number) as number, payload: { n: 1 } })
+    expect(following.list()[0]).toEqual({ id: expect.any(String) as string, status: 'waiting', attempts: 0, runAt: expect.any(Date) as Date, payload: { n: 1 } })
     expect(JSON.stringify(following.list())).not.toContain('secret')
 
     await Bun.sleep(5)

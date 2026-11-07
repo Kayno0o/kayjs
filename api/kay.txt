@@ -886,7 +886,7 @@ interface QueuedJob<Payload = unknown, Progress = unknown>
   key?: string
   payload: Payload
   progress?: Progress
-  runAt: number
+  runAt: Date
   status: "running" | "waiting"
 
 [.] randomId
