@@ -632,6 +632,8 @@ export interface ResourceExtras<T> {
   initial?: T | undefined
   // Names the value: every resource with this key shares one request and one value, `mutate()` and `refresh()` reaching them all. A route's key is its URL, so two islands reading the same route and arguments already share; a `load` function shares only when given one.
   key?: string | undefined
+  // `false` keeps the server from asking the route: the resource renders `loading` and the browser asks it, for a route whose answer or side effects belong to the browser's own request, such as an editor reading the entry it edits.
+  seed?: boolean | undefined
   // Asks the route again quietly, the value kept and the status still `ready`, and stops with the component.
   revalidate?: Revalidation | readonly Revalidation[] | undefined
 }
@@ -887,7 +889,7 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
   const first = untrack(() => route ? optionsNow() : path) as (UrlInput & ResourceExtras<unknown>) | undefined
 
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
-    return serverResource(keyOf(first), route ? urlOf(first) : undefined, first?.initial === undefined ? undefined : { value: first.initial })
+    return serverResource(keyOf(first), route && first?.seed !== false ? urlOf(first) : undefined, first?.initial === undefined ? undefined : { value: first.initial })
 
   const [value, setValue] = ownSignal<unknown>(undefined, { equals: false })
   const [status, setStatus] = ownSignal<ResourceState>('loading')

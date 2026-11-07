@@ -47,6 +47,8 @@ const frozen = memo(() => named(true))
 const source = resource(entriesApi, '/:collection/:slug', {
   params: { collection: entry.collection, slug: entry.slug },
   query: entry.locale === undefined ? {} : { locale: entry.locale },
+  // The editor loads in the browser: reading the entry there is what admits its person to the room's names.
+  seed: false,
 })
 // A single collection's entry is the collection: no slug under its title, its locale still shown. Until the collection is known its slug is taken for a single one's when it is `index`, the only slug a single entry has, so that slug never flashes.
 const isSingle = () => { const loaded = source.value(); return loaded === undefined ? entry.slug === SINGLE_SLUG : loaded.collection.single === true }
@@ -66,7 +68,7 @@ onCleanup(onSaved.stop)
 // A click on the page types in the entry's text fields there while this form stands.
 onCleanup(registerInline(entryKey(entry), { collection: () => source.value()?.collection, failed: () => source.status() === 'failed', busy: () => saving() || removed() }))
 // What the signed-in person's role may not do, which locks the fields it covers once the server has said.
-const can = resource(editorApi, '/can')
+const can = resource(editorApi, '/can', { seed: false })
 // One scope for as long as the answer stands, so the fields render in the one the notices ask which fields are shown.
 const scope = memo(() => {
   const answer = source.value()

@@ -17,7 +17,8 @@ const files: Record<string, string> = {
 import { api } from 'kay/server'
 import { renderLocale } from 'kay/server'
 
-export const calls = { items: 0 }
+export const calls = { items: 0, entry: 0 }
+const admitted = new Set()
 
 export default api()
   .get('/items', async () => {
@@ -25,6 +26,13 @@ export default api()
 
     return { items: ['a', 'b'], locale: await renderLocale() }
   })
+  .get('/entry', ({ request }) => {
+    calls.entry++
+    admitted.add(request.headers.get('cookie'))
+
+    return { title: 'Hello world' }
+  })
+  .get('/names', ({ request }) => ({ names: admitted.has(request.headers.get('cookie')) ? ['Ann'] : [], count: 1 }))
   .get('/slow', async () => {
     await Bun.sleep(400)
 
@@ -139,6 +147,21 @@ const who = resource(data, '/who')
 ---
 p.who {who.value()?.cookie}|{who.value()?.language}
 `,
+  'src/components/Editor.kay': `---
+import { resource } from 'kay'
+import data from '../api/data'
+
+const entry = resource(data, '/entry', { seed: false })
+const room = resource(data, '/names')
+---
+p.entry {entry.status()}
+p.names {room.value()?.names.join(',')}/{room.value()?.count}
+`,
+  'src/routes/editor.kay': `---
+import Editor from '../components/Editor.kay'
+---
+Editor
+`,
   'src/routes/guarded.kay': `---
 import Guarded from '../components/Guarded.kay'
 ---
@@ -178,7 +201,7 @@ const sites = {
   compressed: await testSite({ dirs, styles: true, serve: { compress: true } }),
   localized: await testSite({ dirs, styles: true, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: join(dir, 'src/messages') } }),
 }
-const { calls } = await import(join(dir, 'src/api/data.ts')) as { calls: { items: number } }
+const { calls } = await import(join(dir, 'src/api/data.ts')) as { calls: { items: number, entry: number } }
 const SCRIPT = /<script type="application\/json" data-kay-resources>(.*?)<\/script>/s
 
 afterAll(async () => {
@@ -309,6 +332,16 @@ describe('the server render of resource()', () => {
 
     expect(response.headers.get('content-encoding')).toBe('gzip')
     expect(new TextDecoder().decode(Bun.gunzipSync(await response.arrayBuffer()))).toContain('<p class="big">ready</p>')
+  })
+
+  it('leaves a resource with seed: false to the browser, so its read admits nobody on the server', async () => {
+    const before = calls.entry
+    const html = await page(sites.plain, '/editor', { cookie: 'ann=1' })
+
+    expect(html).toContain('<p class="entry">loading</p>')
+    expect(html).toContain('<p class="names">/1</p>')
+    expect(calls.entry).toBe(before)
+    expect(seeds(html)).not.toHaveProperty(['/api/data/entry'])
   })
 
   it('forwards the visitor\'s cookie and language to the route', async () => {
