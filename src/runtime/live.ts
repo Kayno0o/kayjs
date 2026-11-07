@@ -4,7 +4,7 @@ import type { Seed } from './live-resource.server'
 import { ApiError, apiErrorOf, failed, refused, textOf, unreachable } from './api-error'
 import { withBase } from './base'
 import { trackCalls } from './call-result'
-import { connection, ending, listenerSet, onData } from './connection'
+import { connection, ended, listenerSet, onData } from './connection'
 import { durationSeconds } from './duration'
 import { serverResource } from './live-resource.server'
 import { pageData } from './page-data'
@@ -588,7 +588,7 @@ function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): Strea
   onMount(start)
   onCleanup(close)
 
-  return { last: link.last, status: link.status, pending: link.pending, error: link.error, retry: () => link.retry(() => void read()), on: link.on, onData: onData(link.on), ended: ending(link).ended, onOpen: opened.on, close, start }
+  return { last: link.last, status: link.status, pending: link.pending, error: link.error, retry: () => link.retry(() => void read()), on: link.on, onData: onData(link.on), ended: ended(link), onOpen: opened.on, close, start }
 }
 
 // Reads a route of a module under `src/api` answering with `eventStream()` from an island, once it is in the page, or with `start: false` each time `start()` is called: each value typed as the route sends it, Dates, Maps and Sets included.
@@ -637,7 +637,7 @@ export function stream(module: unknown, path?: string, options?: UrlInput & { me
     reader.start(opened(next))
   }
 
-  return { ...reader, onData: onData(link.on), ended: ending(link).ended, start }
+  return { ...reader, onData: onData(link.on), ended: ended(link), start }
 }
 
 // What a resource's status can be: it starts loading, so never idle.

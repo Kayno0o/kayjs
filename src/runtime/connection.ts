@@ -104,37 +104,14 @@ export function onData<T>(on: (listener: (value: T) => void) => () => void): (li
   return listener => on(value => listener({ value }))
 }
 
-type Link<T> = ReturnType<typeof connection<T>>
-
-// What a connection that ends can be waited on with, for a stream read to its end: `settled(then)` calls `then` with how it ended (`done`, `failed` or `closed`), at once when it has, and `ended()` resolves with the last value once it ran to its end (undefined when it sent none), rejects with its failure, or with an `AbortError` when `close()` came first.
-export function ending<T>(link: Link<T>) {
-  const waiting: ((status: ConnectionStatus) => void)[] = []
-
-  const settle = () => {
-    const now = untrack(link.status)
-
-    if (now === 'done' || now === 'failed' || now === 'closed') {
-      for (const then of waiting.splice(0))
-        then(now)
-    }
-  }
-
-  const settled = (then: (status: ConnectionStatus) => void) => {
-    waiting.push(then)
-    settle()
-  }
-
-  link.watch(settle)
-
-  return {
-    settled,
-    ended: async () => new Promise<T | undefined>((resolve, reject) => settled((final) => {
-      if (final === 'done')
-        resolve(untrack(link.last))
-      else
-        reject(final === 'failed' ? untrack(link.error) : new DOMException('The stream was closed before its end', 'AbortError'))
-    })),
-  }
+// What `ended()` of a stream is: it resolves with the last value once the connection ran to its end (undefined when it sent none), rejects with its failure, or with an `AbortError` when `close()` came first.
+export function ended<T>(link: ReturnType<typeof connection<T>>) {
+  return async () => new Promise<T | undefined>((resolve, reject) => link.settled((final) => {
+    if (final === 'done')
+      resolve(untrack(link.last))
+    else
+      reject(final === 'failed' ? untrack(link.error) : new DOMException('The stream was closed before its end', 'AbortError'))
+  }))
 }
 
 // The state a source that opens, delivers values and drops keeps: the listener set and the last value, the status and the last failure as signals and the backoff of a reconnect.
@@ -147,11 +124,18 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
   let attempt = 0
   let cancel: (() => void) | undefined
   let waiting = false
-  let changed: (() => void) | undefined
+  const ends: ((status: ConnectionStatus) => void)[] = []
 
   const stop = () => {
     waiting = false
     cancel?.()
+  }
+
+  const flush = (now: ConnectionStatus) => {
+    if (now === 'done' || now === 'failed' || now === 'closed') {
+      for (const then of ends.splice(0))
+        then(now)
+    }
   }
 
   // Leaves the state to `next` unless `close()` came first.
@@ -163,7 +147,7 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
       setError(undefined)
 
     setStatus(next)
-    changed?.()
+    flush(next)
   }
 
   const fail = (failure: ApiError) => {
@@ -172,7 +156,7 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
 
     setError(failure)
     setStatus('failed')
-    changed?.()
+    flush('failed')
   }
 
   return {
@@ -181,9 +165,10 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
     pending: () => status() === 'connecting',
     error,
     on: listeners.on,
-    // Calls `fn` each time the status becomes `done`, `failed` or `closed`; `ending` builds on it.
-    watch: (fn: () => void) => {
-      changed = fn
+    // Calls `then` with how the connection ended (`done`, `failed` or `closed`), at once when it has.
+    settled: (then: (status: ConnectionStatus) => void) => {
+      ends.push(then)
+      flush(untrack(status))
     },
     // Delivers a value to every listener; one that throws leaves the others and the connection alone.
     receive: (value: T) => {

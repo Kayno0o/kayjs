@@ -442,7 +442,19 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
   return trackCalls(
     call as (input: unknown, options?: CallOptions) => Promise<unknown>,
     error => !(error instanceof ActionError) || error instanceof ActionRedirectError || refusedAt.get(error) !== url() ? undefined : { ok: false, status: error.status, message: error.message, errors: error.errors, data: error.data },
-    (data, release) => onStreamEnd(data, release),
+    (data, release, take) => {
+      const held = onStreamEnd(data, release)
+
+      // A stream retried is in flight again until it ends once more.
+      if (held) {
+        (data as ActionStream<unknown>).onOpen(() => {
+          take()
+          onStreamEnd(data, release)
+        })
+      }
+
+      return held
+    },
     error => error instanceof ActionRedirectError || superseding.has(error as object),
   )
 }
@@ -518,8 +530,6 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
   })
 }
 
-const streams = (response: Response) => response.ok && response.headers.get('content-type')?.startsWith('text/event-stream') === true
-
 // What a call to `action` got back: the handler's result, or an `ActionError` with the refused fields and the failure data.
 // `left` tells whether the visitor went to another page since the call was made, which a redirect then no longer takes them from; a stream closes with the island that called, else once another path is shown.
 // `call` posts the action again, which a stream that failed does when it is retried.
@@ -545,19 +555,11 @@ export async function readActionResponse<Output>(response: Response, action: str
   }
 
   // Loaded only once an action streams, so a page calling none does not carry it.
-  if (streams(response)) {
+  if (response.ok && response.headers.get('content-type')?.startsWith('text/event-stream') === true) {
     const retrying = call && {
+      send: call,
       // What is not a stream again is the retry's failure: a refusal throws its `ActionError`, a redirect is followed.
-      send: async () => {
-        const next = await call()
-
-        if (streams(next))
-          return next
-
-        await readActionResponse(next, action, left, caller)
-
-        throw new TypeError(`kay: ${action} did not stream when it was called again`)
-      },
+      read: async (next: Response) => readActionResponse(next, action, left, caller),
       begun: (again: ActionStream<unknown> & Settles) => {
         closeWithCaller(again, caller)
         caller?.retried?.(again)

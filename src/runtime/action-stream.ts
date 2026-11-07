@@ -2,7 +2,7 @@ import type { ActionStream, SETTLED, Settles } from './action'
 import type { ApiError } from './api-error'
 import type { ConnectionStatus } from './live'
 import { apiErrorOf } from './api-error'
-import { connection, ending, listenerSet, onData } from './connection'
+import { connection, ended, listenerSet, onData } from './connection'
 import { decodeServerValue } from './wire'
 
 const DATA = 'data: '
@@ -11,9 +11,10 @@ const ERROR = 'event: error'
 // A proxy may rewrite the line breaks kay sends as \r\n.
 const LINE_BREAK = /\r?\n/
 
-// How to call the action again: `send` posts it as the first call was and hands the answer, throwing the error of a refusal or of no answer, and `begun` runs with the stream when a new answer starts being read.
+// How to call the action again: `send` posts it as the first call was and hands the answer, throwing the error of no answer, `read` reads an answer that is not a stream, which throws what a refusal throws, and `begun` runs with the stream when a new answer starts being read.
 export interface Retrying<T> {
   send: () => Promise<Response>
+  read: (answer: Response) => Promise<unknown>
   begun: (stream: ActionStream<T> & Settles) => void
 }
 
@@ -21,7 +22,6 @@ export interface Retrying<T> {
 // Values arriving before the first `on()`, until the task the call resolved in ends, go to it when it comes. `failure` is what `ended()` rejects with for a stream that failed, an `ActionError` its caller makes.
 export function actionStream<T>(response: Response, settled: typeof SETTLED, failure: () => Error, retrying?: Retrying<T>): ActionStream<T> & Settles {
   const link = connection<T>(() => undefined, false)
-  const { ended, settled: whenSettled } = ending(link)
   const opened = listenerSet<boolean>()
   let early: T[] | undefined
   let run = 0
@@ -62,6 +62,12 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
   async function send(stream: ActionStream<T> & Settles) {
     try {
       const next = await retrying!.send()
+
+      if (!next.ok || next.headers.get('content-type')?.startsWith('text/event-stream') !== true) {
+        await retrying!.read(next)
+
+        throw new TypeError('kay: the action did not stream when it was called again')
+      }
 
       if (link.status() !== 'connecting') {
         void next.body?.cancel()
@@ -113,8 +119,8 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED, fai
     onData: onData(on),
     onOpen: opened.on,
     close,
-    ended,
-    [settled]: whenSettled,
+    ended: ended(link),
+    [settled]: link.settled,
   }
 
   return self

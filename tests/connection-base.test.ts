@@ -6,7 +6,7 @@ import { flush, root } from '../src/runtime'
 import { ActionError, readActionResponse, SETTLED } from '../src/runtime/action'
 import { actionStream } from '../src/runtime/action-stream'
 import { ApiError } from '../src/runtime/api-error'
-import { ending, onData } from '../src/runtime/connection'
+import { ended, onData } from '../src/runtime/connection'
 import { openSocket, readEvents, stream } from '../src/runtime/live'
 import { eventually, turn } from './helpers/eventually'
 
@@ -49,7 +49,7 @@ const failure = () => new ApiError(500, 'The stream failed')
 function reading<T>(...args: Parameters<typeof readEvents<T>>) {
   const { link, ...reader } = readEvents<T>(...args)
 
-  return { ...reader, onData: onData(link.on), ended: ending(link).ended }
+  return { ...reader, onData: onData(link.on), ended: ended(link) }
 }
 
 describe('ended() of a stream', () => {
@@ -285,6 +285,7 @@ describe('an action\'s stream', () => {
 
           return answer(10, 20)
         },
+        read: async () => undefined,
         begun: () => void begun.push('begun'),
       })
       const seen: number[] = []
@@ -319,7 +320,7 @@ describe('an action\'s stream', () => {
       return answer(1)
     }
     const open = held(1)
-    const running = actionStream<number>(open.response, SETTLED, failure, { send, begun: () => undefined })
+    const running = actionStream<number>(open.response, SETTLED, failure, { send, read: async () => undefined, begun: () => undefined })
 
     await eventually(() => expect(running.last()).toBe(1))
     running.retry()
@@ -327,7 +328,7 @@ describe('an action\'s stream', () => {
     await running.ended()
     running.retry()
 
-    const closed = actionStream<number>(held(1).response, SETTLED, failure, { send, begun: () => undefined })
+    const closed = actionStream<number>(held(1).response, SETTLED, failure, { send, read: async () => undefined, begun: () => undefined })
 
     closed.close()
     closed.retry()
@@ -362,6 +363,7 @@ describe('an action\'s stream', () => {
 
           return answer(5)
         },
+        read: async () => undefined,
         begun: () => undefined,
       })
 
@@ -388,7 +390,7 @@ describe('an action\'s stream', () => {
       const gate = Promise.withResolvers<Response>()
       const body = held(1)
       const cancelled = spyOn(body.response.body!, 'cancel')
-      const acted = actionStream<number>(new Response('', { headers: { 'content-type': 'text/event-stream' } }), SETTLED, failure, { send: async () => gate.promise, begun: () => undefined })
+      const acted = actionStream<number>(new Response('', { headers: { 'content-type': 'text/event-stream' } }), SETTLED, failure, { send: async () => gate.promise, read: async () => undefined, begun: () => undefined })
 
       await eventually(() => expect(acted.status()).toBe('failed'))
       acted.retry()
@@ -407,7 +409,7 @@ describe('an action\'s stream', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      const acted = actionStream<number>(new Response('', { headers: { 'content-type': 'text/event-stream' } }), SETTLED, failure, { send: async () => answer(1), begun: () => undefined })
+      const acted = actionStream<number>(new Response('', { headers: { 'content-type': 'text/event-stream' } }), SETTLED, failure, { send: async () => answer(1), read: async () => undefined, begun: () => undefined })
       const ends: string[] = []
 
       acted[SETTLED](status => void ends.push(status))
