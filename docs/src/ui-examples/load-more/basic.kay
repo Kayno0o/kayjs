@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import { infiniteList } from '@kaynooo/kayjs-ui'
 import LoadMore from '@kaynooo/kayjs-ui/load-more.kay'
 

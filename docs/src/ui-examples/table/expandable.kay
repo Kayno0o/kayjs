@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import Table from '@kaynooo/kayjs-ui/table.kay'
 import type { Column } from '@kaynooo/kayjs-ui'
 

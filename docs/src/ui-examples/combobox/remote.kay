@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
 
 const people = ['Ada Lovelace', 'Alan Turing', 'Grace Hopper', 'Edsger Dijkstra', 'Barbara Liskov', 'Donald Knuth', 'Margaret Hamilton']

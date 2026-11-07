@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import Button from '@kaynooo/kayjs-ui/button.kay'
 import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
 

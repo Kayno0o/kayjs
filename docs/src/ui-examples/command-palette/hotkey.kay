@@ -1,5 +1,4 @@
----
-// kay-island
+--- island
 import CommandPalette from '@kaynooo/kayjs-ui/command-palette.kay'
 import type { PaletteEntry } from '@kaynooo/kayjs-ui'
 import { toast } from '@kaynooo/kayjs-ui'
