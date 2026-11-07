@@ -1,32 +1,23 @@
 import type { LogEntry } from '../src/server/log'
-import { existsSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { logSink, setLogSink } from '../src/runtime/log'
-import { dropStore, NOT_FOUND_FILE } from '../src/server/not-found'
+import { dropStore } from '../src/server/not-found'
 import { eventually } from './helpers/eventually'
+import { scratchStore } from './helpers/scratch-store'
 import { pages } from './shared-pages'
 
 const PRODUCTION = 'tests/fixtures/production'
 const KEY = 'k'.repeat(40)
 const HEADER = 'x-upstream-key'
 
-// The production servers built here count the paths they answered 404 in the working folder's store, which this file leaves as it found it.
-const storeKept = existsSync(NOT_FOUND_FILE)
-const folderKept = existsSync(dirname(NOT_FOUND_FILE))
+const STORE = await scratchStore()
 
-afterAll(async () => {
+afterAll(() => {
   dropStore()
-
-  if (!storeKept)
-    await rm(NOT_FOUND_FILE, { force: true })
-
-  // The store opens its folder too, which stays behind empty.
-  if (!folderKept)
-    await rm(dirname(NOT_FOUND_FILE), { force: true, recursive: true })
 })
 
 type Options = NonNullable<Parameters<typeof pages>[0]>
@@ -45,7 +36,7 @@ async function served(env: Record<string, string | undefined>, options: Options)
   }
 
   try {
-    return await pages({ root: PRODUCTION, prebuilt: false, ...options })
+    return await pages({ root: PRODUCTION, prebuilt: false, store: STORE, ...options })
   }
   finally {
     for (const [index, name] of names.entries()) {

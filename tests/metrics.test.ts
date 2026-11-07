@@ -1,6 +1,3 @@
-import { existsSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
-import { dirname } from 'node:path'
 import process from 'node:process'
 import { afterAll, afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
@@ -8,16 +5,15 @@ import { cacheReads, countJobRun, countQueueRun, jobRuns, queueRuns } from '../s
 import { liveConnections } from '../src/server/live'
 import { statusOf } from '../src/server/log'
 import { metricsAllowed } from '../src/server/metrics'
-import { dropStore, NOT_FOUND_FILE } from '../src/server/not-found'
+import { dropStore } from '../src/server/not-found'
+import { scratchStore } from './helpers/scratch-store'
 import { pages } from './shared-pages'
 
 const PRODUCTION = 'tests/fixtures/production'
 const KEY = 'k'.repeat(40)
 const TOKEN = 't'.repeat(40)
 
-// The production servers built here count the paths they answered 404 in the working folder's store, which this file leaves as it found it.
-const storeKept = existsSync(NOT_FOUND_FILE)
-const folderKept = existsSync(dirname(NOT_FOUND_FILE))
+const STORE = await scratchStore()
 
 type Options = NonNullable<Parameters<typeof pages>[0]>
 
@@ -30,15 +26,8 @@ afterEach(async () => {
   await Promise.all(stops.splice(0).map(async stop => stop()))
 })
 
-afterAll(async () => {
+afterAll(() => {
   dropStore()
-
-  if (!storeKept)
-    await rm(NOT_FOUND_FILE, { force: true })
-
-  // The store opens its folder too, which stays behind empty.
-  if (!folderKept)
-    await rm(dirname(NOT_FOUND_FILE), { force: true, recursive: true })
 })
 
 // A production server on a real socket, so requests carry the address they came from.
@@ -46,7 +35,7 @@ async function listening(options: Options, env: Record<string, string> = {}) {
   process.env.NODE_ENV = 'production'
   Object.assign(process.env, env)
 
-  const app = new Elysia().use(await pages({ root: PRODUCTION, prebuilt: false, observe: { log: false }, ...options })).listen({ port: 0, hostname: '127.0.0.1' })
+  const app = new Elysia().use(await pages({ root: PRODUCTION, prebuilt: false, store: STORE, observe: { log: false }, ...options })).listen({ port: 0, hostname: '127.0.0.1' })
 
   stops.push(async () => app.stop())
 
@@ -106,7 +95,7 @@ describe('metrics', () => {
 
     process.env.NODE_ENV = 'production'
 
-    const app = await pages({ root: PRODUCTION, prebuilt: false, metrics: true })
+    const app = await pages({ root: PRODUCTION, prebuilt: false, store: STORE, metrics: true })
 
     expect((await app.handle(new Request('http://localhost/metrics'))).status).toBe(403)
   })

@@ -1,11 +1,12 @@
 import * as fs from 'node:fs'
 import { existsSync, statSync } from 'node:fs'
-import { chmod, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
-import { dropStore, NOT_FOUND_FILE } from '../src/server/not-found'
+import { dropStore } from '../src/server/not-found'
 import { testSite } from '../src/test'
+import { scratchStore } from './helpers/scratch-store'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -16,18 +17,10 @@ const HEADER = 'x-upstream-key'
 const PROXY_KEY = 'p'.repeat(40)
 const VARIABLES = ['NODE_ENV', 'KAY_MCP_KEY', 'KAY_MCP_KEY_FILE', 'KAY_PROXY_KEY', 'KAY_PROXY_KEY_FILE']
 
-// A production server counts the paths it answered 404 in the working folder's store, which this file leaves as it found it.
-const storeKept = existsSync(NOT_FOUND_FILE)
-const folderKept = existsSync(dirname(NOT_FOUND_FILE))
+const STORE = await scratchStore()
 
-afterAll(async () => {
+afterAll(() => {
   dropStore()
-
-  if (!storeKept)
-    await rm(NOT_FOUND_FILE, { force: true })
-
-  if (!folderKept)
-    await rm(dirname(NOT_FOUND_FILE), { force: true, recursive: true })
 })
 
 type Options = NonNullable<Parameters<typeof pages>[0]>
@@ -46,7 +39,7 @@ async function served(env: Record<string, string | undefined>, options: Options)
   }
 
   try {
-    return await pages({ root: ROOT, prebuilt: false, ...options })
+    return await pages({ root: ROOT, prebuilt: false, store: STORE, ...options })
   }
   finally {
     for (const [index, name] of VARIABLES.entries()) {
