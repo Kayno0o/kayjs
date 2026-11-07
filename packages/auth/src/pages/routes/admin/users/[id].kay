@@ -148,7 +148,7 @@ PageSection(title={wording('auth.admin.user.roles', 'Roles')})
 if !own && (!found.admin || user.ban)
   PageSection(title={wording('auth.admin.user.ban', 'Suspend the account')})
     if user.ban
-      p {user.ban.until ? wording('auth.admin.user.bannedUntil', 'Suspended until {date}.', { date: date(user.ban.until) }) : wording('auth.admin.user.banned', 'Suspended since {date}.', { date: date(user.ban.at) })}
+      p {user.ban.until ? wording('auth.admin.user.bannedUntil', 'Suspended until {date}.', { date: date(user.ban.until) }) : wording('auth.admin.user.banned', 'Suspended since {date}.', { date: date(user.ban.bannedAt) })}
       if user.ban.reason
         p.text-muted {user.ban.reason}
       form(action={unban})

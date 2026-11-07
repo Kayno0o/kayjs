@@ -143,7 +143,7 @@ describe('admin', () => {
     const { admin, ada, browser, told, store } = await setup()
     const { token } = await ada.browser.callOk('tokens.create', { password: PASSWORD }, 'Phone')
 
-    expect(await admin.browser.post('/ban', { id: ada.id, reason: ' spam ' })).toMatchObject({ ok: true, user: { ban: { reason: 'spam', until: null } } })
+    expect(await admin.browser.post('/ban', { id: ada.id, reason: ' spam ' })).toMatchObject({ ok: true, user: { ban: { reason: 'spam', until: null, bannedAt: expect.any(String) } } })
     expect(await ada.browser.json('/me')).toBe('anonymous')
     expect(await browser().json('/me', { headers: { authorization: `Bearer ${token}` } })).toBe('anonymous')
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'banned' })

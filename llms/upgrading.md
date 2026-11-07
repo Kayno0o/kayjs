@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.92.0
 
+### kayjs-auth `ban.at` is `ban.bannedAt`
+
+The `ban` of an admin's `User` and of the data export is `{ bannedAt, until, reason }`: `at` is now `bannedAt`, the same name as `UserRecord.bannedAt`. No lint can see it: a property read on a value is not visible to `kay check`.
+
 ### kayjs-cms `Recovery.at` is `editedAt`, a `Date`
 
 `cmsDrafts().recovery(ref)` answers `{ editedAt, restored }`, `editedAt` a `Date` where `at` was milliseconds: a notice reading `recovery.at` reads `recovery.editedAt`. No lint can see it: a property read on a value is not visible to `kay check`.

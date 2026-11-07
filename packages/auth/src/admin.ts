@@ -17,7 +17,7 @@ const BAN_REASON_MAX_LENGTH = 500
 export interface ManagedUser extends BareUser {
   createdAt: Date
   // Set while the user is barred from signing in, `until` null for good.
-  ban: { at: Date, until: Date | null, reason: string | null } | null
+  ban: { bannedAt: Date, until: Date | null, reason: string | null } | null
 }
 
 // `forbidden` when the user asking does not meet the `admin` option, acts as someone else or came with a bearer token, `two-factor-required` when `twoFactor.require` names them and they have not turned it on.
@@ -38,7 +38,7 @@ export function managedUser(record: UserRecord): ManagedUser {
   return {
     ...publicUser(record),
     createdAt: record.createdAt,
-    ban: banned(record) ? { at: record.bannedAt!, until: record.bannedUntil, reason: record.banReason } : null,
+    ban: banned(record) ? { bannedAt: record.bannedAt!, until: record.bannedUntil, reason: record.banReason } : null,
   }
 }
 

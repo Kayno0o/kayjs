@@ -942,7 +942,7 @@ function createWsAuthStore<T>(verify: (token: string, ws: Ws) => Promise<T | nul
 interface DataExport
   app: unknown
   audit: AuditEntry[]
-  ban: null | { at: Date; until: Date | null; reason: null | string; }
+  ban: null | { bannedAt: Date; until: Date | null; reason: null | string; }
   exportedAt: Date
   grants: ApprovedClient[]
   identities: { provider: string; providerId: string; createdAt: Date; }[]
@@ -1294,7 +1294,7 @@ type MailRequestResult = { ok: true } | { ok: false, error: 'limited' | 'captcha
 
 [.] ManagedUser
 interface ManagedUser extends BareUser
-  ban: null | { at: Date; until: Date | null; reason: null | string; }
+  ban: null | { bannedAt: Date; until: Date | null; reason: null | string; }
   createdAt: Date
   data: Record<string, unknown>
   email: null | string

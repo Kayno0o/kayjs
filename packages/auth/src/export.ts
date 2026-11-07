@@ -33,7 +33,7 @@ export interface DataExport {
   // The apps the user approved to act as them; empty without an OAuth server.
   grants: ApprovedClient[]
   // The last ban an admin set, with the reason given, once its time has passed: a user under a ban in force cannot sign in to export. Null when never barred.
-  ban: { at: Date, until: Date | null, reason: string | null } | null
+  ban: { bannedAt: Date, until: Date | null, reason: string | null } | null
   // Empty without the `organizations` option.
   organizations: Membership[]
   // The invitations to the user's address, expired ones included, and those they sent; empty without the `organizations` option.
@@ -81,7 +81,7 @@ export async function exportData(state: RequestState): Promise<ExportResult> {
       tokens: await listTokens(state),
       recoveryCodesLeft: await core.store.recoveryCodes.count(record.id),
       grants: core.store.oauth ? await (await import('./authorize/grants')).approvedClients(state) : [],
-      ban: record.bannedAt === null ? null : { at: record.bannedAt, until: record.bannedUntil, reason: record.banReason },
+      ban: record.bannedAt === null ? null : { bannedAt: record.bannedAt, until: record.bannedUntil, reason: record.banReason },
       organizations: organizations ? await organizations.listMemberships(state) : [],
       invitations: organizations ? await organizations.exportedInvitations(state) : { received: [], sent: [] },
       notifications: await notifications.list(record.id, { limit: NOTIFICATIONS_EXPORT_MAX }),
