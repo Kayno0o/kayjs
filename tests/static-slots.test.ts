@@ -132,6 +132,6 @@ describe('static slots', () => {
   it('still refuses a layout passing an island a function, naming the fix', async () => {
     const { default: Layout } = await import(join(fixtures, 'refused/_layout.kay')) as { default: (props: object) => unknown }
 
-    expect(() => child(Layout({}))).toThrow(new IslandPropsError('tests/fixtures/slots/picker.kay is interactive, so it renders as an island: its `format` prop is a function and cannot reach the browser; write `--- island` in the component passing it, which then renders as an island and sends its own props in its place, or pass the island data (`kay check` reports it as `island-prop`)'))
+    expect(() => child(Layout({}))).toThrow(new IslandPropsError('tests/fixtures/slots/picker.kay is interactive, so it renders as an island: its `format` prop is a function and cannot reach the browser; write `--- island` in the component passing it (a page or a layout passes it through a component of its own), which then renders as an island and sends its own props in its place, or pass the island data (`kay check` reports it as `island-prop`)'))
   })
 })

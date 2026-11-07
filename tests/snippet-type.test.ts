@@ -108,7 +108,7 @@ describe('Snippet', () => {
     expect(await problems({
       'src/routes/index.kay': '--- server\nimport Toggle from \'../toggle.kay\'\n---\nToggle\n  @row(name)\n    b {name}\n',
       'src/toggle.kay': island,
-    })).toEqual([['src/routes/index.kay', 5, 'TS2345']])
+    })).toEqual([['src/routes/index.kay', 5, 'island-prop']])
   })
 
   it('refuses a block with parameters from a layout, and allows it from a static component the island promotes', async () => {
@@ -118,7 +118,7 @@ describe('Snippet', () => {
       'src/routes/_layout.kay': '---\nimport Toggle from \'../toggle.kay\'\n---\nToggle\n  @row(name)\n    b {name}\nslot\n',
       'src/routes/index.kay': 'p x\n',
       'src/toggle.kay': island,
-    })).toEqual([['src/routes/_layout.kay', 5, 'TS2345']])
+    })).toEqual([['src/routes/_layout.kay', 5, 'island-prop']])
     expect(await problems({
       'src/routes/index.kay': '---\nimport Wrap from \'../wrap.kay\'\n---\nWrap\n',
       'src/wrap.kay': '--- island\nimport Toggle from \'./toggle.kay\'\n---\nToggle\n  @row(name)\n    b {name}\n',
