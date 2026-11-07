@@ -228,6 +228,39 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a form an 
     expect(await page.evaluate(() => document.querySelectorAll('form.built input[name="kay_since"]').length)).toBe(1)
   })
 
+  it('drops a slow answer for the form\'s action once a submitter asked for another', async () => {
+    await using page = await site.open('/', { path })
+
+    await page.click('button.show')
+    await page.waitFor('form.multi')
+    await page.evaluate((slow: string) => {
+      const real = window.fetch.bind(window)
+      const sent: string[][] = []
+
+      Object.assign(window, {
+        sent,
+        fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+          if (String(input).endsWith(slow))
+            await new Promise(resolve => setTimeout(resolve, 1200))
+
+          return real(input, init)
+        },
+      })
+      // The post never goes out, so the form stays to be read.
+      XMLHttpRequest.prototype.send = function (body) {
+        sent.push(body instanceof FormData || body instanceof URLSearchParams ? [...body.keys()] : [])
+      }
+      const form = document.querySelector('form.multi') as HTMLFormElement
+
+      form.querySelector('input')!.focus()
+      form.requestSubmit(form.querySelector('button.alt'))
+    }, guarded.url.replace('/_kay/action/', '/_kay/fields/'))
+    await page.evaluate(async () => new Promise(resolve => setTimeout(resolve, 1800)))
+    expect(await page.evaluate(() => document.querySelectorAll('form.multi input[name="kay_since"]').length)).toBe(0)
+    expect(await page.evaluate(() => document.querySelectorAll('form.multi input[name="website"]').length)).toBe(1)
+    expect(await page.evaluate(() => (window as unknown as { sent: string[][] }).sent.flat().includes('kay_since'))).toBe(false)
+  })
+
   it('asks for the action a submitter names, not the form\'s', async () => {
     await using page = await site.open('/', { path })
 

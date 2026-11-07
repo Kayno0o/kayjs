@@ -29,15 +29,25 @@ export async function protectForm(form: HTMLFormElement, url: URL): Promise<void
 
   let request = asking.get(form)
 
-  if (request?.path !== path)
-    asking.set(form, request = { path, done: addFields(form, path) })
+  if (request?.path !== path) {
+    request = { path, done: Promise.resolve() }
+    asking.set(form, request)
+    request.done = addFields(form, request)
+  }
 
   await request.done
 }
 
-async function addFields(form: HTMLFormElement, path: string): Promise<void> {
+// An answer that is no longer the form's latest request is dropped, as a submitter naming another action asked since.
+async function addFields(form: HTMLFormElement, request: { path: string }): Promise<void> {
+  const { path } = request
+
   try {
     const html = await fieldsOf(path)
+
+    if (asking.get(form) !== request)
+      return
+
     const template = document.createElement('template')
 
     template.innerHTML = html
@@ -53,7 +63,8 @@ async function addFields(form: HTMLFormElement, path: string): Promise<void> {
     // The post goes without them.
   }
   finally {
-    asking.delete(form)
+    if (asking.get(form) === request)
+      asking.delete(form)
   }
 }
 
