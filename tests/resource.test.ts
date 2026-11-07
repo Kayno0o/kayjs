@@ -31,6 +31,10 @@ export default api()
     return { late: true }
   })
   .get('/big', () => Response.json({ text: 'x'.repeat(2000) }))
+  .get('/huge', () => ({ text: 'x'.repeat(70_000) }))
+  .get('/private', () => new Response(JSON.stringify({ secret: 1 }), { headers: { 'content-type': 'application/json', 'cache-control': 'private, max-age=0' } }))
+  .get('/cookie', () => new Response(JSON.stringify({ fresh: 1 }), { headers: { 'content-type': 'application/json', 'set-cookie': 'visitor=1; Path=/' } }))
+  .get('/who', ({ request }) => ({ cookie: request.headers.get('cookie'), language: request.headers.get('accept-language') }))
   .get('/boom', () => {
     throw new Error('the route broke')
   })
@@ -115,6 +119,45 @@ import Late from '../components/Late.kay'
 ---
 Late
 `,
+  'src/components/Guarded.kay': `---
+import { resource } from 'kay'
+import data from '../api/data'
+
+const huge = resource(data, '/huge')
+const priv = resource(data, '/private')
+const cookie = resource(data, '/cookie')
+---
+p.huge {huge.status()}
+p.priv {priv.status()}
+p.cookie {cookie.status()}
+`,
+  'src/components/Who.kay': `---
+import { resource } from 'kay'
+import data from '../api/data'
+
+const who = resource(data, '/who')
+---
+p.who {who.value()?.cookie}|{who.value()?.language}
+`,
+  'src/routes/guarded.kay': `---
+import Guarded from '../components/Guarded.kay'
+---
+Guarded
+`,
+  'src/routes/who.kay': `---
+import Who from '../components/Who.kay'
+---
+Who
+`,
+  'src/routes/blocked.kay': `---
+import Items from '../components/Items.kay'
+
+const later = (async () => 1)()
+---
+Items
+await later then n
+  Items
+`,
   'src/routes/me.kay': `---
 import Me from '../components/Me.kay'
 ---
@@ -132,6 +175,7 @@ const sites = {
   plain: await testSite({ dirs, styles: true }),
   dev: await testSite({ dirs, dev: true, styles: true }),
   mounted: await testSite({ dirs, base: '/blog', trailingSlash: 'always', styles: true }),
+  compressed: await testSite({ dirs, styles: true, serve: { compress: true } }),
   localized: await testSite({ dirs, styles: true, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: join(dir, 'src/messages') } }),
 }
 const { calls } = await import(join(dir, 'src/api/data.ts')) as { calls: { items: number } }
@@ -228,7 +272,7 @@ describe('the server render of resource()', () => {
     expect(refused).not.toContain('Sign in first')
     expect(seeds(refused)).toBeUndefined()
 
-    const admitted = await page(sites.plain, '/me', { 'x-user': 'ada' })
+    const admitted = await page(sites.plain, '/me', { 'x-user': 'ada', 'cookie': 'session=1' })
 
     expect(admitted).toContain('<p class="me">ready: ada</p>')
     expect(seeds(admitted)?.['/api/private/me']?.value).toEqual({ user: 'ada' })
@@ -248,6 +292,46 @@ describe('the server render of resource()', () => {
     finally {
       limits.routeTimeout = 5000
     }
+  })
+
+  it('leaves a route answering private, no-store or a cookie, or past the size cap, loading', async () => {
+    const html = await page(sites.plain, '/guarded')
+
+    expect(html).toContain('<p class="huge">loading</p>')
+    expect(html).toContain('<p class="priv">loading</p>')
+    expect(html).toContain('<p class="cookie">loading</p>')
+    expect(seeds(html)).toBeUndefined()
+    expect(html).not.toContain('secret')
+  })
+
+  it('reads a large Response answer through a compressing app, whatever the visitor accepts', async () => {
+    const response = await sites.compressed.fetch('/late', { headers: { 'accept-encoding': 'gzip' } })
+
+    expect(response.headers.get('content-encoding')).toBe('gzip')
+    expect(new TextDecoder().decode(Bun.gunzipSync(await response.arrayBuffer()))).toContain('<p class="big">ready</p>')
+  })
+
+  it('forwards the visitor\'s cookie and language to the route', async () => {
+    const html = await page(sites.plain, '/who', { 'cookie': 'a=b', 'accept-language': 'de-CH' })
+
+    expect(html).toContain('<p class="who">a=b|de-CH</p>')
+  })
+
+  it('renders an await block holding a resource of a seeded key ready as the island does', async () => {
+    const html = await page(sites.plain, '/blocked')
+
+    expect(html.match(/<p class="status">ready<\/p>/g)?.length).toBe(2)
+  })
+
+  it('serves the page of a base without its trailing slash', async () => {
+    const response = await sites.mounted.fetch('/blog', { redirect: 'manual' })
+
+    expect([200, 308]).toContain(response.status)
+
+    if (response.status === 308)
+      expect(await page(sites.mounted, new URL(response.headers.get('location')!, 'http://localhost').pathname)).toContain('<p class="items">a,b</p>')
+    else
+      expect(await response.text()).toContain('a,b')
   })
 
   it('adds no seed script to a page that reads no resource', async () => {

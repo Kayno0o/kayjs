@@ -36,6 +36,11 @@ export function collectResources<T>(seeds: Map<string, Seed | null>, render: () 
   }
 }
 
+// Runs a render that comes after the page's, as an `await` block's, with the seeds the page was rendered with, so a resource of one key reads `ready` there as in the island that holds it.
+export function withSeeds<T>(seeds: ReadonlyMap<string, Seed>, run: () => T): T {
+  return collectResources(new Map(seeds), run, true)
+}
+
 // The routes the render in progress left unanswered, for the page to ask and render again.
 export function resourcesWanted(): ReadonlyMap<string, string> | undefined {
   return collecting !== undefined && collecting.wanted.size > 0 ? collecting.wanted : undefined

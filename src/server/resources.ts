@@ -18,6 +18,10 @@ const MAX_PASSES = 3
 
 // How long the server waits for a route before the browser asks it itself.
 export const limits = { routeTimeout: 5000 }
+// The most JSON characters one answer may add to the page; a larger one renders `loading` and the browser asks the route itself.
+export const SEED_LIMIT = 65_536
+// An answer that says it is private to the request, for a visitor the page does not already treat as personal, or sets a cookie, is not the page's to freeze.
+const PERSONAL_ANSWER = /(?:^|[\s,])(?:private|no-store)(?:$|[\s,])/i
 // What the visitor's request carries that its page does not mean for an API route: a body, a condition on a copy the browser holds, a range, the navigation's own marks.
 const NOT_FORWARDED = ['content-length', 'content-type', 'transfer-encoding', 'if-none-match', 'if-modified-since', 'if-match', 'if-unmodified-since', 'if-range', 'range', 'upgrade', 'upgrade-insecure-requests', 'connection', 'expect', 'te', 'purpose', 'sec-purpose', 'sec-fetch-user']
 
@@ -83,7 +87,9 @@ async function asked(request: Request, url: string, late: AbortSignal): Promise<
     requestRecord(visit).address = address
 
   // The answer may differ by visitor, so the page it lands in must not be shared.
-  if (request.headers.has('cookie') || request.headers.has('authorization'))
+  const personal = request.headers.has('cookie') || request.headers.has('authorization')
+
+  if (personal)
     readPersonally(request)
 
   try {
@@ -102,9 +108,15 @@ async function asked(request: Request, url: string, late: AbortSignal): Promise<
       return null
     }
 
+    if (response.headers.has('set-cookie') || (!personal && PERSONAL_ANSWER.test(response.headers.get('cache-control') ?? ''))) {
+      await response.body?.cancel()
+
+      return null
+    }
+
     const value = await readAnswer(response)
 
-    return value instanceof Blob ? null : { value, proof: response.headers.get('x-kay-live') }
+    return value instanceof Blob || JSON.stringify(value).length > SEED_LIMIT ? null : { value, proof: response.headers.get('x-kay-live') }
   }
   catch {
     return null

@@ -35,7 +35,7 @@ import { child, component, html, newServerIslands, withinComponent, withServerIs
 import { localePath, textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
 import { unrevivableAction } from '../runtime/island.server'
-import { resourcesUsed, resourcesWanted } from '../runtime/live-resource.server'
+import { resourcesUsed, resourcesWanted, withSeeds } from '../runtime/live-resource.server'
 import { unansweredLoads } from '../runtime/load-scope'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
@@ -1195,6 +1195,24 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
       void held(block.value)
 
     throw new ResourcesPending(wanted)
+  }
+
+  const seeded = resourcesUsed()
+
+  if (seeded !== undefined && seeded.size > 0) {
+    const seeds = new Map(seeded)
+
+    for (const block of deferred) {
+      const { ready, failed, fallback } = block
+
+      block.ready = value => withSeeds(seeds, () => ready(value))
+
+      if (failed)
+        block.failed = error => withSeeds(seeds, () => failed(error))
+
+      if (fallback)
+        block.fallback = error => withSeeds(seeds, () => fallback(error))
+    }
   }
 
   const streamed = deferred.length > 0
