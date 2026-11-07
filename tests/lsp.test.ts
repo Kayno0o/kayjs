@@ -813,7 +813,7 @@ describe('kay lsp following the project on disk', () => {
     expect(await editor.filesChanged(wrapper, [{ path: 'src/components/wrapper.kay', type: 1 }])).toEqual([])
 
     await Bun.write(join(dir, 'src/routes/plain.kay'), '---\nimport Wrapper from \'../components/wrapper.kay\'\n---\nWrapper(controls={{ pick: () => {} }})\n')
-    expect(codes(await editor.filesChanged(wrapper, [{ path: 'src/routes/plain.kay', type: 1 }]))).toEqual([2345])
+    expect(codes(await editor.filesChanged(wrapper, [{ path: 'src/routes/plain.kay', type: 1 }]))).toEqual(['island-prop'])
   })
 
   // Last, as a module changing publishes the open files again once tsgo asks, which a later wait would take for its own.
