@@ -570,14 +570,21 @@ function local<Row extends object, const Key extends keyof Row & string>(options
 interface Local<Row, Key extends keyof Row>
   clear: () => Promise<void>
   dismiss: (id: number) => Promise<void>
+  error: () => ApiError<unknown> | undefined
   get: (key: Row[Key]) => Row | undefined
   issues: () => readonly LocalIssue<Row>[]
+  onError: (listener: (event: { error: ApiError<unknown>; }) => void) => () => void
+  onIssue: (listener: (event: { issue: LocalIssue<Row>; }) => void) => () => void
+  onSync: (listener: (event: { rows: readonly Row[]; }) => void) => () => void
   pending: () => number
   put: (row: Row) => Promise<void>
   remove: (key: Row[Key]) => Promise<void>
+  retry: () => void
   rows: () => readonly Row[]
   status: () => LocalStatus
   sync: () => Promise<void>
+  syncStatus: () => LocalSyncStatus
+  unsynced: () => number
 
 [.] LocalConflict
 interface LocalConflict<Row>
@@ -585,6 +592,12 @@ interface LocalConflict<Row>
   key: string
   mine: Row | undefined
   theirs: Row
+
+[.] LocalHooks
+interface LocalHooks<Row>
+  onError?: ((event: { error: ApiError<unknown>; }) => void) | undefined
+  onIssue?: ((event: { issue: LocalIssue<Row>; }) => void) | undefined
+  onSync?: ((event: { rows: readonly Row[]; }) => void) | undefined
 
 [.] LocalIssue
 interface LocalIssue<Row>
@@ -602,9 +615,12 @@ interface LocalIssue<Row>
   theirs?: Row | undefined
 
 [.] LocalOptions
-interface LocalOptions<Row extends object, Key extends keyof Row & string>
+interface LocalOptions<Row extends object, Key extends keyof Row & string> extends LocalHooks<Row>
   conflict?: ((conflict: LocalConflict<Row>) => Row | undefined) | undefined
   key: Key
+  onError?: ((event: { error: ApiError<unknown>; }) => void) | undefined
+  onIssue?: ((event: { issue: LocalIssue<Row>; }) => void) | undefined
+  onSync?: ((event: { rows: readonly Row[]; }) => void) | undefined
   put: Action<Row, unknown, never>
   read: (signal: AbortSignal) => Promise<readonly Row[]> | readonly Row[]
   remove?: Action<Pick<Row, Key>, unknown, never> | undefined
@@ -625,6 +641,9 @@ type LocalsOf<App extends Pick<Elysia, '~Singleton' | '~Ephemeral' | '~Volatile'
 
 [.] LocalStatus
 type LocalStatus = 'loading' | 'synced' | 'pending' | 'offline' | 'signed-out' | 'unavailable'
+
+[.] LocalSyncStatus
+type LocalSyncStatus = 'loading' | 'synced' | 'unsynced' | 'offline' | 'signed-out' | 'unavailable'
 
 [.] Log
 type Log = Record<LogLevel, (message: string, error?: unknown) => void>

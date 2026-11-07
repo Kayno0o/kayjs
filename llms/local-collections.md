@@ -33,7 +33,7 @@ import todosApi from '../api/todos'
 
 const todos = local({ key: 'id', read: async signal => call(todosApi, '/', { signal }), put: save, remove })
 ---
-p {todos.status()}
+p {todos.unsynced()} waiting for the server, {todos.syncStatus()}
 ul
   for todo of todos.rows()
     li {todo.title}
@@ -61,10 +61,10 @@ for issue of todos.issues()
 
 ### What a collection is
 
-- `local({ key, read, put, remove?, version?, conflict? })` returns `rows()`, `get(key)`, `put(row)`, `remove(key)`, `pending()`, `status()`, `issues()`, `dismiss(id)`, `sync()` and `clear()`. `rows()`, `pending()`, `status()` and `issues()` are reactive; the rows come in key order.
+- `local({ key, read, put, remove?, version?, conflict?, onSync?, onIssue?, onError? })` returns `rows()`, `get(key)`, `put(row)`, `remove(key)`, `unsynced()`, `syncStatus()`, `error()`, `retry()`, `issues()`, `dismiss(id)`, `sync()`, `clear()` and the hooks `onSync`, `onIssue` and `onError` as methods. `rows()`, `unsynced()`, `syncStatus()`, `error()` and `issues()` are reactive; the rows come in key order. `pending()` (the count `unsynced()` reads) and `status()` (`syncStatus()` with `'pending'` for `'unsynced'`) work until 2.0, which gives them the meaning they have on every source, a boolean and `idle|loading|ready|failed`; `deprecated-local-state` flags them.
 - `key` names the field identifying a row, a string or a number. `put` is an action taking the row, `remove` an action taking `{ [key]: value }`, and `read` a function giving the server's rows (`call` or `resource`'s route, or any promise): all three are the app's own, so their guards, schemas, rate limits and cross-site checks apply as to any call.
 - The collection is named by its `put` action's URL, so declare it once per action; two islands declaring it share one mirror.
-- On the server, and in a browser without IndexedDB, `local()` gives an empty collection: `status()` is `'loading'` on the server and `'unavailable'` where the browser keeps nothing, and a write there throws. Nothing loads on a page that does not import it.
+- On the server, and in a browser without IndexedDB, `local()` gives an empty collection: `syncStatus()` is `'loading'` on the server and `'unavailable'` where the browser keeps nothing, and a write there throws. Nothing loads on a page that does not import it.
 
 ### The mirror
 
@@ -72,7 +72,9 @@ for issue of todos.issues()
 - A row crosses as island props do (Dates, Maps and Sets included) and holds no file.
 - `version: 2` forgets the rows held (they are read again) and keeps the queue; use it when the rows' shape changes. The database itself is versioned by kay.
 - Tabs share it: a change in one reaches the others through a `BroadcastChannel`, and a lock lets one tab or the worker send the queue at a time.
-- `status()` is `'loading'` until the mirror is read, `'synced'`, `'pending'` (writes wait for the server), `'offline'` (the last attempt found no connection) or `'signed-out'` (the server answered 401 or sent the visitor to sign in: the queue waits, nothing is lost).
+- `syncStatus()` is `'loading'` until the mirror is read, `'synced'`, `'unsynced'` (writes wait for the server), `'offline'` (the last attempt found no connection) or `'signed-out'` (the server answered 401 or sent the visitor to sign in: the queue waits, nothing is lost).
+- `error()` is an `ApiError` once a read of the server failed (status 0 for a `read` that threw or got no answer, the thrown `ApiError`'s own status otherwise) or the browser keeps no IndexedDB, kept until a read succeeds; a write waiting for the server is no error, `syncStatus()` says so and a refused one is in `issues()`. `retry()` reads the server and sends the queue now, skipping the delay, when the last read failed or the server could not be reached, and does nothing otherwise.
+- The hooks are options and methods of the same names, each told one object, a throwing one logged and leaving the collection alone, and a method returning what removes it: `onSync({ rows })` after a read of the server was taken in or the queue was sent and the collection stands `synced`, `onIssue({ issue })` once for each new issue (not for those kept from an earlier visit), `onError({ error })` once for each failed read. `local({ ..., onIssue: ({ issue }) => toast.error(issue.message) })`.
 
 ### Sending writes
 

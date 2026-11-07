@@ -3,22 +3,41 @@ import { call, local } from 'kay'
 import { drop, save } from '../routes/index.kay'
 import notesApi from '../api/notes'
 
-const { theirs = false, both = false, hang = false, version = 1 } = props<{ theirs?: boolean, both?: boolean, hang?: boolean, version?: number }>()
+const { theirs = false, both = false, hang = false, version = 1, fail = false } = props<{ theirs?: boolean, both?: boolean, hang?: boolean, version?: number, fail?: boolean }>()
+const issued = signal(0)
+const synced = signal(0)
+const errored = signal(0)
+const kept = signal('')
 const notes = local({
   key: 'id',
   read: async signal => hang ? new Promise<never>((_, reject) => signal.addEventListener('abort', () => {
     document.body.dataset.aborted = 'yes'
     reject(signal.reason)
-  })) : call(notesApi, '/', { signal }),
+  })) : fail && document.cookie.includes('readfail=1') ? Promise.reject(new Error('read broke')) : call(notesApi, '/', { signal }),
   put: save,
   remove: drop,
   version,
+  onIssue: () => issued++,
+  onSync: ({ rows }) => {
+    synced++
+    kept.set(rows.map(row => row.title).join(','))
+  },
   conflict: theirs ? () => undefined : both ? ({ mine, theirs: held }) => ({ ...held, title: `${mine?.title}+${held.title}` }) : undefined,
 })
 const text = signal('')
+const stopped = notes.onError(() => errored++)
+const late = signal(0)
+const stopLate = notes.onIssue(() => late++)
 ---
-p.status {notes.status()}
-p.pending {notes.pending()}
+p.status {notes.syncStatus()}
+p.pending {notes.unsynced()}
+// kay-allow deprecated-local-state
+p.oldstatus {notes.status()}
+// kay-allow deprecated-local-state
+p.oldpending {notes.pending()}
+p.error {notes.error()?.message ?? ''}
+p.errorstatus {notes.error()?.status ?? ''}
+p.hooks {issued()} {synced()} {errored()} {late()} {kept()}
 ul
   for note of notes.rows()
     li.note(data-id={note.id}) {note.title} {note.rev}
@@ -30,5 +49,8 @@ button.add(onClick={() => notes.put({ id: 'a', title: text(), rev: 0 })}) Add
 button.addb(onClick={() => notes.put({ id: 'b', title: text(), rev: 0 })}) Add b
 button.edit(onClick={() => notes.put({ id: 'a', title: text(), rev: notes.get('a')?.rev ?? 0 })}) Edit
 button.remove(onClick={() => notes.remove('a')}) Remove
+button.retry(onClick={notes.retry}) Retry
+button.stoplate(onClick={() => stopLate()}) Stop
+button.stopall(onClick={() => stopped()}) Stop errors
 button.sync(onClick={() => notes.sync()}) Sync
 button.clear(onClick={() => notes.clear()}) Clear

@@ -42,6 +42,7 @@ import { hookNames } from './hook-names'
 import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
 import { libraryNames, pgLoaderSource } from './library-names'
+import { localState } from './local-state'
 import { mcpRoutes } from './mcp-routes'
 import { movedImports } from './moved-imports'
 import { unreadOpenSettings } from './open-settings'
@@ -157,6 +158,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => streamTypes(root, options),
   async ({ root, options }) => streamOn(root, options),
   async ({ root, options }) => streamOpen(root, options),
+  async ({ root, options }) => localState(root, options),
   async ({ root, options }) => sizeLimits(root, options),
   async ({ root, options }) => hookNames(root, options),
 ]

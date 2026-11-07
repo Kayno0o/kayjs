@@ -22,6 +22,8 @@ export interface Parsed {
 
 export interface Found {
   file: string
+  // The whole file, which the offsets of `report` count in.
+  source: string
   parsed: Parsed[]
   // The file's text outside the parsed spans, such as a template, where a name is read in ways no edit here covers.
   unparsed: string
@@ -59,6 +61,7 @@ export async function scan(root: string, options: CheckOptions, lint: LintName, 
 
     visit({
       file,
+      source,
       parsed,
       unparsed,
       report(start, end, message, help, edits, safe = true) {

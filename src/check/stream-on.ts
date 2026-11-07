@@ -28,7 +28,7 @@ function annotated(param: Node): boolean {
 }
 
 // Every name the program binds, counted, so one bound twice is not taken for either.
-function bindings(program: Program): Map<string, number> {
+export function bindings(program: Program): Map<string, number> {
   const counts = new Map<string, number>()
   const add = (pattern: Node | null | undefined) => {
     if (!pattern)
@@ -69,10 +69,9 @@ function bindings(program: Program): Map<string, number> {
   return counts
 }
 
-// The names the file binds once to a call of `stream` or `socket` from `kay`, the only receivers known to be one as `kay check` reads no types.
-function sourceReceivers(ast: Program, names: Map<string, number>): Set<string> {
-  const streams = importsOf(ast, source => source === 'kay', 'stream')
-  const sockets = importsOf(ast, source => source === 'kay', 'socket')
+// The names the file binds once to a call of one of `calls` from `kay`, the only receivers known to be one as `kay check` reads no types.
+export function boundOnce(ast: Program, names: Map<string, number>, ...calls: [string, ...string[]]): Set<string> {
+  const imported = calls.map(name => ({ name, ...importsOf(ast, source => source === 'kay', name) }))
   const receivers = new Set<string>()
 
   const opens = (init: Node): boolean => {
@@ -84,9 +83,9 @@ function sourceReceivers(ast: Program, names: Map<string, number>): Set<string> 
     const { callee } = call
 
     if (callee.type === 'Identifier')
-      return streams.locals.has(callee.name) || sockets.locals.has(callee.name)
+      return imported.some(({ locals }) => locals.has(callee.name))
 
-    return callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.property.type === 'Identifier' && (callee.property.name === 'stream' || callee.property.name === 'socket') && (streams.namespaces.has(callee.object.name) || sockets.namespaces.has(callee.object.name))
+    return callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.property.type === 'Identifier' && imported.some(({ name, namespaces }) => name === (callee.property as { name: string }).name && namespaces.has((callee.object as { name: string }).name))
   }
 
   walk(ast, (node) => {
@@ -95,6 +94,10 @@ function sourceReceivers(ast: Program, names: Map<string, number>): Set<string> 
   })
 
   return receivers
+}
+
+function sourceReceivers(ast: Program, names: Map<string, number>): Set<string> {
+  return boundOnce(ast, names, 'stream', 'socket')
 }
 
 // `.onOpen(reconnected => ...)` of a stream or a socket, `.onOpen(({ reconnected }) => ...)` since 1.92: the hook is told one object, as every hook is, and the old argument, a boolean, reads as true for the object.

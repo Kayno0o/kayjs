@@ -27,6 +27,11 @@ async function opened(url = '/'): Promise<TestPage> {
   return page
 }
 
+// The counters of the fixture's hooks: issues told, syncs, errors, issues told to the listener added as a method, then the titles held at the last sync.
+async function hooks(page: TestPage): Promise<string[]> {
+  return ((await page.text('p.hooks')) ?? '').split(' ')
+}
+
 async function write(page: TestPage, button: string, title: string): Promise<void> {
   await page.fill('input.title', title)
   await page.click(button)
@@ -653,6 +658,101 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
 
     expect(await page.count('li.issue')).toBe(50)
   }, 90_000)
+
+  it('reads the queue as unsynced() and syncStatus(), and the old pending() and status() as they were', async () => {
+    const page = await opened()
+
+    expect(await page.text('p.oldstatus')).toBe('synced')
+    expect(await page.text('p.oldpending')).toBe('0')
+
+    await page.route('/_kay/action/*', async (request) => {
+      await Bun.sleep(1500)
+      await request.fetch()
+      await request.abort()
+    })
+    await write(page, 'button.add', 'slow')
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'unsynced')
+
+    expect(await page.text('p.oldstatus')).toBe('pending')
+    expect(await page.text('p.pending')).toBe('1')
+    expect(await page.text('p.oldpending')).toBe('1')
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'offline')
+
+    expect(await page.text('p.oldstatus')).toBe('offline')
+    expect(await page.text('p.error')).toBe('')
+  }, 60_000)
+
+  it('sets error() when a read of the server fails and clears it once a read succeeds, and tells onError for each failure', async () => {
+    const page = await opened('/fail')
+
+    await page.evaluate(() => {
+      document.cookie = 'readfail=1; path=/'
+    })
+    await page.click('button.sync')
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'offline')
+
+    expect(await page.text('p.error')).toBe('read broke')
+    expect(await page.text('p.errorstatus')).toBe('0')
+    expect((await hooks(page))[2]).toBe('1')
+
+    await page.click('button.sync')
+    await page.waitUntil(() => document.querySelector('.hooks')?.textContent?.split(' ')[2] === '2')
+
+    expect(await page.text('p.error')).toBe('read broke')
+
+    await page.evaluate(() => {
+      document.cookie = 'readfail=; path=/; max-age=0'
+    })
+    await page.click('button.retry')
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'synced')
+
+    expect(await page.text('p.error')).toBe('')
+    expect((await hooks(page))[1]).not.toBe('0')
+  }, 60_000)
+
+  it('does nothing on retry() while synced', async () => {
+    const page = await opened('/fail')
+
+    await page.waitUntil(() => document.querySelector('.hooks')?.textContent?.startsWith('0 0 ') === false)
+
+    const before = await page.text('p.hooks')
+
+    await page.click('button.retry')
+    await Bun.sleep(400)
+
+    expect(await page.text('p.status')).toBe('synced')
+    expect(await page.text('p.hooks')).toBe(before)
+  }, 60_000)
+
+  it('tells onIssue once for each new issue and none of those kept from an earlier visit, and onSync with the rows', async () => {
+    const page = await opened()
+
+    await page.evaluate(() => {
+      document.cookie = 'refuse=1; path=/'
+    })
+    await page.offline()
+    await write(page, 'button.add', 'denied')
+    await page.online()
+    await page.waitUntil(() => document.querySelector('.issue') !== null)
+
+    expect((await hooks(page))[0]).toBe('1')
+    expect((await hooks(page))[3]).toBe('1')
+
+    await page.click('button.stoplate')
+    await page.evaluate(() => {
+      document.cookie = 'refuse=; path=/; max-age=0'
+    })
+    await write(page, 'button.addb', 'fine')
+    await page.waitUntil(() => document.querySelector('.hooks')?.textContent?.endsWith('fine') === true)
+
+    expect((await hooks(page))[3]).toBe('1')
+
+    await page.reload()
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'synced')
+
+    expect(await page.count('li.issue')).toBe(1)
+    expect((await hooks(page))[0]).toBe('0')
+  }, 60_000)
 
   it('loads the collection code on a page that has one and none on a page that has none', async () => {
     const holds = async (path: string) => {

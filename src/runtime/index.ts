@@ -31,7 +31,7 @@ export type { Answered, ApiAnswer, ApiCallOptions, CallMethod, CallPath, Connect
 export { ApiError, apiUrl, call, dispatch, resource, socket, stream } from './live'
 export type { Live, LiveByKey, LiveKey, LiveOptions, LiveOwn } from './live-value'
 export { live } from './live-value'
-export type { Local, LocalConflict, LocalIssue, LocalOptions, LocalStatus } from './local'
+export type { Local, LocalConflict, LocalHooks, LocalIssue, LocalOptions, LocalStatus, LocalSyncStatus } from './local'
 export { local } from './local'
 export type { Log } from './log'
 export { logFrom } from './log'
