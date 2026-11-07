@@ -212,6 +212,7 @@ if list.error() as error
 ```
 
 A page that renders a resource shows the value at once. The server asks the route in process as the visitor, with their cookies, so the route's guards run, and the island arrives `ready` and hydrates without a request. If the route refuses, fails or takes more than five seconds, the island renders as `loading` and the browser asks the route itself, so a refusal never reaches the page's HTML.
+
 The same goes for a route answering `cache-control: private` or `no-store`, one that sets a cookie, and one whose answer is over 64 KB as JSON: they stay `loading` and the browser asks them itself.
 
 A prerendered page asks nothing. An `await` block reads the answers its page was rendered with, so a resource there shares them. A server island asks nothing and renders `loading`, so give its resources a `key` the page does not use.
