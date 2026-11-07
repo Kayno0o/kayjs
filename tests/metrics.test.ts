@@ -1,7 +1,7 @@
 import process from 'node:process'
 import { afterAll, afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { cacheReads, countJobRun, countQueueRun, jobRuns, queueRuns } from '../src/runtime/counters'
+import { cacheReads, countJobRun, countQueueRun, fileEvents, jobRuns, queueRuns, sessionEvents } from '../src/runtime/counters'
 import { liveConnections } from '../src/server/live'
 import { statusOf } from '../src/server/log'
 import { metricsAllowed } from '../src/server/metrics'
@@ -267,5 +267,19 @@ describe('counters', () => {
     expect(text).toMatch(/^kay_queue_runs_total\{queue="metrics-test-queue",result="failed"\} 0$/m)
     expect(text).toMatch(/^kay_queue_runs_total\{queue="workflow:metrics-test-flow",result="retried"\} 1$/m)
     expect(text).toMatch(/^kay_queue_runs_total\{queue="workflow:metrics-test-flow",result="failed"\} 1$/m)
+  })
+
+  it('writes the sessions started and ended and the files written and deleted', async () => {
+    sessionEvents.created += 2
+    fileEvents.deleted += 1
+
+    const url = await listening({ metrics: true })
+    const text = await (await fetch(`${url}/metrics`)).text()
+
+    expect(text).toMatch(/^# TYPE kay_session_events_total counter$/m)
+    expect(text).toContain(`kay_session_events_total{event="created"} ${sessionEvents.created}`)
+    expect(text).toMatch(/^kay_session_events_total\{event="destroyed"\} \d+$/m)
+    expect(text).toContain(`kay_file_events_total{event="deleted"} ${fileEvents.deleted}`)
+    expect(text).toMatch(/^kay_file_events_total\{event="written"\} \d+$/m)
   })
 })

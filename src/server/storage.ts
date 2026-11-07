@@ -2,15 +2,18 @@ import type { Elysia } from 'elysia'
 import type { Duration } from '../runtime/duration'
 import type { StoreBase } from '../runtime/store-base'
 import type { AppStore } from './app-store'
+import type { Hook } from './hooks'
 import { chmod, lstat, mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
+import { fileEvents } from '../runtime/counters'
 import { durationSeconds } from '../runtime/duration'
 import { FILES_ROUTE } from '../runtime/image'
 import { kayLog } from '../runtime/log'
 import { randomId } from '../runtime/random-id'
 import { typeOfName } from './file-type'
+import { dispatch } from './hooks'
 import { dominantColor, imageColors } from './image-color'
 import { drawing, imageHeader, MAX_UPLOAD_PIXELS } from './image-format'
 import { holdsImageMetadata, stripImageMetadata } from './image-metadata'
@@ -33,7 +36,14 @@ export interface FileStore extends StoreBase {
   path?: ((key: string) => string) | undefined
   // Where the files are reachable over HTTP without kay, such as a public bucket or a CDN in front of it, which a static export links.
   publicUrl?: string | undefined
+  // Told after `files.put` stored a file, with its key, size in bytes and whether it is private; a throw is reported with source `files.onWrite` and never fails the put. `diskFiles`, `s3Files` and `memoryFiles` take it as an option; a store of the app's own adds it as a key.
+  onWrite?: Hook<{ key: string, size: number, private: boolean }> | undefined
+  // Told after `files.delete` removed a file that existed (a replaced file too), with its key; a throw is reported with source `files.onDelete`.
+  onDelete?: Hook<{ key: string }> | undefined
 }
+
+// The hooks the built-in stores take.
+export type FileHooks = Pick<FileStore, 'onWrite' | 'onDelete'>
 
 export interface StoredFile {
   key: string
@@ -88,10 +98,11 @@ let current: { store: FileStore | undefined, cacheDir: string | undefined, varia
 let defaultStore: FileStore | undefined
 
 // Files in a directory of this machine, `data/files` by default, relative to where the server runs.
-export function diskFiles(dir: string = DEFAULT_DIR): FileStore {
+export function diskFiles(dir: string = DEFAULT_DIR, hooks: FileHooks = {}): FileStore {
   const path = (key: string) => join(resolve(dir), key)
 
   return {
+    ...hooks,
     async write(key, data) {
       if (!PRIVATE_SEGMENT.test(key))
         return void await Bun.write(path(key), data)
@@ -149,11 +160,13 @@ export function diskFiles(dir: string = DEFAULT_DIR): FileStore {
 }
 
 // Files in an S3 bucket, or any service speaking its API: R2, Spaces, MinIO. Options left out are read from `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`, as Bun's own S3 client reads them.
-export function s3Files(options: Bun.S3Options & { publicUrl?: string | undefined } = {}): FileStore {
-  const { publicUrl, ...settings } = options
+export function s3Files(options: Bun.S3Options & { publicUrl?: string | undefined } & FileHooks = {}): FileStore {
+  const { publicUrl, onWrite, onDelete, ...settings } = options
   const bucket = new Bun.S3Client(settings)
 
   return {
+    onWrite,
+    onDelete,
     async write(key, data) {
       // The key's extension decides how the bucket serves the object, never the uploader's declared type, so a page or SVG uploaded from a browser never runs from the bucket's public URL.
       const served = servedAs(key)
@@ -188,11 +201,12 @@ export function s3Files(options: Bun.S3Options & { publicUrl?: string | undefine
 }
 
 // Files kept in this process, gone when it stops: what `bun test` uses unless told otherwise.
-export function memoryFiles(): FileStore {
+export function memoryFiles(hooks: FileHooks = {}): FileStore {
   const stored = new Map<string, Blob>()
   const written = new Map<string, Date>()
 
   return {
+    ...hooks,
     async write(key, data) {
       stored.set(key, new Blob([await data.arrayBuffer()], { type: data.type }))
       written.set(key, new Date())
@@ -289,6 +303,8 @@ export const files = {
     const store = await activeStore()
 
     await store.write(key, stored)
+    fileEvents.written++
+    await dispatch('files.onWrite', [store.onWrite], { key, size: stored.size, private: key.startsWith(PRIVATE) })
 
     if (options.replace !== undefined && options.replace !== key)
       await files.delete(options.replace)
@@ -303,7 +319,13 @@ export const files = {
 
   // Deletes the file, with its copy and the variants the image route made of it, and resolves with whether there was a file; a key with no file is no error.
   async delete(key: string): Promise<boolean> {
-    const existed = await (await activeStore()).delete(checkedKey(key, 'files.delete()'))
+    const store = await activeStore()
+    const existed = await store.delete(checkedKey(key, 'files.delete()'))
+
+    if (existed) {
+      fileEvents.deleted++
+      await dispatch('files.onDelete', [store.onDelete], { key })
+    }
 
     if (current.cacheDir !== undefined)
       await rm(join(current.cacheDir, key), { force: true })

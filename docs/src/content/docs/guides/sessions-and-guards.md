@@ -101,6 +101,12 @@ A session lasts `maxAge` without use, 30 days by default. It never lasts longer 
 
 So call `regenerate()` at sign-in, not on every request.
 
+### Knowing when a session starts or ends
+
+`session({ onCreate, onDestroy })` take the [hooks](/guides/hooks) of those two moments, each told `{ id, context }`. `onCreate` runs after the response that first stores data for a visitor, `onDestroy` after `destroy()`, after the last value was removed, or when the session reached its `absoluteMaxAge`. `id` is the stored session's id, and `undefined` when the session is kept in the cookie.
+
+A forged or expired cookie being cleared tells nothing, and neither does `regenerate()`, since it is the same session going on. A hook that throws is logged and reported with the source `session.onCreate` or `session.onDestroy`, and the request is answered anyway. Sessions started and ended are counted in `kay_session_events_total`.
+
 ### Remember me
 
 `maxAge()` gives one session its own `maxAge` in place of the plugin's. Call it right after `regenerate()`. It takes a string such as `'90d'`, and never goes past `absoluteMaxAge`.

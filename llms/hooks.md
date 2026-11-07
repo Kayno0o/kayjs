@@ -122,3 +122,8 @@ interface HookContext {
 ```
 
 A library extends it with what it knows. `hookContext()` builds it from the request being answered.
+
+### Session and file hooks
+
+- `session({ onCreate, onDestroy })` (source `session.onCreate`, `session.onDestroy`) are told `({ id, context })`, `id` being the stored session's id (undefined for a session kept in the cookie). `onCreate` runs after the response that sets a visitor's first data; `onDestroy` after `destroy()`, a session left with no data or one past its absolute lifetime. A forged or expired cookie being cleared tells nothing, and `regenerate()` neither: it is the same session going on. Both feed `kay_session_events_total{event}` (`created`, `destroyed`).
+- A `FileStore` takes `onWrite({ key, size, private, context })` and `onDelete({ key, context })` (source `files.onWrite`, `files.onDelete`), as options of `diskFiles(dir, hooks)`, `memoryFiles(hooks)` and `s3Files({ ... })`, or as keys of a store of the app's own: [files](files.md#stores). They feed `kay_file_events_total{event}` (`written`, `deleted`).

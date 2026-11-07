@@ -33,6 +33,16 @@ A JPEG, PNG, WebP, AVIF or HEIC is stored without the metadata a camera or phone
 
 `/_kay/files/<key>` serves each file with its type, cached for good. Images, video, audio, PDFs and plain text are shown in place. Any other file is sent as a sandboxed download, so an HTML page never runs as the site.
 
+### Knowing when a file is stored or deleted
+
+`diskFiles`, `memoryFiles` and `s3Files` take `onWrite` and `onDelete`, and a store of your own can have them as two more keys. `onWrite({ key, size, private })` runs after `files.put` stored the file, `onDelete({ key })` after `files.delete` removed one that existed, which a `replace` does too. Both get `context` like every [hook](/guides/hooks).
+
+A hook that throws is logged and reported with the source `files.onWrite` or `files.onDelete`, and the call still succeeds. A file written straight to the store tells nothing. Writes and deletes are counted in `kay_file_events_total`.
+
+```ts
+store: { files: diskFiles('data/files', { onWrite: ({ key, size }) => audit.record('upload', key, size) }) }
+```
+
 ### Replacing and deleting
 
 Keys are never reused, so a new avatar is a new file. `files.put(file, { replace: user.avatar })` deletes the old one once the new one is stored. `files.put(file, { id })` makes the key from an id you give, such as a hash of the bytes, so the same file sent twice is stored once. An id must stand for one content, since a key is cached for good. `files.delete(key)` deletes a file with every resized variant and social card of it.

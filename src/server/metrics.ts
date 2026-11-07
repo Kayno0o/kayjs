@@ -1,7 +1,7 @@
 import type { Elysia } from 'elysia'
 import type { MetricsConfig, ProxyConfig } from '../config'
 import process from 'node:process'
-import { cacheReads, jobRuns, pageRoutes, queueRuns } from '../runtime/counters'
+import { cacheReads, fileEvents, jobRuns, pageRoutes, queueRuns, sessionEvents } from '../runtime/counters'
 import { kayLog } from '../runtime/log'
 import { routerPath } from './base'
 import { pathOf, statusOf } from './log'
@@ -106,6 +106,10 @@ export function serveMetrics(app: Elysia, options: { path: string, base: string,
         out.push(`kay_queue_runs_total{queue="${labelled(name)}",result="${result}"} ${runs[result]}`)
     }
 
+    put('kay_session_events_total', 'Sessions started and ended, by event.', 'counter')
+    out.push(`kay_session_events_total{event="created"} ${sessionEvents.created}`, `kay_session_events_total{event="destroyed"} ${sessionEvents.destroyed}`)
+    put('kay_file_events_total', 'Files written and deleted through `files`, by event.', 'counter')
+    out.push(`kay_file_events_total{event="written"} ${fileEvents.written}`, `kay_file_events_total{event="deleted"} ${fileEvents.deleted}`)
     put('kay_cache_reads_total', 'Cached values read, by whether the value was there already.', 'counter')
     out.push(`kay_cache_reads_total{result="hit"} ${cacheReads.hit}`, `kay_cache_reads_total{result="miss"} ${cacheReads.miss}`)
     put('kay_live_connections', 'Live event streams open now.', 'gauge')

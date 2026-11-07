@@ -1,17 +1,20 @@
 import type { Duration } from '../runtime/duration'
 import type { MaybePromise, StoreBase } from '../runtime/store-base'
+import type { Hook } from './hooks'
 import { statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { parse, stringify } from 'devalue'
 import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
+import { sessionEvents } from '../runtime/counters'
 import { wholeSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { nodeCrypto } from './builtins'
 import { requestCookies } from './cookies'
+import { dispatch } from './hooks'
 import { maintenance } from './maintenance'
 import { inMemory } from './memory-mark'
 import { WORKER_INDEX } from './parent'
@@ -61,6 +64,14 @@ export interface SessionOptions {
   sameSite?: SameSite | undefined
   // Keeps the data server-side, the cookie carrying only an id: the app's `store.sessions` in kay.config.ts by default, else a SQLite file `data/sessions.sqlite` as jobs keep `data/jobs.sqlite` (memory under `bun test`). `false` keeps the data sealed in the cookie instead, about 3.5 KB at most and never revocable by the session itself, for a host with no disk of its own.
   store?: SessionStore | false | undefined
+  // Told after a visitor's session first holds data (stored, when it has a store). `id` is the stored session's id, undefined for one kept in the cookie. A throw is reported with source `session.onCreate` and never fails the request.
+  onCreate?: Hook<SessionEvent> | undefined
+  // Told after a session ended: `destroy()`, a session left with no data, or one past its absolute lifetime; not for a cookie that was forged or had already expired. Source `session.onDestroy`.
+  onDestroy?: Hook<SessionEvent> | undefined
+}
+
+export interface SessionEvent {
+  id: string | undefined
 }
 
 export interface Session<Data extends object> {
@@ -182,7 +193,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (options.sameSite !== undefined && !SAME_SITE.has(options.sameSite))
     throw new KayError('config-invalid', `kay: the session sameSite is ${JSON.stringify(options.sameSite)}, which is none of 'lax', 'strict' and 'none'`)
 
-  const config: SessionConfig = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store === false ? undefined : options.store ?? appStore()?.sessions ?? (config.revokedElsewhere ? undefined : openDefaultSessions()), keys, revokedElsewhere: false }
+  const config: SessionConfig = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store === false ? undefined : options.store ?? appStore()?.sessions ?? (config.revokedElsewhere ? undefined : openDefaultSessions()), keys, onCreate: options.onCreate, onDestroy: options.onDestroy, revokedElsewhere: false }
 
   const plugin = new Elysia({ name: 'kay/session', seed: config.name })
     .onStart(() => {
@@ -247,6 +258,8 @@ interface SessionConfig {
   // The session's own store, else the app's `store.sessions`, else the default file, read per request as a `session()` made while its module loads comes before the config.
   store: () => SessionStore | undefined
   keys: Buffer[]
+  onCreate: Hook<SessionEvent> | undefined
+  onDestroy: Hook<SessionEvent> | undefined
   // Whether a library refuses the cookie of a session it ended, as kayjs-auth does, so it needs no default store.
   revokedElsewhere: boolean
 }
@@ -262,6 +275,9 @@ class RequestSession<Data extends object> implements Session<Data> {
   // An id `regenerate` or `destroy` left behind, deleted from the store on commit.
   private retired: string | undefined
   private oldKey = false
+  // Whether the request met a live session, and the id of one `destroy()` ended in it, for the hooks.
+  private existed = false
+  private ended: { id: string | undefined } | undefined
   private readonly secure: boolean
   // `__Host-` keeps the cookie to this host over https, so no other host of the site can set it; a Domain rules the prefix out, and so does a session shared under domains, whose name must not depend on the Host a proxy passes on.
   private readonly name: string
@@ -295,6 +311,12 @@ class RequestSession<Data extends object> implements Session<Data> {
 
   async destroy(): Promise<void> {
     await this.load()
+
+    if (this.existed) {
+      this.ended = { id: this.retired ?? this.id }
+      this.existed = false
+    }
+
     this.retired = this.id
     this.id = undefined
     this.started = undefined
@@ -349,6 +371,8 @@ class RequestSession<Data extends object> implements Session<Data> {
       if (this.id !== undefined)
         await store?.delete(this.id)
 
+      await this.tell(this.ended ?? (this.existed ? { id: this.retired ?? this.id } : undefined), undefined)
+
       return this.issued === undefined && this.retired === undefined ? undefined : this.cookie('', 0)
     }
 
@@ -360,12 +384,32 @@ class RequestSession<Data extends object> implements Session<Data> {
       sealed = { id: this.id, issued: now, started, ...this.own }
     }
 
+    await this.tell(this.ended, { id: this.id })
+
     const cookie = this.cookie(sealWith(this.config.keys[0]!, stringify(sealed), name), this.own.browser ? undefined : maxAge)
 
     if (cookie.length > MAX_COOKIE_LENGTH)
       throw new Error(`kay: the session cookie ${name} would take ${cookie.length} bytes, more than a browser keeps; hold less in it, or give session() a store`)
 
     return cookie
+  }
+
+  // Counts and tells the end of a session `ended` names and the start of the one `started` names, after the store took the change.
+  private async tell(ended: { id: string | undefined } | undefined, started: { id: string | undefined } | undefined): Promise<void> {
+    const begins = started !== undefined && !this.existed
+
+    this.ended = undefined
+    this.existed = started !== undefined
+
+    if (ended !== undefined) {
+      sessionEvents.destroyed++
+      await dispatch('session.onDestroy', [this.config.onDestroy], ended)
+    }
+
+    if (begins) {
+      sessionEvents.created++
+      await dispatch('session.onCreate', [this.config.onCreate], started)
+    }
   }
 
   private async load(): Promise<void> {
@@ -395,12 +439,14 @@ class RequestSession<Data extends object> implements Session<Data> {
 
     if (!this.store) {
       this.data = sealed.data ?? {}
+      this.existed = true
 
       return
     }
 
     if (sealed.id === undefined && sealed.data !== undefined && acceptingCookieData) {
       this.data = sealed.data
+      this.existed = true
 
       return
     }
@@ -410,6 +456,7 @@ class RequestSession<Data extends object> implements Session<Data> {
     if (stored) {
       this.id = sealed.id
       this.data = { ...stored }
+      this.existed = true
     }
   }
 

@@ -25,5 +25,9 @@ export function countQueueRun(queue: string, result: 'ok' | 'retried' | 'failed'
   runs[result]++
 }
 
+// Sessions started and ended, and files written and deleted through `files`, counted where their hooks are told.
+export const sessionEvents = { created: 0, destroyed: 0 }
+export const fileEvents = { written: 0, deleted: 0 }
+
 // The pattern of the page a request was answered by, which names it better than the router's `/shop/:p2`.
 export const pageRoutes = new WeakMap<Request, string>()

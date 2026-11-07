@@ -2613,7 +2613,7 @@ function defineEnv<Schema extends EnvSchema>(declared: Schema, source?: Record<s
 type DeletableSessionStore = SessionStore & { deleteWhere: (match: SessionMatch) => MaybePromise<number> }
 
 [./server] diskFiles
-function diskFiles(dir?: string): FileStore
+function diskFiles(dir?: string, hooks?: FileHooks): FileStore
 
 [./server] editedEntry
 function editedEntry(request: Request, collection: string, slug: string): boolean
@@ -2665,6 +2665,9 @@ interface FailedJob<Payload>
   id: string
   payload: Payload
 
+[./server] FileHooks
+type FileHooks = Pick<FileStore, 'onWrite' | 'onDelete'>
+
 [./server] files
 const files: {
   put(data: Blob, options?: PutOptions): Promise<string>;
@@ -2683,6 +2686,8 @@ interface FileStore extends StoreBase
   close?: (() => unknown) | undefined
   delete: (key: string) => Promise<boolean>
   list?: ((prefix?: string | undefined) => Promise<StoredFile[]>) | undefined
+  onDelete?: Hook<{ key: string; }> | undefined
+  onWrite?: Hook<{ key: string; size: number; private: boolean; }> | undefined
   path?: ((key: string) => string) | undefined
   ping?: (() => unknown) | undefined
   publicUrl?: string | undefined
@@ -2929,7 +2934,7 @@ type Logger = boolean | 'json' | ((entry: LogEntry) => void)
 type MaybePromise<T> = T | Promise<T>
 
 [./server] memoryFiles
-function memoryFiles(): FileStore
+function memoryFiles(hooks?: FileHooks): FileStore
 
 [./server] memoryJobs
 function memoryJobs(): JobStore
@@ -3416,7 +3421,7 @@ const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
 }
 
 [./server] s3Files
-function s3Files(options?: S3Options & { publicUrl?: string | undefined; }): FileStore
+function s3Files(options?: S3Options & { publicUrl?: string | undefined; } & FileHooks): FileStore
 
 [./server] safePath
 function safePath(root: string, name: string): string | undefined
@@ -3586,6 +3591,10 @@ interface Session<Data extends object>
 [./server] SessionData
 type SessionData = Record<string, unknown>
 
+[./server] SessionEvent
+interface SessionEvent
+  id: string | undefined
+
 [./server] SessionMatch
 type SessionMatch = ((data: SessionData) => boolean) | Readonly<Record<string, string | number | boolean | null>>
 
@@ -3596,6 +3605,8 @@ interface SessionOptions
   cookie?: string | undefined
   domain?: string | undefined
   maxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
+  onCreate?: Hook<SessionEvent> | undefined
+  onDestroy?: Hook<SessionEvent> | undefined
   sameSite?: SameSite | undefined
   secret?: string | string[] | undefined
   store?: SessionStore | false | undefined
