@@ -2,6 +2,7 @@ import { linkSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeF
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll } from 'bun:test'
+import { startedAt, sweepScratch } from './scratch-sweep'
 
 // The suite builds into this checkout's `.kay` and its fixtures', and prerenders over them, so two runs at once, as from two terminals or sessions, break each other's tests: a second run waits for the first.
 const DIR = join(import.meta.dir, '..', '.kay')
@@ -132,6 +133,12 @@ if (process.env[HELD] === undefined) {
   }
 
   process.env[HELD] = String(process.pid)
+
+  // Holding the turn, nothing else in this checkout is live: what earlier runs left in the scratch folder goes, but not what a worker of this run has made since the run began. Where the run's start is unknown, nothing goes.
+  const began = startedAt(Number(pidOf(own)))
+
+  if (began !== undefined)
+    await sweepScratch(join(DIR, 'scratch'), began)
 
   // `bun test` runs no `exit` listener, and a run stopped short leaves the lock to the next one, which finds its process gone; so does a parallel run, as no worker knows it ends last.
   if (!worker) {

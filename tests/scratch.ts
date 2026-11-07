@@ -2,14 +2,19 @@ import { cp, mkdir, rm } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 import { scratchDir as projectScratch } from '../src/test/scratch'
+import { made } from './scratch-track'
 
 // The checkout, which scratch directories go under as `.kay/scratch`: inside it, so a file a test writes there imports kay and the packages as the fixtures do, and two levels down, as a fixture is, so a copy's relative imports still reach the checkout.
 const CHECKOUT = join(import.meta.dir, '..')
 const SCRATCH = join(CHECKOUT, '.kay', 'scratch')
 
-// A fresh directory of its own, its absolute path.
+// A fresh directory of its own, its absolute path, removed once the process's tests ran (tests/scratch-track.ts).
 export async function scratchDir(prefix: string): Promise<string> {
-  return projectScratch(prefix, CHECKOUT)
+  const dir = await projectScratch(prefix, CHECKOUT)
+
+  made.add(dir)
+
+  return dir
 }
 
 // A copy of `tests/fixtures/<name>`, for a test that changes its files, by its path from the working directory as fixtures are named.

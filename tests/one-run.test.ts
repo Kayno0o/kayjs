@@ -40,6 +40,7 @@ describe('the test run lock', () => {
 
     await Bun.write(join(root, 'bunfig.toml'), '[test]\nroot = "./tests"\npreload = ["./tests/one-run.ts"]\n')
     await Bun.write(join(root, 'tests/one-run.ts'), Bun.file(join(import.meta.dir, 'one-run.ts')))
+    await Bun.write(join(root, 'tests/scratch-sweep.ts'), Bun.file(join(import.meta.dir, 'scratch-sweep.ts')))
     await Promise.all(files.map(async file => Bun.write(join(root, `tests/${file}.test.ts`), 'import { appendFileSync, existsSync } from \'node:fs\'\nimport { it } from \'bun:test\'\n\nit(\'runs\', async () => {\n  appendFileSync(\'runs.log\', `start ${process.env.RUN}\\n`)\n  while (!existsSync(\'gate\'))\n    await Bun.sleep(5)\n  appendFileSync(\'runs.log\', `end ${process.env.RUN}\\n`)\n})\n')))
 
     return root
@@ -53,6 +54,23 @@ describe('the test run lock', () => {
 
     return Bun.spawn([process.execPath, 'test', ...flags], { cwd: root, env, stdout: 'pipe', stderr: 'pipe' })
   }
+
+  it('clears the scratch directories an earlier run left, before the first test runs', async () => {
+    const root = await checkout()
+
+    try {
+      await Bun.write(join(root, 'gate'), '')
+      await Bun.write(join(root, '.kay/scratch/left-over/file.txt'), 'x')
+
+      // The start of a process is told to the second.
+      await Bun.sleep(1100)
+      expect(await run(root, 'a').exited).toBe(0)
+      expect(existsSync(join(root, '.kay/scratch/left-over'))).toBe(false)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 
   it('runs a second suite in a checkout once the first is done, and takes a lock its holder left behind', async () => {
     const root = await checkout()
