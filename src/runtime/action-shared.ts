@@ -7,7 +7,7 @@ import type { CallResult } from './call-result'
 import type { ErrorStatus, RouteParams } from './checks'
 import type { Duration } from './duration'
 import type { RequestContext } from './index'
-import type { EventReader, LoadStatus, Source } from './live'
+import type { Connection, LoadStatus, Source } from './live'
 import type { MaybePromise, StoreBase } from './store-base'
 
 export type { CallResult }
@@ -216,10 +216,8 @@ export interface Failure<Data> {
 export type Success<Output> = Exclude<Output, Failure<unknown>>
 
 // What a call to a handler returning an async iterable resolves with: its values read as they come, typed.
-export interface ActionStream<T> extends Omit<EventReader<T>, 'retry' | 'onOpen'> {
-  // Resolves with the last value once the stream ran to its end, undefined when it sent none; rejects with an `ActionError` when it failed, and an `AbortError` when it was closed first.
-  ended: () => Promise<T | undefined>
-}
+// It never reconnects by itself: `retry()` calls the action again, with the input and options of the call, once the stream failed, and reads the new answer into this same stream (`pending()` while it is sent, `onOpen(true)` once it opens); `ended()` rejects with an `ActionError` when the stream failed.
+export type ActionStream<T> = Connection<T>
 
 // What a handler's return settles to: an async iterable stays one even when it is also a thenable, as a model's reply is, which `Awaited` would read as its text.
 export type Settled<Output> = Output extends AsyncIterable<unknown> ? Output : Awaited<Output>

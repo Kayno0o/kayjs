@@ -81,6 +81,10 @@ A request that fails with `unavailable`, `rate-limited`, `timeout` or `network` 
 A `[x=slug]` route beside a plain `[y]` route now takes `été` and `a_b`, which used to fall through to the plain route: lowercase words of any script, digits and `_`, joined by dashes (and `/` in a rest param). Nothing already accepted is refused. A matcher now gets a second argument, `true` for a catch-all param, so one exported as a built-in taking a second parameter, `export default parseInt`, wraps it: `(value: string) => parseInt(value)`.
 
 ### The forms 1.88 deprecated are gone
+### `EventReader` and `StreamRun` are `Connection` and `Stream`, and `.on` of a stream is `.onData`
+
+`stream()` has two overloads and one return type: a `Stream`, a `Connection` with `start()` (a stream opened with `start: false` was a `StreamRun`), and a streaming action's `ActionStream` is a `Connection` too, so it has `retry()`, `onOpen()` and `onData()` beside `ended()`. `EventReader` and `StreamRun` from `kay` are `Connection` and `Stream`; the old names work until 1.95, `kay check` flags an import of them as `deprecated-stream-types` and `kay upgrade` renames it. `feed.on(value => ...)` is `feed.onData(({ value }) => ...)`, the hook every source hands its data through; `on` works until 1.95 and `kay check` flags it as `deprecated-stream-on`, with a safe fix, on a name the file binds once to `stream(` or `socket(` from `kay` (a stream reached through a property, a parameter or an action's answer is changed by hand). A mock of a stream written out as an object must add `ended`, `onData` and `start`.
+
 ### `notify` and `NotifyOptions` of `kay/library` are `dispatch` and `DispatchOptions`
 ### The 404 log functions of `kay/library` return promises, and a `pgData` store gains three tables
 

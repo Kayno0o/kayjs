@@ -117,13 +117,14 @@ button(onClick={() => messages.send({ text: text() })}) Send
 - `close()` closes it for good.
 - `onOpen(listener)` is called each time the connection opens, a reconnect included, before what was queued goes; its argument is `true` after the first open, so `onOpen(reconnected => reconnected && refetch())` catches up on what the drop lost. `stream()` has the same `onOpen`.
 - A client joining rooms by message joins them there, `messages.onOpen(() => messages.send({ type: 'join', room }))`, so it is back in them after a drop.
-- `stream(module, path, options)` reads one of its routes answering with `eventStream()`, with `last()`, `on()` and `status()` the same way.
+- `stream(module, path, options)` reads one of its routes answering with `eventStream()`, with `last()`, `onData(({ value }) => ...)` (which returns what stops it; `on(value => ...)` is the form before 1.92) and `status()` the same way. A stream and the stream a streaming action answers with are both a `Connection` from `kay`, and `stream()` gives a `Stream`, a `Connection` with `start()`.
+- `await feed.ended()` resolves with the last value once the stream ran to its end (undefined for none) and rejects with the `ApiError` it failed with, or an `AbortError` when `close()` came first.
 - Its `status()` is `done` once the stream ran to its end and `failed` when a guard or the route refused it or its source threw, `error()` then an `ApiError` with the refusal's `status`, `message` and `data`.
 - Every source an island reads, `resource`, `stream`, `socket`, `track()` and `call.track`, shares `status()`, `pending()` (loading or connecting), `error()` (the last failure as an `ApiError`, kept until the next success) and `retry()` (tries again now, skipping any backoff, and does nothing unless it failed or waits to reconnect), so one block shows any of them: `if source.error() as error` then `p {error.message}` and `button(onClick={source.retry} disabled={source.pending()}) Retry`. `LoadStatus` (`idle`, `loading`, `ready`, `failed`) and `ConnectionStatus` (`idle`, `connecting`, `open`, `done`, `failed`, `closed`) from `kay` type them.
 - `{ method: 'post', body }` reads a route taking a body, such as an AI answer.
 - A GET stream that drops reconnects; any other ends as failed.
 - `stream()` sends `Last-Event-ID` when it reconnects to a route whose `eventStream(source, { id })` gave ids, and has `onOpen(listener)` as `socket()` does ([resume after a drop](#resume-after-a-drop)).
-- `stream(module, path, { start: false })` stays `idle` until a handler calls `start(options)`, typed by the route.
+- `stream(module, path, { start: false })` stays `idle` until a handler calls `start(options)`, typed by the route; every stream has `start()`, which a stream that starts by itself ignores unless it is given options.
 - Each start opens a run with those params, query and body, which may hold a `File` or be a `FormData`, closing the one going and forgetting its `last()`.
 - `close()` aborts the request, which stops the route's source; a later `start()` opens it again.
 - `resource(module, path, options)` from `kay` reads one of its GET routes answering a value, typed from the route's `response` as JSON leaves it, a Date as its ISO text.

@@ -1,4 +1,4 @@
-import type { Caller } from './action-owner'
+import type { Caller, Settles } from './action-owner'
 import type { Action, ActionStream, CallOptions, CallQueue, Outcome, Refreshable, TrackedCall } from './action-shared'
 import type { Duration } from './duration'
 import { encodeCall } from './action-encode'
@@ -467,31 +467,44 @@ async function post<Output>(url: string, input: unknown, onProgress: (sent: numb
     }
   }
 
-  let response: Response
+  const answered = async () => {
+    try {
+      // A page holding a challenge for the action solves it from the moment one of its forms takes focus.
+      let response = await send(typeof document !== 'undefined' && document.querySelector(`script[${WORK_SCRIPT}]`) ? await (await import('./work.client')).spendWork(url) : undefined)
 
-  try {
-    // A page holding a challenge for the action solves it from the moment one of its forms takes focus.
-    response = await send(typeof document !== 'undefined' && document.querySelector(`script[${WORK_SCRIPT}]`) ? await (await import('./work.client')).spendWork(url) : undefined)
+      const challenge = response.status === 422 ? response.headers.get(WORK_HEADER) : null
 
-    const challenge = response.status === 422 ? response.headers.get(WORK_HEADER) : null
+      // A call with no challenge to solve, or a stale one, is answered a fresh one, and goes again with its solution.
+      if (challenge !== null)
+        response = await send(await (await import('./work.client')).spendWork(url, challenge))
 
-    // A call with no challenge to solve, or a stale one, is answered a fresh one, and goes again with its solution.
-    if (challenge !== null)
-      response = await send(await (await import('./work.client')).spendWork(url, challenge))
+      return response
+    }
+    finally {
+      // Pages prefetched while it was out, or once it ran whatever the answer, show what it changed no more than the ones before it.
+      prefetched.clear()
+    }
   }
-  finally {
-    // Pages prefetched while it was out, or once it ran whatever the answer, show what it changed no more than the ones before it.
-    prefetched.clear()
-  }
+
+  const response = await answered()
 
   void skew(response)
 
-  return readActionResponse(response, url, left, caller)
+  return readActionResponse(response, url, left, caller, async () => {
+    const again = await answered()
+
+    void skew(again)
+
+    return again
+  })
 }
+
+const streams = (response: Response) => response.ok && response.headers.get('content-type')?.startsWith('text/event-stream') === true
 
 // What a call to `action` got back: the handler's result, or an `ActionError` with the refused fields and the failure data.
 // `left` tells whether the visitor went to another page since the call was made, which a redirect then no longer takes them from; a stream closes with the island that called, else once another path is shown.
-export async function readActionResponse<Output>(response: Response, action: string, left?: () => boolean, caller?: Caller): Promise<Output> {
+// `call` posts the action again, which a stream that failed does when it is retried.
+export async function readActionResponse<Output>(response: Response, action: string, left?: () => boolean, caller?: Caller, call?: () => Promise<Response>): Promise<Output> {
   const target = response.headers.get(REDIRECT_HEADER)
 
   if (target !== null) {
@@ -513,8 +526,22 @@ export async function readActionResponse<Output>(response: Response, action: str
   }
 
   // Loaded only once an action streams, so a page calling none does not carry it.
-  if (response.ok && response.headers.get('content-type')?.startsWith('text/event-stream') === true) {
-    const stream = (await import('./action-stream')).actionStream(response, SETTLED, () => new ActionError(500, '', {}, undefined, `The stream of ${action} failed after its first value`))
+  if (streams(response)) {
+    const retrying = call && {
+      // What is not a stream again is the retry's failure: a refusal throws its `ActionError`, a redirect is followed.
+      send: async () => {
+        const next = await call()
+
+        if (streams(next))
+          return next
+
+        await readActionResponse(next, action, left, caller)
+
+        throw new TypeError(`kay: ${action} did not stream when it was called again`)
+      },
+      begun: (again: ActionStream<unknown> & Settles) => closeWithCaller(again, caller),
+    }
+    const stream = (await import('./action-stream')).actionStream(response, SETTLED, () => new ActionError(500, '', {}, undefined, `The stream of ${action} failed after its first value`), retrying)
 
     closeWithCaller(stream, caller)
 

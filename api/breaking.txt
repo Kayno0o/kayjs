@@ -75,8 +75,13 @@ kay [./server] StoredFile
 kay [./server] StoredNotification
 kay [./server] pushSubscriptions
 kay [./test] TestOptions
+kay [.] ActionStream
+kay [.] EventReader
 kay [.] LocalIssue
 kay [.] QueuedJob
+kay [.] Socket
+kay [.] StreamRun
+kay [.] stream
 mail [./sqlite] openLists
 mail [.] ListStore
 mail [.] Suppression

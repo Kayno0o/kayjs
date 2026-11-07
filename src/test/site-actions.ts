@@ -1,6 +1,6 @@
 import type { Action, ActionError, FailuresOf, ResolvedProtection, ResultOf, Settles } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
-import type { ConnectionStatus, EventReader } from '../runtime/live'
+import type { Connection, ConnectionStatus } from '../runtime/live'
 import type { PageReading } from './page'
 import type { SiteScope } from './site-scope'
 import type { CallArguments, FormValue, SubmitInit, Tested, TestSite } from './site-types'
@@ -48,11 +48,11 @@ function workHeaders(action: Action<never, unknown>): Record<string, string> {
   return work ? { [WORK_HEADER]: solveWork(signWork(action.url, work.difficulty, work.maxAge))! } : {}
 }
 
-function isStream(value: unknown): value is EventReader<unknown> & Settles {
+function isStream(value: unknown): value is Connection<unknown> & Settles {
   return (value as Partial<Settles> | null | undefined)?.[SETTLED] !== undefined
 }
 
-async function streamedValues(stream: EventReader<unknown> & Settles, url: string): Promise<unknown[]> {
+async function streamedValues(stream: Connection<unknown> & Settles, url: string): Promise<unknown[]> {
   const values: unknown[] = []
 
   stream.on(value => void values.push(value))

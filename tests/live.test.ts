@@ -532,6 +532,17 @@ describe('stream() started from a handler', () => {
     expect(ticks.last()?.at).toEqual(new Date(Date.UTC(2026, 0, 1)))
   })
 
+  it('hands each value to onData, waits for the end with ended(), and has start() on a stream that starts by itself', async () => {
+    const ticks = root(() => stream(chat, '/ticks', { start: false }))
+    const seen: number[] = []
+
+    ticks.onData(({ value: tick }) => void seen.push(tick.tick))
+    ticks.start({ query: { count: 2 } })
+    expect((await ticks.ended())?.tick).toBe(2)
+    expect(seen).toEqual([1, 2])
+    expect(typeof root(() => stream(chat, '/ticks', { query: { count: 1 } })).start).toBe('function')
+  })
+
   it('stops the route\'s source when closed, and starts again after', async () => {
     const forever = root(() => stream(chat, '/forever', { start: false }))
     const before = await stopped()

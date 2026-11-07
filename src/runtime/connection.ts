@@ -99,6 +99,44 @@ export function listenerSet<T>(): { on: (listener: (value: T) => void) => () => 
   }
 }
 
+// `on`, handing each value as `{ value }`, the shape every hook takes.
+export function onData<T>(on: (listener: (value: T) => void) => () => void): (listener: (event: { value: T }) => void) => () => void {
+  return listener => on(value => listener({ value }))
+}
+
+type Link<T> = ReturnType<typeof connection<T>>
+
+// What a connection that ends can be waited on with, for a stream read to its end: `settled(then)` calls `then` with how it ended (`done`, `failed` or `closed`), at once when it has, and `ended()` resolves with the last value once it ran to its end (undefined when it sent none), rejects with its failure, or with an `AbortError` when `close()` came first.
+export function ending<T>(link: Link<T>) {
+  const waiting: ((status: ConnectionStatus) => void)[] = []
+
+  const settle = () => {
+    const now = untrack(link.status)
+
+    if (now === 'done' || now === 'failed' || now === 'closed') {
+      for (const then of waiting.splice(0))
+        then(now)
+    }
+  }
+
+  const settled = (then: (status: ConnectionStatus) => void) => {
+    waiting.push(then)
+    settle()
+  }
+
+  link.watch(settle)
+
+  return {
+    settled,
+    ended: async () => new Promise<T | undefined>((resolve, reject) => settled((final) => {
+      if (final === 'done')
+        resolve(untrack(link.last))
+      else
+        reject(final === 'failed' ? untrack(link.error) : new DOMException('The stream was closed before its end', 'AbortError'))
+    })),
+  }
+}
+
 // The state a source that opens, delivers values and drops keeps: the listener set and the last value, the status and the last failure as signals and the backoff of a reconnect.
 // `open` makes one attempt, and `lost()` says it dropped: it retries after the backoff while `reconnect` is set, else fails the connection.
 export function connection<T>(open: () => void, reconnect: boolean, idle = false) {
@@ -109,6 +147,7 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
   let attempt = 0
   let cancel: (() => void) | undefined
   let waiting = false
+  let changed: (() => void) | undefined
 
   const stop = () => {
     waiting = false
@@ -124,6 +163,7 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
       setError(undefined)
 
     setStatus(next)
+    changed?.()
   }
 
   const fail = (failure: ApiError) => {
@@ -132,6 +172,7 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
 
     setError(failure)
     setStatus('failed')
+    changed?.()
   }
 
   return {
@@ -140,6 +181,10 @@ export function connection<T>(open: () => void, reconnect: boolean, idle = false
     pending: () => status() === 'connecting',
     error,
     on: listeners.on,
+    // Calls `fn` each time the status becomes `done`, `failed` or `closed`; `ending` builds on it.
+    watch: (fn: () => void) => {
+      changed = fn
+    },
     // Delivers a value to every listener; one that throws leaves the others and the connection alone.
     receive: (value: T) => {
       setLast(value)

@@ -131,14 +131,7 @@ interface ActionStartDetail
   data: FormData
 
 [.] ActionStream
-interface ActionStream<T> extends Omit<EventReader<T>, 'retry' | 'onOpen'>
-  close: () => void
-  ended: () => Promise<T | undefined>
-  error: () => ApiError<unknown> | undefined
-  last: () => T | undefined
-  on: (listener: (value: T) => void) => () => void
-  pending: () => boolean
-  status: () => ConnectionStatus
+type ActionStream<T> = Connection<T>
 
 [.] ActionSuccessDetail
 interface ActionSuccessDetail
@@ -247,6 +240,19 @@ interface CardPageContext<Params extends Record<string, unknown> = Record<string
 
 [.] Component
 type Component<Props = object> = (props: Props) => JSX.Element
+
+[.] Connection
+interface Connection<T> extends Source<ConnectionStatus>
+  close: () => void
+  ended: () => Promise<T | undefined>
+  error: () => ApiError<unknown> | undefined
+  last: () => T | undefined
+  on: (listener: (value: T) => void) => () => void
+  onData: (listener: (event: { value: T; }) => void) => () => void
+  onOpen: (listener: (reconnected: boolean) => void) => () => void
+  pending: () => boolean
+  retry: () => void
+  status: () => ConnectionStatus
 
 [.] ConnectionStatus
 type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'done' | 'failed' | 'closed'
@@ -370,15 +376,7 @@ function escapeHtml(text: string): string
 type EventHandler<Target, E extends Event> = (event: E & { currentTarget: Target, target: globalThis.Element }) => void
 
 [.] EventReader
-interface EventReader<T> extends Source<ConnectionStatus>
-  close: () => void
-  error: () => ApiError<unknown> | undefined
-  last: () => T | undefined
-  on: (listener: (value: T) => void) => () => void
-  onOpen: (listener: (reconnected: boolean) => void) => () => void
-  pending: () => boolean
-  retry: () => void
-  status: () => ConnectionStatus
+type EventReader<T> = Connection<T>
 
 [.] EventStream
 type EventStream<T> = Response & { readonly [EVENTS]: T }
@@ -1195,6 +1193,7 @@ interface Socket<Send, Receive> extends Source<SocketStatus>
   error: () => ApiError<unknown> | undefined
   last: () => Receive | undefined
   on: (listener: (message: Receive) => void) => () => void
+  onData: (listener: (event: { value: Receive; }) => void) => () => void
   onOpen: (listener: (reconnected: boolean) => void) => () => void
   pending: () => boolean
   retry: () => void
@@ -1223,11 +1222,24 @@ type Static<Type extends TSchema, Params extends unknown[] = [], Result = (Type 
 function store<T extends object>(value: T): T
 
 [.] stream
-function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, options: MethodOption<NodeAt<Module, Path>, M> & {
+function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<(MethodOption<NodeAt<Module, Path>, M> & {
   start: false;
-}): StreamRun<StreamValue<MethodRoute<Module, Path, Chosen<M>>>, StreamStartOptions<Module, Path, M>>
-function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M>>): StreamOf<Module, Path, M>
-function stream<T>(source: (signal: AbortSignal) => AsyncIterable<T>): EventReader<T>
+}) | StreamOptions<Module, Path, M>>): StreamOf<Module, Path, M>
+function stream<T>(source: (signal: AbortSignal) => AsyncIterable<T>): Stream<T, Record<never, never>>
+
+[.] Stream
+interface Stream<T, Options = Record<never, never>> extends Connection<T>
+  close: () => void
+  ended: () => Promise<T | undefined>
+  error: () => ApiError<unknown> | undefined
+  last: () => T | undefined
+  on: (listener: (value: T) => void) => () => void
+  onData: (listener: (event: { value: T; }) => void) => () => void
+  onOpen: (listener: (reconnected: boolean) => void) => () => void
+  pending: () => boolean
+  retry: () => void
+  start: (...[options]: Optional<Options>) => void
+  status: () => ConnectionStatus
 
 [.] StreamPath
 type StreamPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends {
@@ -1235,16 +1247,7 @@ type StreamPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found ex
 } ? [StreamMethod<Node>] extends [never] ? never : Path : never : never
 
 [.] StreamRun
-interface StreamRun<T, Options> extends EventReader<T>
-  close: () => void
-  error: () => ApiError<unknown> | undefined
-  last: () => T | undefined
-  on: (listener: (value: T) => void) => () => void
-  onOpen: (listener: (reconnected: boolean) => void) => () => void
-  pending: () => boolean
-  retry: () => void
-  start: (...[options]: Optional<Options>) => void
-  status: () => ConnectionStatus
+type StreamRun<T, Options> = Stream<T, Options>
 
 [.] StreamStartOptions
 type StreamStartOptions<Module, Path, M> = UrlOptions<MethodRoute<Module, Path, Chosen<M>>> & CallBody<MethodRoute<Module, Path, Chosen<M>>>

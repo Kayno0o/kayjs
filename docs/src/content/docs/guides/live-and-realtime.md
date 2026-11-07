@@ -306,7 +306,7 @@ const answer = stream(chat, '/answer', {
 p {answer.last()}
 ```
 
-`last()` is the latest event, `on()` gets each one, and `status()` tells whether the stream is open, done or failed. A failed stream has its reason in `error()`, and `retry()` starts it again.
+`last()` is the latest event, `onData(({ value }) => ...)` gets each one, and `status()` tells whether the stream is open, done or failed. A failed stream has its reason in `error()`, and `retry()` starts it again. `await answer.ended()` waits for the end and gives the last event, or throws the reason it failed.
 
 ### Starting a stream by hand
 
@@ -330,7 +330,7 @@ p {answer.last()}
 
 ### Streaming anything else
 
-`stream` also takes a function returning an async iterable, and gives `last()`, `on()`, `status()` and `close()`. The iterable has to stop on the `signal` the function receives.
+`stream` also takes a function returning an async iterable, and gives `last()`, `onData()`, `status()` and `close()`. The iterable has to stop on the `signal` the function receives.
 
 <ReadMore href="/llms/api-from-islands#event-streams">How a source is read and stopped, failure handling and keep-alive comments are in the full API routes reference.</ReadMore>
 

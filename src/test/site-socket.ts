@@ -1,4 +1,4 @@
-import type { EventReader } from '../runtime/live'
+import type { Connection } from '../runtime/live'
 import type { SiteScope } from './site-scope'
 import type { TestSite } from './site-types'
 import { joinBase } from '../runtime/base'
@@ -90,7 +90,7 @@ export function socketsOf({ defaults, keyHeader, base, jar, send, listening, con
 }
 
 // Keeps every message a client receives, for a test to read in order.
-function inbox<T>(client: Pick<EventReader<T>, 'on'>): { received: T[], next: () => Promise<T> } {
+function inbox<T>(client: Pick<Connection<T>, 'on'>): { received: T[], next: () => Promise<T> } {
   const received: T[] = []
   const waiting: ((value: T) => void)[] = []
   let read = 0

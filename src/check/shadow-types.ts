@@ -50,6 +50,7 @@ import { contextName, exportNames, hookDispatch } from './renamed-exports'
 import { compileShadow, guardTypes, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { sizeLimits } from './size-limits'
 import { untypedSockets } from './socket-routes'
+import { streamOn, streamTypes } from './stream-on'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
 import { uiTypes } from './ui-types'
@@ -152,6 +153,8 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => movedImports(root, options),
   async ({ root, options }) => deprecatedAuthOptions(root, options),
   async ({ root, options }) => deprecatedEscapeOption(root, options),
+  async ({ root, options }) => streamTypes(root, options),
+  async ({ root, options }) => streamOn(root, options),
   async ({ root, options }) => sizeLimits(root, options),
 ]
 
