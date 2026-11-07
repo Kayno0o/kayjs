@@ -395,7 +395,7 @@ function refusalOfApi<Data>(error: ApiError, refused: ((data: Data) => string | 
   const said = typeof error.data === 'object' && error.data !== null && !(error.data instanceof Blob) ? readRefused(refused, error.data as Data) : undefined
 
   // The messages the route gave for named fields count as its words too; the form-wide one under '' is the route's own text, already read from `data`.
-  const named = Object.entries(error.errors).find(([name, message]) => name !== '' && message !== '')?.[1]
+  const named = Object.entries(error.errors).filter(([name, message]) => name !== '' && message !== '').map(([, message]) => message).join(', ')
 
   return [said, error.status < 500 ? answerMessage(error.data) : undefined, error.status < 500 ? named : undefined].find(message => message !== undefined && message !== '')
 }

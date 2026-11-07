@@ -68,7 +68,7 @@ div({...rest} role={tone === 'danger' ? 'alert' : 'status'} data-tone={tone} dat
   if actions || source
     div(part="actions")
       if source
-        Button(label={retryLabel} size="sm" busy={source.pending()} disabled={source.pending()} onClick={source.retry})
+        Button(label={retryLabel} size="sm" busy={source.pending()} disabled={source.pending()} onClick={() => source.retry()})
       | {actions}
   if closable()
     NoticeDismiss(part="dismiss" label={dismissLabel} open={open} onDismiss={onDismiss})
