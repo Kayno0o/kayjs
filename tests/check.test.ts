@@ -1,6 +1,6 @@
 import type { CheckOptions } from '../src/check'
 import type { RenderedPage } from '../src/check/seo'
-import { chmod, mkdir, mkdtemp, readdir, rm, symlink, utimes } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readdir, rename, rm, symlink, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -4609,8 +4609,14 @@ describe.concurrent('kay check, unused code', () => {
   })
 
   it('reads the paths named from the current directory, through symlinks, and refuses one outside the project', async () => {
-    const root = await scratchProject({ 'src/a.kay': 'img(src="/a.png" width="1" height="1")\n', 'src/b.kay': 'img(src="/b.png" width="1" height="1")\n', '..foo/c.kay': 'img(src="/c.png" width="1" height="1")\n' })
-    const link = `${root}-link`
+    const made = await scratchProject({ 'src/a.kay': 'img(src="/a.png" width="1" height="1")\n', 'src/b.kay': 'img(src="/b.png" width="1" height="1")\n', '..foo/c.kay': 'img(src="/c.png" width="1" height="1")\n' })
+    // Its own parent, so `..` is a directory no other test writes into.
+    const parent = await scratchDir('check-parent-')
+    const root = join(parent, 'app')
+    const link = join(parent, 'link')
+
+    await rename(made, root)
+
     const files = async (result: Promise<{ report: string }>) => (JSON.parse((await result).report) as { problems: { file: string }[] }).problems.map(problem => basename(problem.file))
     const inRoot = async (...args: string[]) => kay(['check', ...args, '--format', 'json'], { cwd: root })
 
@@ -4631,8 +4637,7 @@ describe.concurrent('kay check, unused code', () => {
       expect((await inRoot('..')).code).toBe(1)
     }
     finally {
-      await rm(link, { force: true })
-      await rm(root, { recursive: true, force: true })
+      await rm(parent, { recursive: true, force: true })
     }
   })
 
