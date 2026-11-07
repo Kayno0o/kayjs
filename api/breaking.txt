@@ -6,6 +6,10 @@ kay [./server] KayConfig
 kay [./server] PagesOptions
 kay [./server] StoreRooms
 kay [./test] TestOptions
+mail [./sqlite] openLists
+mail [.] ListStore
+mail [.] Suppression
+mail [.] SuppressionStore
 mail [.] createMailListTables
 mail [.] createMailSuppressionTable
 mail [.] mailListTables

@@ -196,7 +196,7 @@ interface ListStore
   sent: (broadcast: string, subscriber: string, now?: number | undefined) => unknown
   subscribers: (list: string) => MaybePromise<Subscriber[]>
   suppress?: ((email: string, reason: SuppressionReason, source: string, now?: number | undefined) => MaybePromise<void>) | undefined
-  suppressed?: ((emails: string[]) => MaybePromise<Suppression[]>) | undefined
+  suppressed?: ((emails: string[]) => MaybePromise<StoredSuppression[]>) | undefined
   sweep: (now?: number | undefined) => MaybePromise<void>
 
 [.] Logo
@@ -474,6 +474,13 @@ interface SmtpSettings
   timeout?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   user?: string | undefined
 
+[.] StoredSuppression
+interface StoredSuppression extends Omit<Suppression, 'suppressedAt'>
+  email: string
+  reason: SuppressionReason
+  source: string
+  suppressedAt: number
+
 [.] Subscriber
 interface Subscriber
   confirmedAt: number | undefined
@@ -495,10 +502,10 @@ interface Subscription
 
 [.] Suppression
 interface Suppression
-  at: number
   email: string
   reason: SuppressionReason
   source: string
+  suppressedAt: Date
 
 [.] SuppressionReason
 type SuppressionReason = 'bounce' | 'complaint'
@@ -507,7 +514,7 @@ type SuppressionReason = 'bounce' | 'complaint'
 interface SuppressionStore
   lift: (email: string) => MaybePromise<boolean>
   suppress: (email: string, reason: SuppressionReason, source: string, now?: number | undefined) => MaybePromise<void>
-  suppressed: (emails: string[]) => MaybePromise<Suppression[]>
+  suppressed: (emails: string[]) => MaybePromise<StoredSuppression[]>
 
 [.] TextContent
 interface TextContent
@@ -662,7 +669,7 @@ component default
 function openLists(path: string): {
   progress(broadcast: Broadcast): BroadcastProgress;
   suppress(email: string, reason: SuppressionReason, source: string, now?: number): void;
-  suppressed: (emails: string[]) => Suppression[];
+  suppressed: (emails: string[]) => StoredSuppression[];
   lift: (email: string) => boolean;
   close: () => void;
   closed: boolean;

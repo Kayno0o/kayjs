@@ -73,6 +73,7 @@ describe('provider webhooks', () => {
 
     expect((await mail.suppression(hard))?.reason).toBe('bounce')
     expect((await mail.suppression(hard))?.source).toBe('postmark')
+    expect((await mail.suppression(hard))?.suppressedAt).toBeInstanceOf(Date)
     expect((await mail.suppression(complaint))?.reason).toBe('complaint')
     expect(await mail.suppression(soft)).toBeUndefined()
 

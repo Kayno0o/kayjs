@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite'
 import type { MaybePromise } from 'kay/library'
-import type { Suppression, SuppressionReason } from './events'
+import type { StoredSuppression, SuppressionReason } from './events'
 import { existsSync } from 'node:fs'
 import { normalizeAddress, openSqlite } from 'kay/library'
 import { log } from './log'
@@ -10,7 +10,7 @@ export interface SuppressionStore {
   // Remembers the address as one not to mail again, keeping the first reason and time it was given.
   suppress: (email: string, reason: SuppressionReason, source: string, now?: number) => MaybePromise<void>
   // The addresses among these that are suppressed, with why.
-  suppressed: (emails: string[]) => MaybePromise<Suppression[]>
+  suppressed: (emails: string[]) => MaybePromise<StoredSuppression[]>
   // Mails the address again; whether it was suppressed.
   lift: (email: string) => MaybePromise<boolean>
 }
@@ -21,13 +21,13 @@ export function suppressionsIn(db: Database) {
 
   const insert = db.query('INSERT OR IGNORE INTO kay_mail_suppressions (email, reason, source, at) VALUES (?1, ?2, ?3, ?4)')
   const remove = db.query('DELETE FROM kay_mail_suppressions WHERE email = ?1')
-  const one = db.query<Suppression, [string]>('SELECT email, reason, source, at FROM kay_mail_suppressions WHERE email = ?1')
+  const one = db.query<StoredSuppression, [string]>('SELECT email, reason, source, at AS suppressedAt FROM kay_mail_suppressions WHERE email = ?1')
 
   return {
     suppress(email: string, reason: SuppressionReason, source: string, now = Date.now()): void {
       insert.run(email, reason, source, now)
     },
-    suppressed: (emails: string[]): Suppression[] => emails.flatMap(email => one.get(email) ?? []),
+    suppressed: (emails: string[]): StoredSuppression[] => emails.flatMap(email => one.get(email) ?? []),
     lift: (email: string): boolean => remove.run(email).changes > 0,
   }
 }
@@ -52,9 +52,9 @@ export function suppressionsOf(stores: { write: () => SuppressionStore[], read: 
 
   return {
     // The suppressed among the addresses, by their normalised form; a store that cannot answer must not stop the mail it was asked about.
-    suppressed: async (addresses: string[]): Promise<Map<string, Suppression>> => {
+    suppressed: async (addresses: string[]): Promise<Map<string, StoredSuppression>> => {
       const emails = [...new Set(addresses.flatMap(address => normalizeAddress(address) ?? []))]
-      const found = new Map<string, Suppression>()
+      const found = new Map<string, StoredSuppression>()
 
       if (emails.length === 0)
         return found

@@ -1,6 +1,6 @@
 import type { Hook } from 'kay/library'
 import type { EnqueueOptions, ExtensionApp, FailedJob, KayExtension, QueueOptions } from 'kay/server'
-import type { EventSecrets, Found, Suppression, SuppressionReason } from './events'
+import type { EventSecrets, Found, StoredSuppression, Suppression, SuppressionReason } from './events'
 import type { ListOptions, ListRun, ListsHandle, MailingList, Subscription } from './list'
 import type { ListStore } from './list-store'
 import type { MailReply } from './mime'
@@ -236,7 +236,7 @@ function isBulk(mail: Mail): boolean {
 }
 
 // The suppressions that stop this mail: a bounce stops every mail, a complaint only bulk mail, so a password reset still reaches an address that reported a newsletter.
-function withheld(found: Map<string, Suppression>, mail: Mail): Map<string, Suppression> {
+function withheld(found: Map<string, StoredSuppression>, mail: Mail): Map<string, StoredSuppression> {
   return isBulk(mail) ? found : new Map([...found].filter(([, entry]) => entry.reason === 'bounce'))
 }
 
@@ -806,7 +806,11 @@ export function mailer(options: MailerOptions = {}): Mailer {
     subscriptions: async (address: string) => lists.subscriptions(address),
     suppress: async (address: string, reason: SuppressionReason = 'bounce') => lists.suppress(address, reason, 'manual'),
     unsuppress: async (address: string) => lists.lift(address),
-    suppression: async (address: string) => (await lists.suppressed([address])).values().next().value,
+    suppression: async (address: string): Promise<Suppression | undefined> => {
+      const found = (await lists.suppressed([address])).values().next().value
+
+      return found && { ...found, suppressedAt: new Date(found.suppressedAt) }
+    },
     erase: async (address: string) => await lists.erase(address) + await sending.remove({ recipient: address }),
     drain: async () => {
       const mails = await jobs.drain()

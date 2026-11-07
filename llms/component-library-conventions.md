@@ -19,6 +19,10 @@ How kay and its libraries name the same idea, written before the renames land: a
 - Paging by page number takes `pageSize` and `page`; a window onto a list takes `limit` and `offset`. An API is one or the other (#1689).
 - Look goes in the library's settings module (`kay.settings`), behaviour in the call or extension options. A logo is `{ src, alt, width?, height?, href? }`, the `Logo` type of `kay/library`: mail and cms read theirs from the settings module, kayjs-ui and kayjs-auth have no logo of their own and kayjs-ai restyles through CSS properties (#1690).
 
+**Times**
+- A record or event an app reads carries its times as `Date`: `null` when absent on a stored row, optional on an event. Epoch milliseconds belong to store interfaces (what a `*Store` keeps or returns) and to the wire to the browser, never to a record an app reads (#3000).
+- A time is named `<verb>At` (`createdAt`, `sentAt`, `suppressedAt`) and its end `expiresAt`, never bare `at`, `modified`, `date` or `expires`. What a person wrote keeps its name: a front-matter `date`, a feed item's `date`, an email's `Date` header.
+
 **Hooks and switches**
 - An `on*` hook takes one event object, `onSave({ ... })`, and returns nothing. A callback that returns data is named for what it returns (`profileFields`, `exportData`), not `on*` (#1694).
 - A switch is `false` to turn off what is on by default and `true` to turn on what is off by default, with an object where it takes options; the default is the first line of its doc. `optional` on mail is reviewed against this (#1694).

@@ -1,6 +1,6 @@
 import type { SQL } from 'bun'
 import type { PgSource } from 'kay/library'
-import type { Suppression, SuppressionReason } from './events'
+import type { StoredSuppression, SuppressionReason } from './events'
 import type { SuppressionStore } from './suppressions'
 import { connectionOf, privilegeRefused, relationsMissing } from 'kay/library'
 
@@ -77,10 +77,10 @@ export function pgSuppressions(source: PgSource): SuppressionStore & { close: ()
     async suppress(email: string, reason: SuppressionReason, source: string, now = Date.now()): Promise<void> {
       await (await created()).unsafe('INSERT INTO kay_mail_suppressions (email, reason, source, at) VALUES ($1, $2, $3, $4::bigint) ON CONFLICT DO NOTHING', [email, reason, source, now])
     },
-    async suppressed(emails: string[]): Promise<Suppression[]> {
+    async suppressed(emails: string[]): Promise<StoredSuppression[]> {
       const found = await read<{ email: string, reason: SuppressionReason, source: string, at: string }>('SELECT email, reason, source, at FROM kay_mail_suppressions WHERE email = ANY($1::text[])', [emails])
 
-      return found.map(row => ({ ...row, at: Number(row.at) }))
+      return found.map(({ at, ...row }) => ({ ...row, suppressedAt: Number(at) }))
     },
     async lift(email: string): Promise<boolean> {
       return (await read('DELETE FROM kay_mail_suppressions WHERE email = $1 RETURNING email', [email])).length > 0

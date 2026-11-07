@@ -29,7 +29,7 @@ What a suppression does:
 - The address leaves every mailing list at once, with its delivery rows, as an unsubscribe does, so a broadcast under way mails it no more.
 - It is kept in a `kay_mail_suppressions` table: in the mailer's `suppressionStore` when given, else in the list stores (`listStore`, a list's `store`), else in the app's database (`pgData` or `sqliteData`) or `data/mail-list.sqlite`, made by the first suppression with that table alone, so a mailer with no list opens no list store. A lookup before it makes no file, and what a list store kept stays in force. The first reason and time stay.
 - On several servers with no list, `mailer({ suppressionStore: pgSuppressions(db) })` keeps them in Postgres, `db` as `pgLists` takes it, the table made by the first one; a role that may not create it has the owner run `createMailSuppressionTables(db)` and lists `kay_mail_suppressions` in pg-orm's `ignoreTables`. `sqliteSuppressions(path)` names another SQLite file. `pgLists`, `pgSuppressions` and their table creators come from `@kaynooo/kayjs-mail/pg`, `sqliteSuppressions` and `openLists` from `@kaynooo/kayjs-mail/sqlite`. Any object with `suppress`, `suppressed` and `lift` (`SuppressionStore`) works.
-- `mail.suppress(address, reason = 'bounce')`, `mail.unsuppress(address)` and `mail.suppression(address)` (`{ email, reason, source, at }`) do by hand what a webhook does; `mail.erase(address)` lifts it with the rest of a person.
+- `mail.suppress(address, reason = 'bounce')`, `mail.unsuppress(address)` and `mail.suppression(address)` (`{ email, reason, source, suppressedAt }`, a `Date`) do by hand what a webhook does; `mail.erase(address)` lifts it with the rest of a person.
 - A subscriber who bounced or complained and signs up again gets no confirmation mail; `mail.unsuppress` once the address is fixed.
 
 ### Read delivery reports and replies
@@ -53,5 +53,5 @@ export const mail = mailer({
 
 ## Reference
 
-- Types: `EventSecrets`, `Suppression`, `SuppressionReason`, `MailReply`, `ReplyAttachment`.
+- Types: `EventSecrets`, `Suppression`, `StoredSuppression` (what a `SuppressionStore` keeps, `suppressedAt` in milliseconds), `SuppressionReason`, `MailReply`, `ReplyAttachment`.
 - Not understood yet: Amazon SES (SNS notifications need the signing certificate fetched).

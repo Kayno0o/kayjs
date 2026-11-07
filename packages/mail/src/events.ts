@@ -22,7 +22,12 @@ export interface Suppression {
   reason: SuppressionReason
   // `postmark`, `dsn`, `manual`...: where the address was learned of.
   source: string
-  at: number
+  suppressedAt: Date
+}
+
+// What a `SuppressionStore` keeps of one: `suppressedAt` in milliseconds.
+export interface StoredSuppression extends Omit<Suppression, 'suppressedAt'> {
+  suppressedAt: number
 }
 
 // The secrets that open each provider's route, `MAIL_EVENTS_<PROVIDER>` in the environment unless given here.

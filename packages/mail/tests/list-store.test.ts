@@ -62,7 +62,7 @@ for (const [kind, open, enabled] of stores) {
       expect(await store.suppressed!([address])).toEqual([])
       await store.suppress!(address, 'bounce', 'postmark', 5000)
       await store.suppress!(address, 'complaint', 'resend', 9000)
-      expect(await store.suppressed!([address, email('other')])).toEqual([{ email: address, reason: 'bounce', source: 'postmark', at: 5000 }])
+      expect(await store.suppressed!([address, email('other')])).toEqual([{ email: address, reason: 'bounce', source: 'postmark', suppressedAt: 5000 }])
       expect(await store.lift!(address)).toBe(true)
       expect(await store.lift!(address)).toBe(false)
       expect(await store.suppressed!([address])).toEqual([])
