@@ -258,6 +258,13 @@ describe('the dev tool\'s database endpoints', () => {
       expect((await dbQuery('select 1')).rows).toEqual([['1']])
     }, 15_000)
 
+    it('answers a flood of reads, a few workers at a time', async () => {
+      const answers = await Promise.all(Array.from({ length: 12 }, async () => dbQuery('select count(*) from big')))
+
+      for (const answer of answers)
+        expect(answer.rows).toEqual([['10000']])
+    })
+
     it('answers nothing in production', async () => {
       const production = await app({ dev: false })
 

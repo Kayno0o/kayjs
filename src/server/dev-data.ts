@@ -29,6 +29,7 @@ const SQLITE_URL = /^(?:sqlite:\/\/|file:)(.+)$/
 const SQLITE_FILE = /\.(?:db|sqlite3?)$/i
 const SQLITE_HEADER = 'SQLite format 3\0'
 const DATA_FOLDER = 'data'
+const MAX_WORKERS = 2
 const POSTGRES_ID = 'postgres'
 const SQLITE_PREFIX = 'sqlite:'
 
@@ -167,34 +168,58 @@ function searched(root: string): string[] {
 const sqliteFile = (root: string, id: string) => resolve(root, id.slice(SQLITE_PREFIX.length))
 
 // The database a request names (`db`, the first one when it names none), or the response that refuses it.
-function pick(root: string, name: string | null): DevDatabase | Response {
-  const all = databases(root)
+function pick(root: string, all: DevDatabase[], name: string | null): DevDatabase | Response {
   const chosen = name === null ? all[0] : all.find(({ id }) => id === name)
 
   return chosen ?? refused(name === null ? `the app has no database: ${searched(root).join(', ')} held none` : `${name} is not a database of the app`, 404)
 }
 
+let running = 0
+const waiting: (() => void)[] = []
+
+// At most `MAX_WORKERS` reads run at once, the rest wait, so a flood of requests or of runaway queries never spawns many threads.
+async function slot(): Promise<void> {
+  if (running >= MAX_WORKERS)
+    await new Promise<void>(resume => waiting.push(resume))
+  else
+    running++
+}
+
+function release(): void {
+  const next = waiting.shift()
+
+  if (next === undefined)
+    running--
+  else
+    next()
+}
+
 // One read of a SQLite file in a worker of its own, stopped when it outruns the timeout.
 async function sqlite(path: string, task: SqliteTask): Promise<SqliteAnswer> {
-  const worker = new Worker(new URL('./dev-sqlite-worker.ts', import.meta.url))
+  await slot()
+
+  let worker: Worker | undefined
 
   try {
+    const started = worker = new Worker(new URL('./dev-sqlite-worker.ts', import.meta.url))
+
     return await new Promise<SqliteAnswer>((done) => {
       const timer = setTimeout(done, QUERY_TIMEOUT_MS, { error: `the query ran longer than ${QUERY_TIMEOUT_MS / 1000} seconds` })
 
-      worker.onmessage = ({ data }: MessageEvent<SqliteAnswer>) => {
+      started.onmessage = ({ data }: MessageEvent<SqliteAnswer>) => {
         clearTimeout(timer)
         done(data)
       }
-      worker.onerror = (event) => {
+      started.onerror = (event) => {
         clearTimeout(timer)
         done({ error: event.message })
       }
-      worker.postMessage({ path, task })
+      started.postMessage({ path, task })
     })
   }
   finally {
-    worker.terminate()
+    worker?.terminate()
+    release()
   }
 }
 
@@ -273,7 +298,7 @@ export async function devData(request: Request, root: string): Promise<Response>
   if (all.length === 0)
     return Response.json({ configured: false, databases: [], database: undefined, searched: searched(root), tables: [] } satisfies DevDataOverview)
 
-  const chosen = pick(root, new URL(request.url).searchParams.get('db'))
+  const chosen = pick(root, all, new URL(request.url).searchParams.get('db'))
 
   if (chosen instanceof Response)
     return chosen
@@ -308,7 +333,7 @@ export async function devRows(request: Request, root: string): Promise<Response>
     return denied
 
   const params = new URL(request.url).searchParams
-  const chosen = pick(root, params.get('db'))
+  const chosen = pick(root, databases(root), params.get('db'))
 
   if (chosen instanceof Response)
     return chosen
@@ -480,7 +505,7 @@ export async function devQuery(request: Request, root: string): Promise<Response
   if (why !== undefined)
     return refused(why)
 
-  const chosen = pick(root, typeof body.db === 'string' ? body.db : null)
+  const chosen = pick(root, databases(root), typeof body.db === 'string' ? body.db : null)
 
   if (chosen instanceof Response)
     return chosen
