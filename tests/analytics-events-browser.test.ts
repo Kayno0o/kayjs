@@ -79,4 +79,15 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
     expect(download!.props!.url).toMatch(/\/files\/guide\.PDF$/)
     expect(rest).toEqual([])
   })
+
+  it('counts a file on another site as a download, not an outbound link', async () => {
+    const count = received.length
+
+    await page.evaluate(() => document.body.insertAdjacentHTML('beforeend', '<a id="far" href="https://elsewhere.example/big.zip">far</a>'))
+    await page.click('#far')
+    await visits(count + 1)
+    await Bun.sleep(100)
+
+    expect(sent().slice(count).map(entry => entry.name)).toEqual(['File Download'])
+  })
 })

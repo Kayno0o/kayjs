@@ -11,6 +11,11 @@ export function trackerFor(options: AnalyticsOptions): string {
   return trackerScript(events !== undefined && events !== false, typeof events === 'object' && events.outbound === true, downloads !== undefined && downloads !== false)
 }
 
+// A short hash of the built tracker, written on its tag as `?v=`: a new kay or a changed config is a new URL, so the long cache never holds a tracker the page's options do not fit.
+export function trackerVersion(options: AnalyticsOptions): string {
+  return new Bun.CryptoHasher('sha256').update(trackerFor(options)).digest('hex').slice(0, 10)
+}
+
 function trackerScript(events: boolean, outbound: boolean, downloads: boolean): string {
   return `(() => {
   const script = document.currentScript
@@ -182,7 +187,7 @@ function linkClicks(outbound: boolean, downloads: boolean): string {
     if (link && /^https?:$/.test(link.protocol)) {
       const url = link.origin + link.pathname
 
-      ${[outbound && 'if (link.origin !== location.origin)\n        track(\'Outbound Link: Click\', { url })', downloads && 'if (link.hasAttribute(\'download\') || files.has(link.pathname.split(\'.\').pop().toLowerCase()))\n        track(\'File Download\', { url })'].filter(Boolean).join('\n      else ')}
+      ${[downloads && 'if (link.hasAttribute(\'download\') || files.has(link.pathname.split(\'.\').pop().toLowerCase()))\n        track(\'File Download\', { url })', outbound && 'if (link.origin !== location.origin)\n        track(\'Outbound Link: Click\', { url })'].filter(Boolean).join('\n      else ')}
     }
 `
 }

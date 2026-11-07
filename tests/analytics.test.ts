@@ -120,7 +120,7 @@ describe('the script and the page', () => {
 
     expect(notice.headers.get('content-type')).toContain('javascript')
     expect(await notice.text()).toContain('aria-labelledby')
-    expect(home).toContain('src="/_kay/analytics.js"')
+    expect(home).toContain('src="/_kay/analytics.js?v=')
     expect(home).not.toContain('data-consent')
   })
 
@@ -701,7 +701,7 @@ describe('under a base and a trailing slash', () => {
       const script = await mounted.fetch('/_kay/analytics.js')
       const sent = await mounted.fetch('/_kay/analytics', { method: 'POST', body: JSON.stringify(visit({ u: 'http://localhost/shop/pricing/' })), headers: { 'user-agent': CHROME, 'x-forwarded-for': '198.51.100.20', 'cookie': 'kay_analytics=yes' } })
 
-      expect(home).toContain('src="/shop/_kay/analytics.js"')
+      expect(home).toContain('src="/shop/_kay/analytics.js?v=')
       expect(script.status).toBe(200)
       await forwardsSettled()
 
@@ -894,7 +894,7 @@ describe('Fathom and Cloudflare Web Analytics', () => {
     const notice = await app.handle(new Request('http://localhost/_kay/analytics/notice.js'))
 
     expect(html).not.toContain(`src="${src}"`)
-    expect(html).toContain('src="/_kay/analytics.js"')
+    expect(html).toContain('src="/_kay/analytics.js?v=')
     expect(html).toContain('data-info')
     expect(html).not.toContain('data-consent')
     expect(loaderOf(html).src).toBe(src)
@@ -917,7 +917,7 @@ describe('Fathom and Cloudflare Web Analytics', () => {
     const { html } = await home({ provider: 'fathom', siteId: 'ABCDEFGH', consent: true })
 
     expect(html).not.toContain('src="https://cdn.usefathom.com/script.js"')
-    expect(html).toContain('src="/_kay/analytics.js"')
+    expect(html).toContain('src="/_kay/analytics.js?v=')
     expect(html).toContain('data-load=')
     expect(html).toContain('data-consent')
     expect((await (await site({ provider: 'fathom', siteId: 'ABCDEFGH', consent: true })).handle(new Request('http://localhost/_kay/analytics.js'))).status).toBe(200)
@@ -973,7 +973,7 @@ describe('a custom provider', () => {
     const direct = await (await (await site(custom({ info: false }))).handle(new Request('http://localhost/'))).text()
 
     expect(lined).toContain('data-info')
-    expect(lined).toContain('src="/_kay/analytics.js"')
+    expect(lined).toContain('src="/_kay/analytics.js?v=')
     expect(lined).not.toContain('src="/_kay/analytics/script.js"')
     expect(lined).toContain('data-load="{&quot;src&quot;:&quot;/_kay/analytics/script.js&quot;')
     expect(direct).not.toContain('data-info')
@@ -995,7 +995,7 @@ describe('a custom provider', () => {
       const script = await mounted.fetch('/_kay/analytics/script.js?base=%2Fshop')
       const hostile = await mounted.fetch('/_kay/analytics/script.js?base=%22%2B%2Fevil')
 
-      expect(home).toContain('src="/shop/_kay/analytics.js"')
+      expect(home).toContain('src="/shop/_kay/analytics.js?v=')
       expect(home).toContain('data-info')
       expect(script.status).toBe(200)
       expect(await script.text()).toContain('fetch("/shop/_kay/analytics/collect"')
@@ -1423,5 +1423,98 @@ describe('custom events', () => {
 
     expect((params.long as string).length).toBe(100)
     expect(Object.keys(params).length).toBeLessThanOrEqual(25)
+  })
+})
+
+describe('custom events, guarded and hardened', () => {
+  const event = (name: unknown, props?: unknown) => ({ ...visit(), e: name, p: props })
+  const lastBody = () => received.at(-1)!.body as Record<string, unknown>
+
+  it('drops a browser event whose name an events.names list does not hold, and forwards a listed one and kay\'s own', async () => {
+    const app = await site(plausible({ events: { names: ['Signup'], downloads: true } }))
+
+    expect((await send(app, event('Invented'))).status).toBe(204)
+    expect(received).toEqual([])
+
+    await send(app, event('Signup'))
+    await send(app, event('File Download', { url: 'http://localhost/a.pdf' }))
+    await send(app, event('  Signup  '))
+
+    expect(received.map(entry => (entry.body as { name: string }).name)).toEqual(['Signup', 'File Download', 'Signup'])
+  })
+
+  it('does not limit a server-side event to events.names', async () => {
+    await site(plausible({ events: { names: ['Signup'] }, hosts: ['track-e.example'] }))
+    await track({ request: new Request('http://localhost/x', { headers: { 'user-agent': CHROME } }) }, 'Anything')
+    await forwardsSettled()
+
+    expect(lastBody()).toMatchObject({ name: 'Anything' })
+  })
+
+  it('refuses events.names that is no list of names', () => {
+    expect(() => analytics(plausible({ events: { names: 'Signup' } }))).toThrow('events.names')
+    expect(() => analytics(plausible({ events: { names: [''] } }))).toThrow('events.names')
+  })
+
+  it('names the tracker by a hash that changes with events and caches it for good under that hash', async () => {
+    const srcOf = async (more: object) => (/src="(\/_kay\/analytics\.js\?v=[0-9a-f]+)"/).exec(await (await (await site(plausible(more))).handle(new Request('http://localhost/'))).text())![1]!
+    const plain = await srcOf({})
+    const marked = await srcOf({ events: true })
+    const links = await srcOf({ events: { outbound: true } })
+
+    expect(new Set([plain, marked, links]).size).toBe(3)
+    expect(await srcOf({})).toBe(plain)
+
+    const app = await site(plausible())
+    const named = await app.handle(new Request(`http://localhost${plain}`))
+    const bare = await app.handle(new Request('http://localhost/_kay/analytics.js'))
+    const stale = await app.handle(new Request('http://localhost/_kay/analytics.js?v=0000000000'))
+
+    expect(named.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+    expect(bare.headers.get('cache-control')).toBe('public, max-age=3600')
+    expect(stale.headers.get('cache-control')).toBe('public, max-age=3600')
+  })
+
+  it('counts a link that is a file and another site as a download when downloads are on, else as outbound', async () => {
+    const both = await (await (await site(plausible({ events: { outbound: true, downloads: true } }))).handle(new Request('http://localhost/_kay/analytics.js'))).text()
+    const outbound = await (await (await site(plausible({ events: { outbound: true } }))).handle(new Request('http://localhost/_kay/analytics.js'))).text()
+
+    expect(both.indexOf('File Download')).toBeLessThan(both.indexOf('Outbound Link'))
+    expect(both).toContain('else if (link.origin')
+    expect(outbound).not.toContain('File Download')
+  })
+
+  it('skips a __proto__ prop, trims the name and builds props with no prototype', async () => {
+    await send(await site(plausible()), '{"u":"http://localhost/","e":"  hi  ","p":{"__proto__":"x","constructor":"y","a":"b"}}')
+
+    expect(lastBody()).toMatchObject({ name: 'hi', props: { constructor: 'y', a: 'b' } })
+    expect(Object.keys((lastBody() as { props: object }).props)).toEqual(['constructor', 'a'])
+  })
+
+  it('keeps the first of two props that GA4 names alike', async () => {
+    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, consent: false }), event('x', { 'a-b': 'first', 'a_b': 'second' }))
+
+    const [sent] = (lastBody() as { events: { params: Record<string, unknown> }[] }).events
+
+    expect(sent!.params.a_b).toBe('first')
+  })
+
+  it('gives server-side events a rate allowance of their own', async () => {
+    await site(plausible({ hosts: ['track-f.example'] }))
+
+    // A request with no address is counted under one name, in the visit bucket as in the server one.
+    const post = async () => (await (await site(plausible())).handle(new Request('http://localhost/_kay/analytics', { method: 'POST', body: JSON.stringify(visit()), headers: { 'content-type': 'text/plain', 'user-agent': CHROME } }))).status
+    const statuses: number[] = []
+
+    for (let at = 0; at < 125; at++)
+      statuses.push(await post())
+
+    expect(statuses.at(-1)).toBe(429)
+    await forwardsSettled()
+    received = []
+    await track({ request: new Request('http://localhost/x', { headers: { 'user-agent': CHROME } }) }, 'Signup')
+    await forwardsSettled()
+
+    expect(received).toHaveLength(1)
   })
 })

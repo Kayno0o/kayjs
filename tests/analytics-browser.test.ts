@@ -552,7 +552,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a tracker 
 
     const nonceOf = async (selector: string) => opened.evaluate(find => document.querySelector<HTMLScriptElement>(find)?.nonce, selector)
 
-    expect(await nonceOf('script[src$="/_kay/analytics.js"]')).toBe('n0nce')
+    expect(await nonceOf('script[src*="/_kay/analytics.js"]')).toBe('n0nce')
     expect(await nonceOf('script[src$="/notice.js"]')).toBe('n0nce')
 
     await opened.click('section[aria-labelledby] button:first-of-type')

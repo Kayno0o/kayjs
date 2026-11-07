@@ -8,7 +8,7 @@ import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
 import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH, INTEGRITY, isGated, NOTICE_SCRIPT_PATH } from './analytics'
-import { NOTICE_SCRIPT, trackerFor } from './analytics-script'
+import { NOTICE_SCRIPT, trackerFor, trackerVersion } from './analytics-script'
 import { BASE_PATH, routerPath } from './base'
 import { declined } from './consent-cookie'
 import { readCapped } from './errors'
@@ -25,6 +25,10 @@ const MINUTE_MS = 60_000
 const PROVIDER_TIMEOUT_MS = 5000
 const RATE_NAME = 'kay:analytics'
 const COLLECT_RATE_NAME = 'kay:analytics-collect'
+// Events counted from the server have a bucket of their own, so they never use up a visitor's page-view allowance.
+const SERVER_RATE_NAME = 'kay:analytics-server'
+// The names kay's own outbound-link and download events carry, which an `events.names` list never leaves out.
+const BUILT_IN_EVENTS = new Set(['Outbound Link: Click', 'File Download'])
 const MAX_PENDING = 200
 const DAY_MS = 86_400_000
 // A GA4 session is a half hour of one visitor's page views.
@@ -151,7 +155,7 @@ const PROVIDERS = {
     body: {
       client_id: visit.visitor,
       events: [{ name: visit.event === undefined ? 'page_view' : ga4Name(visit.event.name), params: {
-        ...visit.event !== undefined && Object.fromEntries(Object.entries(visit.event.props).slice(0, GA4_PROPS).map(([key, value]) => [ga4Name(key), typeof value === 'string' ? value.slice(0, GA4_VALUE_LENGTH) : value])),
+        ...visit.event !== undefined && Object.fromEntries(Object.entries(visit.event.props).slice(0, GA4_PROPS).map(([key, value]) => [ga4Name(key), typeof value === 'string' ? value.slice(0, GA4_VALUE_LENGTH) : value]).reverse()),
         page_location: visit.page.href,
         page_referrer: visit.referrer,
         page_title: visit.title,
@@ -230,8 +234,10 @@ export function analyticsServer(options: AnalyticsOptions): AnyElysia {
   active = options.provider === 'custom' || options.provider === 'fathom' || options.provider === 'cloudflare' ? undefined : { options, gated }
 
   const script = trackerFor(options)
+  const version = trackerVersion(options)
   const tracker = new Elysia({ name: 'kay-analytics' })
-    .get(ANALYTICS_SCRIPT_PATH, () => new Response(script, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=3600' } }))
+    // The tag names the script by its hash, so a request carrying this one is cached for good and any other revalidates within the hour.
+    .get(ANALYTICS_SCRIPT_PATH, ({ query }) => new Response(script, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': query.v === version ? 'public, max-age=31536000, immutable' : 'public, max-age=3600' } }))
     .get(NOTICE_SCRIPT_PATH, () => new Response(NOTICE_SCRIPT, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=3600' } }))
 
   if (options.provider === 'custom')
@@ -241,6 +247,8 @@ export function analyticsServer(options: AnalyticsOptions): AnyElysia {
     return tracker
 
   const hosts = new Set((options.hosts ?? []).map(host => host.toLowerCase()))
+  // The names a browser may send when the app listed them: a client that is no browser can send any name, and a provider caps or bills the distinct ones.
+  const names = typeof options.events === 'object' && options.events.names !== undefined ? new Set(options.events.names.map(name => name.trim())) : undefined
 
   return tracker
     .post(ANALYTICS_PATH, async ({ request, server }) => {
@@ -266,7 +274,7 @@ export function analyticsServer(options: AnalyticsOptions): AnyElysia {
       if (options.titles !== true)
         visit.title = ''
 
-      const excluded = skippedPath(options.exclude, visit.page.pathname, baseOf(request, visit.scope))
+      const excluded = skippedPath(options.exclude, visit.page.pathname, baseOf(request, visit.scope)) || (visit.event !== undefined && names !== undefined && !names.has(visit.event.name) && !BUILT_IN_EVENTS.has(visit.event.name))
 
       // A development server, a test, a visitor who has not agreed where a yes is needed (the cookie is theirs to send, so a request without it is one the notice never asked) and one who opted out are answered as a counted visit, so nothing tells them apart.
       if (process.env.NODE_ENV !== 'production' || declined(request, gated) || visit.userAgent === '' || excluded)
@@ -309,7 +317,7 @@ export async function trackEvent(request: Request, name: string, props: Record<s
 
   const address = clientAddress(request, undefined)
 
-  if (await overLimit(RATE_NAME, address, VISITS_PER_MINUTE, MINUTE_MS) !== undefined)
+  if (await overLimit(SERVER_RATE_NAME, address, VISITS_PER_MINUTE, MINUTE_MS) !== undefined)
     return
 
   send(options, withIdentity(options, { page, referrer: '', title: '', screen: undefined, language: undefined, userAgent, event }, address))
@@ -506,14 +514,15 @@ function eventOf(name: string, props: unknown): EventData | undefined {
   if (typeof name !== 'string' || name.trim() === '' || name.length > MAX_EVENT_NAME_LENGTH || name.replace(CONTROL_CHARACTERS, '') !== name)
     return undefined
 
-  const kept: Record<string, PropValue> = {}
+  // No prototype, so no key can reach one.
+  const kept: Record<string, PropValue> = Object.create(null)
 
   if (typeof props === 'object' && props !== null && !Array.isArray(props)) {
     for (const [key, value] of Object.entries(props)) {
       if (Object.keys(kept).length >= MAX_PROPS)
         break
 
-      if (key.length > MAX_PROP_KEY_LENGTH || !PROP_KEY.test(key))
+      if (key === '__proto__' || key.length > MAX_PROP_KEY_LENGTH || !PROP_KEY.test(key))
         continue
 
       if (typeof value === 'string')
@@ -523,7 +532,7 @@ function eventOf(name: string, props: unknown): EventData | undefined {
     }
   }
 
-  return { name, props: kept }
+  return { name: name.trim(), props: kept }
 }
 
 // Posts the visit to the provider with headers made here: none of the visitor's own, no cookie, no referer, no authorization, goes with it.

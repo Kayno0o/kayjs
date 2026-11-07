@@ -1401,7 +1401,7 @@ interface Ga4Options extends Counted
   address?: boolean | undefined
   apiSecret: string
   consent?: AnalyticsConsent | boolean | undefined
-  events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; }
+  events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
   host?: string | undefined
   hosts?: string[] | undefined
@@ -1414,7 +1414,7 @@ interface Ga4Options extends Counted
 [./analytics] MatomoOptions
 interface MatomoOptions extends Counted
   consent?: AnalyticsConsent | boolean | undefined
-  events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; }
+  events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
   host: string
   hosts?: string[] | undefined
@@ -1429,7 +1429,7 @@ interface MatomoOptions extends Counted
 interface PlausibleOptions extends Counted
   consent?: AnalyticsConsent | boolean | undefined
   domain?: string | undefined
-  events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; }
+  events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
   host?: string | undefined
   hosts?: string[] | undefined
@@ -1448,7 +1448,7 @@ interface RouteVitals
 [./analytics] SimpleAnalyticsOptions
 interface SimpleAnalyticsOptions extends Counted
   consent?: AnalyticsConsent | boolean | undefined
-  events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; }
+  events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
   host?: string | undefined
   hostname?: string | undefined
@@ -1464,7 +1464,7 @@ function track(ctx: { request: Request; }, name: string, props?: Record<string, 
 [./analytics] UmamiOptions
 interface UmamiOptions extends Counted
   consent?: AnalyticsConsent | boolean | undefined
-  events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; }
+  events?: boolean | undefined | { outbound?: boolean | undefined; downloads?: boolean | string[] | undefined; names?: string[] | undefined; }
   exclude?: string[] | undefined
   host?: string | undefined
   hosts?: string[] | undefined

@@ -5,7 +5,7 @@ import type { Words } from './analytics-words'
 import { KayError } from '../compiler/errors'
 import { CONSENT_MAX_AGE } from '../runtime/consent'
 import { wholeSeconds } from '../runtime/duration'
-import { NOTICE_SCRIPT, trackerFor } from './analytics-script'
+import { NOTICE_SCRIPT, trackerFor, trackerVersion } from './analytics-script'
 import { SHIPPED_WORDS } from './analytics-words'
 
 export { consent } from '../runtime/consent'
@@ -68,7 +68,8 @@ interface Counted extends Common {
   // Sends the page title with each visit, which names the page and so may name a person; left out, visits carry the path alone.
   titles?: boolean | undefined
   // Counts clicks the tracker can tell from a link: `outbound` one to another site (event `Outbound Link: Click`) and `downloads` one to a file (event `File Download`, with `true` for pdf, zip, office, audio, video and image archives, or a list of extensions), each with the address of the target without its query as the `url` prop. Off by default.
-  events?: boolean | { outbound?: boolean | undefined, downloads?: boolean | string[] | undefined } | undefined
+  // `names` lists the names a browser may send (`['Signup']`): any other is dropped, as the route takes any name from a client that is no browser. The outbound and download names are always allowed, and `track` on the server is not limited by it.
+  events?: boolean | { outbound?: boolean | undefined, downloads?: boolean | string[] | undefined, names?: string[] | undefined } | undefined
 }
 
 export interface PlausibleOptions extends Counted {
@@ -245,14 +246,14 @@ export function analytics(options: AnalyticsOptions): KayExtension {
       needsServer: true,
       asksConsent: asking,
       server: async () => (await import('./analytics-server')).analyticsServer(options),
-      config: { head: [{ tag: 'script', props: { src: ANALYTICS_SCRIPT_PATH, defer: true, ...gate, ...counting } }] },
+      config: { head: [{ tag: 'script', props: { src: `${ANALYTICS_SCRIPT_PATH}?v=${trackerVersion(options)}`, defer: true, ...gate, ...counting } }] },
     }
   }
 
   const loaded = options.provider === 'custom' ? { src: CUSTOM_SCRIPT_PATH, attrs: {} } : scriptOf(options)
   // With `info: false` the provider's script goes in the head as it is; behind the notice or the information line, kay's script loads it, once the visitor said yes or until they opted out.
   const loads = asking || informs
-  const tag = loads ? { 'src': ANALYTICS_SCRIPT_PATH, 'defer': true, ...gate, 'data-load': JSON.stringify(loaded) } : { src: loaded.src, defer: true, ...loaded.attrs }
+  const tag = loads ? { 'src': `${ANALYTICS_SCRIPT_PATH}?v=${trackerVersion(options)}`, 'defer': true, ...gate, 'data-load': JSON.stringify(loaded) } : { src: loaded.src, defer: true, ...loaded.attrs }
   const head: HeadTag = { tag: 'script', props: tag }
 
   if (options.provider === 'custom')
@@ -348,12 +349,16 @@ function checked(options: AnalyticsOptions): void {
     refuse(`exclude is a list of paths starting with /, such as ['/account']; got ${JSON.stringify(options.exclude)}`)
 
   const events = options.events as Record<string, unknown> | undefined
+  const names = events?.names
 
   if (events !== undefined && typeof events !== 'boolean') {
     const downloads = events?.downloads
 
     if (typeof events !== 'object' || events === null || (events.outbound !== undefined && typeof events.outbound !== 'boolean') || (downloads !== undefined && typeof downloads !== 'boolean' && !(Array.isArray(downloads) && downloads.every(word => typeof word === 'string' && EXTENSION.test(word)))))
-      refuse(`takes events as true or { outbound?: boolean, downloads?: boolean | string[] } with extensions such as 'pdf'; got ${JSON.stringify(events)}`)
+      refuse(`takes events as true or { outbound?: boolean, downloads?: boolean | string[], names?: string[] } with extensions such as 'pdf'; got ${JSON.stringify(events)}`)
+
+    if (names !== undefined && !(Array.isArray(names) && names.every(name => typeof name === 'string' && name.trim() !== '' && name.length <= 120)))
+      refuse(`takes events.names as a list of event names of 1 to 120 characters; got ${JSON.stringify(names)}`)
   }
 
   if (((options.exclude?.length ?? 0) > 0 || options.titles !== undefined || options.events !== undefined) && (options.provider === 'fathom' || options.provider === 'cloudflare' || options.provider === 'custom'))

@@ -211,6 +211,10 @@ Each `data-analytics-prop-*` is a prop (`data-analytics-prop-seat-count` is `sea
 
 To count clicks without marking anything, write `events: { outbound: true, downloads: true }` instead: a link to another site sends `Outbound Link: Click` and a link to a file, or one with a `download` attribute, sends `File Download`, each with the target's address without its query as the `url` prop. `downloads` also takes a list of extensions, `['pdf', 'zip']`.
 
+A link to a file on another site counts as `File Download` when `downloads` is on, and as `Outbound Link: Click` otherwise.
+
+Events from the browser can be forged like page views, by anything that posts to your site's route, and a tool may cap or bill the distinct names. List the ones you send with `events: { names: ['signup'] }` and the rest are dropped; kay's two link events are always allowed. A count that matters belongs in `track` on the server.
+
 In an action or an endpoint, call `track` with the context:
 
 ```ts
