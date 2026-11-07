@@ -1,3 +1,5 @@
+import type { OptionsQuery, OptionsSource } from './options-source'
+
 export interface ComboboxOption<Value extends string = string> {
   value: Value
   label: string
@@ -8,12 +10,10 @@ export interface ComboboxOption<Value extends string = string> {
 }
 
 // What a list-less combobox asks of its loader: the text typed so far.
-export interface ComboboxQuery {
-  q: string
-}
+export type ComboboxQuery = OptionsQuery
 
 // A list of options, or a function answering the options for a query, such as an action or a wrapped API call.
-export type ComboboxOptions<Value extends string = string> = readonly ComboboxOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly ComboboxOption<Value>[]>)
+export type ComboboxOptions<Value extends string = string> = OptionsSource<ComboboxOption<Value>>
 
 // The options whose label holds the text typed, any case; all of them for a blank text.
 export function matchingOptions<Value extends string>(options: readonly ComboboxOption<Value>[], text: string): readonly ComboboxOption<Value>[] {

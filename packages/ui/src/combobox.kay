@@ -4,6 +4,7 @@ import { fieldInvalid, fieldSize, keepInvalid } from './field-look'
 import type { JSX, Snippet } from 'kay'
 import type { ComboboxOption, ComboboxOptions } from './combobox'
 import { effect, onCleanup, recipe, signal, uid, untrack } from 'kay'
+import { askOptions, isRemote } from './options-source'
 import { enabledIndex, exactOption, matchingOptions, offersCreate } from './combobox'
 import { defaultKept, onFormReset, startRef } from './form-reset'
 import { wording } from 'kay/words'
@@ -34,7 +35,7 @@ const { size = 'md', invalid, id, options, value = '', valueLabel, label, name, 
   invalid?: boolean | undefined
   // The listbox's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
-  // A list, filtered as the visitor types, or a function handed `{ q }` that answers the options for it: an action, or an API call wrapped in one. Only the latest answer is shown.
+  // A list, filtered as the visitor types, a promise of one, or a function handed `{ q }` that answers the options for it: an action, or an API call wrapped in one. Only the latest answer is shown.
   options: ComboboxOptions<Value>
   // The value picked; a control whose parent passes another follows it. Empty while nothing is picked.
   value?: Value | '' | undefined
@@ -73,8 +74,8 @@ const { size = 'md', invalid, id, options, value = '', valueLabel, label, name, 
 
 const listId = id ?? uid()
 // kay-allow once-read-prop: a list or a loader is chosen when the component is created
-const remote = typeof options === 'function'
-const known = () => typeof options === 'function' ? [] : options
+const remote = isRemote(options)
+const known = () => isRemote(options) ? [] : options
 const startOption = () => known().find(option => option.value === value)
 
 // A remote value has no label to show until the visitor searches, so its raw id stays out of the input; a list shows the value for want of a label.
@@ -167,7 +168,7 @@ const status = () => {
 async function load(query: string) {
   const mine = ++request
 
-  if (typeof options !== 'function' || query.trim().length < minLength) {
+  if (!isRemote(options) || query.trim().length < minLength) {
     found = []
     answered = query
 
@@ -175,7 +176,7 @@ async function load(query: string) {
   }
 
   try {
-    const answer = await options({ q: query })
+    const answer = await askOptions(options, query)
 
     if (mine !== request)
       return

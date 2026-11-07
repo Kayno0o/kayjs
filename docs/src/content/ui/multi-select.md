@@ -28,7 +28,7 @@ The trigger opens the panel on its search box, or its first checkbox. ArrowDown 
 
 ## Options from an action
 
-`options` can be a function answering the options for the text typed, such as an action or a wrapped API call: `options={({ q }) => people(q)}`. It is asked when the panel opens and after a pause in typing, and the latest answer wins.
+`options` can be a promise, or a function answering the options for the text typed, such as an action or a wrapped API call: `options={({ q }) => people(q)}`. It is asked when the panel opens and after a pause in typing, and the latest answer wins.
 
 The status line says `loadingLabel` while it waits and `failureLabel` when it fails, and `minLength` holds the ask back until enough is typed. What is picked keeps its label when a later search no longer lists it. For a value picked before any answer lists it, give its label in `valueLabels`. `onLoad(options, query)` and `onError(error, query)` follow each answer.
 

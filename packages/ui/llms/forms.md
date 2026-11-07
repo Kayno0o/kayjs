@@ -18,6 +18,7 @@
   - `emptyOption` adds a first option worth `''`, labelled by the string, or blank with `true`; `value` and `onChange` then take `''` too, so hold a `signal<Kind | ''>`.
   - An option is `{ value, label, disabled? }`; `disabled` keeps it from being picked. A native option draws no icon, unlike the other groups' options.
   - `busy` shows a disabled row saying `loadingLabel` while the options are on their way.
+  - `options` is an `OptionsSource` as on Combobox and MultiSelect: a list, a promise of one, or a function `({ q }) => list | promise`. It is asked in the browser with `query` (empty by default) and again whenever `query` changes, such as a search box beside the select (`Select(options={find} query={text()})`); the latest answer wins and replaces the options, so keep the picked option in it. `onLoad(options, query)` and `onError({ error, query })` follow each answer, with the arguments Combobox and MultiSelect pass.
   - The right option stays chosen when the options arrive after the value.
   - `submit` submits the form holding it once an option is picked, after `onChange`, for a GET filter form (see Forms). A pointer pick submits at once; a keyboard pick, reported by some browsers on each arrow key, waits for Enter or blur.
 

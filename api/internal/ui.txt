@@ -637,11 +637,10 @@ interface ComboboxOption<Value extends string = string>
   value: Value
 
 [./lib/combobox] ComboboxOptions
-type ComboboxOptions<Value extends string = string> = readonly ComboboxOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly ComboboxOption<Value>[]>)
+type ComboboxOptions<Value extends string = string> = OptionsSource<ComboboxOption<Value>>
 
 [./lib/combobox] ComboboxQuery
-interface ComboboxQuery
-  q: string
+type ComboboxQuery = OptionsQuery
 
 [./lib/combobox] enabledIndex
 function enabledIndex(disabled: readonly boolean[], from: number, step: -1 | 1): number
@@ -1214,11 +1213,10 @@ interface ComboboxOption<Value extends string = string>
   value: Value
 
 [./lib/index] ComboboxOptions
-type ComboboxOptions<Value extends string = string> = readonly ComboboxOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly ComboboxOption<Value>[]>)
+type ComboboxOptions<Value extends string = string> = OptionsSource<ComboboxOption<Value>>
 
 [./lib/index] ComboboxQuery
-interface ComboboxQuery
-  q: string
+type ComboboxQuery = OptionsQuery
 
 [./lib/index] ContributionDay
 interface ContributionDay
@@ -1434,6 +1432,13 @@ interface NavLink extends NavItem
 
 [./lib/index] NewTab
 type NewTab = boolean | 'auto'
+
+[./lib/index] OptionsQuery
+interface OptionsQuery
+  q: string
+
+[./lib/index] OptionsSource
+type OptionsSource<Option, Query extends OptionsQuery = OptionsQuery> = readonly Option[] | PromiseLike<readonly Option[]> | ((input: Query) => readonly Option[] | PromiseLike<readonly Option[]>)
 
 [./lib/index] OverlaySize
 type OverlaySize = 'sm' | 'md' | 'lg' | 'full'
@@ -2134,6 +2139,36 @@ type NullOption<Value, Held> = null extends Value ? null extends Held ? '' exten
 } : unknown : {
   'a null option needs a value typed to allow null': never
 } : unknown
+
+[./lib/options-source] askOptions
+function askOptions<Option>(source: OptionsSource<Option, OptionsQuery>, q: string): PromiseLike<readonly Option[]> | readonly Option[]
+
+[./lib/options-source] isRemote
+function isRemote<Option>(source: OptionsSource<Option, OptionsQuery>): ((input: OptionsQuery) => PromiseLike<readonly Option[]> | readonly Option[]) | source is PromiseLike<readonly Option[]>
+
+[./lib/options-source] LoadedOptions
+interface LoadedOptions<Option>
+  failed: () => boolean
+  loading: () => boolean
+  options: () => readonly Option[]
+  retry: () => void
+
+[./lib/options-source] loadOptions
+function loadOptions<Option>(given: () => OptionsSource<Option, OptionsQuery>, hooks: OptionsHooks<Option>): LoadedOptions<Option>
+
+[./lib/options-source] OptionsHooks
+interface OptionsHooks<Option>
+  label: string
+  onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
+  onLoad?: ((options: readonly Option[], query: string) => unknown) | undefined
+  query?: (() => string) | undefined
+
+[./lib/options-source] OptionsQuery
+interface OptionsQuery
+  q: string
+
+[./lib/options-source] OptionsSource
+type OptionsSource<Option, Query extends OptionsQuery = OptionsQuery> = readonly Option[] | PromiseLike<readonly Option[]> | ((input: Query) => readonly Option[] | PromiseLike<readonly Option[]>)
 
 [./lib/outside] isExternal
 function isExternal(href: string): boolean

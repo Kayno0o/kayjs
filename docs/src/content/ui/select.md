@@ -42,7 +42,16 @@ A pick with the mouse submits at once. Some browsers report a change on every ar
 
 ## Options from an action
 
-`options` can be a function returning a promise of the options, such as an action. It is asked once when the select is drawn in the browser, and the select is busy under `loadingLabel` until the answer lands. When it fails the select says `failureLabel`. `onLoad` and `onError` follow the answer.
+`options` can be a promise of the options or a function returning them, such as an action: it is called with `{ q }`. It is asked when the select is drawn in the browser, and the select is busy under `loadingLabel` until the answer lands. When it fails the select says `failureLabel`. `onLoad(options, query)` and `onError({ error, query })` follow each answer, as on Combobox and MultiSelect.
+
+## Searching the options
+
+A native select has no search box, so give it the text from one of your own: `query={text()}`. The function is asked again each time `query` changes, and only the latest answer is shown. The answer replaces the options, so it should still list the option that is picked.
+
+```kay
+TextInput(value={text()} onInput={text.set} aria-label="Search planets")
+Select(options={({ q }) => findPlanets(q)} query={text()} aria-label="Planet")
+```
 
 
 ## Size and invalid

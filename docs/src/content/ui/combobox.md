@@ -10,7 +10,7 @@ A label typed whole, with no row chosen, counts as a pick of that option once th
 
 ## Options loaded as the visitor types
 
-Give `options` a function instead of a list. It is called with `{ q }` a moment after the last key, once `minLength` characters (one by default) are typed, and answers the options. An action or an API call wrapped in a function fits; only the latest answer is shown, so a slow answer to an older question never replaces a newer one. A failed call says `failureLabel` in the status line and the list stays closed.
+Give `options` a function or a promise instead of a list. A function is called with `{ q }` a moment after the last key, once `minLength` characters (one by default) are typed, and answers the options. An action or an API call wrapped in a function fits; only the latest answer is shown, so a slow answer to an older question never replaces a newer one. A failed call says `failureLabel` in the status line and the list stays closed.
 
 <Demo name="combobox/remote" />
 

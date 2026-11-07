@@ -92,11 +92,10 @@ interface ComboboxOption<Value extends string = string>
   value: Value
 
 [.] ComboboxOptions
-type ComboboxOptions<Value extends string = string> = readonly ComboboxOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly ComboboxOption<Value>[]>)
+type ComboboxOptions<Value extends string = string> = OptionsSource<ComboboxOption<Value>>
 
 [.] ComboboxQuery
-interface ComboboxQuery
-  q: string
+type ComboboxQuery = OptionsQuery
 
 [.] ContributionDay
 interface ContributionDay
@@ -309,6 +308,13 @@ interface NavLink extends NavItem
 
 [.] NewTab
 type NewTab = boolean | 'auto'
+
+[.] OptionsQuery
+interface OptionsQuery
+  q: string
+
+[.] OptionsSource
+type OptionsSource<Option, Query extends OptionsQuery = OptionsQuery> = readonly Option[] | PromiseLike<readonly Option[]> | ((input: Query) => readonly Option[] | PromiseLike<readonly Option[]>)
 
 [.] OverlaySize
 type OverlaySize = 'sm' | 'md' | 'lg' | 'full'
@@ -1972,7 +1978,7 @@ component default
   onOpenChange?: ((open: boolean) => unknown) | undefined
   open?: boolean | undefined
   option?: ((option: MultiSelectOption<Value>) => Element) | undefined
-  options: ((input: ComboboxQuery) => PromiseLike<readonly MultiSelectOption<Value>[]>) | readonly MultiSelectOption<Value>[]
+  options: OptionsSource<MultiSelectOption<Value>>
   placeholder?: string | undefined
   placement?: PopoverPlacement | undefined
   search?: boolean | undefined
@@ -2349,11 +2355,12 @@ component default
   invalid?: boolean | undefined
   loadingLabel?: string | undefined
   onChange?: ((value: (Empty extends string | true ? "" : never) | Value, option: SelectOption<Value> | undefined) => unknown) | undefined
-  onError?: ((failure: { error: unknown; }) => unknown) | undefined
-  onLoad?: ((options: readonly SelectOption<Value>[]) => unknown) | undefined
-  options: ((input: ComboboxQuery) => PromiseLike<readonly SelectOption<Value>[]>) | readonly SelectOption<Value>[]
+  onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
+  onLoad?: ((options: readonly SelectOption<Value>[], query: string) => unknown) | undefined
+  options: OptionsSource<SelectOption<Value>>
   param?: string | undefined
   paramDefault?: number | string | undefined
+  query?: string | undefined
   size?: FieldSize | undefined
   submit?: boolean | undefined
   value?: (Empty extends string | true ? "" : never) | Value | undefined
