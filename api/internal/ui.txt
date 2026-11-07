@@ -1116,6 +1116,12 @@ interface IconChoice
   icon: IconProps
   name: string
 
+[./lib/icon-picker] IconQuery
+interface IconQuery extends OptionsQuery
+  limit: number
+  offset: number
+  q: string
+
 [./lib/icon-picker] nameOf
 function nameOf(icon: string): string
 
@@ -1270,6 +1276,12 @@ type HoverCardPlacement = PopoverPlacement | 'top' | 'bottom' | 'left' | 'right'
 interface IconChoice
   icon: IconProps
   name: string
+
+[./lib/index] IconQuery
+interface IconQuery extends OptionsQuery
+  limit: number
+  offset: number
+  q: string
 
 [./lib/index] IconSlot
 type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
@@ -2141,10 +2153,10 @@ type NullOption<Value, Held> = null extends Value ? null extends Held ? '' exten
 } : unknown
 
 [./lib/options-source] askOptions
-function askOptions<Option>(source: OptionsSource<Option, OptionsQuery>, q: string): PromiseLike<readonly Option[]> | readonly Option[]
+function askOptions<Option, Query extends OptionsQuery = OptionsQuery>(source: OptionsSource<Option, Query>, q: string, more?: Omit<Query, "q"> | undefined): PromiseLike<readonly Option[]> | readonly Option[]
 
 [./lib/options-source] isRemote
-function isRemote<Option>(source: OptionsSource<Option, OptionsQuery>): ((input: OptionsQuery) => PromiseLike<readonly Option[]> | readonly Option[]) | source is PromiseLike<readonly Option[]>
+function isRemote<Option, Query extends OptionsQuery = OptionsQuery>(source: OptionsSource<Option, Query>): ((input: Query) => PromiseLike<readonly Option[]> | readonly Option[]) | source is PromiseLike<readonly Option[]>
 
 [./lib/options-source] LoadedOptions
 interface LoadedOptions<Option>

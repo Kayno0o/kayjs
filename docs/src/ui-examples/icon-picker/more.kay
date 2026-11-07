@@ -31,5 +31,5 @@ async function search(query: string, limit: number, offset: number) {
 }
 ---
 .flex.flex-col.items-start.gap-2
-  IconPicker(search={search})
+  IconPicker(icons={({ q, limit, offset }) => search(q, limit, offset)})
   p.text-muted Searches made: {calls().join(', ') || 'none yet'}.

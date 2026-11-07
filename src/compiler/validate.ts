@@ -14,6 +14,8 @@ const AI_CHAT_SOURCES = new Set(['@kaynooo/kayjs-ai/chat.kay', '@kaynooo/kayjs-a
 const AI_CHAT = 'ai-chat'
 // Menu's `items` took `danger: true` for a destructive entry until `tone: 'danger'` replaced it, deprecated since 1.92.
 const MENU_TAG = 'menu'
+// IconPicker's `search(query, limit, offset)` is a function `icons` handed `{ q, limit, offset }` since 1.92.
+const ICON_PICKER_TAG = 'icon-picker'
 // The kayjs-ui tags whose `onToggle` is `onOpenChange` since 1.90, as every show and hide state reports.
 const TOGGLE_TAGS = new Set(['table', 'tree-view'])
 // The kayjs-ui tags whose per-day predicate `isDisabled` is `disabledDay` since 1.89.
@@ -914,6 +916,16 @@ class Validator {
         continue
 
       const name = this.text(attribute.name)
+
+      if (file === ICON_PICKER_TAG && name === 'search' && attribute.kind === 'expression') {
+        const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === 'icons')
+        const wrap = (expression: string) => `({ q, limit, offset }) => (${expression})(q, limit, offset)`
+        const edits = attribute.shorthand ? [{ ...attribute.shorthand, text: `icons={${wrap('search')}}` }] : [{ start: attribute.name.start, end: attribute.name.end, text: 'icons' }, { start: attribute.expression.start, end: attribute.expression.end, text: wrap(this.text(attribute.expression).trim()) }]
+
+        this.lint(attribute.name, 'deprecated-icon-picker-search', '`search` on an `IconPicker` is a function `icons` since kayjs-ui 1.92, handed `{ q, limit, offset }`: one prop for a set, a promise and an action', named ? { help: 'Drop `search`, `icons` is there' } : { help: 'Write `icons={({ q, limit, offset }) => ...}`', fixes: [{ title: 'Write `icons`', edits, safe: true }] })
+
+        continue
+      }
 
       if (file === MENU_TAG && name === 'items' && attribute.kind === 'expression') {
         for (const { property, toned } of dangerFlags(this.text(attribute.expression), attribute.expression.start))

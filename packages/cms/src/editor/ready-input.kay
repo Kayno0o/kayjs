@@ -78,4 +78,4 @@ match field.kind
         TextInput(placeholder="#1a2b3c" aria-label={label} value={text()} onInput={next => onChange(next === '' && !required ? cleared : next)} onBlur={touch} maxlength={7})
   else
     FormField(label={label} hint={hint} issue={issue} required={required} group)
-      IconPicker(search={findIcons} value={text()} onChange={next => { onChange(next === '' && !required ? cleared : next); touch() }})
+      IconPicker(icons={({ q, limit, offset }) => findIcons(q, limit, offset)} value={text()} onChange={next => { onChange(next === '' && !required ? cleared : next); touch() }})

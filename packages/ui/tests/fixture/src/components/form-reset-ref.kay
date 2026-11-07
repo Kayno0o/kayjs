@@ -33,7 +33,7 @@ form
   Textarea(name="bio" placeholder={hint()} ref={element => note('textarea', element)})
   MarkdownEditor(placeholder={hint()} ref={element => note('markdown', element)})
   Select(name="level" options={levels} value="a" class={hint()} ref={element => note('select', element)})
-  IconPicker(search={none} ref={element => note('icon', element)} class={hint()})
+  IconPicker(icons={() => none()} ref={element => note('icon', element)} class={hint()})
   Checkbox(label="Box" class={hint()} ref={element => note('checkbox', element)})
   Toggle(label="Switch" class={hint()} ref={element => note('toggle', element)})
   Slider(label="Level" value={1} class={hint()} ref={element => note('slider', element)})

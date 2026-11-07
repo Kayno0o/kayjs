@@ -754,6 +754,14 @@ export const LINTS = {
     wrong: '---\nimport Menu from \'@kaynooo/kayjs-ui/menu.kay\'\n---\nMenu(label="Actions" items={[{ label: \'Delete\', danger: true }]})',
     right: '---\nimport Menu from \'@kaynooo/kayjs-ui/menu.kay\'\n---\nMenu(label="Actions" items={[{ label: \'Delete\', tone: \'danger\' }]})',
   },
+  'deprecated-icon-picker-search': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.92',
+    summary: 'A kayjs-ui IconPicker `search`, which is a function `icons` since 1.92: `icons` takes a set, a promise of one or a function handed `{ q, limit, offset }`, the one source every choice control takes. The old prop works until 1.95. The fix writes `icons={({ q, limit, offset }) => (search)(q, limit, offset)}`; a search function declaring fewer than three parameters then needs the extra arguments dropped from the call, or `kay check` reports a type error; an IconPicker that already names `icons` is reported with no fix.',
+    wrong: '---\nimport IconPicker from \'@kaynooo/kayjs-ui/icon-picker.kay\'\nimport { findIcons } from \'./icons\'\n---\nIconPicker(search={findIcons})',
+    right: '---\nimport IconPicker from \'@kaynooo/kayjs-ui/icon-picker.kay\'\nimport { findIcons } from \'./icons\'\n---\nIconPicker(icons={({ q, limit, offset }) => (findIcons)(q, limit, offset)})',
+  },
   'deprecated-open-change': {
     level: 'warn',
     group: 'deprecated',

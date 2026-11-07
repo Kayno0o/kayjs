@@ -1242,6 +1242,27 @@ describe('deprecated-menu-danger', () => {
   })
 })
 
+describe('deprecated-icon-picker-search', () => {
+  const imports = 'import IconPicker from \'@kaynooo/kayjs-ui/icon-picker.kay\'\nimport Other from \'./other.kay\'\n'
+  const found = (template: string) => {
+    const source = `---\n${imports}---\n${template}\n`
+    const result = compileKay(source, 'icon-search.kay', { check: true })
+
+    return result.diagnostics.filter(d => d.code === 'deprecated-icon-picker-search').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`) }))
+  }
+
+  it('wraps the function of `search` in an `icons` source', () => {
+    expect(found('IconPicker(search={findIcons})')).toEqual([{ at: 'search', fix: ['search->icons', 'findIcons->({ q, limit, offset }) => (findIcons)(q, limit, offset)'] }])
+    expect(found('IconPicker(search={(q, limit, offset) => load(q, limit, offset)})')[0]?.fix?.[1]).toBe('(q, limit, offset) => load(q, limit, offset)->({ q, limit, offset }) => ((q, limit, offset) => load(q, limit, offset))(q, limit, offset)')
+  })
+
+  it('reports an IconPicker that names `icons` too with no fix, and leaves the rest alone', () => {
+    expect(found('IconPicker(search={a} icons={b})')).toEqual([{ at: 'search', fix: undefined }])
+    expect(found('IconPicker(icons={b})')).toEqual([])
+    expect(found('Other(search={a})')).toEqual([])
+  })
+})
+
 describe('deprecated-ui-props', () => {
   const imports = 'import DateInput from \'@kaynooo/kayjs-ui/date-input.kay\'\nimport DateRangeInput from \'@kaynooo/kayjs-ui/date-range-input.kay\'\nimport Other from \'./other.kay\'\n'
   const found = (template: string) => {

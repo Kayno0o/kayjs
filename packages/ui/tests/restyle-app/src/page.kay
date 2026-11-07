@@ -203,7 +203,7 @@ ZoomPane#zoom(label="Map")
   p content
 QrCode#qr(value="https://kay.dev")
 SiteFavicon#favicon(name="Kay" src="/favicon.png")
-IconPicker#icon-picker(search={async () => []})
+IconPicker#icon-picker(icons={async () => []})
 MarkdownEditor#markdown
 BarChart#bars(label="Runs" labels={['a', 'b']} xLabels legend series={[{ name: 'S', values: [1, 2] }, { name: 'T', values: [2, 1] }]})
 Accordion#accordion(items={[{ value: 'a', title: 'A' }]})

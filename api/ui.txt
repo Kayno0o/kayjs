@@ -147,6 +147,12 @@ interface IconChoice
   icon: IconProps
   name: string
 
+[.] IconQuery
+interface IconQuery extends OptionsQuery
+  limit: number
+  offset: number
+  q: string
+
 [.] IconSlot
 type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
@@ -1670,12 +1676,13 @@ component default
   errorLabel?: string | undefined
   failureLabel?: string | undefined
   gridLabel?: string | undefined
-  icons?: readonly IconChoice[] | undefined
+  icons?: OptionsSource<IconChoice, IconQuery> | undefined
   invalid?: boolean | undefined
   moreLabel?: string | undefined
   name?: string | undefined
   onChange?: ((name: string, choice: IconChoice | undefined) => unknown) | undefined
-  onError?: ((failure: { error: unknown; }) => unknown) | undefined
+  onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
+  onLoad?: ((icons: readonly IconChoice[], query: string) => unknown) | undefined
   onSearch?: ((query: string) => unknown) | undefined
   placeholder?: string | undefined
   search?: ((query: string, limit: number, offset: number) => Promise<IconChoice[]>) | undefined

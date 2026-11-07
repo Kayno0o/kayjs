@@ -132,6 +132,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `broken-canonical` | warn | seo | A canonical link to a page that is a 404 or a redirect |
 | `one-way-hreflang` | warn | seo | Alternates that do not point back at each other |
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
+| `deprecated-icon-picker-search` | warn | deprecated | A kayjs-ui IconPicker `search`, now a function `icons` handed `{ q, limit, offset }`; the old prop works until 1.95 |
 | `deprecated-menu-danger` | warn | deprecated | A kayjs-ui Menu entry flagged `danger: true`, now `tone: 'danger'`; the flag works until 2.0.0 |
 | `deprecated-open-change` | warn | deprecated | `onToggle` on a kayjs-ui Table or TreeView, now `onOpenChange` |
 | `deprecated-ui-failures` | warn | deprecated | A kayjs-ui failure prop under its name before 1.90: `failure` and `errorLabel` are `failureLabel`, and a CopyButton's `onFail` is `onError`, which takes `{ error }`; the old names work until 1.93 |

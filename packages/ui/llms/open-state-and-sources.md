@@ -41,7 +41,7 @@
 
 - `MultiSelect(options={({ q }) => api.people(q)} valueLabels={{ ada: 'Ada' }})`: `options` is a list, or a function returning a promise of the options for the text typed, as Combobox's. It is asked when the panel opens and after each 200 ms pause in typing, only the latest answer lands, `minLength` holds the asks back, and the status line says `loadingLabel` or `failureLabel`. What was picked keeps its label across searches, from the answers seen or `valueLabels` for values never listed. `onLoad(options, query)` and `onError(error, query)` follow each answer.
 - `Select(options={() => api.sizes()})`: the same function, asked once with an empty `q` when the select is drawn in the browser; it is busy under `loadingLabel` until the answer, or shows `failureLabel` once rejected, with `onLoad` and `onError`.
-- `IconPicker(icons={[{ name, icon }]})` takes a fixed set instead of `search`, filtered by name and paged like an answer.
+- `IconPicker(icons={...})` takes the same `OptionsSource` as the other pickers: a set or a promise of one, filtered by name and paged like an answer, or a function handed `{ q, limit, offset }`; `search` is its deprecated form.
 
 ### Drawing an option
 

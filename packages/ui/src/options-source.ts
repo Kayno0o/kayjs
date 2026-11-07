@@ -10,17 +10,17 @@ export interface OptionsQuery {
 export type OptionsSource<Option, Query extends OptionsQuery = OptionsQuery> = readonly Option[] | PromiseLike<readonly Option[]> | ((input: Query) => readonly Option[] | PromiseLike<readonly Option[]>)
 
 // Whether the source has to be asked, as a function or a promise has.
-export function isRemote<Option>(source: OptionsSource<Option>): source is Exclude<OptionsSource<Option>, readonly Option[]> {
+export function isRemote<Option, Query extends OptionsQuery = OptionsQuery>(source: OptionsSource<Option, Query>): source is Exclude<OptionsSource<Option, Query>, readonly Option[]> {
   return !Array.isArray(source)
 }
 
 // The answer of a source for a query: the list itself, or what the function or the promise gives. A function that throws answers with a rejection.
-export function askOptions<Option>(source: OptionsSource<Option>, q: string): readonly Option[] | PromiseLike<readonly Option[]> {
+export function askOptions<Option, Query extends OptionsQuery = OptionsQuery>(source: OptionsSource<Option, Query>, q: string, more?: Omit<Query, 'q'>): readonly Option[] | PromiseLike<readonly Option[]> {
   if (typeof source !== 'function')
     return source
 
   try {
-    return source({ q })
+    return source({ q, ...more } as Query)
   }
   catch (error) {
     return Promise.reject(error)

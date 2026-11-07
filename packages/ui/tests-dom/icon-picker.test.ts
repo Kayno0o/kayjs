@@ -3,6 +3,7 @@ import type { IconChoice } from '../src/icon-picker'
 import { afterEach, expect, test } from 'bun:test'
 import { trustHtml } from 'kay'
 import { mountComponent, settle } from 'kay/test'
+import DeprecatedSearch from '../src/icon-picker.kay'
 import IconPicker from '../tests/fixture/src/components/icon-picker.kay'
 import { click, clock } from './dom'
 
@@ -49,7 +50,7 @@ async function picker(options: { value?: string, hold?: (query: string) => boole
     onSearch: (query: string) => searched.push(query),
     onError: ({ error }: { error: unknown }) => errors.push((error as Error).message),
     onChange: (name: string) => changes.push(name),
-    search: async (query: string, limit: number, offset: number) => {
+    icons: async ({ q: query, limit, offset }: { q: string, limit: number, offset: number }) => {
       searches.push([query, limit, offset])
 
       if (options.fail?.(query))
@@ -297,4 +298,45 @@ test('a Show more pressed while a new search loads asks for nothing, and the gri
   await clock.settle()
 
   expect(view.names()).toEqual(['home', 'house'])
+})
+
+test('icons takes a function handed the page wanted, a promise of a set, and onLoad hears each page', async () => {
+  const asked: unknown[] = []
+  const loads: string[] = []
+
+  mounted = await mountComponent(IconPicker, {
+    icons: async (input: { q: string, limit: number, offset: number }) => {
+      asked.push(input)
+
+      return found(input.q, input.limit, input.offset)
+    },
+    onLoad: (icons: IconChoice[], query: string) => loads.push(`${query}:${icons.length}`),
+    onChange: (name: string) => changes.push(name),
+  })
+  await settle()
+
+  expect(asked).toEqual([{ q: '', limit: 50, offset: 0 }])
+  expect(loads).toEqual([`:${Math.min(SET.length, 50)}`])
+  expect(mounted.root.querySelectorAll('[data-part=option]').length).toBe(Math.min(SET.length, 50))
+  mounted.unmount()
+
+  mounted = await mountComponent(IconPicker, { icons: Promise.resolve(SET.slice(0, 2)), onChange: (name: string) => changes.push(name) })
+  await settle()
+  expect(mounted.root.querySelectorAll('[data-part=option]').length).toBe(2)
+})
+
+test('the deprecated search prop still pages like a function icons', async () => {
+  const asked: [string, number, number][] = []
+
+  mounted = await mountComponent(DeprecatedSearch, {
+    search: async (query: string, limit: number, offset: number) => {
+      asked.push([query, limit, offset])
+
+      return found(query, limit, offset)
+    },
+    onChange: (name: string) => changes.push(name),
+  })
+  await settle()
+
+  expect(asked).toEqual([['', 50, 0]])
 })

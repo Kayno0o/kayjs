@@ -1,12 +1,15 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import type { IconChoice } from './icon-picker'
+import type { IconChoice, IconQuery } from './icon-picker'
+import type { OptionsSource } from './options-source'
 import { batch, effect, flush, onCleanup, postedValue, recipe, signal } from 'kay'
 import { fieldInvalid, keepInvalid } from './field-look'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { defaultKept, onFormReset } from './form-reset'
 import { nameOf } from './icon-picker'
+import { askOptions } from './options-source'
+import { safely } from './safely'
 import { wording } from 'kay/words'
 
 const PAGE_SIZE = 50
@@ -14,11 +17,11 @@ const DEBOUNCE_MS = 200
 
 const look = recipe({ parts: { root: 'kui-icon-picker', search: '', grid: 'kui-icon-grid', option: 'kui-icon-grid-option', empty: 'kui-icon-grid-empty', bar: 'kui-icon-grid-bar', selection: 'kui-icon-grid-selection', clear: 'kui-icon-grid-clear', error: 'kui-icon-grid-error', more: 'kui-icon-grid-more' } })
 
-const { search, icons: given, value = '', name, invalid, disabled = false, onChange, onSearch, onError, searchLabel = wording('ui.iconPicker.search', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.grid', 'Icons'), searchingLabel = wording('ui.iconPicker.searching', 'Searching…'), emptyLabel = wording('ui.iconPicker.empty', 'No icons found.'), empty, failureLabel, errorLabel, clearLabel = wording('ui.iconPicker.clear', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.more', 'Show more'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onError'> & {
-  // The icons matching `query` from the `offset`th on, at most `limit` of them: typically an action, since a whole icon set is too large to ship. A page of fewer than `limit` is the last. A rejection is logged and leaves the last grid on screen under `errorLabel`.
+const { search, icons: given, value = '', name, invalid, disabled = false, onChange, onSearch, onLoad, onError, searchLabel = wording('ui.iconPicker.search', 'Search icons'), placeholder = wording('ui.iconPicker.placeholder', 'Search icons…'), gridLabel = wording('ui.iconPicker.grid', 'Icons'), searchingLabel = wording('ui.iconPicker.searching', 'Searching…'), emptyLabel = wording('ui.iconPicker.empty', 'No icons found.'), empty, failureLabel, errorLabel, clearLabel = wording('ui.iconPicker.clear', 'Clear icon selection'), moreLabel = wording('ui.iconPicker.more', 'Show more'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onLoad' | 'onError'> & {
+  // Deprecated: a function `icons`, which is handed `{ q, limit, offset }`. Works until 1.95.
   search?: ((query: string, limit: number, offset: number) => Promise<IconChoice[]>) | undefined
-  // A fixed set of icons instead of `search`, filtered by the text typed and paged like its answers: no action is needed for a small set. Give one of the two.
-  icons?: readonly IconChoice[] | undefined
+  // The icons to pick from: a set, or a promise of one, filtered by the text typed and paged like an answer; or a function handed `{ q, limit, offset }` that answers the icons matching `q` from the `offset`th on, at most `limit` of them, typically an action, since a whole icon set is too large to ship. A page of fewer than `limit` is the last. A rejection is logged and leaves the last grid on screen under `failureLabel`.
+  icons?: OptionsSource<IconChoice, IconQuery> | undefined
   // The chosen icon's name, or an empty string for none; a picker whose parent passes another follows it.
   value?: string | undefined
   // Submits the chosen icon's name under this name, for a picker inside a form.
@@ -31,8 +34,10 @@ const { search, icons: given, value = '', name, invalid, disabled = false, onCha
   onChange?: ((name: string, choice: IconChoice | undefined) => unknown) | undefined
   // Called with the query each time a new search starts, the first one included, not for a page added by Show more.
   onSearch?: ((query: string) => unknown) | undefined
-  // Called with `{ error }`, what `search` rejected with, for the latest search or page only; the grid keeps its icons under `failureLabel`.
-  onError?: ((failure: { error: unknown }) => unknown) | undefined
+  // Called with the icons of each page `icons` answered and the text it was asked for, for the latest search or page only.
+  onLoad?: ((icons: readonly IconChoice[], query: string) => unknown) | undefined
+  // Called with `{ error, query }`, what `icons` rejected with and the text it was asked for, for the latest search or page only; the grid keeps its icons under `failureLabel`.
+  onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // What the picker says: the search box's name and placeholder, the grid's name, its states, and its two buttons.
   searchLabel?: string | undefined
   placeholder?: string | undefined
@@ -56,10 +61,16 @@ const query = signal('')
 const icons = signal<IconChoice[]>([])
 
 // The icons of a given set whose name holds the text, any case.
-async function listed(needle: string, limit: number, offset: number): Promise<IconChoice[]> {
+async function page(needle: string, limit: number, offset: number): Promise<readonly IconChoice[]> {
+  if (search)
+    return search(needle, limit, offset)
+
+  if (typeof given === 'function')
+    return askOptions(given, needle, { limit, offset })
+
   const text = needle.trim().toLowerCase()
 
-  return (given ?? []).filter(choice => choice.name.toLowerCase().includes(text)).slice(offset, offset + limit)
+  return ((await given) ?? []).filter(choice => choice.name.toLowerCase().includes(text)).slice(offset, offset + limit)
 }
 // Whether the last page came back full, so another may follow.
 const more = signal(false)
@@ -108,7 +119,7 @@ async function load(needle: string, offset: number) {
     onSearch?.(needle)
 
   try {
-    const found = await (search ?? listed)(needle, PAGE_SIZE, offset)
+    const found = [...await page(needle, PAGE_SIZE, offset)]
 
     if (mine !== request)
       return
@@ -125,12 +136,13 @@ async function load(needle: string, offset: number) {
       more = found.length >= PAGE_SIZE && fresh.length > 0
       failed = false
     })
+    safely(() => onLoad?.(found, needle), 'kayjs-ui: an IconPicker onLoad')
   }
   catch (error) {
     if (mine === request) {
       console.error('kayjs-ui: an IconPicker\'s search failed', error)
       failed = true
-      onError?.({ error })
+      safely(() => onError?.({ error, query: needle }), 'kayjs-ui: an IconPicker onError')
     }
   }
   finally {

@@ -30,6 +30,10 @@ An island's `onClick` on a link that calls `event.preventDefault()` now stops ka
 
 `Toast.type` and `ToastType` are deprecated for `Toast.tone`, where `error` is `danger`, and the exported `Toast` is `{ id, message, tone }` in 2.0.0. No lint can see it: an app reading `toasts()[n].type`, or a `@toast` snippet reading `item.type`, reads `item.tone` instead. `toast.error`, `toast.success` and `toast.info` stay.
 
+### An IconPicker's `search` is a function `icons`
+
+`IconPicker(search={find})` is `IconPicker(icons={({ q, limit, offset }) => find(q, limit, offset)})`: `icons` takes a set, a promise or a function handed `{ q, limit, offset }`, the source every choice control takes, and its `onError` gets `{ error, query }` with a new `onLoad(icons, query)` beside it. `kay check` flags `search` as `deprecated-icon-picker-search` with a safe fix that `kay upgrade` applies; the prop works until 1.95.
+
 ### kayjs-ai retries a failed request, and a `Step` has four more members
 
 A request that fails with `unavailable`, `rate-limited`, `timeout` or `network` before anything streamed is now asked again by default, 2 requests per model (`ai({ retry: false })` opts out), so a failing request can cost up to two requests per model, and each failed attempt reaches `onStep` and `onError` and is listed in `reply.steps`. An app building a `Step` by hand (a test double, a stored copy) adds `provider`, `model`, `attempt` and `failed`: [when a provider fails](../packages/ai/llms/asking.md#when-a-provider-fails).
