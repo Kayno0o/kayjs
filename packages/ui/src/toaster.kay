@@ -45,7 +45,7 @@ const look = recipe({
   defaults: { position: 'bottom-right' },
 })
 
-const { dismissLabel = wording('ui.toaster.dismiss', 'Dismiss notification'), hotkey = 't', position = 'bottom-right', limit, toast, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'popover'> & {
+const { dismissLabel = wording('ui.toaster.dismiss', 'Dismiss notification'), hotkey = 't', position = 'bottom-right', limit, toast, fallback = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'popover'> & {
   // Names each toast's close button for screen readers.
   dismissLabel?: string | undefined
   // Alt and this key move focus to the toasts on screen, where Escape dismisses the focused one; `null` leaves it to the app.
@@ -55,12 +55,14 @@ const { dismissLabel = wording('ui.toaster.dismiss', 'Dismiss notification'), ho
   limit?: number | undefined
   // Draws what is inside each toast in place of its icon, message, description and buttons: `@toast(item, dismiss)`, given the toast and a function closing it. The toast keeps its box, its tone, its clock and Escape.
   toast?: Snippet<[item: Toast, dismiss: () => void]> | undefined
+  // The extension's own Toaster, which gives way to the app's whichever hydrates first.
+  fallback?: boolean | undefined
 }>()
 
 const toaster = signal<HTMLElement>()
 const ref = startRef<HTMLElement>(element => toaster = element, rest.ref)
 // An extension rendering its own Toaster inside an app that has one shows each toast once.
-const owns = claim('toaster')
+const owns = claim('toaster', fallback)
 // The toasts outlive a page swap, so one on screen when the next page's Toaster hydrates is not in the server markup: shown from the mount on, hydration meets the markup it was given.
 const mounted = signal(false)
 

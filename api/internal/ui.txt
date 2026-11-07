@@ -624,7 +624,7 @@ const TOOLTIP_LOOK: "pointer-events-none fixed top-0 left-0 z-50 flex w-max max-
 const loaders: Loaders
 
 [./lib/claim] claim
-function claim(job: "toaster" | "tooltips"): () => boolean
+function claim(job: "toaster" | "tooltips", fallback?: boolean): () => boolean
 
 [./lib/claim] Job
 type Job = keyof typeof claimants

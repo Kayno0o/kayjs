@@ -2764,6 +2764,7 @@ component default
   };
 }
   dismissLabel?: string | undefined
+  fallback?: (boolean & ((() => Element) | Html | Node | Range | bigint | boolean | null | number | readonly Element[] | string)) | undefined
   hotkey?: null | string | undefined
   limit?: number | undefined
   position?: "bottom-center" | "bottom-left" | "bottom-right" | "top-center" | "top-left" | "top-right" | undefined
@@ -2801,6 +2802,7 @@ component default
 [./tooltip-host.kay] default
 component default
   class?: string | undefined | { root?: string | undefined; }
+  fallback?: (boolean & ((() => Element) | Html | Node | Range | bigint | boolean | null | number | readonly Element[] | string)) | undefined
   hideDelay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
   showDelay?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 

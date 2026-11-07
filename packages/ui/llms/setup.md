@@ -68,7 +68,7 @@ head
 - `value` makes the app the holder, such as a signed-in visitor's saved preference: the toggle follows it and writes no cookie. `onChange(mode, option)` hears each pick and may return a promise, as Segmented's: the toggle is busy until it settles, and a pick that resolves to `false`, rejects or throws is put back and not kept.
 - `cookie="appearance"` names another cookie; the layout must then call `scheme('appearance')`, or it reads the default cookie.
 
-A layout may still render its own `Toaster` and `TooltipHost`, as an app did before `ui()`: only the first mounted shows toasts and tooltips, so the two copies never double them.
+A layout may still render its own `Toaster` and `TooltipHost`, as an app did before `ui()`: only one shows toasts and tooltips, the app's own before the extension's whichever hydrates first, so the two copies never double them.
 
 ```kay
 ---

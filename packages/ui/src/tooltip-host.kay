@@ -14,18 +14,20 @@ const PANEL_ID = 'kui-tooltip'
 // 'kui-tooltip' stays as the component's name for an app's CSS. Anchored to whichever element TooltipHost names --tooltip-anchor.
 const look = recipe({ parts: { root: 'kui-tooltip inset-auto m-1.5 max-w-xs overflow-visible border-solid border-[length:var(--border-width)] border-border-strong bg-surface-strong px-2 py-1 text-2xs text-foreground [position-anchor:--tooltip-anchor] [position-try-fallbacks:flip-block,flip-inline]' } })
 
-const { showDelay = '80ms', hideDelay = '150ms', ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'id' | 'popover' | 'role'> & {
+const { showDelay = '80ms', hideDelay = '150ms', fallback = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'id' | 'popover' | 'role'> & {
   // How long the pointer or focus rests on an element before its tooltip shows.
   showDelay?: Duration | undefined
   // How long a tooltip lingers once the pointer leaves, long enough by default for it to cross the gap onto the tooltip, which stays while hovered.
   hideDelay?: Duration | undefined
+  // The extension's own host, which gives way to the app's whichever hydrates first.
+  fallback?: boolean | undefined
 }>()
 
 const aimed = signal<{ element: HTMLElement, text: string } | null>(null)
 let at: HTMLElement | null = null
 let timer: ReturnType<typeof setTimeout> | undefined
 const panel = signal<HTMLElement>()
-const owns = claim('tooltips')
+const owns = claim('tooltips', fallback)
 
 // The element carrying a tooltip that an event's target is, or sits inside.
 function found(event: Event): HTMLElement | null {

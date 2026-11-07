@@ -72,9 +72,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
   it('stacks toasts at the Toaster\'s position, shows at most its limit, draws a description and a link action, and settles a promise', async () => {
     const page = await site.open('/toast-rich')
 
+    // Counts the toasts after every change to the page, so one drawn for a moment by the extension's own Toaster before the app's took over is caught, not only the count when the test looks.
+    await page.evaluate(() => {
+      const seen = { most: 0 }
+
+      ;(window as { toastsSeen?: { most: number } }).toastsSeen = seen
+      new MutationObserver(() => {
+        seen.most = Math.max(seen.most, document.querySelectorAll('.kui-toast').length)
+      }).observe(document.body, { childList: true, subtree: true })
+    })
     await page.click('#stack')
     await page.waitFor('.kui-toast')
     expect(await page.count('.kui-toast')).toBe(2)
+    expect(await page.evaluate(() => (window as { toastsSeen?: { most: number } }).toastsSeen?.most)).toBe(2)
     expect(await page.text('.kui-toast [data-part=message]')).toBe('Two')
     expect(await page.evaluate(() => document.querySelector('.kui-toaster')!.getAttribute('data-position'))).toBe('top-center')
     expect(await page.evaluate(() => document.querySelector('.kui-toast a[data-part=action]')?.getAttribute('href'))).toBe('/shell')

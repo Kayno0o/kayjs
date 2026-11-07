@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, jest, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import HostsLate from '../tests/fixture/src/components/hosts-late.kay'
 import Hosts from '../tests/fixture/src/components/hosts.kay'
 import Toasts from '../tests/fixture/src/components/toasts.kay'
 import { click } from './dom'
@@ -169,4 +170,21 @@ test('a toast carries its tone as an attribute, and its tone variants set the co
     expect([...item.classList], tone ?? '').toContain(`data-[tone=${tone}]:[--_toast-tone:var(--color-${color})]`)
     expect(item.querySelector('[data-part=icon]')?.classList.contains('text-(--_toast-tone)')).toBe(true)
   }
+})
+
+test('the extension\'s fallback Toaster gives way to an app\'s own that mounts after it', async () => {
+  mounted = await mountComponent(HostsLate)
+  const { root } = mounted
+
+  click(root.querySelector('#saved'))
+  await settle()
+  expect(root.querySelector('.kui-toaster')?.getAttribute('data-position')).toBe('bottom-right')
+
+  click(root.querySelector('#mount'))
+  await settle()
+
+  const toasters = [...root.querySelectorAll('.kui-toaster')]
+
+  expect(toasters.map(item => item.getAttribute('data-position'))).toEqual(['top-left'])
+  expect([...root.querySelectorAll('.kui-toast [data-part=message]')].map(item => item.textContent)).toEqual(['Saved'])
 })

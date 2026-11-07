@@ -1,0 +1,12 @@
+---
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import { toast } from '@kaynooo/kayjs-ui'
+
+// The extension's fallback Toaster hydrates first, and the app's own mounts after it.
+const app = signal(false)
+---
+button#saved(onClick={() => toast.success('Saved')}) Save
+button#mount(onClick={() => app = true}) Mount
+Toaster(fallback)
+if app()
+  Toaster(position="top-left")
