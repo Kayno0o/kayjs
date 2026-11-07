@@ -3,7 +3,7 @@ import type { SiteScope } from './site-scope'
 import type { TestSite } from './site-types'
 import { joinBase } from '../runtime/base'
 import { connectionHooks } from '../runtime/connection'
-import { openSocket, readEvents, resumeHeaders, routeUrl, streamRequest } from '../runtime/live'
+import { openSocket, readEvents, refusalOf, resumeHeaders, routeUrl, streamRequest } from '../runtime/live'
 import { effect, root as reactiveRoot } from '../runtime/reactive'
 import { withKept } from './cookies'
 import { NativeFetch, NativeWebSocket } from './natives'
@@ -57,6 +57,17 @@ export function socketsOf({ defaults, keyHeader, base, jar, send, listening, con
         }
 
         jar.keep(response)
+
+        const error = await refusalOf(response.clone())
+
+        for (const hook of [() => options?.onError?.({ error }), () => options?.onClose?.({ status: 'failed' })]) {
+          try {
+            hook()
+          }
+          catch (thrown) {
+            console.error(thrown)
+          }
+        }
 
         return response
       }

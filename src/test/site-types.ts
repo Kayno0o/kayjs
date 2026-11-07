@@ -90,7 +90,7 @@ export interface TestSite {
   api: <Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<ApiRequest<Module, Path, M> & VisitInit>) => Promise<ApiResult<ApiAnswer<Module, Path, M>>>
   // The same site with these headers added to every request, a string being a `Cookie` header such as `auth.sessionCookie` returns; the site it was made from is unchanged and shares its cookies.
   as: (who: string | Record<string, string>) => TestSite
-  // A websocket route expected to refuse the upgrade, which it sends for real: the refusal as a response, such as a guard's 401 or the 403 of a cross-site `origin`; an upgrade that was accepted fails the test.
+  // A websocket route expected to refuse the upgrade, which it sends for real: the refusal as a response, such as a guard's 401 or the 403 of a cross-site `origin`; an upgrade that was accepted fails the test. `onError({ error })` and `onClose({ status: 'failed' })` of the options run with the refusal; there is no connection, so `onOpen` and `onData` never do.
   socketRefusal: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path> & VisitInit>) => Promise<Response>
   // A websocket route of a module under `src/api`, opened as an island opens it, over a server the site starts on a free port the first time; `close()` stops it.
   socket: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path> & VisitInit>) => TestSocket<SocketOf<Module, Path>>

@@ -282,7 +282,7 @@ export function openSocket<Send, Receive>(connect: () => WebSocket | undefined, 
 }
 
 // A refused stream response as an `ApiError`: its JSON or text as the data, read without the route-call machinery a stream page does not otherwise load.
-async function refusalOf(response: Response): Promise<ApiError> {
+export async function refusalOf(response: Response): Promise<ApiError> {
   let data: unknown
 
   try {

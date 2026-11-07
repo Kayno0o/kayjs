@@ -1918,6 +1918,19 @@ describe('site.api, default headers and socketRefusal', () => {
     expect(crossSite.status).toBe(403)
   })
 
+  it('runs the onError and onClose options of a refusal with the refusal, in that order', async () => {
+    const seen: string[] = []
+    const response = await site.socketRefusal(secret, '/feed', {
+      onError: ({ error }) => void seen.push(`error ${error.status} ${error.message}`),
+      onClose: ({ status }) => void seen.push(`close ${status}`),
+    })
+
+    expect(response.status).toBe(401)
+    expect(seen).toEqual(['error 401 Sign in first', 'close failed'])
+    // The body is still there for the test to read.
+    expect(await response.text()).toBe('Sign in first')
+  })
+
   it('fails when the upgrade was accepted, naming the route', async () => {
     await expect(site.socketRefusal(chat, '/:room', { params: { room: 'general' } })).rejects.toThrow('/api/chat/general was accepted')
     await expect(site.as({ 'x-user': 'ada' }).socketRefusal(secret, '/feed')).rejects.toThrow('/api/private/feed was accepted')
