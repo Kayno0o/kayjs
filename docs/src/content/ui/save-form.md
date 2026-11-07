@@ -28,7 +28,7 @@ The form is dirty when what its controls hold differs from what they held when i
 
 ## Checking before saving
 
-`validate="submit"` checks the fields against the action's schema when Save is pressed, before the `confirm` question, and `validate="blur"` also as each field loses focus. A refused field shows its message and takes the focus, and nothing is called. It is read with `action`, not with `onSave`. See [Form](/ui/form#checking-as-you-type) for what it checks.
+`validate="submit"` checks the fields against the action's schema when Save is pressed, before the `confirm` question, and `validate="blur"` also as each field loses focus. A refused field shows its message and takes the focus, and nothing is called. It is read with `action`, not with `save`. See [Form](/ui/form#checking-as-you-type) for what it checks.
 
 ## Saving
 
@@ -36,20 +36,20 @@ Save calls the action. It does nothing while the form is clean or a save is unde
 
 A failure keeps the bar dirty. A refused field shows its message on its [FormField](/ui/form-field) and takes the focus. Any other message is toasted, as in a FormDialog, and `refused` words a handler's refusals. Edits made while the save runs stay unsaved.
 
-A save toasts `saved` when given, calls `onSaved` with what the action returned and leaves the form clean.
+A save toasts `saved` when given, calls `onSave` with what the action returned and leaves the form clean. Before 1.92 `onSave` was the call that does the save, which is `save` now: an `onSave` on a SaveForm with no `action` still does the save until 1.95, and `onSaved` is the old name of the hook that hears the result.
 
 When a save is refused or fails, `onError` is called first with `{ error }`, before the toast. A refusal is an `ActionError` with its `errors` by field and its `data`, and any other failure is what the call threw. Use it to log the failure or scroll to the first bad field.
 
 ## Editors driven by signals
 
-An editor whose state is signals and whose save takes an object, not a `FormData`, gives SaveForm the `dirty` it computes and an `onSave` returning the call's promise, in place of `action`.
+An editor whose state is signals and whose save takes an object, not a `FormData`, gives SaveForm the `dirty` it computes and an `save` returning the call's promise, in place of `action`.
 
 ```kay
-SaveForm(dirty={isNew || changed()} onSave={() => save({ name: name(), config: config() })} saved="Saved.")
+SaveForm(dirty={isNew || changed()} save={() => save({ name: name(), config: config() })} saved="Saved.")
   // the editor
 ```
 
-The bar, the leave guard, Save and Ctrl+S follow `dirty`, so a new item saves with no change. A rejection of `onSave` is handled as a refused action is, with its messages on their FormField and `failureLabel` toasted, and a result of `false` is a refusal the page shows itself. Either leaves the bar unsaved. `onSaved` is for `action` only. The page clears `dirty` once it has saved, and `status` replaces the status line.
+The bar, the leave guard, Save and Ctrl+S follow `dirty`, so a new item saves with no change. A rejection of `save` is handled as a refused action is, with its messages on their FormField and `failureLabel` toasted, and a result of `false` is a refusal the page shows itself. Either leaves the bar unsaved. `onSave` is for `action` only. The page clears `dirty` once it has saved, and `status` replaces the status line.
 
 ## Discarding
 

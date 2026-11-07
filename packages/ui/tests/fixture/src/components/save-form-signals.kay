@@ -12,7 +12,7 @@ const name = signal('Ada')
 const saved = signal('Ada')
 const changed = () => isNew || name() !== saved()
 
-async function onSave() {
+async function commit() {
   const accepted = await save({ name: name() })
 
   if (typeof accepted === 'object')
@@ -24,7 +24,7 @@ async function onSave() {
   return accepted
 }
 ---
-SaveForm(dirty={changed()} onSave={onSave} saved="Saved." status={status} cancelHref={cancelHref} confirm={confirm} saveDisabled={saveDisabled} onDiscard={() => { name = saved(); onDiscard() }})
+SaveForm(dirty={changed()} save={commit} saved="Saved." status={status} cancelHref={cancelHref} confirm={confirm} saveDisabled={saveDisabled} onDiscard={() => { name = saved(); onDiscard() }})
   button#edit(type="button" onClick={() => name = 'Grace'}) Edit
   FormField(label="Title" name="title")
     TextInput#title(name="title" value={name()} onInput={name.set})

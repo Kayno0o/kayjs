@@ -8,4 +8,4 @@ import SubscribeForm from '@kaynooo/kayjs-ui/subscribe-form.kay'
 
 ---
 main
-  SubscribeForm(action={subscribe} wordingId="ui-v1" onSent={() => undefined})
+  SubscribeForm(action={subscribe} wordingId="ui-v1" onSend={() => undefined})

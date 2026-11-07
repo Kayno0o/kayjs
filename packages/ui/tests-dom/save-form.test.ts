@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { trustHtml } from 'kay'
 import { mountComponent, settle } from 'kay/test'
 import SaveFormControls from '../tests/fixture/src/components/save-form-controls.kay'
+import SaveFormLegacy from '../tests/fixture/src/components/save-form-legacy.kay'
 import SaveFormMoment from '../tests/fixture/src/components/save-form-moment.kay'
 import SaveFormSignals from '../tests/fixture/src/components/save-form-signals.kay'
 import SaveFormComponent from '../tests/fixture/src/components/save-form.kay'
@@ -23,7 +24,7 @@ afterEach(() => {
 type Answer = string | { errors: Record<string, string> }
 
 async function saveForm(save: (input: { name: string }) => Promise<Answer>, shortcut?: string | false) {
-  mounted = await mountComponent(SaveFormComponent, { save, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++, shortcut })
+  mounted = await mountComponent(SaveFormComponent, { save, onSave: (name: string) => saved.push(name), onDiscard: () => discarded++, shortcut })
 
   return mounted.root
 }
@@ -174,7 +175,7 @@ describe('SaveForm', () => {
         throw answer
 
       return answer
-    }, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++, onError: ({ error }: { error: unknown }) => heard.push(error) })
+    }, onSave: (name: string) => saved.push(name), onDiscard: () => discarded++, onError: ({ error }: { error: unknown }) => heard.push(error) })
 
     const root = mounted.root
 
@@ -524,7 +525,7 @@ describe('SaveForm confirm', () => {
       calls.push(input.name)
 
       return input.name
-    }, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++, confirm: 'Apply this change?' })
+    }, onSave: (name: string) => saved.push(name), onDiscard: () => discarded++, confirm: 'Apply this change?' })
 
     const { root } = mounted
     const form = root.querySelector('form')!
@@ -550,7 +551,7 @@ describe('SaveForm confirm', () => {
       calls.push(input.name)
 
       return input.name
-    }, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++, confirm: 'Apply this change?' })
+    }, onSave: (name: string) => saved.push(name), onDiscard: () => discarded++, confirm: 'Apply this change?' })
 
     const { root } = mounted
 
@@ -584,7 +585,7 @@ describe('SaveForm driven by signals', () => {
     await settle()
   }
 
-  test('follows the dirty the app gives, saves through onSave and is clean once the app is', async () => {
+  test('follows the dirty the app gives, saves through save and is clean once the app is', async () => {
     const calls: string[] = []
     const root = await editor(async (input) => {
       calls.push(input.name)
@@ -604,6 +605,22 @@ describe('SaveForm driven by signals', () => {
     expect(status(root)).toBe('No unsaved change.')
     expect(root.querySelector('.kui-toast')?.textContent).toContain('Saved.')
     expect(leaves()).toBe(false)
+  })
+
+  test('an onSave with no action is still the call that does the save, and onSaved is not heard', async () => {
+    const calls: string[] = []
+
+    mounted = await mountComponent(SaveFormLegacy, { old: { onSave: async () => {
+      calls.push('saved')
+    }, onSaved: () => calls.push('heard') } })
+
+    const { root } = mounted
+
+    root.querySelector<HTMLInputElement>('#name')!.value = 'Grace'
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+
+    expect(calls).toEqual(['saved'])
   })
 
   test('a clean editor calls nothing, a new one saves with no change', async () => {
@@ -649,7 +666,7 @@ describe('SaveForm driven by signals', () => {
     expect(failed.querySelector('.kui-toast')?.textContent).toContain('Could not save.')
   })
 
-  test('shows the saving text while onSave runs, and the status the app sets', async () => {
+  test('shows the saving text while save runs, and the status the app sets', async () => {
     let finish: () => void = () => undefined
     const root = await editor(async () => new Promise<undefined>((resolve) => {
       finish = () => resolve(undefined)

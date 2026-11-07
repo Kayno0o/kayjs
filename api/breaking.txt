@@ -97,6 +97,7 @@ mail [.] pgLists
 mail [.] pgSuppressions
 mail [.] sqliteSuppressions
 ui [./menu.kay] default
+ui [./save-form.kay] default
 ui [.] MenuEntry
 ui [.] Toast
 ui [.] ToastAction

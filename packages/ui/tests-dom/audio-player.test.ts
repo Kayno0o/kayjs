@@ -112,7 +112,16 @@ test('plays a source from a bar with a play button, the time and a slider, and d
   expect([part('play')[0]!.getAttribute('aria-label'), audio.paused, player.querySelector('input[type=range]')!.getAttribute('max')]).toEqual(['Play', true, String(LENGTH)])
 })
 
-test('tells onPlay, onPause, onEnded and onError as the audio moves through them', async () => {
+test('onEnded still hears the end of the audio', async () => {
+  const { root } = await players()
+
+  root.querySelector('#legacy audio')!.dispatchEvent(new Event('ended'))
+  await settle()
+
+  expect(events).toEqual(['legacy ended'])
+})
+
+test('tells onPlay, onPause, onEnd and onError as the audio moves through them', async () => {
   const { audio, part } = await players()
 
   click(part('play')[0]!)

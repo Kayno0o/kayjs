@@ -9,11 +9,26 @@ let mounted: Mounted | undefined
 afterEach(() => mounted?.unmount())
 
 describe('ContactForm and SubscribeForm', () => {
-  test('onSent runs once on success and the sent block replaces the notice', async () => {
+  test('onSent still hears the result, after onSend', async () => {
+    const heard: string[] = []
+
+    mounted = await mountComponent(MailForms, {
+      onSend: (data: unknown) => heard.push(`send ${String(data)}`),
+      onError: () => undefined,
+      onSubscribed: (data: unknown) => heard.push(`subscribe ${String(data)}`),
+      old: { contact: { onSent: (data: unknown) => heard.push(`sent ${String(data)}`) }, subscribe: { onSent: (data: unknown) => heard.push(`subscribed ${String(data)}`) } },
+    })
+    click(mounted.root.querySelector('#sent'))
+    await settle()
+
+    expect(heard).toEqual(['send ok', 'sent ok', 'subscribe ok', 'subscribed ok'])
+  })
+
+  test('onSend runs once on success and the sent block replaces the notice', async () => {
     const sent: unknown[] = []
     const failures: unknown[] = []
 
-    mounted = await mountComponent(MailForms, { onSent: (data: unknown) => sent.push(data), onError: (failure: unknown) => failures.push(failure) })
+    mounted = await mountComponent(MailForms, { onSend: (data: unknown) => sent.push(data), onError: (failure: unknown) => failures.push(failure) })
 
     const { root } = mounted
 
@@ -33,7 +48,7 @@ describe('ContactForm and SubscribeForm', () => {
     const sent: unknown[] = []
     const failures: unknown[] = []
 
-    mounted = await mountComponent(MailForms, { onSent: () => undefined, onError: () => undefined, onSubscribed: (data: unknown) => sent.push(data), onSubscribeError: (failure: unknown) => failures.push(failure) })
+    mounted = await mountComponent(MailForms, { onSend: () => undefined, onError: () => undefined, onSubscribed: (data: unknown) => sent.push(data), onSubscribeError: (failure: unknown) => failures.push(failure) })
     click(mounted.root.querySelector('#refused'))
     await settle()
 
@@ -46,11 +61,11 @@ describe('ContactForm and SubscribeForm', () => {
     expect(mounted.root.querySelector('.kui-subscribe-form #subscribed')).not.toBeNull()
   })
 
-  test('onError runs with the failure of a refused post, and onSent is quiet', async () => {
+  test('onError runs with the failure of a refused post, and onSend is quiet', async () => {
     const sent: unknown[] = []
     const failures: { errors: Record<string, string> }[] = []
 
-    mounted = await mountComponent(MailForms, { onSent: (data: unknown) => sent.push(data), onError: (failure: { errors: Record<string, string> }) => failures.push(failure) })
+    mounted = await mountComponent(MailForms, { onSend: (data: unknown) => sent.push(data), onError: (failure: { errors: Record<string, string> }) => failures.push(failure) })
     click(mounted.root.querySelector('#refused'))
     await settle()
 

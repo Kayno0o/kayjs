@@ -36,4 +36,4 @@ Once the audio has played, the lock screen and the headset buttons show the chap
 
 ## Play, pause, end and error
 
-`onPlay`, `onPause` and `onEnded` are called as the audio moves through them. `onError` gets `{ error, event }`, the error being the `MediaError` when the file or stream fails to load, or the `DOMException` when the browser refuses to play, which the `failureLabel` toast also reports.
+`onPlay`, `onPause` and `onEnd` (`onEnded` before 1.92, which works until 1.95) are called as the audio moves through them. `onError` gets `{ error, event }`, the error being the `MediaError` when the file or stream fails to load, or the `DOMException` when the browser refuses to play, which the `failureLabel` toast also reports.

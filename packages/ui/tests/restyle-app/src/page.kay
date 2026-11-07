@@ -160,7 +160,7 @@ SidePanel#beside(open={true} modal={false} closeHref="/list" title="Detail" onOp
   p detail
 ConfirmDelete#confirm-link(message="Sure?" triggerLook="link" onConfirm={() => undefined})
 ConfirmDelete#confirm-inline(message="Sure?" ask="inline" triggerLook="button" onConfirm={() => undefined})
-SaveForm#save(dirty={false} onSave={() => undefined})
+SaveForm#save(dirty={false} save={() => undefined})
   p field
 CommandPalette#palette(entries={[]})
 Tabs#tabs(label="Sections" value="a" tabs={[{ value: 'a', label: 'A', icon: 'info' }, { value: 'b', label: 'B' }]})

@@ -34,6 +34,15 @@ const FAILURE_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>
   'image-cropper': { errorLabel: 'failureLabel' },
   'ai-chat': { errorMessage: 'failureLabel' },
 }
+// The kayjs-ui callbacks renamed in 1.92 to follow the hook convention (`llms/hooks.md`): `onX` after a transition X in its base form, never a participle. SaveForm is apart, as its own `onSave` was the call that does the save, which `save` is now.
+const HOOK_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  'form': { onSaved: 'onSave' },
+  'form-dialog': { onSaved: 'onSave' },
+  'save-form': { onSaved: 'onSave' },
+  'contact-form': { onSent: 'onSend' },
+  'subscribe-form': { onSent: 'onSend' },
+  'audio-player': { onEnded: 'onEnd' },
+}
 // The kayjs-ui props and blocks that are `actions` since 1.90, where the role is the controls a component holds beside its own: the rest of a Card's title line, a FormField's label line, an AppHeader's far end, a TreeView row's end and a MarkdownEditor's toolbar. A ConfirmDelete's `trigger` string is `triggerLook`, as `trigger` is a block elsewhere.
 const ACTIONS_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   'card': { head: 'actions' },
@@ -969,6 +978,27 @@ class Validator {
         const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: 'disabledDay={isDisabled}' } : { start: attribute.name.start, end: attribute.name.end, text: 'disabledDay' }
 
         this.lint(attribute.name, 'deprecated-ui-props', `\`isDisabled\` on \`${element.name}\` is \`disabledDay\` since kayjs-ui 1.89, so \`disabled\` alone is the boolean`, { help: 'Write `disabledDay`', fixes: [{ title: 'Write `disabledDay`', edits: [edit], safe: true }] })
+
+        continue
+      }
+
+      const hookRenamed = HOOK_RENAMES[file]?.[name]
+      const saveCall = file === 'save-form' && name === 'onSave'
+
+      if (hookRenamed !== undefined || saveCall) {
+        const to = saveCall ? 'save' : hookRenamed!
+        const others = new Set(element.attributes.filter(other => other.kind !== 'spread').map(other => this.text(other.name)))
+        const spread = element.attributes.some(other => other.kind === 'spread')
+
+        // `onSave` of a SaveForm with an `action` hears its result since 1.92, so only one with no `action` (and no spread that may hold one) is the call that does the save. An `onSaved` beside an `onSave` is renamed once that one is `save`.
+        if (saveCall && (spread || others.has('action') || others.has('save')))
+          continue
+
+        const blocked = !saveCall && others.has(to)
+        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: `${to}={${name}}` } : { start: attribute.name.start, end: attribute.name.end, text: to }
+        const why = saveCall ? `\`onSave\` on \`${element.name}\` is \`save\` since kayjs-ui 1.92, the call that does the save, where \`onSave\` hears an \`action\`'s result` : `\`${name}\` on \`${element.name}\` is \`${to}\` since kayjs-ui 1.92, so every hook is \`onX\` after a transition, in its base form`
+
+        this.lint(attribute.name, 'deprecated-hook-names', why, blocked ? { help: `Drop \`${name}\`, \`${to}\` is there` } : { help: `Write \`${to}\``, fixes: [{ title: `Write \`${to}\``, edits: [edit], safe: true }] })
 
         continue
       }

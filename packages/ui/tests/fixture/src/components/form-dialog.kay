@@ -13,7 +13,7 @@ interface Refusal {
 
 // `save` stands in for the server: it answers the saved name, the messages a schema refusal carries, the data of a handler's refusal, or throws for a call that failed outright.
 // `plain` leaves `refused` out, as a page reading nothing from its handler's refusals does.
-const { save, onSaved, onError, plain = false } = props<{ onError?: ((failure: { error: unknown }) => unknown) | undefined, save: (input: { name: string }) => Promise<string | { errors: Record<string, string> } | { fail: Refusal }>, onSaved: (name: string) => void, plain?: boolean }>()
+const { save, onSave, onError, plain = false, old } = props<{ old?: Record<string, unknown> | undefined, onError?: ((failure: { error: unknown }) => unknown) | undefined, save: (input: { name: string }) => Promise<string | { errors: Record<string, string> } | { fail: Refusal }>, onSave: (name: string) => void, plain?: boolean }>()
 
 const open = signal(true)
 const pending = signal(false)
@@ -50,7 +50,7 @@ function said(refusal: Refusal) {
 ---
 button#open(onClick={() => open = true}) Open
 button#hide(onClick={() => open = false}) Hide
-FormDialog(open={open()} title="Rename" action={rename} submitLabel="Rename" failureLabel="Could not rename" refused={plain ? undefined : said} onSaved={onSaved} onError={onError} onOpenChange={() => open = false})
+FormDialog(open={open()} title="Rename" action={rename} submitLabel="Rename" failureLabel="Could not rename" refused={plain ? undefined : said} onSave={onSave} onError={onError} onOpenChange={() => open = false} {...old})
   FormField(label="Name" name="name" hint="As the profile shows it")
     input#name(name="name" value="Ada" aria-describedby="name-note")
   p#name-note Public

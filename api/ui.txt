@@ -787,6 +787,7 @@ component default
   linkLabel?: string | undefined
   nextLabel?: string | undefined
   onChapterChange?: ((index: number) => unknown) | undefined
+  onEnd?: (() => unknown) | undefined
   onEnded?: (() => unknown) | undefined
   onError?: ((failure: { error: DOMException | MediaError | null; event?: Event; }) => unknown) | undefined
   onPause?: (() => unknown) | undefined
@@ -1259,6 +1260,7 @@ component default
   messageLabel?: string | undefined
   nameLabel?: string | undefined
   onError?: ((failure: FormFailure<never, unknown, never>) => unknown) | undefined
+  onSend?: ((data: unknown) => unknown) | undefined
   onSent?: ((data: unknown) => unknown) | undefined
   privacy?: string | undefined
   privacyLabel?: string | undefined
@@ -1587,6 +1589,7 @@ component default
   modal?: boolean | undefined
   onError?: ((failure: { error: unknown; }) => unknown) | undefined
   onOpenChange: (open: boolean) => unknown
+  onSave?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
   onSaved?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
   open: boolean
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
@@ -1627,6 +1630,7 @@ component default
   class?: string | undefined | { root?: string | undefined; }
   failureLabel?: string | undefined
   onError?: ((failure: { error: unknown; }) => unknown) | undefined
+  onSave?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
   onSaved?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   saved?: string | undefined
@@ -2304,9 +2308,10 @@ component default
   failureLabel?: string | undefined
   onDiscard?: (() => unknown) | undefined
   onError?: ((failure: { error: unknown; }) => unknown) | undefined
-  onSave?: (() => Promise<unknown>) | undefined
+  onSave?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
   onSaved?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
+  save?: (() => Promise<unknown>) | undefined
   saveDisabled?: boolean | string | undefined
   saveLabel?: string | undefined
   saved?: string | undefined
@@ -2692,6 +2697,7 @@ component default
   label?: string | undefined
   noticeText?: string | undefined
   onError?: ((failure: FormFailure<never, unknown, never>) => unknown) | undefined
+  onSend?: ((data: unknown) => unknown) | undefined
   onSent?: ((data: unknown) => unknown) | undefined
   privacy?: string | undefined
   privacyLabel?: string | undefined

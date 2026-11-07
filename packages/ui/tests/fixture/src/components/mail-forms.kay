@@ -5,7 +5,7 @@ import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
 import SubscribeForm from '@kaynooo/kayjs-ui/subscribe-form.kay'
 
 // A stand-in for an action: the page's outcome of the last post is what `settle` and `refuse` set.
-const { onSent, onError, onSubscribed, onSubscribeError } = props<{ onSent: (data: unknown) => void, onError: (failure: FormFailure<never, unknown>) => void, onSubscribed?: (data: unknown) => void, onSubscribeError?: (failure: FormFailure<never, unknown>) => void }>()
+const { onSend, onError, onSubscribed, onSubscribeError, old } = props<{ old?: { contact?: object, subscribe?: object } | undefined, onSend: (data: unknown) => void, onError: (failure: FormFailure<never, unknown>) => void, onSubscribed?: (data: unknown) => void, onSubscribeError?: (failure: FormFailure<never, unknown>) => void }>()
 
 const done = signal<{ data: unknown } | undefined>(undefined)
 const failed = signal<FormFailure<never, unknown> | undefined>(undefined)
@@ -21,10 +21,10 @@ const action = Object.assign(async () => undefined, {
 ---
 button#sent(onClick={() => { failed = undefined; done = { data: 'ok' } }}) Sent
 button#refused(onClick={() => { done = undefined; failed = { status: 422, message: 'Invalid', values: {}, errors: { email: 'Invalid' } } }}) Refused
-ContactForm(action={action} onSent={onSent} onError={onError})
+ContactForm(action={action} onSend={onSend} onError={onError} {...old?.contact})
   @sent
     p#custom-sent Custom
-SubscribeForm(action={action} onSent={onSubscribed} onError={onSubscribeError})
+SubscribeForm(action={action} onSend={onSubscribed} onError={onSubscribeError} {...old?.subscribe})
   @sent
     p#subscribed Subscribed
   input#extra(name="extra")

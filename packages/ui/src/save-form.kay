@@ -10,26 +10,28 @@ import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kui-save-form', grid: 'kui-form-grid', bar: 'kui-save-bar', status: 'kui-save-bar-status', actions: 'kui-save-bar-actions', confirm: '' } })
 
-const { action, refused, saved, onSaved, onError, onDiscard, dirty, onSave, status, failureLabel, failure, validate = false, onFocusOut, dirtyLabel = wording('ui.saveForm.dirty', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.clean', 'No unsaved change.'), savingLabel = wording('ui.saveForm.saving', 'Saving…'), saveLabel = wording('ui.saveForm.save', 'Save'), discardLabel = wording('ui.saveForm.discard', 'Discard'), cancelLabel = wording('ui.saveForm.cancel', 'Cancel'), cancelHref, confirm, confirmLabel, saveDisabled, shortcut: saveKeys = 'mod+s', ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'children' | 'onSubmit' | 'onInput' | 'onChange' | 'onError'> & {
-  // The page's action the form calls with its fields, as FormDialog does. An editor whose state is signals gives `dirty` and `onSave` instead.
+const { action, refused, saved, onSave, onSaved, onError, onDiscard, dirty, save, status, failureLabel, failure, validate = false, onFocusOut, dirtyLabel = wording('ui.saveForm.dirty', 'Unsaved changes.'), cleanLabel = wording('ui.saveForm.clean', 'No unsaved change.'), savingLabel = wording('ui.saveForm.saving', 'Saving…'), saveLabel = wording('ui.saveForm.save', 'Save'), discardLabel = wording('ui.saveForm.discard', 'Discard'), cancelLabel = wording('ui.saveForm.cancel', 'Cancel'), cancelHref, confirm, confirmLabel, saveDisabled, shortcut: saveKeys = 'mod+s', ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'children' | 'onSubmit' | 'onInput' | 'onChange' | 'onError'> & {
+  // The page's action the form calls with its fields, as FormDialog does. An editor whose state is signals gives `dirty` and `save` instead.
   action?: Action<never, Output> | undefined
-  // Toasted when the call fails other than on a field, or when `onSave` rejects.
+  // Toasted when the call fails other than on a field, or when `save` rejects.
   failureLabel?: string | undefined
   // Deprecated: `failureLabel`. Works until 1.93.
   failure?: string | undefined
-  // Checks the fields against `action`'s schema in the browser, as the server would, with the same messages shown on their FormField: `'submit'` when Save is pressed, with nothing called while a field is refused, `'blur'` also each field as it loses focus; `false` (the default) leaves it to the server. Not read with `onSave`.
+  // Checks the fields against `action`'s schema in the browser, as the server would, with the same messages shown on their FormField: `'submit'` when Save is pressed, with nothing called while a field is refused, `'blur'` also each field as it loses focus; `false` (the default) leaves it to the server. Not read with `save`.
   validate?: FormValidation
   // Whether the editor holds unsaved changes, when its state is the app's own signals rather than named fields: the bar, the leave guard and Save follow it instead of the fields, so `dirty={isNew || changed()}` lets a new item save with no change.
   dirty?: boolean | undefined
-  // Called by Save, the shortcut included, instead of `action`: answer the call's promise. A rejection is handled as an action's refusal is (`refused`, the messages on their FormField, `failureLabel`); `false` is a refusal the app shows itself, and either leaves the bar unsaved. `onSaved` is for `action` only. The app clears `dirty` once it has saved.
-  onSave?: (() => Promise<unknown>) | undefined
+  // Called by Save, the shortcut included, instead of `action`: answer the call's promise. A rejection is handled as an action's refusal is (`refused`, the messages on their FormField, `failureLabel`); `false` is a refusal the app shows itself, and either leaves the bar unsaved. `onSave` is for `action` only. The app clears `dirty` once it has saved.
+  save?: (() => Promise<unknown>) | undefined
   // Replaces the status line, whatever the form's state.
   status?: string | undefined
   // What a refusal of the action's handler says, as FormDialog's `refused`.
   refused?: ((data: FailureData<Output>) => Record<string, string> | string | undefined) | undefined
   // Toasted as a success once the action has run.
   saved?: string | undefined
-  // What the action returned, for the page to patch into what it shows. The form is clean again once it has run.
+  // What the action returned, for the page to patch into what it shows. The form is clean again once it has run. With no `action`, `onSave` is still what `save` is, a function that does the save (deprecated, works until 1.95).
+  onSave?: ((result: Answer<Success<Output>>) => unknown) | undefined
+  // Deprecated: `onSave`. Works until 1.95.
   onSaved?: ((result: Answer<Success<Output>>) => unknown) | undefined
   // Called with `{ error }` before the toast: the `ActionError` of a refusal (its `errors` by field, its `data`), or whatever the call threw. For logging, or to scroll to the first bad field.
   onError?: ((failure: { error: unknown }) => unknown) | undefined
@@ -71,7 +73,12 @@ let baseline = ''
 
 formIssues.provide(issues)
 
-if (validate !== false && action && !onSave)
+// Before 1.92 `onSave` was the call that does the save, which `save` is now: an `onSave` with no `action` is still read that way, as `onSave` hears an `action`'s result.
+function custom(): (() => Promise<unknown>) | undefined {
+  return save ?? (action ? undefined : onSave as (() => Promise<unknown>) | undefined)
+}
+
+if (validate !== false && action && !custom())
   carrySchema(action)
 
 // Follows `confirm`, which a parent may set after mount.
@@ -197,11 +204,11 @@ async function submit(event: SubmitEvent) {
   if (busy() || !form || !(dirty ?? snapshot() !== baseline))
     return
 
-  if ((!action && !onSave) || saveDisabled)
+  if ((!action && !custom()) || saveDisabled)
     return
 
   // Before any question is asked: a form the schema refuses is not worth one.
-  if (action && !onSave && validate !== false && !(await checkSent(form, action, issues, failureText(), checking)))
+  if (action && !custom() && validate !== false && !(await checkSent(form, action, issues, failureText(), checking)))
     return
 
   if (confirm !== undefined && !sure) {
@@ -217,7 +224,7 @@ async function submit(event: SubmitEvent) {
   const adopt = values()
   let done: Awaited<ReturnType<typeof callAction>>
 
-  const run = onSave
+  const run = custom()
 
   if (run) {
     saving = true
@@ -249,8 +256,10 @@ async function submit(event: SubmitEvent) {
   if (saved)
     toast.success(saved)
 
-  if (!onSave)
+  if (!run) {
+    onSave?.(done.result as Answer<Success<Output>>)
     onSaved?.(done.result as Answer<Success<Output>>)
+  }
 }
 
 // The form's methods are called through its prototype, as a control named `requestSubmit` or `reset` takes their place on the form.

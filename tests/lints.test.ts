@@ -1,4 +1,5 @@
 import type { CompileOptions } from '../src/compiler'
+import type { LintLevels } from '../src/compiler/lints'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
@@ -1605,6 +1606,53 @@ describe('deprecated-ui-failures', () => {
     expect(found('CopyButton(text="x" failure="No" failureLabel="No")')).toEqual([{ at: 'failure', fix: undefined }])
     expect(found('Other(failure="No")')).toEqual([])
     expect(found('SaveForm(onSave={run})')).toEqual([])
+  })
+})
+
+describe('deprecated-hook-names in a template', () => {
+  const imports = 'import Form from \'@kaynooo/kayjs-ui/form.kay\'\nimport FormDialog from \'@kaynooo/kayjs-ui/form-dialog.kay\'\nimport Save from \'@kaynooo/kayjs-ui/save-form.kay\'\nimport ContactForm from \'@kaynooo/kayjs-ui/contact-form.kay\'\nimport SubscribeForm from \'@kaynooo/kayjs-ui/subscribe-form.kay\'\nimport AudioPlayer from \'@kaynooo/kayjs-ui/audio-player.kay\'\nimport Other from \'./other.kay\'\n'
+  const found = (template: string, levels?: LintLevels) => {
+    const source = `---\n${imports}---\n${template}\n`
+    const result = compileKay(source, 'hooks.kay', { check: true, lints: levels })
+
+    return result.diagnostics.filter(d => d.code === 'deprecated-hook-names').map(d => ({ at: source.slice(d.start, d.end), fix: d.fixes?.[0]?.edits.map(edit => `${source.slice(edit.start, edit.end)}->${edit.text}`), safe: d.fixes?.[0]?.safe }))
+  }
+
+  it('renames onSaved, onSent and onEnded with a safe fix', () => {
+    expect(found('Form(action={add} onSaved={done})')).toEqual([{ at: 'onSaved', fix: ['onSaved->onSave'], safe: true }])
+    expect(found('FormDialog(open={open} action={add} onSaved={done})')).toEqual([{ at: 'onSaved', fix: ['onSaved->onSave'], safe: true }])
+    expect(found('Save(action={add} onSaved={done})')).toEqual([{ at: 'onSaved', fix: ['onSaved->onSave'], safe: true }])
+    expect(found('ContactForm(action={send} onSent={done})')).toEqual([{ at: 'onSent', fix: ['onSent->onSend'], safe: true }])
+    expect(found('SubscribeForm(action={send} onSent={done})')).toEqual([{ at: 'onSent', fix: ['onSent->onSend'], safe: true }])
+    expect(found('AudioPlayer(src="/a.mp3" title="A" onEnded={done})')).toEqual([{ at: 'onEnded', fix: ['onEnded->onEnd'], safe: true }])
+  })
+
+  it('writes a shorthand with its value and finds the old name beside a spread', () => {
+    expect(found('Form(action={add} {onSaved})')).toEqual([{ at: 'onSaved', fix: ['{onSaved}->onSave={onSaved}'], safe: true }])
+    expect(found('Form(action={add} {...rest} onSaved={done})')).toEqual([{ at: 'onSaved', fix: ['onSaved->onSave'], safe: true }])
+  })
+
+  it('reports an old name written beside the new one with no fix', () => {
+    expect(found('Form(action={add} onSaved={a} onSave={b})')).toEqual([{ at: 'onSaved', fix: undefined, safe: undefined }])
+    expect(found('ContactForm(action={send} onSent={a} onSend={b})')).toEqual([{ at: 'onSent', fix: undefined, safe: undefined }])
+  })
+
+  it('reads the onSave of a SaveForm with no action as the save call, now save', () => {
+    expect(found('Save(dirty={changed()} onSave={run})')).toEqual([{ at: 'onSave', fix: ['onSave->save'], safe: true }])
+    expect(found('Save(dirty={changed()} {onSave})')).toEqual([{ at: 'onSave', fix: ['{onSave}->save={onSave}'], safe: true }])
+  })
+
+  it('leaves the onSave of a SaveForm that has an action or a spread, which hears its result, and the new names alone', () => {
+    expect(found('Save(action={add} onSave={run})')).toEqual([])
+    expect(found('Save(dirty={true} {...rest} onSave={run})')).toEqual([])
+    expect(found('Save(dirty={true} save={run})')).toEqual([])
+    expect(found('Form(action={add} onSave={done})')).toEqual([])
+    expect(found('Form(onSave={done})')).toEqual([])
+  })
+
+  it('leaves a tag of the app and the allow level alone', () => {
+    expect(found('Other(onSaved={done} onSent={done} onEnded={done})')).toEqual([])
+    expect(found('Form(action={add} onSaved={done})', { 'deprecated-hook-names': 'allow' })).toEqual([])
   })
 })
 

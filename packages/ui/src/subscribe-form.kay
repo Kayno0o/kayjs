@@ -10,7 +10,7 @@ import Notice from './notice.kay'
 
 const look = recipe({ parts: { root: 'kui-subscribe-form', notice: FIELD_MESSAGE.hint } })
 
-const { action, noticeText, label = wording('ui.subscribeForm.email', wording('ui.subscribeForm.label', wording('mail.list.form.email', 'Email'))), submitLabel = wording('ui.subscribeForm.submit', wording('mail.list.form.submit', 'Subscribe')), sentLabel = wording('ui.subscribeForm.sent', wording('mail.list.form.sent', 'Almost done: open the mail we just sent you and confirm your address.')), privacyLabel = wording('ui.subscribeForm.privacy', wording('mail.list.form.privacy', 'Privacy policy')), privacy, wordingId, onSent, onError, sent, ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'novalidate' | 'children' | 'onError'> & {
+const { action, noticeText, label = wording('ui.subscribeForm.email', wording('ui.subscribeForm.label', wording('mail.list.form.email', 'Email'))), submitLabel = wording('ui.subscribeForm.submit', wording('mail.list.form.submit', 'Subscribe')), sentLabel = wording('ui.subscribeForm.sent', wording('mail.list.form.sent', 'Almost done: open the mail we just sent you and confirm your address.')), privacyLabel = wording('ui.subscribeForm.privacy', wording('mail.list.form.privacy', 'Privacy policy')), privacy, wordingId, onSend, onSent, onError, sent, ...rest } = props<Omit<JSX.IntrinsicElements['form'], 'class' | 'action' | 'novalidate' | 'children' | 'onError'> & {
   // The action `mail.list().form()` from kayjs-mail gives, or any with an `email` field.
   action: Action<never, unknown>
   // The labels read the `ui.subscribeForm.*` messages, then kayjs-mail's `mail.list.form` ones in the page's language, English and French, which these replace.
@@ -21,6 +21,8 @@ const { action, noticeText, label = wording('ui.subscribeForm.email', wording('u
   // Replaces the success notice, whatever `sentLabel` says.
   sent?: Snippet
   // Called once the post went through, with what the action returned: for an analytics conversion, closing a dialog around the form or a redirect.
+  onSend?: ((data: unknown) => unknown) | undefined
+  // Deprecated: `onSend`. Works until 1.95.
   onSent?: ((data: unknown) => unknown) | undefined
   // Called when the post was refused or failed, with the messages by field, the status and the failure's data; the notice and the field messages still show.
   onError?: ((failure: FormFailure<never, unknown>) => unknown) | undefined
@@ -37,6 +39,11 @@ const notice = () => noticeText ?? wording('ui.subscribeForm.notice', wording('m
 // The list's own `privacy`, which its form action carries; the prop replaces it.
 const policy = () => privacy ?? (action as { schema?: { 'x-privacy'?: string } }).schema?.['x-privacy']
 const shownWording = () => wordingId ?? (noticeText === undefined ? 'stock' : 'custom')
+
+function told(data: unknown) {
+  onSend?.(data)
+  onSent?.(data)
+}
 ---
 // Posts without JavaScript; the honeypot, the time stamp and the refused email's message come from the action.
 form(part="root" {...rest} action={action} novalidate)
@@ -51,8 +58,8 @@ form(part="root" {...rest} action={action} novalidate)
   input(type="hidden" name="wording" value={shownWording()})
   Button(type="submit" tone="accent" label={submitLabel})
   // Only an island renders the form with a callback, which this passes on; the cast keeps `kay check` from reading the form as a static component handing an island a function.
-  if onSent || onError
-    FormOutcome(action={action} whenSent={onSent as never} whenRefused={onError as never})
+  if onSend || onSent || onError
+    FormOutcome(action={action} whenSent={told as never} whenRefused={onError as never})
   if action.succeeded()
     if sent
       | {sent}

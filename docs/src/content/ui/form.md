@@ -37,7 +37,7 @@ The same goes for a `form(action={add})` of your own: write `validate` (or `vali
 
 A refused field shows its message on its FormField and takes the focus. Any other message is toasted, and `refused` words a handler's refusals, as in a [FormDialog](/ui/form-dialog). A failure carrying no message toasts `failureLabel`.
 
-A call that goes through toasts `saved` when given and calls `onSaved` with what the action returned. When it is refused or fails, `onError` is called first with `{ error }`.
+A call that goes through toasts `saved` when given and calls `onSave` with what the action returned. When it is refused or fails, `onError` is called first with `{ error }`. `onSaved` is the name `onSave` had before 1.92 and works until 1.95.
 
 ## A form of your own
 

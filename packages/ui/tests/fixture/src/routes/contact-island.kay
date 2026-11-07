@@ -12,4 +12,4 @@ import ContactForm from '@kaynooo/kayjs-ui/contact-form.kay'
 
 ---
 main
-  ContactForm(action={contact} onSent={() => undefined})
+  ContactForm(action={contact} onSend={() => undefined})

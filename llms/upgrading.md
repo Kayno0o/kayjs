@@ -29,6 +29,12 @@ Every failed kayjs-auth result is `{ ok: false, error }` with `error` the `Error
 
 A hook given to `ask(prompt, { onSuccess })` no longer replaces the one of `ai()` of the same name: both run, the one of `ai()` first. An app that relied on the replacement to switch a bill or an audit off for one ask sets it from one place instead (an option of its own that the hook reads). A throw in `onStep`, `onToolCall`, `onSuccess` or `onError` is still logged and never fails the reply, and is now also handed to the app's `onError` with source `ai.onStep`, `ai.onToolCall`, `ai.onSuccess` or `ai.onError`.
 
+### kayjs-ui callbacks follow the hook convention, SaveForm's `onSave` is `save`
+
+`onSaved` is `onSave` on Form, FormDialog and SaveForm, `onSent` is `onSend` on ContactForm and SubscribeForm, and `onEnded` is `onEnd` on AudioPlayer, each told what it was told. The old names work until 1.95, run after the new ones when both are set, and `kay check` flags them in a template as `deprecated-hook-names`; `kay upgrade` renames them, a shorthand `{onSaved}` becoming `onSave={onSaved}`.
+
+SaveForm's `onSave` was the call that does the save for an editor with no `action` (`SaveForm(dirty={changed()} onSave={run})`), and is `save` now, as `onSave` hears an `action`'s result. An `onSave` with no `action` is still read as the call that does the save until 1.95, and `kay upgrade` writes `save` for it when the SaveForm has no `action` and no spread. `kay check` leaves an `onSave` beside an `action` or a spread alone, as it cannot tell the old call from the new hook: an `onSave` that was meant to replace the `action` is `save` now. A function given as `save` makes the page an island, which `kay check` reports as `promoted-island` until the component is marked `--- island`.
+
 ### kay `QueuedJob.runAt` is a `Date`
 
 The jobs `jobs(queue)` follows in an island carry `runAt` as a `Date` where they carried milliseconds: read `job.runAt.getTime()` for the number. The `JobStore` interface keeps milliseconds. No lint can see it: a type changing under a property is not visible to `kay check`.
