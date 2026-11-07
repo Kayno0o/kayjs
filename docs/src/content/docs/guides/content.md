@@ -352,7 +352,7 @@ const author = await resolve(post.data.author, authors)
 p {author?.data.name}
 ```
 
-A collection filled by a loader is not read by `kay check`, so a reference to it is checked only when an entry is written.
+A collection filled by a loader is not read by `kay check`, so a reference to it is checked only when an entry is written. The check accepts a reference to a draft, and `resolve` returns undefined for it until the entry is published.
 
 ## Collections from a CMS
 

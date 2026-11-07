@@ -203,7 +203,7 @@ export async function translations(name: string): Promise<TranslationIndex> {
 
 // Where an entry an editor wrote fails its collection: a slug naming another place, or another file than its own in a folder, a new `a/index` included, a locale the site does not serve, a locale missing from a localized collection's entry or given to another's, the schema, or a component its body uses that the collection does not name.
 // A body's issue is flagged `body`, a slug's or a locale's `key`, apart from a data field of that name; the body comes back compiled when it compiles.
-export async function entryIssues(name: string, collection: Collection<unknown>, entry: WrittenEntry, replacing?: string, alongside: { collection: string, slug: string }[] = []): Promise<{ issues: DraftIssue[], compiled?: CompiledMarkdown | undefined }> {
+export async function entryIssues(name: string, collection: Collection<unknown>, entry: WrittenEntry, replacing?: string, alongside: { collection: string, slug: string }[] = [], slugs = new Map<string, Set<string>>()): Promise<{ issues: DraftIssue[], compiled?: CompiledMarkdown | undefined }> {
   const { slug, locale, data, body } = entry
   const at = { collection: name, slug, ...locale !== undefined && { locale } }
   const issues: DraftIssue[] = []
@@ -220,7 +220,7 @@ export async function entryIssues(name: string, collection: Collection<unknown>,
 
   if (isFields(data)) {
     issues.push(...await uniqueIssues(name, collection, at, data, replacing))
-    issues.push(...await referenceIssues(collection, at, data, [at, ...alongside]))
+    issues.push(...await referenceIssues(collection, at, data, [at, ...alongside], slugs))
   }
 
   return { issues, compiled }
@@ -246,10 +246,9 @@ async function uniqueIssues(name: string, collection: Collection<unknown>, at: {
   return issues
 }
 
-// Each `reference()` field naming a slug its collection has no entry for, or a collection the content config does not export; the entries of a collection are read once per call. The entries written together count as held, the one being written included, so an entry may name itself and a batch its own members.
-async function referenceIssues(collection: Collection<unknown>, at: { collection: string, slug: string, locale?: string }, data: Record<string, DataValue>, written: { collection: string, slug: string }[]): Promise<DraftIssue[]> {
+// Each `reference()` field naming a slug its collection has no entry for, or a collection the content config does not export; the entries of a collection are read once per `slugs` map, which a batch shares. The entries written together count as held, the one being written included, so an entry may name itself and a batch its own members.
+async function referenceIssues(collection: Collection<unknown>, at: { collection: string, slug: string, locale?: string }, data: Record<string, DataValue>, written: { collection: string, slug: string }[], slugs: Map<string, Set<string>>): Promise<DraftIssue[]> {
   const issues: DraftIssue[] = []
-  const slugs = new Map<string, Set<string>>()
 
   for (const use of referencesIn(collection.options.schema, data)) {
     if (!registeredCollections().some(([name]) => name === use.collection)) {
@@ -456,8 +455,11 @@ export async function saveEntries(name: string, written: WrittenEntry[]): Promis
   try {
     const checked: WrittenEntry[] = []
 
+    const held = written.map(each => ({ collection: name, slug: each.slug }))
+    const slugs = new Map<string, Set<string>>()
+
     for (const entry of written) {
-      const { issues } = await entryIssues(name, collection, entry, undefined, written.map(each => ({ collection: name, slug: each.slug })))
+      const { issues } = await entryIssues(name, collection, entry, undefined, held, slugs)
 
       if (issues.length > 0)
         return { issues }
