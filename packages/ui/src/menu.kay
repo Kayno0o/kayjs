@@ -5,14 +5,14 @@ import type { IconSlot } from './defaults'
 import type { MenuAction, MenuCheckbox, MenuEntry, MenuItem, MenuRadio, MenuSource, MenuTriggerProps } from './menu'
 import type { PopoverPlacement } from './popover'
 import type { Snippet } from 'kay'
-import { recipe, signal, uid } from 'kay'
+import { memo, recipe, signal, uid } from 'kay'
 import { wording } from 'kay/words'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { MENU_ITEM, MENU_LIST } from './menu-look'
 import Menu from './menu.kay'
-import { actionOf, checkboxOf, headingOf, radioOf, submenuOf, withPopup } from './menu'
+import { actionOf, checkboxOf, headingOf, menuGroups, radioOf, submenuOf, withPopup } from './menu'
 import { tabOf } from './outside'
 import Popover from './popover.kay'
 import type { Tone } from './tone'
@@ -27,6 +27,8 @@ const look = recipe({
     separator: 'my-1 border-0 border-t border-border',
     status: 'm-0 px-3 py-2 text-sm text-muted',
     icon: 'size-4 shrink-0',
+    // Holds the owned entries for assistive technology only, taking no room.
+    group: 'sr-only',
     heading: 'px-2 pt-2 pb-1 text-xs font-medium text-muted',
     // The check or the dot of a checkbox or radio entry, a fixed width so the labels line up whether or not it is checked.
     indicator: 'inline-block w-4 shrink-0 text-center text-accent',
@@ -37,6 +39,8 @@ const look = recipe({
 })
 
 const TYPEAHEAD_MS = 700
+// How long the pointer rests on a submenu's entry before it opens.
+const HOVER_MS = 150
 
 // The keys that move focus through the entries, as a native menu does.
 const MOVES: Partial<Record<string, (index: number, count: number) => number>> = {
@@ -84,10 +88,12 @@ const asked = signal<MenuEntry[] | undefined>(undefined)
 const failed = signal(false)
 const waits = () => typeof items === 'function' || items instanceof Promise
 const shown = () => waits() ? asked() ?? [] : items as MenuEntry[]
-// What the menu keeps of the checkboxes and radios whose `checked` the app leaves out: a checkbox by its label, a radio group by its value.
+// What the menu keeps of the checkboxes and radios whose `checked` the app leaves out: a checkbox by its `id` or position, a radio group by its value.
 const kept = signal<Record<string, boolean | string>>({})
 let typed = ''
 let typedAt = 0
+let hoverTimer: ReturnType<typeof setTimeout> | undefined
+const announced = memo(() => menuGroups(shown(), menuId))
 let latest = 0
 
 async function load() {
@@ -105,7 +111,7 @@ async function load() {
     asked = answer
     // The first entry takes focus once the answer is in, if the menu is still the reader's.
     queueMicrotask(() => {
-      if (document.getElementById(menuId)?.matches(':popover-open'))
+      if (document.getElementById(menuId)?.matches(':popover-open') && !openedByPointer())
         entries()[0]?.focus()
     })
   }
@@ -116,6 +122,11 @@ async function load() {
 }
 
 // The entries of this list alone: those of a submenu sit in the same element.
+// A submenu the pointer opened leaves the focus where it was.
+function openedByPointer() {
+  return document.getElementById(menuId)?.hasAttribute('data-pointer') === true
+}
+
 function entries(): HTMLElement[] {
   return [...list?.querySelectorAll<HTMLElement>('[data-part=item]:not(:disabled)') ?? []].filter(element => element.closest('[role=menu]') === list)
 }
@@ -145,6 +156,38 @@ function typeahead(key: string, buttons: HTMLElement[]) {
   const found = [...buttons.slice(from), ...buttons.slice(0, from)].find(button => (button.dataset.label ?? '').toLocaleLowerCase().startsWith(search))
 
   found?.focus()
+}
+
+// A submenu opens once the pointer rests on its entry, and an entry beside it closes the ones open, as a native menu does.
+function pointerOver(event: PointerEvent) {
+  const item = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-part=item]') : null
+
+  if (!item || item.closest('[role=menu]') !== list)
+    return
+
+  clearTimeout(hoverTimer)
+
+  const target = item.getAttribute('popovertarget')
+  const panel = target ? document.getElementById(target) : null
+
+  for (const other of entries()) {
+    const otherId = other.getAttribute('popovertarget')
+
+    if (otherId && otherId !== target) {
+      const open = document.getElementById(otherId)
+
+      if (open?.matches(':popover-open'))
+        open.hidePopover()
+    }
+  }
+
+  if (!panel || item.hasAttribute('disabled') || panel.matches(':popover-open'))
+    return
+
+  hoverTimer = setTimeout(() => {
+    panel.setAttribute('data-pointer', '')
+    panel.showPopover()
+  }, HOVER_MS)
 }
 
 function keyDown(event: KeyboardEvent) {
@@ -224,7 +267,7 @@ function select(action: MenuAction) {
   pick(action, () => action.onSelect?.())
 }
 
-function isChecked(entry: MenuCheckbox | MenuRadio): boolean {
+function isChecked(entry: MenuCheckbox | MenuRadio, index: number): boolean {
   if (entry.checked !== undefined)
     return entry.checked
 
@@ -236,20 +279,20 @@ function isChecked(entry: MenuCheckbox | MenuRadio): boolean {
     return value === undefined ? radio.defaultChecked === true : value === radio.value
   }
 
-  return kept()[`check:${entry.label}`] as boolean | undefined ?? entry.defaultChecked === true
+  return kept()[`check:${(entry as MenuCheckbox).id ?? index}`] as boolean | undefined ?? entry.defaultChecked === true
 }
 
-function toggle(entry: MenuCheckbox) {
-  const next = !isChecked(entry)
+function toggle(entry: MenuCheckbox, index: number) {
+  const next = !isChecked(entry, index)
 
   if (entry.checked === undefined)
-    kept = { ...kept(), [`check:${entry.label}`]: next }
+    kept = { ...kept(), [`check:${entry.id ?? index}`]: next }
 
   pick(entry, () => entry.onCheckedChange?.(next))
 }
 
-function choose(entry: MenuRadio) {
-  const was = isChecked(entry)
+function choose(entry: MenuRadio, index: number) {
+  const was = isChecked(entry, index)
 
   if (entry.checked === undefined)
     kept = { ...kept(), [`radio:${entry.radioGroup}`]: entry.value }
@@ -263,8 +306,11 @@ function choose(entry: MenuRadio) {
 Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')} at={at} open={open} part="menu" onOpenChange={opened => {
   if (opened && waits())
     void load()
-  else if (opened)
+  else if (opened && !openedByPointer())
     entries()[0]?.focus()
+
+  if (!opened)
+    document.getElementById(menuId)?.removeAttribute('data-pointer')
 
   onOpenChange?.(opened)
 }})
@@ -273,7 +319,7 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
       | {trigger(withPopup(attributes, 'menu'))}
     else
       IconButton({...rest} {...attributes} style={[attributes.style, style].filter(Boolean).join('; ')} icon={icon!} label={label} size={size} variant={variant} tone={tone} aria-haspopup="menu" part="root")
-  div(part="list" ref={element => list = element} role="menu" aria-label={label} tabindex="-1" onKeyDown={keyDown})
+  div(part="list" ref={element => list = element} role="menu" aria-label={label} tabindex="-1" onKeyDown={keyDown} onPointerOver={pointerOver})
     if waits() && failed()
       p(part="status" role="alert") {failureLabel}
       button(part="item" type="button" role="menuitem" tabindex="-1" onClick={load}) {retryLabel}
@@ -283,11 +329,11 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
       if entry === 'separator'
         hr(part="separator")
       else if headingOf(entry) as heading
-        div(part="heading" role="presentation") {heading.heading}
+        div(part="heading" id={`${menuId}-heading-${index}`} role="group" aria-labelledby={`${menuId}-heading-${index}`} aria-owns={announced().owns.get(index) || undefined}) {heading.heading}
       else if submenuOf(entry) as submenu
-        Menu(items={submenu.items} label={submenu.label} placement="right-start" loadingLabel={loadingLabel} failureLabel={failureLabel} retryLabel={retryLabel} item={item})
+        Menu(items={submenu.items} label={submenu.label} open={submenu.open} onOpenChange={submenu.onOpenChange} placement="right-start" loadingLabel={loadingLabel} failureLabel={failureLabel} retryLabel={retryLabel} item={item})
           @trigger(attributes)
-            button({...attributes} part="item" type="button" role="menuitem" tabindex="-1" disabled={submenu.disabled} data-label={submenu.label} data-tone={submenu.tone})
+            button({...attributes} id={`${menuId}-item-${index}`} part="item" type="button" role="menuitem" tabindex="-1" disabled={submenu.disabled} data-label={submenu.label} data-tone={submenu.tone})
               if item
                 | {item(submenu)}
               else
@@ -296,8 +342,8 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
                 | {submenu.label}
                 Icon(icon="chevron" part="chevron")
       else if checkboxOf(entry) as box
-        button(part="item" type="button" role="menuitemcheckbox" aria-checked={isChecked(box) ? 'true' : 'false'} tabindex="-1" disabled={box.disabled} data-label={box.label} data-danger={isDanger(box) || undefined} data-tone={toneOf(box)} onClick={() => toggle(box)})
-          span(part="indicator" aria-hidden="true") {isChecked(box) ? '✓' : ''}
+        button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitemcheckbox" aria-checked={isChecked(box, index) ? 'true' : 'false'} tabindex="-1" disabled={box.disabled} data-label={box.label} data-danger={isDanger(box) || undefined} data-tone={toneOf(box)} onClick={() => toggle(box, index)})
+          span(part="indicator" aria-hidden="true") {isChecked(box, index) ? '✓' : ''}
           if item
             | {item(box)}
           else
@@ -307,8 +353,10 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
             if box.shortcut
               kbd(part="shortcut") {box.shortcut}
       else if radioOf(entry) as radio
-        button(part="item" type="button" role="menuitemradio" aria-checked={isChecked(radio) ? 'true' : 'false'} tabindex="-1" disabled={radio.disabled} data-label={radio.label} data-danger={isDanger(radio) || undefined} data-tone={toneOf(radio)} onClick={() => choose(radio)})
-          span(part="indicator" aria-hidden="true") {isChecked(radio) ? '●' : ''}
+        if announced().radios.get(index) as group
+          div(part="group" id={`${menuId}-group-${index}`} role="group" aria-labelledby={group.labelledby} aria-owns={group.owns})
+        button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitemradio" aria-checked={isChecked(radio, index) ? 'true' : 'false'} tabindex="-1" disabled={radio.disabled} data-label={radio.label} data-danger={isDanger(radio) || undefined} data-tone={toneOf(radio)} onClick={() => choose(radio, index)})
+          span(part="indicator" aria-hidden="true") {isChecked(radio, index) ? '●' : ''}
           if item
             | {item(radio)}
           else
@@ -319,7 +367,7 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
               kbd(part="shortcut") {radio.shortcut}
       else if actionOf(entry) as action
         if action.href !== undefined && !action.disabled
-          a(part="item" href={action.href} {...tabOf(action.href, action.newTab)} role="menuitem" tabindex="-1" data-label={action.label} data-danger={isDanger(action) || undefined} data-tone={toneOf(action)} onClick={() => select(action)})
+          a(part="item" id={`${menuId}-item-${index}`} href={action.href} {...tabOf(action.href, action.newTab)} role="menuitem" tabindex="-1" data-label={action.label} data-danger={isDanger(action) || undefined} data-tone={toneOf(action)} onClick={() => select(action)})
             if item
               | {item(action)}
             else
@@ -329,7 +377,7 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
               if action.shortcut
                 kbd(part="shortcut") {action.shortcut}
         else
-          button(part="item" type="button" role="menuitem" tabindex="-1" disabled={action.disabled} data-label={action.label} data-danger={isDanger(action) || undefined} data-tone={toneOf(action)} onClick={() => select(action)})
+          button(part="item" id={`${menuId}-item-${index}`} type="button" role="menuitem" tabindex="-1" disabled={action.disabled} data-label={action.label} data-danger={isDanger(action) || undefined} data-tone={toneOf(action)} onClick={() => select(action)})
             if item
               | {item(action)}
             else

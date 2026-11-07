@@ -230,6 +230,7 @@ interface MenuCheckbox extends MenuItemBase
   defaultChecked?: boolean | undefined
   disabled?: boolean
   icon?: IconProps | IconSlot
+  id?: string | undefined
   label: string
   onCheckedChange?: ((checked: boolean) => unknown) | undefined
   shortcut?: string | undefined
@@ -279,6 +280,8 @@ interface MenuSubmenu
   icon?: IconProps | IconSlot
   items: MenuSource
   label: string
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
   tone?: Tone | undefined
 
 [.] MenuTriggerProps
@@ -1891,6 +1894,7 @@ component default
   };
   indicator?: string | undefined;
   shortcut?: string | undefined;
+  group?: string | undefined;
 }
   failureLabel?: string | undefined
   icon?: IconProps | IconSlot | undefined

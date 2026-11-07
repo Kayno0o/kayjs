@@ -1353,6 +1353,7 @@ interface MenuCheckbox extends MenuItemBase
   defaultChecked?: boolean | undefined
   disabled?: boolean
   icon?: IconProps | IconSlot
+  id?: string | undefined
   label: string
   onCheckedChange?: ((checked: boolean) => unknown) | undefined
   shortcut?: string | undefined
@@ -1402,6 +1403,8 @@ interface MenuSubmenu
   icon?: IconProps | IconSlot
   items: MenuSource
   label: string
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
   tone?: Tone | undefined
 
 [./lib/index] MenuTriggerProps
@@ -2004,6 +2007,7 @@ interface MenuCheckbox extends MenuItemBase
   defaultChecked?: boolean | undefined
   disabled?: boolean
   icon?: IconProps | IconSlot
+  id?: string | undefined
   label: string
   onCheckedChange?: ((checked: boolean) => unknown) | undefined
   shortcut?: string | undefined
@@ -2011,6 +2015,14 @@ interface MenuCheckbox extends MenuItemBase
 
 [./lib/menu] MenuEntry
 type MenuEntry = MenuItem | MenuHeading | 'separator'
+
+[./lib/menu] menuGroups
+function menuGroups(entries: readonly MenuEntry[], menuId: string): MenuGroups
+
+[./lib/menu] MenuGroups
+interface MenuGroups
+  owns: Map<number, string>
+  radios: Map<number, { owns: string; labelledby: string | undefined; }>
 
 [./lib/menu] MenuHeading
 interface MenuHeading
@@ -2053,6 +2065,8 @@ interface MenuSubmenu
   icon?: IconProps | IconSlot
   items: MenuSource
   label: string
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
   tone?: Tone | undefined
 
 [./lib/menu] MenuTriggerProps

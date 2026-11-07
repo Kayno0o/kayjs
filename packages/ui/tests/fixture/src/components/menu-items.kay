@@ -7,8 +7,9 @@ import { signal } from 'kay'
 const { calls } = props<{ calls: string[] }>()
 const word = signal(false)
 const sort = signal('name')
+const sub = signal(false)
 
-const rich: MenuEntry[] = [
+const rich = (): MenuEntry[] => [
   { heading: 'Show' },
   { label: 'Word wrap', checked: word(), shortcut: 'Alt+Z', closeOnSelect: false, onCheckedChange: (now: boolean) => { word = now; calls.push(`wrap ${now}`) } },
   { label: 'Ruler', defaultChecked: true, onCheckedChange: (now: boolean) => calls.push(`ruler ${now}`) },
@@ -27,6 +28,13 @@ const own: MenuEntry[] = [
   { label: 'Banana', onSelect: () => undefined },
   { label: 'Avocado', onSelect: () => undefined },
 ]
+const twins: MenuEntry[] = [
+  { label: 'Same', onCheckedChange: (now: boolean) => calls.push(`first ${now}`) },
+  { label: 'Same', id: 'second', defaultChecked: true, onCheckedChange: (now: boolean) => calls.push(`second ${now}`) },
+  { label: 'Same', onCheckedChange: (now: boolean) => calls.push(`third ${now}`) },
+]
 ---
-Menu#rich(label="View" icon="plus" items={rich})
+Menu#rich(label="View" icon="plus" items={rich()})
 Menu#own(label="Own" icon="plus" items={own})
+Menu#twins(label="Twins" icon="plus" items={twins})
+Menu#ctl(label="Controlled" icon="plus" items={[{ label: 'More', open: sub(), onOpenChange: (now: boolean) => { sub = now; calls.push(`sub ${now}`) }, items: [{ label: 'Inner', onSelect: () => undefined }] }, { label: 'Other', onSelect: () => undefined }]})

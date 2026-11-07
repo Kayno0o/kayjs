@@ -348,3 +348,104 @@ test('typing letters moves to the next entry starting with them, a repeated lett
 
   expect(document.activeElement?.textContent).toBe('Banana')
 })
+
+test('two checkboxes with the same label keep their own state, and an id keeps it with the entry', async () => {
+  const calls: string[] = []
+  const root = await richMenu(calls)
+  const boxes = () => [...root.querySelectorAll('#twins [role=menuitemcheckbox]')].map(box => box.getAttribute('aria-checked'))
+
+  expect(boxes()).toEqual(['false', 'true', 'false'])
+
+  click(root.querySelectorAll('#twins [role=menuitemcheckbox]')[0]!)
+  await settle()
+
+  expect(boxes()).toEqual(['true', 'true', 'false'])
+
+  click(root.querySelectorAll('#twins [role=menuitemcheckbox]')[2]!)
+  await settle()
+
+  expect(boxes()).toEqual(['true', 'true', 'true'])
+  expect(calls).toEqual(['first true', 'third true'])
+})
+
+test('a heading is a group naming the entries up to the next rule, and radios sharing a radioGroup sit in a group of their own', async () => {
+  const root = await richMenu([])
+  const rich = root.querySelector('#rich')!
+  const [show, sort] = [...rich.querySelectorAll<HTMLElement>('[data-part=heading]')]
+  const owned = (element: HTMLElement) => element.getAttribute('aria-owns')!.split(' ').map(id => document.getElementById(id)!)
+
+  expect([show!.getAttribute('role'), show!.getAttribute('aria-labelledby')]).toEqual(['group', show!.id])
+  expect(owned(show!).map(element => labelOf(element))).toEqual(['Word wrap', 'Ruler'])
+
+  const [radios] = owned(sort!)
+
+  expect(radios!.getAttribute('role')).toBe('group')
+  expect(radios!.getAttribute('aria-labelledby')).toBe(sort!.id)
+  expect(owned(radios!).map(element => element.getAttribute('role'))).toEqual(['menuitemradio', 'menuitemradio'])
+})
+
+test('a submenu follows open from the page and tells it whenever it opens or closes, and left alone the menu holds it', async () => {
+  const calls: string[] = []
+  const root = await richMenu(calls)
+  const ctl = root.querySelector<HTMLElement>('#ctl')!
+  const trigger = ctl.querySelector<HTMLElement>('[aria-haspopup=menu][role=menuitem]')!
+  const panel = document.getElementById(trigger.getAttribute('popovertarget')!)!
+
+  ctl.showPopover()
+  await settle()
+  trigger.focus()
+  key(trigger, 'ArrowRight')
+  await settle()
+
+  expect(panel.matches(':popover-open')).toBe(true)
+  expect(calls).toEqual(['sub true'])
+
+  key(document.activeElement, 'ArrowLeft')
+  await settle()
+
+  expect(panel.matches(':popover-open')).toBe(false)
+  expect(calls).toEqual(['sub true', 'sub false'])
+
+  const share = root.querySelector('#rich [aria-haspopup=menu][role=menuitem]') as HTMLElement
+  const own = document.getElementById(share.getAttribute('popovertarget')!)!
+
+  root.querySelector<HTMLElement>('#rich')!.showPopover()
+  await settle()
+  share.focus()
+  key(share, 'ArrowRight')
+
+  expect(own.matches(':popover-open')).toBe(true)
+})
+
+test('a submenu opens when the pointer rests on its entry without taking the focus, and closes when the pointer moves to a sibling', async () => {
+  const root = await richMenu([])
+  const rich = root.querySelector<HTMLElement>('#rich')!
+  const trigger = rich.querySelector<HTMLElement>('[aria-haspopup=menu][role=menuitem]')!
+  const panel = document.getElementById(trigger.getAttribute('popovertarget')!)!
+  const over = (element: Element) => element.dispatchEvent(new Event('pointerover', { bubbles: true }))
+
+  rich.showPopover()
+  await settle()
+  over(trigger)
+
+  expect(panel.matches(':popover-open')).toBe(false)
+
+  await Bun.sleep(250)
+
+  expect(panel.matches(':popover-open')).toBe(true)
+  expect(rich.contains(document.activeElement) && panel.contains(document.activeElement)).toBe(false)
+
+  over(panel.querySelector('[data-part=item]')!)
+
+  expect(panel.matches(':popover-open')).toBe(true)
+
+  over(rich.querySelector('[role=menuitemcheckbox]')!)
+
+  expect(panel.matches(':popover-open')).toBe(false)
+
+  over(trigger)
+  over(rich.querySelector('[role=menuitemcheckbox]')!)
+  await Bun.sleep(250)
+
+  expect(panel.matches(':popover-open')).toBe(false)
+})

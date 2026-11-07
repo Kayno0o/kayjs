@@ -28,14 +28,15 @@ export interface MenuAction extends MenuItemBase {
   onSelect?: (() => unknown) | undefined
 }
 
-// A `role="menuitemcheckbox"` entry. The app holds its state with `checked` and learns of a change in `onCheckedChange`, or leaves `checked` out and the menu keeps it, starting from `defaultChecked`.
+// A `role="menuitemcheckbox"` entry: an entry carrying `checked`, `defaultChecked` or `onCheckedChange` is one. The app holds its state with `checked` and learns of a change in `onCheckedChange`, or leaves `checked` out and the menu keeps it, starting from `defaultChecked`. The menu keeps it under `id`, else under the entry's position in the list, so give an `id` to an entry that can move.
 export interface MenuCheckbox extends MenuItemBase {
+  id?: string | undefined
   checked?: boolean | undefined
   defaultChecked?: boolean | undefined
   onCheckedChange?: ((checked: boolean) => unknown) | undefined
 }
 
-// A `role="menuitemradio"` entry: of the entries sharing a `radioGroup`, one is checked. The app holds the state with `checked` on each, or leaves it out and the menu keeps the group's value, starting from the entry with `defaultChecked`; `onCheckedChange` hears the `value` of the entry that became the checked one.
+// A `role="menuitemradio"` entry: an entry with a `radioGroup` is one, and of the entries sharing it one is checked. The app holds the state with `checked` on each, or leaves it out and the menu keeps the group's value, starting from the entry with `defaultChecked`: with neither, nothing is checked until one is picked. `onCheckedChange` hears the `value` of the entry that became the checked one.
 export interface MenuRadio extends MenuItemBase {
   radioGroup: string
   value: string
@@ -54,6 +55,9 @@ export interface MenuSubmenu {
   tone?: Tone | undefined
   disabled?: boolean
   items: MenuSource
+  // Shows the submenu when the page sets it, and `onOpenChange` hears it open and close, as the menu's own do; left out, the menu opens and closes it.
+  open?: boolean | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
 }
 
 // A title over the entries that follow it.
@@ -94,4 +98,56 @@ export type MenuTriggerProps = PopoverTriggerProps & { 'aria-haspopup': 'menu' |
 // Adds `aria-haspopup` to the attributes while keeping `aria-expanded` a getter, so a spread of the result still follows the panel.
 export function withPopup(attributes: PopoverTriggerProps, popup: MenuTriggerProps['aria-haspopup']): MenuTriggerProps {
   return Object.defineProperty(Object.defineProperties({}, Object.getOwnPropertyDescriptors(attributes)), 'aria-haspopup', { value: popup, enumerable: true }) as MenuTriggerProps
+}
+
+// What a row of entries needs to be announced in groups: a heading owns the entries up to the next heading or rule, and the radios sharing a `radioGroup` in that stretch sit in a group of their own, drawn before the first of them.
+export interface MenuGroups {
+  // A heading's owned ids.
+  owns: Map<number, string>
+  // The first radio of a group: the owned ids of its group, and the heading naming it.
+  radios: Map<number, { owns: string, labelledby: string | undefined }>
+}
+
+export function menuGroups(entries: readonly MenuEntry[], menuId: string): MenuGroups {
+  const owns = new Map<number, string[]>()
+  const radios = new Map<number, { owns: string[], labelledby: string | undefined }>()
+  let heading: number | undefined
+  let seen = new Map<string, number>()
+
+  for (const [index, entry] of entries.entries()) {
+    if (entry === 'separator' || headingOf(entry)) {
+      heading = entry === 'separator' ? undefined : index
+      seen = new Map()
+
+      if (heading !== undefined)
+        owns.set(heading, [])
+
+      continue
+    }
+
+    const radio = radioOf(entry)
+    const itemId = `${menuId}-item-${index}`
+
+    if (!radio) {
+      if (heading !== undefined)
+        owns.get(heading)!.push(itemId)
+
+      continue
+    }
+
+    const first = seen.get(radio.radioGroup)
+
+    if (first === undefined) {
+      seen.set(radio.radioGroup, index)
+      radios.set(index, { owns: [itemId], labelledby: heading === undefined ? undefined : `${menuId}-heading-${heading}` })
+
+      if (heading !== undefined)
+        owns.get(heading)!.push(`${menuId}-group-${index}`)
+    }
+    else {
+      radios.get(first)!.owns.push(itemId)
+    }
+  }
+
+  return { owns: new Map([...owns].map(([index, ids]) => [index, ids.join(' ')])), radios: new Map([...radios].map(([index, group]) => [index, { owns: group.owns.join(' '), labelledby: group.labelledby }])) }
 }

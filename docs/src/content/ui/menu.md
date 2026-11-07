@@ -12,11 +12,15 @@ description: An icon button opening a menu of actions.
 
 An entry with `checked` and `onCheckedChange(checked)` is a check item (`role="menuitemcheckbox"`). Hold its state in the page and set `checked`, or leave `checked` out and the menu keeps it, starting from `defaultChecked`. Entries sharing a `radioGroup` are radio items (`role="menuitemradio"`), each with a `value`: set `checked` on each, or let the menu keep the group, starting from the entry with `defaultChecked`, and `onCheckedChange(value)` hears the one that became checked.
 
+An entry is a checkbox when it carries `checked`, `defaultChecked` or `onCheckedChange`, and a radio when it has a `radioGroup`; the menu keeps the state of a checkbox left uncontrolled under its `id`, else its position in the list, and an uncontrolled radio group shows nothing checked until one is picked or an entry has `defaultChecked`.
+
 By default picking an entry closes the menu. `closeOnSelect: false` on an entry keeps it open, such as to flip several options in a row; its callback then runs at once.
 
 `{ heading: 'Sort by' }` draws a title over the entries after it. `shortcut: 'Ctrl+S'` draws a hint at the end of the row; it only shows the combination, and kay's `shortcut()` binds it.
 
-`{ label: 'Share', items: [...] }` is a submenu, with the same kinds of entries and the same async sources as the menu. A click or ArrowRight opens it and focuses its first entry, ArrowLeft or Escape closes it, and picking one of its entries closes the whole menu.
+`{ label: 'Share', items: [...] }` is a submenu, with the same kinds of entries and the same async sources as the menu. Resting the pointer on it opens it, and moving to a sibling entry closes it; a click or ArrowRight opens it and focuses its first entry, ArrowLeft or Escape closes it, `open` and `onOpenChange` on it work as the menu's own, and picking one of its entries closes the whole menu.
+
+A heading is announced as a group of the entries up to the next heading or rule, and radios sharing a `radioGroup` as a group of their own.
 
 Typing letters moves the focus to the next entry whose label starts with them; a letter repeated cycles through the entries starting with it.
 
