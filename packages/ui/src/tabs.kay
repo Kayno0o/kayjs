@@ -3,6 +3,9 @@ import type { JSX, Snippet } from 'kay'
 import type { NavItem } from './nav-item'
 import { effect, persisted, recipe, signal, uid, untrack } from 'kay'
 import { stepIndex } from './cycle'
+import { loadOptions } from './options-source'
+import type { OptionsSource } from './options-source'
+import { wording } from 'kay/words'
 import Icon from './icon.kay'
 
 // The keys that move between tabs, as the tabs pattern has them: the arrows wrap, Home and End go to either end.
@@ -23,14 +26,23 @@ const look = recipe({
     tab: '-mb-px shrink-0 border-b-2 border-transparent px-4 py-2 text-sm text-muted transition-colors hover:text-foreground inline-flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted aria-selected:border-accent aria-selected:text-accent',
     icon: 'size-3.5 shrink-0',
     badge: 'rounded-full bg-surface-strong px-1.5 text-xs tabular-nums text-muted',
+    status: 'm-0 pt-2 text-xs text-muted',
+    retry: 'cursor-pointer self-start text-xs text-accent underline',
     // A hidden panel is hidden until found, which keeps its box with its content skipped: it takes no room.
     panel: 'pt-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&[hidden]]:p-0',
   },
 })
 
-const { tabs, value, param, paramDefault, label, onChange, tab, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
+const { tabs: given, value, param, paramDefault, label, loadingLabel = wording('ui.tabs.loading', 'Loading…'), retryLabel = wording('ui.tabs.retry', 'Try again'), failureLabel = wording('ui.tabs.failure', 'Could not load the tabs'), onLoad, onError, onChange, tab, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange' | 'onLoad' | 'onError'> & {
   // `icon` sits before the label and `badge` after it; `disabled` keeps that tab from being shown, and the arrow keys skip it.
-  tabs: readonly ({ value: Value } & NavItem)[]
+  // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the tabs busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected, with a button of `retryLabel` to ask a function again.
+  tabs: OptionsSource<{ value: Value } & NavItem>
+  loadingLabel?: string | undefined
+  retryLabel?: string | undefined
+  failureLabel?: string | undefined
+  // Called with each answer of a function or promise `tabs`, and with what it rejected with.
+  onLoad?: ((tabs: readonly ({ value: Value } & NavItem)[], query: string) => unknown) | undefined
+  onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // Names the tab list for screen readers.
   label: string
   // Gets the tab shown as a second argument.
@@ -55,6 +67,9 @@ const { tabs, value, param, paramDefault, label, onChange, tab, panel, ...rest }
   }
 )>()
 
+const source = loadOptions<{ value: Value } & NavItem>(() => given, { onLoad, onError, label: 'Tabs' })
+// The loaded tabs, empty until a source answers.
+const tabs = source.options
 const id = uid()
 // Held as a string: a signal cannot take a type parameter that might be a function.
 const shown = signal<string>(value ?? '')
@@ -72,7 +87,7 @@ const asked = () => kept ? kept() : shown()
 const active = () => {
   const wanted = asked()
 
-  return tabs.some(tab => tab.value === wanted && !tab.disabled) ? wanted : tabs.find(tab => !tab.disabled)?.value
+  return tabs().some(tab => tab.value === wanted && !tab.disabled) ? wanted : tabs().find(tab => !tab.disabled)?.value
 }
 
 function show(next: Value) {
@@ -85,7 +100,7 @@ function show(next: Value) {
   else
     shown = next
 
-  onChange?.(next, tabs.find(entry => entry.value === next)!)
+  onChange?.(next, tabs().find(entry => entry.value === next)!)
 }
 
 // Moving with the keys shows the tab it lands on, and focus goes with it: only the shown tab is in the page's tab order.
@@ -100,27 +115,29 @@ function keyDown(event: KeyboardEvent) {
 
   event.preventDefault()
 
-  if (tabs.length === 0)
+  const all = tabs()
+
+  if (all.length === 0)
     return
 
-  let next = move(tabs.findIndex(tab => tab.value === active()), tabs.length)
+  let next = move(all.findIndex(tab => tab.value === active()), all.length)
 
   // The arrows go on past a disabled tab, Home and End to the nearest one that is not, every tab being checked at most once.
   const step = key === 'ArrowLeft' || key === 'End' ? -1 : 1
 
-  for (let tried = 0; tabs[next]?.disabled && tried < tabs.length; tried++)
-    next = stepIndex(next, step, tabs.length)
+  for (let tried = 0; all[next]?.disabled && tried < all.length; tried++)
+    next = stepIndex(next, step, all.length)
 
-  if (tabs[next]?.disabled)
+  if (all[next]?.disabled)
     return
 
-  show(tabs[next]!.value)
+  show(all[next]!.value)
   list?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus()
 }
 ---
-div(part="root" {...rest})
+div(part="root" {...rest} aria-busy={source.loading() ? 'true' : undefined})
   div(part="list" ref={element => list = element} role="tablist" aria-label={label} onKeyDown={keyDown})
-    for entry, index of tabs key={entry.value}
+    for entry, index of tabs() key={entry.value}
       button(part="tab" type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={active() === entry.value ? 'true' : 'false'} tabindex={active() === entry.value ? 0 : -1} disabled={entry.disabled} onClick={() => show(entry.value)})
         if entry.icon
           Icon(icon={entry.icon} part="icon")
@@ -130,7 +147,13 @@ div(part="root" {...rest})
           | {entry.label}
         if entry.badge !== undefined
           span(part="badge") {entry.badge}
-  for entry, index of tabs key={entry.value}
+  if source.loading()
+    p(part="status" role="status") {loadingLabel}
+  if source.failed()
+    p(part="status" role="alert") {failureLabel}
+    if source.retryable()
+      button(part="retry" type="button" onClick={source.retry}) {retryLabel}
+  for entry, index of tabs() key={entry.value}
     div(part="panel" ref={element => element.addEventListener('beforematch', () => show(entry.value))} role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex={active() === entry.value ? 0 : undefined} hidden={active() === entry.value ? undefined : 'until-found'})
       // Untracked, so a tab relabelled, such as with a count, keeps its panel and the focus inside it.
       | {untrack(() => panel(entry.value))}

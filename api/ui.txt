@@ -2660,18 +2660,25 @@ component default
   list?: string | undefined;
   item?: string | undefined;
   link?: string | undefined;
+  status?: string | undefined;
+  retry?: string | undefined;
 }
   current: string
   done?: readonly string[] | undefined
   doneLabel?: string | undefined
   errorLabel?: string | undefined
+  failureLabel?: string | undefined
   label: string
+  loadingLabel?: string | undefined
+  onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined
+  onLoad?: ((steps: readonly StepItem<string>[], query: string) => unknown) | undefined
   onSelect?: ((key: string) => unknown) | undefined
   param?: string | undefined
+  retryLabel?: string | undefined
   skippedLabel?: string | undefined
   step?: ((step: StepItem<string>, state: "current" | "done" | "upcoming") => Element) | undefined
   stepLabel?: ((step: StepItem<string>, state: "current" | "done" | "upcoming") => Element) | ((step: StepItem<string>, state: "current" | "done" | "upcoming") => string) | undefined
-  steps: readonly StepItem<string>[]
+  steps: OptionsSource<StepItem<string>>
   url?: URL | string | undefined
 
 [./subscribe-form.kay] default
@@ -2830,8 +2837,10 @@ component default
     root?: string | undefined;
   };
   badge?: string | undefined;
+  status?: string | undefined;
+  retry?: string | undefined;
   panel?: string | undefined;
-}; label: string; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: readonly ({ value: Value; } & NavItem)[]; value: Value }
+}; failureLabel?: string | undefined; label: string; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((tabs: readonly ({ value: Value; } & NavItem)[], query: string) => unknown) | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; retryLabel?: string | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: OptionsSource<{ value: Value; } & NavItem>; value: Value }
   | { class?: string | undefined | {
   root?: string | undefined;
   list?: string | undefined;
@@ -2840,8 +2849,10 @@ component default
     root?: string | undefined;
   };
   badge?: string | undefined;
+  status?: string | undefined;
+  retry?: string | undefined;
   panel?: string | undefined;
-}; label: string; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: readonly ({ value: Value; } & NavItem)[]; value?: undefined }
+}; failureLabel?: string | undefined; label: string; loadingLabel?: string | undefined; onChange?: ((value: Value, tab: { value: Value; } & NavItem) => unknown) | undefined; onError?: ((failure: { error: unknown; query: string; }) => unknown) | undefined; onLoad?: ((tabs: readonly ({ value: Value; } & NavItem)[], query: string) => unknown) | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; retryLabel?: string | undefined; tab?: ((tab: { value: Value; } & NavItem) => Element) | undefined; tabs: OptionsSource<{ value: Value; } & NavItem>; value?: undefined }
 
 [./text-input.kay] default
 component default

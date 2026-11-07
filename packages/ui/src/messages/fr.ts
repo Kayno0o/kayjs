@@ -172,7 +172,7 @@ export default defineMessages({
     sparkline: { empty: 'Aucune donnée pour le moment.' },
     splitLayout: { back: 'Retour', resize: 'Redimensionner la liste' },
     statusStrip: { empty: 'Aucune donnée pour le moment.' },
-    steps: { done: 'terminée', error: 'en erreur', skipped: 'ignorée' },
+    steps: { failure: 'Impossible de charger les étapes', loading: 'Chargement…', retry: 'Réessayer', done: 'terminée', error: 'en erreur', skipped: 'ignorée' },
     subscribeForm: {
       label: 'E-mail',
       notice: 'Nous utilisons votre adresse pour vous envoyer les mails de ce site, jusqu\'à ce que vous vous désabonniez avec le lien de chacun.',
@@ -180,6 +180,7 @@ export default defineMessages({
       sent: 'Presque fini : ouvrez le mail que nous venons de vous envoyer et confirmez votre adresse.',
       submit: 'S\'abonner',
     },
+    tabs: { failure: 'Impossible de charger les onglets', loading: 'Chargement…', retry: 'Réessayer' },
     table: {
       columns: 'Colonnes',
       details: 'Détails',

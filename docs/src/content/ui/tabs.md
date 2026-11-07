@@ -31,3 +31,13 @@ Tabs(tabs={[{ value: 'details', label: 'Details' }, { value: 'reviews', label: '
 ```
 
 `paramDefault` is the tab shown while the param is left out, and picking it leaves the param out. Without it the first enabled tab is shown, and picking it sets the param like any other. `onChange` still runs on each pick. The page must be rendered per request, not once at build time.
+
+## Tabs from a source
+
+`tabs` can be a promise or a function returning one, such as an action, in place of a list. The tabs are asked in the browser: the component says "Loading…" (`loadingLabel`) meanwhile, and `failureLabel` with a "Try again" button (`retryLabel`) when the function rejects. `onLoad(tabs)` and `onError({ error })` follow the answer. The `@panel` block is still yours, drawn once for each tab that arrives.
+
+```kay
+Tabs(tabs={() => loadSections()} value="details" label="Product")
+  @panel(tab)
+    ProductPanel(tab={tab})
+```

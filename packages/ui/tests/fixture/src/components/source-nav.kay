@@ -1,0 +1,11 @@
+---
+// kay-island
+import Steps from '@kaynooo/kayjs-ui/steps.kay'
+import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+
+const { tabs, steps, calls } = props<{ tabs: () => Promise<{ value: string, label: string }[]>, steps: () => Promise<{ key: string, label: string }[]>, calls: string[] }>()
+---
+Tabs#tabs(tabs={tabs} label="Sections" value="b" onLoad={(loaded, query) => calls.push(`tabs ${loaded.length}:${query}`)} onError={failure => calls.push(`tabs error ${failure.query}`)})
+  @panel(value)
+    p.panel {value}
+Steps#steps(steps={steps} current="b" label="Progress" onLoad={loaded => calls.push(`steps ${loaded.length}`)})

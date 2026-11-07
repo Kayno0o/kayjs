@@ -76,7 +76,7 @@ else
 - Keep no password in it. The cookie is not tied to a session, so call `clear()` on sign-out, or the next visitor of a shared browser inherits the draft for the hour.
 - Back keeps what was typed, since the values come from the draft. A step posted again replaces its values.
 - `check` is required: `done()` lists only the steps whose values pass it, and `currentStep` sends the visitor back to the first one that does not, so a hand-edited cookie or URL skips nothing. The schemas say `additionalProperties: false`, so an edited cookie adds no key either.
-- `Steps` takes the standard parts: `list`, `item`, `link`, `marker`, `icon`, `label` and `state`.
+- `Steps` takes the standard parts: `list`, `item`, `link`, `marker`, `icon`, `label`, `state`, `status` and `retry`.
 
 ## A wizard with no navigation
 
@@ -87,3 +87,11 @@ Steps(steps={STEPS} current={step()} done={done()} label="Booking" onSelect={key
 ```
 
 A step may carry `state: 'error'` or `'skipped'` (the item gets `data-outcome`, and a screen reader hears `errorLabel` or `skippedLabel`), an `icon` in place of its number, and `linkable` to be reachable before it is done, for a flow that can be entered at any step. `@step(step, state)` is a block that draws the markup of a step, and `stepLabel(step, state)` a function that returns its text (the old `@stepLabel` block works until 1.92); the number, the state words and the link around it stay.
+
+## Steps from a source
+
+`steps` can be a promise or a function returning one, such as an action, in place of a list. The steps are asked in the browser: the row says "Loading…" (`loadingLabel`) meanwhile, and `failureLabel` with a "Try again" button (`retryLabel`) when the function rejects. `onLoad(steps)` and `onError({ error })` follow the answer.
+
+```kay
+Steps(steps={() => loadSteps()} current={step()} label="Booking")
+```

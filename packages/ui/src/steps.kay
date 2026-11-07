@@ -3,6 +3,8 @@ import type { JSX, Snippet } from 'kay'
 import type { StepItem } from './steps'
 import { wording } from 'kay/words'
 import { stepHref } from './steps'
+import { loadOptions } from './options-source'
+import type { OptionsSource } from './options-source'
 import { recipe } from 'kay'
 import Icon from './icon.kay'
 
@@ -17,11 +19,20 @@ const look = recipe({
     icon: 'size-3.5',
     label: 'min-w-0',
     state: 'sr-only',
+    status: 'm-0 pt-2 text-xs text-muted',
+    retry: 'cursor-pointer text-xs text-accent underline',
   },
 })
 
-const { steps, current, url, done = [], param = 'step', label, doneLabel = wording('ui.steps.done', 'completed'), errorLabel = wording('ui.steps.error', 'has an error'), skippedLabel = wording('ui.steps.skipped', 'skipped'), onSelect, step: drawStep, stepLabel, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children' | 'onSelect'> & {
-  steps: readonly StepItem[]
+const { steps: given, current, url, done = [], param = 'step', label, doneLabel = wording('ui.steps.done', 'completed'), errorLabel = wording('ui.steps.error', 'has an error'), skippedLabel = wording('ui.steps.skipped', 'skipped'), loadingLabel = wording('ui.steps.loading', 'Loading…'), retryLabel = wording('ui.steps.retry', 'Try again'), failureLabel = wording('ui.steps.failure', 'Could not load the steps'), onLoad, onError, onSelect, step: drawStep, stepLabel, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children' | 'onSelect' | 'onLoad' | 'onError'> & {
+  // A list, a promise of one, or a function answering it, such as an action: asked in the browser, the row busy under `loadingLabel` until the answer lands, or under `failureLabel` once it rejected, with a button of `retryLabel` to ask a function again.
+  steps: OptionsSource<StepItem>
+  loadingLabel?: string | undefined
+  retryLabel?: string | undefined
+  failureLabel?: string | undefined
+  // Called with each answer of a function or promise `steps`, and with what it rejected with.
+  onLoad?: ((steps: readonly StepItem[], query: string) => unknown) | undefined
+  onError?: ((failure: { error: unknown, query: string }) => unknown) | undefined
   // The key of the step on screen, which `currentStep(ctx.url, keys, done)` reads off the URL.
   current: string
   // The page's URL, `ctx.url`: each link to a step keeps its other params. Left out when `onSelect` drives the steps, whose clickable ones are then buttons.
@@ -45,7 +56,10 @@ const { steps, current, url, done = [], param = 'step', label, doneLabel = wordi
   stepLabel?: ((step: StepItem, state: 'current' | 'done' | 'upcoming') => string) | Snippet<[step: StepItem, state: 'current' | 'done' | 'upcoming']> | undefined
 }>()
 
-const at = () => steps.findIndex(step => step.key === current)
+const source = loadOptions<StepItem>(() => given, { onLoad, onError, label: 'Steps' })
+// The loaded steps, empty until a source answers.
+const steps = source.options
+const at = () => steps().findIndex(step => step.key === current)
 const state = (index: number, key: string) => key === current ? 'current' : index < at() || done.includes(key) ? 'done' : 'upcoming'
 const reached = (step: StepItem, index: number) => state(index, step.key) === 'done' || (step.linkable === true && step.key !== current)
 const target = (step: StepItem) => url === undefined ? undefined : { href: stepHref(url, step.key, param) }
@@ -75,9 +89,9 @@ snippet body(step: StepItem, index: number, shown: 'current' | 'done' | 'upcomin
       | {step.label}
   if spoken(step, shown)
     span(part="state") {spoken(step, shown)}
-nav(part="root" {...rest} aria-label={label})
+nav(part="root" {...rest} aria-label={label} aria-busy={source.loading() ? 'true' : undefined})
   ol(part="list")
-    for step, index of steps key={step.key}
+    for step, index of steps() key={step.key}
       li(part="item" data-step={state(index, step.key)} data-outcome={step.state})
         if reached(step, index) && target(step)
           a(part="link" {...target(step)} onClick={event => pick(event, step.key)})
@@ -88,3 +102,9 @@ nav(part="root" {...rest} aria-label={label})
         else
           span(part="link" aria-current={step.key === current ? 'step' : undefined})
             {body(step, index, state(index, step.key))}
+  if source.loading()
+    p(part="status" role="status") {loadingLabel}
+  if source.failed()
+    p(part="status" role="alert") {failureLabel}
+    if source.retryable()
+      button(part="retry" type="button" onClick={source.retry}) {retryLabel}
