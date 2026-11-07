@@ -52,9 +52,9 @@ describe('guessing at an account', () => {
     const app = await account({ signInAccount: { max: 3, window: '900s' } })
 
     for (let i = 0; i < 3; i++)
-      expect(await attempt(app, '10.0.0.1', WRONG)).toEqual({ ok: false, error: 'invalid' })
+      expect(await attempt(app, '10.0.0.1', WRONG)).toMatchObject({ ok: false, error: { code: 'invalid' } })
 
-    expect(await attempt(app, '10.0.0.1', WRONG)).toEqual({ ok: false, error: 'limited' })
+    expect(await attempt(app, '10.0.0.1', WRONG)).toMatchObject({ ok: false, error: { code: 'limited' } })
     expect(await attempt(app, '10.0.0.2', PASSWORD)).toMatchObject({ ok: true })
   })
 
@@ -64,7 +64,7 @@ describe('guessing at an account', () => {
     await attempt(app, '10.0.0.1', WRONG)
     await attempt(app, '10.0.0.1', WRONG)
 
-    expect(await attempt(app, '10.0.0.1', PASSWORD)).toEqual({ ok: false, error: 'limited' })
+    expect(await attempt(app, '10.0.0.1', PASSWORD)).toMatchObject({ ok: false, error: { code: 'limited' } })
   })
 
   test('a successful sign-in spends nothing and clears the client\'s failures', async () => {
@@ -76,7 +76,7 @@ describe('guessing at an account', () => {
     await attempt(app, '10.0.0.1', WRONG)
     expect(await attempt(app, '10.0.0.1', PASSWORD)).toMatchObject({ ok: true })
     await attempt(app, '10.0.0.1', WRONG)
-    expect(await attempt(app, '10.0.0.1', WRONG)).toEqual({ ok: false, error: 'invalid' })
+    expect(await attempt(app, '10.0.0.1', WRONG)).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
 
   test('every spelling of the email counts as one account, per client', async () => {
@@ -85,7 +85,7 @@ describe('guessing at an account', () => {
     await attempt(app, '10.0.0.1', WRONG, 'ada@example.com')
     await attempt(app, '10.0.0.1', WRONG, ' ADA@Example.com ')
 
-    expect(await attempt(app, '10.0.0.1', WRONG, 'Ada@example.COM')).toEqual({ ok: false, error: 'limited' })
+    expect(await attempt(app, '10.0.0.1', WRONG, 'Ada@example.COM')).toMatchObject({ ok: false, error: { code: 'limited' } })
   })
 
   test('an email with no account runs out per client the same way, and mails no one', async () => {
@@ -94,12 +94,12 @@ describe('guessing at an account', () => {
     await attempt(app, '10.0.0.1', WRONG, 'nobody@example.com')
     await attempt(app, '10.0.0.1', WRONG, 'Nobody@example.com')
 
-    expect(await attempt(app, '10.0.0.1', WRONG, ' nobody@example.com')).toEqual({ ok: false, error: 'limited' })
+    expect(await attempt(app, '10.0.0.1', WRONG, ' nobody@example.com')).toMatchObject({ ok: false, error: { code: 'limited' } })
 
     for (const from of ['10.0.0.2', '10.0.0.3'])
       await attempt(app, from, WRONG, 'nobody@example.com')
 
-    expect(await attempt(app, '10.0.0.4', WRONG, 'nobody@example.com')).toEqual({ ok: false, error: 'limited' })
+    expect(await attempt(app, '10.0.0.4', WRONG, 'nobody@example.com')).toMatchObject({ ok: false, error: { code: 'limited' } })
     expect(app.box.mails.map(mail => mail.to)).not.toContain('nobody@example.com')
     expect(app.notices()).toHaveLength(0)
   })
@@ -108,18 +108,18 @@ describe('guessing at an account', () => {
     const app = await account({ signInAccount: { max: 2, window: '900s' }, signInAccountAll: { max: 5, window: '900s' } })
 
     for (let i = 1; i <= 5; i++)
-      expect(await attempt(app, `10.0.1.${i}`, WRONG)).toEqual({ ok: false, error: 'invalid' })
+      expect(await attempt(app, `10.0.1.${i}`, WRONG)).toMatchObject({ ok: false, error: { code: 'invalid' } })
 
     expect(app.notices()).toHaveLength(0)
 
     for (let i = 6; i <= 9; i++)
-      expect(await attempt(app, `10.0.1.${i}`, WRONG)).toEqual({ ok: false, error: 'limited' })
+      expect(await attempt(app, `10.0.1.${i}`, WRONG)).toMatchObject({ ok: false, error: { code: 'limited' } })
 
     const [notice] = await app.box.take({ kind: 'sign-in-locked', to: 'ada@example.com' })
 
     expect(notice).toMatchObject({ to: 'ada@example.com', kind: 'sign-in-locked' })
     expect(app.notices()).toHaveLength(1)
-    expect(await attempt(app, '10.0.2.1', PASSWORD)).toEqual({ ok: false, error: 'limited' })
+    expect(await attempt(app, '10.0.2.1', PASSWORD)).toMatchObject({ ok: false, error: { code: 'limited' } })
     expect(app.notices()).toHaveLength(1)
   })
 
@@ -140,9 +140,9 @@ describe('guessing at an account', () => {
     await attempt(app, '10.0.5.3', WRONG)
     expect(await attempt(app, '10.0.5.9', PASSWORD)).toMatchObject({ ok: true })
 
-    expect(await attempt(app, '10.0.5.4', WRONG)).toEqual({ ok: false, error: 'invalid' })
-    expect(await attempt(app, '10.0.5.5', WRONG)).toEqual({ ok: false, error: 'limited' })
-    expect(await attempt(app, '10.0.5.9', PASSWORD)).toEqual({ ok: false, error: 'limited' })
+    expect(await attempt(app, '10.0.5.4', WRONG)).toMatchObject({ ok: false, error: { code: 'invalid' } })
+    expect(await attempt(app, '10.0.5.5', WRONG)).toMatchObject({ ok: false, error: { code: 'limited' } })
+    expect(await attempt(app, '10.0.5.9', PASSWORD)).toMatchObject({ ok: false, error: { code: 'limited' } })
   })
 
   test('the lockout mail goes out once a day however often the ceiling is reached again', async () => {
@@ -171,7 +171,7 @@ describe('guessing at an account', () => {
     const app = await account({ signInAccount: { max: 2, window: '900s' }, signInAccountAll: { max: 4, window: '900s' } })
     const answers = await Promise.all(Array.from({ length: 12 }, async (_, i) => attempt(app, `10.0.4.${i + 1}`, WRONG)))
 
-    expect(answers.filter(answer => (answer as { error?: string }).error === 'invalid')).toHaveLength(4)
+    expect(answers.filter(answer => (answer as { error?: { code: string } }).error?.code === 'invalid')).toHaveLength(4)
   })
 
   test('a second factor stays asked for: the right password from another client still reaches it during an attack', async () => {
@@ -200,8 +200,8 @@ describe('guessing at an account', () => {
     expect(await verify('10.0.0.1', WRONG)).toMatchObject({ ok: false })
     await attempt(app, '10.0.0.1', WRONG)
 
-    expect(await attempt(app, '10.0.0.1', PASSWORD)).toEqual({ ok: false, error: 'limited' })
-    expect(await verify('10.0.0.1', PASSWORD)).toEqual({ ok: false, error: 'limited' })
+    expect(await attempt(app, '10.0.0.1', PASSWORD)).toMatchObject({ ok: false, error: { code: 'limited' } })
+    expect(await verify('10.0.0.1', PASSWORD)).toMatchObject({ ok: false, error: { code: 'limited' } })
     expect(await verify('10.0.0.2', PASSWORD)).toMatchObject({ ok: true })
   })
 })

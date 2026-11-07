@@ -1,11 +1,13 @@
 import type { Duration } from 'kay'
 import type { Core } from './core'
+import type { AuthFailed } from './failure'
 import type { Proof, ProofFailure } from './proof'
 import type { RequestState } from './state'
 import type { BearerTokenRecord, UserRecord } from './store'
 import { durationSeconds } from 'kay/library'
 import { siteBase, underResource } from './authorize/resource'
 import { banned, TOUCH_EVERY_MS } from './core'
+import { failed } from './failure'
 import { digest, randomToken } from './keys'
 import { reprove } from './proof'
 import { securityNotice } from './securityNotice'
@@ -53,9 +55,9 @@ function expirySeconds(maxAge: Duration): number | undefined {
 
 type TokenProblem = 'label' | 'scope' | 'expiry'
 
-export type CreateTokenResult = { ok: true, token: string, id: string } | { ok: false, error: ProofFailure | TokenProblem }
+export type CreateTokenResult = { ok: true, token: string, id: string } | AuthFailed<ProofFailure | TokenProblem>
 
-export type IssueTokenResult = { ok: true, token: string, id: string } | { ok: false, error: TokenProblem | 'token' | 'not-found' | 'banned' }
+export type IssueTokenResult = { ok: true, token: string, id: string } | AuthFailed<TokenProblem | 'token' | 'not-found' | 'banned'>
 
 function tokenProblem(core: Core, name: string, options: TokenOptions): TokenProblem | undefined {
   if (name.length === 0 || name.length > LABEL_MAX_LENGTH)
@@ -101,7 +103,7 @@ export async function createToken(state: RequestState, proof: Proof, label: stri
   const problem = tokenProblem(state.core, name, options)
 
   if (problem)
-    return { ok: false, error: problem }
+    return failed(problem)
 
   const proved = await reprove(state, proof)
 
@@ -109,7 +111,7 @@ export async function createToken(state: RequestState, proof: Proof, label: stri
     return proved
 
   if (state.via() !== 'session')
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   const token = newToken()
   const id = await storeToken(state.core, proved.record.id, name, options, token)
@@ -125,18 +127,18 @@ export async function issueToken(core: Core, userId: string, label: string, opti
   const problem = tokenProblem(core, name, options)
 
   if (problem)
-    return { ok: false, error: problem }
+    return failed(problem)
 
   if (options.token !== undefined && (!TOKEN.test(options.token) || new Set(options.token).size < MIN_DISTINCT_CHARACTERS))
-    return { ok: false, error: 'token' }
+    return failed('token')
 
   const record = await core.store.users.get(userId)
 
   if (!record)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   if (banned(record))
-    return { ok: false, error: 'banned' }
+    return failed('banned')
 
   const token = options.token ?? newToken()
 
@@ -149,15 +151,15 @@ export async function listTokens(state: RequestState): Promise<BearerToken[]> {
   return record && state.via() === 'session' ? (await state.core.store.bearerTokens.listByUser(record.id)).filter(token => !token.oauth).map(publicToken) : []
 }
 
-export type RevokeTokenResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+export type RevokeTokenResult = { ok: true } | AuthFailed<'signed-out' | 'not-found'>
 
 export async function revokeToken(state: RequestState, id: string): Promise<RevokeTokenResult> {
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
-  return (await state.core.store.bearerTokens.delete(record.id, id)) ? { ok: true } : { ok: false, error: 'not-found' }
+  return (await state.core.store.bearerTokens.delete(record.id, id)) ? { ok: true } : failed('not-found')
 }
 
 // The user a bearer token belongs to, as a websocket handshake checks one; an expired token is refused, and so is one bound to a resource unless `url`, the address the request was made to, is under it; without one (null) a bound token is refused.

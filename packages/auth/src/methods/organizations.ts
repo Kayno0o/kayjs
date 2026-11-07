@@ -1,5 +1,6 @@
 import type { AcceptResult, CreateOrganizationResult, DeleteOrganizationResult, Invitation, InviteResult, ListInvitationsResult, ListMembersResult, MemberResult, Membership, RejectInvitationResult, RevokeInvitationResult, UpdateOrganizationResult } from '../organizations'
 import type { RequestState } from '../state'
+import { failed } from '../failure'
 import { load } from '../load'
 
 // `auth.organizations`: the teams or workspaces of the `organizations` option, each named by `ref`, its id or slug.
@@ -56,7 +57,7 @@ export class OrganizationMethods<OrgRole extends string = string> {
   async leave(ref: string): Promise<MemberResult> {
     const record = await this.state.current()
 
-    return record ? (await load.organizations()).removeMember(this.state, ref, record.id) : { ok: false, error: 'signed-out' }
+    return record ? (await load.organizations()).removeMember(this.state, ref, record.id) : failed('signed-out')
   }
 
   // Mails `email` a link to the `invitationPage`, else the prebuilt pages' invitation page, giving `roles` (`defaultRoles` when none) once accepted: for members holding `manage` and every role it gives.

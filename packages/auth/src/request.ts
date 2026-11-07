@@ -17,6 +17,7 @@ import { bearerRequest, bearerToken } from './bearerHeader'
 import { admit, captchaChallenge, captchaRequired } from './captcha'
 import { banned, guardPageOf, isNavigation, linkedProviders, linkedUser, newUserRecord, publicUser, unlinked, withBack } from './core'
 import { report } from './events'
+import { failed } from './failure'
 import { scopeAllows } from './gate'
 import { load } from './load'
 import { acceptedLocales } from './locale'
@@ -328,7 +329,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     if (acting.ok)
       return user
 
-    return acting.error === 'two-factor-required' ? sendToEnrolment(this.core, this.request, stoppers(this.request)) : stoppers(this.request).deny(403)
+    return acting.error.code === 'two-factor-required' ? sendToEnrolment(this.core, this.request, stoppers(this.request)) : stoppers(this.request).deny(403)
   }
 
   // The `guard()` of kayjs-auth, for a `_guard.ts` that cannot import the `authCore` result: the guard of the one behind this request.
@@ -437,15 +438,15 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const current = await this.record()
 
     if (current)
-      return current.guest ? { ok: true, user: publicUser(current) } : { ok: false, error: 'signed-in' }
+      return current.guest ? { ok: true, user: publicUser(current) } : failed('signed-in')
 
     if (!this.core.signUp)
-      return { ok: false, error: 'off' }
+      return failed('off')
 
     const refused = await admit(this[STATE], 'guest', options.captcha)
 
     if (refused)
-      return { ok: false, error: refused }
+      return failed(refused)
 
     const fresh = newUserRecord({ guest: true, roles: [...this.core.defaultRoles], locale: this[STATE].languages[0] ?? null })
     const record = (await this.core.store.users.create(fresh)) ?? fresh

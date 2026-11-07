@@ -180,7 +180,7 @@ describe('exporting a user\'s data', () => {
   test('needs a session', async () => {
     const { browser } = testApp()
 
-    expect(await browser().call('account.export')).toEqual({ ok: false, error: 'signed-out' })
+    expect(await browser().call('account.export')).toMatchObject({ ok: false, error: { code: 'signed-out' } })
   })
 
   test('counts each export, the download included, against the account\'s limit', async () => {
@@ -191,7 +191,7 @@ describe('exporting a user\'s data', () => {
 
     expect((await ada.call('account.export')).ok).toBe(true)
     expect((await ada.fetch('/auth/export')).status).toBe(200)
-    expect(await ada.call('account.export')).toEqual({ ok: false, error: 'limited' })
+    expect(await ada.call('account.export')).toMatchObject({ ok: false, error: { code: 'limited' } })
     expect((await ada.fetch('/auth/export')).status).toBe(429)
   })
 
@@ -203,7 +203,7 @@ describe('exporting a user\'s data', () => {
       await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
       setSystemTime(new Date(Date.now() + LATER))
 
-      expect(await ada.call('account.export')).toEqual({ ok: false, error: 'stale' })
+      expect(await ada.call('account.export')).toMatchObject({ ok: false, error: { code: 'stale' } })
 
       const response = await ada.fetch('/auth/export')
 
@@ -222,7 +222,7 @@ describe('exporting a user\'s data', () => {
       await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
       setSystemTime(new Date(Date.now() + LATER))
 
-      expect(await ada.call('reprove', { password: 'wrong password' })).toEqual({ ok: false, error: 'proof' })
+      expect(await ada.call('reprove', { password: 'wrong password' })).toMatchObject({ ok: false, error: { code: 'proof' } })
       expect((await ada.fetch('/auth/export')).status).toBe(403)
       expect(await ada.call('provedLately')).toBe(false)
 
@@ -242,8 +242,8 @@ describe('exporting a user\'s data', () => {
       expect((await ada.call('account.export')).ok).toBe(true)
       setSystemTime(new Date(Date.now() + LATER))
 
-      expect(await ada.call('account.export')).toEqual({ ok: false, error: 'stale' })
-      expect(await ada.call('reprove', {})).toEqual({ ok: false, error: 'stale' })
+      expect(await ada.call('account.export')).toMatchObject({ ok: false, error: { code: 'stale' } })
+      expect(await ada.call('reprove', {})).toMatchObject({ ok: false, error: { code: 'stale' } })
       expect((await ada.fetch('/auth/export')).status).toBe(403)
     })
 
@@ -258,9 +258,9 @@ describe('exporting a user\'s data', () => {
       await ada.call('twoFactor.enable', await totpCode(setup.secret, totpStep()))
       setSystemTime(new Date(Date.now() + LATER))
 
-      expect(await ada.call('account.export')).toEqual({ ok: false, error: 'stale' })
-      expect(await ada.call('reprove', { code: '000000' })).toEqual({ ok: false, error: 'proof' })
-      expect(await ada.call('account.export')).toEqual({ ok: false, error: 'stale' })
+      expect(await ada.call('account.export')).toMatchObject({ ok: false, error: { code: 'stale' } })
+      expect(await ada.call('reprove', { code: '000000' })).toMatchObject({ ok: false, error: { code: 'proof' } })
+      expect(await ada.call('account.export')).toMatchObject({ ok: false, error: { code: 'stale' } })
 
       await ada.call('reprove', { password: PASSWORD })
 
@@ -272,7 +272,7 @@ describe('exporting a user\'s data', () => {
 
       setSystemTime(new Date(Date.now() + LATER))
 
-      expect(await browser().call('account.export')).toEqual({ ok: false, error: 'signed-out' })
+      expect(await browser().call('account.export')).toMatchObject({ ok: false, error: { code: 'signed-out' } })
     })
   })
 })

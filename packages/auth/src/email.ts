@@ -1,5 +1,6 @@
 import type { Duration } from 'kay'
 import type { Core } from './core'
+import type { AuthFailed, AuthRejected } from './failure'
 import type { AuthMailer, MailData, Templates } from './mail'
 import type { Proof, ProofFailure } from './proof'
 import type { EmailProblem, PasswordProblem } from './rules'
@@ -11,6 +12,7 @@ import { trackDetached } from 'kay/library'
 import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { backOf, banned, homeOf, withBack } from './core'
+import { failed, rejected } from './failure'
 import { failGuess, forgive, passwordMatches, startGuess } from './guesses'
 import { digest, randomToken } from './keys'
 import { spend, typedKey, windowOf } from './limits'
@@ -66,20 +68,20 @@ export interface PendingCode {
   expires: number
 }
 
-export type CodeResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'expired' | 'limited' | 'banned' }
+export type CodeResult = { ok: true, redirect: string } | AuthFailed<'invalid' | 'expired' | 'limited' | 'banned'>
 
 // Sent whether or not an account has that address, so the answer tells nothing of which ones exist.
-export type MailRequestResult = { ok: true } | { ok: false, error: 'limited' | 'captcha' | 'unavailable' }
+export type MailRequestResult = { ok: true } | AuthFailed<'limited' | 'captcha' | 'unavailable'>
 
-export type LinkResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'banned' }
+export type LinkResult = { ok: true, redirect: string } | AuthFailed<'invalid' | 'limited' | 'banned'>
 
-export type VerifyEmailResult = LinkResult | { ok: false, error: 'confirm' }
+export type VerifyEmailResult = LinkResult | AuthFailed<'confirm'>
 
-export type ResetPasswordResult = LinkResult | { ok: false, errors: { password: PasswordProblem | 'breached' } }
+export type ResetPasswordResult = LinkResult | AuthRejected<{ password: PasswordProblem | 'breached' }>
 
-export type ChangeEmailResult = { ok: true } | { ok: false, error: ProofFailure | 'unavailable' } | { ok: false, errors: { email: EmailProblem | 'taken' | 'unchanged' } }
+export type ChangeEmailResult = { ok: true } | AuthFailed<ProofFailure | 'unavailable'> | AuthRejected<{ email: EmailProblem | 'taken' | 'unchanged' }>
 
-export type SendVerificationResult = MailRequestResult | { ok: false, error: 'signed-out' | 'verified' }
+export type SendVerificationResult = MailRequestResult | AuthFailed<'signed-out' | 'verified'>
 
 // Mails a new verification link to the signed-in user or, with nobody signed in, off the response's path to the account this browser registered or proved the password of.
 export async function sendVerification(state: RequestState): Promise<SendVerificationResult> {
@@ -91,13 +93,13 @@ export async function sendVerification(state: RequestState): Promise<SendVerific
   const email = record?.email ?? held
 
   if (email == null || email === '')
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   if (record && record.emailVerifiedAt !== null)
-    return { ok: false, error: 'verified' }
+    return failed('verified')
 
   if (!state.core.email)
-    return { ok: false, error: 'unavailable' }
+    return failed('unavailable')
 
   const refused = await spendResend(state, record?.id ?? `held:${email}`, 'resend')
 
@@ -134,7 +136,7 @@ export async function verifyEmail(state: RequestState, token: string, password?:
     if (proved !== true) {
       await state.core.store.tokens.create(spent.token)
 
-      return { ok: false, error: proved }
+      return failed(proved)
     }
   }
 
@@ -184,13 +186,13 @@ export async function requestPasswordReset(state: RequestState, email: string, c
 export async function resetPassword(state: RequestState, token: string, password: string): Promise<ResetPasswordResult> {
   // Counted before the breached-password service is asked, so forged links cannot make the server call it without end.
   if (await spend(state.core.rates, `link:${state.client}`, state.core.limits.link))
-    return { ok: false, error: 'limited' }
+    return failed('limited')
 
   const problem = await newPasswordProblem(state.core, password)
 
   // Checked before the token is spent, so a refused password leaves the link usable.
   if (problem !== undefined)
-    return { ok: false, errors: { password: problem } }
+    return rejected({ password: problem })
 
   const spent = await spendLink(state, token, 'reset-password', true)
 
@@ -199,7 +201,7 @@ export async function resetPassword(state: RequestState, token: string, password
 
   // Before the password changes: a banned user keeps the account as the admin left it.
   if (banned(spent.record))
-    return { ok: false, error: 'banned' }
+    return failed('banned')
 
   const { store } = state.core
   const record = await store.users.update(spent.record.id, {
@@ -251,13 +253,13 @@ export async function changeEmail(state: RequestState, proof: Proof, email: stri
   const problem = emailProblem(address)
 
   if (problem)
-    return { ok: false, errors: { email: problem } }
+    return rejected({ email: problem })
 
   if (address === record.email)
-    return { ok: false, errors: { email: 'unchanged' } }
+    return rejected({ email: 'unchanged' })
 
   if (await state.core.store.users.findByEmail(address))
-    return { ok: false, errors: { email: 'taken' } }
+    return rejected({ email: 'taken' })
 
   return mailFor(state, record, 'change-email', address, null)
 }
@@ -272,12 +274,12 @@ export async function confirmEmailChange(state: RequestState, token: string): Pr
   const { store } = state.core
 
   if (await store.users.findByEmail(spent.token.email))
-    return { ok: false, error: 'invalid' }
+    return failed('invalid')
 
   const record = await endOtherSessions(state, spent.record, { email: spent.token.email, emailVerifiedAt: new Date() })
 
   if (!record)
-    return { ok: false, error: 'invalid' }
+    return failed('invalid')
 
   await store.tokens.erase(record.id)
   // To the address the account left, which is the one a thief would want silent.
@@ -369,22 +371,22 @@ async function spendCode(state: RequestState, type: CodeType, code: string) {
   const pending = await state.session.get('authEmailCode')
 
   if (!pending || pending.type !== type || pending.expires < Date.now())
-    return { ok: false, error: 'expired' } as const
+    return failed('expired')
 
   if (await spend(core.rates, `email-code:${state.client}`, core.limits.emailCode) || await spend(core.rates, typedKey(core, 'email-code', pending.email), core.limits.emailCodeAccount))
-    return { ok: false, error: 'limited' } as const
+    return failed('limited')
 
   const spent = await core.store.tokens.consume(codeDigest(state.core, pending.nonce, code.replace(NOT_DIGITS, '')), type)
   const record = spent && await core.store.users.get(spent.userId)
 
   if (!spent || !record || record.email !== spent.email) {
     if ((await core.rates(windowOf(core.email!.maxAge[type] * 1000)).hit(`email-code-miss:${pending.nonce}`)).count < CODE_MISSES)
-      return { ok: false, error: 'invalid' } as const
+      return failed('invalid')
 
     // Only this session's pending code is dropped: the holder's live code may be one another session asked for, and it is unreachable from here anyway, since its digest binds that session's nonce.
     await state.session.unset('authEmailCode')
 
-    return { ok: false, error: 'expired' } as const
+    return failed('expired')
   }
 
   await state.session.unset('authEmailCode')
@@ -404,17 +406,17 @@ async function mailByAddress(state: RequestState, email: string, type: 'reset-pa
   const { core } = state
 
   if (!core.email)
-    return { ok: false, error: 'unavailable' }
+    return failed('unavailable')
 
   const address = normalizeEmail(email)
   const limit = type === 'magic-link' ? 'magicLink' : 'forgot'
   const refused = await admit(state, type === 'magic-link' ? 'magic-link' : 'reset', captcha)
 
   if (refused)
-    return { ok: false, error: refused }
+    return failed(refused)
 
   if (await spend(core.rates, typedKey(core, limit, address), core.limits[`${limit}Account`]))
-    return { ok: false, error: 'limited' }
+    return failed('limited')
 
   // Parked whether or not an account has the address, so this session looks the same either way.
   const nonce = await bindCode(state, type, address)
@@ -436,11 +438,11 @@ async function issueQuietly(state: RequestState, record: UserRecord, type: LinkT
   }
 }
 
-async function mailFor(state: RequestState, record: UserRecord, type: LinkType, email: string, redirect: string | null): Promise<{ ok: true } | { ok: false, error: 'limited' | 'unavailable' }> {
+async function mailFor(state: RequestState, record: UserRecord, type: LinkType, email: string, redirect: string | null): Promise<{ ok: true } | AuthFailed<'limited' | 'unavailable'>> {
   const { core } = state
 
   if (!core.email)
-    return { ok: false, error: 'unavailable' }
+    return failed('unavailable')
 
   const refused = await spendResend(state, record.id, 'emailChange')
 
@@ -453,11 +455,11 @@ async function mailFor(state: RequestState, record: UserRecord, type: LinkType, 
 }
 
 // Counted per client and per account, so neither one sender nor many can flood an inbox.
-async function spendResend(state: RequestState, id: string, limit: 'resend' | 'emailChange'): Promise<{ ok: false, error: 'limited' } | undefined> {
+async function spendResend(state: RequestState, id: string, limit: 'resend' | 'emailChange'): Promise<AuthFailed<'limited'> | undefined> {
   const { core } = state
 
   if (await spend(core.rates, `${limit}:${state.client}`, core.limits[limit]) || await spend(core.rates, `${limit}:${id}`, core.limits[`${limit}Account`]))
-    return { ok: false, error: 'limited' }
+    return failed('limited')
 
   return undefined
 }
@@ -505,13 +507,13 @@ async function spendLink(state: RequestState, token: string, type: LinkType, cou
   const { store, limits } = state.core
 
   if (!counted && await spend(state.core.rates, `link:${state.client}`, limits.link))
-    return { ok: false, error: 'limited' } as const
+    return failed('limited')
 
   const spent = await store.tokens.consume(digest(type === 'magic-link' ? unmarked(token) : token), type)
   const record = spent && await store.users.get(spent.userId)
 
   if (!spent || !record || (type !== 'change-email' && record.email !== spent.email))
-    return { ok: false, error: 'invalid' } as const
+    return failed('invalid')
 
   // The code the same mail carried is spent with it.
   if (type in CODE_OF)

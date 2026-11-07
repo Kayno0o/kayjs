@@ -34,7 +34,7 @@ describe('guests', () => {
 
     await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    expect(await ada.call('signInAsGuest')).toEqual({ ok: false, error: 'signed-in' })
+    expect(await ada.call('signInAsGuest')).toMatchObject({ ok: false, error: { code: 'signed-in' } })
   })
 
   test('registering makes the guest a real account, keeping their id, even where addresses must be verified', async () => {
@@ -67,7 +67,7 @@ describe('guests', () => {
     const guest = browser()
     const { user } = await guest.callOk('signInAsGuest')
 
-    expect(await guest.call('password.register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
+    expect(await guest.call('password.register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: false, errors: { email: 'taken' } })
     expect(await guest.json('/me')).toMatchObject({ id: user.id, guest: true, email: null })
   })
 
@@ -75,6 +75,6 @@ describe('guests', () => {
     const { browser } = setup({ rateLimit: { register: { max: 1, window: '3600s' } } })
 
     expect(await browser().call('signInAsGuest')).toMatchObject({ ok: true })
-    expect(await browser().call('signInAsGuest')).toEqual({ ok: false, error: 'limited' })
+    expect(await browser().call('signInAsGuest')).toMatchObject({ ok: false, error: { code: 'limited' } })
   })
 })

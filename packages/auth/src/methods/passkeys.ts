@@ -14,7 +14,7 @@ export class PasskeyMethods {
   constructor(private readonly state: RequestState) {}
 
   // The options for `makePasskey` of `@kaynooo/kayjs-auth/browser`, to make a passkey for the signed-in user once `proof` re-proves them, the second factor when it is on.
-  async registrationOptions(proof: Proof): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, ProofFailure | Off['error']>> {
+  async registrationOptions(proof: Proof): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, ProofFailure | 'off'>> {
     return !this.state.core.switches.passkeys ? OFF : (await load.passkeys()).passkeyRegistrationOptions(this.state, proof)
   }
 

@@ -15,7 +15,7 @@ export const confirm = action(schemas.token, async ({ token }, ctx) => {
   const result = await ctx.locals.auth.email.confirmChange(token)
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error === 'invalid' ? 'link' : result.error })
+    return ctx.fail(400, { error: result.error.code === 'invalid' ? 'link' : result.error.code })
 
   return ctx.redirect(localize(result.redirect))
 })

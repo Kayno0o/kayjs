@@ -1,9 +1,11 @@
 import type { Core } from './core'
+import type { AuthFailed } from './failure'
 import type { Proof, ProofFailure } from './proof'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { nanoid } from '@kaynooo/utils'
 import { report } from './events'
+import { failed } from './failure'
 import { secondFactorLimited } from './guesses'
 import { digest, totpContext } from './keys'
 import { forget, spend } from './limits'
@@ -27,7 +29,7 @@ export interface TwoFactorSetup {
   uri: string
 }
 
-export type TwoFactorResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'expired' | 'limited' }
+export type TwoFactorResult = { ok: true, redirect: string } | AuthFailed<'invalid' | 'expired' | 'limited'>
 
 export async function verifyTwoFactor(state: RequestState, code: string, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<TwoFactorResult> {
   const { store } = state.core
@@ -35,16 +37,16 @@ export async function verifyTwoFactor(state: RequestState, code: string, signIn:
   const record = challenge && challenge.expires > Date.now() ? await store.users.get(challenge.user) : undefined
 
   if (!challenge || !record || record.sessionVersion !== challenge.version || record.totpEnabledAt === null)
-    return { ok: false, error: 'expired' }
+    return failed('expired')
 
   // Six digits with three live at a time make about one guess in 333,000: the attempt budget is what makes the factor strong.
   if (await secondFactorLimited(state, record))
-    return { ok: false, error: 'limited' }
+    return failed('limited')
 
   if (!(await spendSecondFactor(state, record, code))) {
     await report(state, record, 'sign-in-failed', 'two-factor')
 
-    return { ok: false, error: 'invalid' }
+    return failed('invalid')
   }
 
   await forget(state.core.rates, `two-factor:${record.id}`, state.core.limits.twoFactorAccount)
@@ -54,7 +56,7 @@ export async function verifyTwoFactor(state: RequestState, code: string, signIn:
   return { ok: true, redirect: challenge.redirect }
 }
 
-export type SetUpTwoFactorResult = { ok: true, setup: TwoFactorSetup } | { ok: false, error: ProofFailure | 'enabled' }
+export type SetUpTwoFactorResult = { ok: true, setup: TwoFactorSetup } | AuthFailed<ProofFailure | 'enabled'>
 
 // A new secret for the signed-in user's authenticator, active once `twoFactor.enable` gets a code from it.
 export async function setUpTwoFactor(state: RequestState, proof: Proof): Promise<SetUpTwoFactorResult> {
@@ -64,7 +66,7 @@ export async function setUpTwoFactor(state: RequestState, proof: Proof): Promise
     return proved
 
   if (proved.record.totpEnabledAt !== null)
-    return { ok: false, error: 'enabled' }
+    return failed('enabled')
 
   const secret = generateTotpSecret()
   const uri = otpauthUri({ secret, account: proved.record.email ?? proved.record.username ?? proved.record.id, issuer: state.core.name })
@@ -74,31 +76,31 @@ export async function setUpTwoFactor(state: RequestState, proof: Proof): Promise
   return { ok: true, setup: { secret, uri } }
 }
 
-export type EnableTwoFactorResult = { ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited' }
+export type EnableTwoFactorResult = { ok: true, recoveryCodes: string[] } | AuthFailed<'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited'>
 
 // Turns the second factor on once the authenticator proves it holds the secret; answers the recovery codes, shown this once.
 export async function enableTwoFactor(state: RequestState, code: string): Promise<EnableTwoFactorResult> {
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   if (record.totpEnabledAt !== null)
-    return { ok: false, error: 'enabled' }
+    return failed('enabled')
 
   const secret = record.totpSecret === null ? undefined : state.core.keys.decrypt(record.totpSecret, totpContext(record.id))
 
   if (secret === undefined)
-    return { ok: false, error: 'not-set-up' }
+    return failed('not-set-up')
 
   // Counted like a sign-in code: a session alone may not guess the pending secret's codes at will.
   if (await spend(state.core.rates, `two-factor:${state.client}`, state.core.limits.twoFactor) || await spend(state.core.rates, `enable-two-factor:${record.id}`, state.core.limits.twoFactorAccount))
-    return { ok: false, error: 'limited' }
+    return failed('limited')
 
   const step = await verifyTotp(secret, code)
 
   if (step === undefined)
-    return { ok: false, error: 'invalid' }
+    return failed('invalid')
 
   await forget(state.core.rates, `enable-two-factor:${record.id}`, state.core.limits.twoFactorAccount)
 
@@ -134,7 +136,7 @@ export async function enrollTotp(core: Core, userId: string): Promise<TotpEnrolm
   return { secret, code: async (offset = 0) => totpCode(secret, totpStep() + offset), recoveryCodes: await issueRecoveryCodes(core, userId) }
 }
 
-export type DisableTwoFactorResult = { ok: true } | { ok: false, error: ProofFailure }
+export type DisableTwoFactorResult = { ok: true } | AuthFailed<ProofFailure>
 
 export async function disableTwoFactor(state: RequestState, proof: Proof): Promise<DisableTwoFactorResult> {
   const proved = await reprove(state, proof, { secondFactor: true })
@@ -149,7 +151,7 @@ export async function disableTwoFactor(state: RequestState, proof: Proof): Promi
   return { ok: true }
 }
 
-export type RecoveryCodesResult = { ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'not-enabled' }
+export type RecoveryCodesResult = { ok: true, recoveryCodes: string[] } | AuthFailed<ProofFailure | 'not-enabled'>
 
 // A new set of recovery codes, the old ones void.
 export async function regenerateRecoveryCodes(state: RequestState, proof: Proof): Promise<RecoveryCodesResult> {
@@ -159,7 +161,7 @@ export async function regenerateRecoveryCodes(state: RequestState, proof: Proof)
     return proved
 
   if (proved.record.totpEnabledAt === null)
-    return { ok: false, error: 'not-enabled' }
+    return failed('not-enabled')
 
   const recoveryCodes = await issueRecoveryCodes(state.core, proved.record.id)
 

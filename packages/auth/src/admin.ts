@@ -1,11 +1,13 @@
 import type { BareUser } from './core'
 import type { AuditCursorInput, AuditEntry } from './events'
+import type { AuthFailed } from './failure'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { clamp } from '@kaynooo/utils'
 import { banned, linkedUser, publicUser } from './core'
 import { eraseLeavingUser } from './erase'
 import { auditEntries, report } from './events'
+import { failed } from './failure'
 import { provedLately } from './proof'
 import { lacksTwoFactor } from './requiredTwoFactor'
 import { openSession, revokeBearerTokens } from './sessions'
@@ -26,13 +28,13 @@ export type AdminFailure = 'forbidden' | 'not-found' | 'two-factor-required'
 // `stale` when the admin's session neither signed in nor re-proved in the last ten minutes.
 export type AdminChangeFailure = AdminFailure | 'stale'
 
-export type RoleResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'unknown-role' | 'self' | 'last-admin' }
+export type RoleResult = { ok: true, user: ManagedUser } | AuthFailed<AdminChangeFailure | 'unknown-role' | 'self' | 'last-admin'>
 
-export type BanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'self' | 'admin' | 'until' }
+export type BanResult = { ok: true, user: ManagedUser } | AuthFailed<AdminChangeFailure | 'self' | 'admin' | 'until'>
 
-export type UnbanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure }
+export type UnbanResult = { ok: true, user: ManagedUser } | AuthFailed<AdminChangeFailure>
 
-export type DeleteResult = { ok: true } | { ok: false, error: AdminChangeFailure | 'self' | 'admin' }
+export type DeleteResult = { ok: true } | AuthFailed<AdminChangeFailure | 'self' | 'admin'>
 
 export function managedUser(record: UserRecord): ManagedUser {
   return {
@@ -53,23 +55,23 @@ export async function actingAdmin(state: RequestState): Promise<UserRecord | nul
 }
 
 // The admin changing a user, who must have signed in or re-proved lately, so a session left open or stolen grants, bans and deletes no one.
-export async function changingAdmin(state: RequestState): Promise<{ ok: true, actor: UserRecord } | { ok: false, error: 'forbidden' | 'two-factor-required' | 'stale' }> {
+export async function changingAdmin(state: RequestState): Promise<{ ok: true, actor: UserRecord } | AuthFailed<'forbidden' | 'two-factor-required' | 'stale'>> {
   const acting = await askingAdmin(state)
 
   if (!acting.ok)
     return acting
 
-  return await provedLately(state) ? acting : { ok: false, error: 'stale' }
+  return await provedLately(state) ? acting : failed('stale')
 }
 
 // The admin as `actingAdmin` finds them, or why not: an admin whom `twoFactor.require` names and who lacks it is held back until they turn it on.
-export async function askingAdmin(state: RequestState): Promise<{ ok: true, actor: UserRecord } | { ok: false, error: 'forbidden' | 'two-factor-required' }> {
+export async function askingAdmin(state: RequestState): Promise<{ ok: true, actor: UserRecord } | AuthFailed<'forbidden' | 'two-factor-required'>> {
   const actor = await actingAdmin(state)
 
   if (!actor)
-    return { ok: false, error: 'forbidden' }
+    return failed('forbidden')
 
-  return await lacksTwoFactor(state, publicUser(actor)) ? { ok: false, error: 'two-factor-required' } : { ok: true, actor }
+  return await lacksTwoFactor(state, publicUser(actor)) ? failed('two-factor-required') : { ok: true, actor }
 }
 
 export async function isAdmin(state: RequestState, record: UserRecord): Promise<boolean> {
@@ -125,7 +127,7 @@ async function anotherAdmin(state: RequestState, exceptId: string): Promise<bool
   }
 }
 
-export type ListUsersResult = { ok: true, users: ManagedUser[], total: number } | { ok: false, error: 'forbidden' | 'two-factor-required' }
+export type ListUsersResult = { ok: true, users: ManagedUser[], total: number } | AuthFailed<'forbidden' | 'two-factor-required'>
 
 // Newest first, a page of `limit` (50 by default) from `offset`.
 export async function listUsers(state: RequestState, query: { search?: string | undefined, offset?: number | undefined, limit?: number | undefined }): Promise<ListUsersResult> {
@@ -144,7 +146,7 @@ export async function listUsers(state: RequestState, query: { search?: string | 
   return { ok: true, users: found.users.map(managedUser), total: found.total }
 }
 
-export type GetUserResult = { ok: true, user: ManagedUser, admin: boolean } | { ok: false, error: AdminFailure }
+export type GetUserResult = { ok: true, user: ManagedUser, admin: boolean } | AuthFailed<AdminFailure>
 
 export async function getUser(state: RequestState, userId: string): Promise<GetUserResult> {
   const acting = await askingAdmin(state)
@@ -154,7 +156,7 @@ export async function getUser(state: RequestState, userId: string): Promise<GetU
 
   const record = await state.core.store.users.get(userId)
 
-  return record ? { ok: true, user: managedUser(record), admin: await isAdmin(state, record) } : { ok: false, error: 'not-found' }
+  return record ? { ok: true, user: managedUser(record), admin: await isAdmin(state, record) } : failed('not-found')
 }
 
 // Takes effect on the user's next request, roles being read with the user each time.
@@ -167,12 +169,12 @@ export async function changeRole(state: RequestState, userId: string, role: stri
   const { actor } = acting
 
   if (state.core.roles && !state.core.roles.has(role))
-    return { ok: false, error: 'unknown-role' }
+    return failed('unknown-role')
 
   const record = await state.core.store.users.get(userId)
 
   if (!record)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   if (record.roles.includes(role) === granted)
     return { ok: true, user: managedUser(record) }
@@ -180,7 +182,7 @@ export async function changeRole(state: RequestState, userId: string, role: stri
   const roles = granted ? [...record.roles, role] : record.roles.filter(held => held !== role)
 
   if (record.id === actor.id && !(await isAdmin(state, { ...record, roles })))
-    return { ok: false, error: 'self' }
+    return failed('self')
 
   const updated = await state.core.store.users.update(record.id, { roles }) ?? { ...record, roles }
 
@@ -188,7 +190,7 @@ export async function changeRole(state: RequestState, userId: string, role: stri
   if (!granted && await isAdmin(state, record) && !await isAdmin(state, updated) && !await anotherAdmin(state, '')) {
     await state.core.store.users.update(record.id, { roles: record.roles })
 
-    return { ok: false, error: 'last-admin' }
+    return failed('last-admin')
   }
 
   await report(state, updated, granted ? 'role-granted' : 'role-revoked', role, actor)
@@ -206,18 +208,18 @@ export async function banUser(state: RequestState, userId: string, options: { re
   const { actor } = acting
 
   if (options.until !== undefined && !(options.until.getTime() > Date.now()))
-    return { ok: false, error: 'until' }
+    return failed('until')
 
   const record = await state.core.store.users.get(userId)
 
   if (!record)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   if (record.id === actor.id)
-    return { ok: false, error: 'self' }
+    return failed('self')
 
   if (await isAdmin(state, record))
-    return { ok: false, error: 'admin' }
+    return failed('admin')
 
   const given = options.reason?.trim().slice(0, BAN_REASON_MAX_LENGTH)
   const reason = given === undefined || given === '' ? null : given
@@ -241,7 +243,7 @@ export async function unbanUser(state: RequestState, userId: string): Promise<Un
   const record = await state.core.store.users.get(userId)
 
   if (!record)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   if (record.bannedAt === null)
     return { ok: true, user: managedUser(record) }
@@ -266,15 +268,15 @@ export async function deleteUser(state: RequestState, userId: string): Promise<D
   const record = await state.core.store.users.get(userId)
 
   if (!record)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   if (record.id === actor.id)
-    return { ok: false, error: 'self' }
+    return failed('self')
 
-  return await isAdmin(state, record) ? { ok: false, error: 'admin' } : eraseLeavingUser(state, record, { actor, handOver: true })
+  return await isAdmin(state, record) ? failed('admin') : eraseLeavingUser(state, record, { actor, handOver: true })
 }
 
-export type AdminAuditLogResult = { ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' | 'two-factor-required' }
+export type AdminAuditLogResult = { ok: true, entries: AuditEntry[] } | AuthFailed<'forbidden' | 'two-factor-required'>
 
 // Everyone's audit log, or one user's, newest first.
 export async function adminAuditLog(state: RequestState, query: { userId?: string | undefined, before?: AuditCursorInput | undefined, limit?: number | undefined }): Promise<AdminAuditLogResult> {
@@ -283,7 +285,7 @@ export async function adminAuditLog(state: RequestState, query: { userId?: strin
   return !acting.ok ? acting : { ok: true, entries: await auditEntries(state.core, query) }
 }
 
-export type ImpersonateResult = { ok: true } | { ok: false, error: AdminFailure | 'stale' | 'self' | 'admin' | 'banned' }
+export type ImpersonateResult = { ok: true } | AuthFailed<AdminFailure | 'stale' | 'self' | 'admin' | 'banned'>
 
 // Signs this browser in as `userId`, the admin's own sign-in kept for `admin.stopImpersonating`; 'stale' unless the admin signed in or re-proved lately. Nothing that takes a proof works meanwhile, and another admin cannot be impersonated.
 export async function impersonate(state: RequestState, userId: string): Promise<ImpersonateResult> {
@@ -291,23 +293,23 @@ export async function impersonate(state: RequestState, userId: string): Promise<
   const own = await state.session.get('auth')
 
   if (!acting.ok || !own)
-    return { ok: false, error: acting.ok ? 'forbidden' : acting.error }
+    return acting.ok ? failed('forbidden') : acting
 
   const { actor } = acting
 
   const record = await state.core.store.users.get(userId)
 
   if (!record)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   if (record.id === actor.id)
-    return { ok: false, error: 'self' }
+    return failed('self')
 
   if (await isAdmin(state, record))
-    return { ok: false, error: 'admin' }
+    return failed('admin')
 
   if (banned(record))
-    return { ok: false, error: 'banned' }
+    return failed('banned')
 
   await state.session.unset('authChallenge')
   await state.session.regenerate()

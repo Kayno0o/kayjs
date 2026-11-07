@@ -17,7 +17,7 @@ export const rename = action(schemas.organization, async ({ name, slug }, ctx) =
   const result = await auth.organizations.update(String(ctx.params.org), { name: name.trim(), slug: slug?.trim() || null })
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error })
+    return ctx.fail(400, { error: result.error.code })
 
   const { organization } = result
 
@@ -27,25 +27,25 @@ export const rename = action(schemas.organization, async ({ name, slug }, ctx) =
 export const setRoles = action(schemas.memberRoles, async ({ userId, roles }, ctx) => {
   const result = await ctx.locals.auth.organizations.setMemberRoles(String(ctx.params.org), userId, (roles ?? []) as never[])
 
-  return result.ok ? 'done' : ctx.fail(400, { error: result.error })
+  return result.ok ? 'done' : ctx.fail(400, { error: result.error.code })
 })
 
 export const removeMember = action(schemas.member, async ({ userId }, ctx) => {
   const result = await ctx.locals.auth.organizations.removeMember(String(ctx.params.org), userId)
 
-  return result.ok ? 'done' : ctx.fail(400, { error: result.error })
+  return result.ok ? 'done' : ctx.fail(400, { error: result.error.code })
 })
 
 export const invite = action(schemas.invite, async ({ email, roles }, ctx) => {
   const result = await ctx.locals.auth.organizations.invite(String(ctx.params.org), email.trim(), roles?.length ? roles as never[] : undefined)
 
-  return result.ok ? result.invitation.email : ctx.fail(400, { error: result.error })
+  return result.ok ? result.invitation.email : ctx.fail(400, { error: result.error.code })
 })
 
 export const revoke = action(schemas.id, async ({ id }, ctx) => {
   const result = await ctx.locals.auth.organizations.revokeInvitation(String(ctx.params.org), id)
 
-  return result.ok ? 'done' : ctx.fail(400, { error: result.error })
+  return result.ok ? 'done' : ctx.fail(400, { error: result.error.code })
 })
 
 export const leave = action(schemas.adminDelete, async ({ confirm }, ctx) => {
@@ -55,7 +55,7 @@ export const leave = action(schemas.adminDelete, async ({ confirm }, ctx) => {
   const auth = ctx.locals.auth
   const result = await auth.organizations.leave(String(ctx.params.org))
 
-  return result.ok ? ctx.redirect(organizationsPage(auth.features())) : ctx.fail(400, { error: result.error })
+  return result.ok ? ctx.redirect(organizationsPage(auth.features())) : ctx.fail(400, { error: result.error.code })
 })
 
 export const remove = action(schemas.adminDelete, async ({ confirm }, ctx) => {
@@ -65,7 +65,7 @@ export const remove = action(schemas.adminDelete, async ({ confirm }, ctx) => {
   const auth = ctx.locals.auth
   const result = await auth.organizations.delete(String(ctx.params.org))
 
-  return result.ok ? ctx.redirect(organizationsPage(auth.features())) : ctx.fail(400, { error: result.error })
+  return result.ok ? ctx.redirect(organizationsPage(auth.features())) : ctx.fail(400, { error: result.error.code })
 })
 
 const auth = ctx.locals.auth

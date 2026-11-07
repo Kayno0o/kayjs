@@ -124,7 +124,7 @@ describe('time options take a Duration', () => {
 
     expect(minted.id).toBe(stored!.id)
     expect(stored!.expiresAt!.getTime() - Date.now()).toBeGreaterThan(30 * DAY_MS - 60_000)
-    expect(await ada.call('tokens.create', { password: PASSWORD }, 'Tablet', { maxAge: 'forever' as Duration })).toEqual({ ok: false, error: 'expiry' })
+    expect(await ada.call('tokens.create', { password: PASSWORD }, 'Tablet', { maxAge: 'forever' as Duration })).toMatchObject({ ok: false, error: { code: 'expiry' } })
     expect(await ada.call('tokens.create', { password: PASSWORD }, 'Tablet', { maxAge: '3600s' })).toMatchObject({ ok: true })
   })
 })

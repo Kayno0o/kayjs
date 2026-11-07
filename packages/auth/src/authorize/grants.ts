@@ -1,5 +1,7 @@
+import type { AuthFailed } from '../failure'
 import type { RequestState } from '../state'
 import { report } from '../events'
+import { failed } from '../failure'
 import { approver } from './request'
 
 // An app the signed-in user approved to act as them.
@@ -21,7 +23,7 @@ export async function approvedClients(state: RequestState): Promise<ApprovedClie
   return (await state.core.store.oauth.grants.listByUser(record.id)).map(grant => ({ id: grant.clientId, name: grant.clientName, scopes: grant.scopes, createdAt: grant.createdAt, lastUsedAt: grant.lastUsedAt }))
 }
 
-export type RevokeGrantResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+export type RevokeGrantResult = { ok: true } | AuthFailed<'signed-out' | 'not-found'>
 
 // Takes the approval back with every token the app was given; `not-found` when there was none, `signed-out` when this is not the user's own session.
 export async function revokeClient(state: RequestState, clientId: string): Promise<RevokeGrantResult> {
@@ -29,12 +31,12 @@ export async function revokeClient(state: RequestState, clientId: string): Promi
   const oauth = state.core.store.oauth
 
   if (!record)
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   const grant = await oauth?.grants.get(record.id, clientId)
 
   if (!oauth || !grant || !await oauth.grants.revoke(record.id, clientId))
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   await report(state, record, 'oauth-client-revoked', grant.clientName)
 

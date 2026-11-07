@@ -3,6 +3,7 @@ import type { ApprovedClient } from './authorize/grants'
 import type { BearerToken } from './bearer'
 import type { User } from './core'
 import type { AuditEntry } from './events'
+import type { AuthFailed } from './failure'
 import type { MailingSubscription } from './mail'
 import type { Invitation, Membership } from './organizations'
 import type { Passkey } from './passkeys'
@@ -12,6 +13,7 @@ import { notifications } from 'kay/server'
 import { listTokens } from './bearer'
 import { linkedUser } from './core'
 import { impersonatorOf } from './events'
+import { failed } from './failure'
 import { spend } from './limits'
 import { provedLately } from './proof'
 import { listSessions } from './sessions'
@@ -47,7 +49,7 @@ export interface DataExport {
   app: unknown
 }
 
-export type ExportResult = { ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' | 'impersonating' | 'stale' }
+export type ExportResult = { ok: true, data: DataExport } | AuthFailed<'signed-out' | 'limited' | 'impersonating' | 'stale'>
 
 // Not for an admin acting as the user: they see what the user sees, not a copy of everything kept about them.
 // Only within ten minutes of signing in or re-proving, so a session left open or stolen does not download everything the account holds.
@@ -56,16 +58,16 @@ export async function exportData(state: RequestState): Promise<ExportResult> {
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   if (await impersonatorOf(state) !== undefined)
-    return { ok: false, error: 'impersonating' }
+    return failed('impersonating')
 
   if (!await provedLately(state))
-    return { ok: false, error: 'stale' }
+    return failed('stale')
 
   if (await spend(core.rates, `export:${record.id}`, core.limits.export))
-    return { ok: false, error: 'limited' }
+    return failed('limited')
 
   const user = await linkedUser(core, record)
   const organizations = core.organizations ? await import('./organizations') : undefined

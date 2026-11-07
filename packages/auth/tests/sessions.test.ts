@@ -69,7 +69,7 @@ describe('sessions', () => {
 
     await bob.fetch('/sign-in/u2', { method: 'POST' })
 
-    expect(await bob.call('sessions.revoke', own.id)).toEqual({ ok: false, error: 'not-found' })
+    expect(await bob.call('sessions.revoke', own.id)).toMatchObject({ ok: false, error: { code: 'not-found' } })
     expect(await laptop.json('/me')).toMatchObject({ id: 'u1' })
     expect(await laptop.call('sessions.revoke', own.id)).toEqual({ ok: true })
     expect(await laptop.json('/me')).toBe('anonymous')
@@ -180,7 +180,7 @@ describe('sessions', () => {
     const call = async (method: string, ...args: unknown[]): Promise<unknown> => (await app.handle(new Request(`http://localhost/call/${method}`, { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(args) }))).json()
 
     expect(await call('sessions.list')).toEqual([])
-    expect(await call('sessions.revoke', own.id)).toEqual({ ok: false, error: 'signed-out' })
+    expect(await call('sessions.revoke', own.id)).toMatchObject({ ok: false, error: { code: 'signed-out' } })
     expect(await laptop.json('/me')).toMatchObject({ id: 'u1' })
   })
 

@@ -1,4 +1,5 @@
 import type { BareUser, Core } from './core'
+import type { AuthFailed, AuthRejected } from './failure'
 import type { EmailProblem, PasswordProblem, UsernameProblem } from './rules'
 import type { SignInOptions } from './signInOptions'
 import type { RequestState } from './state'
@@ -9,6 +10,7 @@ import { newPasswordProblem } from './breached'
 import { admit } from './captcha'
 import { backOf, homeOf, newUserRecord, publicUser, unlinked } from './core'
 import { afterResponse, report } from './events'
+import { failed, rejected } from './failure'
 import { failGuess, forgive, passwordMatches, startGuess } from './guesses'
 import { validLocale } from './locale'
 import { emailProblem, normalizeEmail, normalizeUsername, PASSWORD_MAX_LENGTH, usernameProblem } from './rules'
@@ -30,7 +32,7 @@ export interface RegisterErrors {
 }
 
 // `signedIn` is false, with no user, when the app wants the address verified first: the same answer whether the address was free or held, its holder mailed instead. `off` with `signUp: false`.
-export type RegisterResult = { ok: true, user: BareUser, signedIn: true } | { ok: true, signedIn: false } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' | 'captcha' | 'off' }
+export type RegisterResult = { ok: true, user: BareUser, signedIn: true } | { ok: true, signedIn: false } | AuthRejected<RegisterErrors> | AuthFailed<'limited' | 'captcha' | 'off'>
 
 export interface CreateUserInput {
   // At least one of the two, the user signing in with either.
@@ -45,7 +47,7 @@ export interface CreateUserInput {
   locale?: string | undefined
 }
 
-export type CreateUserResult = { ok: true, user: BareUser } | { ok: false, errors: RegisterErrors }
+export type CreateUserResult = { ok: true, user: BareUser } | AuthRejected<RegisterErrors>
 
 export interface PasswordSignInInput {
   // An email, or a username when it holds no `@`.
@@ -55,19 +57,19 @@ export interface PasswordSignInInput {
 
 // `invalid` whether no account matches or the password is wrong, so the answer tells nothing of which accounts exist.
 // `unverified` once the password is right, when the app wants the address verified first.
-export type PasswordSignInResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'captcha' | 'unverified' | 'banned' }
+export type PasswordSignInResult = { ok: true, redirect: string } | AuthFailed<'invalid' | 'limited' | 'captcha' | 'unverified' | 'banned'>
 
 // A new user with a password, signed in on this session; a guest signed in becomes it, keeping their id.
 export async function register(state: RequestState, input: RegisterInput, options: Pick<SignInOptions, 'redirect' | 'captcha'> = {}): Promise<RegisterResult> {
   const { store } = state.core
 
   if (!state.core.signUp)
-    return { ok: false, error: 'off' }
+    return failed('off')
 
   const refused = await admit(state, 'register', options.captcha)
 
   if (refused)
-    return { ok: false, error: refused }
+    return failed(refused)
 
   const email = normalizeEmail(input.email)
   const username = input.username === undefined ? null : normalizeUsername(input.username)
@@ -95,7 +97,7 @@ export async function register(state: RequestState, input: RegisterInput, option
   }
 
   if (errors.email !== undefined || errors.password !== undefined || errors.username !== undefined)
-    return { ok: false, errors: withoutUndefined(errors) }
+    return rejected(withoutUndefined(errors))
 
   if (holder && !unclaimed)
     return answerHeld(state, holder, input.password)
@@ -120,10 +122,10 @@ export async function register(state: RequestState, input: RegisterInput, option
       return answerHeld(state, taken, null)
 
     if (taken)
-      return { ok: false, errors: { email: 'taken' } }
+      return rejected({ email: 'taken' })
 
     if (username !== null && await store.users.findByUsername(username))
-      return { ok: false, errors: { username: 'taken' } }
+      return rejected({ username: 'taken' })
 
     throw error
   }
@@ -190,7 +192,7 @@ export async function createUser(core: Core, input: CreateUserInput): Promise<Cr
   const errors = await userProblems(core, input)
 
   if (Object.keys(errors).length > 0)
-    return { ok: false, errors }
+    return rejected(errors)
 
   const email = input.email === undefined ? null : normalizeEmail(input.email)
   const username = input.username === undefined ? null : normalizeUsername(input.username)
@@ -210,10 +212,10 @@ export async function createUser(core: Core, input: CreateUserInput): Promise<Cr
   // Another request took the email or the name in between; any other failure is the store's.
   catch (error) {
     if (email !== null && await core.store.users.findByEmail(email))
-      return { ok: false, errors: { email: 'taken' } }
+      return rejected({ email: 'taken' })
 
     if (username !== null && await core.store.users.findByUsername(username))
-      return { ok: false, errors: { username: 'taken' } }
+      return rejected({ username: 'taken' })
 
     throw error
   }
@@ -270,7 +272,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   const refused = await admit(state, 'sign-in', options.captcha)
 
   if (refused)
-    return { ok: false, error: refused }
+    return failed(refused)
 
   // No password this long was ever accepted, and hashing it would cost the server for nothing. A ceiling the app lowered later still lets an older, longer one sign in.
   const tooLong = input.password.length > Math.max(PASSWORD_MAX_LENGTH, state.core.rules.password.max)
@@ -279,7 +281,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
   const guess = await startGuess(state, record, identifier)
 
   if (guess === 'limited')
-    return { ok: false, error: 'limited' }
+    return failed('limited')
 
   if (tooLong || !(await passwordMatches(record, input.password))) {
     await failGuess(state, guess)
@@ -288,7 +290,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
     if (record)
       await afterResponse('reporting a failed sign-in', async () => report(state, record, 'sign-in-failed', 'password'))
 
-    return { ok: false, error: 'invalid' }
+    return failed('invalid')
   }
 
   await forgive(state, guess)
@@ -298,7 +300,7 @@ export async function signInWithPassword(state: RequestState, input: PasswordSig
     await state.session.set('authRegistered', record!.id)
     await keepBack(state, options.redirect)
 
-    return { ok: false, error: 'unverified' }
+    return failed('unverified')
   }
 
   // Hashed with weaker settings, or by bcrypt in an older app: rehashed while the password is at hand.

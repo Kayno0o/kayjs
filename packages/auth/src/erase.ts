@@ -1,8 +1,10 @@
+import type { AuthFailed } from './failure'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { notifications } from 'kay/server'
 import { linkedUser } from './core'
 import { reportFrom } from './events'
+import { failed } from './failure'
 import { log } from './log'
 import { mailNotice, securityNotice } from './securityNotice'
 
@@ -71,8 +73,8 @@ export async function eraseUser(core: Core, record: UserRecord): Promise<void> {
 
 // `eraseUser` for a user who goes, by their own hand or an admin's (`actor`): the invitations to their address go too, and the account-deleted notice is mailed. Refused with `last-owner` while they are the only owner of an organization with other members, unless `handOver` is set, as for an admin who cannot name an owner: the organization then passes to its longest-standing member. An organization they are alone in goes with them.
 export async function eraseLeavingUser(state: RequestState, record: UserRecord, options: { actor?: UserRecord, handOver: true }): Promise<{ ok: true }>
-export async function eraseLeavingUser(state: RequestState, record: UserRecord, options?: { actor?: UserRecord, handOver?: false }): Promise<{ ok: true } | { ok: false, error: 'last-owner' }>
-export async function eraseLeavingUser(state: RequestState, record: UserRecord, options: { actor?: UserRecord, handOver?: boolean } = {}): Promise<{ ok: true } | { ok: false, error: 'last-owner' }> {
+export async function eraseLeavingUser(state: RequestState, record: UserRecord, options?: { actor?: UserRecord, handOver?: false }): Promise<{ ok: true } | AuthFailed<'last-owner'>>
+export async function eraseLeavingUser(state: RequestState, record: UserRecord, options: { actor?: UserRecord, handOver?: boolean } = {}): Promise<{ ok: true } | AuthFailed<'last-owner'>> {
   const { store } = state.core
   const { actor, handOver = false } = options
 
@@ -88,11 +90,11 @@ export async function eraseLeavingUser(state: RequestState, record: UserRecord, 
 
 // `afterDelete` runs once the user is gone, and what it records is forgotten after it. The audit log forgets the user before and after, and a failure of either fails the erase, so none of their data stays behind unreported; only the first leaves the account to delete again.
 // A throwing `afterDelete` fails the erase too, but only once the hand-over and the second strip have run.
-async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afterDelete?: () => Promise<void>): Promise<{ ok: true } | { ok: false, error: 'last-owner' }> {
+async function eraseThen(core: Core, record: UserRecord, handOver: boolean, afterDelete?: () => Promise<void>): Promise<{ ok: true } | AuthFailed<'last-owner'>> {
   const { store } = core
 
   if (!handOver && (await soleOwned(core, record)).some(organization => !organization.alone))
-    return { ok: false, error: 'last-owner' }
+    return failed('last-owner')
 
   const owners = await owning(core, record)
   const pseudonym = crypto.randomUUID()

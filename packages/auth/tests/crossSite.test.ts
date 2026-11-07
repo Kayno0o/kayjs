@@ -36,7 +36,7 @@ describe('a plain Elysia app on auth.plugin', () => {
     const { app, ada } = await signedIn()
 
     expect((await ada.fetch('/sign-out', { method: 'POST', headers: EVIL })).status).toBe(403)
-    expect(await ada.json('/call/account.changeUsername', crossPost(['mallory']))).toEqual({ ok: false, error: 'signed-out' })
+    expect(await ada.json('/call/account.changeUsername', crossPost(['mallory']))).toMatchObject({ ok: false, error: { code: 'signed-out' } })
     expect((await app.store.users.get('u1'))!.username).not.toBe('mallory')
     expect(await ada.json('/me')).toMatchObject({ id: 'u1' })
   })

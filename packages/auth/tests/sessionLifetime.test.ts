@@ -140,6 +140,6 @@ describe('a magic link carries the remember choice', () => {
 
     const token = new URL(mails.findLast(mail => mail.kind === 'reset-password')!.url!).searchParams.get('token')!
 
-    expect(await app.browser().call('password.reset', `${token}.r`, 'a new password long enough')).toMatchObject({ ok: false, error: 'invalid' })
+    expect(await app.browser().call('password.reset', `${token}.r`, 'a new password long enough')).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
 })

@@ -7,7 +7,7 @@ import { testApp, userRecord } from './helpers/app'
 import { mailbox } from './helpers/mail'
 
 const PASSWORD = 'correct horse battery'
-const OFF = { ok: false, error: 'off' } as const
+const OFF = { ok: false, error: { code: 'off' } } as const
 const email = () => ({ mailer: mailbox().mailer, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false })
 
 describe('feature switches', () => {
@@ -26,11 +26,11 @@ describe('feature switches', () => {
     await ada.post('/sign-in/u1', {})
 
     expect(await ada.call('features')).toMatchObject({ password: false, magicLink: true })
-    expect(await ada.call('password.register', { email: 'bob@example.com', password: PASSWORD })).toEqual(OFF)
-    expect(await ada.call('password.signIn', { identifier: 'ada@example.com', password: PASSWORD })).toEqual(OFF)
-    expect(await ada.call('password.requestReset', 'ada@example.com')).toEqual(OFF)
-    expect(await ada.call('password.reset', 'token', PASSWORD)).toEqual(OFF)
-    expect(await ada.call('password.change', {}, PASSWORD)).toEqual(OFF)
+    expect(await ada.call('password.register', { email: 'bob@example.com', password: PASSWORD })).toMatchObject(OFF)
+    expect(await ada.call('password.signIn', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject(OFF)
+    expect(await ada.call('password.requestReset', 'ada@example.com')).toMatchObject(OFF)
+    expect(await ada.call('password.reset', 'token', PASSWORD)).toMatchObject(OFF)
+    expect(await ada.call('password.change', {}, PASSWORD)).toMatchObject(OFF)
     expect(await store.users.findByEmail('bob@example.com')).toBeUndefined()
     expect(mails.mails).toHaveLength(0)
   })
@@ -43,9 +43,9 @@ describe('feature switches', () => {
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
 
     expect(await ada.call('features')).toMatchObject({ email: true, magicLink: false })
-    expect(await ada.call('magicLink.request', 'ada@example.com')).toEqual(OFF)
-    expect(await ada.call('magicLink.signIn', 'token')).toEqual(OFF)
-    expect(await ada.call('magicLink.signInWithCode', '123456')).toEqual(OFF)
+    expect(await ada.call('magicLink.request', 'ada@example.com')).toMatchObject(OFF)
+    expect(await ada.call('magicLink.signIn', 'token')).toMatchObject(OFF)
+    expect(await ada.call('magicLink.signInWithCode', '123456')).toMatchObject(OFF)
     expect(mails.mails).toHaveLength(0)
   })
 
@@ -60,8 +60,8 @@ describe('feature switches', () => {
     await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     expect(await ada.call('features')).toMatchObject({ twoFactor: false })
-    expect(await ada.call('twoFactor.setUp', { password: PASSWORD })).toEqual(OFF)
-    expect(await ada.call('twoFactor.enable', '123456')).toEqual(OFF)
+    expect(await ada.call('twoFactor.setUp', { password: PASSWORD })).toMatchObject(OFF)
+    expect(await ada.call('twoFactor.enable', '123456')).toMatchObject(OFF)
 
     await store.users.update((await store.users.findByEmail('ada@example.com'))!.id, { totpSecret: 'sealed', totpEnabledAt: new Date() })
 
@@ -118,12 +118,12 @@ describe('feature switches', () => {
     await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     expect(await ada.call('features')).toMatchObject({ passkeys: false })
-    expect(await ada.call('passkeys.registrationOptions', { password: PASSWORD })).toEqual(OFF)
-    expect(await ada.call('passkeys.register', {} as never)).toEqual(OFF)
-    expect(await ada.call('passkeys.signIn', {} as never)).toEqual(OFF)
-    expect(await ada.call('twoFactor.passkeyOptions')).toEqual(OFF)
-    expect(await ada.call('twoFactor.verifyPasskey', {} as never)).toEqual(OFF)
-    expect(await ada.call('passkeys.proofOptions')).toEqual(OFF)
+    expect(await ada.call('passkeys.registrationOptions', { password: PASSWORD })).toMatchObject(OFF)
+    expect(await ada.call('passkeys.register', {} as never)).toMatchObject(OFF)
+    expect(await ada.call('passkeys.signIn', {} as never)).toMatchObject(OFF)
+    expect(await ada.call('twoFactor.passkeyOptions')).toMatchObject(OFF)
+    expect(await ada.call('twoFactor.verifyPasskey', {} as never)).toMatchObject(OFF)
+    expect(await ada.call('passkeys.proofOptions')).toMatchObject(OFF)
     expect(await ada.call('passkeys.list')).toEqual([])
   })
 })

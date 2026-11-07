@@ -445,8 +445,8 @@ describe('linking a provider', () => {
     await signInWith(bob, 'discord', '2')
 
     expect((await linkWith(ada, 'discord', '2')).response.headers.get('location')).toBe('/login?error=taken')
-    expect(await browser().call('oauth.link', 'discord', {})).toEqual({ ok: false, error: 'signed-out' })
-    expect(await ada.call('oauth.link', 'gitlab', {})).toEqual({ ok: false, error: 'not-found' })
+    expect(await browser().call('oauth.link', 'discord', {})).toMatchObject({ ok: false, error: { code: 'signed-out' } })
+    expect(await ada.call('oauth.link', 'gitlab', {})).toMatchObject({ ok: false, error: { code: 'not-found' } })
   })
 
   test('joins the provider to the account that asked for it, not to one signed in since in the same browser', async () => {

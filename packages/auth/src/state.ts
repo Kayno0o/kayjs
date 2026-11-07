@@ -1,5 +1,6 @@
 import type { Session } from 'kay/server'
 import type { AuthSessionData, Core } from './core'
+import type { AuthFailed } from './failure'
 import type { UserRecord } from './store'
 
 // What a flow works with for one request.
@@ -19,7 +20,7 @@ export interface RequestState {
   // How the current user was read, once `current` has been.
   via: () => 'session' | 'bearer' | null
   // Signs `record` in, `method` saying how for the `signed-in` event, and answers where the browser goes next; refused while an admin bans them.
-  complete: (record: UserRecord, redirect: string, method: string) => Promise<{ ok: true, redirect: string } | { ok: false, error: 'banned' }>
+  complete: (record: UserRecord, redirect: string, method: string) => Promise<{ ok: true, redirect: string } | AuthFailed<'banned'>>
   // Signs `record` in under a new session id, with no ban check: for a flow that checked already, as a second factor does.
   establish: (record: UserRecord, method: string) => Promise<void>
   // Signs this session out, telling `onAuthEvent`.

@@ -66,8 +66,8 @@ describe('bearer tokens', () => {
     const post = async (method: string, ...args: unknown[]) => device.json(`/call/${method}`, { method: 'POST', headers: { ...bearer, 'content-type': 'application/json' }, body: JSON.stringify(args) })
 
     expect(await post('tokens.list')).toEqual([])
-    expect(await post('tokens.revoke', minted.id)).toEqual({ ok: false, error: 'signed-out' })
-    expect(await post('twoFactor.enable', '123456')).toEqual({ ok: false, error: 'signed-out' })
+    expect(await post('tokens.revoke', minted.id)).toMatchObject({ ok: false, error: { code: 'signed-out' } })
+    expect(await post('twoFactor.enable', '123456')).toMatchObject({ ok: false, error: { code: 'signed-out' } })
     expect(await ada.call('tokens.list')).toHaveLength(1)
   })
 
@@ -75,12 +75,12 @@ describe('bearer tokens', () => {
     const { ada, browser, bearer } = await withToken()
     const device = browser()
     const post = async (method: string, ...args: unknown[]) => device.json(`/call/${method}`, { method: 'POST', headers: { ...bearer, 'content-type': 'application/json' }, body: JSON.stringify(args) })
-    const refused = { ok: false, error: 'signed-out' }
+    const refused = { ok: false, error: { code: 'signed-out' } }
 
-    expect(await post('twoFactor.setUp', { password: PASSWORD })).toEqual(refused)
-    expect(await post('twoFactor.disable', { password: PASSWORD })).toEqual(refused)
-    expect(await post('twoFactor.regenerateRecoveryCodes', { password: PASSWORD })).toEqual(refused)
-    expect(await post('reprove', { password: PASSWORD })).toEqual(refused)
+    expect(await post('twoFactor.setUp', { password: PASSWORD })).toMatchObject(refused)
+    expect(await post('twoFactor.disable', { password: PASSWORD })).toMatchObject(refused)
+    expect(await post('twoFactor.regenerateRecoveryCodes', { password: PASSWORD })).toMatchObject(refused)
+    expect(await post('reprove', { password: PASSWORD })).toMatchObject(refused)
     expect(await ada.call('twoFactor.setUp', { password: PASSWORD })).toMatchObject({ ok: true })
   })
 
@@ -89,19 +89,19 @@ describe('bearer tokens', () => {
     const device = browser()
     const bob = browser()
 
-    expect(await device.json('/call/tokens.create', { method: 'POST', headers: { ...bearer, 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }, 'Another']) })).toEqual({ ok: false, error: 'signed-out' })
+    expect(await device.json('/call/tokens.create', { method: 'POST', headers: { ...bearer, 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }, 'Another']) })).toMatchObject({ ok: false, error: { code: 'signed-out' } })
 
     await bob.call('password.register', { email: 'bob@example.com', password: PASSWORD })
 
-    expect(await bob.call('tokens.revoke', minted.id)).toEqual({ ok: false, error: 'not-found' })
+    expect(await bob.call('tokens.revoke', minted.id)).toMatchObject({ ok: false, error: { code: 'not-found' } })
   })
 
   test('minting needs the password and a label', async () => {
     const { ada } = await withToken()
 
-    expect(await ada.call('tokens.create', { password: 'wrong password!' }, 'Laptop')).toEqual({ ok: false, error: 'proof' })
-    expect(await ada.call('tokens.create', { password: PASSWORD }, '  ')).toEqual({ ok: false, error: 'label' })
-    expect(await ada.call('tokens.create', { password: PASSWORD }, '\n\u202E\u0007')).toEqual({ ok: false, error: 'label' })
+    expect(await ada.call('tokens.create', { password: 'wrong password!' }, 'Laptop')).toMatchObject({ ok: false, error: { code: 'proof' } })
+    expect(await ada.call('tokens.create', { password: PASSWORD }, '  ')).toMatchObject({ ok: false, error: { code: 'label' } })
+    expect(await ada.call('tokens.create', { password: PASSWORD }, '\n\u202E\u0007')).toMatchObject({ ok: false, error: { code: 'label' } })
 
     const minted = await ada.callOk('tokens.create', { password: PASSWORD }, 'Lap\ntop\u202E\u0000')
 
@@ -183,9 +183,9 @@ describe('scoped and expiring tokens', () => {
   test('only declared scopes are given, and an expiry must lie ahead', async () => {
     const { ada } = await withToken()
 
-    expect(await ada.post('/call/tokens.create', [{ password: PASSWORD }, 'Laptop', { scopes: ['admin'] }])).toEqual({ ok: false, error: 'scope' })
-    expect(await ada.call('tokens.create', { password: PASSWORD }, 'Laptop', { scopes: [] })).toEqual({ ok: false, error: 'scope' })
-    expect(await ada.call('tokens.create', { password: PASSWORD }, 'Laptop', { maxAge: '0s' })).toEqual({ ok: false, error: 'expiry' })
+    expect(await ada.post('/call/tokens.create', [{ password: PASSWORD }, 'Laptop', { scopes: ['admin'] }])).toMatchObject({ ok: false, error: { code: 'scope' } })
+    expect(await ada.call('tokens.create', { password: PASSWORD }, 'Laptop', { scopes: [] })).toMatchObject({ ok: false, error: { code: 'scope' } })
+    expect(await ada.call('tokens.create', { password: PASSWORD }, 'Laptop', { maxAge: '0s' })).toMatchObject({ ok: false, error: { code: 'expiry' } })
   })
 
   test('an expired token is refused, and listed as expired', async () => {
@@ -228,15 +228,15 @@ describe('issuing a token from the server', () => {
     const app = testApp()
     const { user } = await app.browser().callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    expect(await app.auth.issueToken('nobody', 'Phone')).toEqual({ ok: false, error: 'not-found' })
-    expect(await app.auth.issueToken(user.id, 'Phone', { token: 'short' })).toEqual({ ok: false, error: 'token' })
-    expect(await app.auth.issueToken(user.id, 'Phone', { token: 'has a space in it, sixteen+' })).toEqual({ ok: false, error: 'token' })
-    expect(await app.auth.issueToken(user.id, ' ')).toEqual({ ok: false, error: 'label' })
-    expect(await app.auth.issueToken(user.id, 'Phone', { maxAge: '0s' })).toEqual({ ok: false, error: 'expiry' })
+    expect(await app.auth.issueToken('nobody', 'Phone')).toMatchObject({ ok: false, error: { code: 'not-found' } })
+    expect(await app.auth.issueToken(user.id, 'Phone', { token: 'short' })).toMatchObject({ ok: false, error: { code: 'token' } })
+    expect(await app.auth.issueToken(user.id, 'Phone', { token: 'has a space in it, sixteen+' })).toMatchObject({ ok: false, error: { code: 'token' } })
+    expect(await app.auth.issueToken(user.id, ' ')).toMatchObject({ ok: false, error: { code: 'label' } })
+    expect(await app.auth.issueToken(user.id, 'Phone', { maxAge: '0s' })).toMatchObject({ ok: false, error: { code: 'expiry' } })
 
     await app.store.users.update(user.id, { bannedAt: new Date() })
 
-    expect(await app.auth.issueToken(user.id, 'Phone')).toEqual({ ok: false, error: 'banned' })
+    expect(await app.auth.issueToken(user.id, 'Phone')).toMatchObject({ ok: false, error: { code: 'banned' } })
   })
 })
 
@@ -339,7 +339,7 @@ describe('token hygiene', () => {
     const { id } = await ada.json('/me') as { id: string }
 
     for (const maxAge of [0, -5, 'forever'] as never[])
-      expect(await auth.issueToken(id, 'Phone', { maxAge })).toEqual({ ok: false, error: 'expiry' })
+      expect(await auth.issueToken(id, 'Phone', { maxAge })).toMatchObject({ ok: false, error: { code: 'expiry' } })
   })
 
   test('an adopted token needs 32 characters of at least 10 kinds, and keeps its own form without the prefix', async () => {
@@ -348,10 +348,10 @@ describe('token hygiene', () => {
     const thirtyOne = 'a'.repeat(31)
     const thirtyTwo = 'abcdefghijklmnopqrstuvwxyz012345'
 
-    expect(await auth.issueToken(id, 'Old', { token: thirtyOne })).toEqual({ ok: false, error: 'token' })
+    expect(await auth.issueToken(id, 'Old', { token: thirtyOne })).toMatchObject({ ok: false, error: { code: 'token' } })
     expect(await auth.issueToken(id, 'Old', { token: thirtyTwo })).toMatchObject({ ok: true, token: thirtyTwo })
     expect(await browser().json('/me', { headers: { authorization: `Bearer ${thirtyTwo}` } })).toMatchObject({ email: 'ada@example.com' })
-    expect(await auth.issueToken(id, 'Old', { token: 'c'.repeat(4097) })).toEqual({ ok: false, error: 'token' })
-    expect(await auth.issueToken(id, 'Old', { token: 'abcabcabc'.repeat(4) })).toEqual({ ok: false, error: 'token' })
+    expect(await auth.issueToken(id, 'Old', { token: 'c'.repeat(4097) })).toMatchObject({ ok: false, error: { code: 'token' } })
+    expect(await auth.issueToken(id, 'Old', { token: 'abcabcabc'.repeat(4) })).toMatchObject({ ok: false, error: { code: 'token' } })
   })
 })

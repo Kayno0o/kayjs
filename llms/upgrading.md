@@ -11,6 +11,10 @@ They resolve `{ ok: true }` where they resolved `{}`, and `{ ok: false, error, i
 ### `resource()` asks its route while the page renders
 
 An island's `resource(api, '/path')` is now asked in process, as the visitor, while the server renders the page, and the island hydrates `ready` instead of rendering `loading` and asking from the browser. A route whose read must happen in the browser, because reading it records something or admits the reader as the cms editor's entry read does, takes `{ seed: false }` to keep the old behaviour: [read a route's answer in an island](api-from-islands.md#read-a-routes-answer-in-an-island).
+### kayjs-auth results carry `error` as an `ErrorShape`, the kind is `error.code`
+
+Every failed kayjs-auth result is `{ ok: false, error }` with `error` the `ErrorShape` the rest of kay answers (`status`, `message`, `errors`, `data`) and the kind in `error.code`, where `error` was the kind string: `result.error === 'limited'` is `result.error.code === 'limited'`, `switch (result.error)` is `switch (result.error.code)`, and `ctx.fail(400, { error: result.error })` is `{ error: result.error.code }` to keep passing the word to a form. A call that refused its input (`errors` by field) puts `error` beside `errors`, with `error.code` `'invalid'`; `'errors' in result` still tells them apart. `deprecated-auth-error` finds the comparisons where `kay check` types the result as an auth one and `kay upgrade` rewrites them; a result stored or passed on untyped, and a form's `failed()?.data?.error` string, are left to you. The old form does not keep working, as the string and the object cannot share `error`. A test comparing a whole result, `toEqual({ ok: false, error: 'limited' })`, matches `{ ok: false, error: { code: 'limited' } }` with `toMatchObject`, as `error` also carries `status` and `message`.
+
 ### kay `QueuedJob.runAt` is a `Date`
 
 The jobs `jobs(queue)` follows in an island carry `runAt` as a `Date` where they carried milliseconds: read `job.runAt.getTime()` for the number. The `JobStore` interface keeps milliseconds. No lint can see it: a type changing under a property is not visible to `kay check`.

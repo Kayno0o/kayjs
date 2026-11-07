@@ -19,7 +19,7 @@ export const password = action(schemas.signIn, async (input, ctx) => {
   const result = await ctx.locals.auth.password.signIn({ identifier: input.identifier, password: input.password }, { remember: remembered(ctx.locals.auth.features(), input.remember), redirect: input.redirect, captcha: captchaOf(input) })
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error === 'invalid' ? 'credentials' : refusedFor(result.error, input) })
+    return ctx.fail(400, { error: result.error.code === 'invalid' ? 'credentials' : refusedFor(result.error.code, input) })
 
   return ctx.redirect(localize(result.redirect))
 }, guarded)
@@ -27,14 +27,14 @@ export const password = action(schemas.signIn, async (input, ctx) => {
 export const magicLink = action(schemas.magicLink, async (input, ctx) => {
   const result = await ctx.locals.auth.magicLink.request(input.email, { redirect: input.redirect, captcha: captchaOf(input), remember: remembered(ctx.locals.auth.features(), input.remember) })
 
-  return result.ok ? input.email : ctx.fail(400, { error: refusedFor(result.error, input) })
+  return result.ok ? input.email : ctx.fail(400, { error: refusedFor(result.error.code, input) })
 }, guarded)
 
 export const emailCode = action(schemas.emailCode, async ({ code }, ctx) => {
   const result = await ctx.locals.auth.magicLink.signInWithCode(code)
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
+    return ctx.fail(400, { error: result.error.code === 'invalid' ? 'code' : result.error.code })
 
   return ctx.redirect(localize(result.redirect))
 })
@@ -44,7 +44,7 @@ export const passkeyOptions = action(async ctx => ctx.locals.auth.features().pas
 export const passkey = action(schemas.passkey, async (input, ctx) => {
   const result = await ctx.locals.auth.passkeys.signIn(input.response, { redirect: input.redirect, remember: remembered(ctx.locals.auth.features(), input.remember) })
 
-  return !result.ok ? ctx.fail(400, { error: result.error }) : ctx.redirect(localize(result.redirect))
+  return !result.ok ? ctx.fail(400, { error: result.error.code }) : ctx.redirect(localize(result.redirect))
 })
 
 const auth = ctx.locals.auth

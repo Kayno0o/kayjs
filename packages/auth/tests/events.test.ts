@@ -286,8 +286,8 @@ describe('impersonation', () => {
 
     await root.call('admin.impersonate', user.id)
 
-    expect(await root.call('organizations.delete', membership.organization.id)).toEqual({ ok: false, error: 'impersonating' })
-    expect(await root.call('account.export')).toEqual({ ok: false, error: 'impersonating' })
+    expect(await root.call('organizations.delete', membership.organization.id)).toMatchObject({ ok: false, error: { code: 'impersonating' } })
+    expect(await root.call('account.export')).toMatchObject({ ok: false, error: { code: 'impersonating' } })
     expect((await root.fetch('/auth/export')).status).toBe(403)
     expect(await ada.call('organizations.get', membership.organization.id)).toMatchObject({ organization: { name: 'Acme' } })
   })

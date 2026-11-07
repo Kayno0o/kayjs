@@ -1,8 +1,10 @@
+import type { AuthFailed } from './failure'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import type { AuthenticationResponseJSON } from './webauthn'
 import { comparePasswords } from '@kaynooo/utils'
 import { backOf, banned, withBack } from './core'
+import { failed } from './failure'
 import { forget, spend } from './limits'
 
 const CHALLENGE_MAX_AGE_MS = 10 * 60 * 1000
@@ -21,7 +23,7 @@ export interface Proof {
 // `proof` when the proof was wrong or missing; `stale` when the account has neither a password nor a second factor and was signed into too long ago, so the user signs in again first; `impersonating` when an admin acts as the user, who proves nothing for them.
 export type ProofFailure = 'signed-out' | 'proof' | 'stale' | 'limited' | 'impersonating'
 
-export type ReproveResult = { ok: true } | { ok: false, error: ProofFailure }
+export type ReproveResult = { ok: true } | AuthFailed<ProofFailure>
 
 // What a sign-in waiting for its second factor keeps in the session.
 export interface Challenge {
@@ -34,9 +36,9 @@ export interface Challenge {
 }
 
 // Signs `record` in, or when it has a second factor parks the sign-in until the code, and answers where the browser goes next.
-export async function completeSignIn(state: RequestState, record: UserRecord, redirect: string, method: string, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<{ ok: true, redirect: string } | { ok: false, error: 'banned' }> {
+export async function completeSignIn(state: RequestState, record: UserRecord, redirect: string, method: string, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<{ ok: true, redirect: string } | AuthFailed<'banned'>> {
   if (banned(record))
-    return { ok: false, error: 'banned' }
+    return failed('banned')
 
   if (record.totpEnabledAt === null) {
     await signIn(record, method)
@@ -61,22 +63,22 @@ export async function challenged(state: RequestState): Promise<boolean> {
 
 // The user signed in on a session (never a bearer token), once `proof` re-proves them, so a stolen session alone cannot change what protects the account.
 // With `secondFactor`, an account with 2FA on proves it with a code, password or not, since a password alone must not turn off or replace what stands behind it.
-export async function reprove(state: RequestState, proof: Proof, options: { secondFactor?: boolean } = {}): Promise<{ ok: true, record: UserRecord } | { ok: false, error: ProofFailure }> {
+export async function reprove(state: RequestState, proof: Proof, options: { secondFactor?: boolean } = {}): Promise<{ ok: true, record: UserRecord } | AuthFailed<ProofFailure>> {
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   if ((await state.session.get('auth'))?.impersonator)
-    return { ok: false, error: 'impersonating' }
+    return failed('impersonating')
 
   const twoFactor = record.totpEnabledAt !== null
 
   if (proof.passkey === undefined && record.passwordHash === null && !twoFactor)
-    return await provedLately(state) ? { ok: true, record } : { ok: false, error: 'stale' }
+    return await provedLately(state) ? { ok: true, record } : failed('stale')
 
   if (await spend(state.core.rates, `reprove:${record.id}`, state.core.limits.reprove))
-    return { ok: false, error: 'limited' }
+    return failed('limited')
 
   let proved: boolean
 
@@ -88,7 +90,7 @@ export async function reprove(state: RequestState, proof: Proof, options: { seco
     proved = (await (await import('./twoFactor')).spendSecondFactor(state, record, proof.code ?? '')) !== undefined
 
   if (!proved)
-    return { ok: false, error: 'proof' }
+    return failed('proof')
 
   await forget(state.core.rates, `reprove:${record.id}`, state.core.limits.reprove)
 

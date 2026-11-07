@@ -839,6 +839,15 @@ export const LINTS = {
     wrong: '--- server\nimport { normalizeEmail } from \'@kaynooo/kayjs-auth\'\n\nexport const email = (value: string) => normalizeEmail(value)\n---\np x',
     right: '--- server\nimport { normalizeEmail } from \'@kaynooo/kayjs-auth/rules\'\n\nexport const email = (value: string) => normalizeEmail(value)\n---\np x',
   },
+  'deprecated-auth-error': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.92',
+    typed: true,
+    summary: 'A kayjs-auth result\'s `error` compared with a kind, `result.error === \'limited\'`, `!==`, or a `switch (result.error)` over kinds: since 1.92 `error` is the `ErrorShape` every result carries (`status`, `message`, `errors`, `data`) and the kind is its `code`, so the old comparison is never true. Unlike the other deprecations the old form does not keep working, so TypeScript refuses it too; the lint is found when `kay check` types the result as an auth one, and a comparison of a result it cannot type keeps TypeScript\'s own error. The fix reads `error.code`, and `kay upgrade` applies it.',
+    wrong: '--- server\nimport { action } from \'kay\'\n\nexport const signIn = action(async (_input, ctx) => {\n  const result = await ctx.locals.auth.password.signIn({ identifier: \'ada\', password: \'x\' })\n\n  return !result.ok && result.error === \'limited\' ? ctx.fail(429, {}) : undefined\n})\n---\np x',
+    right: '--- server\nimport { action } from \'kay\'\n\nexport const signIn = action(async (_input, ctx) => {\n  const result = await ctx.locals.auth.password.signIn({ identifier: \'ada\', password: \'x\' })\n\n  return !result.ok && result.error.code === \'limited\' ? ctx.fail(429, {}) : undefined\n})\n---\np x',
+  },
   'deprecated-size-limits': {
     level: 'warn',
     group: 'deprecated',

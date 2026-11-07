@@ -43,7 +43,7 @@ describe('register', () => {
     const { browser, signUps } = setup()
     const result = await browser().post('/register', { email: 'not-an-email', password: 'short', username: 'аlice' })
 
-    expect(result).toEqual({ ok: false, errors: { email: 'invalid', password: 'too-short', username: 'mixed-scripts' } })
+    expect(result).toMatchObject({ ok: false, errors: { email: 'invalid', password: 'too-short', username: 'mixed-scripts' } })
     expect(signUps).toEqual([])
   })
 
@@ -52,8 +52,8 @@ describe('register', () => {
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', username: 'Ada' }))
 
-    expect(await browser().post('/register', { email: 'ADA@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
-    expect(await browser().post('/register', { email: 'bob@example.com', password: PASSWORD, username: 'ada' })).toEqual({ ok: false, errors: { username: 'taken' } })
+    expect(await browser().post('/register', { email: 'ADA@example.com', password: PASSWORD })).toMatchObject({ ok: false, errors: { email: 'taken' } })
+    expect(await browser().post('/register', { email: 'bob@example.com', password: PASSWORD, username: 'ada' })).toMatchObject({ ok: false, errors: { username: 'taken' } })
   })
 })
 
@@ -80,8 +80,8 @@ describe('signInWithPassword', () => {
     const { browser } = await registered()
     const visitor = browser()
 
-    expect(await visitor.post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })).toEqual({ ok: false, error: 'invalid' })
-    expect(await visitor.post('/password', { identifier: 'nobody@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'invalid' })
+    expect(await visitor.post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })).toMatchObject({ ok: false, error: { code: 'invalid' } })
+    expect(await visitor.post('/password', { identifier: 'nobody@example.com', password: PASSWORD })).toMatchObject({ ok: false, error: { code: 'invalid' } })
     expect(await visitor.json('/me')).toBe('anonymous')
   })
 
@@ -90,7 +90,7 @@ describe('signInWithPassword', () => {
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
 
-    expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'invalid' })
+    expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
 
   test('stops an account after its failed attempts, even with the right password, and a success clears them', async () => {
@@ -103,23 +103,23 @@ describe('signInWithPassword', () => {
     await visitor.post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })
     await visitor.post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })
 
-    expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'limited' })
+    expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: false, error: { code: 'limited' } })
   })
 
   test('counts an account once however it is named, by its email or by its name in any case', async () => {
     const { browser } = await registered({ rateLimit: { signInAccount: { max: 3, window: '900s' } } })
 
     for (const identifier of ['ada@example.com', 'Ada', 'ADA'])
-      expect(await browser().post('/password', { identifier, password: 'wrong password!' })).toEqual({ ok: false, error: 'invalid' })
+      expect(await browser().post('/password', { identifier, password: 'wrong password!' })).toMatchObject({ ok: false, error: { code: 'invalid' } })
 
-    expect(await browser().post('/password', { identifier: 'ada', password: PASSWORD })).toEqual({ ok: false, error: 'limited' })
+    expect(await browser().post('/password', { identifier: 'ada', password: PASSWORD })).toMatchObject({ ok: false, error: { code: 'limited' } })
   })
 
   test('counts a burst of parallel guesses before any password is checked', async () => {
     const { browser } = await registered({ rateLimit: { signInAccount: { max: 2, window: '900s' } } })
     const answers = await Promise.all(Array.from({ length: 6 }, async () => browser().post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })))
 
-    expect(answers.filter(answer => typeof answer === 'object' && answer !== null && 'error' in answer && answer.error === 'invalid')).toHaveLength(2)
+    expect(answers.filter(answer => typeof answer === 'object' && answer !== null && 'error' in answer && (answer.error as { code?: string }).code === 'invalid')).toHaveLength(2)
   })
 
   test('counts each client apart, as kay reads its address', async () => {
@@ -127,7 +127,7 @@ describe('signInWithPassword', () => {
     const from = (address: string) => ({ method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': address }, body: JSON.stringify({ identifier: 'ada@example.com', password: PASSWORD }) })
 
     expect(await browser().json('/password', from('10.0.0.1'))).toMatchObject({ ok: true })
-    expect(await browser().json('/password', from('10.0.0.1'))).toEqual({ ok: false, error: 'limited' })
+    expect(await browser().json('/password', from('10.0.0.1'))).toMatchObject({ ok: false, error: { code: 'limited' } })
     expect(await browser().json('/password', from('10.0.0.2'))).toMatchObject({ ok: true })
   })
 
@@ -143,6 +143,6 @@ describe('signInWithPassword', () => {
   test('refuses a password past the longest allowed', async () => {
     const { browser } = await registered()
 
-    expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'x'.repeat(10_000) })).toEqual({ ok: false, error: 'invalid' })
+    expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'x'.repeat(10_000) })).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
 })

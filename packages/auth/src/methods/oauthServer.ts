@@ -2,6 +2,7 @@ import type { ApprovedClient, RevokeGrantResult } from '../authorize/grants'
 import type { AuthorizeOutcome, AuthorizeParams, DecideResult } from '../authorize/request'
 import type { RequestState } from '../state'
 import { siteRoot } from '../authorize/metadata'
+import { failed } from '../failure'
 import { load } from '../load'
 
 // `auth.oauthServer`: the consent page MCP clients send the user to, and the apps they approved.
@@ -15,7 +16,7 @@ export class OAuthServerMethods {
 
   // The user's answer on the consent page, checked again as the request is: where the browser goes next.
   async decide(fields: AuthorizeParams, allow: boolean): Promise<DecideResult> {
-    return this.state.core.oauthServer ? (await load.request()).decide(this.state, fields, allow, siteRoot(this.state.core, this.request)) : { ok: false, error: 'client' }
+    return this.state.core.oauthServer ? (await load.request()).decide(this.state, fields, allow, siteRoot(this.state.core, this.request)) : failed('client')
   }
 
   // The apps the signed-in user approved to act as them.

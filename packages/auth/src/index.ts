@@ -17,6 +17,7 @@ export type { ChangeEmailResult, CodedLink, CodeMode, CodeResult, EmailOptions, 
 export type { DeletionImpact } from './erase'
 export type { ActivityEvent, AuditEntry, AuthEvent, AuthEventInfo, EventContext, EventFields } from './events'
 export type { DataExport, ExportResult } from './export'
+export type { AuthFailed, AuthFailure, AuthRejected } from './failure'
 export * from './gate'
 export { authGuard } from './guard'
 export type { GuardOptions } from './guard'

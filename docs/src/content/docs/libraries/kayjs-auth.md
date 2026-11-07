@@ -253,7 +253,7 @@ authCore({
 
 `check` returns a problem code or a message, and the prebuilt pages show it as it is. Registering, resetting, changing a password and `admin.createUser` all follow the rules, and so do the pages' hints. An island checks before posting with the same values: `passwordProblem(value, auth.features().rules)` from `@kaynooo/kayjs-auth/rules`, the only entry exporting the rules, with `features().rules` passed down as a prop. A password longer than a ceiling you lowered later can still sign in.
 
-Methods that can fail answer `{ ok: true, ... }` or `{ ok: false, error }`, with codes such as `'invalid'` or `'limited'`. Your page words them.
+Methods that can fail answer `{ ok: true, ... }` or `{ ok: false, error }`. `error` is the same `ErrorShape` (`status`, `message`, `errors`, `data`) every result in kay carries, and its `code` is the kind, such as `'invalid'` or `'limited'`, which your page words. Compare `result.error.code`, not `result.error`.
 
 ```kay
 --- server
@@ -266,7 +266,7 @@ export const signIn = action(s.Object({
   const result = await ctx.locals.auth.password.signIn(input)
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error })
+    return ctx.fail(400, { error: result.error.code })
 
   return ctx.redirect(result.redirect)
 })
@@ -277,7 +277,7 @@ form(action={signIn})
   button Sign in
 ```
 
-`password.register({ email, password, username })` creates an account the same way, answering `errors` by field.
+`password.register({ email, password, username })` creates an account the same way, answering `errors` by field, next to `error` with the code `'invalid'`.
 
 Every way of signing in takes what is not a credential in one trailing options object: `password.signIn(input, { redirect, remember, captcha })`, `password.register(input, { redirect, remember, captcha })`, `magicLink.request(email, { redirect, remember, captcha })`, `password.requestReset(email, { redirect, captcha })` and `passkeys.signIn(response, { redirect, remember })`. A `redirect` that is not a path of the site leads home.
 
@@ -311,7 +311,7 @@ An account registered and never verified goes the same way, 30 days after it was
 
 A guest costs nothing to make, so kayjs-auth does not name it to other libraries: kayjs-ai's limits count a guest by address, and a signed-in user by id.
 
-`signUp: false` in `authCore` closes self-service accounts. `password.register` and `signInAsGuest` answer `{ ok: false, error: 'off' }`, as any switched-off feature does. Make users yourself with `auth.admin.createUser({ email, password, roles })`, or the first one from the terminal:
+`signUp: false` in `authCore` closes self-service accounts. `password.register` and `signInAsGuest` answer `{ ok: false, error: { code: 'off' } }`, as any switched-off feature does. Make users yourself with `auth.admin.createUser({ email, password, roles })`, or the first one from the terminal:
 
 ```sh
 kay auth create-user ada@example.com --role admin
@@ -357,7 +357,7 @@ export const enable = action(s.Object({ code: s.String({ maxLength: 20 }) }), as
   const result = await ctx.locals.auth.twoFactor.enable(code)
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error })
+    return ctx.fail(400, { error: result.error.code })
 
   return { recoveryCodes: result.recoveryCodes }
 })
@@ -386,7 +386,7 @@ if (result.ok)
 
 Control characters are removed from a token's label and from a passkey's name.
 
-`tokens.list()` lists the user's tokens and `tokens.revoke(id)` revokes one and answers `{ ok }`, `{ ok: false, error: 'not-found' }` for a token that is not theirs. A password change, a reset and `signOutEverywhere` end them all. Both need a browser session: a token cannot list or revoke tokens, nor turn on two-factor. Anything that asks for your password or a code first, such as changing two-factor, passkeys, the password or deleting the account, needs a browser session as well.
+`tokens.list()` lists the user's tokens and `tokens.revoke(id)` revokes one and answers `{ ok }`, `{ ok: false, error: { code: 'not-found' } }` for a token that is not theirs. A password change, a reset and `signOutEverywhere` end them all. Both need a browser session: a token cannot list or revoke tokens, nor turn on two-factor. Anything that asks for your password or a code first, such as changing two-factor, passkeys, the password or deleting the account, needs a browser session as well.
 
 For a flow you gate yourself, such as pairing a device, `auth.issueToken(userId, label)` makes a token on the server with no proof, on the same terms. Its `token` option adopts one you handed out before, at least 32 characters long with at least 10 distinct ones. An adopted token expires after 90 days too, so pass `maxAge: null` to keep an old device working. Only `null` means never: do not forward a client's value into `maxAge` unchecked.
 
@@ -419,7 +419,7 @@ A page of your own calls `auth.account.profile(locale)` and `auth.account.savePr
 
 `auth({ password: false, passkeys: false, magicLink: false, twoFactor: false })` turns a feature off, and `authCore` takes the same four keys. Each is on by default wherever it works today, so `false` is the only value to write, and `twoFactor` also takes `{ require }`. Writing `true` works until 1.93 and `kay upgrade` drops it. The same holds for `signUp`, and for `pages` of `auth()`.
 
-A feature that is off is gone from the prebuilt pages: no password form, no mail form for sign-in links, no passkey button, no two-step section on the account page, and the register and password reset pages answer 404. Its methods answer `{ ok: false, error: 'off' }`, and `auth.features()` says `false` for it, so your own pages can follow.
+A feature that is off is gone from the prebuilt pages: no password form, no mail form for sign-in links, no passkey button, no two-step section on the account page, and the register and password reset pages answer 404. Its methods answer `{ ok: false, error: { code: 'off' } }`, and `auth.features()` says `false` for it, so your own pages can follow.
 
 `'off'` is the word for any feature the app switched off. `'unavailable'` is for a feature that is on but lacks what it needs, such as mail, and `'not-enabled'` for a user who has not turned two-factor on.
 
@@ -429,7 +429,7 @@ To make it a must, give `twoFactor: { require: ['admin'] }`, which takes what a 
 
 A user it names who has not turned it on is sent to the security page by `authGuard()` and `requireAdmin()`, and comes back once it is on. Anything that is not a page gets a 403, and a gate only ever answers 403.
 
-Every `auth.admin` method answers `{ ok: false, error: 'two-factor-required' }`, and OAuth consent answers `access_denied`. The security page and the second-factor page are never held back, and `securityPage` names your own.
+Every `auth.admin` method answers `{ ok: false, error: { code: 'two-factor-required' } }`, and OAuth consent answers `access_denied`. The security page and the second-factor page are never held back, and `securityPage` names your own.
 
 A passkey sign-in counts as two factors, a password or OAuth session does not. An admin acting as a user is not asked. A predicate that throws fails the request with a 500. In production kayjs-auth warns at boot when `admin` is on and nothing requires it.
 
@@ -457,7 +457,7 @@ An action takes that answer with `passkeyAssertion` for a sign-in, a second fact
 
 Registering, password resets and magic links ask for a proof of work by default, and a password sign-in from the third attempt. The browser hashes for some tens of milliseconds before the request goes through, with no third party and no cookie.
 
-The prebuilt pages carry it. Your own form carries `captchaChallenge` in a `data-kay-work` field, and your action passes its solution on as `captcha`. `kay check` reports a call to `password.register`, `password.requestReset`, `magicLink.request` or `password.signIn` with no `captcha` option (`missing-captcha`), since without the token it answers `{ ok: false, error: 'captcha' }` and the form fails with no message.
+The prebuilt pages carry it. Your own form carries `captchaChallenge` in a `data-kay-work` field, and your action passes its solution on as `captcha`. `kay check` reports a call to `password.register`, `password.requestReset`, `magicLink.request` or `password.signIn` with no `captcha` option (`missing-captcha`), since without the token it answers `{ ok: false, error: { code: 'captcha' } }` and the form fails with no message.
 
 ```kay
 --- server
@@ -471,7 +471,7 @@ export const register = action(s.Object({
   const result = await ctx.locals.auth.password.register(input, { captcha })
 
   if (!result.ok)
-    return ctx.fail(400, { error: 'error' in result ? result.error : 'invalid' })
+    return ctx.fail(400, { error: result.error.code })
 
   return ctx.redirect('/')
 })
@@ -535,7 +535,7 @@ A deleted user's entries stay, but nothing in them leads back to the person.
 
 ## Admin
 
-`admin: 'admin'` names who may manage users. It takes any requirement a guard takes. Without it, every method below answers `{ ok: false, error: 'forbidden' }`. An admin whom `twoFactor.require` names and who has none answers `two-factor-required`.
+`admin: 'admin'` names who may manage users. It takes any requirement a guard takes. Without it, every method below answers `{ ok: false, error: { code: 'forbidden' } }`. An admin whom `twoFactor.require` names and who has none answers `two-factor-required`.
 
 ```ts
 const found = await auth.admin.listUsers({ search: 'ada', limit: 20 })
@@ -604,7 +604,7 @@ if (made.ok)
 
 `organizations.invite(ref, email, roles?)` mails a link to `invitationPage` with `?invitation=<id>`, or to the prebuilt `/auth/invitation` page when you set none. It needs a mailer. The page reads `organizations.invitation(id)` and posts to an action calling `organizations.acceptInvitation(id)`. Only an account verified at the invited address joins, and only while the member who invited them still manages the organization and holds the roles it gives.
 
-`organizations.myInvitations()` lists those open to the user, and `organizations.rejectInvitation(id)` turns one down and answers `{ ok }`, `{ ok: false, error: 'not-found' }` for one not open to the user. `organizations.invitations(ref)` and `organizations.revokeInvitation(ref, id)` are for managers.
+`organizations.myInvitations()` lists those open to the user, and `organizations.rejectInvitation(id)` turns one down and answers `{ ok }`, `{ ok: false, error: { code: 'not-found' } }` for one not open to the user. `organizations.invitations(ref)` and `organizations.revokeInvitation(ref, id)` are for managers.
 
 `auth.memberOf('admin')` is a requirement met by a member holding that role in the organization the route's `org` param names.
 

@@ -14,7 +14,7 @@ const FIELDS = ['client_id', 'redirect_uri', 'response_type', 'code_challenge', 
 export const decide = action(schemas.oauthConsent, async ({ decision, ...fields }, ctx) => {
   const result = await ctx.locals.auth.oauthServer.decide({ ...fields, scope: fields.scope === '' ? undefined : fields.scope, state: fields.state === '' ? undefined : fields.state, resource: fields.resource === '' ? undefined : fields.resource }, decision === 'allow')
 
-  return result.ok ? ctx.redirect(result.redirect) : ctx.fail(400, { error: result.error })
+  return result.ok ? ctx.redirect(result.redirect) : ctx.fail(400, { error: result.error.code })
 })
 
 const auth = ctx.locals.auth

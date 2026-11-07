@@ -16,7 +16,7 @@ export const verify = action(schemas.verify, async ({ token, password }, ctx) =>
   const result = await ctx.locals.auth.email.verify(token, password)
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error === 'invalid' ? 'link' : result.error })
+    return ctx.fail(400, { error: result.error.code === 'invalid' ? 'link' : result.error.code })
 
   return ctx.redirect(localize(result.redirect))
 })
@@ -25,7 +25,7 @@ export const code = action(schemas.emailCode, async ({ code }, ctx) => {
   const result = await ctx.locals.auth.email.verifyCode(code)
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
+    return ctx.fail(400, { error: result.error.code === 'invalid' ? 'code' : result.error.code })
 
   return ctx.redirect(localize(result.redirect))
 })
@@ -33,7 +33,7 @@ export const code = action(schemas.emailCode, async ({ code }, ctx) => {
 export const resend = action(async (ctx) => {
   const result = await ctx.locals.auth.email.sendVerification()
 
-  return result.ok ? 'sent' : ctx.fail(400, { error: result.error })
+  return result.ok ? 'sent' : ctx.fail(400, { error: result.error.code })
 })
 
 const auth = ctx.locals.auth

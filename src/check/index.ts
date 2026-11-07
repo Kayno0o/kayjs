@@ -13,6 +13,7 @@ import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { pickConfig } from '../config'
+import { authErrorKind } from './auth-error'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { unknownNameHelp } from './export-homes'
 import { generatedProblem } from './generated'
@@ -107,6 +108,25 @@ function helped({ message, help }: CheckDiagnostic): Pick<CheckDiagnostic, 'help
   return found === undefined ? {} : { help: found }
 }
 
+// A comparison of a kayjs-auth result's `error` with a kind, which TypeScript refuses, as the `deprecated-auth-error` lint with its fix; nothing when the lint is allowed, so the type error stays.
+async function authErrorLint(diagnostic: CheckDiagnostic, shadow: ShadowFile | undefined, diagnosed: ReturnType<typeof diagnoseShadow>, levelAt: ReturnType<typeof lintLevels> | undefined, options: CheckOptions): Promise<CheckDiagnostic | undefined> {
+  const code = tsgoCode(diagnostic)
+
+  if ((code !== 2367 && code !== 2678) || !diagnostic.message.includes('AuthFailure<') || (shadow && !diagnosed?.span))
+    return undefined
+
+  const file = shadow?.file ?? diagnostic.file
+  const source = shadow?.source ?? await Bun.file(file).text()
+  const offset = shadow ? diagnosed!.span!.start : offsetAt(source, diagnostic)
+  const level = (levelAt ?? lintLevels(source, options.lints))('deprecated-auth-error', offset)
+  const found = level === 'allow' ? undefined : authErrorKind(file, source, offset, code, diagnostic.message)
+
+  if (found === undefined || level === 'allow')
+    return undefined
+
+  return { file, ...positionAt(source, offset), code: 'deprecated-auth-error', severity: level === 'warn' ? 'warning' : 'error', message: found.message, help: found.help, ...found.fix && { fixes: [found.fix] } }
+}
+
 // The loaded config's `publicEnv` goes along, as no app key: `kay check` claims `/_kay/env.js` when it is set.
 export function configCheckOptions(config: LoadedConfig): CheckOptions {
   const { observe, ...picked } = pickConfig(config, CHECK_CONFIG)
@@ -192,9 +212,9 @@ async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory)
     if (shadow ? !diagnosed : !shownOutsideKay(tsgoCode(diagnostic), projectUnused))
       continue
 
-    const mapped: CheckDiagnostic = shadow && diagnosed
+    const mapped: CheckDiagnostic = await authErrorLint(diagnostic, shadow, diagnosed, shadow ? levelsOf(shadow) : undefined, options) ?? (shadow && diagnosed
       ? { ...diagnostic, file: shadow.file, ...positionAt(shadow.source, diagnosed.span?.start ?? 0), code: diagnosed.code ?? diagnostic.code, severity: diagnosed.severity, message: diagnosed.message, note: diagnosed.note, help: diagnosed.help }
-      : { ...diagnostic, ...helped(diagnostic) }
+      : { ...diagnostic, ...helped(diagnostic) })
     const generated = generatedProblem(root, mapped, types, content)
 
     if (generated)

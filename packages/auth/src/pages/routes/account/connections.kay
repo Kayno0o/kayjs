@@ -15,13 +15,13 @@ export const connect = action(schemas.unlink, async (input, ctx) => {
   const features = auth.features()
   const started = await auth.oauth.link(input.provider, proofOf(input), { redirect: localize(`${features.pages?.prefix ?? features.prefix}/account/connections`) })
 
-  return started.ok ? ctx.redirect(started.url) : ctx.fail(400, { error: started.error, provider: input.provider })
+  return started.ok ? ctx.redirect(started.url) : ctx.fail(400, { error: started.error.code, provider: input.provider })
 })
 
 export const disconnect = action(schemas.unlink, async (input, ctx) => {
   const result = await ctx.locals.auth.oauth.unlink(input.provider, proofOf(input))
 
-  return result.ok ? 'disconnected' : ctx.fail(400, { error: result.error, provider: input.provider })
+  return result.ok ? 'disconnected' : ctx.fail(400, { error: result.error.code, provider: input.provider })
 })
 
 const auth = ctx.locals.auth

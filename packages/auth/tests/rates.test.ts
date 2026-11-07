@@ -43,7 +43,7 @@ describe('where attempts are counted', () => {
     expect(await signIn(browser, PASSWORD)).toMatchObject({ ok: true })
     await signIn(browser, WRONG)
     await signIn(browser, WRONG)
-    expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
+    expect(await signIn(browser, PASSWORD)).toMatchObject({ ok: false, error: { code: 'limited' } })
 
     const keys = hit.mock.calls.map(call => call[0])
 
@@ -62,7 +62,7 @@ describe('where attempts are counted', () => {
 
         await signIn(browser, WRONG)
         await signIn(browser, WRONG)
-        expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
+        expect(await signIn(browser, PASSWORD)).toMatchObject({ ok: false, error: { code: 'limited' } })
       }
 
       expect(warned).not.toHaveBeenCalled()
@@ -102,7 +102,7 @@ describe('a rates store that fails', () => {
       expect(await signIn(browser, PASSWORD)).toMatchObject({ ok: true })
       await signIn(browser, WRONG)
       await signIn(browser, WRONG)
-      expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
+      expect(await signIn(browser, PASSWORD)).toMatchObject({ ok: false, error: { code: 'limited' } })
       expect(warned.mock.calls.filter(call => String(call[0]).includes('kayjs-auth'))).toHaveLength(1)
     }
     finally {
@@ -119,7 +119,7 @@ describe('a rates store that fails', () => {
 
       await signIn(browser, WRONG)
       await signIn(browser, WRONG)
-      expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
+      expect(await signIn(browser, PASSWORD)).toMatchObject({ ok: false, error: { code: 'limited' } })
     }
     finally {
       warned.mockRestore()
@@ -142,7 +142,7 @@ describe('a rates store that fails', () => {
 
       await signIn(browser, WRONG)
       await signIn(browser, WRONG)
-      expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
+      expect(await signIn(browser, PASSWORD)).toMatchObject({ ok: false, error: { code: 'limited' } })
       expect(calls).toBe(1)
     }
     finally {
@@ -197,7 +197,7 @@ describe('two auth instances', () => {
 
       await signIn(first.browser, WRONG)
       await signIn(first.browser, WRONG)
-      expect(await signIn(first.browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
+      expect(await signIn(first.browser, PASSWORD)).toMatchObject({ ok: false, error: { code: 'limited' } })
       expect(await signIn(second.browser, PASSWORD)).toMatchObject({ ok: true })
     }
     finally {
@@ -214,7 +214,7 @@ describe('a bucket of rateLimit', () => {
     for (let n = 0; n < 3; n++)
       answers.push(await app.browser().post('/register', { email: `ada${n}@example.com`, password: PASSWORD }))
 
-    expect(answers[2]).toEqual({ ok: false, error: 'limited' })
+    expect(answers[2]).toMatchObject({ ok: false, error: { code: 'limited' } })
   })
 
   test('counts in the store of its own', async () => {

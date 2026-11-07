@@ -61,7 +61,7 @@ describe('resetting a password', () => {
       await visitor.call('password.reset', 'forged', PASSWORD)
 
     expect(asked.length).toBeLessThanOrEqual(2)
-    expect(await visitor.call('password.reset', 'forged', PASSWORD)).toEqual({ ok: false, error: 'limited' })
+    expect(await visitor.call('password.reset', 'forged', PASSWORD)).toMatchObject({ ok: false, error: { code: 'limited' } })
   })
 
   test('a refused password still leaves the link usable', async () => {
@@ -74,7 +74,7 @@ describe('resetting a password', () => {
     const token = new URL((await take({ kind: 'reset-password' }))[0]!.url!).searchParams.get('token')!
     const visitor = browser()
 
-    expect(await visitor.call('password.reset', token, 'known breached one')).toEqual({ ok: false, errors: { password: 'breached' } })
+    expect(await visitor.call('password.reset', token, 'known breached one')).toMatchObject({ ok: false, errors: { password: 'breached' } })
     expect(await visitor.call('password.reset', token, PASSWORD)).toMatchObject({ ok: true })
   })
 })
@@ -100,7 +100,7 @@ describe('the second factor cap', () => {
     for (let i = 0; i < 7; i++)
       answers.push(await visitor.call('twoFactor.verify', '000000'))
 
-    expect(answers.at(-1)).toEqual({ ok: false, error: 'limited' })
+    expect(answers.at(-1)).toMatchObject({ ok: false, error: { code: 'limited' } })
     // The notice is mailed off the response's path.
     await untilHolds(() => box.mails.some(mail => mail.kind === 'sign-in-locked'))
     expect(box.mails.filter(mail => mail.kind === 'sign-in-locked')).toHaveLength(1)

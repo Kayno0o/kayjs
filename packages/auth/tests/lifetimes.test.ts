@@ -100,7 +100,7 @@ describe('email.maxAge', () => {
     const token = tokenOf(mails.find(mail => mail.kind === 'reset-password')!)
 
     setSystemTime(new Date(Date.now() + 121 * 60 * 1000))
-    expect(await ada.call('password.reset', token, 'a brand new password')).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.call('password.reset', token, 'a brand new password')).toMatchObject({ ok: false, error: { code: 'invalid' } })
     setSystemTime()
     await ada.call('password.requestReset', 'ada@example.com')
     setSystemTime(new Date(Date.now() + 90 * 60 * 1000))
@@ -116,7 +116,7 @@ describe('email.maxAge', () => {
     const mail = mails.find(mail => mail.kind === 'verify-email')!
 
     setSystemTime(new Date(Date.now() + 2 * 60 * 60 * 1000))
-    expect(await ada.call('email.verifyCode', mail.code!)).toEqual({ ok: false, error: 'expired' })
+    expect(await ada.call('email.verifyCode', mail.code!)).toMatchObject({ ok: false, error: { code: 'expired' } })
     setSystemTime(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000))
     expect(await ada.call('email.verify', tokenOf(mail))).toMatchObject({ ok: true })
   })

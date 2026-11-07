@@ -56,7 +56,7 @@ describe('signInWithPassword', () => {
     const { browser } = await setup()
 
     expect(await browser().call('password.signIn', credentials, { redirect: '/account', captcha: 'human' })).toEqual({ ok: true, redirect: '/account' })
-    expect(await browser().call('password.signIn', credentials, { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
+    expect(await browser().call('password.signIn', credentials, { captcha: 'bot' })).toMatchObject({ ok: false, error: { code: 'captcha' } })
     expect(asked).toEqual(['sign-in:human', 'sign-in:bot'])
     expect(await cookieOf(browser(), 'password.signIn', credentials, { remember: true, captcha: 'human' })).toContain(`Max-Age=${90 * DAY}`)
     expect(await cookieOf(browser(), 'password.signIn', credentials, { remember: false, captcha: 'human' })).not.toContain('Max-Age')
@@ -81,7 +81,7 @@ describe('register', () => {
     const { browser } = await setup()
 
     expect(await cookieOf(browser(), 'password.register', { email: 'bob@example.com', password: PASSWORD }, { remember: true, captcha: 'human' })).toContain(`Max-Age=${90 * DAY}`)
-    expect(await browser().call('password.register', { email: 'di@example.com', password: PASSWORD }, { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
+    expect(await browser().call('password.register', { email: 'di@example.com', password: PASSWORD }, { captcha: 'bot' })).toMatchObject({ ok: false, error: { code: 'captcha' } })
   })
 
   test('a remember or captcha in the input is ignored', async () => {
@@ -104,7 +104,7 @@ describe('requestMagicLink', () => {
     const app = await setup()
 
     expect(await redirectOf(app, { redirect: '/account', captcha: 'human' })).toBe('/account')
-    expect(await app.browser().call('magicLink.request', 'ada@example.com', { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
+    expect(await app.browser().call('magicLink.request', 'ada@example.com', { captcha: 'bot' })).toMatchObject({ ok: false, error: { code: 'captcha' } })
 
     const ada = app.browser()
 
@@ -116,7 +116,7 @@ describe('requestMagicLink', () => {
   test('a positional redirect is no redirect', async () => {
     const app = await setup()
 
-    expect(await answer(app.browser(), 'magicLink.request', 'ada@example.com', '/old', { captcha: 'human' })).toEqual({ ok: false, error: 'captcha' })
+    expect(await answer(app.browser(), 'magicLink.request', 'ada@example.com', '/old', { captcha: 'human' })).toMatchObject({ ok: false, error: { code: 'captcha' } })
   })
 
   test.each(HOSTILE)('a redirect of %s leads home', async (hostile) => {

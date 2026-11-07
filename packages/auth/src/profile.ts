@@ -1,9 +1,11 @@
 import type { BareUser } from './core'
+import type { AuthFailed, AuthRejected } from './failure'
 import type { ProfileFieldView, ProfileOptions, ProfileProblem } from './pages'
+import { rejected } from './failure'
 import { profileLabel, profileValue } from './pages'
 import { PROFILE_MAX_LENGTH } from './rules'
 
-export type SaveProfileResult = { ok: true } | { ok: false, error: 'signed-out' } | { ok: false, errors: Record<string, ProfileProblem> }
+export type SaveProfileResult = { ok: true } | AuthFailed<'signed-out'> | AuthRejected<Record<string, ProfileProblem>>
 
 // The fields of the profile form with what `user` holds in each.
 export async function profileFields(profile: ProfileOptions, user: BareUser, locale: string | undefined): Promise<ProfileFieldView[]> {
@@ -13,7 +15,7 @@ export async function profileFields(profile: ProfileOptions, user: BareUser, loc
 }
 
 // The values posted from the form, trimmed and checked against each field's `required` and `maxLength`; nothing is stored while any field is refused.
-export async function saveProfile(profile: ProfileOptions, user: BareUser, values: Record<string, unknown>): Promise<{ ok: true } | { ok: false, errors: Record<string, ProfileProblem> }> {
+export async function saveProfile(profile: ProfileOptions, user: BareUser, values: Record<string, unknown>): Promise<{ ok: true } | AuthRejected<Record<string, ProfileProblem>>> {
   const clean: Record<string, string> = {}
   const errors: Record<string, ProfileProblem> = {}
 
@@ -30,12 +32,12 @@ export async function saveProfile(profile: ProfileOptions, user: BareUser, value
   }
 
   if (Object.keys(errors).length > 0)
-    return { ok: false, errors }
+    return rejected(errors)
 
   const refused = await profile.save(user, clean)
 
   if (!refused)
     return { ok: true }
 
-  return { ok: false, errors: Object.fromEntries(Object.entries(refused.errors).flatMap(([name, message]) => typeof message === 'string' && Object.hasOwn(profile.fields, name) ? [[name, { message }]] : [])) }
+  return rejected(Object.fromEntries(Object.entries(refused.errors).flatMap(([name, message]) => typeof message === 'string' && Object.hasOwn(profile.fields, name) ? [[name, { message }]] : [])))
 }

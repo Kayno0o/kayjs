@@ -72,7 +72,7 @@ describe('registering', () => {
 
     const again = browser()
 
-    expect(await again.post('/password', { identifier: 'ada@example.com', password: PASSWORD, redirect: '/members' })).toEqual({ ok: false, error: 'unverified' })
+    expect(await again.post('/password', { identifier: 'ada@example.com', password: PASSWORD, redirect: '/members' })).toMatchObject({ ok: false, error: { code: 'unverified' } })
     expect(await again.call('email.sendVerification')).toEqual({ ok: true })
     expect(await again.call('email.verify', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/login?redirect=%2Fmembers' })
   })

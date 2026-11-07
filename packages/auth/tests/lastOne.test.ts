@@ -124,7 +124,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
     expect(race.overlapped()).toBe(true)
     expect((await owners()).length).toBeGreaterThanOrEqual(1)
     expect(answers.filter(answer => answer.ok).length).toBe(2 - (await owners()).length)
-    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-owner')).toBe(true)
+    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error.code === 'last-owner')).toBe(true)
   })
 
   test('one owner demoting themselves while the other leaves keeps one owner', async () => {
@@ -138,7 +138,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
 
     expect(race.overlapped()).toBe(true)
     expect((await owners()).length).toBeGreaterThanOrEqual(1)
-    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-owner')).toBe(true)
+    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error.code === 'last-owner')).toBe(true)
   })
 
   test('two owners demoting each other keep one', async () => {
@@ -151,7 +151,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
 
     expect(race.overlapped()).toBe(true)
     expect((await owners()).length).toBeGreaterThanOrEqual(1)
-    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-owner')).toBe(true)
+    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error.code === 'last-owner')).toBe(true)
   })
 
   test('an owner leaving while the other deletes their account keeps the organization owned', async () => {
@@ -190,7 +190,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
 
     expect(race.overlapped()).toBe(true)
     expect(admins.length).toBeGreaterThanOrEqual(1)
-    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-admin')).toBe(true)
+    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error.code === 'last-admin')).toBe(true)
   })
 
   test('two admins deleting their own accounts together keep one', async () => {
@@ -215,7 +215,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
     expect(race.overlapped()).toBe(true)
     expect(remaining.length).toBeGreaterThanOrEqual(1)
     expect(remaining.every(user => user.roles.includes('admin'))).toBe(true)
-    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-admin')).toBe(true)
+    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error.code === 'last-admin')).toBe(true)
   })
 
   test('the two last ways in, unlinked together, leave one', async () => {
@@ -236,7 +236,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
 
     expect(race.overlapped()).toBe(true)
     expect((await app.store.identities.listByUser('u1')).length).toBeGreaterThanOrEqual(1)
-    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-way-in')).toBe(true)
+    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error.code === 'last-way-in')).toBe(true)
   })
 
   test('the last provider and the last passkey, removed together, leave one', async () => {
@@ -255,7 +255,7 @@ describe.each(backends)('%s: requests racing for the last', (_, make) => {
     const answers = await Promise.all([ada.call('oauth.unlink', 'discord', {}), ada.call('passkeys.revoke', 'key', {})])
 
     expect(race.overlapped()).toBe(true)
-    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error === 'last-way-in')).toBe(true)
+    expect(answers.filter(answer => !answer.ok).every(answer => !answer.ok && answer.error.code === 'last-way-in')).toBe(true)
     expect((await app.store.identities.listByUser('u1')).length + (await app.store.passkeys.listByUser('u1')).length).toBeGreaterThanOrEqual(1)
   })
 })
@@ -294,8 +294,8 @@ describe('an undo meeting a store outage', () => {
 
     expect(race.overlapped()).toBe(true)
     expect((await app.store.identities.listByUser('u1')).length).toBe(0)
-    expect(answers.some(answer => answer.status === 'rejected' || (answer.status === 'fulfilled' && !answer.value.ok && answer.value.error !== 'last-way-in'))).toBe(true)
-    expect(answers.every(answer => answer.status === 'fulfilled' && !answer.value.ok && answer.value.error === 'last-way-in')).toBe(false)
+    expect(answers.some(answer => answer.status === 'rejected' || (answer.status === 'fulfilled' && !answer.value.ok && (answer.value.error as { code?: string } | undefined)?.code !== 'last-way-in'))).toBe(true)
+    expect(answers.every(answer => answer.status === 'fulfilled' && !answer.value.ok && (answer.value.error as { code?: string } | undefined)?.code === 'last-way-in')).toBe(false)
   })
 
   test('a failed put-back of the last owner is not answered as last-owner', async () => {
@@ -340,6 +340,6 @@ describe('an undo meeting a store outage', () => {
 
     expect(race.overlapped()).toBe(true)
     expect((await app.store.members!.listByOrganization(org)).length).toBe(0)
-    expect(answers.every(answer => answer.status === 'fulfilled' && !answer.value.ok && answer.value.error === 'last-owner')).toBe(false)
+    expect(answers.every(answer => answer.status === 'fulfilled' && !answer.value.ok && (answer.value.error as { code?: string } | undefined)?.code === 'last-owner')).toBe(false)
   })
 })

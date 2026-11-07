@@ -266,7 +266,7 @@ describe('twoFactor.require in the admin pages', () => {
     const call = admin.browser.call.bind(admin.browser) as (path: string, ...args: unknown[]) => Promise<unknown>
 
     for (const [method, args] of [['listUsers', []], ['getUser', [other.id]], ['grantRole', [other.id, 'editor']], ['revokeRole', [other.id, 'editor']], ['ban', [other.id]], ['unban', [other.id]], ['deleteUser', [other.id]], ['impersonate', [other.id]], ['auditLog', []]] as const)
-      expect(await call(`admin.${method}`, ...args)).toEqual({ ok: false, error: 'two-factor-required' })
+      expect(await call(`admin.${method}`, ...args)).toMatchObject({ ok: false, error: { code: 'two-factor-required' } })
   })
 
   test('the admin methods work once it is on', async () => {

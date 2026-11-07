@@ -1,10 +1,12 @@
 import type { Core } from './core'
+import type { AuthFailed } from './failure'
 import type { OrganizationsCore } from './organizationsCore'
 import type { RequestState } from './state'
 import type { AuthStore, InvitationRecord, MaybePromise, MemberRecord, OrganizationRecord, UserRecord } from './store'
 import { configError } from 'kay/library'
 import { publicUser } from './core'
 import { impersonatorOf, report } from './events'
+import { failed } from './failure'
 import { spend, typedKey } from './limits'
 import { log } from './log'
 import { writing } from './mail'
@@ -50,21 +52,21 @@ export interface Invitation<Role extends string = string> {
 // `not-found` for an organization the user is no member of, so its existence does not leak; `forbidden` for a member whose roles do not reach.
 export type OrganizationFailure = 'signed-out' | 'not-found' | 'forbidden'
 
-export type CreateOrganizationResult<Role extends string = string> = { ok: true, membership: Membership<Role> } | { ok: false, error: 'signed-out' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' | 'limited' }
+export type CreateOrganizationResult<Role extends string = string> = { ok: true, membership: Membership<Role> } | AuthFailed<'signed-out' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' | 'limited'>
 
-export type UpdateOrganizationResult = { ok: true, organization: Organization } | { ok: false, error: OrganizationFailure | 'invalid-name' | 'invalid-slug' | 'slug-taken' }
+export type UpdateOrganizationResult = { ok: true, organization: Organization } | AuthFailed<OrganizationFailure | 'invalid-name' | 'invalid-slug' | 'slug-taken'>
 
 // `last-owner` keeps an organization from being left without one.
-export type MemberResult = { ok: true } | { ok: false, error: OrganizationFailure | 'unknown-role' | 'last-owner' }
+export type MemberResult = { ok: true } | AuthFailed<OrganizationFailure | 'unknown-role' | 'last-owner'>
 
-export type InviteResult<Role extends string = string> = { ok: true, invitation: Invitation<Role> } | { ok: false, error: OrganizationFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable' }
+export type InviteResult<Role extends string = string> = { ok: true, invitation: Invitation<Role> } | AuthFailed<OrganizationFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable'>
 
-export type ListMembersResult<Role extends string = string> = { ok: true, members: AuthMember<Role>[] } | { ok: false, error: OrganizationFailure }
+export type ListMembersResult<Role extends string = string> = { ok: true, members: AuthMember<Role>[] } | AuthFailed<OrganizationFailure>
 
-export type ListInvitationsResult<Role extends string = string> = { ok: true, invitations: Invitation<Role>[] } | { ok: false, error: OrganizationFailure }
+export type ListInvitationsResult<Role extends string = string> = { ok: true, invitations: Invitation<Role>[] } | AuthFailed<OrganizationFailure>
 
 // `wrong-account` when the signed-in user's address is not the one invited, `unverified` while it is but unproven.
-export type AcceptResult<Role extends string = string> = { ok: true, membership: Membership<Role> } | { ok: false, error: 'signed-out' | 'not-found' | 'wrong-account' | 'unverified' | 'member' }
+export type AcceptResult<Role extends string = string> = { ok: true, membership: Membership<Role> } | AuthFailed<'signed-out' | 'not-found' | 'wrong-account' | 'unverified' | 'member'>
 
 interface Stores {
   organizations: NonNullable<AuthStore['organizations']>
@@ -106,25 +108,25 @@ export async function createOrganization(state: RequestState, input: { name: str
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   if (config.create && !(await config.create(publicUser(record))))
-    return { ok: false, error: 'forbidden' }
+    return failed('forbidden')
 
   if (await spend(state.core.rates, `organization:${record.id}`, state.core.limits.organization))
-    return { ok: false, error: 'limited' }
+    return failed('limited')
 
   const name = input.name.trim()
   const slug = slugOf(input.slug)
 
   if (!validName(name))
-    return { ok: false, error: 'invalid-name' }
+    return failed('invalid-name')
 
   if (slug !== null && !validSlug(slug))
-    return { ok: false, error: 'invalid-slug' }
+    return failed('invalid-slug')
 
   if (slug !== null && await store.organizations.findBySlug(slug))
-    return { ok: false, error: 'slug-taken' }
+    return failed('slug-taken')
 
   const organization: OrganizationRecord = { id: crypto.randomUUID(), name, slug, createdAt: new Date() }
   const member: MemberRecord = { organizationId: organization.id, userId: record.id, roles: [config.owner], createdAt: organization.createdAt }
@@ -134,7 +136,7 @@ export async function createOrganization(state: RequestState, input: { name: str
   }
   // Taken between the check and the write.
   catch {
-    return { ok: false, error: 'slug-taken' }
+    return failed('slug-taken')
   }
 
   await store.members.add(member)
@@ -183,13 +185,13 @@ export async function updateOrganization(state: RequestState, ref: string, patch
   const slug = patch.slug === undefined ? undefined : slugOf(patch.slug)
 
   if (name !== undefined && !validName(name))
-    return { ok: false, error: 'invalid-name' }
+    return failed('invalid-name')
 
   if (slug != null && !validSlug(slug))
-    return { ok: false, error: 'invalid-slug' }
+    return failed('invalid-slug')
 
   if (slug != null && slug !== found.organization.slug && await store.organizations.findBySlug(slug))
-    return { ok: false, error: 'slug-taken' }
+    return failed('slug-taken')
 
   let updated: OrganizationRecord | undefined
 
@@ -201,15 +203,15 @@ export async function updateOrganization(state: RequestState, ref: string, patch
     const holder = slug == null ? undefined : await store.organizations.findBySlug(slug)
 
     if (holder && holder.id !== found.organization.id)
-      return { ok: false, error: 'slug-taken' }
+      return failed('slug-taken')
 
     throw error
   }
 
-  return updated ? { ok: true, organization: publicOrganization(updated) } : { ok: false, error: 'not-found' }
+  return updated ? { ok: true, organization: publicOrganization(updated) } : failed('not-found')
 }
 
-export type DeleteOrganizationResult = { ok: true } | { ok: false, error: OrganizationFailure | 'impersonating' }
+export type DeleteOrganizationResult = { ok: true } | AuthFailed<OrganizationFailure | 'impersonating'>
 
 // Owners only, from a session: every membership and invitation goes with it. Never for an admin acting as the owner, as it cannot be undone.
 export async function deleteOrganization(state: RequestState, ref: string): Promise<DeleteOrganizationResult> {
@@ -220,7 +222,7 @@ export async function deleteOrganization(state: RequestState, ref: string): Prom
     return found
 
   if (await impersonatorOf(state) !== undefined)
-    return { ok: false, error: 'impersonating' }
+    return failed('impersonating')
 
   await store.organizations.delete(found.organization.id)
   await report(state, found.record, 'organization-deleted', found.organization.id)
@@ -260,23 +262,23 @@ export async function setMemberRoles(state: RequestState, ref: string, userId: s
     return found
 
   if (roles.some(role => !config.roles.has(role)))
-    return { ok: false, error: 'unknown-role' }
+    return failed('unknown-role')
 
   const target = await store.members.get(found.organization.id, userId)
 
   if (!target)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   if (!reaches(config, found.member.roles, [...target.roles, ...roles]))
-    return { ok: false, error: 'forbidden' }
+    return failed('forbidden')
 
   if (target.roles.includes(config.owner) && !roles.includes(config.owner) && await lastOwner(config, store, found.organization.id))
-    return { ok: false, error: 'last-owner' }
+    return failed('last-owner')
 
   await store.members.update(found.organization.id, userId, { roles: [...new Set(roles)] })
 
   if (target.roles.includes(config.owner) && !roles.includes(config.owner) && !await ownerKept(config, store, found.organization.id, async () => store.members.update(found.organization.id, userId, { roles: target.roles })))
-    return { ok: false, error: 'last-owner' }
+    return failed('last-owner')
 
   await reportOn(state, userId, 'member-roles-changed', `${found.organization.id} ${roles.join(' ')}`, found.record)
 
@@ -295,18 +297,18 @@ export async function removeMember(state: RequestState, ref: string, userId: str
   const target = self ? found.member : await store.members.get(found.organization.id, userId)
 
   if (!target)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   if (!self && !reaches(config, found.member.roles, target.roles))
-    return { ok: false, error: 'forbidden' }
+    return failed('forbidden')
 
   if (target.roles.includes(config.owner) && await lastOwner(config, store, found.organization.id))
-    return { ok: false, error: 'last-owner' }
+    return failed('last-owner')
 
   await store.members.delete(found.organization.id, userId)
 
   if (target.roles.includes(config.owner) && !await ownerKept(config, store, found.organization.id, async () => store.members.add(target)))
-    return { ok: false, error: 'last-owner' }
+    return failed('last-owner')
 
   if (self)
     await report(state, found.record, 'member-left', found.organization.id)
@@ -332,35 +334,35 @@ export async function invite(state: RequestState, ref: string, email: string, ro
 
   // The mail goes out from the site's domain in the inviter's words, the organization's name: only someone who proved an address of their own may send it.
   if (found.record.emailVerifiedAt === null)
-    return { ok: false, error: 'unverified' }
+    return failed('unverified')
 
   const given = roles ?? config.defaultRoles
 
   if (given.some(role => !config.roles.has(role)))
-    return { ok: false, error: 'unknown-role' }
+    return failed('unknown-role')
 
   if (!reaches(config, found.member.roles, given))
-    return { ok: false, error: 'forbidden' }
+    return failed('forbidden')
 
   if (emailProblem(email))
-    return { ok: false, error: 'invalid-email' }
+    return failed('invalid-email')
 
   const mail = core.email
 
   const page = invitationPageOf(core)
 
   if (!mail || page === undefined)
-    return { ok: false, error: 'unavailable' }
+    return failed('unavailable')
 
   const address = normalizeEmail(email)
   const invitee = await core.store.users.findByEmail(address)
 
   if (invitee && await store.members.get(found.organization.id, invitee.id))
-    return { ok: false, error: 'member' }
+    return failed('member')
 
   // Each mail goes to an inbox someone else owns, so neither a manager nor many managers together may flood it.
   if (await spend(core.rates, `invite:${found.record.id}`, core.limits.invite) || await spend(core.rates, typedKey(core, 'invite-address', address), core.limits.inviteAddress))
-    return { ok: false, error: 'limited' }
+    return failed('limited')
 
   for (const earlier of await store.invitations.listByOrganization(found.organization.id)) {
     if (earlier.email === address)
@@ -383,7 +385,7 @@ export async function invite(state: RequestState, ref: string, email: string, ro
     log.error('mailing an invitation failed', error)
     await store.invitations.delete(invitation.id)
 
-    return { ok: false, error: 'unavailable' }
+    return failed('unavailable')
   }
 
   return { ok: true, invitation: publicInvitation(invitation, found.organization) }
@@ -400,7 +402,7 @@ export async function listInvitations(state: RequestState, ref: string): Promise
   return { ok: true, invitations: (await standing(config, store, open(await store.invitations.listByOrganization(found.organization.id)))).map(invitation => publicInvitation(invitation, found.organization)) }
 }
 
-export type RevokeInvitationResult = { ok: true } | { ok: false, error: OrganizationFailure }
+export type RevokeInvitationResult = { ok: true } | AuthFailed<OrganizationFailure>
 
 export async function revokeInvitation(state: RequestState, ref: string, invitationId: string): Promise<RevokeInvitationResult> {
   const { config, store } = organizationsOf(state.core)
@@ -412,7 +414,7 @@ export async function revokeInvitation(state: RequestState, ref: string, invitat
   const invitation = await store.invitations.get(invitationId)
 
   if (invitation?.organizationId !== found.organization.id)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   await store.invitations.delete(invitation.id)
 
@@ -479,27 +481,27 @@ export async function acceptInvitation(state: RequestState, invitationId: string
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   const found = await live(store, invitationId)
   const invitation = found && await senderMay(config, store, found) ? found : undefined
   const organization = invitation && await store.organizations.get(invitation.organizationId)
 
   if (!invitation || !organization)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   if (record.email !== invitation.email)
-    return { ok: false, error: 'wrong-account' }
+    return failed('wrong-account')
 
   if (record.emailVerifiedAt === null)
-    return { ok: false, error: 'unverified' }
+    return failed('unverified')
 
   if (await store.members.get(organization.id, record.id))
-    return { ok: false, error: 'member' }
+    return failed('member')
 
   // Deleted first, so of two requests accepting it only one adds the member.
   if (!(await store.invitations.delete(invitation.id)))
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   const member: MemberRecord = { organizationId: organization.id, userId: record.id, roles: invitation.roles, createdAt: new Date() }
 
@@ -509,7 +511,7 @@ export async function acceptInvitation(state: RequestState, invitationId: string
   return { ok: true, membership: membership(organization, member) }
 }
 
-export type RejectInvitationResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+export type RejectInvitationResult = { ok: true } | AuthFailed<'signed-out' | 'not-found'>
 
 // The invited user turns it down; `not-found` when it is not open to them, whoever it was meant for.
 export async function declineInvitation(state: RequestState, invitationId: string): Promise<RejectInvitationResult> {
@@ -517,32 +519,32 @@ export async function declineInvitation(state: RequestState, invitationId: strin
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   const invitation = await live(store, invitationId)
 
   if (record.email == null || record.email === '' || record.emailVerifiedAt === null || invitation?.email !== record.email)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
-  return (await store.invitations.delete(invitation.id)) ? { ok: true } : { ok: false, error: 'not-found' }
+  return (await store.invitations.delete(invitation.id)) ? { ok: true } : failed('not-found')
 }
 
 // The signed-in user's membership of the organization `ref` names, holding `role` there when given; with `session`, a bearer or OAuth token is refused as signed out.
-async function asMember(state: RequestState, ref: string, role?: string, session = false): Promise<{ ok: true, record: UserRecord, organization: OrganizationRecord, member: MemberRecord } | { ok: false, error: OrganizationFailure }> {
+async function asMember(state: RequestState, ref: string, role?: string, session = false): Promise<{ ok: true, record: UserRecord, organization: OrganizationRecord, member: MemberRecord } | AuthFailed<OrganizationFailure>> {
   const { config, store } = organizationsOf(state.core)
   const record = await state.current()
 
   if (!record || (session && state.via() !== 'session'))
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   const organization = await findOrganization(state.core, ref)
   const member = organization && await store.members.get(organization.id, record.id)
 
   if (!organization || !member)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   if (role !== undefined && !config.isGranted(role, member.roles))
-    return { ok: false, error: 'forbidden' }
+    return failed('forbidden')
 
   return { ok: true, record, organization, member }
 }

@@ -5,6 +5,7 @@ import type { Access } from './access'
 import type { CaptchaOptions } from './captcha'
 import type { EmailCore, PendingCode } from './email'
 import type { AuthEventInfo } from './events'
+import type { AuthFailed } from './failure'
 import type { ForwardAuthCore } from './forwardAuth'
 import type { Keys } from './keys'
 import type { ResolvedLimits } from './limits'
@@ -22,6 +23,7 @@ import type { AuthStore, IdentityRecord, UserRecord } from './store'
 import type { Requirement } from './types'
 import type { UserDataRules } from './userData'
 import { localPath } from 'kay'
+import { failed } from './failure'
 
 // A visit or a token use is recorded at most this often, so a busy browser or device does not write on every request.
 export const TOUCH_EVERY_MS = 5 * 60 * 1000
@@ -95,12 +97,9 @@ export interface User<Data extends object = Record<string, unknown>> extends Bar
 }
 
 // What a sign-in or account method answers when its feature is switched off.
-export interface Off {
-  ok: false
-  error: 'off'
-}
+export type Off = AuthFailed<'off'>
 
-export const OFF: Off = Object.freeze({ ok: false, error: 'off' })
+export const OFF: Off = Object.freeze(failed('off'))
 
 // The features `auth({ password, passkeys, magicLink, twoFactor })` switch, on unless set to false.
 export interface Switches {

@@ -36,14 +36,14 @@ describe('credential rules', () => {
 
     const token = new URL(mails.findLast(mail => mail.kind === 'reset-password')!.url!).searchParams.get('token')!
 
-    expect(await ada.call('password.reset', token, 'twelve chars!')).toEqual({ ok: false, errors: { password: 'Add a digit.' } })
-    expect(await ada.call('password.reset', token, 'short1')).toEqual({ ok: false, errors: { password: 'too-short' } })
-    expect(await ada.call('password.change', { password: GOOD }, 'twelve chars!')).toEqual({ ok: false, errors: { password: 'Add a digit.' } })
+    expect(await ada.call('password.reset', token, 'twelve chars!')).toMatchObject({ ok: false, errors: { password: 'Add a digit.' } })
+    expect(await ada.call('password.reset', token, 'short1')).toMatchObject({ ok: false, errors: { password: 'too-short' } })
+    expect(await ada.call('password.change', { password: GOOD }, 'twelve chars!')).toMatchObject({ ok: false, errors: { password: 'Add a digit.' } })
     expect(await ada.call('password.change', { password: GOOD }, 'twelve chars 2')).toEqual({ ok: true })
-    expect(await ada.call('account.changeUsername', 'toolongname')).toEqual({ ok: false, errors: { username: 'length' } })
+    expect(await ada.call('account.changeUsername', 'toolongname')).toMatchObject({ ok: false, errors: { username: 'length' } })
     expect(await ada.call('account.changeUsername', 'Ada')).toMatchObject({ ok: true })
-    expect(await auth.admin.createUser({ email: 'bob@example.com', username: 'Bob', password: 'nodigitsatall' })).toEqual({ ok: false, errors: { password: 'Add a digit.' } })
-    expect(await auth.admin.createUser({ email: 'bob@example.com', username: 'bo', password: GOOD })).toEqual({ ok: false, errors: { username: 'length' } })
+    expect(await auth.admin.createUser({ email: 'bob@example.com', username: 'Bob', password: 'nodigitsatall' })).toMatchObject({ ok: false, errors: { password: 'Add a digit.' } })
+    expect(await auth.admin.createUser({ email: 'bob@example.com', username: 'bo', password: GOOD })).toMatchObject({ ok: false, errors: { username: 'length' } })
     expect(await auth.admin.createUser({ email: 'bob@example.com', username: 'Bob', password: GOOD })).toMatchObject({ ok: true })
   })
 

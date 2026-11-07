@@ -255,8 +255,8 @@ describe('the authorization request', () => {
     const { client_id } = await register(app)
     const ada = await signedIn(app)
 
-    expect(await ada.post('/call/oauthServer.decide', [params(client_id, { redirect_uri: 'http://evil.example/cb' }), true])).toEqual({ ok: false, error: 'redirect_uri' })
-    expect(await app.browser().post('/call/oauthServer.decide', [params(client_id), true])).toEqual({ ok: false, error: 'signed-out' })
+    expect(await ada.post('/call/oauthServer.decide', [params(client_id, { redirect_uri: 'http://evil.example/cb' }), true])).toMatchObject({ ok: false, error: { code: 'redirect_uri' } })
+    expect(await app.browser().post('/call/oauthServer.decide', [params(client_id), true])).toMatchObject({ ok: false, error: { code: 'signed-out' } })
   })
 
   test('a bearer token cannot approve a client', async () => {
@@ -488,7 +488,7 @@ describe('refresh tokens', () => {
 
     expect(await ada.call('oauthServer.clients')).toEqual([expect.objectContaining({ id: client_id, name: 'Claude Code', scopes: ['posts:read'] })])
     expect(await ada.call('oauthServer.revokeGrant', client_id)).toEqual({ ok: true })
-    expect(await ada.call('oauthServer.revokeGrant', client_id)).toEqual({ ok: false, error: 'not-found' })
+    expect(await ada.call('oauthServer.revokeGrant', client_id)).toMatchObject({ ok: false, error: { code: 'not-found' } })
     expect(await ada.call('oauthServer.clients')).toEqual([])
     expect((await token(app, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })).body.error).toBe('invalid_grant')
     expect(await app.browser().json('/me', { headers: { authorization: `Bearer ${first.body.access_token}` } })).toBe('anonymous')

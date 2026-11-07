@@ -6,6 +6,7 @@ import type { SaveProfileResult } from '../profile'
 import type { Proof } from '../proof'
 import type { RequestState } from '../state'
 import { publicUser } from '../core'
+import { failed } from '../failure'
 import { load } from '../load'
 
 // `auth.account`: the signed-in user's own account.
@@ -54,7 +55,7 @@ export class AccountMethods {
 
     // A device's token cannot edit the profile of the account it was given for, as it cannot rename it.
     if (!record || this.state.via() !== 'session')
-      return { ok: false, error: 'signed-out' }
+      return failed('signed-out')
 
     return (await load.profile()).saveProfile(profile, publicUser(record), values)
   }

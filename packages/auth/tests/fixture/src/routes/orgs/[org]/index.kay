@@ -6,7 +6,7 @@ import { action } from 'kay'
 export const rename = action(t.Object({ name: t.String({ maxLength: 100 }) }), async ({ name }, ctx) => {
   const result = await ctx.locals.auth.organizations.update(String(ctx.params.org), { name })
 
-  return result.ok ? result.organization.name : ctx.fail(400, { error: result.error })
+  return result.ok ? result.organization.name : ctx.fail(400, { error: result.error.code })
 })
 
 const membership = (await ctx.locals.auth.organizations.get(ctx.params.org))!

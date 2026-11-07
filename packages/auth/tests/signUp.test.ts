@@ -22,8 +22,8 @@ describe('signUp: false', () => {
     const { browser, signUps, store } = setup({ signUp: false })
     const visitor = browser()
 
-    expect(await visitor.post('/register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'off' })
-    expect(await visitor.call('signInAsGuest')).toEqual({ ok: false, error: 'off' })
+    expect(await visitor.post('/register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: false, error: { code: 'off' } })
+    expect(await visitor.call('signInAsGuest')).toMatchObject({ ok: false, error: { code: 'off' } })
     expect(await visitor.call('features')).toMatchObject({ signUp: false })
     expect((await store.users.list({ offset: 0, limit: 10 })).total).toBe(0)
     expect(signUps).toEqual([])
@@ -67,7 +67,7 @@ describe('createUser', () => {
 
     await auth.admin.createUser({ email: 'ada@example.com', username: 'ada' })
 
-    expect(await auth.admin.createUser({ email: 'ada@example.com', username: 'ADA', password: 'short' })).toEqual({ ok: false, errors: { email: 'taken', username: 'taken', password: 'too-short' } })
+    expect(await auth.admin.createUser({ email: 'ada@example.com', username: 'ADA', password: 'short' })).toMatchObject({ ok: false, errors: { email: 'taken', username: 'taken', password: 'too-short' } })
     expect(await auth.admin.createUser({ email: 'not-an-address' })).toMatchObject({ ok: false, errors: { email: expect.any(String) } })
   })
 
@@ -118,7 +118,7 @@ describe('open password sign-up without a mailer', () => {
 
     await browser().post('/register', { email: 'ada@example.com', password: PASSWORD })
 
-    expect(await browser().post('/register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
+    expect(await browser().post('/register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: false, errors: { email: 'taken' } })
   })
 
   test.each([

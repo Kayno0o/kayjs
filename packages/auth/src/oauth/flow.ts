@@ -1,4 +1,5 @@
 import type { Core, Profile } from '../core'
+import type { AuthFailed } from '../failure'
 import type { Proof, ProofFailure } from '../proof'
 import type { RequestState } from '../state'
 import type { IdentityRecord, UserRecord } from '../store'
@@ -6,6 +7,7 @@ import type { OAuthTokens } from './types'
 import { localPath } from 'kay'
 import { homeOf, linkedUser, newUserRecord, sameText } from '../core'
 import { report } from '../events'
+import { failed } from '../failure'
 import { randomToken } from '../keys'
 import { log } from '../log'
 import { reprove } from '../proof'
@@ -34,7 +36,7 @@ export interface OAuthFlow {
   expires: number
 }
 
-export type LinkProviderResult = { ok: true, url: string } | { ok: false, error: ProofFailure | 'not-found' | 'unavailable' }
+export type LinkProviderResult = { ok: true, url: string } | AuthFailed<ProofFailure | 'not-found' | 'unavailable'>
 
 // The provider's authorize URL for a sign-in, the flow parked in the session; undefined for a provider the app has not configured.
 export async function startOAuth(state: RequestState, provider: string, options: { redirect?: string | undefined, remember?: boolean | undefined }): Promise<string | { error: OAuthFailure } | undefined> {
@@ -61,10 +63,10 @@ export async function startOAuth(state: RequestState, provider: string, options:
 // A linked provider is a way in that outlives every sign-out, so a stolen session alone may not add one, and the second factor proves it when it is on.
 export async function startLink(state: RequestState, provider: string, proof: Proof, redirect: string | undefined): Promise<LinkProviderResult> {
   if (!state.core.oauth.has(provider))
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   if (!(await state.current()) || state.via() !== 'session')
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   const proved = await reprove(state, proof, { secondFactor: true })
 
@@ -73,7 +75,7 @@ export async function startLink(state: RequestState, provider: string, proof: Pr
 
   const url = await leave(state, provider, redirect, proved.record.id)
 
-  return typeof url === 'string' ? { ok: true, url } : { ok: false, error: 'unavailable' }
+  return typeof url === 'string' ? { ok: true, url } : failed('unavailable')
 }
 
 // The flow this session has in progress, unless it ran out.
@@ -208,7 +210,7 @@ export async function finishOAuth(state: RequestState, provider: string, query: 
   if (!done.ok)
     await report(state, record, 'sign-in-failed', 'oauth')
 
-  return done.ok ? { redirect: done.redirect } : { error: done.error, redirect: flow.redirect }
+  return done.ok ? { redirect: done.redirect } : { error: done.error.code, redirect: flow.redirect }
 }
 
 // What else the provider came back with, such as Apple's `user` naming the user on their first sign-in.

@@ -15,7 +15,7 @@ export const create = action(schemas.organization, async ({ name, slug }, ctx) =
   const result = await ctx.locals.auth.organizations.create({ name: name.trim(), ...slug?.trim() && { slug: slug.trim() } })
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error })
+    return ctx.fail(400, { error: result.error.code })
 
   const { organization } = result.membership
 
@@ -27,7 +27,7 @@ export const accept = action(schemas.id, async ({ id }, ctx) => {
   const result = await ctx.locals.auth.organizations.acceptInvitation(id)
 
   if (!result.ok)
-    return ctx.fail(400, { error: result.error })
+    return ctx.fail(400, { error: result.error.code })
 
   const { organization } = result.membership
 
@@ -37,7 +37,7 @@ export const accept = action(schemas.id, async ({ id }, ctx) => {
 export const reject = action(schemas.id, async ({ id }, ctx) => {
   const result = await ctx.locals.auth.organizations.rejectInvitation(id)
 
-  return result.ok ? 'rejected' : ctx.fail(400, { error: result.error })
+  return result.ok ? 'rejected' : ctx.fail(400, { error: result.error.code })
 })
 
 const auth = ctx.locals.auth

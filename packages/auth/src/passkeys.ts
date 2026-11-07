@@ -1,4 +1,5 @@
 import type { Core } from './core'
+import type { AuthFailed } from './failure'
 import type { Proof, ProofFailure } from './proof'
 import type { RequestState } from './state'
 import type { PasskeyRecord, UserRecord } from './store'
@@ -10,6 +11,7 @@ import { configError } from 'kay/library'
 import { banned, homeOf } from './core'
 import { readDevice } from './device'
 import { report } from './events'
+import { failed } from './failure'
 import { secondFactorLimited } from './guesses'
 import { forget, spend, windowOf } from './limits'
 import { reprove } from './proof'
@@ -56,11 +58,11 @@ export interface Passkey {
   lastUsedAt: Date | null
 }
 
-export type PasskeyOptionsResult<Options, Failure extends string = 'signed-out' | 'none' | 'expired' | 'off'> = { ok: true, options: Options } | { ok: false, error: Failure }
+export type PasskeyOptionsResult<Options, Failure extends string = 'signed-out' | 'none' | 'expired' | 'off'> = { ok: true, options: Options } | AuthFailed<Failure>
 
-export type RegisterPasskeyResult = { ok: true, passkey: Passkey } | { ok: false, error: 'signed-out' | 'expired' | 'invalid' }
+export type RegisterPasskeyResult = { ok: true, passkey: Passkey } | AuthFailed<'signed-out' | 'expired' | 'invalid'>
 
-export type PasskeySignInResult = { ok: true, redirect: string } | { ok: false, error: 'expired' | 'invalid' | 'limited' | 'banned' }
+export type PasskeySignInResult = { ok: true, redirect: string } | AuthFailed<'expired' | 'invalid' | 'limited' | 'banned'>
 
 // The options for the browser's `navigator.credentials.create`, through `makePasskey` of `@kaynooo/kayjs-auth/browser`, once `proof` re-proves the user.
 // A passkey is a way in that skips the second factor and outlives every sign-out, so a stolen session alone may not add one, and the second factor proves it when it is on.
@@ -68,7 +70,7 @@ export async function passkeyRegistrationOptions(state: RequestState, proof: Pro
   const relying = relyingParty(state.core)
 
   if (!(await state.current()) || state.via() !== 'session')
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   const proved = await reprove(state, proof, { secondFactor: true })
 
@@ -97,17 +99,17 @@ export async function registerPasskey(state: RequestState, response: Registratio
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   const challenge = await take(state, 'register', record.id)
 
   if (challenge === undefined)
-    return { ok: false, error: 'expired' }
+    return failed('expired')
 
   const credential = await verifyRegistration(response, { challenge, origins: relying.origins, rpId: relying.id, requireUserVerification: true })
 
   if (!credential || await core.store.passkeys.get(credential.id))
-    return { ok: false, error: 'invalid' }
+    return failed('invalid')
 
   const passkey: PasskeyRecord = {
     id: credential.id,
@@ -135,29 +137,29 @@ export async function listPasskeys(state: RequestState): Promise<Passkey[]> {
   return record ? (await state.core.store.passkeys.listByUser(record.id)).map(passkey => publicPasskey(passkey)) : []
 }
 
-export type RenamePasskeyResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' | 'invalid-name' }
+export type RenamePasskeyResult = { ok: true } | AuthFailed<'signed-out' | 'not-found' | 'invalid-name'>
 
 export async function renamePasskey(state: RequestState, id: string, name: string): Promise<RenamePasskeyResult> {
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
-    return { ok: false, error: 'signed-out' }
+    return failed('signed-out')
 
   const passkey = await state.core.store.passkeys.get(id)
   const cleaned = cleanName(name)
 
   if (passkey?.userId !== record.id)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   if (cleaned === undefined)
-    return { ok: false, error: 'invalid-name' }
+    return failed('invalid-name')
 
   await state.core.store.passkeys.update(id, { name: cleaned })
 
   return { ok: true }
 }
 
-export type RevokePasskeyResult = { ok: true } | { ok: false, error: ProofFailure | 'not-found' | 'last-way-in' }
+export type RevokePasskeyResult = { ok: true } | AuthFailed<ProofFailure | 'not-found' | 'last-way-in'>
 
 // Removes one of the signed-in user's passkeys once `proof` re-proves them, unless it is their last way in.
 export async function removePasskey(state: RequestState, id: string, proof: Proof): Promise<RevokePasskeyResult> {
@@ -172,12 +174,12 @@ export async function removePasskey(state: RequestState, id: string, proof: Proo
   const passkey = passkeys.find(entry => entry.id === id)
 
   if (!passkey)
-    return { ok: false, error: 'not-found' }
+    return failed('not-found')
 
   const removed = { passkey }
 
   if (!await hasWayIn(core, record.id, removed))
-    return { ok: false, error: 'last-way-in' }
+    return failed('last-way-in')
 
   await core.store.passkeys.delete(record.id, id)
 
@@ -185,7 +187,7 @@ export async function removePasskey(state: RequestState, id: string, proof: Proo
   if (!await hasWayIn(core, record.id)) {
     await putBack(core, record.id, async () => core.store.passkeys.create(passkey))
 
-    return { ok: false, error: 'last-way-in' }
+    return failed('last-way-in')
   }
 
   await endOtherSessions(state, record)
@@ -208,28 +210,28 @@ export async function signInWithPasskey(state: RequestState, response: Authentic
   const { core } = state
 
   if (await spend(core.rates, `passkey:${state.client}`, core.limits.signIn))
-    return { ok: false, error: 'limited' }
+    return failed('limited')
 
   const challenge = await take(state, 'sign-in', null)
 
   if (challenge === undefined)
-    return { ok: false, error: 'expired' }
+    return failed('expired')
 
   const passkey = await core.store.passkeys.get(response.id)
   const record = passkey && await core.store.users.get(passkey.userId)
 
   // The authenticator names the account it made the passkey for, which must be the one holding it.
   if (!passkey || !record || (response.response.userHandle !== undefined && response.response.userHandle !== userHandle(record.id)))
-    return { ok: false, error: 'invalid' }
+    return failed('invalid')
 
   if (!(await check(core, passkey, response, challenge, true))) {
     await report(state, record, 'sign-in-failed', 'passkey')
 
-    return { ok: false, error: 'invalid' }
+    return failed('invalid')
   }
 
   if (banned(record))
-    return { ok: false, error: 'banned' }
+    return failed('banned')
 
   await signIn(record, 'passkey')
 
@@ -241,7 +243,7 @@ export async function twoFactorPasskeyOptions(state: RequestState): Promise<Pass
   const pending = await state.session.get('authChallenge')
   const record = pending && pending.expires > Date.now() ? await state.core.store.users.get(pending.user) : undefined
 
-  return !record ? { ok: false, error: 'expired' } : userOptions(state, record, 'second-factor')
+  return !record ? failed('expired') : userOptions(state, record, 'second-factor')
 }
 
 // Answers a pending sign-in's second factor with a passkey, in place of an authenticator code.
@@ -251,22 +253,22 @@ export async function verifyTwoFactorPasskey(state: RequestState, response: Auth
   const record = pending && pending.expires > Date.now() ? await store.users.get(pending.user) : undefined
 
   if (!pending || !record || record.sessionVersion !== pending.version)
-    return { ok: false, error: 'expired' }
+    return failed('expired')
 
   if (await secondFactorLimited(state, record))
-    return { ok: false, error: 'limited' }
+    return failed('limited')
 
   const challenge = await take(state, 'second-factor', record.id)
 
   if (challenge === undefined)
-    return { ok: false, error: 'expired' }
+    return failed('expired')
 
   const passkey = await store.passkeys.get(response.id)
 
   if (passkey?.userId !== record.id || !(await check(state.core, passkey, response, challenge, relyingParty(state.core).userVerification === 'required'))) {
     await report(state, record, 'sign-in-failed', 'two-factor')
 
-    return { ok: false, error: 'invalid' }
+    return failed('invalid')
   }
 
   await forget(state.core.rates, `two-factor:${record.id}`, state.core.limits.twoFactorAccount)
@@ -280,10 +282,7 @@ export async function verifyTwoFactorPasskey(state: RequestState, response: Auth
 export async function passkeyProofOptions(state: RequestState): Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>> {
   const record = await state.current()
 
-  if (!record || state.via() !== 'session')
-    return { ok: false, error: 'signed-out' }
-
-  return userOptions(state, record, 'reprove')
+  return !record || state.via() !== 'session' ? failed('signed-out') : userOptions(state, record, 'reprove')
 }
 
 // Whether `response` re-proves `record` with one of their passkeys, against the challenge `passkeys.proofOptions` parked.
@@ -310,7 +309,7 @@ async function userOptions(state: RequestState, record: UserRecord, purpose: 'se
   const passkeys = await state.core.store.passkeys.listByUser(record.id)
 
   if (passkeys.length === 0)
-    return { ok: false, error: 'none' }
+    return failed('none')
 
   const options = authenticationOptions({
     rpId: relyingParty(state.core).id,

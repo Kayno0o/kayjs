@@ -91,7 +91,7 @@ const rows: Row[] = [
   },
   {
     key: 'signIn',
-    answers: { ok: false, error: 'invalid' },
+    answers: { ok: false, error: { code: 'invalid' } },
     per: 'client',
     limit: { max: 2, window: '900s' },
     prepare: async (limits) => {
@@ -102,7 +102,7 @@ const rows: Row[] = [
   },
   {
     key: 'signInAccount',
-    answers: { ok: false, error: 'invalid' },
+    answers: { ok: false, error: { code: 'invalid' } },
     per: 'account',
     prepare: async (limits) => {
       const { browser } = await registered(limits)
@@ -112,7 +112,7 @@ const rows: Row[] = [
   },
   {
     key: 'reprove',
-    answers: { ok: false, error: 'proof' },
+    answers: { ok: false, error: { code: 'proof' } },
     per: 'account',
     prepare: async (limits) => {
       const { ada } = await registered(limits)
@@ -123,7 +123,7 @@ const rows: Row[] = [
   {
     key: 'twoFactor',
     action: 'signing in',
-    answers: { ok: false, error: 'invalid' },
+    answers: { ok: false, error: { code: 'invalid' } },
     per: 'client',
     limit: { max: 2, window: '900s' },
     prepare: async (limits) => {
@@ -135,7 +135,7 @@ const rows: Row[] = [
   {
     key: 'twoFactor',
     action: 'turning on',
-    answers: { ok: false, error: 'invalid' },
+    answers: { ok: false, error: { code: 'invalid' } },
     per: 'client',
     limit: { max: 2, window: '900s' },
     prepare: async (limits) => {
@@ -147,7 +147,7 @@ const rows: Row[] = [
   {
     key: 'twoFactorAccount',
     action: 'turning on',
-    answers: { ok: false, error: 'invalid' },
+    answers: { ok: false, error: { code: 'invalid' } },
     per: 'account',
     prepare: async (limits) => {
       const { ada, secret } = await secondFactor(limits)
@@ -165,7 +165,7 @@ const rows: Row[] = [
   {
     key: 'twoFactorAccount',
     action: 'signing in',
-    answers: { ok: false, error: 'invalid' },
+    answers: { ok: false, error: { code: 'invalid' } },
     per: 'account',
     prepare: async (limits) => {
       const { visitor, secret } = await pendingSignIn(limits)
@@ -182,14 +182,14 @@ const rows: Row[] = [
   },
   {
     key: 'emailCode',
-    answers: { ok: false, error: 'invalid' },
+    answers: { ok: false, error: { code: 'invalid' } },
     per: 'client',
     limit: { max: 2, window: '900s' },
     prepare: guessingCodes,
   },
   {
     key: 'emailCodeAccount',
-    answers: { ok: false, error: 'invalid' },
+    answers: { ok: false, error: { code: 'invalid' } },
     per: 'account',
     limit: { max: 2, window: '900s' },
     prepare: guessingCodes,
@@ -218,7 +218,7 @@ const rows: Row[] = [
   },
   {
     key: 'link',
-    answers: { ok: false, error: 'invalid' },
+    answers: { ok: false, error: { code: 'invalid' } },
     per: 'client',
     limit: { max: 2, window: '3600s' },
     prepare: async (limits) => {
@@ -316,21 +316,21 @@ describe('rate limits', () => {
     for (let n = 1; n <= limit.max; n++)
       expect(await attempt(n)).toMatchObject(row.answers)
 
-    expect(await attempt(limit.max + 1)).toEqual({ ok: false, error: 'limited' })
+    expect(await attempt(limit.max + 1)).toMatchObject({ ok: false, error: { code: 'limited' } })
   })
 })
 
 describe('a list of limits in one bucket', () => {
-  const LIMITED = { ok: false, error: 'limited' } as const
+  const LIMITED = { ok: false, error: { code: 'limited' } } as const
 
   test('the failures ceiling holds in every limit of signInAccountAll, so a right password in between does not escape a longer window', async () => {
     const { ada } = await registered({ signInAccountAll: [{ max: 50, window: '15m' }, { max: 2, window: '1d' }] })
     const signIn = async (password: string) => ada.post('/password', { identifier: 'ada@example.com', password })
 
-    expect(await signIn(WRONG)).not.toEqual(LIMITED)
-    expect(await signIn(PASSWORD)).not.toEqual(LIMITED)
-    expect(await signIn(WRONG)).not.toEqual(LIMITED)
-    expect(await signIn(PASSWORD)).toEqual(LIMITED)
+    expect(await signIn(WRONG)).not.toMatchObject(LIMITED)
+    expect(await signIn(PASSWORD)).not.toMatchObject(LIMITED)
+    expect(await signIn(WRONG)).not.toMatchObject(LIMITED)
+    expect(await signIn(PASSWORD)).toMatchObject(LIMITED)
   })
 
   test('a right password forgets the hard stop in every limit of signInAccount', async () => {
@@ -338,14 +338,14 @@ describe('a list of limits in one bucket', () => {
     const signIn = async (password: string) => ada.post('/password', { identifier: 'ada@example.com', password })
 
     for (const password of [WRONG, PASSWORD, WRONG, PASSWORD])
-      expect(await signIn(password)).not.toEqual(LIMITED)
+      expect(await signIn(password)).not.toMatchObject(LIMITED)
   })
 
   test('the second factor account cap refuses past any limit of the list', async () => {
     const { visitor } = await pendingSignIn({ twoFactorAccount: [{ max: 50, window: '15m' }, { max: 2, window: '15m' }] })
 
-    expect(await visitor.call('twoFactor.verify', '000000')).toEqual({ ok: false, error: 'invalid' })
-    expect(await visitor.call('twoFactor.verify', '000000')).toEqual({ ok: false, error: 'invalid' })
-    expect(await visitor.call('twoFactor.verify', '000000')).toEqual(LIMITED)
+    expect(await visitor.call('twoFactor.verify', '000000')).toMatchObject({ ok: false, error: { code: 'invalid' } })
+    expect(await visitor.call('twoFactor.verify', '000000')).toMatchObject({ ok: false, error: { code: 'invalid' } })
+    expect(await visitor.call('twoFactor.verify', '000000')).toMatchObject(LIMITED)
   })
 })

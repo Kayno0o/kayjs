@@ -284,7 +284,7 @@ describe('the consent page', () => {
     const outcome = await admin.call('oauthServer.authorize', params(body.client_id!)) as { kind: string, url: string }
 
     expect(new URL(outcome.url).searchParams.get('error')).toBe('access_denied')
-    expect(await admin.post('/call/oauthServer.decide', [params(body.client_id!), true])).toEqual({ ok: false, error: 'signed-out' })
+    expect(await admin.post('/call/oauthServer.decide', [params(body.client_id!), true])).toMatchObject({ ok: false, error: { code: 'signed-out' } })
     expect(await app.store.oauth!.grants.listByUser(id)).toEqual([])
   })
 })

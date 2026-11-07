@@ -53,7 +53,7 @@ describe('verifying an email', () => {
 
     await ada.call('email.verify', token)
 
-    expect(await ada.call('email.verify', token)).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.call('email.verify', token)).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
 
   test('another browser verifies the address only given the password, keeping the link until then, and signs no one in', async () => {
@@ -64,8 +64,8 @@ describe('verifying an email', () => {
     const elsewhere = browser()
     const token = tokenOf('verify-email')
 
-    expect(await elsewhere.call('email.verify', token)).toEqual({ ok: false, error: 'confirm' })
-    expect(await elsewhere.call('email.verify', token, 'wrong password!')).toEqual({ ok: false, error: 'confirm' })
+    expect(await elsewhere.call('email.verify', token)).toMatchObject({ ok: false, error: { code: 'confirm' } })
+    expect(await elsewhere.call('email.verify', token, 'wrong password!')).toMatchObject({ ok: false, error: { code: 'confirm' } })
     expect(await ada.json('/me')).toMatchObject({ emailVerified: false })
     expect(await elsewhere.call('email.verify', token, PASSWORD)).toMatchObject({ ok: true })
     expect(await elsewhere.json('/me')).toBe('anonymous')
@@ -78,7 +78,7 @@ describe('verifying an email', () => {
 
     await stranger.call('password.register', { email: 'ada@example.com', password: 'squatter password' })
 
-    expect(await browser().call('email.verify', tokenOf('verify-email'))).toEqual({ ok: false, error: 'confirm' })
+    expect(await browser().call('email.verify', tokenOf('verify-email'))).toMatchObject({ ok: false, error: { code: 'confirm' } })
     expect(await stranger.json('/me')).toMatchObject({ emailVerified: false })
   })
 
@@ -94,7 +94,7 @@ describe('verifying an email', () => {
     await ada.call('magicLink.request', 'ada@example.com')
     await ada.call('magicLink.signIn', tokenOf('magic-link'))
 
-    expect(await stranger.call('email.confirmChange', moving)).toEqual({ ok: false, error: 'invalid' })
+    expect(await stranger.call('email.confirmChange', moving)).toMatchObject({ ok: false, error: { code: 'invalid' } })
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
   })
 
@@ -104,7 +104,7 @@ describe('verifying an email', () => {
 
     expect(await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true, signedIn: false })
     expect(await ada.json('/me')).toBe('anonymous')
-    expect(await ada.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'unverified' })
+    expect(await ada.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: false, error: { code: 'unverified' } })
 
     await ada.call('email.verify', tokenOf('verify-email'))
 
@@ -122,7 +122,7 @@ describe('verifying an email', () => {
     await ada.call('email.verify', tokenOf('verify-email'))
 
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
-    expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'squatter password' })).toEqual({ ok: false, error: 'invalid' })
+    expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'squatter password' })).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
 
   test('with `requireVerified`, an unverified account given roles, as an invited one, is not replaced', async () => {
@@ -239,7 +239,7 @@ describe('verifying an email', () => {
 
     expect(await browser().call('password.register', { email: 'ada@example.com', username: 'ada', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
     expect(await store.users.findByUsername('ada')).toMatchObject({ email: 'ada@example.com' })
-    expect(await browser().call('password.register', { email: 'ada@example.com', username: 'bob', password: PASSWORD })).toEqual({ ok: false, errors: { username: 'taken' } })
+    expect(await browser().call('password.register', { email: 'ada@example.com', username: 'bob', password: PASSWORD })).toMatchObject({ ok: false, errors: { username: 'taken' } })
   })
 
   test('with `requireVerified`, a refused registration leaves the unverified holder in place', async () => {
@@ -282,9 +282,9 @@ describe('verifying an email', () => {
     const first = tokenOf('verify-email')
 
     expect(await ada.call('email.sendVerification')).toEqual({ ok: true })
-    expect(await ada.call('email.verify', first)).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.call('email.verify', first)).toMatchObject({ ok: false, error: { code: 'invalid' } })
     expect(await ada.call('email.verify', tokenOf('verify-email'))).toMatchObject({ ok: true })
-    expect(await ada.call('email.sendVerification')).toEqual({ ok: false, error: 'verified' })
+    expect(await ada.call('email.sendVerification')).toMatchObject({ ok: false, error: { code: 'verified' } })
   })
 
   test('with `requireVerified`, a browser that proved the password is told the address is unverified, and may have the link resent and confirm it', async () => {
@@ -294,9 +294,9 @@ describe('verifying an email', () => {
     const elsewhere = browser()
     const guesser = browser()
 
-    expect(await guesser.post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })).toEqual({ ok: false, error: 'invalid' })
-    expect(await guesser.call('email.sendVerification')).toEqual({ ok: false, error: 'signed-out' })
-    expect(await elsewhere.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'unverified' })
+    expect(await guesser.post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })).toMatchObject({ ok: false, error: { code: 'invalid' } })
+    expect(await guesser.call('email.sendVerification')).toMatchObject({ ok: false, error: { code: 'signed-out' } })
+    expect(await elsewhere.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: false, error: { code: 'unverified' } })
     expect(await elsewhere.call('email.sendVerification')).toEqual({ ok: true })
     expect(mails.filter(mail => mail.kind === 'verify-email')).toHaveLength(2)
     expect(await elsewhere.call('email.verify', tokenOf('verify-email'))).toMatchObject({ ok: true })
@@ -313,13 +313,13 @@ describe('verifying an email', () => {
 
     const answers = [await ada.call('email.sendVerification'), await ada.call('email.sendVerification'), await ada.call('email.sendVerification'), await ada.call('email.sendVerification')]
 
-    expect(answers.at(-1)).toEqual({ ok: false, error: 'limited' })
+    expect(answers.at(-1)).toMatchObject({ ok: false, error: { code: 'limited' } })
 
     // The address registered again replaces the account this browser proved the password of.
     await browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
     const sent = mails.length
 
-    expect(await ada.call('email.sendVerification')).toEqual({ ok: false, error: 'signed-out' })
+    expect(await ada.call('email.sendVerification')).toMatchObject({ ok: false, error: { code: 'signed-out' } })
     expect(mails).toHaveLength(sent)
   })
 
@@ -331,13 +331,13 @@ describe('verifying an email', () => {
     await ada.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
     await ada.post('/sign-out', {})
 
-    expect(await ada.call('email.sendVerification')).toEqual({ ok: false, error: 'signed-out' })
+    expect(await ada.call('email.sendVerification')).toMatchObject({ ok: false, error: { code: 'signed-out' } })
 
     await ada.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
     await store.users.create(userRecord({ id: 'u2', email: 'bob@example.com', emailVerifiedAt: new Date() }))
     await ada.post('/sign-in/u2', {})
 
-    expect(await ada.call('email.sendVerification')).toEqual({ ok: false, error: 'verified' })
+    expect(await ada.call('email.sendVerification')).toMatchObject({ ok: false, error: { code: 'verified' } })
   })
 })
 
@@ -377,7 +377,7 @@ describe('resetting a password', () => {
     await reset.call('password.requestReset', 'ada@example.com')
     const token = tokenOf('reset-password')
 
-    expect(await reset.call('password.reset', token, 'short')).toEqual({ ok: false, errors: { password: 'too-short' } })
+    expect(await reset.call('password.reset', token, 'short')).toMatchObject({ ok: false, errors: { password: 'too-short' } })
     expect(await reset.call('password.reset', token, 'a brand new password')).toMatchObject({ ok: true })
   })
 
@@ -410,7 +410,7 @@ describe('magic links', () => {
 
     expect(await ada.call('magicLink.signIn', token)).toEqual({ ok: true, redirect: '/account' })
     expect(await ada.json('/me')).toMatchObject({ id: 'u1', emailVerified: true })
-    expect(await browser().call('magicLink.signIn', token)).toEqual({ ok: false, error: 'invalid' })
+    expect(await browser().call('magicLink.signIn', token)).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
 
   test('an account a stranger registered with the address goes to its owner clean, the stranger signed out and their password void', async () => {
@@ -427,7 +427,7 @@ describe('magic links', () => {
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com', emailVerified: true, hasPassword: false, twoFactor: false })
     expect(await stranger.json('/me')).toBe('anonymous')
     expect(await browser().json('/me', { headers: { authorization: `Bearer ${minted.token}` } })).toBe('anonymous')
-    expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'squatter password' })).toEqual({ ok: false, error: 'invalid' })
+    expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'squatter password' })).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
 
   test('a passkey the stranger added before the owner claimed the account signs no one in after the claim', async () => {
@@ -447,7 +447,7 @@ describe('magic links', () => {
 
     const signIn = await stranger.call('passkeys.signInOptions')
 
-    expect(await stranger.call('passkeys.signIn', await device.get(signIn))).toEqual({ ok: false, error: 'invalid' })
+    expect(await stranger.call('passkeys.signIn', await device.get(signIn))).toMatchObject({ ok: false, error: { code: 'invalid' } })
     expect(await ada.call('passkeys.list')).toEqual([])
   })
 
@@ -458,7 +458,7 @@ describe('magic links', () => {
     await browser().call('magicLink.request', 'ada@example.com')
     await store.users.update('u1', { email: 'ada@elsewhere.test' })
 
-    expect(await browser().call('magicLink.signIn', tokenOf('magic-link'))).toEqual({ ok: false, error: 'invalid' })
+    expect(await browser().call('magicLink.signIn', tokenOf('magic-link'))).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
 
   test('a token of one kind opens nothing of another', async () => {
@@ -467,7 +467,7 @@ describe('magic links', () => {
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
     await browser().call('password.requestReset', 'ada@example.com')
 
-    expect(await browser().call('magicLink.signIn', tokenOf('reset-password'))).toEqual({ ok: false, error: 'invalid' })
+    expect(await browser().call('magicLink.signIn', tokenOf('reset-password'))).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
 })
 
@@ -493,10 +493,10 @@ describe('changing an email', () => {
     await store.users.create(userRecord({ id: 'u2', email: 'bob@example.com' }))
     await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    expect(await ada.call('email.change', { password: PASSWORD }, 'BOB@example.com')).toEqual({ ok: false, errors: { email: 'taken' } })
-    expect(await ada.call('email.change', { password: PASSWORD }, 'ada@example.com')).toEqual({ ok: false, errors: { email: 'unchanged' } })
-    expect(await ada.call('email.change', { password: 'wrong password!' }, 'ada@new.test')).toEqual({ ok: false, error: 'proof' })
-    expect(await browser().call('email.change', { password: PASSWORD }, 'x@example.com')).toEqual({ ok: false, error: 'signed-out' })
+    expect(await ada.call('email.change', { password: PASSWORD }, 'BOB@example.com')).toMatchObject({ ok: false, errors: { email: 'taken' } })
+    expect(await ada.call('email.change', { password: PASSWORD }, 'ada@example.com')).toMatchObject({ ok: false, errors: { email: 'unchanged' } })
+    expect(await ada.call('email.change', { password: 'wrong password!' }, 'ada@new.test')).toMatchObject({ ok: false, error: { code: 'proof' } })
+    expect(await browser().call('email.change', { password: PASSWORD }, 'x@example.com')).toMatchObject({ ok: false, error: { code: 'signed-out' } })
   })
 
   test('an address taken between the mail and the click is not moved to', async () => {
@@ -507,7 +507,7 @@ describe('changing an email', () => {
     await ada.call('email.change', { password: PASSWORD }, 'ada@new.test')
     await store.users.create(userRecord({ id: 'u2', email: 'ada@new.test' }))
 
-    expect(await ada.call('email.confirmChange', tokenOf('change-email'))).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.call('email.confirmChange', tokenOf('change-email'))).toMatchObject({ ok: false, error: { code: 'invalid' } })
   })
 })
 
@@ -516,5 +516,5 @@ test('an app without a mailer answers that mail is unavailable', async () => {
 
   await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
 
-  expect(await browser().call('password.requestReset', 'ada@example.com')).toEqual({ ok: false, error: 'unavailable' })
+  expect(await browser().call('password.requestReset', 'ada@example.com')).toMatchObject({ ok: false, error: { code: 'unavailable' } })
 })

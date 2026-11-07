@@ -116,7 +116,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
     global[LOG_SINK] = (...args: unknown[]) => logged.push(args)
 
     try {
-      expect(await app.browser().json('/password', from('10.0.0.1', { identifier: 'ada@example.com', password: WRONG }))).toEqual({ ok: false, error: 'invalid' })
+      expect(await app.browser().json('/password', from('10.0.0.1', { identifier: 'ada@example.com', password: WRONG }))).toMatchObject({ ok: false, error: { code: 'invalid' } })
 
       for (let waited = 0; waited < 5000 && logged.length === 0; waited += 10)
         await Bun.sleep(10)

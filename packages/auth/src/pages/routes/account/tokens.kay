@@ -22,7 +22,7 @@ export const create = action(schemas.createToken, async (input, ctx) => {
   // The app's scopes are its own type, which this page cannot name: tokens.create refuses any it does not declare.
   const result = await ctx.locals.auth.tokens.create(proofOf(input), input.label, { scopes: input.scopes?.length ? input.scopes as never[] : undefined, maxAge: expiry(input.days) })
 
-  return result.ok ? result.token : ctx.fail(400, { error: result.error })
+  return result.ok ? result.token : ctx.fail(400, { error: result.error.code })
 })
 
 export const revoke = action(schemas.id, async ({ id }, ctx) => {

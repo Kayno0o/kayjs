@@ -70,13 +70,13 @@ export async function exportRoute({ auth, set, status }: RouteContext, core: Cor
   const exported = await auth.account.export()
 
   if (!exported.ok) {
-    if (exported.error === 'limited')
+    if (exported.error.code === 'limited')
       return status(429, 'Too many exports; try again later')
 
-    if (exported.error === 'impersonating')
+    if (exported.error.code === 'impersonating')
       return status(403, 'Not while acting as the user')
 
-    return exported.error === 'stale' ? status(403, 'Sign in again to continue') : status(401, 'Sign in to continue')
+    return exported.error.code === 'stale' ? status(403, 'Sign in again to continue') : status(401, 'Sign in to continue')
   }
 
   set.headers['content-disposition'] = `attachment; filename="${core.name.replaceAll(UNSAFE_FILE_NAME, '-')}-data.json"`

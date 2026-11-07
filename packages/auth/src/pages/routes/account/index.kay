@@ -11,14 +11,14 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 export const resend = action(async (ctx) => {
   const result = await ctx.locals.auth.email.sendVerification()
 
-  return result.ok ? 'sent' : ctx.fail(400, { error: result.error })
+  return result.ok ? 'sent' : ctx.fail(400, { error: result.error.code })
 })
 
 export const changeEmail = action(schemas.changeEmail, async (input, ctx) => {
   const result = await ctx.locals.auth.email.change(proofOf(input), input.email)
 
   if (!result.ok)
-    return ctx.fail(400, 'errors' in result ? { email: result.errors.email } : { error: result.error })
+    return ctx.fail(400, 'errors' in result ? { email: result.errors.email } : { error: result.error.code })
 
   return input.email
 })
@@ -27,7 +27,7 @@ export const changeUsername = action(schemas.changeUsername, async ({ username }
   const result = await ctx.locals.auth.account.changeUsername(username)
 
   if (!result.ok)
-    return ctx.fail(400, 'errors' in result ? { username: result.errors.username } : { error: result.error })
+    return ctx.fail(400, 'errors' in result ? { username: result.errors.username } : { error: result.error.code })
 
   return 'saved'
 })

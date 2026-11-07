@@ -1,15 +1,13 @@
 [.] AcceptResult
 type AcceptResult<Role extends string = string> = {
   ok: true, membership: Membership<Role>
-} | {
-  ok: false, error: 'signed-out' | 'not-found' | 'wrong-account' | 'unverified' | 'member'
-}
+} | AuthFailed<'signed-out' | 'not-found' | 'wrong-account' | 'unverified' | 'member'>
 
 [.] ActivityEvent
 type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-started' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-changed' | 'oauth-client-approved' | 'oauth-client-revoked'
 
 [.] AdminAuditLogResult
-type AdminAuditLogResult = { ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' | 'two-factor-required' }
+type AdminAuditLogResult = { ok: true, entries: AuditEntry[] } | AuthFailed<'forbidden' | 'two-factor-required'>
 
 [.] AdminChangeFailure
 type AdminChangeFailure = AdminFailure | 'stale'
@@ -345,6 +343,13 @@ interface AuthExtensionOptions extends AuthPagesOptions
   server?: (() => AnyElysia | Promise<AnyElysia>) | false | undefined
   viewer?: boolean | undefined
 
+[.] AuthFailed
+type AuthFailed<Kind extends string = string> = Kind extends string ? { ok: false, error: AuthFailure<Kind> } : never
+
+[.] AuthFailure
+interface AuthFailure<Kind extends string = string> extends ErrorShape
+  code: Kind
+
 [.] AuthFeatures
 interface AuthFeatures
   admin: boolean
@@ -527,6 +532,12 @@ type AuthRateLimit = Omit<RateLimit, 'key'>
 [.] AuthRates
 type AuthRates = RateStore
 
+[.] AuthRejected
+interface AuthRejected<Fields extends object>
+  error: AuthFailure<"invalid">
+  errors: Fields
+  ok: false
+
 [.] AuthRequirement
 type AuthRequirement<Role extends string> = Requirement<BareUser, Role>
 
@@ -677,7 +688,7 @@ interface AuthStore
 }
 
 [.] BanResult
-type BanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'self' | 'admin' | 'until' }
+type BanResult = { ok: true, user: ManagedUser } | AuthFailed<AdminChangeFailure | 'self' | 'admin' | 'until'>
 
 [.] BareUser
 interface BareUser<Data extends object = Record<string, unknown>>
@@ -741,29 +752,13 @@ interface CaptchaWidget
   siteKey: string
 
 [.] ChangeEmailResult
-type ChangeEmailResult = {
-  ok: true
-} | {
-  ok: false, error: ProofFailure | 'unavailable'
-} | {
-  ok: false, errors: {
-    email: EmailProblem | 'taken' | 'unchanged'
-  }
-}
+type ChangeEmailResult = { ok: true } | AuthFailed<ProofFailure | 'unavailable'> | AuthRejected<{ email: EmailProblem | 'taken' | 'unchanged' }>
 
 [.] ChangePasswordResult
-type ChangePasswordResult = { ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem | 'breached' } }
+type ChangePasswordResult = { ok: true } | AuthFailed<ProofFailure> | AuthRejected<{ password: PasswordProblem | 'breached' }>
 
 [.] ChangeUsernameResult
-type ChangeUsernameResult = {
-  ok: true, user: BareUser
-} | {
-  ok: false, error: 'signed-out'
-} | {
-  ok: false, errors: {
-    username: UsernameProblem | 'taken' | 'unchanged'
-  }
-}
+type ChangeUsernameResult = { ok: true, user: BareUser } | AuthFailed<'signed-out'> | AuthRejected<{ username: UsernameProblem | 'taken' | 'unchanged' }>
 
 [.] CodedLink
 type CodedLink = 'magic-link' | 'verify-email'
@@ -772,7 +767,7 @@ type CodedLink = 'magic-link' | 'verify-email'
 type CodeMode = 'link' | 'code' | 'both'
 
 [.] CodeResult
-type CodeResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'expired' | 'limited' | 'banned' }
+type CodeResult = { ok: true, redirect: string } | AuthFailed<'invalid' | 'expired' | 'limited' | 'banned'>
 
 [.] CodeType
 type CodeType = 'sign-in-code' | 'verify-code'
@@ -906,9 +901,7 @@ function createGate<P, G extends string, S extends string = string>(deps: GateDe
 [.] CreateOrganizationResult
 type CreateOrganizationResult<Role extends string = string> = {
   ok: true, membership: Membership<Role>
-} | {
-  ok: false, error: 'signed-out' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' | 'limited'
-}
+} | AuthFailed<'signed-out' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' | 'limited'>
 
 [.] createRoleHierarchy
 function createRoleHierarchy<P, R extends string>(hierarchy: RoleHierarchy<R>, getRoles: (principal: P) => R[]): {
@@ -917,7 +910,7 @@ function createRoleHierarchy<P, R extends string>(hierarchy: RoleHierarchy<R>, g
 }
 
 [.] CreateTokenResult
-type CreateTokenResult = { ok: true, token: string, id: string } | { ok: false, error: ProofFailure | TokenProblem }
+type CreateTokenResult = { ok: true, token: string, id: string } | AuthFailed<ProofFailure | TokenProblem>
 
 [.] CreateUserInput
 interface CreateUserInput
@@ -929,7 +922,7 @@ interface CreateUserInput
   username?: string | undefined
 
 [.] CreateUserResult
-type CreateUserResult = { ok: true, user: BareUser } | { ok: false, errors: RegisterErrors }
+type CreateUserResult = { ok: true, user: BareUser } | AuthRejected<RegisterErrors>
 
 [.] createWsAuthStore
 function createWsAuthStore<T>(verify: (token: string, ws: Ws) => Promise<T | null> | T | null): {
@@ -960,7 +953,7 @@ interface DataExport
 function decide<P, G extends string>(store: GrantStore<P, G>, principal: Principal<P>, requirement: Requirement<P, G>, level: Level, ctx?: PolicyContext): Promise<boolean>
 
 [.] DecideResult
-type DecideResult = { ok: true, redirect: string } | { ok: false, error: 'client' | 'redirect_uri' | 'signed-out' }
+type DecideResult = { ok: true, redirect: string } | AuthFailed<'client' | 'redirect_uri' | 'signed-out'>
 
 [.] DEFAULT_LIMITS
 const DEFAULT_LIMITS: {
@@ -1054,13 +1047,13 @@ const DEFAULT_LIMITS: {
 const defaultTemplates: Templates
 
 [.] DeleteAccountResult
-type DeleteAccountResult = { ok: true } | { ok: false, error: ProofFailure | 'last-admin' | 'last-owner' }
+type DeleteAccountResult = { ok: true } | AuthFailed<ProofFailure | 'last-admin' | 'last-owner'>
 
 [.] DeleteOrganizationResult
-type DeleteOrganizationResult = { ok: true } | { ok: false, error: OrganizationFailure | 'impersonating' }
+type DeleteOrganizationResult = { ok: true } | AuthFailed<OrganizationFailure | 'impersonating'>
 
 [.] DeleteResult
-type DeleteResult = { ok: true } | { ok: false, error: AdminChangeFailure | 'self' | 'admin' }
+type DeleteResult = { ok: true } | AuthFailed<AdminChangeFailure | 'self' | 'admin'>
 
 [.] DeletionImpact
 interface DeletionImpact
@@ -1077,7 +1070,7 @@ interface Device
   os: null | string
 
 [.] DisableTwoFactorResult
-type DisableTwoFactorResult = { ok: true } | { ok: false, error: ProofFailure }
+type DisableTwoFactorResult = { ok: true } | AuthFailed<ProofFailure>
 
 [.] discordProvider
 function discordProvider(opts?: ProviderOptions): OAuthProvider<DiscordRawUser, OAuthUser>
@@ -1095,7 +1088,7 @@ interface EmailOptions
   unverifiedMaxAge?: `${number}d` | `${number}h` | `${number}m` | `${number}ms` | `${number}s` | `${number}w` | undefined
 
 [.] EnableTwoFactorResult
-type EnableTwoFactorResult = { ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited' }
+type EnableTwoFactorResult = { ok: true, recoveryCodes: string[] } | AuthFailed<'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited'>
 
 [.] EventContext
 interface EventContext
@@ -1140,7 +1133,7 @@ interface EventFields
   unbanned: Record<never, never>
 
 [.] ExportResult
-type ExportResult = { ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' | 'impersonating' | 'stale' }
+type ExportResult = { ok: true, data: DataExport } | AuthFailed<'signed-out' | 'limited' | 'impersonating' | 'stale'>
 
 [.] frenchTemplates
 const frenchTemplates: Templates
@@ -1155,7 +1148,7 @@ interface GateDeps<P, G extends string, S extends string = string>
   scopes?: ((ctx: object) => Promise<null | readonly string[]>) | undefined
 
 [.] GetUserResult
-type GetUserResult = { ok: true, user: ManagedUser, admin: boolean } | { ok: false, error: AdminFailure }
+type GetUserResult = { ok: true, user: ManagedUser, admin: boolean } | AuthFailed<AdminFailure>
 
 [.] githubProvider
 function githubProvider(opts?: ProviderOptions): OAuthProvider<GithubRawUser, OAuthUser>
@@ -1183,7 +1176,7 @@ interface GuardOptions
   twoFactor?: true | undefined
 
 [.] GuestSignInResult
-type GuestSignInResult = { ok: true, user: BareUser } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' | 'off' }
+type GuestSignInResult = { ok: true, user: BareUser } | AuthFailed<'limited' | 'captcha' | 'signed-in' | 'off'>
 
 [.] hcaptcha
 function hcaptcha(secret: string): (token: string, action: CaptchaAction, context?: CaptchaContext | undefined) => Promise<boolean> | boolean
@@ -1202,7 +1195,7 @@ interface IdentityRecord
   userId: string
 
 [.] ImpersonateResult
-type ImpersonateResult = { ok: true } | { ok: false, error: AdminFailure | 'stale' | 'self' | 'admin' | 'banned' }
+type ImpersonateResult = { ok: true } | AuthFailed<AdminFailure | 'stale' | 'self' | 'admin' | 'banned'>
 
 [.] Invitation
 interface Invitation<Role extends string = string>
@@ -1227,12 +1220,10 @@ interface InvitationRecord
 [.] InviteResult
 type InviteResult<Role extends string = string> = {
   ok: true, invitation: Invitation<Role>
-} | {
-  ok: false, error: OrganizationFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable'
-}
+} | AuthFailed<OrganizationFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable'>
 
 [.] IssueTokenResult
-type IssueTokenResult = { ok: true, token: string, id: string } | { ok: false, error: TokenProblem | 'token' | 'not-found' | 'banned' }
+type IssueTokenResult = { ok: true, token: string, id: string } | AuthFailed<TokenProblem | 'token' | 'not-found' | 'banned'>
 
 [.] Level
 type Level = 'read' | 'write'
@@ -1253,22 +1244,22 @@ type Limits = Record<keyof typeof DEFAULT_LIMITS, AuthRateLimit> & { oauthRegist
 type LimitsOption = Partial<Record<keyof Limits, LimitOption>>
 
 [.] LinkProviderResult
-type LinkProviderResult = { ok: true, url: string } | { ok: false, error: ProofFailure | 'not-found' | 'unavailable' }
+type LinkProviderResult = { ok: true, url: string } | AuthFailed<ProofFailure | 'not-found' | 'unavailable'>
 
 [.] LinkResult
-type LinkResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'banned' }
+type LinkResult = { ok: true, redirect: string } | AuthFailed<'invalid' | 'limited' | 'banned'>
 
 [.] LinkType
 type LinkType = 'verify-email' | 'reset-password' | 'magic-link' | 'change-email'
 
 [.] ListInvitationsResult
-type ListInvitationsResult<Role extends string = string> = { ok: true, invitations: Invitation<Role>[] } | { ok: false, error: OrganizationFailure }
+type ListInvitationsResult<Role extends string = string> = { ok: true, invitations: Invitation<Role>[] } | AuthFailed<OrganizationFailure>
 
 [.] ListMembersResult
-type ListMembersResult<Role extends string = string> = { ok: true, members: AuthMember<Role>[] } | { ok: false, error: OrganizationFailure }
+type ListMembersResult<Role extends string = string> = { ok: true, members: AuthMember<Role>[] } | AuthFailed<OrganizationFailure>
 
 [.] ListUsersResult
-type ListUsersResult = { ok: true, users: ManagedUser[], total: number } | { ok: false, error: 'forbidden' | 'two-factor-required' }
+type ListUsersResult = { ok: true, users: ManagedUser[], total: number } | AuthFailed<'forbidden' | 'two-factor-required'>
 
 [.] MailContent
 interface MailContent
@@ -1290,7 +1281,7 @@ interface MailingSubscription
 type MailKind = AuthMailKind
 
 [.] MailRequestResult
-type MailRequestResult = { ok: true } | { ok: false, error: 'limited' | 'captcha' | 'unavailable' }
+type MailRequestResult = { ok: true } | AuthFailed<'limited' | 'captcha' | 'unavailable'>
 
 [.] ManagedUser
 interface ManagedUser extends BareUser
@@ -1321,7 +1312,7 @@ interface MemberRecord
   userId: string
 
 [.] MemberResult
-type MemberResult = { ok: true } | { ok: false, error: OrganizationFailure | 'unknown-role' | 'last-owner' }
+type MemberResult = { ok: true } | AuthFailed<OrganizationFailure | 'unknown-role' | 'last-owner'>
 
 [.] Membership
 interface Membership<Role extends string = string>
@@ -1455,9 +1446,7 @@ interface OAuthUser
   username: string
 
 [.] Off
-interface Off
-  error: "off"
-  ok: false
+type Off = AuthFailed<'off'>
 
 [.] oidcProvider
 function oidcProvider(opts: OpenIdOptions & { issuer: string; name?: string; }): OAuthProvider<OpenIdClaims, OAuthUser>
@@ -1590,11 +1579,7 @@ const passkeyAssertion: TUnsafe<AuthenticationResponseJSON>
 const passkeyAttestation: TUnsafe<RegistrationResponseJSON>
 
 [.] PasskeyOptionsResult
-type PasskeyOptionsResult<Options, Failure extends string = 'signed-out' | 'none' | 'expired' | 'off'> = {
-  ok: true, options: Options
-} | {
-  ok: false, error: Failure
-}
+type PasskeyOptionsResult<Options, Failure extends string = 'signed-out' | 'none' | 'expired' | 'off'> = { ok: true, options: Options } | AuthFailed<Failure>
 
 [.] PasskeyRecord
 interface PasskeyRecord
@@ -1611,7 +1596,7 @@ interface PasskeyRecord
   userVerified: boolean
 
 [.] PasskeySignInResult
-type PasskeySignInResult = { ok: true, redirect: string } | { ok: false, error: 'expired' | 'invalid' | 'limited' | 'banned' }
+type PasskeySignInResult = { ok: true, redirect: string } | AuthFailed<'expired' | 'invalid' | 'limited' | 'banned'>
 
 [.] PasswordSignInInput
 interface PasswordSignInInput
@@ -1619,7 +1604,7 @@ interface PasswordSignInInput
   password: string
 
 [.] PasswordSignInResult
-type PasswordSignInResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'captcha' | 'unverified' | 'banned' }
+type PasswordSignInResult = { ok: true, redirect: string } | AuthFailed<'invalid' | 'limited' | 'captcha' | 'unverified' | 'banned'>
 
 [.] PendingEmailCode
 type PendingEmailCode = { type: 'sign-in' | 'verify', email: string } | null
@@ -1741,7 +1726,7 @@ interface PruneLimits
 function pwnedPassword(password: string): Promise<boolean>
 
 [.] RecoveryCodesResult
-type RecoveryCodesResult = { ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'not-enabled' }
+type RecoveryCodesResult = { ok: true, recoveryCodes: string[] } | AuthFailed<ProofFailure | 'not-enabled'>
 
 [.] RefreshableOAuthClient
 interface RefreshableOAuthClient
@@ -1764,27 +1749,23 @@ interface RegisterInput
   username?: string
 
 [.] RegisterPasskeyResult
-type RegisterPasskeyResult = { ok: true, passkey: Passkey } | { ok: false, error: 'signed-out' | 'expired' | 'invalid' }
+type RegisterPasskeyResult = { ok: true, passkey: Passkey } | AuthFailed<'signed-out' | 'expired' | 'invalid'>
 
 [.] RegisterResult
 type RegisterResult = {
   ok: true, user: BareUser, signedIn: true
 } | {
   ok: true, signedIn: false
-} | {
-  ok: false, errors: RegisterErrors
-} | {
-  ok: false, error: 'limited' | 'captcha' | 'off'
-}
+} | AuthRejected<RegisterErrors> | AuthFailed<'limited' | 'captcha' | 'off'>
 
 [.] RejectInvitationResult
-type RejectInvitationResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+type RejectInvitationResult = { ok: true } | AuthFailed<'signed-out' | 'not-found'>
 
 [.] RenamePasskeyResult
-type RenamePasskeyResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' | 'invalid-name' }
+type RenamePasskeyResult = { ok: true } | AuthFailed<'signed-out' | 'not-found' | 'invalid-name'>
 
 [.] ReproveResult
-type ReproveResult = { ok: true } | { ok: false, error: ProofFailure }
+type ReproveResult = { ok: true } | AuthFailed<ProofFailure>
 
 [.] Requirement
 type Requirement<P, G extends string> = | G | { type: G, resourceId?: number | null } | Predicate<P> | Requirement<P, G>[]
@@ -1797,22 +1778,22 @@ interface RequireUserOptions<Scope extends string, Role extends string>
   scope?: ScopeRequirement<Scope> | undefined
 
 [.] ResetPasswordResult
-type ResetPasswordResult = LinkResult | { ok: false, errors: { password: PasswordProblem | 'breached' } }
+type ResetPasswordResult = LinkResult | AuthRejected<{ password: PasswordProblem | 'breached' }>
 
 [.] RevokeGrantResult
-type RevokeGrantResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+type RevokeGrantResult = { ok: true } | AuthFailed<'signed-out' | 'not-found'>
 
 [.] RevokeInvitationResult
-type RevokeInvitationResult = { ok: true } | { ok: false, error: OrganizationFailure }
+type RevokeInvitationResult = { ok: true } | AuthFailed<OrganizationFailure>
 
 [.] RevokePasskeyResult
-type RevokePasskeyResult = { ok: true } | { ok: false, error: ProofFailure | 'not-found' | 'last-way-in' }
+type RevokePasskeyResult = { ok: true } | AuthFailed<ProofFailure | 'not-found' | 'last-way-in'>
 
 [.] RevokeSessionResult
-type RevokeSessionResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+type RevokeSessionResult = { ok: true } | AuthFailed<'signed-out' | 'not-found'>
 
 [.] RevokeTokenResult
-type RevokeTokenResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+type RevokeTokenResult = { ok: true } | AuthFailed<'signed-out' | 'not-found'>
 
 [.] roleHierarchy
 function roleHierarchy<P, R extends string>(hierarchy: RoleHierarchy<R>, getRoles: (principal: P) => R[]): {
@@ -1824,10 +1805,10 @@ function roleHierarchy<P, R extends string>(hierarchy: RoleHierarchy<R>, getRole
 type RoleHierarchy<R extends string> = Record<R, R[]>
 
 [.] RoleResult
-type RoleResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'unknown-role' | 'self' | 'last-admin' }
+type RoleResult = { ok: true, user: ManagedUser } | AuthFailed<AdminChangeFailure | 'unknown-role' | 'self' | 'last-admin'>
 
 [.] SaveProfileResult
-type SaveProfileResult = { ok: true } | { ok: false, error: 'signed-out' } | { ok: false, errors: Record<string, ProfileProblem> }
+type SaveProfileResult = { ok: true } | AuthFailed<'signed-out'> | AuthRejected<Record<string, ProfileProblem>>
 
 [.] scopeAllows
 function scopeAllows(scopes: null | readonly string[], wanted: ScopeRequirement<string> | undefined): boolean
@@ -1842,7 +1823,7 @@ function sealTotpSecret(secret: string | string[], userId: string, plain: string
 type SecurityEvent = AuthNoticeKind
 
 [.] SendVerificationResult
-type SendVerificationResult = MailRequestResult | { ok: false, error: 'signed-out' | 'verified' }
+type SendVerificationResult = MailRequestResult | AuthFailed<'signed-out' | 'verified'>
 
 [.] SessionPlugin
 interface SessionPlugin<Data extends AuthSessionData>
@@ -1863,7 +1844,7 @@ interface SessionRecord
   version: number
 
 [.] SetUpTwoFactorResult
-type SetUpTwoFactorResult = { ok: true, setup: TwoFactorSetup } | { ok: false, error: ProofFailure | 'enabled' }
+type SetUpTwoFactorResult = { ok: true, setup: TwoFactorSetup } | AuthFailed<ProofFailure | 'enabled'>
 
 [.] SignInOptions
 interface SignInOptions
@@ -1921,7 +1902,7 @@ function turnstile(secret: string): (token: string, action: CaptchaAction, conte
 function turnstileWidget(siteKey: string): CaptchaWidget
 
 [.] TwoFactorResult
-type TwoFactorResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'expired' | 'limited' }
+type TwoFactorResult = { ok: true, redirect: string } | AuthFailed<'invalid' | 'expired' | 'limited'>
 
 [.] TwoFactorSetup
 interface TwoFactorSetup
@@ -1929,20 +1910,16 @@ interface TwoFactorSetup
   uri: string
 
 [.] UnbanResult
-type UnbanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure }
+type UnbanResult = { ok: true, user: ManagedUser } | AuthFailed<AdminChangeFailure>
 
 [.] UnlinkResult
-type UnlinkResult = { ok: true } | { ok: false, error: ProofFailure | 'not-linked' | 'last-way-in' }
+type UnlinkResult = { ok: true } | AuthFailed<ProofFailure | 'not-linked' | 'last-way-in'>
 
 [.] UpdateLocaleResult
-type UpdateLocaleResult = { ok: true } | { ok: false, error: 'signed-out' | 'invalid-locale' }
+type UpdateLocaleResult = { ok: true } | AuthFailed<'signed-out' | 'invalid-locale'>
 
 [.] UpdateOrganizationResult
-type UpdateOrganizationResult = {
-  ok: true, organization: Organization
-} | {
-  ok: false, error: OrganizationFailure | 'invalid-name' | 'invalid-slug' | 'slug-taken'
-}
+type UpdateOrganizationResult = { ok: true, organization: Organization } | AuthFailed<OrganizationFailure | 'invalid-name' | 'invalid-slug' | 'slug-taken'>
 
 [.] User
 interface User<Data extends object = Record<string, unknown>> extends BareUser<Data>
@@ -1991,7 +1968,7 @@ interface UserSession
   userAgent: string
 
 [.] VerifyEmailResult
-type VerifyEmailResult = LinkResult | { ok: false, error: 'confirm' }
+type VerifyEmailResult = LinkResult | AuthFailed<'confirm'>
 
 [.] Ws
 interface Ws extends WsSender

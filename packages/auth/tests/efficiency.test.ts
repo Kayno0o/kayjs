@@ -334,7 +334,7 @@ describe('attempt keys', () => {
     const log = recorded()
     const { mailer } = mailbox()
     const { browser } = testApp({ store: log.store, site: 'https://site.test', email: { mailer, links: LINKS, requireVerified: false } })
-    const answers: { ok: boolean, error?: string }[] = []
+    const answers: { ok: boolean, error?: { code: string } }[] = []
 
     for (let attempt = 0; attempt < 4; attempt++)
       answers.push(await browser().call('password.requestReset', attempt % 2 === 0 ? 'Ada@Example.com' : 'ada@example.com'))
@@ -344,7 +344,7 @@ describe('attempt keys', () => {
     expect(keys.some(key => key.startsWith('kayjs-auth\nforgot:'))).toBe(true)
     expect(keys.filter(key => key.includes('ada') || key.includes('@'))).toEqual([])
     // forgotAccount allows 3 an hour: the fourth, spelled either way, is limited.
-    expect(answers.map(answer => answer.error)).toEqual([undefined, undefined, undefined, 'limited'])
+    expect(answers.map(answer => answer.error?.code)).toEqual([undefined, undefined, undefined, 'limited'])
   })
 
   test('a name typed at sign-in is a digest too', async () => {
