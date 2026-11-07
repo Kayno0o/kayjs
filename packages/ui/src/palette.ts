@@ -10,6 +10,8 @@ interface PaletteBase {
   icon?: IconSlot | IconProps | undefined
   // Extra words a query matches, never shown.
   keywords?: string | undefined
+  // Text hinting the key combination that does the same elsewhere, such as `Ctrl+S`, drawn at the end of the row. It binds nothing: kay's `shortcut()` does.
+  shortcut?: string | undefined
 }
 
 // A place to go: followed in the same tab, or a new one with Ctrl or Cmd held, or always when `newTab` is `true`, or when the address leaves the site with `newTab` left to `'auto'`.

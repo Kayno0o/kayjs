@@ -26,6 +26,7 @@ const look = recipe({
     option: 'flex h-11 w-full cursor-pointer items-center gap-3 px-4 text-left text-sm text-foreground no-underline outline-none aria-selected:bg-hover aria-selected:[box-shadow:inset_2px_0_0_var(--color-accent)] aria-selected:[outline-offset:-2px] aria-selected:[outline:2px_solid_transparent] data-snippet:h-auto data-snippet:py-2',
     label: 'min-w-0 flex-1 truncate',
     group: 'max-w-[40%] shrink-0 truncate text-xs text-muted',
+    shortcut: 'shrink-0 font-sans text-xs text-muted',
     text: 'flex min-w-0 flex-1 flex-col',
     snippet: 'line-clamp-2 text-xs text-muted',
     more: 'text-xs text-muted',
@@ -311,6 +312,8 @@ dialog({...rest} part="root" data-size={size === 'md' ? undefined : size} ref={r
                   span(part="label") {row.entry.label}
                 if query().trim() && row.entry.group
                   span(part="group") {row.entry.group}
+                if row.entry.shortcut
+                  kbd(part="shortcut") {row.entry.shortcut}
             else if actionOf(row.entry) as action
               button(part="option" type="button" id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected = row.index} onClick={() => act(action)})
                 if action.icon as icon
@@ -318,6 +321,8 @@ dialog({...rest} part="root" data-size={size === 'md' ? undefined : size} ref={r
                 span(part="label") {row.entry.label}
                 if query().trim() && row.entry.group
                   span(part="group") {row.entry.group}
+                if row.entry.shortcut
+                  kbd(part="shortcut") {row.entry.shortcut}
       if site?.error() && query().trim()
         p(part="empty") {siteSearchError}
       else if lookFailed() && query().trim()

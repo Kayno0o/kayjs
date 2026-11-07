@@ -1,4 +1,4 @@
-export type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
+export type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
 
 // What a Popover's `@trigger(attributes)` block spreads onto its button: what opens the panel, says whether it shows, and anchors it.
 export interface PopoverTriggerProps {

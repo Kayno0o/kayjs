@@ -210,7 +210,8 @@ interface MediaItem
   title?: string
 
 [.] MenuAction
-interface MenuAction
+interface MenuAction extends MenuItemBase
+  closeOnSelect?: boolean | undefined
   danger?: boolean
   disabled?: boolean
   href?: string | undefined
@@ -218,10 +219,67 @@ interface MenuAction
   label: string
   newTab?: NewTab | undefined
   onSelect?: (() => unknown) | undefined
+  shortcut?: string | undefined
+  tone?: Tone | undefined
+
+[.] MenuCheckbox
+interface MenuCheckbox extends MenuItemBase
+  checked?: boolean | undefined
+  closeOnSelect?: boolean | undefined
+  danger?: boolean
+  defaultChecked?: boolean | undefined
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  onCheckedChange?: ((checked: boolean) => unknown) | undefined
+  shortcut?: string | undefined
   tone?: Tone | undefined
 
 [.] MenuEntry
-type MenuEntry = MenuAction | 'separator'
+type MenuEntry = MenuItem | MenuHeading | 'separator'
+
+[.] MenuHeading
+interface MenuHeading
+  heading: string
+
+[.] MenuItem
+type MenuItem = MenuAction | MenuCheckbox | MenuRadio | MenuSubmenu
+
+[.] MenuItemBase
+interface MenuItemBase
+  closeOnSelect?: boolean | undefined
+  danger?: boolean
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  shortcut?: string | undefined
+  tone?: Tone | undefined
+
+[.] MenuRadio
+interface MenuRadio extends MenuItemBase
+  checked?: boolean | undefined
+  closeOnSelect?: boolean | undefined
+  danger?: boolean
+  defaultChecked?: boolean | undefined
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  onCheckedChange?: ((value: string) => unknown) | undefined
+  radioGroup: string
+  shortcut?: string | undefined
+  tone?: Tone | undefined
+  value: string
+
+[.] MenuSource
+type MenuSource = MenuEntry[] | (() => MenuEntry[] | Promise<MenuEntry[]>) | Promise<MenuEntry[]>
+
+[.] MenuSubmenu
+interface MenuSubmenu
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  items: MenuSource
+  label: string
+  tone?: Tone | undefined
 
 [.] MenuTriggerProps
 type MenuTriggerProps = PopoverTriggerProps & { 'aria-haspopup': 'menu' | 'true' }
@@ -275,6 +333,7 @@ interface PaletteAction extends PaletteBase
   keywords?: string | undefined
   label: string
   onSelect: () => unknown
+  shortcut?: string | undefined
 
 [.] PaletteEntry
 type PaletteEntry = PaletteLink | PaletteAction
@@ -288,6 +347,7 @@ interface PaletteLink extends PaletteBase
   keywords?: string | undefined
   label: string
   newTab?: NewTab | undefined
+  shortcut?: string | undefined
 
 [.] Plate
 interface Plate
@@ -296,7 +356,7 @@ interface Plate
   y: number
 
 [.] PopoverPlacement
-type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
+type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
 
 [.] PopoverTriggerProps
 interface PopoverTriggerProps
@@ -1064,6 +1124,7 @@ component default
   snippet?: string | undefined;
   more?: string | undefined;
   group?: string | undefined;
+  shortcut?: string | undefined;
   empty?: string | undefined;
   count?: string | undefined;
 }
@@ -1821,15 +1882,21 @@ component default
   status?: string | undefined;
   item?: string | undefined;
   separator?: string | undefined;
+  heading?: string | undefined;
   icon?: string | undefined | {
     root?: string | undefined;
   };
+  chevron?: string | undefined | {
+    root?: string | undefined;
+  };
+  indicator?: string | undefined;
+  shortcut?: string | undefined;
 }
   failureLabel?: string | undefined
   icon?: IconProps | IconSlot | undefined
   id?: string | undefined
-  item?: ((entry: MenuAction) => Element) | undefined
-  items: (() => MenuEntry[] | Promise<MenuEntry[]>) | MenuEntry[] | Promise<MenuEntry[]>
+  item?: ((entry: MenuItem) => Element) | undefined
+  items: MenuSource
   label: string
   loadingLabel?: string | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined

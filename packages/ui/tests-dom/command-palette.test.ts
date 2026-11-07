@@ -136,6 +136,19 @@ describe('CommandPalette', () => {
     expect(active()).toBe('New moon')
   })
 
+  test('draws the shortcut hint of an entry at the end of its row', async () => {
+    const { root, input } = await palette()
+
+    press(window, 'k', { ctrlKey: true })
+    await settle()
+
+    expect([...root.querySelectorAll('[data-part=shortcut]')].map(hint => hint.textContent)).toEqual(['Ctrl+N'])
+
+    await search(input()!, 'moon')
+
+    expect(root.querySelector('[data-part=option] [data-part=shortcut]')?.textContent).toBe('Ctrl+N')
+  })
+
   test('opens a link from Ctrl+Enter through the script-URL guard', async () => {
     const opened: string[] = []
     // eslint-disable-next-line ts/unbound-method -- put back as it was

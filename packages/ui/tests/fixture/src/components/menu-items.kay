@@ -1,0 +1,32 @@
+---
+// kay-island
+import type { MenuEntry } from '@kaynooo/kayjs-ui'
+import Menu from '@kaynooo/kayjs-ui/menu.kay'
+import { signal } from 'kay'
+
+const { calls } = props<{ calls: string[] }>()
+const word = signal(false)
+const sort = signal('name')
+
+const rich: MenuEntry[] = [
+  { heading: 'Show' },
+  { label: 'Word wrap', checked: word(), shortcut: 'Alt+Z', closeOnSelect: false, onCheckedChange: (now: boolean) => { word = now; calls.push(`wrap ${now}`) } },
+  { label: 'Ruler', defaultChecked: true, onCheckedChange: (now: boolean) => calls.push(`ruler ${now}`) },
+  'separator',
+  { heading: 'Sort' },
+  { label: 'Name', radioGroup: 'sort', value: 'name', checked: sort() === 'name', onCheckedChange: (value: string) => { sort = value; calls.push(`sort ${value}`) } },
+  { label: 'Date', radioGroup: 'sort', value: 'date', checked: sort() === 'date', onCheckedChange: (value: string) => { sort = value; calls.push(`sort ${value}`) } },
+  'separator',
+  { label: 'Share', items: [{ label: 'Copy link', onSelect: () => calls.push('link') }, { label: 'Email', onSelect: () => calls.push('email') }] },
+  { label: 'Save', shortcut: 'Ctrl+S', onSelect: () => calls.push('save') },
+]
+const own: MenuEntry[] = [
+  { label: 'Small', radioGroup: 'size', value: 's' },
+  { label: 'Large', radioGroup: 'size', value: 'l', defaultChecked: true, onCheckedChange: (value: string) => calls.push(`size ${value}`) },
+  { label: 'Apple', onSelect: () => undefined },
+  { label: 'Banana', onSelect: () => undefined },
+  { label: 'Avocado', onSelect: () => undefined },
+]
+---
+Menu#rich(label="View" icon="plus" items={rich})
+Menu#own(label="Own" icon="plus" items={own})

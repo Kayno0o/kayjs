@@ -8,6 +8,18 @@ description: An icon button opening a menu of actions.
 
 `items` lists the entries: an object with a `label`, an `onSelect`, an optional `icon` and `danger` for a destructive one, or `'separator'` to draw a rule between groups. `icon` sets the trigger's icon and `label` names it. `onSelect` runs once the menu has closed and focus is back on the trigger. A menu taller than the window scrolls, and its entries are taller on a touch screen.
 
+## Options, groups and submenus
+
+An entry with `checked` and `onCheckedChange(checked)` is a check item (`role="menuitemcheckbox"`). Hold its state in the page and set `checked`, or leave `checked` out and the menu keeps it, starting from `defaultChecked`. Entries sharing a `radioGroup` are radio items (`role="menuitemradio"`), each with a `value`: set `checked` on each, or let the menu keep the group, starting from the entry with `defaultChecked`, and `onCheckedChange(value)` hears the one that became checked.
+
+By default picking an entry closes the menu. `closeOnSelect: false` on an entry keeps it open, such as to flip several options in a row; its callback then runs at once.
+
+`{ heading: 'Sort by' }` draws a title over the entries after it. `shortcut: 'Ctrl+S'` draws a hint at the end of the row; it only shows the combination, and kay's `shortcut()` binds it.
+
+`{ label: 'Share', items: [...] }` is a submenu, with the same kinds of entries and the same async sources as the menu. A click or ArrowRight opens it and focuses its first entry, ArrowLeft or Escape closes it, and picking one of its entries closes the whole menu.
+
+Typing letters moves the focus to the next entry whose label starts with them; a letter repeated cycles through the entries starting with it.
+
 ## Row actions
 
 A menu fits at the end of a row. `disabled` greys an entry out, and the arrows, Home and End move between the enabled ones, an accent bar marking the one the keyboard is on.

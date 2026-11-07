@@ -2,7 +2,7 @@
 import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
-import type { MenuAction, MenuEntry, MenuTriggerProps } from './menu'
+import type { MenuAction, MenuCheckbox, MenuEntry, MenuItem, MenuRadio, MenuSource, MenuTriggerProps } from './menu'
 import type { PopoverPlacement } from './popover'
 import type { Snippet } from 'kay'
 import { recipe, signal, uid } from 'kay'
@@ -11,7 +11,8 @@ import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { MENU_ITEM, MENU_LIST } from './menu-look'
-import { withPopup } from './menu'
+import Menu from './menu.kay'
+import { actionOf, checkboxOf, headingOf, radioOf, submenuOf, withPopup } from './menu'
 import { tabOf } from './outside'
 import Popover from './popover.kay'
 import type { Tone } from './tone'
@@ -26,9 +27,16 @@ const look = recipe({
     separator: 'my-1 border-0 border-t border-border',
     status: 'm-0 px-3 py-2 text-sm text-muted',
     icon: 'size-4 shrink-0',
+    heading: 'px-2 pt-2 pb-1 text-xs font-medium text-muted',
+    // The check or the dot of a checkbox or radio entry, a fixed width so the labels line up whether or not it is checked.
+    indicator: 'inline-block w-4 shrink-0 text-center text-accent',
+    shortcut: 'ml-auto pl-4 font-sans text-xs text-muted',
+    chevron: 'ml-auto size-4 shrink-0 -rotate-90',
     item: `${MENU_ITEM} no-underline pointer-coarse:min-h-11 data-[tone=accent]:text-accent data-[tone=success]:text-success data-[tone=warning]:text-warning data-danger:text-danger data-[tone=info]:text-info disabled:cursor-default disabled:opacity-50`,
   },
 })
+
+const TYPEAHEAD_MS = 700
 
 // The keys that move focus through the entries, as a native menu does.
 const MOVES: Partial<Record<string, (index: number, count: number) => number>> = {
@@ -43,8 +51,8 @@ const { id, items, label, icon, size = 'md', variant = 'ghost', tone, placement,
   style?: string | undefined
   // The menu's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
-  // The entries; a function returning them, or a promise of them, is called each time the menu opens, with a loading row meanwhile and a failure row with a retry if it throws or rejects.
-  items: MenuEntry[] | (() => MenuEntry[] | Promise<MenuEntry[]>) | Promise<MenuEntry[]>
+  // The entries, headings and submenus; a function returning them, or a promise of them, is called each time the menu opens, with a loading row meanwhile and a failure row with a retry if it throws or rejects.
+  items: MenuSource
   // Names the trigger and the menu it opens.
   label: string
   // The trigger's icon, such as a row of dots; not needed for a menu opened `at` a point.
@@ -62,7 +70,7 @@ const { id, items, label, icon, size = 'md', variant = 'ghost', tone, placement,
   // Replaces the icon button that opens the menu, such as a labelled Button or a user name with an avatar: `@trigger(attributes)`, then `button({...attributes})`. The attributes carry `popovertarget`, `aria-expanded`, `aria-haspopup="menu"` and the anchor style, and `icon`, `size`, `variant` and `tone` then have nothing to style.
   trigger?: Snippet<[attributes: MenuTriggerProps]> | undefined
   // Draws an entry's content in place of its icon and label: `@item(entry)`. The entry keeps its role, its keys and its link or button.
-  item?: Snippet<[entry: MenuAction]> | undefined
+  item?: Snippet<[entry: MenuItem]> | undefined
   loadingLabel?: string | undefined
   failureLabel?: string | undefined
   retryLabel?: string | undefined
@@ -76,6 +84,10 @@ const asked = signal<MenuEntry[] | undefined>(undefined)
 const failed = signal(false)
 const waits = () => typeof items === 'function' || items instanceof Promise
 const shown = () => waits() ? asked() ?? [] : items as MenuEntry[]
+// What the menu keeps of the checkboxes and radios whose `checked` the app leaves out: a checkbox by its label, a radio group by its value.
+const kept = signal<Record<string, boolean | string>>({})
+let typed = ''
+let typedAt = 0
 let latest = 0
 
 async function load() {
@@ -103,16 +115,43 @@ async function load() {
   }
 }
 
+// The entries of this list alone: those of a submenu sit in the same element.
 function entries(): HTMLElement[] {
-  return [...list?.querySelectorAll<HTMLElement>('[data-part=item]:not(:disabled)') ?? []]
+  return [...list?.querySelectorAll<HTMLElement>('[data-part=item]:not(:disabled)') ?? []].filter(element => element.closest('[role=menu]') === list)
 }
 
-// Hidden at once rather than through a signal, so the browser has given focus back to the trigger before an action runs.
+// Hidden at once rather than through a signal, so the browser has given focus back to the trigger before an action runs. A submenu closes the whole menu it belongs to.
 function close() {
-  document.getElementById(menuId)?.hidePopover()
+  let panel = document.getElementById(menuId)
+
+  for (let parent = panel?.parentElement?.closest<HTMLElement>('.kui-menu'); parent; parent = panel?.parentElement?.closest<HTMLElement>('.kui-menu'))
+    panel = parent
+
+  panel?.hidePopover()
+}
+
+// The entry whose label starts with what was typed lately: a letter alone, or repeated, goes to the next one starting with it.
+function typeahead(key: string, buttons: HTMLElement[]) {
+  const now = Date.now()
+
+  typed = now - typedAt > TYPEAHEAD_MS ? key : typed + key
+  typedAt = now
+
+  const needle = typed.toLocaleLowerCase()
+  const repeated = [...needle].every(character => character === needle[0])
+  const search = repeated ? needle[0]! : needle
+  const current = buttons.indexOf(document.activeElement as HTMLElement)
+  const from = repeated ? current + 1 : Math.max(current, 0)
+  const found = [...buttons.slice(from), ...buttons.slice(0, from)].find(button => (button.dataset.label ?? '').toLocaleLowerCase().startsWith(search))
+
+  found?.focus()
 }
 
 function keyDown(event: KeyboardEvent) {
+  // The key of a submenu reaches the list around it too, which leaves it to the submenu.
+  if (event.target instanceof Element && event.target.closest('[role=menu]') !== list)
+    return
+
   const move = MOVES[event.key]
   const buttons = entries()
 
@@ -131,6 +170,32 @@ function keyDown(event: KeyboardEvent) {
     return
   }
 
+  const active = document.activeElement as HTMLElement | null
+
+  // ArrowRight opens the submenu the focused entry stands for, ArrowLeft closes the one the focus is in.
+  if (event.key === 'ArrowRight' && active?.hasAttribute('popovertarget') && buttons.includes(active)) {
+    event.preventDefault()
+    document.getElementById(active.getAttribute('popovertarget')!)?.showPopover()
+
+    return
+  }
+
+  if (event.key === 'ArrowLeft' && document.getElementById(menuId)?.parentElement?.closest('.kui-menu')) {
+    event.preventDefault()
+    document.getElementById(menuId)?.hidePopover()
+
+    return
+  }
+
+  const isTyping = event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && (event.key !== ' ' || Date.now() - typedAt <= TYPEAHEAD_MS)
+
+  if (isTyping) {
+    event.preventDefault()
+    typeahead(event.key, buttons)
+
+    return
+  }
+
   if (!move || buttons.length === 0)
     return
 
@@ -139,17 +204,60 @@ function keyDown(event: KeyboardEvent) {
 }
 
 // A `tone` has the last word over the `danger` flag it replaces.
-function toneOf(action: MenuAction): Tone | undefined {
+function toneOf(action: Pick<MenuAction, 'tone' | 'danger'>): Tone | undefined {
   return action.tone ?? (action.danger === true ? 'danger' : undefined)
 }
 
-function isDanger(action: MenuAction) {
+function isDanger(action: Pick<MenuAction, 'tone' | 'danger'>) {
   return toneOf(action) === 'danger'
 }
 
+// Closes the menu first, unless the entry keeps it open, then runs what the pick does.
+function pick(entry: { closeOnSelect?: boolean | undefined }, run: () => unknown) {
+  if (entry.closeOnSelect !== false)
+    close()
+
+  run()
+}
+
 function select(action: MenuAction) {
-  close()
-  action.onSelect?.()
+  pick(action, () => action.onSelect?.())
+}
+
+function isChecked(entry: MenuCheckbox | MenuRadio): boolean {
+  if (entry.checked !== undefined)
+    return entry.checked
+
+  const radio = radioOf(entry)
+
+  if (radio) {
+    const value = kept()[`radio:${radio.radioGroup}`]
+
+    return value === undefined ? radio.defaultChecked === true : value === radio.value
+  }
+
+  return kept()[`check:${entry.label}`] as boolean | undefined ?? entry.defaultChecked === true
+}
+
+function toggle(entry: MenuCheckbox) {
+  const next = !isChecked(entry)
+
+  if (entry.checked === undefined)
+    kept = { ...kept(), [`check:${entry.label}`]: next }
+
+  pick(entry, () => entry.onCheckedChange?.(next))
+}
+
+function choose(entry: MenuRadio) {
+  const was = isChecked(entry)
+
+  if (entry.checked === undefined)
+    kept = { ...kept(), [`radio:${entry.radioGroup}`]: entry.value }
+
+  pick(entry, () => {
+    if (!was)
+      entry.onCheckedChange?.(entry.value)
+  })
 }
 ---
 Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')} at={at} open={open} part="menu" onOpenChange={opened => {
@@ -174,20 +282,59 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
     for entry, index of shown() key={index}
       if entry === 'separator'
         hr(part="separator")
-      else
-        if entry.href !== undefined && !entry.disabled
-          a(part="item" href={entry.href} {...tabOf(entry.href, entry.newTab)} role="menuitem" tabindex="-1" data-danger={isDanger(entry) || undefined} data-tone={toneOf(entry)} onClick={() => select(entry)})
+      else if headingOf(entry) as heading
+        div(part="heading" role="presentation") {heading.heading}
+      else if submenuOf(entry) as submenu
+        Menu(items={submenu.items} label={submenu.label} placement="right-start" loadingLabel={loadingLabel} failureLabel={failureLabel} retryLabel={retryLabel} item={item})
+          @trigger(attributes)
+            button({...attributes} part="item" type="button" role="menuitem" tabindex="-1" disabled={submenu.disabled} data-label={submenu.label} data-tone={submenu.tone})
+              if item
+                | {item(submenu)}
+              else
+                if submenu.icon
+                  Icon(icon={submenu.icon} part="icon")
+                | {submenu.label}
+                Icon(icon="chevron" part="chevron")
+      else if checkboxOf(entry) as box
+        button(part="item" type="button" role="menuitemcheckbox" aria-checked={isChecked(box) ? 'true' : 'false'} tabindex="-1" disabled={box.disabled} data-label={box.label} data-danger={isDanger(box) || undefined} data-tone={toneOf(box)} onClick={() => toggle(box)})
+          span(part="indicator" aria-hidden="true") {isChecked(box) ? '✓' : ''}
+          if item
+            | {item(box)}
+          else
+            if box.icon
+              Icon(icon={box.icon} part="icon")
+            | {box.label}
+            if box.shortcut
+              kbd(part="shortcut") {box.shortcut}
+      else if radioOf(entry) as radio
+        button(part="item" type="button" role="menuitemradio" aria-checked={isChecked(radio) ? 'true' : 'false'} tabindex="-1" disabled={radio.disabled} data-label={radio.label} data-danger={isDanger(radio) || undefined} data-tone={toneOf(radio)} onClick={() => choose(radio)})
+          span(part="indicator" aria-hidden="true") {isChecked(radio) ? '●' : ''}
+          if item
+            | {item(radio)}
+          else
+            if radio.icon
+              Icon(icon={radio.icon} part="icon")
+            | {radio.label}
+            if radio.shortcut
+              kbd(part="shortcut") {radio.shortcut}
+      else if actionOf(entry) as action
+        if action.href !== undefined && !action.disabled
+          a(part="item" href={action.href} {...tabOf(action.href, action.newTab)} role="menuitem" tabindex="-1" data-label={action.label} data-danger={isDanger(action) || undefined} data-tone={toneOf(action)} onClick={() => select(action)})
             if item
-              | {item(entry)}
+              | {item(action)}
             else
-              if entry.icon
-                Icon(icon={entry.icon} part="icon")
-              | {entry.label}
+              if action.icon
+                Icon(icon={action.icon} part="icon")
+              | {action.label}
+              if action.shortcut
+                kbd(part="shortcut") {action.shortcut}
         else
-          button(part="item" type="button" role="menuitem" tabindex="-1" disabled={entry.disabled} data-danger={isDanger(entry) || undefined} data-tone={toneOf(entry)} onClick={() => select(entry)})
+          button(part="item" type="button" role="menuitem" tabindex="-1" disabled={action.disabled} data-label={action.label} data-danger={isDanger(action) || undefined} data-tone={toneOf(action)} onClick={() => select(action)})
             if item
-              | {item(entry)}
+              | {item(action)}
             else
-              if entry.icon
-                Icon(icon={entry.icon} part="icon")
-              | {entry.label}
+              if action.icon
+                Icon(icon={action.icon} part="icon")
+              | {action.label}
+              if action.shortcut
+                kbd(part="shortcut") {action.shortcut}

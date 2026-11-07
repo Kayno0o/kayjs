@@ -1,6 +1,7 @@
 import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import MenuItems from '../tests/fixture/src/components/menu-items.kay'
 import MenuSource from '../tests/fixture/src/components/menu-source.kay'
 import Menus from '../tests/fixture/src/components/menus.kay'
 import { click } from './dom'
@@ -225,4 +226,125 @@ test('a Menu draws an entry with its item block, the entry keeping its button or
 
   expect([rename!.tagName, rename!.querySelector('.row')?.textContent, rename!.querySelector('.hint')?.textContent]).toEqual(['BUTTON', 'Rename', 'F2'])
   expect([away!.tagName, away!.getAttribute('href')]).toEqual(['A', '/away'])
+})
+
+function key(element: Element | null, name: string) {
+  element!.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }))
+}
+
+const labelOf = (element: Element | null) => element?.getAttribute('data-label')
+
+async function richMenu(calls: string[]) {
+  mounted = await mountComponent(MenuItems, { calls })
+
+  return mounted.root
+}
+
+test('a Menu draws checkbox and radio entries with their role and state, headings and shortcuts', async () => {
+  const root = await richMenu([])
+  const rich = root.querySelector('#rich')!
+
+  expect([...rich.querySelectorAll('[data-part=heading]')].map(heading => heading.textContent)).toEqual(['Show', 'Sort'])
+  expect([...rich.querySelectorAll('[role=menuitemcheckbox]')].map(box => [labelOf(box), box.getAttribute('aria-checked')])).toEqual([['Word wrap', 'false'], ['Ruler', 'true']])
+  expect([...rich.querySelectorAll('[role=menuitemradio]')].map(radio => [labelOf(radio), radio.getAttribute('aria-checked')])).toEqual([['Name', 'true'], ['Date', 'false']])
+  expect([...rich.querySelectorAll('[data-part=shortcut]')].map(hint => hint.textContent)).toEqual(['Alt+Z', 'Ctrl+S'])
+})
+
+test('a checkbox with closeOnSelect false keeps the menu open and reports the new state, one the app leaves uncontrolled keeps its own', async () => {
+  const calls: string[] = []
+  const root = await richMenu(calls)
+  const rich = root.querySelector<HTMLElement>('#rich')!
+
+  rich.showPopover()
+  await settle()
+  click(rich.querySelector('[role=menuitemcheckbox]'))
+  await settle()
+
+  expect(rich.matches(':popover-open')).toBe(true)
+  expect(rich.querySelector('[role=menuitemcheckbox]')!.getAttribute('aria-checked')).toBe('true')
+
+  click(rich.querySelectorAll('[role=menuitemcheckbox]')[1]!)
+  await settle()
+
+  expect(calls).toEqual(['wrap true', 'ruler false'])
+  expect(rich.matches(':popover-open')).toBe(false)
+  expect(rich.querySelectorAll('[role=menuitemcheckbox]')[1]!.getAttribute('aria-checked')).toBe('false')
+})
+
+test('picking a radio checks it alone in its group and reports its value once; picking the checked one reports nothing', async () => {
+  const calls: string[] = []
+  const root = await richMenu(calls)
+  const rich = root.querySelector<HTMLElement>('#rich')!
+  const radios = () => [...rich.querySelectorAll('[role=menuitemradio]')].map(radio => radio.getAttribute('aria-checked'))
+
+  click(rich.querySelectorAll('[role=menuitemradio]')[1]!)
+  await settle()
+
+  expect(radios()).toEqual(['false', 'true'])
+
+  click(rich.querySelectorAll('[role=menuitemradio]')[1]!)
+
+  expect(calls).toEqual(['sort date'])
+
+  const own = [...root.querySelectorAll('#own [role=menuitemradio]')]
+
+  expect(own.map(radio => radio.getAttribute('aria-checked'))).toEqual(['false', 'true'])
+  click(own[0]!)
+  await settle()
+  expect([...root.querySelectorAll('#own [role=menuitemradio]')].map(radio => radio.getAttribute('aria-checked'))).toEqual(['true', 'false'])
+})
+
+test('ArrowRight opens a submenu and focuses its first entry, ArrowLeft closes it, and an entry of it closes the whole menu', async () => {
+  const calls: string[] = []
+  const root = await richMenu(calls)
+  const rich = root.querySelector<HTMLElement>('#rich')!
+  const trigger = rich.querySelector<HTMLElement>('[aria-haspopup=menu][role=menuitem]')!
+  const panel = document.getElementById(trigger.getAttribute('popovertarget')!)!
+
+  rich.showPopover()
+  await settle()
+  trigger.focus()
+  key(trigger, 'ArrowRight')
+  await settle()
+
+  expect(panel.matches(':popover-open')).toBe(true)
+  expect(document.activeElement?.textContent).toBe('Copy link')
+
+  key(document.activeElement, 'ArrowDown')
+
+  expect(document.activeElement?.textContent).toBe('Email')
+
+  key(document.activeElement, 'ArrowLeft')
+  await settle()
+
+  expect(panel.matches(':popover-open')).toBe(false)
+  expect(rich.matches(':popover-open')).toBe(true)
+
+  key(trigger, 'ArrowRight')
+  await settle()
+  click(panel.querySelector('[data-part=item]'))
+  await settle()
+
+  expect(calls).toEqual(['link'])
+  expect(rich.matches(':popover-open')).toBe(false)
+})
+
+test('typing letters moves to the next entry starting with them, a repeated letter cycling', async () => {
+  const root = await richMenu([])
+  const own = root.querySelector<HTMLElement>('#own')!
+
+  own.showPopover()
+  await settle()
+  key(document.activeElement, 'a')
+
+  expect(document.activeElement?.textContent).toBe('Apple')
+
+  key(document.activeElement, 'a')
+
+  expect(document.activeElement?.textContent).toBe('Avocado')
+
+  await Bun.sleep(750)
+  key(document.activeElement, 'b')
+
+  expect(document.activeElement?.textContent).toBe('Banana')
 })

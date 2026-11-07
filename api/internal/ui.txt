@@ -1333,7 +1333,8 @@ interface MediaItem
   title?: string
 
 [./lib/index] MenuAction
-interface MenuAction
+interface MenuAction extends MenuItemBase
+  closeOnSelect?: boolean | undefined
   danger?: boolean
   disabled?: boolean
   href?: string | undefined
@@ -1341,10 +1342,67 @@ interface MenuAction
   label: string
   newTab?: NewTab | undefined
   onSelect?: (() => unknown) | undefined
+  shortcut?: string | undefined
+  tone?: Tone | undefined
+
+[./lib/index] MenuCheckbox
+interface MenuCheckbox extends MenuItemBase
+  checked?: boolean | undefined
+  closeOnSelect?: boolean | undefined
+  danger?: boolean
+  defaultChecked?: boolean | undefined
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  onCheckedChange?: ((checked: boolean) => unknown) | undefined
+  shortcut?: string | undefined
   tone?: Tone | undefined
 
 [./lib/index] MenuEntry
-type MenuEntry = MenuAction | 'separator'
+type MenuEntry = MenuItem | MenuHeading | 'separator'
+
+[./lib/index] MenuHeading
+interface MenuHeading
+  heading: string
+
+[./lib/index] MenuItem
+type MenuItem = MenuAction | MenuCheckbox | MenuRadio | MenuSubmenu
+
+[./lib/index] MenuItemBase
+interface MenuItemBase
+  closeOnSelect?: boolean | undefined
+  danger?: boolean
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  shortcut?: string | undefined
+  tone?: Tone | undefined
+
+[./lib/index] MenuRadio
+interface MenuRadio extends MenuItemBase
+  checked?: boolean | undefined
+  closeOnSelect?: boolean | undefined
+  danger?: boolean
+  defaultChecked?: boolean | undefined
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  onCheckedChange?: ((value: string) => unknown) | undefined
+  radioGroup: string
+  shortcut?: string | undefined
+  tone?: Tone | undefined
+  value: string
+
+[./lib/index] MenuSource
+type MenuSource = MenuEntry[] | (() => MenuEntry[] | Promise<MenuEntry[]>) | Promise<MenuEntry[]>
+
+[./lib/index] MenuSubmenu
+interface MenuSubmenu
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  items: MenuSource
+  label: string
+  tone?: Tone | undefined
 
 [./lib/index] MenuTriggerProps
 type MenuTriggerProps = PopoverTriggerProps & { 'aria-haspopup': 'menu' | 'true' }
@@ -1398,6 +1456,7 @@ interface PaletteAction extends PaletteBase
   keywords?: string | undefined
   label: string
   onSelect: () => unknown
+  shortcut?: string | undefined
 
 [./lib/index] PaletteEntry
 type PaletteEntry = PaletteLink | PaletteAction
@@ -1411,6 +1470,7 @@ interface PaletteLink extends PaletteBase
   keywords?: string | undefined
   label: string
   newTab?: NewTab | undefined
+  shortcut?: string | undefined
 
 [./lib/index] Plate
 interface Plate
@@ -1419,7 +1479,7 @@ interface Plate
   y: number
 
 [./lib/index] PopoverPlacement
-type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
+type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
 
 [./lib/index] PopoverTriggerProps
 interface PopoverTriggerProps
@@ -1914,8 +1974,18 @@ interface MediaItem
 [./lib/media] playSource
 function playSource(video: HTMLVideoElement, src: string): () => void
 
+[./lib/menu] actionOf
+function actionOf(entry: MenuEntry): MenuAction | undefined
+
+[./lib/menu] checkboxOf
+function checkboxOf(entry: MenuEntry): MenuCheckbox | undefined
+
+[./lib/menu] headingOf
+function headingOf(entry: MenuEntry): MenuHeading | undefined
+
 [./lib/menu] MenuAction
-interface MenuAction
+interface MenuAction extends MenuItemBase
+  closeOnSelect?: boolean | undefined
   danger?: boolean
   disabled?: boolean
   href?: string | undefined
@@ -1923,13 +1993,76 @@ interface MenuAction
   label: string
   newTab?: NewTab | undefined
   onSelect?: (() => unknown) | undefined
+  shortcut?: string | undefined
+  tone?: Tone | undefined
+
+[./lib/menu] MenuCheckbox
+interface MenuCheckbox extends MenuItemBase
+  checked?: boolean | undefined
+  closeOnSelect?: boolean | undefined
+  danger?: boolean
+  defaultChecked?: boolean | undefined
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  onCheckedChange?: ((checked: boolean) => unknown) | undefined
+  shortcut?: string | undefined
   tone?: Tone | undefined
 
 [./lib/menu] MenuEntry
-type MenuEntry = MenuAction | 'separator'
+type MenuEntry = MenuItem | MenuHeading | 'separator'
+
+[./lib/menu] MenuHeading
+interface MenuHeading
+  heading: string
+
+[./lib/menu] MenuItem
+type MenuItem = MenuAction | MenuCheckbox | MenuRadio | MenuSubmenu
+
+[./lib/menu] MenuItemBase
+interface MenuItemBase
+  closeOnSelect?: boolean | undefined
+  danger?: boolean
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  shortcut?: string | undefined
+  tone?: Tone | undefined
+
+[./lib/menu] MenuRadio
+interface MenuRadio extends MenuItemBase
+  checked?: boolean | undefined
+  closeOnSelect?: boolean | undefined
+  danger?: boolean
+  defaultChecked?: boolean | undefined
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  onCheckedChange?: ((value: string) => unknown) | undefined
+  radioGroup: string
+  shortcut?: string | undefined
+  tone?: Tone | undefined
+  value: string
+
+[./lib/menu] MenuSource
+type MenuSource = MenuEntry[] | (() => MenuEntry[] | Promise<MenuEntry[]>) | Promise<MenuEntry[]>
+
+[./lib/menu] MenuSubmenu
+interface MenuSubmenu
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  items: MenuSource
+  label: string
+  tone?: Tone | undefined
 
 [./lib/menu] MenuTriggerProps
 type MenuTriggerProps = PopoverTriggerProps & { 'aria-haspopup': 'menu' | 'true' }
+
+[./lib/menu] radioOf
+function radioOf(entry: MenuEntry): MenuRadio | undefined
+
+[./lib/menu] submenuOf
+function submenuOf(entry: MenuEntry): MenuSubmenu | undefined
 
 [./lib/menu] withPopup
 function withPopup(attributes: PopoverTriggerProps, popup: "menu" | "true"): MenuTriggerProps
@@ -2066,6 +2199,7 @@ interface PaletteAction extends PaletteBase
   keywords?: string | undefined
   label: string
   onSelect: () => unknown
+  shortcut?: string | undefined
 
 [./lib/palette] PaletteEntry
 type PaletteEntry = PaletteLink | PaletteAction
@@ -2089,6 +2223,7 @@ interface PaletteLink extends PaletteBase
   keywords?: string | undefined
   label: string
   newTab?: NewTab | undefined
+  shortcut?: string | undefined
 
 [./lib/palette] paletteMatches
 function paletteMatches(entries: PaletteEntry[], query: string, groups?: string[]): PaletteEntry[]
@@ -2205,7 +2340,7 @@ function trackPointer(): void
 function whenReleased(show: () => void): void
 
 [./lib/popover] PopoverPlacement
-type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
+type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
 
 [./lib/popover] PopoverTriggerProps
 interface PopoverTriggerProps
