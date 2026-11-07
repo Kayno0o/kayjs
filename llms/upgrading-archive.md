@@ -1,6 +1,40 @@
 # Upgrading, older releases
 
-What each minor release before 1.91 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+What each minor release before 1.92 broke, and what an app changed to move to it. The newer releases are in [Upgrading](upgrading.md).
+
+## 1.91.0
+
+### kayjs-auth: the escape is `server: false`
+
+- `auth({ plugin: false })` is `auth({ server: false })`, the escape `mail({ server: false })` takes too; the old name works until 1.94 and `kay check` flags it as `deprecated-escape-option`, with a safe fix that `kay upgrade` applies.
+
+### The forms 1.87 deprecated are gone
+
+Their `deprecated-*` lints go with them: run `kay upgrade` on 1.90 first and it rewrites every one that has a fix. On 1.91 each fails `kay check`, and a Table, TreeView or Timeline `onSelect`, a `queue()`, `workflow()` or `mailer({ queue })` `onFailed` or `keepFailed`, and `fileStore` in the config also throw when they run, so none is a silent change.
+
+- `fileStore` in the config is `store: { files }`; the config refuses the old key, naming the new one.
+- kayjs-auth's flat account, provider and audit methods (`auth.deleteAccount`, `auth.changeUsername`, `auth.listIdentities`, `auth.listAuditLog` and the rest) are `auth.account.*`, `auth.oauth.*` and `auth.audit.*`, and `createUser` on the `createAuth` result is `auth.admin.createUser`.
+- A page's `revalidate` is `ttl`, `notify(user, { keep })` is `ttl`, a `queue()` or `workflow()` `keepFailed` is `failedTtl`, and kayjs-ai's `Chat` `keep` is `history`.
+- `onFailed` of `queue()`, `workflow()` and `mailer({ queue })` is `onError`, which also gets `id` and `attempts`.
+- The `onSelect` of a Table, TreeView or Timeline is `onSelectedChange`, and is no longer called.
+- `.answer` of an `ApiError` is `.data`, and of an `ActionError` `.body`.
+- `refusalMessage(error, fallback)` is `error instanceof ApiError ? error.message : fallback`.
+- The types StreamStatus, ResourceStatus and ResourceFailure from `kay` are `ConnectionStatus`, `LoadStatus` and `ApiError`.
+- `api({ errorShape })` is gone: a refused input always answers `{ errors, status }`, and `'elysia'` no longer keeps Elysia's own body.
+### Environment variable names follow one rule
+
+- `KAYJS_AUTH_DATABASE_URL` is `AUTH_DATABASE_URL` (kayjs-auth), and `MAIL_INBOUND_SECRET` is `MAIL_EVENTS_INBOUND` (kayjs-mail), as `MAIL_EVENTS_<PROVIDER>` is named. The old names are read until 1.94, with one warning at boot, and `kay env` warns when the environment, a compose file or `.env.example` holds one; `kay check` reads code, not the environment, so no lint ships: rename them in your `.env`, compose files and deployment. `SITE_URL`, `SITE_BASE`, the vendors' keys and `<PROVIDER>_CLIENT_ID` and `_SECRET` keep their names. The rule is in [Environment variables](environment.md).
+
+### Constructors are nouns, Postgres helpers share one `PgSource`
+
+- kayjs-auth's `createAuth` is `authCore`, `createGate` is `authGate`, `createRoleHierarchy` is `roleHierarchy`, `createWsAuthStore` is `wsAuthStore`, `memoryAuthStore` is `memoryAuth` and `pgStore` is `pgAuth`; kayjs-cms's `createDrafts` and `createEntryForm` are `cmsDrafts` and `cmsEntryForm`.
+- `PgJobsSource` is `PgSource` (`kay/server`, `kay/library`), which every Postgres store and table helper takes; kayjs-mail's `createMailSuppressionTable` from `@kaynooo/kayjs-mail/pg` is `createMailSuppressionTables` and its `mailListTables` is `mailListTableNames`, as `jobTableNames` lists names and `createXTables` creates.
+- The `sql` key of `pgLoader({ ... })` in kayjs-cms is `source`, which also takes a pg-orm `Database`.
+- The old names work until 1.94, and `kay check` flags an import of each, and the `sql` key, as `deprecated-library-names`, with a safe fix that `kay upgrade` applies.
+### `AiError.code` is `ai-error`, and the library error messages open with one prefix
+
+- `AiError` extends `KayError`: read `error.kind` for what the failure is (`'auth'`, `'rate-limited'`, `'schema'`), which `error.code` held until now. `kay check` cannot see a read of `.code`, so no lint reports it. `error.code` is `'ai-error'` and `kay explain ai-error` lists the kinds.
+- A message opens with `kay: ` for a setting, `kayjs-<library>: ` for a refused call and nothing for text shown to a visitor: `OAuthExchangeError`, `MailNotConfiguredError`, `UnreadReferrersError` and `UpstreamError` gained their library prefix. An app matching on the start of one of those messages updates the match.
 
 ## 1.90.0
 
