@@ -250,7 +250,9 @@ Three tools add what Markdown lacks, each set in `markdown` in `kay.config.ts` f
 
 `containers: true` turns `:::note Title` ... `:::` into an `<aside class="admonition note">` with the title in a `<p class="admonition-title">`. What sits inside stays Markdown, paragraphs, lists and code blocks included, and containers nest. An opener nothing closes, or one inside a code fence, stays text. A container must start at the line's left edge, so one inside a list or a quote is not read.
 
-`footnotes: true` turns `[^id]` into a numbered mark and `[^id]: text` into a list at the end of the entry, each item with a link back. A definition is its line and the indented lines under it, one paragraph. A reference without a definition stays as written, and a definition nothing refers to is dropped. The ids are `fn:1` and `fnref:1`, which no heading can have. Both are off by default, so existing content renders as before.
+`footnotes: true` turns `[^id]` into a numbered mark and `[^id]: text` into a list at the end of the entry, each item with a link back. A definition is its line and the indented lines under it, one paragraph. A reference without a definition stays as written, and a definition nothing refers to is dropped. So does one in code, in link text or in a heading.
+
+The ids are `fn:1` and `fnref:1`, which no heading can have. Both are off by default, so existing content renders as before.
 
 A `transform` gets the HTML an entry renders to and gives it back changed, for the rest: link, image and heading rewriting. Bun's `HTMLRewriter` edits it by selector:
 
@@ -484,7 +486,7 @@ export const news = collection({
 
 ### Caches
 
-Each Markdown entry compiles once, and the result is kept in `.kay/cache/content`. A change to an entry recompiles that entry only. A change to a module or a JSON file the content config imports recompiles every entry when the collection has a highlighter, a `transform` or a `preprocess`, and so does a change to the hook's own source, to the switches, and, for a hook, to the lockfile, so a dependency upgrade shows.
+Each Markdown entry compiles once, and the result is kept in `.kay/cache/content`. A change to an entry recompiles that entry only. A change to a module or a JSON file the content config imports recompiles every entry when the collection has a highlighter, a `transform` or a `preprocess`, and so does a change to the hook's own source, to the switches, and, for a hook, to the nearest `bun.lock` above the project up to its git root, so a dependency upgrade shows.
 
 A hook given as a bound function is refused, as its source cannot be read: write an arrow function calling it. The Markdown bodies of a collection with a `load` function are kept there too, in one file for the collection.
 

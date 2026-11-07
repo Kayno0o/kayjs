@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
@@ -372,6 +372,42 @@ describe('the entry a hook is given', () => {
   })
 })
 
+describe('the lockfile of the cache', () => {
+  it('is the nearest bun.lock above the root, up to the git root', async () => {
+    await inProject(async (root) => {
+      const app = join(root, 'apps', 'site')
+      const counted = { compiles: 0 }
+      const run = async () => {
+        const cache = await loadedBodies('things', { transform: (html) => {
+          counted.compiles++
+
+          return html
+        } }, { sanitize: false, preview: false })
+
+        await cache.compile('a', 'x')
+        await cache.save()
+      }
+
+      await mkdir(app, { recursive: true })
+      await Bun.write(join(root, 'bun.lock'), 'one')
+      setContentPlace(app, app)
+      await run()
+      await run()
+      expect(counted.compiles).toBe(1)
+      await Bun.write(join(root, 'bun.lock'), 'two')
+      await run()
+      expect(counted.compiles).toBe(2)
+      // A lockfile above a git root is another project's.
+      await mkdir(join(root, 'apps', '.git'))
+      await run()
+      expect(counted.compiles).toBe(3)
+      await Bun.write(join(root, 'bun.lock'), 'three')
+      await run()
+      expect(counted.compiles).toBe(3)
+    })
+  })
+})
+
 describe('the cache of a transform', () => {
   const lines = async (transform: (html: string) => string) => {
     const cache = await loadedBodies('things', { transform }, { sanitize: false, preview: false })
@@ -516,6 +552,15 @@ describe('built-in containers and footnotes', () => {
     expect(html).toContain('[^a] and <code>code[^a]</code>')
     expect(html).toContain('<pre><code>[^a]\n')
     expect(html.match(/<sup/g)).toHaveLength(1)
+  })
+
+  it('leave a reference as written in indented code, link text and headings, and mark it in a list and after them', async () => {
+    const html = await render('# Title[^a]\n\nText\n\n    code[^a]\n\n- item\n\n    more[^a]\n\n[link [^a]](/x) and [other][ref] and real[^a]\n\n[ref]: /y\n[^a]: Def\n')
+
+    expect(html).toContain('Title[^a]</a></h1>')
+    expect(html).toContain('code[^a]')
+    expect(html).toContain('<a href="/x">link [^a]</a>')
+    expect(html.match(/<sup/g)).toHaveLength(2)
   })
 
   it('work in renderMarkdown and agree with a collection\'s compile', async () => {

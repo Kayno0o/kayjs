@@ -3,7 +3,7 @@ import type { LinkedImage } from './images'
 import type { CompiledMarkdown, Heading, Highlighter, MarkdownPreprocess, MarkdownTransform, Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
-import { join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { clientDir, writeAsset, writtenAsset } from '../build/assets'
 import { pruneCache, readCacheEntry, touchCacheFile, writeCacheEntry } from '../build/cache'
@@ -434,12 +434,27 @@ export function draftCommentLine(name: string, head: string): number | undefined
 
 // What an entry's cache key holds of the Markdown settings: the source of the highlighter and the hooks, the switches, and what they may draw on: the project modules and JSON files the config imports, and the lockfile for a hook, which may call a dependency.
 // A function whose output changes with none of them, such as one reading `process.env` or a file at run time, needs the cache cleared.
-async function lockfileText(root: string): Promise<string> {
+async function gitRoot(dir: string): Promise<boolean> {
   try {
-    return await Bun.file(join(root, 'bun.lock')).text()
+    await stat(join(dir, '.git'))
+
+    return true
   }
   catch {
-    return ''
+    return false
+  }
+}
+
+// The nearest `bun.lock` from the root up, a workspace app's lying above it, stopping at the git root.
+async function lockfileText(root: string): Promise<string> {
+  for (let dir = root; ; dir = dirname(dir)) {
+    try {
+      return await Bun.file(join(dir, 'bun.lock')).text()
+    }
+    catch {}
+
+    if (dirname(dir) === dir || await gitRoot(dir))
+      return ''
   }
 }
 

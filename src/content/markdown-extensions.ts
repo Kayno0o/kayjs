@@ -13,6 +13,10 @@ const DEFINITION = /^ {0,3}\[\^([^\]\s]{1,64})\]:/
 const CONTINUATION = /^(?: {2,}|\t)\S/
 const REFERENCE = /\[\^([^\]\s]{1,64})\]/g
 const BACKTICKS = /`+/g
+const MARK = /^\[\^[^\]\s]{1,64}\]/
+const HEADING = /^ {0,3}#{1,6}(?:\s|$)/
+const INDENTED = /^(?: {4}|\t)/
+const LIST_ITEM = /^ {0,3}(?:[-*+]|\d{1,9}[.)])\s/
 
 // The lines inside a fenced code block, fences included, which the passes below leave as written.
 function fencedLines(lines: string[]): boolean[] {
@@ -128,22 +132,86 @@ function codeSpans(line: string): [number, number][] {
   return spans
 }
 
-// `[^id]` marks in prose, outside code spans and unless escaped.
+// Which characters of a line are a link's text, `[text](url)` or `[text][ref]`: a mark there would nest an anchor in the link. Read in one pass with a stack of open brackets, a `[^id]` mark standing as a unit.
+function linkText(line: string): Uint8Array {
+  const inside = new Uint8Array(line.length)
+  const open: number[] = []
+
+  for (let index = 0; index < line.length; index++) {
+    const char = line[index]
+
+    if (char === '\\') {
+      index++
+    }
+    else if (char === '[') {
+      const mark = line[index + 1] === '^' ? line.slice(index).match(MARK) : null
+
+      if (mark)
+        index += mark[0].length - 1
+      else
+        open.push(index)
+    }
+    else if (char === ']' && open.length > 0) {
+      const start = open.pop()!
+
+      if (line[index + 1] === '(' || line[index + 1] === '[')
+        inside.fill(1, start, index)
+    }
+  }
+
+  return inside
+}
+
+// `[^id]` marks in prose, outside code spans and link text and unless escaped.
 function marked(line: string, mark: (id: string) => string | undefined): string {
   if (!line.includes('[^'))
     return line
 
   const spans = codeSpans(line)
+  const inLink = linkText(line)
+  let from = 0
   let out = ''
   let last = 0
 
   for (const [start, end] of [...spans, [line.length, line.length] as [number, number]]) {
-    out += line.slice(last, start).replace(REFERENCE, (found, id: string, offset: number, whole: string) => (offset > 0 && whole[offset - 1] === '\\' ? undefined : mark(id)) ?? found)
+    from = last
+    out += line.slice(last, start).replace(REFERENCE, (found, id: string, offset: number, whole: string) => ((offset > 0 && whole[offset - 1] === '\\') || inLink[from + offset] === 1 ? undefined : mark(id)) ?? found)
     out += line.slice(start, end)
     last = end
   }
 
   return out
+}
+
+// The lines a reference is left as written in: fenced code, indented code (an indented line after a blank one, outside a list) and headings, whose text a mark would change along with their slug.
+function literalLines(lines: string[], fenced: boolean[]): boolean[] {
+  const literal: boolean[] = []
+  let blank = true
+  let code = false
+  let list = false
+
+  for (const [index, line] of lines.entries()) {
+    if (fenced[index]) {
+      literal.push(true)
+      blank = false
+      code = false
+
+      continue
+    }
+
+    const empty = line.trim() === ''
+    const indented = INDENTED.test(line) && !empty
+
+    code = indented && !list && (blank || code)
+    literal.push(code || HEADING.test(line))
+
+    if (!empty && !indented)
+      list = LIST_ITEM.test(line) || (list && !blank)
+
+    blank = empty
+  }
+
+  return literal
 }
 
 // `[^id]` references as numbered marks, in the order they appear, and `[^id]: text` definitions as a closing list with a link back to each mark.
@@ -195,11 +263,12 @@ export function footnoted(text: string): string {
 
     return `<sup${first ? ` id="fnref:${number}"` : ''}><a href="#fn:${number}">${number}</a></sup>`
   }
+  const literal = literalLines(lines, fenced)
   const out = lines.map((line, index) => {
     if (defined.has(index))
       return ''
 
-    return fenced[index] ? line : marked(line, mark)
+    return literal[index] ? line : marked(line, mark)
   })
 
   if (numbers.size > 0) {

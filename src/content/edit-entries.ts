@@ -839,7 +839,10 @@ async function compileOptions(collection: Collection<unknown>, slug: string, loc
   }
   else {
     const dir = folderOf(collection.dir)
-    const { existing, place } = await entryPlace(collection.name, dir, slug, locale)
+    const place = locale === undefined ? slug : `${locale}/${slug}`
+    // The file a save writes, `<place>.md`, found with one stat; the folder is listed only for an entry kept under another name, so a preview costs no sweep.
+    const named = await Bun.file(join(dir, `${place}.md`)).exists()
+    const existing = named ? `${place}.md` : (await entryPlace(collection.name, dir, slug, locale)).existing
 
     file = relative(contentPlace().root, sourcePath(join(dir, existing ?? `${place}.md`))).split(sep).join('/')
   }
