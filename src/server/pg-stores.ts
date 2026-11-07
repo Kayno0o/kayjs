@@ -1,7 +1,7 @@
 import type { SQL } from 'bun'
 import type { RateStore } from '../runtime/action'
 import type { KvStore } from './kv'
-import type { Notification, NotificationStore } from './notifications'
+import type { NotificationRow, NotificationStore } from './notifications'
 import type { PgHandle } from './pg-data'
 import type { PushStore } from './push-store'
 import type { DeletableSessionStore, SessionData } from './session'
@@ -267,9 +267,9 @@ export function pgNotifications(pg: PgHandle): NotificationStore {
 
       const db = await pg.db()
 
-      await query(db, 'INSERT INTO kay_notifications (id, user_id, title, url, at, expires) VALUES ($1, $2, $3, $4, $5::bigint, $6::bigint)', [note.id, user, note.title, note.url ?? null, note.at, note.expires])
+      await query(db, 'INSERT INTO kay_notifications (id, user_id, title, url, at, expires) VALUES ($1, $2, $3, $4, $5::bigint, $6::bigint)', [note.id, user, note.title, note.url ?? null, note.createdAt, note.expiresAt])
       await query(db, 'DELETE FROM kay_notifications WHERE user_id = $1 AND seq <= (SELECT seq FROM kay_notifications WHERE user_id = $1 ORDER BY seq DESC LIMIT 1 OFFSET $2::integer)', [user, most])
-      await query(db, 'DELETE FROM kay_notifications WHERE expires <= $1::bigint', [note.at])
+      await query(db, 'DELETE FROM kay_notifications WHERE expires <= $1::bigint', [note.createdAt])
     },
     async list(user, limit, now) {
       start()
@@ -277,7 +277,7 @@ export function pgNotifications(pg: PgHandle): NotificationStore {
       const db = await pg.db()
       const rows = await query<{ id: string, title: string, url: string | null, at: string, read: boolean }>(db, 'SELECT id, title, url, at::text, (read_at IS NOT NULL) AS read FROM kay_notifications WHERE user_id = $1 AND expires > $2::bigint ORDER BY seq DESC LIMIT $3::integer', [user, now, limit])
 
-      return rows.map((row): Notification => ({ id: row.id, title: row.title, ...row.url === null ? {} : { url: row.url }, at: Number(row.at), read: row.read }))
+      return rows.map((row): NotificationRow => ({ id: row.id, title: row.title, ...row.url === null ? {} : { url: row.url }, createdAt: Number(row.at), read: row.read }))
     },
     async unread(user, now) {
       const db = await pg.db()
@@ -322,7 +322,7 @@ export function pgPush(pg: PgHandle): PushStore {
       // One transaction under a lock on the person, so two devices subscribing at once leave at most `most`, the newest.
       await db.begin(async (tx) => {
         await query(tx, 'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`kay_push_subscriptions\n${user}`])
-        await query(tx, 'INSERT INTO kay_push_subscriptions (endpoint, user_id, p256dh, auth, at) VALUES ($1, $2, $3, $4, $5::bigint) ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, at = EXCLUDED.at', [subscription.endpoint, user, subscription.p256dh, subscription.auth, subscription.at])
+        await query(tx, 'INSERT INTO kay_push_subscriptions (endpoint, user_id, p256dh, auth, at) VALUES ($1, $2, $3, $4, $5::bigint) ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, at = EXCLUDED.at', [subscription.endpoint, user, subscription.p256dh, subscription.auth, subscription.createdAt])
         await query(tx, 'DELETE FROM kay_push_subscriptions WHERE user_id = $1 AND endpoint NOT IN (SELECT endpoint FROM kay_push_subscriptions WHERE user_id = $1 ORDER BY at DESC, endpoint DESC LIMIT $2::integer)', [user, most])
       })
     },
@@ -330,7 +330,7 @@ export function pgPush(pg: PgHandle): PushStore {
       const db = await pg.db()
       const rows = await query<{ endpoint: string, p256dh: string, auth: string, at: string }>(db, 'SELECT endpoint, p256dh, auth, at::text FROM kay_push_subscriptions WHERE user_id = $1 ORDER BY kay_push_subscriptions.at DESC, endpoint DESC', [user])
 
-      return rows.map(row => ({ ...row, at: Number(row.at) }))
+      return rows.map(({ at, ...row }) => ({ ...row, createdAt: Number(at) }))
     },
     async delete(endpoint, user) {
       return await (user === undefined ? counted('DELETE FROM kay_push_subscriptions WHERE endpoint = $1', [endpoint]) : counted('DELETE FROM kay_push_subscriptions WHERE endpoint = $1 AND user_id = $2', [endpoint, user])) > 0

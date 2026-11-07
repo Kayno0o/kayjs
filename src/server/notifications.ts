@@ -17,18 +17,22 @@ export interface Notification {
   title: string
   // Where a click goes: a path of the site or an http(s) URL, nothing else is ever kept.
   url?: string | undefined
-  // When it was stored, in milliseconds.
-  at: number
+  createdAt: Date
   read: boolean
 }
 
-// What a store keeps of one: `expires` is when it goes, in milliseconds.
+// What a store keeps of one: `expiresAt` is when it goes, both times in milliseconds.
 export interface StoredNotification {
   id: string
   title: string
   url?: string | undefined
-  at: number
-  expires: number
+  createdAt: number
+  expiresAt: number
+}
+
+// What a store answers for one of a person's notifications, `createdAt` in milliseconds.
+export interface NotificationRow extends Omit<Notification, 'createdAt'> {
+  createdAt: number
 }
 
 // What the app keeps of its people's notifications, `store.notifications` of kay.config.ts: one row each, so replicas share them. A method may answer with a promise.
@@ -36,7 +40,7 @@ export interface NotificationStore extends StoreBase {
   // Keeps one for a person, and drops the person's oldest beyond `most`.
   add: (user: string, note: StoredNotification, most: number) => MaybePromise<void>
   // A person's notifications that have not expired, newest first.
-  list: (user: string, limit: number, now: number) => MaybePromise<Notification[]>
+  list: (user: string, limit: number, now: number) => MaybePromise<NotificationRow[]>
   // How many of them are unread.
   unread: (user: string, now: number) => MaybePromise<number>
   // Marks one read; false when the person has no such notification.
@@ -104,7 +108,7 @@ export function memoryNotifications(): NotificationStore {
   const users = new Map<string, (StoredNotification & { read: boolean })[]>()
 
   const own = (user: string, now: number) => {
-    const rows = (users.get(user) ?? []).filter(row => row.expires > now)
+    const rows = (users.get(user) ?? []).filter(row => row.expiresAt > now)
 
     if (rows.length === 0)
       users.delete(user)
@@ -116,12 +120,12 @@ export function memoryNotifications(): NotificationStore {
 
   return inMemory({
     add(user, note, most) {
-      const rows = own(user, note.at)
+      const rows = own(user, note.createdAt)
 
       rows.push({ ...note, read: false })
       users.set(user, rows.slice(-most))
     },
-    list: (user, limit, now) => own(user, now).toReversed().slice(0, limit).map(({ expires: _expires, ...note }) => note),
+    list: (user, limit, now) => own(user, now).toReversed().slice(0, limit).map(({ expiresAt: _expiresAt, ...note }) => note),
     unread: (user, now) => own(user, now).filter(row => !row.read).length,
     markRead(user, id, now) {
       const row = own(user, now).find(each => each.id === id)
@@ -170,8 +174,8 @@ interface Row {
   read_at: number | null
 }
 
-function noteOf(row: Row): Notification {
-  return { id: row.id, title: row.title, ...row.url === null ? {} : { url: row.url }, at: row.at, read: row.read_at !== null }
+function noteOf(row: Row): NotificationRow {
+  return { id: row.id, title: row.title, ...row.url === null ? {} : { url: row.url }, createdAt: row.at, read: row.read_at !== null }
 }
 
 // Notifications kept in a SQLite file every process of the machine opening it shares, one row each.
@@ -229,9 +233,9 @@ function openNotifications(path: string): NotificationStore {
 
   return {
     add(user, note, most) {
-      insert.run(note.id, user, note.title, note.url ?? null, note.at, note.expires)
+      insert.run(note.id, user, note.title, note.url ?? null, note.createdAt, note.expiresAt)
       trim.run(user, most)
-      prune.run(note.at)
+      prune.run(note.createdAt)
     },
     list: (user, limit, now) => read.all(user, now, limit).map(noteOf),
     unread: (user, now) => count.get(user, now)?.unread ?? 0,
@@ -251,11 +255,11 @@ function openNotifications(path: string): NotificationStore {
 }
 
 // A store of the app's own may hold what `notify` would not have kept, so the link is checked again as it is read.
-function linkedOnly(notes: Notification[]): Notification[] {
-  return notes.map(({ url, ...note }) => {
+function linkedOnly(notes: NotificationRow[]): Notification[] {
+  return notes.map(({ url, createdAt, ...note }) => {
     const link = safeNotificationUrl(url)
 
-    return link === undefined ? note : { ...note, url: link }
+    return { ...note, ...link === undefined ? {} : { url: link }, createdAt: new Date(createdAt) }
   })
 }
 
@@ -285,8 +289,8 @@ export async function notify(user: string, { title, url, ttl, push }: NotifyOpti
   if (url !== undefined && link === undefined)
     kayLog('warn', `notify() dropped the url of a notification for ${id}: only a path of the site or an http(s) URL is linked`)
 
-  const at = Date.now()
-  const note: StoredNotification = { id: crypto.randomUUID(), title: text, ...link === undefined ? {} : { url: link }, at, expires: at + Math.round(durationSeconds(ttl ?? DEFAULT_KEEP, 'notify\'s ttl') * 1000) }
+  const createdAt = Date.now()
+  const note: StoredNotification = { id: crypto.randomUUID(), title: text, ...link === undefined ? {} : { url: link }, createdAt, expiresAt: createdAt + Math.round(durationSeconds(ttl ?? DEFAULT_KEEP, 'notify\'s ttl') * 1000) }
 
   await notificationStore().add(id, note, MOST_PER_USER)
   changed(id)
@@ -294,7 +298,7 @@ export async function notify(user: string, { title, url, ttl, push }: NotifyOpti
   if (push !== false)
     pushAlongside(id, { title: text, url: link })
 
-  return { id: note.id, title: note.title, ...link === undefined ? {} : { url: link }, at, read: false }
+  return { id: note.id, title: note.title, ...link === undefined ? {} : { url: link }, createdAt: new Date(createdAt), read: false }
 }
 
 // What the `Bell` shows of a person's inbox: the unread count and the newest notifications.

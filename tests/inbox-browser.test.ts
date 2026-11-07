@@ -108,8 +108,8 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
     const now = Date.now()
 
     await notify('ada', { title: '<img src=x onerror="window.pwned=1"> & "co"' })
-    await STORE.add('ada', { id: 'hostile', title: 'Click me', url: 'javascript:window.pwned=1', at: now, expires: now + 100_000 }, 200)
-    await STORE.add('ada', { id: 'proto', title: 'Protocol relative', url: '//evil.example/x', at: now + 1, expires: now + 100_000 }, 200)
+    await STORE.add('ada', { id: 'hostile', title: 'Click me', url: 'javascript:window.pwned=1', createdAt: now, expiresAt: now + 100_000 }, 200)
+    await STORE.add('ada', { id: 'proto', title: 'Protocol relative', url: '//evil.example/x', createdAt: now + 1, expiresAt: now + 100_000 }, 200)
     invalidate(() => true)
     await using page = await main.open('/')
 
@@ -130,7 +130,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
 
     await page.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications, 1 unread')
     // The server reads the clock for the time to live, so it is waited out.
-    await Bun.sleep(Math.max(0, short.at + 2000 - Date.now()) + 200)
+    await Bun.sleep(Math.max(0, short.createdAt.getTime() + 2000 - Date.now()) + 200)
     invalidate(() => true)
     await page.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications')
     await notify('ada', { title: 'Again' })

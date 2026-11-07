@@ -142,9 +142,9 @@ describe('the inbox route', () => {
   it('links only a path of the site or an http(s) URL, even from a store that kept a hostile one', async () => {
     const now = Date.now()
 
-    await store.add('ada', { id: 'a', title: 'js', url: 'javascript:alert(1)', at: now, expires: now + 100_000 }, 200)
-    await store.add('ada', { id: 'b', title: 'proto', url: '//evil.example/x', at: now + 1, expires: now + 100_000 }, 200)
-    await store.add('ada', { id: 'c', title: 'ok', url: '/orders/2', at: now + 2, expires: now + 100_000 }, 200)
+    await store.add('ada', { id: 'a', title: 'js', url: 'javascript:alert(1)', createdAt: now, expiresAt: now + 100_000 }, 200)
+    await store.add('ada', { id: 'b', title: 'proto', url: '//evil.example/x', createdAt: now + 1, expiresAt: now + 100_000 }, 200)
+    await store.add('ada', { id: 'c', title: 'ok', url: '/orders/2', createdAt: now + 2, expiresAt: now + 100_000 }, 200)
     invalidate(() => true)
 
     const items = (await inbox(ADA)).items

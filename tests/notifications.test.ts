@@ -33,6 +33,8 @@ describe('with no store configured', () => {
     const note = await notify('ada', { title: 'Order shipped', url: '/orders/12' })
 
     expect(note).toMatchObject({ title: 'Order shipped', url: '/orders/12', read: false })
+    expect(note.createdAt).toBeInstanceOf(Date)
+    expect((await notifications.list('ada'))[0]!.createdAt).toEqual(note.createdAt)
     expect(await notifications.list('ada')).toEqual([note])
     expect(await notifications.unread('ada')).toBe(1)
     expect(await notifications.erase('ada')).toBe(1)
@@ -135,9 +137,9 @@ function storeCases(name: string, make: () => Promise<NotificationStore>): void 
       const now = Date.now()
 
       setupStore({ notifications: store })
-      await store.add('ada', { id: 'a', title: 'brief', at: now, expires: now + 1000 }, 200)
-      await store.add('ada', { id: 'b', title: 'long', at: now + 1, expires: now + 100_000 }, 200)
-      await store.add('grace', { id: 'c', title: 'other', at: now + 2, expires: now + 100_000 }, 200)
+      await store.add('ada', { id: 'a', title: 'brief', createdAt: now, expiresAt: now + 1000 }, 200)
+      await store.add('ada', { id: 'b', title: 'long', createdAt: now + 1, expiresAt: now + 100_000 }, 200)
+      await store.add('grace', { id: 'c', title: 'other', createdAt: now + 2, expiresAt: now + 100_000 }, 200)
       expect(await store.list('ada', 5, now + 500)).toHaveLength(2)
       expect(await store.prune(now + 2000)).toBe(1)
       expect(await store.prune(now + 2000)).toBe(0)

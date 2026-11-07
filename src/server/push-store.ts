@@ -11,7 +11,7 @@ export interface PushSubscriptionRecord {
   p256dh: string
   auth: string
   // When it was stored, in milliseconds.
-  at: number
+  createdAt: number
 }
 
 // What the app keeps of its people's push subscriptions, `store.push` of kay.config.ts: one row each, so replicas share them. A method may answer with a promise.
@@ -116,10 +116,10 @@ function openPush(path: string): PushStore {
 
   return {
     add(user, subscription, most) {
-      insert.run(subscription.endpoint, user, subscription.p256dh, subscription.auth, subscription.at)
+      insert.run(subscription.endpoint, user, subscription.p256dh, subscription.auth, subscription.createdAt)
       trim.run(user, most)
     },
-    list: user => list.all(user),
+    list: user => list.all(user).map(({ at, ...row }) => ({ ...row, createdAt: at })),
     delete: (endpoint, user) => (user === undefined ? drop.run(endpoint) : dropOwn.run(endpoint, user)).changes > 0,
     erase: user => erase.run(user).changes,
     close: () => db.close(),

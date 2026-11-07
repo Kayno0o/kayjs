@@ -390,7 +390,7 @@ export async function readSubscription(body: unknown): Promise<PushSubscriptionR
     return undefined
   }
 
-  return { endpoint: checked, p256dh, auth, at: Date.now() }
+  return { endpoint: checked, p256dh, auth, createdAt: Date.now() }
 }
 
 const DEVICE_COOKIE = 'kay_push_device'
@@ -434,8 +434,8 @@ export async function forgetPushDevice(request: Request, user: string): Promise<
 
 // A person's push subscriptions, read and erased from the server: the function that erases a person on request ([Privacy](privacy.md)) calls `erase`.
 export const pushSubscriptions = {
-  async list(user: string): Promise<{ endpoint: string, at: number }[]> {
-    return (await pushStore().list(user)).map(({ endpoint, at }) => ({ endpoint, at }))
+  async list(user: string): Promise<{ endpoint: string, createdAt: Date }[]> {
+    return (await pushStore().list(user)).map(({ endpoint, createdAt }) => ({ endpoint, createdAt: new Date(createdAt) }))
   },
   async erase(user: string): Promise<number> {
     return pushStore().erase(user)

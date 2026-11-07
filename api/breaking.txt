@@ -3,8 +3,13 @@ auth [.] lifetime
 kay [./server] AsyncRoomStore
 kay [./server] AsyncRooms
 kay [./server] KayConfig
+kay [./server] Notification
+kay [./server] NotificationStore
 kay [./server] PagesOptions
+kay [./server] PushSubscriptionRecord
 kay [./server] StoreRooms
+kay [./server] StoredNotification
+kay [./server] pushSubscriptions
 kay [./test] TestOptions
 mail [./sqlite] openLists
 mail [.] ListStore

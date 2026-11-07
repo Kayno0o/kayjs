@@ -2960,7 +2960,15 @@ interface MessageEntry
 
 [./server] Notification
 interface Notification
-  at: number
+  createdAt: Date
+  id: string
+  read: boolean
+  title: string
+  url?: string | undefined
+
+[./server] NotificationRow
+interface NotificationRow extends Omit<Notification, 'createdAt'>
+  createdAt: number
   id: string
   read: boolean
   title: string
@@ -2985,7 +2993,7 @@ interface NotificationStore extends StoreBase
   add: (user: string, note: StoredNotification, most: number) => MaybePromise<void>
   close?: (() => unknown) | undefined
   erase: (user: string) => MaybePromise<number>
-  list: (user: string, limit: number, now: number) => MaybePromise<Notification[]>
+  list: (user: string, limit: number, now: number) => MaybePromise<NotificationRow[]>
   markAllRead: (user: string, now: number) => MaybePromise<number>
   markRead: (user: string, id: string, now: number) => MaybePromise<boolean>
   ping?: (() => unknown) | undefined
@@ -3197,13 +3205,13 @@ interface PushStore extends StoreBase
 
 [./server] PushSubscriptionRecord
 interface PushSubscriptionRecord
-  at: number
   auth: string
+  createdAt: number
   endpoint: string
   p256dh: string
 
 [./server] pushSubscriptions
-const pushSubscriptions: { list(user: string): Promise<{ endpoint: string; at: number; }[]>; erase(user: string): Promise<number>; }
+const pushSubscriptions: { list(user: string): Promise<{ endpoint: string; createdAt: Date; }[]>; erase(user: string): Promise<number>; }
 
 [./server] PutOptions
 interface PutOptions
@@ -3700,8 +3708,8 @@ interface StoredJobState extends StoredJob
 
 [./server] StoredNotification
 interface StoredNotification
-  at: number
-  expires: number
+  createdAt: number
+  expiresAt: number
   id: string
   title: string
   url?: string | undefined

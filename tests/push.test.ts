@@ -48,7 +48,7 @@ async function device(name: string): Promise<Device> {
 }
 
 async function subscribe(user: string, who: Device): Promise<void> {
-  await currentStore().add(user, { endpoint: who.endpoint, p256dh: who.keys.publicKey, auth: who.auth, at: Date.now() }, 10)
+  await currentStore().add(user, { endpoint: who.endpoint, p256dh: who.keys.publicKey, auth: who.auth, createdAt: Date.now() }, 10)
 }
 
 let store: PushStore
@@ -195,6 +195,7 @@ describe('sendPush', () => {
 
     expect(await sendPush('ada', { title: 'Hi' })).toEqual({ sent: 1, dropped: 2, failed: 1 })
     expect((await pushSubscriptions.list('ada')).map(each => new URL(each.endpoint).pathname).toSorted()).toEqual(['/push/busy', '/push/fine'])
+    expect((await pushSubscriptions.list('ada'))[0]!.createdAt).toBeInstanceOf(Date)
   })
 
   it('refuses a title, body, tag, topic or urgency out of bounds, and drops a hostile link', async () => {
@@ -244,7 +245,7 @@ describe('the endpoint a browser names', () => {
   })
 
   it('drops a stored subscription whose endpoint stopped being one, without sending', async () => {
-    await currentStore().add('ada', { endpoint: 'http://10.0.0.5/x', p256dh: 'a', auth: 'b', at: 1 }, 10)
+    await currentStore().add('ada', { endpoint: 'http://10.0.0.5/x', p256dh: 'a', auth: 'b', createdAt: 1 }, 10)
 
     expect(await sendPush('ada', { title: 'x' })).toEqual({ sent: 0, dropped: 1, failed: 0 })
     expect(received).toHaveLength(0)
@@ -281,7 +282,7 @@ describe('the endpoint a browser names', () => {
     setPushResolver(async () => [{ address: '10.0.0.7', family: 4 }])
 
     try {
-      await currentStore().add('ada', { endpoint: 'https://push.example.test/abc', p256dh: phone.keys.publicKey, auth: phone.auth, at: 1 }, 10)
+      await currentStore().add('ada', { endpoint: 'https://push.example.test/abc', p256dh: phone.keys.publicKey, auth: phone.auth, createdAt: 1 }, 10)
       expect(await sendPush('ada', { title: 'x' })).toEqual({ sent: 0, dropped: 1, failed: 0 })
       expect(await pushSubscriptions.list('ada')).toEqual([])
     }
@@ -300,7 +301,7 @@ describe('the endpoint a browser names', () => {
     })
 
     try {
-      await currentStore().add('ada', { endpoint: 'https://push.example.test/abc', p256dh: phone.keys.publicKey, auth: phone.auth, at: 1 }, 10)
+      await currentStore().add('ada', { endpoint: 'https://push.example.test/abc', p256dh: phone.keys.publicKey, auth: phone.auth, createdAt: 1 }, 10)
       expect(await sendPush('ada', { title: 'x' })).toEqual({ sent: 0, dropped: 0, failed: 1 })
       expect(await pushSubscriptions.list('ada')).toHaveLength(1)
       expect(await readSubscription({ endpoint: 'https://push.example.test/abc', keys: { p256dh: phone.keys.publicKey, auth: phone.auth } })).toBeUndefined()
@@ -801,7 +802,7 @@ describe('the keys', () => {
 
 function storeCases(name: string, make: () => Promise<PushStore>): void {
   describe(name, () => {
-    const record = (endpoint: string, at: number) => ({ endpoint, p256dh: 'p', auth: 'a', at })
+    const record = (endpoint: string, at: number) => ({ endpoint, p256dh: 'p', auth: 'a', createdAt: at })
 
     it('keeps a person\'s subscriptions, newest first, never another\'s', async () => {
       const made = await make()
@@ -821,7 +822,7 @@ function storeCases(name: string, make: () => Promise<PushStore>): void {
       await made.add('ada', record('https://a/1', 1), 10)
       await made.add('grace', record('https://a/1', 2), 10)
       expect(await made.list('ada')).toEqual([])
-      expect((await made.list('grace')).map(each => each.at)).toEqual([2])
+      expect((await made.list('grace')).map(each => each.createdAt)).toEqual([2])
     })
 
     it('drops a person\'s oldest beyond the most', async () => {
