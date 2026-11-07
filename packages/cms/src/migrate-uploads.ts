@@ -94,7 +94,7 @@ export async function migrateUploads(): Promise<Migrated> {
     // A copy a run before this one made is not written again.
     const to = shared.find(key => key.startsWith(`${MEDIA_FOLDER}/${id}.`)) ?? await files.put(blob, { folder: MEDIA_FOLDER, id })
 
-    adoptions.set(file.key, { from: file.key, to, size: blob.size, at: file.modified?.getTime(), done: false })
+    adoptions.set(file.key, { from: file.key, to, size: blob.size, at: file.modifiedAt?.getTime(), done: false })
 
     for (const ref of read.usedBy.get(idOf(file.key)!)!.values()) {
       const name = `${ref.collection}/${ref.slug}/${ref.locale ?? ''}`
