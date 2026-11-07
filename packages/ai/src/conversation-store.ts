@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite'
-import type { ConversationSummary } from './conversation-title'
+import type { ConversationRow } from './conversation-title'
 import type { Source } from './types'
 import { openSqlite } from 'kay/library'
 
@@ -25,7 +25,7 @@ export interface StoredTurn {
   reply?: string | undefined
 }
 
-export interface StoredConversation extends ConversationSummary {
+export interface StoredConversation extends ConversationRow {
   // Counts the writes of its turns, so a Chat posting to an older one is told another tab moved on.
   revision: number
   turns: StoredTurn[]
@@ -49,7 +49,7 @@ export interface ConversationChange {
 // Where `ask` keeps the conversations of a Chat with `keepOnServer`: `pgConversations(db)` or `sqliteConversations(path)`, or one of the app's own given to `ai({ conversations })`; left out, the database of the app's `store`.
 export interface ConversationStore {
   // The owner's conversations under `scope`, the most recently updated first, `limit` at most.
-  list: (owner: string, scope: string, limit: number) => Promise<ConversationSummary[]>
+  list: (owner: string, scope: string, limit: number) => Promise<ConversationRow[]>
   get: (key: ConversationKey) => Promise<StoredConversation | undefined>
   // Applies `change` when the conversation is still at `revision` (0 for one not stored yet) and answers its new revision, or undefined, writing nothing, when another write came first.
   write: (key: ConversationKey, revision: number, change: ConversationChange) => Promise<number | undefined>

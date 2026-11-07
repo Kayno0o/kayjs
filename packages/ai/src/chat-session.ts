@@ -288,7 +288,7 @@ export function createChatSession(options: ChatSessionOptions) {
       const answer = await consult('list')
 
       if (answer?.owned === true && answer.op === 'list')
-        conversations.set(answer.conversations)
+        conversations.set(answer.conversations.map(row => ({ ...row, updatedAt: new Date(row.updatedAt) })))
       else if (answer?.owned === false)
         owned.set(false)
     }
@@ -306,7 +306,7 @@ export function createChatSession(options: ChatSessionOptions) {
     const known = conversations().find(item => item.id === id)
     const first = history().find(({ role }) => role === 'user')
 
-    conversations.set([{ id, title: known?.title ?? titleOf(first?.content ?? ''), updatedAt: Date.now() }, ...conversations().filter(item => item.id !== id)])
+    conversations.set([{ id, title: known?.title ?? titleOf(first?.content ?? ''), updatedAt: new Date() }, ...conversations().filter(item => item.id !== id)])
   }
 
   // A new conversation: nothing is stored until its first reply lands.

@@ -129,7 +129,7 @@ export function cmsDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       return
 
     if (entry && entry !== base)
-      keep.write(key, { entry, version: versions.get(key), at: keep.now(), ...versions.get(key) === undefined && base ? { base: fingerprint(base) } : {} })
+      keep.write(key, { entry, version: versions.get(key), editedAt: keep.now(), ...versions.get(key) === undefined && base ? { base: fingerprint(base) } : {} })
     else
       keep.remove(key)
   }
@@ -148,7 +148,7 @@ export function cmsDrafts({ show, delay = '150ms', keep }: DraftsOptions) {
       keep?.remove(key)
 
     if (stale || restored)
-      recoveries.set(new Map(recoveries()).set(key, { editedAt: new Date(kept.at), restored }))
+      recoveries.set(new Map(recoveries()).set(key, { editedAt: new Date(kept.editedAt), restored }))
 
     return restored ? kept.entry : entry
   }

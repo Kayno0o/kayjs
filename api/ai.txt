@@ -226,19 +226,25 @@ interface ConversationKey
   owner: string
   scope: string
 
+[.] ConversationRow
+interface ConversationRow
+  id: string
+  title: string
+  updatedAt: number
+
 [.] ConversationStore
 interface ConversationStore
   delete: (key: ConversationKey) => Promise<boolean>
   get: (key: ConversationKey) => Promise<StoredConversation | undefined>
-  list: (owner: string, scope: string, limit: number) => Promise<ConversationSummary[]>
+  list: (owner: string, scope: string, limit: number) => Promise<ConversationRow[]>
   rename: (key: ConversationKey, title: string) => Promise<boolean>
   write: (key: ConversationKey, revision: number, change: ConversationChange) => Promise<number | undefined>
 
 [.] ConversationSummary
-interface ConversationSummary
+interface ConversationSummary extends Omit<ConversationRow, 'updatedAt'>
   id: string
   title: string
-  updatedAt: number
+  updatedAt: Date
 
 [.] DeepPartial
 type DeepPartial<Value> = Value extends string ? string : Value extends readonly (infer Item)[] ? DeepPartial<Item>[] : Value extends (...args: never[]) => unknown ? Value : Value extends Date ? Value : Value extends object ? {
@@ -569,7 +575,7 @@ interface Step
   usage: Usage | undefined
 
 [.] StoredConversation
-interface StoredConversation extends ConversationSummary
+interface StoredConversation extends ConversationRow
   id: string
   revision: number
   title: string

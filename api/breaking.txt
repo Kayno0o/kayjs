@@ -1,7 +1,11 @@
+ai [.] ConversationStore
+ai [.] ConversationSummary
+ai [.] StoredConversation
 ai [.] sqliteConversations
 auth [.] DataExport
 auth [.] ManagedUser
 auth [.] lifetime
+cms [.] KeptDraft
 cms [.] Recovery
 kay [./server] AsyncRoomStore
 kay [./server] AsyncRooms
@@ -15,6 +19,7 @@ kay [./server] StoredFile
 kay [./server] StoredNotification
 kay [./server] pushSubscriptions
 kay [./test] TestOptions
+kay [.] LocalIssue
 mail [./sqlite] openLists
 mail [.] ListStore
 mail [.] Suppression

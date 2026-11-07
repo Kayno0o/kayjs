@@ -1,7 +1,7 @@
 import type { SQL } from 'bun'
 import type { PgSource } from 'kay/library'
 import type { ConversationKey, ConversationStore, StoredConversation } from './conversation-store'
-import type { ConversationSummary } from './conversation-title'
+import type { ConversationRow } from './conversation-title'
 import { connectionOf, privilegeRefused, relationsMissing } from 'kay/library'
 import { MOST_CONVERSATIONS, MOST_TURNS, turnsOf, withinResultCap } from './conversation-store'
 
@@ -64,7 +64,7 @@ export function pgConversations(source: PgSource): ConversationStore & { close: 
     }
   }
 
-  const summaryOf = (row: Row): ConversationSummary => ({ id: row.id, title: row.title, updatedAt: Number(row.updated_at) })
+  const summaryOf = (row: Row): ConversationRow => ({ id: row.id, title: row.title, updatedAt: Number(row.updated_at) })
 
   return {
     async list(owner, scope, limit) {

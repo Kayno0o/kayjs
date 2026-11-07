@@ -379,8 +379,8 @@ interface JsonSchema
 
 [.] KeptDraft
 interface KeptDraft
-  at: number
   base?: string | undefined
+  editedAt: number
   entry: CmsDraftEntry
   version: string | undefined
 

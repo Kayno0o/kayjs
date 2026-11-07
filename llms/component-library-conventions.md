@@ -22,6 +22,7 @@ How kay and its libraries name the same idea, written before the renames land: a
 **Times**
 - A record or event an app reads carries its times as `Date`: `null` when absent on a stored row, optional on an event. Epoch milliseconds belong to store interfaces (what a `*Store` keeps or returns), never to a record an app reads: a `Date` crosses to an island as a `Date` (#3000).
 - A time is named `<verb>At` (`createdAt`, `sentAt`, `suppressedAt`) and its end `expiresAt`, never bare `at`, `modified`, `date` or `expires`. What a person wrote keeps its name: a front-matter `date`, a feed item's `date`, an email's `Date` header.
+- A record a store keeps or lists is the store's own type in milliseconds, named for the store (`StoredNotification`, `NotificationRow`, `StoredSuppression`, `ConversationRow`), and the type an app reads is the same fields with `Date`. The job, rate-limit, cache and list-store records (`StoredJob`, `RateWindow`, `StoredValue`, `Subscriber`, `Broadcast`) are store types and keep milliseconds. The dev tool's log lines carry `time: string` for display.
 
 **Hooks and switches**
 - An `on*` hook takes one event object, `onSave({ ... })`, and returns nothing. A callback that returns data is named for what it returns (`profileFields`, `exportData`), not `on*` (#1694).

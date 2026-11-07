@@ -236,6 +236,7 @@ test('lists the conversations, moves the one a reply landed in to the top, and r
   await session.send()
   reply.finish()
   expect(session.conversations().map(({ id }) => id)).toEqual([SHOWN, 'conv-0002'])
+  expect(session.conversations()[1]!.updatedAt).toEqual(new Date(1))
 
   expect(await session.rename('conv-0002', '  Trip  plans ')).toBe(true)
   expect(consulted[2]!.messages).toEqual([{ role: 'user', content: '  Trip  plans ' }])

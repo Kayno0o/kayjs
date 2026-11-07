@@ -185,7 +185,7 @@ describe('drafts of the person the admin let in', () => {
     const storage = memoryStorage()
     let who: string | undefined = 'ann'
     const keeper = browserKeeper(() => storage, Date.now, () => who)
-    const kept = { entry: post, version: 'v1', at: Date.now() }
+    const kept = { entry: post, version: 'v1', editedAt: Date.now() }
 
     keeper.write('posts:hello', kept)
     expect(storage.getItem('kcms:draft:ann:posts:hello')).not.toBeNull()
@@ -200,7 +200,7 @@ describe('drafts of the person the admin let in', () => {
 
   it('forgets every draft of the browser, whoever kept it, and nothing else, when asked', () => {
     const storage = memoryStorage()
-    const kept = { entry: post, version: 'v1', at: Date.now() }
+    const kept = { entry: post, version: 'v1', editedAt: Date.now() }
 
     browserKeeper(() => storage, Date.now, () => 'ann').write('posts:hello', kept)
     browserKeeper(() => storage, Date.now, () => 'bob').write('posts:hello', kept)
@@ -255,10 +255,22 @@ describe('kept drafts of an entry with no version', () => {
     expect(moved.recovery(post)?.restored).toBe(false)
   })
 
+  it('reads a draft an older release kept with its time as at', () => {
+    const storage = memoryStorage()
+
+    storage.setItem('kcms:draft:posts:hello', JSON.stringify({ entry: { ...post, data: { title: 'Typed' } }, version: 'v1', at: Date.now() }))
+
+    const after = pageOf(storage)
+
+    after.open(post, 'v1')
+    expect(after.recovery(post)?.restored).toBe(true)
+    expect(after.recovery(post)?.editedAt).toBeInstanceOf(Date)
+  })
+
   it('drops a draft kept with no record of its saved copy', () => {
     const storage = memoryStorage()
 
-    storage.setItem('kcms:draft:posts:hello', JSON.stringify({ entry: { ...post, data: { title: 'Old' } }, at: Date.now() }))
+    storage.setItem('kcms:draft:posts:hello', JSON.stringify({ entry: { ...post, data: { title: 'Old' } }, editedAt: Date.now() }))
 
     const after = pageOf(storage)
 

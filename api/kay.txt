@@ -579,7 +579,7 @@ interface LocalConflict<Row>
 
 [.] LocalIssue
 interface LocalIssue<Row>
-  at: number
+  createdAt: Date
   data?: unknown
   errors?: Record<string, string> | undefined
   id: number

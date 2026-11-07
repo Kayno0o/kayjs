@@ -24,7 +24,7 @@ ul
     li.note(data-id={note.id}) {note.title} {note.rev}
 ul
   for issue of notes.issues()
-    li.issue {issue.kind} {issue.key} {issue.status ?? ''}
+    li.issue(data-at={issue.createdAt.getTime()}) {issue.kind} {issue.key} {issue.status ?? ''}
 input.title(bind:value={text} aria-label="Title")
 button.add(onClick={() => notes.put({ id: 'a', title: text(), rev: 0 })}) Add
 button.addb(onClick={() => notes.put({ id: 'b', title: text(), rev: 0 })}) Add b

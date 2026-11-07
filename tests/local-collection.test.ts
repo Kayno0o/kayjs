@@ -592,6 +592,50 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     await page.waitUntil(() => document.querySelector('.status')?.textContent === 'synced', { timeout: '15s' })
   }, 60_000)
 
+  it('gives an issue a createdAt Date, and reads one an older release stored with at in milliseconds', async () => {
+    const page = await opened()
+
+    await page.evaluate(() => {
+      document.cookie = 'refuse=1; path=/'
+    })
+    await page.fill('input.title', 'refused')
+    await page.click('button.add')
+    await page.waitUntil(() => document.querySelector('li.issue') !== null)
+
+    const fresh = Number(await page.evaluate(() => document.querySelector('li.issue')!.getAttribute('data-at')))
+
+    expect(Math.abs(Date.now() - fresh)).toBeLessThan(60_000)
+
+    await page.evaluate(async () => {
+      const db = await new Promise<IDBDatabase>((resolve) => {
+        const open = indexedDB.open('kay-local')
+
+        open.onsuccess = () => resolve(open.result)
+      })
+      const tx = db.transaction('issues', 'readwrite')
+      const store = tx.objectStore('issues')
+      const found = await new Promise<{ createdAt?: Date, at?: number }[]>((resolve) => {
+        const all = store.getAll()
+
+        all.onsuccess = () => resolve(all.result)
+      })
+
+      for (const record of found) {
+        delete record.createdAt
+        record.at = 1234
+        store.put(record)
+      }
+
+      await new Promise((resolve) => {
+        tx.oncomplete = resolve
+      })
+    })
+
+    // The collection reads its issues again when another tab says it changed.
+    await page.evaluate(() => new BroadcastChannel('kay-local').postMessage('/_kay/action/src/routes/index.kay/save'))
+    await page.waitUntil(() => document.querySelector('li.issue')?.getAttribute('data-at') === '1234')
+  }, 60_000)
+
   it('keeps the latest fifty issues of a collection', async () => {
     const page = await opened()
 

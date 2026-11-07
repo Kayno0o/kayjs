@@ -4,6 +4,18 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.92.0
 
+### kayjs-ai `ConversationSummary.updatedAt` is a `Date`, and a store lists `ConversationRow`
+
+A Chat's `conversations()` holds `ConversationSummary` with `updatedAt` a `Date`, where it was milliseconds: read `.getTime()` for the number. A `ConversationStore` of your own lists the new `ConversationRow` (the old `ConversationSummary`, `updatedAt` in milliseconds), and `StoredConversation` extends it. No lint can see it: a type changing under a property is not visible to `kay check`.
+
+### kayjs-cms `KeptDraft.at` is `editedAt`
+
+A `DraftKeeper` of your own reads and writes `editedAt` (milliseconds) where it read `at`. `browserKeeper()` still reads the drafts an older release kept in `localStorage`. No lint can see it: the property is read on a value.
+
+### A `local()` issue's `at` is `createdAt`, a `Date`
+
+`issues()` of a `local()` collection lists `createdAt: Date` where it listed `at` in milliseconds: read `issue.createdAt` (`.getTime()` for the number). Issues a browser stored before the upgrade are read as they were, `at` becoming `createdAt`. No lint can see it: a property read on a value is not visible to `kay check`.
+
 ### kay `StoredFile.modified` is `modifiedAt`
 
 `files.list()` and `FileStore.list` answer `{ key, modifiedAt }` where they answered `modified`, still a `Date` and absent when the store cannot say. A `FileStore` of your own returns `modifiedAt`. No lint can see it: a property read on a value is not visible to `kay check`.

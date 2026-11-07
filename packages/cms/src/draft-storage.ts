@@ -1,11 +1,11 @@
 import type { CmsDraftEntry } from './kay/contract'
 import { EDITOR_COOKIE } from './page-link'
 
-// What the browser keeps of an entry's unsaved edits: the entry as typed, the version of the file it was edited from, and when.
+// What the browser keeps of an entry's unsaved edits: the entry as typed, the version of the file it was edited from, and when (`editedAt`, in milliseconds).
 export interface KeptDraft {
   entry: CmsDraftEntry
   version: string | undefined
-  at: number
+  editedAt: number
   // A hash of the saved copy the edits were made from, kept for an entry with no version, which cannot tell by it that the entry was saved since.
   base?: string | undefined
 }
@@ -49,9 +49,9 @@ function isKept(value: unknown): value is KeptDraft {
   if (typeof value !== 'object' || value === null)
     return false
 
-  const { entry, version, at, base } = value as Record<string, unknown>
+  const { entry, version, editedAt, base } = value as Record<string, unknown>
 
-  return typeof at === 'number' && (base === undefined || typeof base === 'string') && (version === undefined || typeof version === 'string') && typeof entry === 'object' && entry !== null && typeof (entry as CmsDraftEntry).collection === 'string' && typeof (entry as CmsDraftEntry).slug === 'string' && typeof (entry as CmsDraftEntry).data === 'object' && (entry as CmsDraftEntry).data !== null
+  return typeof editedAt === 'number' && (base === undefined || typeof base === 'string') && (version === undefined || typeof version === 'string') && typeof entry === 'object' && entry !== null && typeof (entry as CmsDraftEntry).collection === 'string' && typeof (entry as CmsDraftEntry).slug === 'string' && typeof (entry as CmsDraftEntry).data === 'object' && (entry as CmsDraftEntry).data !== null
 }
 
 // Keeps drafts in the browser's `localStorage`, one item per entry. `get` and `now` are for a test to give. With `who`, the person the drafts belong to, they are kept under that name and none is read or written while it is undefined, so a draft is never offered to another person.
@@ -97,12 +97,19 @@ export function browserKeeper(get: () => Storage | undefined = storageOf, now: (
 
       try {
         kept = JSON.parse(text)
+
+        // A draft kept before 1.92 holds the time as `at`.
+        if (typeof kept === 'object' && kept !== null && 'at' in kept && !('editedAt' in kept)) {
+          const { at, ...rest } = kept
+
+          kept = { ...rest, editedAt: at }
+        }
       }
       catch {
         kept = undefined
       }
 
-      if (isKept(kept) && now() - kept.at <= KEEP_FOR)
+      if (isKept(kept) && now() - kept.editedAt <= KEEP_FOR)
         return kept
 
       remove(key)
