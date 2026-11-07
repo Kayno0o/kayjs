@@ -317,7 +317,7 @@ class RequestSession<Data extends object> implements Session<Data> {
       this.existed = false
     }
 
-    this.retired = this.id
+    this.retired ??= this.id
     this.id = undefined
     this.started = undefined
     this.data = {}
@@ -384,12 +384,12 @@ class RequestSession<Data extends object> implements Session<Data> {
       sealed = { id: this.id, issued: now, started, ...this.own }
     }
 
-    await this.tell(this.ended, { id: this.id })
-
     const cookie = this.cookie(sealWith(this.config.keys[0]!, stringify(sealed), name), this.own.browser ? undefined : maxAge)
 
     if (cookie.length > MAX_COOKIE_LENGTH)
       throw new Error(`kay: the session cookie ${name} would take ${cookie.length} bytes, more than a browser keeps; hold less in it, or give session() a store`)
+
+    await this.tell(this.ended, { id: this.id })
 
     return cookie
   }
