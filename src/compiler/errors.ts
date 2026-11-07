@@ -68,7 +68,7 @@ export const ERRORS = {
   },
   'static-pin': {
     group: 'compile',
-    summary: 'A component pinned static, with a `--- static` fence line, that something makes an island: an `on*`, `bind:` or `ref`, a browser value of `kay`, a live value, or a function written in the component, declared in its script, or a block taking parameters it passes to a component. The error stands at that thing; a value only the types know to be a function is `island-prop` in `kay check` and in the build\'s check stage.',
+    summary: 'A component pinned static, with a `--- static` fence line, that something makes an island: an `on*`, `bind:` or `ref`, a browser value of `kay`, a live value, or a function or a block taking parameters it passes to a component. The error stands at that thing.',
     fix: { file: 'llms/islands.md', heading: 'Islands' },
   },
   'browser-only-read': {

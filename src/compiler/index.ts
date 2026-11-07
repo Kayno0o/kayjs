@@ -153,16 +153,10 @@ function realCause(cause: IslandCause | undefined, expansion: Expansion | undefi
 }
 
 // A component pinned static that something makes an island: the error stands at that thing, so the author sees it.
-function staticPin(comment: boolean, span: Span, cause: IslandCause, island = true): Diagnostic {
+function staticPin(comment: boolean, span: Span, cause: IslandCause): Diagnostic {
   const written = comment ? '`// kay-static`' : '`--- static`'
 
-  return {
-    ...span,
-    code: 'static-pin',
-    message: `This component is pinned ${written}, and ${island ? 'is an island' : 'passes an island what cannot be sent as data'}: ${describeCause(cause)}`,
-    note: island ? 'it needs the browser, so it hydrates there' : 'an island is sent its props as data, so the render would throw an `IslandPropsError` on the first request',
-    help: 'take that out of the component, or pin it `--- island`',
-  }
+  return { ...span, code: 'static-pin', message: `This component is pinned ${written}, and is an island: ${describeCause(cause)}`, note: 'it needs the browser, so it hydrates there', help: 'take that out of the component, or pin it `--- island`' }
 }
 
 function liveImport(script: ScriptAnalysis, imported: ImportedSignals | undefined): string | undefined {
@@ -299,8 +293,6 @@ export function compileKay(original: string, filename: string, options: CompileO
   // A component pinned static is never promoted: what it passes an island that cannot be sent is an `island-prop` error.
   const promotion = island === undefined && !routeFile && pin?.kind !== 'static' ? promotionSite(file, script, options.importedSignals) : undefined
   const promote = promotion === undefined ? undefined : islandId(filename, options.root)
-  // The build has no types, so it stops at what it knows is not data; `kay check` has the types, and says `island-prop` for the rest.
-  const staticPassing = pin?.kind === 'static' && island === undefined && !routeFile && options.check !== true ? promotionSite(file, script, options.importedSignals, true) : undefined
   const rawCause = island === undefined ? promotion : islandCause(file, script) ?? liveCause(file, script, live)
   const cause = realCause(rawCause, expansion, original)
   const generateOptions = { cause: options.inspect === true && cause !== undefined ? causeSummary(cause, island === undefined) : undefined, classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, promote, output: options.output, failedCode, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, outerGuards: options.outerGuards, outerSlots: options.outerSlots, layoutFile: basename(filename) === LAYOUT, component: options.page === false && !routeFile, check: options.check, route: options.check === true && (routeFile || options.page === true), pageFile: routeFile || options.page === true, namedRefresh: options.namedRefresh, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: basename(filename) === ERROR_PAGE, cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
@@ -328,7 +320,6 @@ export function compileKay(original: string, filename: string, options: CompileO
     ...coded(validate(file, script, server, generateOptions), 'template-invalid'),
     ...coded(unparsed ? [] : found.diagnostics, 'signal-misuse'),
     ...coded(pin?.kind === 'static' && cause !== undefined && rawCause !== undefined && !routeFile && island !== undefined ? [staticPin(pin.comment, rawCause.span, cause)] : [], 'static-pin'),
-    ...coded(staticPassing ? [staticPin(pin?.comment === true, staticPassing.span, staticPassing, false)] : [], 'static-pin'),
   ]
 
   // Code that does not parse usually already has a better diagnostic from the fence or the template; this one is what is left when nothing else explains it.

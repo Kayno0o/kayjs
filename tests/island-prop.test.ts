@@ -217,35 +217,23 @@ describe('--- static, with the promotion gone to the types', () => {
   })
 })
 
-describe('--- static, passing what the compiler knows is not data', () => {
-  const part = 'src/components/part.kay'
-  const staticPins = (source: string, options = {}) => compileKay(source, part, options).diagnostics.filter(diagnostic => diagnostic.code === 'static-pin')
+describe('--- static, passing what cannot be sent as data', () => {
+  it('compiles: only the types know whether the component it passes it to is an island', () => {
+    const local = '--- static\nimport Table from \'./table.kay\'\nfunction shout() {}\n---\nTable(format={shout})\n'
+    const literal = '--- static\nimport Table from \'./table.kay\'\n---\nTable(format={() => 1})\n'
+    const block = '--- static\nimport Table from \'./table.kay\'\n---\nTable\n  @row(item)\n    p {item}\n'
 
-  it('is a `static-pin` error of the build for a function written or declared in the component, and a block taking parameters', () => {
-    const local = '--- static\nimport Picker from \'./picker.kay\'\nfunction shout() {}\n---\nPicker(format={shout})\n'
-    const literal = '--- static\nimport Picker from \'./picker.kay\'\n---\nPicker(format={() => 1})\n'
-    const block = '--- static\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @row(item)\n    p {item}\n'
-
-    for (const source of [local, literal, block]) {
-      const [found] = staticPins(source, { output: 'html' })
-
-      expect(found?.message).toContain('passes an island what cannot be sent as data')
-      expect(staticPins(source, { check: true })).toEqual([])
-    }
-
-    expect(staticPins(literal.replace('--- static', '---\n// kay-static'), { output: 'html' })).toHaveLength(1)
+    for (const source of [local, literal, block, literal.replace('--- static', '---\n// kay-static')])
+      expect(compileKay(source, 'src/components/part.kay', { output: 'html' }).diagnostics).toEqual([])
   })
 
-  it('leaves an imported value to the types, and a promotable component to the promotion', () => {
-    expect(staticPins('--- static\nimport Picker from \'./picker.kay\'\nimport { save } from \'../data\'\n---\nPicker(v={save})\n', { output: 'html' })).toEqual([])
-    expect(staticPins('---\nimport Picker from \'./picker.kay\'\nfunction shout() {}\n---\nPicker(format={shout})\n', { output: 'html' })).toEqual([])
-  })
-
-  it('fails `kay build`, naming the component, rather than throwing on the first request', async () => {
+  it('fails `kay build` for one an island is passed, naming the component, rather than throwing on the first request, and builds one a server component is passed', async () => {
     const root = await project({
       'src/components/island.kay': island,
+      'src/components/table.kay': '---\nconst { format } = props<{ format: (n: number) => string }>()\n---\np {format(1)}\n',
       'src/components/pinned.kay': component('function pick() {}', 'Island(v={pick})', '--- static'),
-      'src/routes/index.kay': '---\nimport Pinned from \'../components/pinned.kay\'\n---\nPinned\n',
+      'src/components/listing.kay': '--- static\nimport Table from \'./table.kay\'\nfunction shout(n: number) { return String(n) }\n---\nTable(format={shout})\n',
+      'src/routes/index.kay': '---\nimport Pinned from \'../components/pinned.kay\'\nimport Listing from \'../components/listing.kay\'\n---\nPinned\nListing\n',
     })
 
     try {
@@ -256,7 +244,7 @@ describe('--- static, passing what the compiler knows is not data', () => {
 
       const result = JSON.parse(output.trim().split('\n').at(-1)!) as { failed?: { stage: string }, built?: unknown, checked: { code: string, file: string }[] }
 
-      // The build's check stage refuses it with the type verdict; the compile's `static-pin` above stands where the types are not read.
+      // The build's check stage refuses it with the type verdict, which knows `Table` renders on the server alone.
       expect(errors).toBe('')
       expect(result.failed).toEqual({ stage: 'check' })
       expect(result.built).toBeUndefined()
