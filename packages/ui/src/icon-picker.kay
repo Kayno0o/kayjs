@@ -140,7 +140,7 @@ async function load(needle: string, offset: number) {
   }
   catch (error) {
     if (mine === request) {
-      console.error('kayjs-ui: an IconPicker\'s search failed', error)
+      console.error('kayjs-ui: an IconPicker could not load its icons', error)
       failed = true
       safely(() => onError?.({ error, query: needle }), 'kayjs-ui: an IconPicker onError')
     }
