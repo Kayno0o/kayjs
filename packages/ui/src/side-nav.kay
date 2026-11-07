@@ -12,7 +12,7 @@ import { wording } from 'kay/words'
 // 'kui-side-nav' stays as the component's name for an app's CSS. From lg the nav is a column, narrowed to a rail of icons when collapsed; below it the nav gives way to a button opening the same lists in a SidePanel.
 const look = recipe({
   parts: {
-    root: 'kui-side-nav flex flex-col max-lg:flex-row max-lg:flex-wrap max-lg:items-center',
+    root: 'kui-side-nav flex flex-col lg:w-min lg:gap-4 max-lg:flex-row max-lg:flex-wrap max-lg:items-center',
     menu: 'lg:hidden',
     nav: 'group/side flex min-h-0 flex-1 flex-col gap-4 data-[panel]:max-lg:hidden w-60 data-[collapsed]:w-14 transition-[width] max-lg:w-full',
     header: 'min-w-0 overflow-hidden px-3',
