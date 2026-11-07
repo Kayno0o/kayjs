@@ -4356,6 +4356,26 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports a kayjs-auth result\'s `error` compared with a kind in a module and a page, and `--fix` reads `error.code`', async () => {
+    const root = await scratchProject({
+      'src/limited.ts': 'import type { ChangePasswordResult } from \'@kaynooo/kayjs-auth\'\n\nexport function limited(result: ChangePasswordResult): boolean {\n  return !result.ok && result.error === \'limited\'\n}\n',
+      'src/routes/index.kay': '--- server\nimport type { ChangePasswordResult } from \'@kaynooo/kayjs-auth\'\n\ndeclare const result: ChangePasswordResult\nconst stale = !result.ok && result.error === \'stale\'\n---\np {stale}\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(d => d.code === 'deprecated-auth-error')
+
+      expect(found.map(d => [basename(d.file), d.line])).toEqual([['index.kay', 5], ['limited.ts', 4]])
+      expect(await applySafeFixes(root, found)).toBe(2)
+      expect(await Bun.file(join(root, 'src/limited.ts')).text()).toContain('result.error.code === \'limited\'')
+      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toContain('result.error.code === \'stale\'')
+      expect((await check(root)).filter(d => d.code === 'deprecated-auth-error')).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a Dockerfile building from a Bun older than kay needs, and `--fix` moves it up', async () => {
     const root = await scratchProject({ 'src/a.kay': 'p a\n', 'Dockerfile': 'FROM oven/bun:1.0.0 AS build\n' })
 
