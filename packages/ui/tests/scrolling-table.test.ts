@@ -25,7 +25,7 @@ it('stops loading pages once the sentinel is out of view under a page-scrolled t
   expect(before).toBeLessThan(4)
 
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
-  await page.waitUntil(() => ((window as unknown as { loads?: number }).loads ?? 0) > 0)
+  await page.waitUntil(count => ((window as unknown as { loads?: number }).loads ?? 0) > count, {}, before)
   expect(await page.evaluate(loads)).toBeGreaterThan(before)
 }, 120_000)
 
@@ -45,7 +45,7 @@ it('stops and resumes under a table inside a scroll box of its own', async () =>
 
     box.scrollTop = box.scrollHeight
   })
-  await page.waitUntil(() => ((window as unknown as { loads?: number }).loads ?? 0) > 1)
+  await page.waitUntil(count => ((window as unknown as { loads?: number }).loads ?? 0) > count, {}, before)
   expect(await page.evaluate(loads)).toBeGreaterThan(before)
 }, 120_000)
 
@@ -59,6 +59,17 @@ it('stops and resumes under a virtual table', async () => {
   await new Promise(resolve => setTimeout(resolve, 500))
   expect(await page.evaluate(loads)).toBe(before)
   expect(before).toBeLessThan(4)
+
+  await page.evaluate(() => {
+    for (let node: HTMLElement | null = document.querySelector<HTMLElement>('.kui-table-wrap'); node; node = node.parentElement) {
+      if (node.scrollHeight > node.clientHeight && getComputedStyle(node).overflowY !== 'visible')
+        node.scrollTop = node.scrollHeight
+    }
+
+    window.scrollTo(0, document.body.scrollHeight)
+  })
+  await page.waitUntil(count => ((window as unknown as { loads?: number }).loads ?? 0) > count, {}, before)
+  expect(await page.evaluate(loads)).toBeGreaterThan(before)
 }, 120_000)
 
 it('keeps filling a first page that fits the screen until the sentinel leaves view, then ends with the list', async () => {

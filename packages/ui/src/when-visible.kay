@@ -82,6 +82,9 @@ onMount(() => {
     }
 
     intersection.observe(el)
+
+    if (root)
+      growth.observe(root)
   }
 
   // Rows added inside a scroll box of fixed height leave its size alone, so new children count as growth as much as a parent growing does.
@@ -89,6 +92,9 @@ onMount(() => {
   const added = new MutationObserver(recheck)
 
   intersection.observe(el)
+
+  if (root)
+    growth.observe(root)
 
   if (el.parentElement) {
     growth.observe(el.parentElement)
