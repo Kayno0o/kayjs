@@ -916,6 +916,24 @@ describe('kay.config.ts', () => {
   })
 })
 
+describe('kay build with resource()', () => {
+  it('prerenders an island reading a route `loading`: a build has no visitor to ask as, and seeds nothing', async () => {
+    const root = await scratchProject({
+      'src/api/data.ts': 'import { api } from \'kay/server\'\n\nexport default api().get(\'/items\', () => ({ items: [\'a\'] }))\n',
+      'src/card.kay': '---\nimport { resource } from \'kay\'\nimport data from \'./api/data\'\n\nconst list = resource(data, \'/items\')\n---\np.status {list.status()}\n',
+      'src/routes/index.kay': '--- server\nexport const page = { prerender: true }\n---\n---\nimport Card from \'../card.kay\'\n---\nCard\n',
+    })
+    const { report, output, code } = await kayBuild([root, '--no-check'], {})
+
+    expect(code, report + output).toBe(0)
+
+    const html = await Bun.file(join(outputDir(root), 'pages/index.html')).text()
+
+    expect(html).toContain('<p class="status">loading</p>')
+    expect(html).not.toContain('data-kay-resources')
+  })
+})
+
 describe('kay build without the server environment', () => {
   it('prerenders a page whose layout declares a variable the build lacks, and fails one reading it, naming it', async () => {
     const root = await scratchProject({

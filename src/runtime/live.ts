@@ -1,11 +1,21 @@
 import type { CallResult } from './call-result'
+import type { Duration } from './duration'
 import { ApiError, apiErrorOf, failed, refused, textOf, unreachable } from './api-error'
 import { withBase } from './base'
 import { trackCalls } from './call-result'
 import { connection, listenerSet } from './connection'
-import { effect, onCleanup, onMount, ownSignal, untrack } from './reactive'
+import { durationSeconds } from './duration'
+import { serverResource } from './live-resource.server'
+import { pageData } from './page-data'
+import { effect, isHydrating, onCleanup, onMount, ownSignal, untrack } from './reactive'
 import { parseEvents, SENDABLE_ID } from './sse'
 import { decodeServerValue } from './wire'
+
+// Defined by the browser build, which never runs the server's half: tested where it is read, so the bundler drops it.
+declare const KAY_BROWSER: true | undefined
+
+// A timer waits 2^31 - 1 ms at most.
+const MAX_TIMER = 2_147_483_647
 
 // Set by the server on every module it mounts under `/api`, and by the browser build on the stub standing in for one: where the module's routes are served.
 export const API_MOUNT = Symbol.for('kay.api')
@@ -612,6 +622,19 @@ export function stream(module: unknown, path?: string, options?: UrlInput & { me
 // What a resource's status can be: it starts loading, so never idle.
 type ResourceState = Exclude<LoadStatus, 'idle'>
 
+// When a resource asks its route again by itself: when the tab gets the focus back, when the network returns, or every so often while the tab shows.
+export type Revalidation = 'focus' | 'reconnect' | Duration
+
+// What `resource()` takes besides the route's params and query.
+export interface ResourceExtras<T> {
+  // A value the app already has: the resource is `ready` with it at once, on the server too, and asks the route for nothing until `refresh()` or a `revalidate`.
+  initial?: T | undefined
+  // Names the value: every resource with this key shares one request and one value, `mutate()` and `refresh()` reaching them all. A route's key is its URL, so two islands reading the same route and arguments already share; a `load` function shares only when given one.
+  key?: string | undefined
+  // Asks the route again quietly, the value kept and the status still `ready`, and stops with the component.
+  revalidate?: Revalidation | readonly Revalidation[] | undefined
+}
+
 export interface Resource<T> extends Source<ResourceState> {
   // What the route last answered, kept while it is asked again; undefined before the first answer.
   value: () => T | undefined
@@ -621,6 +644,8 @@ export interface Resource<T> extends Source<ResourceState> {
   error: () => ApiError | undefined
   // Asks the route again with the same options, until the component that read it is gone, even when it is ready.
   refresh: () => void
+  // Sets the value at once, for every resource sharing its key, and asks the route again to settle it: a request still in flight is dropped, so an older answer never overwrites it. `{ refresh: false }` keeps the value as set. Given a function, it gets the current value.
+  mutate: (next: T | ((current: T | undefined) => T), options?: { refresh?: boolean }) => void
 }
 
 // What a value is once it crossed as JSON: a Date arrives as its ISO text.
@@ -633,8 +658,9 @@ type Readable<Value> = unknown extends Value ? true : [Value] extends [EventStre
 
 // The GET routes of a module that answer an object, an array or a string.
 export type ResourcePath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: { get: infer Route } } ? Route extends { response: { 200: infer Value } } ? Readable<Value> extends true ? Path : never : Path : never : never
-export type ResourceOptions<Module, Path> = UrlOptions<GetRoute<Module, Path>>
-export type ResourceOf<Module, Path> = Resource<GetRoute<Module, Path> extends { response: { 200: infer Value } } ? Jsonified<Value> : unknown>
+type ResourceValue<Module, Path> = GetRoute<Module, Path> extends { response: { 200: infer Value } } ? Jsonified<Value> : unknown
+export type ResourceOptions<Module, Path> = UrlOptions<GetRoute<Module, Path>> & ResourceExtras<ResourceValue<Module, Path>>
+export type ResourceOf<Module, Path> = Resource<ResourceValue<Module, Path>>
 
 // An answer as Elysia sends it: JSON for an object, text for anything else.
 // What a route answered: JSON, text, or the bytes of anything else, a file say. A refusal whose JSON does not parse reads as its text, and an answer cut off throws an ApiError with status 0, unless the call was aborted.
@@ -669,110 +695,317 @@ export async function readAnswer(response: Response, signal?: AbortSignal): Prom
   }
 }
 
-// Reads a GET route of a module under `src/api` from an island, once it is in the page, typed from the route. Options given as a function are read reactively: the route is asked again when a signal they read changes, and an answer a newer request overtook is dropped.
-// kept: request
-export function resource<Module, const Path extends ResourcePath<Module>>(module: Module, path: Path, ...[options]: Optional<ResourceOptions<Module, Path> | (() => ResourceOptions<Module, Path>)>): ResourceOf<Module, Path>
-// Reads anything else the same way: `load` gets a signal that aborts when it is superseded or the component is gone, and the signals it reads before its first await are tracked, so it runs again when one changes. A throw is the `error()`, its `status` 0 unless it is an `ApiError`.
-export function resource<T>(load: (signal: AbortSignal) => T | PromiseLike<T>): Resource<Awaited<T>>
-export function resource(module: unknown, path?: string, options?: UrlInput | (() => UrlInput)): Resource<unknown> {
-  const [value, setValue] = ownSignal<unknown>(undefined, { equals: false })
-  const [status, setStatus] = ownSignal<ResourceState>('loading')
-  const [error, setError] = ownSignal<ApiError | undefined>(undefined)
-  const [busy, setBusy] = ownSignal(true)
-  let current: AbortController | undefined
-  let asked: ((signal: AbortSignal, fresh?: boolean) => unknown) | undefined
-  let gone = false
-  let followed = false
+// How an Entry asks its route: the first time or on `refresh()` it shows `loading`; a quiet reload keeps the status and drops a failure; the one after `mutate()` keeps the status and shows a failure.
+type Ask = 'first' | 'quiet' | 'kept'
+type Read = (signal: AbortSignal, fresh?: boolean, proof?: (header: string | null) => void) => unknown
+
+// One resource's view of an Entry: it copies the Entry's state into its own signals.
+interface Sink {
+  apply: (entry: Entry) => void
+}
+
+// The entries by key, while a resource holds them.
+const entries = new Map<string, Entry>()
+
+// The value, status and request behind the resources sharing a key; a resource with none is the only one on its Entry.
+class Entry {
+  readonly sinks = new Set<Sink>()
+  value: unknown
+  // Counts the values written, 0 before the first, so a Sink copies a value only once.
+  rev: number
+  status: ResourceState
+  error: ApiError | undefined = undefined
+  busy: boolean
+  asked: Read | undefined = undefined
+  gone = false
+  private current: AbortController | undefined
+  private followed = false
+
+  constructor(readonly key: string | undefined, known?: { value: unknown }) {
+    this.value = known?.value
+    this.rev = known === undefined ? 0 : 1
+    this.status = known === undefined ? 'loading' : 'ready'
+    this.busy = known === undefined
+  }
+
+  private publish(): void {
+    for (const sink of this.sinks)
+      sink.apply(this)
+  }
 
   // A reload made for a change keeps the status, and the value on failure, so it is swapped without a loading state in between; it skips the browser's cache.
-  const load = async (read: (signal: AbortSignal, fresh?: boolean) => unknown, quiet = false) => {
+  readonly load = async (read: Read, ask: Ask = 'first'): Promise<void> => {
     const controller = new AbortController()
 
-    current?.abort()
-    current = controller
-    asked = read
+    this.current?.abort()
+    this.current = controller
+    this.asked = read
+    this.busy = true
 
-    setBusy(true)
+    if (ask === 'first')
+      this.status = 'loading'
 
-    if (!quiet)
-      setStatus('loading')
+    this.publish()
 
     try {
-      const answer = await read(controller.signal, quiet)
+      const answer = await read(controller.signal, ask !== 'first', (header) => {
+        if ((header !== null || this.followed) && !controller.signal.aborted && !this.gone)
+          void this.follow(header)
+      })
 
       if (controller.signal.aborted)
         return
 
-      setValue(answer)
-      setError(undefined)
-      setStatus('ready')
-      setBusy(false)
+      this.value = answer
+      this.rev++
+      this.error = undefined
+      this.status = 'ready'
+      this.busy = false
     }
     catch (failure) {
       if (controller.signal.aborted)
         return
 
-      setBusy(false)
+      this.busy = false
 
-      if (quiet)
-        return
-
-      setError(apiErrorOf(failure))
-      setStatus('failed')
+      if (ask !== 'quiet') {
+        this.error = apiErrorOf(failure)
+        this.status = 'failed'
+      }
     }
+
+    this.publish()
+  }
+
+  set(value: unknown): void {
+    this.current?.abort()
+    this.current = undefined
+    this.value = value
+    this.rev++
+    this.error = undefined
+    this.status = 'ready'
+    this.busy = false
+    this.publish()
+  }
+
+  revalidate(): void {
+    if (!this.busy && this.asked !== undefined && !this.gone)
+      void this.load(this.asked, 'quiet')
   }
 
   // Follows the cached values the route's handler read, from the proof its answer carried, or lets go of them when it carried none.
-  const follow = async (proof: string | null) => {
-    followed = proof !== null
+  async follow(proof: string | null): Promise<void> {
+    this.followed = proof !== null
 
     try {
-      (await import('./live-cache')).followRoute(load, proof, async () => gone || load(asked!, true))
+      (await import('./live-cache')).followRoute(this.load, proof, async () => this.gone || this.load(this.asked!, 'quiet'))
     }
     catch {}
   }
 
-  // The server renders the island loading, as the browser does until the answer comes.
-  if (typeof document !== 'undefined') {
-    effect(() => {
-      if (typeof module === 'function')
-        return void load(module as (signal: AbortSignal) => unknown)
+  leave(sink: Sink): void {
+    this.sinks.delete(sink)
 
-      const given = typeof options === 'function' ? options() : options
+    if (this.sinks.size > 0)
+      return
 
-      return void load(async (signal, fresh) => {
-        const url = withBase(routeUrl(module, path ?? '', given))
-        let response: Response
+    this.gone = true
+    this.busy = false
+    this.current?.abort()
 
-        try {
-          response = await fetch(url, { headers: { accept: 'application/json' }, signal, ...fresh && { cache: 'reload' } })
-        }
-        catch (failure) {
-          throw signal.aborted ? failure : unreachable(failure)
-        }
+    if (this.followed)
+      void this.follow(null)
 
-        const answer = await readAnswer(response, signal)
-
-        if (!response.ok && !signal.aborted)
-          throw refused(response, answer)
-
-        const proof = response.headers.get('x-kay-live')
-
-        if ((proof !== null || followed) && !signal.aborted && !gone)
-          void follow(proof)
-
-        return answer
-      })
-    })
+    if (this.key !== undefined && entries.get(this.key) === this)
+      entries.delete(this.key)
   }
+}
+
+// The page where `resource()` finds what the server's render read: a JSON script of the seeds by key.
+export const RESOURCES_SCRIPT = 'data-kay-resources'
+
+function seedOf(key: string): { value: unknown, proof: string | null } | undefined {
+  for (const seeds of pageData<Record<string, { value: unknown, proof: string | null }>>(`script[${RESOURCES_SCRIPT}]`, JSON.parse, true)) {
+    if (Object.hasOwn(seeds, key))
+      return seeds[key]
+  }
+
+  return undefined
+}
+
+// Asks again each time the browser says so, until the owner is gone: the tab getting the focus back, the network returning, or an interval while the tab shows.
+function revalidating(when: Revalidation | readonly Revalidation[], run: () => void): void {
+  for (const trigger of typeof when === 'string' ? [when] : when) {
+    if (trigger === 'focus') {
+      const shown = () => {
+        if (!document.hidden)
+          run()
+      }
+
+      window.addEventListener('focus', run)
+      document.addEventListener('visibilitychange', shown)
+      onCleanup(() => {
+        window.removeEventListener('focus', run)
+        document.removeEventListener('visibilitychange', shown)
+      })
+    }
+    else if (trigger === 'reconnect') {
+      window.addEventListener('online', run)
+      onCleanup(() => window.removeEventListener('online', run))
+    }
+    else {
+      const timer = setInterval(() => {
+        if (!document.hidden)
+          run()
+      }, Math.min(durationSeconds(trigger, 'the revalidate of resource()') * 1000, MAX_TIMER))
+
+      onCleanup(() => clearInterval(timer))
+    }
+  }
+}
+
+// Reads a GET route of a module under `src/api` from an island, typed from the route. Options given as a function are read reactively: the route is asked again when a signal they read changes, and an answer a newer request overtook is dropped.
+// The server renders the island with the route's answer, asked in process with the visitor's cookies so its guards run, and the island hydrates `ready` with it; a route that refuses or fails there leaves the island `loading` for the browser to ask. A prerendered page asks nothing.
+// Resources reading one route and arguments share a request and a value, `key` naming another; `initial` is a value the app has, `revalidate` asks again on focus, on reconnect or every so often, and `mutate(value)` sets the value for all of them and asks the route again.
+// kept: request
+export function resource<Module, const Path extends ResourcePath<Module>>(module: Module, path: Path, ...[options]: Optional<ResourceOptions<Module, Path> | (() => ResourceOptions<Module, Path>)>): ResourceOf<Module, Path>
+// Reads anything else the same way: `load` gets a signal that aborts when it is superseded or the component is gone, and the signals it reads before its first await are tracked, so it runs again when one changes. A throw is the `error()`, its `status` 0 unless it is an `ApiError`. It runs in the browser only; `initial` shows until it first answers.
+export function resource<T>(load: (signal: AbortSignal) => T | PromiseLike<T>, options?: ResourceExtras<Awaited<T>>): Resource<Awaited<T>>
+export function resource(module: unknown, path?: string | ResourceExtras<unknown>, options?: UrlInput & ResourceExtras<unknown> | (() => UrlInput & ResourceExtras<unknown>)): Resource<unknown> {
+  const route = typeof module !== 'function'
+  const urlOf = (given: UrlInput | undefined) => {
+    try {
+      return routeUrl(module, path as string, given)
+    }
+    catch {
+      return undefined
+    }
+  }
+  const keyOf = (given: UrlInput | ResourceExtras<unknown> | undefined) => (given as ResourceExtras<unknown> | undefined)?.key ?? (route ? urlOf(given as UrlInput | undefined) : undefined)
+  const optionsNow = () => typeof options === 'function' ? options() : options
+  const first = untrack(() => route ? optionsNow() : path) as (UrlInput & ResourceExtras<unknown>) | undefined
+
+  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
+    return serverResource(keyOf(first), route ? urlOf(first) : undefined, first?.initial === undefined ? undefined : { value: first.initial })
+
+  const [value, setValue] = ownSignal<unknown>(undefined, { equals: false })
+  const [status, setStatus] = ownSignal<ResourceState>('loading')
+  const [error, setError] = ownSignal<ApiError | undefined>(undefined)
+  const [busy, setBusy] = ownSignal(true)
+  let entry: Entry | undefined
+  let gone = false
+  let shown: { from: Entry, rev: number } | undefined
+
+  const sink: Sink = {
+    apply: (from) => {
+      if (from.rev > 0 && (shown?.from !== from || shown.rev !== from.rev)) {
+        shown = { from, rev: from.rev }
+        setValue(from.value)
+      }
+
+      setStatus(from.status)
+      setError(from.error)
+      setBusy(from.busy)
+    },
+  }
+
+  const readOf = (given: UrlInput | undefined): Read => route
+    ? async (signal, fresh, proof) => {
+      const url = withBase(routeUrl(module, path as string, given))
+      let response: Response
+
+      try {
+        response = await fetch(url, { headers: { accept: 'application/json' }, signal, ...fresh && { cache: 'reload' } })
+      }
+      catch (failure) {
+        throw signal.aborted ? failure : unreachable(failure)
+      }
+
+      const answer = await readAnswer(response, signal)
+
+      if (!response.ok && !signal.aborted)
+        throw refused(response, answer)
+
+      proof?.(response.headers.get('x-kay-live'))
+
+      return answer
+    }
+    : module as Read
+
+  const join = (next: Entry) => {
+    entry = next
+    next.sinks.add(sink)
+    sink.apply(next)
+  }
+
+  // The entry the key names, made if no resource holds it; true when it was made here.
+  const take = (key: string | undefined, known?: { value: unknown }): [Entry, boolean] => {
+    const held = key === undefined ? undefined : entries.get(key)
+    const next = held ?? new Entry(key, known)
+
+    if (held === undefined && key !== undefined)
+      entries.set(key, next)
+
+    return [next, held === undefined]
+  }
+
+  // A value the app has, or the one the server rendered this island with, is shown at once.
+  let known = false
+  const firstKey = keyOf(first)
+  let seed: { value: unknown, proof: string | null } | undefined = first?.initial === undefined ? undefined : { value: first.initial, proof: null }
+
+  if (seed === undefined && isHydrating() && route && firstKey !== undefined)
+    seed = seedOf(firstKey)
+
+  if (seed !== undefined) {
+    const [next, made] = take(firstKey, seed)
+
+    join(next)
+    known = true
+
+    if (made && seed.proof !== null)
+      void next.follow(seed.proof)
+  }
+
+  effect(() => {
+    const given = (route ? optionsNow() : undefined) as UrlInput | undefined
+    const read = readOf(given)
+    const key = keyOf(route ? given : first)
+    // A route the app has the value of is not asked; a function runs once, to follow its signals and replace the value.
+    const placeholder = known && !route
+    const held = entry !== undefined && entry.key === key ? entry : undefined
+
+    known = false
+
+    if (held !== undefined && (key === undefined || placeholder)) {
+      void held.load(read, placeholder ? 'kept' : 'first')
+
+      return
+    }
+
+    if (held !== undefined) {
+      held.asked ??= read
+
+      return
+    }
+
+    entry?.leave(sink)
+
+    const [next, made] = take(key)
+
+    join(next)
+
+    if (made)
+      void next.load(read, 'first')
+  })
+
+  if (first?.revalidate !== undefined)
+    revalidating(first.revalidate, () => entry?.revalidate())
 
   onCleanup(() => {
     gone = true
-    current?.abort()
+    entry?.leave(sink)
     setBusy(false)
-
-    if (followed)
-      void follow(null)
   })
 
   return {
@@ -780,10 +1013,19 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
     status,
     pending: busy,
     error,
-    refresh: () => asked === undefined || gone ? undefined : void load(asked),
+    refresh: () => entry?.asked === undefined || gone ? undefined : void entry.load(entry.asked),
     retry: () => {
-      if (asked !== undefined && !gone && untrack(status) === 'failed')
-        void load(asked)
+      if (entry?.asked !== undefined && !gone && untrack(status) === 'failed')
+        void entry.load(entry.asked)
+    },
+    mutate: (next, settings) => {
+      if (entry === undefined || gone)
+        return
+
+      entry.set(typeof next === 'function' ? (next as (current: unknown) => unknown)(entry.rev > 0 ? entry.value : undefined) : next)
+
+      if (settings?.refresh !== false && entry.asked !== undefined)
+        void entry.load(entry.asked, 'kept')
     },
   }
 }

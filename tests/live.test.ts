@@ -242,7 +242,7 @@ describe('API modules', () => {
 
     expect(page.html).toContain('<p class="status">connecting</p>')
     expect(page.html).toContain('<p class="last">Nothing yet</p>')
-    expect(page.html).toMatch(/<p class="rooms">(<!--\[-->)?loading/)
+    expect(page.html).toMatch(/<p class="rooms">(<!--\[-->)?ready/)
   })
 
   it('makes no URL on the server, where a page prerendering the island imports the module unmounted', () => {
@@ -718,14 +718,14 @@ describe('resource()', () => {
 
   it('fails with status 0 and kay\'s own wording when the fetch rejects', async () => {
     served.mockImplementationOnce((async () => Promise.reject(new TypeError('offline'))) as unknown as typeof fetch)
-    const rooms = root(() => resource(chat, '/rooms'))
+    const rooms = root(() => resource(chat, '/rooms', { key: 'rejected' }))
 
     await until(() => rooms.status() !== 'loading')
     expect(rooms.error()).toMatchObject({ status: 0, message: 'The server could not be reached' })
   })
 
   it('aborts what it asked once its component is gone', () => {
-    const [rooms, dispose] = root(done => [resource(chat, '/rooms'), done] as const)
+    const [rooms, dispose] = root(done => [resource(chat, '/rooms', { key: 'aborted' }), done] as const)
 
     flush()
     dispose()

@@ -35,6 +35,7 @@ import { child, component, html, newServerIslands, withinComponent, withServerIs
 import { localePath, textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
 import { unrevivableAction } from '../runtime/island.server'
+import { resourcesUsed, resourcesWanted } from '../runtime/live-resource.server'
 import { unansweredLoads } from '../runtime/load-scope'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
@@ -77,6 +78,7 @@ import { recordOf, requestRecord } from './request-record'
 import { forgetOnces, guardValues, onceOf } from './request-scope'
 import { againstDeadline, requestSignal, RequestTimeoutError, retime } from './request-timeout'
 import { overHttps } from './request-url'
+import { ResourcesPending, resourcesScript, withResources } from './resources'
 import { askedPath } from './rewrite'
 import { CONTEXT_LAYOUT, guardUrl, routeChain } from './routes'
 import { savesLess } from './save-data'
@@ -297,7 +299,8 @@ async function renderRoute(route: ServedRoute, rendering: Rendering, client: Cli
 
   try {
     const started = performance.now()
-    const body = traced(() => `kay.render ${projectPath(route.file)}`, {}, () => renderDocument(page.files, page.modules, page.data, client, rendering, options, page.head))
+    const render = () => traced(() => `kay.render ${projectPath(route.file)}`, {}, () => renderDocument(page.files, page.modules, page.data, client, rendering, options, page.head))
+    const body = options.prerendering ? render() : await withResources(rendering.ctx.request, render)
 
     timed(page, rendering, started, options)
 
@@ -1192,6 +1195,16 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   if (marks)
     noteProbedEntries(rendering.ctx.request, marks.entries.values())
 
+  const wanted = resourcesWanted()
+
+  if (wanted !== undefined) {
+    // The pass is thrown away, so a promise its `await` blocks started must not report a rejection nothing will take.
+    for (const block of deferred)
+      void held(block.value)
+
+    throw new ResourcesPending(wanted)
+  }
+
   const hasIslands = client.entry !== undefined && islands.count > 0
 
   const unrevivable = unrevivableAction(islands, client)
@@ -1219,7 +1232,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const headHtml = polish ? polish(head.html) : head.html
   // The browser's form check words a refusal as the server does, so a page with a checked form sends the `kay.invalid.*` messages too.
   const words = checked === '' ? islands.messages : new Set([...islands.messages, ...invalidKeys()])
-  const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true, hasIslands && lang !== state?.locale) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) : '') + liveText
+  const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true, hasIslands && lang !== state?.locale) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) + resourcesScript(resourcesUsed()) : '') + liveText
   // A page rendering an island that uses `installPrompt` keeps the browser's install offer from the first moment, unless the worker's registration script already does. A streamed block or deferred server island renders after the head, so such a page carries it whenever the app has one.
   const keepsInstallOffer = client.installs?.some(id => streamed || defers || islands.used.has(id)) === true && !(options.offline && options.installOffer)
   const opening = `${htmlOpen(lang, head.root)}<head>${headStart(head)}`
@@ -1238,6 +1251,17 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
 
   // A deferred module would wait for the whole stream; an async one hydrates the islands already there as soon as it loads.
   return streamDocument(shipsEntry ? `${start}<script type="module" async src="${client.entry}"></script>` : start, deferred, client, shipsEntry, error => reportServerError(error, rendering.ctx.request, options.observe?.onError), { hydration: hasIslands, forms: posts ? forms : undefined, words: checked !== '', locale: hasIslands || (checked !== '' && words.size > 0), dev: options.dev, polish })
+}
+
+// Takes the rejection of a promise whose render was dropped.
+async function held(value: PendingBlock['value']): Promise<void> {
+  if (!(value instanceof Promise))
+    return
+
+  try {
+    await value
+  }
+  catch {}
 }
 
 function htmlOpen(lang: string, attributes: string): string {

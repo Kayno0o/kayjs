@@ -994,11 +994,12 @@ interface ResolvedProtection extends ActionHooks
 
 [.] resource
 function resource<Module, const Path extends ResourcePath<Module>>(module: Module, path: Path, ...[options]: Optional<(() => ResourceOptions<Module, Path>) | ResourceOptions<Module, Path>>): ResourceOf<Module, Path>
-function resource<T>(load: (signal: AbortSignal) => PromiseLike<T> | T): Resource<Awaited<T>>
+function resource<T>(load: (signal: AbortSignal) => PromiseLike<T> | T, options?: ResourceExtras<Awaited<T>> | undefined): Resource<Awaited<T>>
 
 [.] Resource
 interface Resource<T> extends Source<ResourceState>
   error: () => ApiError<unknown> | undefined
+  mutate: (next: ((current: T | undefined) => T) | T, options?: undefined | { refresh?: boolean; }) => void
   pending: () => boolean
   refresh: () => void
   retry: () => void

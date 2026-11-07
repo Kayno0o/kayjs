@@ -211,7 +211,26 @@ if list.error() as error
   button(onClick={list.retry} disabled={list.pending()}) Retry
 ```
 
-A resource opens once the island is in the page, never on the server. There it renders as `loading`.
+A page that renders a resource shows the value at once. The server asks the route in process as the visitor, with their cookies, so the route's guards run, and the island arrives `ready` and hydrates without a request. If the route refuses, fails or takes more than five seconds, the island renders as `loading` and the browser asks the route itself, so a refusal never reaches the page's HTML.
+
+A prerendered page asks nothing, and nor does an `await` block or a server island: they render as `loading`.
+
+Two resources reading the same route with the same params and query share one request and one value. Give both the same `key` to share routes that differ.
+
+```kay
+---
+import { resource } from 'kay'
+import notes from '../api/notes'
+
+const list = resource(notes, '/', { revalidate: ['focus', 'reconnect', '30s'] })
+const add = () => list.mutate(current => [...current ?? [], { title: 'New' }])
+---
+button(onClick={add}) Add
+```
+
+`mutate(value)` sets the value for every resource sharing it, then asks the route again so the answer settles it. A request still in flight is dropped, so an older answer never overwrites the new value. Pass `{ refresh: false }` to keep the value as you set it.
+
+`initial` is a value you already have. The resource is `ready` with it on the server and in the browser and asks nothing until `refresh()`. `revalidate` asks again quietly, keeping the value and the `ready` status, when the tab gets the focus back (`'focus'`), when the network returns (`'reconnect'`) or every so often (`'30s'`). It stops with the component.
 
 To send data, call a route from an event handler. See [API routes](/guides/api-routes#calling-a-route-from-an-event-handler).
 
