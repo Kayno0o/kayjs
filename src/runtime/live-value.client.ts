@@ -47,7 +47,7 @@ type Reader = ReturnType<typeof readEvents<LiveUpdate[]>>
 
 let current: { keys: Set<string>, reader: Reader } | undefined
 // The connection `status()`, `error()` and `retry()` of every handle read: none while the page follows nothing.
-const [followed, follow] = ownSignal<Reader | undefined>(undefined)
+const followedReader = ownSignal<Reader | undefined>(undefined)
 let settling: ReturnType<typeof setTimeout> | undefined
 let renewing: ReturnType<typeof setTimeout> | undefined
 
@@ -217,7 +217,7 @@ function release(): void {
   renewing = undefined
   current?.reader.close()
   current = undefined
-  follow(undefined)
+  followedReader[1](undefined)
 }
 
 // Opens, moves or closes the one connection so it carries exactly the keys the islands read.
@@ -270,7 +270,7 @@ function sync(): void {
 
   reader.on(apply)
   current = { keys, reader }
-  follow(reader)
+  followedReader[1](reader)
 
   if (renewing === undefined)
     renewLater()
@@ -320,10 +320,10 @@ function warnUnnoted(id: string, key: string): void {
 
 // What a handle says of the page's one connection, which every handle shares.
 const connectionOf = {
-  status: () => followed()?.status() ?? 'idle',
-  pending: () => followed()?.status() === 'connecting',
-  error: () => followed()?.error(),
-  retry: () => followed()?.retry(),
+  status: () => followedReader[0]()?.status() ?? 'idle',
+  pending: () => followedReader[0]()?.status() === 'connecting',
+  error: () => followedReader[0]()?.error(),
+  retry: () => followedReader[0]()?.retry(),
 }
 
 export function browserLive(id: string, initial: unknown): Handle {
