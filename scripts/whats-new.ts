@@ -35,6 +35,7 @@ const POINTER = /\n*The rest of this release is in [^\n]*\n/
 const FENCE = /^\s*(?:```|~~~)/
 const CONTINUED = /^## [^\n]* \(continued\)\n/
 const NOTE_LINK = /\[[^\]]*\]\([^)]*\)/
+const LINK_TARGET = /\]\([^)]*\)/g
 
 const UNRELEASED = /^## Unreleased$/m
 // The heading stamped at a release, which names a section left over from a cut too.
@@ -268,11 +269,12 @@ export function capPage(page: string, text: string, archive: string): { page: st
   return Buffer.byteLength(cut.page) > CAP_DUE ? archiveOldest(cut.page, cut.archive, whatsNew ? WHATS_NEW_LIMIT : PAGE_LIMIT) : cut
 }
 
-// The lines of the newest released section of What's new that its release did not ship, which `tagged` (the page and its archive at the release's tag) lacks: a line written there after the release misses the next release's notes, which stamp `## Unreleased` alone.
+// The lines of the newest released section of What's new that its release did not ship, which `tagged` (the page and its archive at the release's tag) lacks: a line written there after the release misses the next release's notes, which stamp `## Unreleased` alone. Link targets are left out of the comparison, as a cap moving the section a line links to an archive rewrites them.
 export function lateLines(page: string, tagged: string): string[] {
   const newest = page.split(SECTION).find(section => VERSION_HEADING.test(section))
+  const shipped = tagged.replace(LINK_TARGET, '](')
 
-  return newest === undefined ? [] : newest.split('\n').filter(line => line.startsWith('- ') && !tagged.includes(line))
+  return newest === undefined ? [] : newest.split('\n').filter(line => line.startsWith('- ') && !shipped.includes(line.replace(LINK_TARGET, '](')))
 }
 
 // Runs the tests a release's rewritten pages must keep green, returning their output when one fails: moving and trimming releases can drop a line a test reads, which only a run after the move shows.

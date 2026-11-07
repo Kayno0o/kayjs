@@ -109,6 +109,8 @@ describe('what\'s new', () => {
     expect(lateLines(page, '## 1.44.0\n\n- shipped\n')).toEqual(['- late'])
     expect(lateLines(page, '## 1.44.0\n\n- shipped\n- late\n')).toEqual([])
     expect(lateLines('# What\'s new\n\n## Unreleased\n\n- u\n', '')).toEqual([])
+    // A line whose link a cap pointed at the archive shipped all the same.
+    expect(lateLines(page.replace('- shipped', '- shipped: [upgrading](upgrading-archive.md)'), '## 1.44.0\n\n- shipped: [upgrading](upgrading.md#shipped)\n')).toEqual(['- late'])
   })
 
   it('moves the oldest releases to the archive while the page is over its limit, and the "before" version with them', () => {
