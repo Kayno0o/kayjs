@@ -468,7 +468,7 @@ export const LINTS = {
     level: 'warn',
     group: 'islands',
     typed: true,
-    summary: 'A static component that renders as an island because it passes one a function or a block taking parameters, which cannot be serialized. Its own props then travel to the browser, and it hydrates. `--- island` in the component says it is meant.',
+    summary: 'A static component that may render as an island because it passes one a function or a block taking parameters, which cannot be serialized: when the render finds one, its own props travel to the browser and it hydrates; a value that serializes, such as an action, leaves it static. `--- island` in the component makes it one.',
     wrong: '---\nimport Picker from \'./picker.kay\'\n\nfunction shout(value: string) {\n  return value.toUpperCase()\n}\n---\nPicker(format={shout})',
     right: '--- island\nimport Picker from \'./picker.kay\'\n\nfunction shout(value: string) {\n  return value.toUpperCase()\n}\n---\nPicker(format={shout})',
   },

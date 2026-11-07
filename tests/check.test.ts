@@ -184,7 +184,7 @@ describe('kay check', () => {
       { file: 'broken/src/todo-list.kay', line: 5, column: 3, code: 'TS2741', message: expect.stringContaining('Property \'todo\' is missing') },
       { file: 'broken/src/main.ts', line: 3, column: 38, code: 'TS2741', message: expect.stringContaining('\'done\' is missing') },
       { file: 'broken/src/routes/_guard.ts', line: 5, column: 14, code: 'TS2345', message: expect.stringContaining('No page, public file or app route serves /sign/in') },
-      { file: 'broken/src/routes/generic.kay', line: 6, column: 1, code: 'promoted-island', message: 'This component renders as an island: `show` passed to List, line 6' },
+      { file: 'broken/src/routes/generic.kay', line: 6, column: 1, code: 'promoted-island', message: 'This component may render as an island: `show` passed to List, line 6, when its props cannot be sent as data' },
     ])
   })
 
@@ -946,7 +946,7 @@ describe.concurrent('kay check, edge cases', () => {
       const found = (await check(root)).filter(d => d.code === 'promoted-island' || d.code === 'static-pin')
 
       expect(found.map(d => [d.code, d.file.slice(root.length + 1), d.message.slice(0, 35)]).toSorted()).toEqual([
-        ['promoted-island', 'src/components/bare.kay', 'This component renders as an island'],
+        ['promoted-island', 'src/components/bare.kay', 'This component may render as an isl'],
         ['static-pin', 'src/components/denied.kay', 'This component is pinned `// kay-st'],
         ['static-pin', 'src/components/pinned.kay', 'This component is pinned `--- stati'],
       ])
@@ -967,7 +967,7 @@ describe.concurrent('kay check, edge cases', () => {
     try {
       const found = (await check(root)).filter(d => d.code === 'promoted-island')
 
-      expect(found.map(d => [d.file.slice(root.length + 1), d.message.slice(0, 35)])).toEqual([['src/components/parent.kay', 'This component renders as an island']])
+      expect(found.map(d => [d.file.slice(root.length + 1), d.message.slice(0, 38)])).toEqual([['src/components/parent.kay', 'This component may render as an island']])
     }
     finally {
       await rm(root, { recursive: true, force: true })

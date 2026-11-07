@@ -248,7 +248,7 @@ export function promotedChecks(original: string, root?: string, imported?: Impor
   const site = promotionSite(file, script, imported)
   const pin = islandPin(file)
   const pinned = pin?.kind === 'static' && site !== undefined ? [staticPin(pin.comment, site.span, site, false)] : []
-  const announced = site === undefined || pin !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${describeCause(site)}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `--- island` in place of `---` to say so, or pass the island what can be serialized', checkOnly: true }]
+  const announced = site === undefined || pin !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component may render as an island: ${describeCause(site)}, when its props cannot be sent as data`, note: 'a function or a block with parameters cannot be sent to the browser as data, so when the render finds one the component hydrates itself; a value that serializes, such as an action, leaves it static', help: 'write `--- island` in place of `---` to make it one, or pass the island what can be serialized', checkOnly: true }]
 
   return [...scriptFences(script).flatMap(fence => serverOnlyImports(fence)), ...announced, ...pinned]
 }

@@ -102,7 +102,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unguarded-route` | deny | security | With `requireGuards`, a route no guard covers that does not set `guards: false` |
 | `unguarded-tool` | warn | security | With `mcp`, a tool action with bot protection that no guard covers |
 | `island-marker` | deny | islands | `--- island` on a page, layout or special page, which are never islands |
-| `promoted-island` | warn | islands | A static component that renders as an island for the function it passes one, unless `--- island` says it is meant |
+| `promoted-island` | warn | islands | A static component that may render as an island for the function it passes one, unless `--- island` says it is meant |
 | `hydration-mismatch` | deny | islands | An island reading the clock, `Math.random()` or a locale-less `Intl` or `toLocale*String` while it renders, which the server and the browser compute apart; allow a deliberate read with `// kay-allow hydration-mismatch` |
 | `unowned-effect` | warn | islands | `effect`, `watch`, `every`, `listen`, `debounced`, `onMount` or `onCleanup` called in a timer, a promise callback or after an `await` (nothing stops them), or in an inline handler (each event adds one); call them in the component script or inside `root()`; a named or conditional handler is not seen |
 | `secret-prop` | warn | security | A value handed to an island with a field named like a secret, such as `passwordHash` or `token`, which lands in the page source |
