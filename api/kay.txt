@@ -3679,7 +3679,7 @@ interface StoreBase
 [./server] StoredFile
 interface StoredFile
   key: string
-  modified?: Date | undefined
+  modifiedAt?: Date | undefined
 
 [./server] StoredJob
 interface StoredJob

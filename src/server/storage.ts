@@ -38,7 +38,7 @@ export interface FileStore extends StoreBase {
 export interface StoredFile {
   key: string
   // When the file was last written; absent when the store cannot say.
-  modified?: Date | undefined
+  modifiedAt?: Date | undefined
 }
 
 export interface PutOptions {
@@ -128,7 +128,7 @@ export function diskFiles(dir: string = DEFAULT_DIR): FileStore {
         // A file deleted since the walk, or unreadable, is left out rather than failing the whole listing.
         const listed = await Promise.all(keys.map(async (key) => {
           try {
-            return { key, modified: (await stat(path(key))).mtime }
+            return { key, modifiedAt: (await stat(path(key))).mtime }
           }
           catch {
             return undefined
@@ -177,7 +177,7 @@ export function s3Files(options: Bun.S3Options & { publicUrl?: string | undefine
       do {
         const page = await bucket.list(token === undefined ? { prefix } : { prefix, continuationToken: token })
 
-        found.push(...(page.contents ?? []).map(object => ({ key: object.key, modified: object.lastModified === undefined ? undefined : new Date(object.lastModified) })))
+        found.push(...(page.contents ?? []).map(object => ({ key: object.key, modifiedAt: object.lastModified === undefined ? undefined : new Date(object.lastModified) })))
         token = page.isTruncated ? page.nextContinuationToken : undefined
       } while (token !== undefined)
 
@@ -209,7 +209,7 @@ export function memoryFiles(): FileStore {
     },
     // eslint-disable-next-line ts/require-await -- the interface returns a promise
     async list(prefix = '') {
-      return [...stored.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key, modified: written.get(key) }))
+      return [...stored.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key, modifiedAt: written.get(key) }))
     },
   }
 }

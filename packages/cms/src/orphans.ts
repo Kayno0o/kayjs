@@ -31,7 +31,7 @@ const IDS = /(?=([\da-f]{20}))/g
 
 interface Stored {
   key: string
-  modified?: Date | undefined
+  modifiedAt?: Date | undefined
 }
 
 export interface Read {
@@ -154,7 +154,7 @@ export async function unusedUploads(): Promise<UploadScan> {
   const orphans = read.stored.filter((file) => {
     const id = idOf(file.key)
 
-    return id !== undefined && !read.usedBy.has(id) && !read.held!.has(id) && file.modified !== undefined && now - file.modified.getTime() >= GRACE
+    return id !== undefined && !read.usedBy.has(id) && !read.held!.has(id) && file.modifiedAt !== undefined && now - file.modifiedAt.getTime() >= GRACE
   }).map(file => file.key).toSorted()
   const variants = await files.variants(orphans)
   const unused = orphans.map(key => ({ key, url: files.url(key), variants: variants.get(key) ?? [] }))
@@ -225,7 +225,7 @@ export async function libraryUploads(options: { page?: number | undefined, q?: s
   const named = (key: string) => index[key]?.name ?? key.split('/').at(-1)!
   const found = read.stored
     .filter(file => idOf(file.key) !== undefined && !moved.has(file.key) && (needle === '' || named(file.key).toLowerCase().includes(needle) || file.key.toLowerCase().includes(needle)))
-    .toSorted((a, b) => (index[b.key]?.at ?? b.modified?.getTime() ?? 0) - (index[a.key]?.at ?? a.modified?.getTime() ?? 0))
+    .toSorted((a, b) => (index[b.key]?.at ?? b.modifiedAt?.getTime() ?? 0) - (index[a.key]?.at ?? a.modifiedAt?.getTime() ?? 0))
   const pages = Math.max(1, Math.ceil(found.length / LIBRARY_PAGE))
   const page = Math.min(pages, Math.max(1, Number.isInteger(options.page) ? options.page! : 1))
   const now = Date.now()
@@ -242,10 +242,10 @@ export async function libraryUploads(options: { page?: number | undefined, q?: s
       width: width === undefined ? undefined : Number(width),
       height: height === undefined ? undefined : Number(height),
       by: record?.by,
-      at: record?.at ?? file.modified?.getTime(),
+      at: record?.at ?? file.modifiedAt?.getTime(),
       usedIn,
       held: read.held?.has(idOf(file.key)!),
-      deletable: usedIn.length === 0 && read.held !== undefined && !read.held.has(idOf(file.key)!) && file.modified !== undefined && now - file.modified.getTime() >= GRACE,
+      deletable: usedIn.length === 0 && read.held !== undefined && !read.held.has(idOf(file.key)!) && file.modifiedAt !== undefined && now - file.modifiedAt.getTime() >= GRACE,
     }
   }))
 

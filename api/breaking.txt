@@ -11,6 +11,7 @@ kay [./server] NotificationStore
 kay [./server] PagesOptions
 kay [./server] PushSubscriptionRecord
 kay [./server] StoreRooms
+kay [./server] StoredFile
 kay [./server] StoredNotification
 kay [./server] pushSubscriptions
 kay [./test] TestOptions

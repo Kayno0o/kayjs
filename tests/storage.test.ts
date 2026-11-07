@@ -473,7 +473,7 @@ describe('files.list', () => {
       expect(await keys('covers/20')).toEqual([])
 
       for (const file of await files.list())
-        expect(Math.abs(Date.now() - file.modified!.getTime())).toBeLessThan(60_000)
+        expect(Math.abs(Date.now() - file.modifiedAt!.getTime())).toBeLessThan(60_000)
     }
 
     expect((await files.list()).map(file => file.key)).not.toContain('stray file.txt')
@@ -534,7 +534,7 @@ describe('files.list', () => {
       setupStorage(s3Files({ bucket: 'site', endpoint: `http://localhost:${server.port}`, accessKeyId: 'id', secretAccessKey: 'secret', region: 'us-east-1' }), join(dir, 'cache'))
       expect((await files.list({ folder: 'photos' })).map(file => file.key)).toEqual(['photos/0123456789abcdef0123.png', 'photos/89abcdef012345670123.png'])
       expect(asked).toEqual(['photos/|null', 'photos/|next'])
-      expect((await files.list({ folder: 'photos' }))[0]?.modified).toEqual(new Date('2026-01-02T03:04:05.000Z'))
+      expect((await files.list({ folder: 'photos' }))[0]?.modifiedAt).toEqual(new Date('2026-01-02T03:04:05.000Z'))
     }
     finally {
       setupStorage(memoryFiles(), join(dir, 'cache'))
