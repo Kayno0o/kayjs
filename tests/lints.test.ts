@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, spyOn } from 'bun:test'
 import * as parser from 'oxc-parser'
-import { compileKay, onceReadChecks, promotedChecks } from '../src/compiler'
+import { browserRole, compileKay, onceReadChecks, promotedChecks } from '../src/compiler'
 import { moduleChecks } from '../src/compiler/fence-checks'
 import { explainLint, isLint, LINT_GROUPS, lintList, LINTS, typeLint } from '../src/compiler/lints'
 
@@ -1629,7 +1629,7 @@ describe('deprecated-hook-names in a template', () => {
 
   it('writes a shorthand with its value and finds the old name beside a spread', () => {
     expect(found('Form(action={add} {onSaved})')).toEqual([{ at: 'onSaved', fix: ['{onSaved}->onSave={onSaved}'], safe: true }])
-    expect(found('Form(action={add} {...rest} onSaved={done})')).toEqual([{ at: 'onSaved', fix: ['onSaved->onSave'], safe: true }])
+    expect(found('Form(action={add} {...rest} onSaved={done})')).toEqual([{ at: 'onSaved', fix: undefined, safe: undefined }])
   })
 
   it('reports an old name written beside the new one with no fix', () => {
@@ -1638,8 +1638,64 @@ describe('deprecated-hook-names in a template', () => {
   })
 
   it('reads the onSave of a SaveForm with no action as the save call, now save', () => {
-    expect(found('Save(dirty={changed()} onSave={run})')).toEqual([{ at: 'onSave', fix: ['onSave->save'], safe: true }])
-    expect(found('Save(dirty={changed()} {onSave})')).toEqual([{ at: 'onSave', fix: ['{onSave}->save={onSave}'], safe: true }])
+    expect(found('Save(dirty={changed()} onSave={run})')).toEqual([{ at: 'onSave', fix: ['onSave->save'], safe: false }])
+    expect(found('Save(dirty={changed()} {onSave})')).toEqual([{ at: 'onSave', fix: ['{onSave}->save={onSave}'], safe: false }])
+  })
+
+  it('offers the save rename without applying it, as the component may become promotable', () => {
+    const source = `---\n${imports}---\nSave(dirty={false} onSave={() => undefined})\n`
+    const [diagnostic] = compileKay(source, 'hooks.kay', { check: true }).diagnostics.filter(d => d.code === 'deprecated-hook-names')
+    const edits = diagnostic!.fixes!.flatMap(fix => fix.edits).toSorted((a, b) => b.start - a.start)
+    const fixed = edits.reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)
+    const codes = (text: string) => compileKay(text, 'hooks.kay', { check: true }).diagnostics.map(d => d.code)
+
+    expect(diagnostic!.fixes!.every(fix => fix.safe !== true)).toBe(true)
+    expect(diagnostic!.help).toContain('--- island')
+    expect(browserRole(source, 'hooks.kay')).toBe('island')
+    expect(browserRole(fixed, 'hooks.kay')).toBe('promotable')
+    expect(codes(fixed)).not.toContain('deprecated-hook-names')
+  })
+
+  it('warns, with no fix, about an onSave with no parameter beside an action, which used to replace it', () => {
+    expect(found('Save(action={add} onSave={() => run()})')).toEqual([{ at: 'onSave', fix: undefined, safe: undefined }])
+    expect(found('Save(action={add} onSave={async () => { await run() }})')).toEqual([{ at: 'onSave', fix: undefined, safe: undefined }])
+    expect(found('Save(action={add} onSave={function () { run() }})')).toEqual([{ at: 'onSave', fix: undefined, safe: undefined }])
+  })
+
+  it('points to the save rename from an onSaved beside an onSave with no action', () => {
+    const source = `---\n${imports}---\nSave(dirty={true} onSave={run} onSaved={done})\n`
+    const hints = compileKay(source, 'hooks.kay', { check: true }).diagnostics.filter(d => d.code === 'deprecated-hook-names').map(d => [source.slice(d.start, d.end), d.help])
+
+    expect(hints).toEqual([['onSave', 'Write `save`; the component may then need `--- island`, as an `on*` attribute made it one'], ['onSaved', 'Rename `onSave` to `save` first, then write `onSave` here']])
+  })
+
+  it('reads a save beside an onSave, and an action beside onSaved and onSave', () => {
+    expect(found('Save(dirty={true} save={a} onSave={b})')).toEqual([])
+    expect(found('Save(action={add} onSaved={a} onSave={b})')).toEqual([{ at: 'onSaved', fix: undefined, safe: undefined }])
+  })
+
+  it('leaves a component of the app named like a kayjs-ui one, and honours kay-allow', () => {
+    const source = `---\nimport Form from './form.kay'\n---\nForm(onSaved={done})\n`
+
+    expect(compileKay(source, 'hooks.kay', { check: true }).diagnostics.filter(d => d.code === 'deprecated-hook-names')).toEqual([])
+    expect(found('// kay-allow deprecated-hook-names\nForm(action={add} onSaved={done})')).toEqual([])
+  })
+
+  it('keeps the browser role of the renamed kayjs-ui components', async () => {
+    const roles: Record<string, string | undefined> = {}
+
+    for (const file of ['contact-form', 'subscribe-form', 'form', 'form-dialog', 'save-form', 'audio-player']) {
+      const path = join(import.meta.dir, '..', 'packages/ui/src', `${file}.kay`)
+
+      roles[file] = browserRole(await Bun.file(path).text(), path)
+    }
+
+    // A form that asks for no callback stays static and ships no JavaScript.
+    expect(roles).toEqual({ 'contact-form': undefined, 'subscribe-form': undefined, 'form': 'island', 'form-dialog': 'island', 'save-form': 'island', 'audio-player': 'island' })
+  })
+
+  it('does not read inherited names of the tables', () => {
+    expect(found('Form(action={add} constructor={done} toString={done})')).toEqual([])
   })
 
   it('leaves the onSave of a SaveForm that has an action or a spread, which hears its result, and the new names alone', () => {

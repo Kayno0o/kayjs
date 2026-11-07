@@ -25,7 +25,7 @@ How kay and its libraries name the same idea, written before the renames land: a
 - A record a store keeps or lists is the store's own type in milliseconds, named for the store (`StoredNotification`, `NotificationRow`, `StoredSuppression`, `ConversationRow`), and the type an app reads is the same fields with `Date`. The job, rate-limit, cache and list-store records (`StoredJob`, `RateWindow`, `StoredValue`, `Subscriber`, `Broadcast`) are store types and keep milliseconds. The dev tool's log lines carry `time: string` for display.
 
 **Hooks and switches**
-- An `on*` hook takes one event object, `onSave({ ... })`, and returns nothing. A callback that returns data is named for what it returns (`profileFields`, `exportData`), not `on*` (#1694).
+- An `on*` hook of a server extension takes one event object, `onSave({ ... })`, and returns nothing; the `on*` prop of a kayjs-ui component takes the transition's value directly (`onSave(result)`, `onSend(data)`, `onCopy(text)`), as the DOM does, except `onError({ error })` ([hooks](hooks.md)). A callback that returns data is named for what it returns (`profileFields`, `exportData`), not `on*` (#1694).
 - A switch is `false` to turn off what is on by default and `true` to turn on what is off by default, with an object where it takes options; the default is the first line of its doc. `optional` on mail is reviewed against this (#1694).
 
 **Errors**

@@ -35,6 +35,15 @@ const FAILURE_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>
   'ai-chat': { errorMessage: 'failureLabel' },
 }
 // The kayjs-ui callbacks renamed in 1.92 to follow the hook convention (`llms/hooks.md`): `onX` after a transition X in its base form, never a participle. SaveForm is apart, as its own `onSave` was the call that does the save, which `save` is now.
+const NO_PARAMETER_FUNCTION = /^\s*(?:async\s+)?(?:\(\s*\)\s*=>|function\s*(?:\w+\s*)?\(\s*\))/
+
+// A name the table holds itself, not one an object inherits (`constructor`, `toString`).
+function ownName(table: Readonly<Record<string, Readonly<Record<string, string>>>>, file: string, name: string): string | undefined {
+  const row = Object.hasOwn(table, file) ? table[file] : undefined
+
+  return row !== undefined && Object.hasOwn(row, name) ? row[name] : undefined
+}
+
 const HOOK_RENAMES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   'form': { onSaved: 'onSave' },
   'form-dialog': { onSaved: 'onSave' },
@@ -894,12 +903,12 @@ class Validator {
       }
     }
 
-    const actionRenames = ACTIONS_RENAMES[file]
+    const actionRenames = Object.hasOwn(ACTIONS_RENAMES, file) ? ACTIONS_RENAMES[file] : undefined
 
     if (actionRenames !== undefined) {
       for (const child of element.children) {
         const old = child.kind === 'slot' ? this.text(child.name) : undefined
-        const renamed = old === undefined ? undefined : actionRenames[old]
+        const renamed = old === undefined ? undefined : ownName(ACTIONS_RENAMES, file, old)
 
         if (child.kind !== 'slot' || old === undefined || renamed === undefined)
           continue
@@ -913,7 +922,7 @@ class Validator {
     if (file === AI_CHAT) {
       for (const child of element.children) {
         const old = child.kind === 'slot' ? this.text(child.name) : undefined
-        const icon = old === undefined ? undefined : CHAT_ICON_BLOCKS[old]
+        const icon = old === undefined || !Object.hasOwn(CHAT_ICON_BLOCKS, old) ? undefined : CHAT_ICON_BLOCKS[old]
 
         if (child.kind === 'slot' && old !== undefined && icon !== undefined)
           this.lint(child.name, 'deprecated-chat-icons', `\`@${old}\` on \`${element.name}\` is \`icons={{ ${icon}: ... }}\` since kayjs-ai 1.90, one prop for every icon`, { help: `Give \`icons={{ ${icon}: <icon> }}\`, an icon of the app's set or one imported from \`~icons/<prefix>/<name>\`` })
@@ -943,7 +952,7 @@ class Validator {
         continue
       }
 
-      const actionRenamed = actionRenames?.[name]
+      const actionRenamed = ownName(ACTIONS_RENAMES, file, name)
 
       if (actionRenamed !== undefined) {
         const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === actionRenamed) || element.children.some(other => other.kind === 'slot' && this.text(other.name) === actionRenamed)
@@ -982,28 +991,46 @@ class Validator {
         continue
       }
 
-      const hookRenamed = HOOK_RENAMES[file]?.[name]
+      const hookRenamed = ownName(HOOK_RENAMES, file, name)
       const saveCall = file === 'save-form' && name === 'onSave'
 
       if (hookRenamed !== undefined || saveCall) {
         const to = saveCall ? 'save' : hookRenamed!
         const others = new Set(element.attributes.filter(other => other.kind !== 'spread').map(other => this.text(other.name)))
         const spread = element.attributes.some(other => other.kind === 'spread')
+        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: `${to}={${name}}` } : { start: attribute.name.start, end: attribute.name.end, text: to }
 
-        // `onSave` of a SaveForm with an `action` hears its result since 1.92, so only one with no `action` (and no spread that may hold one) is the call that does the save. An `onSaved` beside an `onSave` is renamed once that one is `save`.
-        if (saveCall && (spread || others.has('action') || others.has('save')))
+        // `onSave` of a SaveForm with an `action` hears its result since 1.92, where it replaced the `action`: a function taking no parameter is the old call, which the form no longer makes instead of the action. A reference, or a function reading its parameter, is left alone, as it may be the new hook.
+        if (saveCall && others.has('action')) {
+          if (attribute.kind === 'expression' && NO_PARAMETER_FUNCTION.test(this.text(attribute.expression)))
+            this.lint(attribute.name, 'deprecated-hook-names', `\`onSave\` beside an \`action\` on \`${element.name}\` hears the action's result since kayjs-ui 1.92, where it replaced the \`action\`: this function takes no parameter, so it was the call that does the save`, { help: 'Write `save` for the call that does the save, without the `action`, or `onSave={result => ...}` to hear the result' })
+
+          continue
+        }
+
+        // Without an `action` (and no spread that may hold one), `onSave` is the call that does the save. The rename changes the component's role: an `on*` attribute makes it an island, `save` leaves it to the build, so the fix is not applied by `kay upgrade`.
+        if (saveCall && (spread || others.has('save')))
           continue
 
-        const blocked = !saveCall && others.has(to)
-        const edit = attribute.kind === 'expression' && attribute.shorthand ? { ...attribute.shorthand, text: `${to}={${name}}` } : { start: attribute.name.start, end: attribute.name.end, text: to }
         const why = saveCall ? `\`onSave\` on \`${element.name}\` is \`save\` since kayjs-ui 1.92, the call that does the save, where \`onSave\` hears an \`action\`'s result` : `\`${name}\` on \`${element.name}\` is \`${to}\` since kayjs-ui 1.92, so every hook is \`onX\` after a transition, in its base form`
+        // `onSaved` beside an `onSave` is renamed once that one is `save`; with a spread the rename may clash with a prop it holds.
+        const blocked = !saveCall && (others.has(to) || spread)
 
-        this.lint(attribute.name, 'deprecated-hook-names', why, blocked ? { help: `Drop \`${name}\`, \`${to}\` is there` } : { help: `Write \`${to}\``, fixes: [{ title: `Write \`${to}\``, edits: [edit], safe: true }] })
+        if (blocked) {
+          const renameFirst = file === 'save-form' && !others.has('action')
+          const clash = renameFirst ? 'Rename `onSave` to `save` first, then write `onSave` here' : `Drop \`${name}\`, \`${to}\` is there`
+          const help = others.has(to) ? clash : `Write \`${to}\` by hand: a spread beside it may hold one`
+
+          this.lint(attribute.name, 'deprecated-hook-names', why, { help })
+        }
+        else {
+          this.lint(attribute.name, 'deprecated-hook-names', why, { help: saveCall ? 'Write `save`; the component may then need `--- island`, as an `on*` attribute made it one' : `Write \`${to}\``, fixes: [{ title: `Write \`${to}\``, edits: [edit], safe: !saveCall }] })
+        }
 
         continue
       }
 
-      const renamed = FAILURE_RENAMES[file]?.[name]
+      const renamed = ownName(FAILURE_RENAMES, file, name)
 
       if (renamed !== undefined) {
         const named = element.attributes.some(other => other.kind !== 'spread' && this.text(other.name) === renamed)

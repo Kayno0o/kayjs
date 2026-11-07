@@ -118,7 +118,7 @@ test('onEnded still hears the end of the audio', async () => {
   root.querySelector('#legacy audio')!.dispatchEvent(new Event('ended'))
   await settle()
 
-  expect(events).toEqual(['legacy ended'])
+  expect(events).toEqual(['ended', 'legacy ended'])
 })
 
 test('tells onPlay, onPause, onEnd and onError as the audio moves through them', async () => {

@@ -41,10 +41,6 @@ const { action, nameLabel = wording('ui.contactForm.name', wording('mail.contact
   rows?: number | undefined
 }>()
 
-function told(data: unknown) {
-  onSend?.(data)
-  onSent?.(data)
-}
 
 // Server actions carry their schema; the consent checkbox is drawn when `consent: true` marked the field.
 const asksConsent = () => consent ?? (action as { schema?: { properties?: Record<string, Record<string, unknown> | undefined> } }).schema?.properties?.consent?.['x-kay-consent'] === true
@@ -70,7 +66,7 @@ form(part="root" {...rest} action={action} novalidate)
   Button(type="submit" tone="accent" label={submitLabel})
   // Only an island renders the form with a callback, which this passes on; the cast keeps `kay check` from reading the form as a static component handing an island a function.
   if onSend || onSent || onError
-    FormOutcome(action={action} whenSent={told as never} whenRefused={onError as never})
+    FormOutcome(action={action} whenSent={onSend as never} whenSentOld={onSent as never} whenRefused={onError as never})
   if action.succeeded()
     if sent
       | {sent}

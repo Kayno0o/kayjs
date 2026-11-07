@@ -118,6 +118,17 @@ const token = {}
 const placed = (seconds: number) => `inset-inline-start: calc(0.5rem + (100% - 1rem) * ${seconds / length()})`
 const marked = () => length() > 0 ? chapters.map((chapter, index) => ({ chapter, index })).filter(({ chapter }) => chapter.start > 0 && chapter.start < length()) : []
 
+function finished() {
+  playing = false
+
+  try {
+    onEnd?.()
+  }
+  finally {
+    onEnded?.()
+  }
+}
+
 function echoed(seconds: number) {
   const when = told.get(seconds)
 
@@ -342,7 +353,7 @@ onCleanup(() => {
 ---
 div(part="root" {...rest})
   // Without `controls`, so the element draws nothing and the bar below is the player.
-  audio(part="audio" ref={element => player = element} src={src} preload={preload} onTimeUpdate={event => report(event.currentTarget.currentTime)} onDurationChange={event => measure(event.currentTarget)} onLoadedMetadata={event => measure(event.currentTarget)} onPlay={() => { playing = true; claim(); onPlay?.() }} onPause={() => { playing = false; onPause?.() }} onEnded={() => { playing = false; onEnd?.(); onEnded?.() }} onError={event => onError?.({ error: event.currentTarget.error, event })} onEmptied={event => emptied(event.currentTarget)})
+  audio(part="audio" ref={element => player = element} src={src} preload={preload} onTimeUpdate={event => report(event.currentTarget.currentTime)} onDurationChange={event => measure(event.currentTarget)} onLoadedMetadata={event => measure(event.currentTarget)} onPlay={() => { playing = true; claim(); onPlay?.() }} onPause={() => { playing = false; onPause?.() }} onEnded={finished} onError={event => onError?.({ error: event.currentTarget.error, event })} onEmptied={event => emptied(event.currentTarget)})
   div(part="bar")
     if chapters.length > 1
       IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={previous})

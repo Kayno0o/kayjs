@@ -39,11 +39,6 @@ const notice = () => noticeText ?? wording('ui.subscribeForm.notice', wording('m
 // The list's own `privacy`, which its form action carries; the prop replaces it.
 const policy = () => privacy ?? (action as { schema?: { 'x-privacy'?: string } }).schema?.['x-privacy']
 const shownWording = () => wordingId ?? (noticeText === undefined ? 'stock' : 'custom')
-
-function told(data: unknown) {
-  onSend?.(data)
-  onSent?.(data)
-}
 ---
 // Posts without JavaScript; the honeypot, the time stamp and the refused email's message come from the action.
 form(part="root" {...rest} action={action} novalidate)
@@ -59,7 +54,7 @@ form(part="root" {...rest} action={action} novalidate)
   Button(type="submit" tone="accent" label={submitLabel})
   // Only an island renders the form with a callback, which this passes on; the cast keeps `kay check` from reading the form as a static component handing an island a function.
   if onSend || onSent || onError
-    FormOutcome(action={action} whenSent={told as never} whenRefused={onError as never})
+    FormOutcome(action={action} whenSent={onSend as never} whenSentOld={onSent as never} whenRefused={onError as never})
   if action.succeeded()
     if sent
       | {sent}

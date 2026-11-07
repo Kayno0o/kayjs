@@ -95,8 +95,12 @@ async function submit(event: SubmitEvent) {
     return
 
   // Outside the call's `try`, so a page failing to patch the saved result in surfaces as the bug it is rather than as a refused save.
-  onSave?.(done.result)
-  onSaved?.(done.result)
+  try {
+    onSave?.(done.result)
+  }
+  finally {
+    onSaved?.(done.result)
+  }
   onOpenChange(false)
 }
 

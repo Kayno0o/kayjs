@@ -623,6 +623,17 @@ describe('SaveForm driven by signals', () => {
     expect(calls).toEqual(['saved'])
   })
 
+  test('onSaved is heard after onSave with an action', async () => {
+    const heard: string[] = []
+
+    mounted = await mountComponent(SaveFormComponent, { save: async (input: { name: string }) => input.name, onSave: (name: string) => heard.push(`save ${name}`), onDiscard: () => undefined, old: { onSaved: (name: string) => heard.push(`saved ${name}`) } })
+    type(mounted.root, 'Grace')
+    mounted.root.querySelector('form')!.requestSubmit()
+    await settle()
+
+    expect(heard).toEqual(['save Grace', 'saved Grace'])
+  })
+
   test('a clean editor calls nothing, a new one saves with no change', async () => {
     let calls = 0
     const save = async () => {

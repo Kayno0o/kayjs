@@ -56,8 +56,12 @@ async function submit(event: SubmitEvent) {
   if (saved)
     toast.success(saved)
 
-  onSave?.(done.result)
-  onSaved?.(done.result)
+  try {
+    onSave?.(done.result)
+  }
+  finally {
+    onSaved?.(done.result)
+  }
 }
 
 async function leave(event: FocusEvent) {

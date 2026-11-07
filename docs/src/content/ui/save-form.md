@@ -42,7 +42,7 @@ When a save is refused or fails, `onError` is called first with `{ error }`, bef
 
 ## Editors driven by signals
 
-An editor whose state is signals and whose save takes an object, not a `FormData`, gives SaveForm the `dirty` it computes and an `save` returning the call's promise, in place of `action`.
+An editor whose state is signals and whose save takes an object, not a `FormData`, gives SaveForm the `dirty` it computes and a `save` returning the call's promise, in place of `action`.
 
 ```kay
 SaveForm(dirty={isNew || changed()} save={() => save({ name: name(), config: config() })} saved="Saved.")
