@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { expect, it } from 'bun:test'
 import { addExtension, addFeatures, detectFeatures, handEdit, rangeIn, restore, runnerOf, snapshot as snapshotManifest } from '../src/add'
-import { createProject, PRESETS } from '../src/new'
+import { createProject, PRESETS, toggle } from '../src/new'
 
 const repo = join(import.meta.dir, '..')
 
@@ -939,6 +939,8 @@ it('writes with kay new --with the files kay add writes to the project kay new m
     expect([...new Set([...core, ...added.written])].toSorted()).toEqual(files)
     expect(await read(together)).toEqual(await read(apart))
     expect(await Bun.file(join(together, 'kay.config.ts')).text()).toContain('ui()')
+    expect(files).toEqual(expect.arrayContaining(['AGENTS.md', 'CLAUDE.md', '.mcp.json']))
+    expect(added.written).not.toEqual(expect.arrayContaining(['AGENTS.md', 'CLAUDE.md', '.mcp.json']))
     expect(notes.length).toBeGreaterThan(0)
   }
   finally {
@@ -961,6 +963,28 @@ it('lists in a dry run the files a real kay new --with writes, library features 
   finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+it('says kay new wrote the project and how to finish when the install of a library feature fails', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'kay-add-'))
+
+  try {
+    const { bun } = await stubBun(root, 'echo no network >&2\nexit 1')
+    const dir = join(root, 'app')
+    const create = createProject(dir, { kay: '^1.0.0', features: [...PRESETS.server.features, 'ui'], bun })
+
+    await expect(create).rejects.toThrow(`kay new: the project is written in ${dir}, but adding ui failed`)
+    await expect(create).rejects.toThrow(`cd ${dir} && kay add ui`)
+    expect(existsSync(join(dir, 'package.json'))).toBe(true)
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('checks ui with auth in the picker, as kay add brings it, and unchecks auth with ui', () => {
+  expect(toggle(new Set(['server', 'tailwind']), 'auth').has('ui')).toBe(true)
+  expect(toggle(new Set(['server', 'tailwind', 'auth', 'ui']), 'ui').has('auth')).toBe(false)
 })
 
 it('refuses a library feature missing what it needs in kay new, as kay add does', async () => {

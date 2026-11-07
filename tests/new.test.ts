@@ -15,7 +15,7 @@ import { nativeExe } from '../src/compiler/native-typescript'
 import { loadConfig } from '../src/config-loader'
 import { formatFiles } from '../src/format'
 import { projectCapabilities } from '../src/mcp/tools'
-import { createProject, detectHost, FEATURE_NAMES, FEATURES, PRESETS, toggle } from '../src/new'
+import { createProject, detectHost, FEATURE_NAMES, FEATURES, libraryFeature, PRESETS, toggle } from '../src/new'
 import { SEARCH_MANIFEST } from '../src/runtime/search'
 import { agentsFile, TAILWIND_CLASS_REGEX } from '../src/templates'
 import { listeningPort } from './listening'
@@ -993,7 +993,10 @@ describe('kay new', () => {
   }, 30_000)
 
   // Without installing, every variant is scaffolded formatted, naming only files it holds, packages it depends on and scripts it has, and depending on nothing it does not import.
-  for (const [label, variant] of VARIANTS) {
+  for (const [label, withLibraries] of VARIANTS) {
+    // Checking auth also checks ui, a library feature kay new installs and add.test.ts covers.
+    const variant = new Set([...withLibraries].filter(feature => !libraryFeature(feature)))
+
     it(`scaffolds ${label} formatted, with every file, package and script it names`, async () => {
       const features = [...variant]
       const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')

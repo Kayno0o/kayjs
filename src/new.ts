@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { checklist, select } from '@kaynooo/cli-kit/prompt'
-import { addFeatures } from './add'
+import { addFeatures, LibraryNotInstalledError } from './add'
 import { nativeExe } from './compiler/native-typescript'
 import { FEATURE_NAMES, FEATURES } from './features'
 import { AGENT_FILES, agentsFile, CLAUDE_FILE, MCP_FILE, templateFiles } from './templates'
@@ -69,14 +69,14 @@ export function toggle(features: ReadonlySet<Feature>, feature: Feature): Readon
   const check = (name: Feature) => {
     next.add(name)
 
-    for (const need of FEATURES[name].needs)
+    for (const need of [...FEATURES[name].needs, ...FEATURES[name].brings ?? []])
       check(need)
   }
   const uncheck = (name: Feature) => {
     next.delete(name)
 
     for (const other of FEATURE_NAMES) {
-      if (next.has(other) && FEATURES[other].needs.includes(name))
+      if (next.has(other) && (FEATURES[other].needs.includes(name) || FEATURES[other].brings?.includes(name)))
         uncheck(other)
     }
   }
@@ -138,12 +138,16 @@ export async function refuseTarget(target: string): Promise<void> {
     throw new Error(`kay: ${target} is not empty`)
 }
 
+// Whether `kay new` adds the feature through `kay add` after scaffolding: a library's, but for a templated one whose files the templates write.
+export function libraryFeature(name: Feature): boolean {
+  return FEATURES[name].packages !== undefined && FEATURES[name].templated !== true
+}
+
 // Scaffolds a project that \`kay dev\` runs and \`kay check\` passes as it is; refuses a directory that already holds files.
 export async function createProject(target: string, options: NewOptions = {}): Promise<string[]> {
   const dir = resolve(target)
   const features = new Set(options.features ?? PRESETS.server.features)
-  // `auth` is written by the templates, so it is not added a second time.
-  const libraries = FEATURE_NAMES.filter(name => features.has(name) && name !== 'auth' && FEATURES[name].packages !== undefined)
+  const libraries = FEATURE_NAMES.filter(name => features.has(name) && libraryFeature(name))
 
   for (const feature of features) {
     const missing = FEATURES[feature].needs.filter(need => !features.has(need))
@@ -175,7 +179,16 @@ export async function createProject(target: string, options: NewOptions = {}): P
     return Object.keys(files).sort()
 
   // The same run as `kay add` on the project just written, which installs the libraries before it can ask them what they write.
-  const added = await addFeatures(dir, libraries, { install: options.install, bun: options.bun })
+  let added: Awaited<ReturnType<typeof addFeatures>>
+
+  try {
+    added = await addFeatures(dir, libraries, { install: options.install, bun: options.bun })
+  }
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+
+    throw new Error(`kay new: the project is written in ${target}, but adding ${libraries.join(', ')} failed: ${message}\n\nFinish with \`cd ${target} && kay add ${libraries.join(',')}\``, { cause: error })
+  }
 
   options.notes?.push(...added.notes)
 
@@ -197,6 +210,14 @@ async function librariesDryRun(files: Record<string, string>, libraries: readonl
     options.notes?.push(...planned.notes)
 
     return planned.written
+  }
+  catch (error) {
+    if (!(error instanceof LibraryNotInstalledError))
+      throw error
+
+    options.notes?.push(`${libraries.join(', ')} ${libraries.length === 1 ? 'is' : 'are'} not installed beside kay, so the files they write are not listed: they are planned when kay new installs them.`)
+
+    return []
   }
   finally {
     await rm(scratch, { recursive: true, force: true })

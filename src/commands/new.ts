@@ -5,7 +5,7 @@ import { isInteractive } from '@kaynooo/cli-kit'
 import { confirm } from '@kaynooo/cli-kit/prompt'
 import { colors } from '@kaynooo/utils/tools/colors'
 import { EDITORS, findEditors, installEditor, printSetups } from '../editors'
-import { createProject, detectHost, FEATURE_NAMES, HOSTS, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from '../new'
+import { createProject, detectHost, FEATURE_NAMES, HOSTS, libraryFeature, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from '../new'
 import { count, done, formatOption, printDocument, reportFailure, shellQuote } from './command'
 
 export const scaffold: Command = {
@@ -120,7 +120,7 @@ export const scaffold: Command = {
 
       // With Postgres, the database runs in the container its compose.dev.yaml describes, with kayjs-auth's first migration generated and applied before the first start; SQLite is a file kayjs-auth creates itself.
       if (values.quiet !== true)
-        console.log(`\n  ${colors.cyan(`cd ${shellQuote(dir)} && bun install && ${features.includes('postgres') ? 'docker compose up -d --wait && bun run db:generate init && bun run db:migrate && ' : ''}bun run dev`)}`)
+        console.log(`\n  ${colors.cyan(`cd ${shellQuote(dir)} && ${features.some(libraryFeature) ? '' : 'bun install && '}${features.includes('postgres') ? 'docker compose up -d --wait && bun run db:generate init && bun run db:migrate && ' : ''}bun run dev`)}`)
 
       return 0
     }

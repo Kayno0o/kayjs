@@ -481,13 +481,15 @@ function resolveIn(specifier: string, dir: string): string | undefined {
   }
 }
 
+export class LibraryNotInstalledError extends Error {}
+
 // The library's `add` export is resolved from the project, else from `from`: where a dry run of `kay new` finds the libraries kay itself sits beside, as the project has none yet.
 async function loadLibrary(dir: string, name: string, project: LibraryProject, from?: string): Promise<LibraryFeature> {
   const specifier = `${LIBRARIES[name]![0]!}/add`
   const path = resolveIn(specifier, dir) ?? (from === undefined ? undefined : resolveIn(specifier, from))
 
   if (path === undefined)
-    throw new Error(`kay add: ${LIBRARIES[name]![0]!} is not installed, and --no-install or --dry-run keeps kay add from installing it: it has to be installed to say what it writes`)
+    throw new LibraryNotInstalledError(`kay add: ${LIBRARIES[name]![0]!} is not installed, and --no-install or --dry-run keeps kay add from installing it: it has to be installed to say what it writes`)
 
   const module = await import(path) as { default?: LibraryFeature | ((project: LibraryProject) => LibraryFeature) }
   const feature = typeof module.default === 'function' ? module.default(project) : module.default

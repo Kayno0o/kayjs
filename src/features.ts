@@ -1,7 +1,7 @@
 import type { Feature } from './template-shared'
 
-// What `kay new --with` and `kay add` both take, in the order the picker lists them, each with what it cannot go without. A feature with `packages` is a library's: `kay add` installs them and writes what the first one's `add` export says, and `kay new` does the same after it scaffolds the rest, except for `auth`, whose files the templates write. `brings` are the library features it brings along.
-export const FEATURES: Record<Feature, { description: string, needs: readonly Feature[], packages?: readonly string[], brings?: readonly Feature[] }> = {
+// What `kay new --with` and `kay add` both take, in the order the picker lists them, each with what it cannot go without. A feature with `packages` is a library's: `kay add` installs them and writes what the first one's `add` export says, and `kay new` does the same after it scaffolds the rest, except for a `templated` one (`auth`), whose files the templates write. `brings` are the library features it brings along, which checking it in the picker checks too.
+export const FEATURES: Record<Feature, { description: string, needs: readonly Feature[], packages?: readonly string[], brings?: readonly Feature[], templated?: true }> = {
   server: { description: 'an Elysia server, run in production as one executable; off, a static site built to dist', needs: [] },
   starter: { description: 'a header, a 404 page, and a home page greeting from the server with a counter island', needs: [] },
   tailwind: { description: 'Tailwind over the Catppuccin Mocha palette', needs: [] },
@@ -10,7 +10,7 @@ export const FEATURES: Record<Feature, { description: string, needs: readonly Fe
   tests: { description: 'kay test through kay/test, with a first test', needs: [] },
   ci: { description: 'a Forgejo or GitHub workflow checking, linting and testing the server, or publishing the static site to Pages', needs: [] },
   docker: { description: 'a Dockerfile and compose.prod.yaml running the executable, or nginx serving the static site', needs: [] },
-  auth: { description: 'kayjs-auth: sign-in, register and account pages on kay sessions, every page behind a signed-in user, its users in a SQLite file', needs: ['server', 'tailwind'], packages: ['@kaynooo/kayjs-auth', '@kaynooo/kayjs-ui', '@iconify-json/tabler', '@kaynooo/pg-orm'], brings: ['ui'] },
+  auth: { description: 'kayjs-auth: sign-in, register and account pages on kay sessions, every page behind a signed-in user, its users in a SQLite file', needs: ['server', 'tailwind'], packages: ['@kaynooo/kayjs-auth', '@kaynooo/kayjs-ui', '@iconify-json/tabler', '@kaynooo/pg-orm'], brings: ['ui'], templated: true },
   postgres: { description: 'kayjs-auth\'s users in Postgres instead of SQLite: a compose stack for development, roles and migrations as an owner', needs: ['auth'] },
   ws: { description: 'an API module over a websocket, with an island counting the visitors online', needs: ['server'] },
   ai: { description: 'kayjs-ai: ask(), an LLM called with no SDK, streaming into await blocks and actions, answered by a scripted fake in development and tests', needs: [], packages: ['@kaynooo/kayjs-ai'] },
