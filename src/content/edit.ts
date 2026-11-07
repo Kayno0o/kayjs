@@ -1,4 +1,4 @@
-export { collectionInfo, collectionLoader, collections, entries, entryFile, entryIssues, entryPage, entrySource, removeEntry, repositoryRoot, saveEntries, saveEntry, translations } from './edit-entries'
+export { bodyHtml, collectionInfo, collectionLoader, collections, entries, entryFile, entryIssues, entryPage, entrySource, removeEntry, repositoryRoot, saveEntries, saveEntry, translations } from './edit-entries'
 export { blocks, colorField, customField, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, markdownField, moneyField, reference, tagsField, unique, untranslated } from './edit-fields'
 export type { ImageFieldOptions, MoneyFieldOptions, UploadFieldOptions } from './edit-fields'
 export { clearEditSite, registerCollections, registerEditSite, reloadableFolders } from './edit-registry'

@@ -28,10 +28,10 @@ import { hasSteps, migrateEntries, migrateLoaded, withMigrationHint, writeBack }
 import { ContentError, decodeEntries, isBlockItem, validEntries } from './validate'
 
 export type { CollectionInfo, DataValue, EntryFile, EntryFilter, EntryPath, FieldHint, FieldInputOptions, FieldKind, ImageFieldOptions, JsonSchema, SourceEntry, TranslationIndex, UploadFieldOptions, WrittenEntry } from './edit'
-export { blocks, collectionInfo, collectionLoader, collections, colorField, customField, entries, entryFile, entryPage, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, markdownField, moneyField, reference, removeEntry, repositoryRoot, saveEntries, saveEntry, tagsField, translations, unique, untranslated } from './edit'
+export { blocks, bodyHtml, collectionInfo, collectionLoader, collections, colorField, customField, entries, entryFile, entryPage, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, markdownField, moneyField, reference, removeEntry, repositoryRoot, saveEntries, saveEntry, tagsField, translations, unique, untranslated } from './edit'
 export type { FeedFormat, FeedItem, FeedOptions } from './feed'
 export type { Heading, Highlighter, MarkdownPreprocess, MarkdownSource, MarkdownTransform, RenderedMarkdown } from './markdown'
-export { bodyHtml, highlightCode, LOADED_HTML, MarkdownError, renderMarkdown } from './markdown'
+export { highlightCode, LOADED_HTML, MarkdownError, renderMarkdown } from './markdown'
 export type { Migration } from './migrate'
 export { convertField, renameField, setField } from './migrate'
 export type { Page, Paginated } from './paginate'

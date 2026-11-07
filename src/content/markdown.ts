@@ -267,13 +267,8 @@ export function sanitizedHtml(html: string): string {
   return withoutInnerRel(sanitizedMarkdown(html, LOADED_HTML, false))
 }
 
-// The HTML an entry's Markdown body puts on the page, each component standing as a `<kay-component>` element around what it wraps, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components kay cannot read.
-// kept: free
-// Given the `collection` the body belongs to, as exported from the content config, it goes through that collection's hooks and switches as the build does, with the same `entry`, so a preview matches the page, code highlighting aside.
-export async function bodyHtml(body: string, entry: { collection?: string | undefined, slug?: string | undefined, locale?: string | undefined } = {}): Promise<string> {
-  // Loaded on demand: the compiler reads this module too, in processes with neither Bun nor the content store.
-  // The highlighter stays out: its colours are `style` attributes the app wrote, which a check for what an editor's text would run must not read as the editor's.
-  const options = { ...entry.collection === undefined ? {} : await (await import('./edit-entries')).previewOptions(entry.collection, entry.slug ?? '', entry.locale), highlight: undefined }
+// A Markdown body as HTML with each component standing as a `<kay-component>` element around what it wraps, for `bodyHtml`.
+export async function componentHtml(body: string, options: CompileOptions): Promise<string> {
   const { text, components } = extractComponents(options.preprocess ? await options.preprocess(body) : body, 1)
   const { html } = await renderedMarkdown(extended(text, options), options)
 

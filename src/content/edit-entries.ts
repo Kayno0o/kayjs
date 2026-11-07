@@ -18,7 +18,7 @@ import { CRLF, DELETE, folderOf, indexes, LEADING_NEWLINE, MARKDOWN, SLASHES, SP
 import { entryPath } from './entry-route'
 import { ContentChangedError, contentKey } from './key'
 import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, sourcePath, STAMP_SETTLED_MS, translationKey, writableFolder } from './load'
-import { compileMarkdown, MarkdownError, markdownHooks, splitFrontmatter } from './markdown'
+import { compileMarkdown, componentHtml, MarkdownError, markdownHooks, splitFrontmatter } from './markdown'
 import { migrateData } from './migrate'
 import { referencesIn } from './references'
 import { takeTurn } from './turns'
@@ -855,6 +855,14 @@ export async function previewOptions(name: string, slug: string, locale: string 
   const collection = registeredCollections().find(([exported]) => exported === name)?.[1]
 
   return collection && { ...await compileOptions(collection, slug, locale), sanitize: false }
+}
+
+// The HTML an entry's Markdown body puts on the page, each component standing as a `<kay-component>` element around what it wraps, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components kay cannot read.
+// kept: free
+// Given the `collection` the body belongs to, as exported from the content config, it goes through that collection's hooks and switches as the build does, with the same `entry`, so a preview matches the page, code highlighting aside.
+export async function bodyHtml(body: string, entry: { collection?: string | undefined, slug?: string | undefined, locale?: string | undefined } = {}): Promise<string> {
+  // The highlighter stays out: its colours are `style` attributes the app wrote, which a check for what an editor's text would run must not read as the editor's.
+  return componentHtml(body, { ...entry.collection === undefined ? {} : await previewOptions(entry.collection, entry.slug ?? '', entry.locale), highlight: undefined })
 }
 
 async function compiledBody(collection: Collection<unknown>, body: string, at: { collection: string, slug: string, locale?: string | undefined }, report: (message: string) => void): Promise<CompiledMarkdown | undefined> {
