@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { flush, root, signal } from '../src/runtime'
 import { API_MOUNT, resource } from '../src/runtime/live'
 import { hydrationEnded, hydrationStarted } from '../src/runtime/reactive'
+import { limits } from '../src/server/resources'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -24,6 +25,12 @@ export default api()
 
     return { items: ['a', 'b'], locale: await renderLocale() }
   })
+  .get('/slow', async () => {
+    await Bun.sleep(400)
+
+    return { late: true }
+  })
+  .get('/big', () => Response.json({ text: 'x'.repeat(2000) }))
   .get('/boom', () => {
     throw new Error('the route broke')
   })
@@ -92,6 +99,21 @@ Items(initial={{ items: ['x'], locale: 'given' }})
 import Other from '../components/Other.kay'
 ---
 Other
+`,
+  'src/components/Late.kay': `---
+import { resource } from 'kay'
+import data from '../api/data'
+
+const slow = resource(data, '/slow')
+const big = resource(data, '/big')
+---
+p.slow {slow.status()}
+p.big {big.status()}
+`,
+  'src/routes/late.kay': `---
+import Late from '../components/Late.kay'
+---
+Late
 `,
   'src/routes/me.kay': `---
 import Me from '../components/Me.kay'
@@ -212,6 +234,22 @@ describe('the server render of resource()', () => {
     expect(seeds(admitted)?.['/api/private/me']?.value).toEqual({ user: 'ada' })
   })
 
+  it('leaves a route that outlasts the timeout loading, and reads a large Response answer whatever the visitor accepts', async () => {
+    limits.routeTimeout = 100
+
+    try {
+      const started = performance.now()
+      const html = await page(sites.plain, '/late', { 'accept-encoding': 'br, gzip' })
+
+      expect(performance.now() - started).toBeLessThan(350)
+      expect(html).toContain('<p class="slow">loading</p>')
+      expect(html).toContain('<p class="big">ready</p>')
+    }
+    finally {
+      limits.routeTimeout = 5000
+    }
+  })
+
   it('adds no seed script to a page that reads no resource', async () => {
     expect(seeds(await page(sites.plain, '/bare'))).toBeUndefined()
   })
@@ -293,6 +331,23 @@ describe('resource() in the browser', () => {
 
     expect(answers - before).toBe(1)
     expect(one.value()).toEqual(two.value())
+  })
+
+  it('asks a keyed function again when a signal it read changes', async () => {
+    const query = signal('a')
+    const seen: string[] = []
+    const found = root(() => resource((): string => {
+      const now = query()
+
+      seen.push(now)
+
+      return now
+    }, { key: 'fn-key' }))
+
+    await until(() => found.value() === 'a')
+    query.set('b')
+    await until(() => found.value() === 'b')
+    expect(seen).toEqual(['a', 'b'])
   })
 
   it('starts ready with initial and asks nothing until refresh', async () => {

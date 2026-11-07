@@ -1,5 +1,6 @@
 import type { CallResult } from './call-result'
 import type { Duration } from './duration'
+import type { Seed } from './live-resource.server'
 import { ApiError, apiErrorOf, failed, refused, textOf, unreachable } from './api-error'
 import { withBase } from './base'
 import { trackCalls } from './call-result'
@@ -824,8 +825,8 @@ class Entry {
 // The page where `resource()` finds what the server's render read: a JSON script of the seeds by key.
 export const RESOURCES_SCRIPT = 'data-kay-resources'
 
-function seedOf(key: string): { value: unknown, proof: string | null } | undefined {
-  for (const seeds of pageData<Record<string, { value: unknown, proof: string | null }>>(`script[${RESOURCES_SCRIPT}]`, JSON.parse, true)) {
+function seedOf(key: string): Seed | undefined {
+  for (const seeds of pageData<Record<string, Seed>>(`script[${RESOURCES_SCRIPT}]`, JSON.parse, true)) {
     if (Object.hasOwn(seeds, key))
       return seeds[key]
   }
@@ -952,7 +953,7 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
   // A value the app has, or the one the server rendered this island with, is shown at once.
   let known = false
   const firstKey = keyOf(first)
-  let seed: { value: unknown, proof: string | null } | undefined = first?.initial === undefined ? undefined : { value: first.initial, proof: null }
+  let seed: Seed | undefined = first?.initial === undefined ? undefined : { value: first.initial, proof: null }
 
   if (seed === undefined && isHydrating() && route && firstKey !== undefined)
     seed = seedOf(firstKey)
@@ -977,7 +978,8 @@ export function resource(module: unknown, path?: string | ResourceExtras<unknown
 
     known = false
 
-    if (held !== undefined && (key === undefined || placeholder)) {
+    // A function rerunning for a signal it read asks again under the same key.
+    if (held !== undefined && (key === undefined || placeholder || !route)) {
       void held.load(read, placeholder ? 'kept' : 'first')
 
       return

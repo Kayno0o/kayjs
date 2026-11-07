@@ -15,8 +15,9 @@ export class ResourcesPending extends Error {
 
 // A page asking for routes that depend on one another settles in this many passes; what is left renders `loading`.
 const MAX_PASSES = 3
+
 // How long the server waits for a route before the browser asks it itself.
-const ROUTE_TIMEOUT_MS = 5000
+export const limits = { routeTimeout: 5000 }
 // What the visitor's request carries that its page does not mean for an API route: a body, a condition on a copy the browser holds, a range, the navigation's own marks.
 const NOT_FORWARDED = ['content-length', 'content-type', 'transfer-encoding', 'if-none-match', 'if-modified-since', 'if-match', 'if-unmodified-since', 'if-range', 'range', 'upgrade', 'upgrade-insecure-requests', 'connection', 'expect', 'te', 'purpose', 'sec-purpose', 'sec-fetch-user']
 
@@ -45,6 +46,8 @@ function visitorHeaders(request: Request): Headers {
     headers.delete(name)
 
   headers.set('accept', 'application/json')
+  // The answer is read here as it is, never decoded.
+  headers.set('accept-encoding', 'identity')
   // The page the browser would fetch from, which an API route reads its locale off.
   headers.set('referer', request.url)
   headers.set('sec-fetch-site', 'same-origin')
@@ -56,7 +59,23 @@ function visitorHeaders(request: Request): Headers {
 
 // What the route answers the visitor, asked at the path the server routes (a `base` is taken off before the app sees it), as the browser's fetch would read it; null for a refusal, a failure, a late answer or a file.
 async function answer(request: Request, url: string): Promise<Seed | null> {
-  const visit = new Request(new URL(url, request.url), { headers: visitorHeaders(request), signal: AbortSignal.any([request.signal, AbortSignal.timeout(ROUTE_TIMEOUT_MS)]) })
+  const late = new AbortController()
+  const timer = setTimeout(() => late.abort(), limits.routeTimeout)
+
+  try {
+    // A route ignoring the signal must not hold the page past the timeout.
+    return await Promise.race([
+      asked(request, url, late.signal),
+      new Promise<null>(resolve => late.signal.addEventListener('abort', () => resolve(null), { once: true })),
+    ])
+  }
+  finally {
+    clearTimeout(timer)
+  }
+}
+
+async function asked(request: Request, url: string, late: AbortSignal): Promise<Seed | null> {
+  const visit = new Request(new URL(url, request.url), { headers: visitorHeaders(request), signal: AbortSignal.any([request.signal, late]) })
   const server = requestServer(request)
   const address = knownAddress(request, server)
 

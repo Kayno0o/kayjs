@@ -1187,14 +1187,6 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   // Its stylesheet comes last, after the page's.
   const styled = file === undefined || editor === undefined ? files : [...files, file]
   const { result: { result: { html: markup, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown, undefined, chunks)) : renderStatic(shown, undefined, chunks), pageHead(modules, options.head?.(rendering.ctx.url, rendering.status)))))
-  const streamed = deferred.length > 0
-
-  if (streamed)
-    noteStreams()
-
-  if (marks)
-    noteProbedEntries(rendering.ctx.request, marks.entries.values())
-
   const wanted = resourcesWanted()
 
   if (wanted !== undefined) {
@@ -1204,6 +1196,14 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
 
     throw new ResourcesPending(wanted)
   }
+
+  const streamed = deferred.length > 0
+
+  if (streamed)
+    noteStreams()
+
+  if (marks)
+    noteProbedEntries(rendering.ctx.request, marks.entries.values())
 
   const hasIslands = client.entry !== undefined && islands.count > 0
 
