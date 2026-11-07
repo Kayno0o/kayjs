@@ -72,6 +72,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.select.*`: `failure` (`Could not load the options`), `loading` (`Loading…`)
 - `ui.sidePanel.*`: `close` (`Close`), `resize` (`Resize`)
 - `ui.siteNav.*`: `expand` (`Show the pages under {label}`), `menu` (`Menu`)
+- `ui.sideNav.*`: `collapse` (`Collapse the menu`), `expand` (`Expand the menu`), `failure` (`Could not load.`), `loading` (`Loading…`), `menu` (`Menu`), `retry` (`Try again`)
 - `ui.sparkline.*`: `empty` (`No data yet.`)
 - `ui.splitLayout.*`: `back` (`Back`), `resize` (`Resize list`)
 - `ui.statusStrip.*`: `empty` (`No data yet.`)

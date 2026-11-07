@@ -22,4 +22,7 @@ SideNav#block(groups={groups} current="https://example.com/home" label="Block" p
   @footer
     p footer
 SideNav#panel(groups={groups} current="https://example.com/home" label="Panel" onOpenChange={onOpenChange})
+SideNav#later(groups={async () => groups} current="https://example.com/home" label="Later" panel={false})
+SideNav#broken(links={async () => { throw new Error('no') }} current="https://example.com/home" label="Broken" panel={false})
+SideNav#folded(groups={groups} current="https://example.com/home" label="Folded" collapsed={true})
 SiteNav#site(links={[{ href: 'https://example.com/a', label: 'A', badge: 2 }, { href: 'https://example.com/b', label: 'B', disabled: true }]} current="https://example.com/a" label="Site")

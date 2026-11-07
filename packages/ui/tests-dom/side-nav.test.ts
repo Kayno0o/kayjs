@@ -92,3 +92,26 @@ test('the menu button opens the same lists in a SidePanel and following a link c
   await settle()
   expect(opens).toEqual([true, false])
 })
+
+test('lists from a function load once the island runs, and a failure offers a retry', async () => {
+  const page = await root()
+
+  await settle()
+  expect(page.querySelectorAll('#later [data-part="group"]')).toHaveLength(2)
+  expect(page.querySelector('#later [data-part="status"]')).toBeNull()
+  expect(page.querySelector('#broken [data-part="status"]')?.textContent).toBe('Could not load.')
+  expect(page.querySelector('#broken [data-part="retry"]')?.textContent).toBe('Try again')
+})
+
+test('the panel is not read as a rail when the page collapsed the desktop nav', async () => {
+  const page = await root()
+
+  page.querySelector<HTMLButtonElement>('#folded ~ [data-part="menu"]')!.click()
+  await settle()
+
+  const inside = page.querySelector<HTMLElement>('#folded-panel')!
+
+  expect(inside.hasAttribute('data-collapsed')).toBe(false)
+  expect(page.querySelector('#folded')?.hasAttribute('data-collapsed')).toBe(true)
+  expect(page.querySelector('[data-part="root"][data-collapsed]')).toBeNull()
+})

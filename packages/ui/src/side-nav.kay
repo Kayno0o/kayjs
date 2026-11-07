@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { NavLink } from './defaults'
 import type { SideNavGroup } from './side-nav'
-import { persisted, recipe, signal, uid } from 'kay'
+import { onMount, persisted, recipe, signal, uid } from 'kay'
 import { navMark } from './nav-current'
 import { tabOf } from './outside'
 import Icon from './icon.kay'
@@ -12,9 +12,9 @@ import { wording } from 'kay/words'
 // 'kui-side-nav' stays as the component's name for an app's CSS. From lg the nav is a column, narrowed to a rail of icons when collapsed; below it the nav gives way to a button opening the same lists in a SidePanel.
 const look = recipe({
   parts: {
-    root: 'kui-side-nav group/side flex flex-col',
+    root: 'kui-side-nav flex flex-col',
     menu: 'lg:hidden',
-    nav: 'flex min-h-0 flex-1 flex-col gap-4 data-[panel]:max-lg:hidden w-60 data-[collapsed]:w-14 transition-[width] max-lg:w-full',
+    nav: 'group/side flex min-h-0 flex-1 flex-col gap-4 data-[panel]:max-lg:hidden w-60 data-[collapsed]:w-14 transition-[width] max-lg:w-full',
     header: 'px-3',
     group: 'flex flex-col gap-1',
     heading: 'px-3 text-xs uppercase tracking-label text-muted group-data-[collapsed]/side:sr-only',
@@ -29,17 +29,21 @@ const look = recipe({
     children: 'flex flex-col gap-1 ps-4 group-data-[collapsed]/side:hidden',
     footer: 'mt-auto px-3',
     toggle: 'self-end max-lg:hidden',
+    panel: 'flex flex-col gap-4',
+    status: 'px-3 text-sm text-muted',
+    retry: 'mx-3 self-start',
     toggleIcon: 'size-4 shrink-0 rotate-90 transition-transform group-data-[collapsed]/side:-rotate-90',
   },
 })
 
-const { id, links, groups, link, heading, header, footer, current, label, collapsed, collapsedKey, collapsible = true, onCollapsedChange, collapseLabel = wording('ui.sideNav.collapse', 'Collapse the menu'), expandLabel = wording('ui.sideNav.expand', 'Expand the menu'), panel = true, menuLabel = wording('ui.sideNav.menu', 'Menu'), open, onOpenChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children'> & {
+const { id, links, groups, link, heading, header, footer, current, label, collapsed, collapsedKey, collapsible = true, onCollapsedChange, collapseLabel = wording('ui.sideNav.collapse', 'Collapse the menu'), expandLabel = wording('ui.sideNav.expand', 'Expand the menu'), panel = true, menuLabel = wording('ui.sideNav.menu', 'Menu'), loadingLabel = wording('ui.sideNav.loading', 'Loading…'), failureLabel = wording('ui.sideNav.failure', 'Could not load.'), retryLabel = wording('ui.sideNav.retry', 'Try again'), open, onOpenChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'id' | 'class' | 'children'> & {
   // The id of the nav, unique on the page; one is drawn when none is given.
   id?: string | undefined
   // Links with no heading, before the `groups`; a link may hold `children`, one level of links under it.
-  links?: readonly NavLink[] | undefined
+  links?: readonly NavLink[] | (() => readonly NavLink[] | Promise<readonly NavLink[]>) | Promise<readonly NavLink[]> | undefined
+  // Either list may also be a function returning it, or a promise of it, loaded once the island runs, with a loading row meanwhile and a failure row with a retry if it throws or rejects.
   // Titled runs of links, each with its own heading and list.
-  groups?: readonly SideNavGroup[] | undefined
+  groups?: readonly SideNavGroup[] | (() => readonly SideNavGroup[] | Promise<readonly SideNavGroup[]>) | Promise<readonly SideNavGroup[]> | undefined
   // Draws the text of each link, children included, in place of its `label`: `@link(link)`, given the link. The icon and the badge it names are still drawn around it.
   link?: Snippet<[link: NavLink]> | undefined
   // Draws the heading of each group in place of its `label`: `@heading(group)`.
@@ -68,6 +72,12 @@ const { id, links, groups, link, heading, header, footer, current, label, collap
   panel?: boolean | undefined
   // Names the button opening the panel.
   menuLabel?: string | undefined
+  // The loading row of a list that comes from a function or a promise.
+  loadingLabel?: string | undefined
+  // The failure row of such a list.
+  failureLabel?: string | undefined
+  // Names the button retrying it.
+  retryLabel?: string | undefined
   // Shows the panel of a narrow screen when the page sets it; the button, a click on a link, a press outside and Escape open and close it on their own.
   open?: boolean | undefined
   // Called with the panel's new state whenever it shows or hides, however it did.
@@ -81,7 +91,33 @@ const shown = signal(false)
 
 const folded = () => collapsible && (collapsed ?? (kept ? kept() : own()))
 const panelOpen = () => open ?? shown()
-const all = (): SideNavGroup[] => [...links && links.length > 0 ? [{ links }] : [], ...groups ?? []]
+const waits = (source: unknown) => typeof source === 'function' || source instanceof Promise
+const askedLinks = signal<readonly NavLink[] | undefined>(undefined)
+const askedGroups = signal<readonly SideNavGroup[] | undefined>(undefined)
+const failed = signal(false)
+const pending = () => !failed() && ((waits(links) && askedLinks() === undefined) || (waits(groups) && askedGroups() === undefined))
+const flat = () => waits(links) ? askedLinks() : links as readonly NavLink[] | undefined
+const titled = () => waits(groups) ? askedGroups() : groups as readonly SideNavGroup[] | undefined
+const all = (): SideNavGroup[] => [...flat() && flat()!.length > 0 ? [{ links: flat()! }] : [], ...titled() ?? []]
+
+async function load() {
+  failed = false
+
+  try {
+    if (waits(links))
+      askedLinks = await (typeof links === 'function' ? links() : links)
+
+    if (waits(groups))
+      askedGroups = await (typeof groups === 'function' ? groups() : groups)
+  }
+  catch {
+    failed = true
+  }
+}
+
+onMount(() => {
+  void load()
+})
 
 function fold() {
   const next = !folded()
@@ -132,7 +168,7 @@ snippet inside(entry: NavLink)
 // One link; a disabled one is a text, as in TabNav. A rail names it by a tooltip.
 snippet destination(entry: NavLink)
   if entry.disabled
-    span(part="link" aria-disabled="true" data-tooltip={folded() ? entry.label : undefined})
+    span(part="link" aria-disabled="true" data-hint={folded() ? entry.label : undefined})
       | {inside(entry)}
   else
     a(part="link" href={entry.href} {...tabOf(entry.href, entry.newTab)} aria-current={navMark(entry.href, current)} data-tooltip={folded() ? entry.label : undefined})
@@ -142,6 +178,11 @@ snippet lists(inPanel: boolean)
     if header
       div(part="header")
         | {header}
+    if pending()
+      p(part="status" role="status") {loadingLabel}
+    if failed()
+      p(part="status" role="alert") {failureLabel}
+      button.kui-btn(part="retry" type="button" onClick={load}) {retryLabel}
     for group, index of all() key={index}
       div(part="group")
         if group.label !== undefined
@@ -166,11 +207,12 @@ snippet lists(inPanel: boolean)
       button.kui-icon-btn(part="toggle" type="button" aria-label={folded() ? expandLabel : collapseLabel} aria-expanded={folded() ? 'false' : 'true'} aria-controls={navId} data-tooltip={folded() ? expandLabel : collapseLabel} data-size="md" data-variant="ghost" data-tone="neutral" onClick={fold})
         Icon(icon="chevron" part="toggleIcon")
 // The nav is a column from lg, hidden below it where the button opens the same lists in a panel.
-div(part="root" {...rest} data-collapsed={folded() ? '' : undefined})
+div(part="root" {...rest})
   | {lists(false)}
   if panel
-    button.kui-icon-btn(part="menu" type="button" aria-label={menuLabel} data-tooltip={menuLabel} data-size="md" data-variant="ghost" data-tone="neutral" onClick={() => setOpen(true)})
+    button.kui-icon-btn(part="menu" type="button" aria-label={menuLabel} aria-haspopup="dialog" data-tooltip={menuLabel} data-size="md" data-variant="ghost" data-tone="neutral" onClick={() => setOpen(true)})
       Icon(icon="menu")
     SidePanel(open={panelOpen()} title={label} onOpenChange={setOpen})
-      div(onClick={followed})
+      // kay-allow unreachable-click -- the click comes from a link inside, which the keyboard follows
+      div(part="panel" onClick={followed})
         | {lists(true)}
