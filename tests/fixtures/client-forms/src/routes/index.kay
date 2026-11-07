@@ -13,7 +13,6 @@ export const limited = action(t.Object({}), () => 1, { protect: { rateLimit: { m
 export const plainOnly = action(t.Object({}), () => 1, { protect: { minTime: { after: '2s', plain: true } } })
 
 export const quiet = action(t.Object({}), () => 1, { protect: { minTime: { after: '2s', pretend: true } } })
-
 --- script
 import Opener from '../components/opener.kay'
 ---
