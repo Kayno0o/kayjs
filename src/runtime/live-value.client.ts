@@ -43,9 +43,11 @@ const browserSlots = new Map<string, BrowserSlot>()
 export const wanted = new Map<string, number>()
 // Set by `presence()`: whether the keys read now hold a connection open in a hidden tab, and what names the tab to the server.
 export const hold: { open?: () => boolean, tab?: string } = {}
-let current: { keys: Set<string>, reader: ReturnType<typeof readEvents<LiveUpdate[]>> } | undefined
+type Reader = ReturnType<typeof readEvents<LiveUpdate[]>>
+
+let current: { keys: Set<string>, reader: Reader } | undefined
 // The connection `status()`, `error()` and `retry()` of every handle read: none while the page follows nothing.
-const [followed, follow] = ownSignal<ReturnType<typeof readEvents<LiveUpdate[]>>['link'] | undefined>(undefined)
+const [followed, follow] = ownSignal<Reader | undefined>(undefined)
 let settling: ReturnType<typeof setTimeout> | undefined
 let renewing: ReturnType<typeof setTimeout> | undefined
 
@@ -268,7 +270,7 @@ function sync(): void {
 
   reader.on(apply)
   current = { keys, reader }
-  follow(reader.link)
+  follow(reader)
 
   if (renewing === undefined)
     renewLater()
@@ -319,9 +321,9 @@ function warnUnnoted(id: string, key: string): void {
 // What a handle says of the page's one connection, which every handle shares.
 const connectionOf = {
   status: () => followed()?.status() ?? 'idle',
-  pending: () => followed()?.pending() ?? false,
+  pending: () => followed()?.status() === 'connecting',
   error: () => followed()?.error(),
-  retry: () => current?.reader.retry(),
+  retry: () => followed()?.retry(),
 }
 
 export function browserLive(id: string, initial: unknown): Handle {

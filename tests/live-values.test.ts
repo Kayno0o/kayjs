@@ -523,6 +523,20 @@ describe('writing a live value in a browser', () => {
     expect(compile('---\nimport { visitors } from \'../live\'\n---\np {visitors()}\n', 'src/routes/count.kay')).toEqual([])
   })
 
+  it('reads the state of the connection through status, pending, error and retry, left uncalled', () => {
+    for (const name of ['visitors', 'room']) {
+      const source = `---\nimport { ${name} } from '../live'\n---\np {${name}.status()} {${name}.pending()}\nif ${name}.error() as error\n  p {error.message}\nbutton(onClick={${name}.retry}) Retry\n`
+      const { diagnostics, tsx } = compileKay(source, 'src/components/writer.kay', { importedSignals: imported, check: true })
+
+      expect(diagnostics.map(diagnostic => diagnostic.message)).toEqual([])
+      expect(tsx).toContain(`${name}.status()`)
+      expect(tsx).toContain(`${name}.pending()`)
+      expect(tsx).toContain(`${name}.error()`)
+      expect(tsx).toContain(`onClick={${name}.retry}`)
+      expect(tsx).not.toContain(`${name}().`)
+    }
+  })
+
   it('is read as a signal is: called, not named', () => {
     expect(compile('---\nimport { visitors } from \'../live\'\n---\np {visitors}\n')).toEqual(['`visitors` is a live value, read by calling it'])
   })

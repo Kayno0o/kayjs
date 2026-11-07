@@ -21,6 +21,8 @@ type UpdateExpression = NodeOfType<'UpdateExpression'>
 type VariableDeclarator = NodeOfType<'VariableDeclarator'>
 
 const LIVE_WRITES = new Set(['set', 'delete'])
+// The members of a live value that are not its value: the state of the page's connection.
+const LIVE_STATE = new Set(['status', 'pending', 'error', 'retry'])
 
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 const CAPITAL = /^[A-Z]/
@@ -440,7 +442,7 @@ class RewriteFinder {
   // A signal or memo the template names uncalled where only its value fits, as in `{count}` or `count > 1`: kay still reads it there, reported as `uncalled-signal` until it is written `count()`.
   // A call, `.set`, `bind:`, and the signal handed on whole, as a component's prop or a function's argument, take the signal itself.
   // Gives the source offset of such a name, undefined for any other reference.
-  private readonly uncalled = (reference: Path): number | undefined => {
+  private readonly uncalled = (reference: Path, live = false): number | undefined => {
     const { node, parent } = reference
     const source = this.input.map.isExact(node.start) ? this.input.map.toSource(node.start) : undefined
 
@@ -450,7 +452,7 @@ class RewriteFinder {
     if (isCall(parent) && (parent.callee === node || !compilerCall(parent.callee)))
       return undefined
 
-    if (parent.type === 'MemberExpression' && parent.object === node && !parent.computed && parent.property.type === 'Identifier' && parent.property.name === 'set')
+    if (parent.type === 'MemberExpression' && parent.object === node && !parent.computed && parent.property.type === 'Identifier' && (parent.property.name === 'set' || (live && LIVE_STATE.has(parent.property.name))))
       return undefined
 
     // `count++` writes it.
@@ -658,7 +660,7 @@ class RewriteFinder {
 
     for (const reference of valueReferences(binding)) {
       const values = this.input.values && !this.deferred(reference)
-      const uncalled = this.uncalled(reference)
+      const uncalled = this.uncalled(reference, kind === 'live')
 
       if (uncalled !== undefined)
         this.reportUncalled(reference, uncalled, name, kind)

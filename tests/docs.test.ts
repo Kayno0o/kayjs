@@ -99,7 +99,8 @@ describe('the documentation site\'s pages', () => {
   it.each(pageBlocks)('%s compiles cleanly and is formatted', (_name, source) => {
     // A server fence left open is a file with no template, an `_actions.kay`.
     const filename = source.startsWith('--- server') ? `src/routes/${CLOSED_FENCE.test(source) ? 'example' : '_actions'}.kay` : 'src/example.kay'
-    const { diagnostics } = compileKay(source, filename)
+    // The live values the guides read, as a project's build reports them to its pages.
+    const { diagnostics } = compileKay(source, filename, { importedSignals: { '../live': { visitors: 'live', room: 'live', unread: 'live' } } })
 
     expect(diagnostics.map(diagnostic => formatDiagnostic(source, filename, diagnostic))).toEqual([])
     expect(formatKay(source).code).toBe(source)

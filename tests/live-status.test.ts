@@ -30,11 +30,13 @@ class Connection {
 
 const declare = (live: Live, id: string, initial: unknown) => (live as unknown as (initial: unknown, id: string) => Status & ((key?: string) => unknown))(initial, id)
 
+const declareOwn = (live: Live, id: string, initial: unknown) => (live as unknown as (initial: unknown, id: string, options: unknown) => Status & (() => unknown))(initial, id, { user: true })
+
 describe('the status of a live value on the server', () => {
   it('is idle for every shape, with nothing to retry', async () => {
     const { live } = await import('../src/runtime/live-value')
 
-    for (const handle of [declare(live, 'plain', 0), declare(live, 'keyed', (key: string) => key), declare(live, 'own', 0)]) {
+    for (const handle of [declare(live, 'plain', 0), declare(live, 'keyed', (key: string) => key), declareOwn(live, 'own', 0)]) {
       expect(handle.status()).toBe('idle')
       expect(handle.pending()).toBe(false)
       expect(handle.error()).toBeUndefined()
@@ -153,6 +155,39 @@ describe('the status of a live value in a browser', () => {
     count.retry()
     await until(() => count.status() === 'open')
     expect(count.error()).toBeUndefined()
+    expect(posted.length).toBe(2)
+  })
+
+  it('stays open while one of two islands reading the value goes', async () => {
+    const count = declare(live, 'count', 0)
+
+    answers = [new Connection()]
+    follow(count)
+    follow(count)
+    await until(() => count.status() === 'open')
+    disposals.shift()!()
+    await Bun.sleep(100)
+    expect(count.status()).toBe('open')
+    expect(posted.length).toBe(1)
+  })
+
+  it('goes idle in a hidden tab, where retry sends nothing, and opens again once shown', async () => {
+    const count = declare(live, 'count', 0)
+    const hidden = (value: boolean) => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => value })
+      document.dispatchEvent(new Event('visibilitychange'))
+    }
+
+    answers = [new Connection(), new Connection()]
+    follow(count)
+    await until(() => count.status() === 'open')
+    hidden(true)
+    await until(() => count.status() === 'idle')
+    count.retry()
+    await Bun.sleep(100)
+    expect(posted.length).toBe(1)
+    hidden(false)
+    await until(() => count.status() === 'open')
     expect(posted.length).toBe(2)
   })
 
