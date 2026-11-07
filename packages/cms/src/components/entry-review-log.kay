@@ -21,9 +21,9 @@ if lastNote() as sent
   Notice.kcms-review-note(tone="warning" size="sm" label={wording('cms.review.sentBackNote', 'Sent back by {name}: {note}', { name: sent.by ?? '', note: sent.note ?? '' })})
 if review.events.length > 0
   ol.kcms-review-log(aria-label={wording('cms.review.log', 'Review')})
-    for event of events() key={event.at}
+    for event of events() key={event.doneAt.getTime()}
       li.kcms-review-event
-        EntryEdited(editedAt={new Date(event.at)} moment author={event.by})
+        EntryEdited(editedAt={event.doneAt} moment author={event.by})
         span {verbs[event.verb] ?? event.verb}
         if event.by
           span {event.by}

@@ -7,9 +7,14 @@ export interface MediaRecord {
   size: number
   by?: string | undefined
   // Absent for an upload sent before the library, which the file's own date stands in for.
-  at?: number | undefined
+  sentAt?: Date | undefined
   // The keys of the older per-collection uploads this one replaced, which the library and the pickers no longer list.
   from?: string[] | undefined
+}
+
+// A record as the index file keeps it, with the time in milliseconds.
+interface StoredMediaRecord extends Omit<MediaRecord, 'sentAt'> {
+  at?: number | undefined
 }
 
 // Where every new upload goes, whatever the collection, named by the hash of its bytes so a file sent twice is stored once.
@@ -28,16 +33,16 @@ export const NAME_LENGTH = 200
 let writing: Promise<void> = Promise.resolve()
 
 // The index as stored, `{}` when there is none yet; a read that fails or finds something unreadable throws, so a write never replaces records it could not read.
-async function readIndex(): Promise<Record<string, MediaRecord>> {
+async function readIndex(): Promise<Record<string, StoredMediaRecord>> {
   const stored = await files.get(INDEX_KEY)
 
-  return stored === undefined ? {} : await stored.json() as Record<string, MediaRecord>
+  return stored === undefined ? {} : await stored.json() as Record<string, StoredMediaRecord>
 }
 
 // What the library shows beside the files; an index that cannot be read leaves each upload shown by its key.
 export async function mediaIndex(): Promise<Record<string, MediaRecord>> {
   try {
-    return await readIndex()
+    return Object.fromEntries(Object.entries(await readIndex()).map(([key, { at, ...record }]) => [key, { ...record, ...at !== undefined && { sentAt: new Date(at) } }]))
   }
   catch (error) {
     log.error('reading the media index failed', error)
@@ -47,7 +52,7 @@ export async function mediaIndex(): Promise<Record<string, MediaRecord>> {
 }
 
 // `update` answers false when it changed nothing, so the index is not written.
-async function change(update: (index: Record<string, MediaRecord>) => boolean): Promise<void> {
+async function change(update: (index: Record<string, StoredMediaRecord>) => boolean): Promise<void> {
   const before = writing
   let release!: () => void
 
@@ -149,7 +154,7 @@ export async function adoptUploads(moves: Adoption[]): Promise<void> {
 
     for (const move of moves) {
       const old = index[move.from]
-      const record: MediaRecord = index[move.to] ?? { name: old?.name ?? move.from.split('/').at(-1)!, size: move.size, ...old?.by !== undefined && { by: old.by }, ...(old?.at ?? move.at) !== undefined && { at: old?.at ?? move.at } }
+      const record: StoredMediaRecord = index[move.to] ?? { name: old?.name ?? move.from.split('/').at(-1)!, size: move.size, ...old?.by !== undefined && { by: old.by }, ...(old?.at ?? move.at) !== undefined && { at: old?.at ?? move.at } }
 
       if (index[move.to] === undefined)
         changed = true
@@ -167,6 +172,6 @@ export async function adoptUploads(moves: Adoption[]): Promise<void> {
 }
 
 // The keys of older uploads whose copy in the shared folder took their place.
-export function movedKeys(index: Record<string, MediaRecord>): Set<string> {
+export function movedKeys(index: Record<string, Pick<MediaRecord, 'from'>>): Set<string> {
   return new Set(Object.values(index).flatMap(record => record.from ?? []))
 }

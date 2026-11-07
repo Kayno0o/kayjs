@@ -16,7 +16,7 @@ test('a file sent twice is stored once under its hash, in the folder every colle
   expect(first).toMatch(new RegExp(`^${MEDIA_FOLDER}/[\\da-f]{20}\\.1x1(?:-[\\da-f]{6})?\\.png$`))
   expect(again).toBe(first)
   expect(await files.list({ folder: MEDIA_FOLDER })).toHaveLength(1)
-  expect((await mediaIndex())[first]).toMatchObject({ name: 'first.png', by: 'Ada', size: PNG.length })
+  expect((await mediaIndex())[first]).toMatchObject({ name: 'first.png', by: 'Ada', size: PNG.length, sentAt: expect.any(Date) })
 })
 
 test('different bytes get different keys, and the index keeps every upload', async () => {

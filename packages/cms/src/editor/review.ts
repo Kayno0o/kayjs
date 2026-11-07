@@ -6,6 +6,14 @@ import type { ReviewReply } from './save'
 import { signal } from 'kay'
 import { approveSaved, refuseUnsaved, sendBackSaved, submitSaved } from './save'
 
+// A review as the entry API answers it, whose JSON carries each time as text.
+export type ReviewJson = Omit<ReviewView, 'events'> & { events: (Omit<ReviewView['events'][number], 'doneAt'> & { doneAt: Date | string })[] }
+
+// The review with each step's time a `Date` again.
+export function revived(review: ReviewJson | undefined): ReviewView | undefined {
+  return review && { ...review, events: review.events.map(event => ({ ...event, doneAt: new Date(event.doneAt) })) }
+}
+
 export interface EntryReview {
   review: Signal<ReviewView | undefined>
   busy: Signal<boolean>
@@ -31,7 +39,7 @@ export function createReview(ref: EntryRef, initial: ReviewView | undefined, dra
       if (!reply)
         return false
 
-      review.set(reply.review)
+      review.set(revived(reply.review))
 
       if (reply.entry?.data !== undefined)
         drafts.adopt(ref, { ...ref, data: reply.entry.data, body: reply.entry.body }, reply.entry.version)

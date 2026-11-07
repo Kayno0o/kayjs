@@ -19,7 +19,7 @@ import { fieldAtPath, registerInline } from './inline'
 import { savedHandler } from './live'
 import { readReferrers } from './referrers'
 import { rebuildFinished, rebuildStarted } from './rebuild'
-import { createReview } from './review'
+import { createReview, revived } from './review'
 import { unfoldAround } from './reorder'
 import { anchorsOf, keyOfPath, ownerOf } from './anchors'
 import { forgetPlace, placeCaret } from './caret'
@@ -209,7 +209,7 @@ effect(() => {
   const answer = source.value()
 
   if (answer)
-    stages.review.set(answer.review)
+    stages.review.set(revived(answer.review))
 })
 
 const isDraft = () => { const field = draftField(); return field !== undefined && drafts.value(entry, field) === true }

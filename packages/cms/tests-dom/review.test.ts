@@ -7,13 +7,14 @@ import { afterEach, expect, mock, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import EntryReviewLog from '../src/components/entry-review-log.kay'
 import EntryReview from '../src/components/entry-review.kay'
+import { revived } from '../src/editor/review'
 import WithToaster from './with-toaster.kay'
 
 const POSTS = { name: 'posts', title: 'Posts', kind: 'folder', localized: false, components: [], draftField: 'draft', schema: { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' } } }, review: true } as unknown as ScreenCollection
 const WRITER: Denials = { publish: 'Your role may not do this: publish or unpublish', review: 'Your role may not do this: approve or send back an entry in review' }
 const REVIEWER: Denials = { publish: 'Your role may not do this: publish or unpublish' }
 const OWN = 'You sent this entry for review: another person approves it'
-const waiting: ReviewView = { status: 'review', by: 'Wanda', events: [{ at: 1_700_000_000_000, verb: 'submit', by: 'Wanda' }] }
+const waiting: ReviewView = { status: 'review', by: 'Wanda', events: [{ doneAt: new Date(1_700_000_000_000), verb: 'submit', by: 'Wanda' }] }
 let mounted: Mounted | undefined
 
 afterEach(() => {
@@ -149,7 +150,7 @@ test('a draft sent back is badged Sent back, and its writer submits it again', a
 })
 
 test('the review log lists the steps newest first, and a draft sent back shows the last note above them', async () => {
-  const review: ReviewView = { status: 'sent-back', by: 'Wanda', events: [{ at: 1_700_000_000_000, verb: 'submit', by: 'Wanda' }, { at: 1_700_000_100_000, verb: 'send-back', by: 'Rex', note: 'Shorter title' }] }
+  const review: ReviewView = { status: 'sent-back', by: 'Wanda', events: [{ doneAt: new Date(1_700_000_000_000), verb: 'submit', by: 'Wanda' }, { doneAt: new Date(1_700_000_100_000), verb: 'send-back', by: 'Rex', note: 'Shorter title' }] }
 
   mounted = await mountComponent(EntryReviewLog, { review, draft: true })
   await settle()
@@ -185,4 +186,11 @@ test('the list shows In review and Sent back beside Draft, and nothing for a dra
   expect(statusOf('plain')).toContain('Draft')
   expect(statusOf('plain')).not.toMatch(/In review|Sent back/)
   expect(statusOf('live')).not.toMatch(/In review|Sent back/)
+})
+
+test('a review the entry API answers as JSON has its step times back as Dates', () => {
+  const answered = JSON.parse(JSON.stringify({ status: 'review', events: [{ doneAt: new Date(1_700_000_000_000), verb: 'submit' }] }))
+
+  expect(revived(answered)?.events[0]?.doneAt).toEqual(new Date(1_700_000_000_000))
+  expect(revived(undefined)).toBeUndefined()
 })

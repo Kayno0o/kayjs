@@ -223,7 +223,7 @@ export async function libraryUploads(options: { page?: number | undefined, q?: s
   const named = (key: string) => index[key]?.name ?? key.split('/').at(-1)!
   const found = read.stored
     .filter(file => idOf(file.key) !== undefined && !moved.has(file.key) && (needle === '' || named(file.key).toLowerCase().includes(needle) || file.key.toLowerCase().includes(needle)))
-    .toSorted((a, b) => (index[b.key]?.at ?? b.modifiedAt?.getTime() ?? 0) - (index[a.key]?.at ?? a.modifiedAt?.getTime() ?? 0))
+    .toSorted((a, b) => ((index[b.key]?.sentAt ?? b.modifiedAt)?.getTime() ?? 0) - ((index[a.key]?.sentAt ?? a.modifiedAt)?.getTime() ?? 0))
   const pages = Math.max(1, Math.ceil(found.length / LIBRARY_PAGE))
   const page = Math.min(pages, Math.max(1, Number.isInteger(options.page) ? options.page! : 1))
   const now = Date.now()
@@ -240,7 +240,7 @@ export async function libraryUploads(options: { page?: number | undefined, q?: s
       width: width === undefined ? undefined : Number(width),
       height: height === undefined ? undefined : Number(height),
       by: record?.by,
-      sentAt: record?.at === undefined ? file.modifiedAt : new Date(record.at),
+      sentAt: record?.sentAt ?? file.modifiedAt,
       usedIn,
       held: read.held?.has(idOf(file.key)!),
       deletable: usedIn.length === 0 && read.held !== undefined && !read.held.has(idOf(file.key)!) && file.modifiedAt !== undefined && now - file.modifiedAt.getTime() >= GRACE,

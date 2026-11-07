@@ -34,7 +34,10 @@ export interface Review {
 }
 
 // What a screen is given of a review: the id of the person is left out. `own` is set when the signed-in person sent the draft and `cms({ fourEyes })` keeps them from approving it.
-export type ReviewView = Omit<Review, 'byId'> & { own?: true }
+export type ReviewView = Omit<Review, 'byId' | 'events'> & { events: ReviewEventView[], own?: true }
+
+// A step of a review as a screen reads it, `at` in milliseconds becoming a `Date`.
+export type ReviewEventView = Omit<ReviewEvent, 'at'> & { doneAt: Date }
 
 // Who is looking at a review or acting on it, as far as the guard knows them.
 export interface Viewer {
@@ -93,7 +96,7 @@ async function jsonOf(file: string): Promise<unknown> {
 }
 
 export function viewOf(review: Review, viewer?: Viewer): ReviewView {
-  return { status: review.status, ...review.by !== undefined && { by: review.by }, events: review.events, ...mayNotApprove(review, viewer) && { own: true as const } }
+  return { status: review.status, ...review.by !== undefined && { by: review.by }, events: review.events.map(({ at, ...event }) => ({ ...event, doneAt: new Date(at) })), ...mayNotApprove(review, viewer) && { own: true as const } }
 }
 
 // A stored value as a review, undefined for anything else.

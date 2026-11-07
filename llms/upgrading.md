@@ -33,7 +33,7 @@ The `ban` of an admin's `User` and of the data export is `{ bannedAt, until, rea
 
 ### kayjs-cms `EntryRow` times are a `Date`
 
-`EntryRow.modifiedAt`, `scheduledAt` and `endsAt` are a `Date` where they were epoch milliseconds: a row read with `row.modifiedAt - now` reads `row.modifiedAt.getTime() - now`. The cms screens' own rows follow (`HistoryRow.savedAt` and `revision`, `TrashRow.deletedAt`, `ActivityRow.doneAt`, `LibraryUpload.sentAt`), as do the props of the `EntryEdited` (`editedAt`) and `EntryStatus` (`goesLiveAt`, `endsAt`) components. No lint can see it: a property read on a value is not visible to `kay check`.
+`EntryRow.modifiedAt`, `scheduledAt` and `endsAt` are a `Date` where they were epoch milliseconds: a row read with `row.modifiedAt - now` reads `row.modifiedAt.getTime() - now`. The cms screens' own rows follow (`HistoryRow.savedAt` and `revision`, `TrashRow.deletedAt`, `ActivityRow.doneAt`, `LibraryUpload.sentAt`, the `doneAt` of each event of a `ReviewView`), as do the props of the `EntryEdited` (`editedAt`) and `EntryStatus` (`goesLiveAt`, `endsAt`) components. No lint can see it: a property read on a value is not visible to `kay check`.
 
 ### kayjs-cms `Recovery.at` is `editedAt`, a `Date`
 

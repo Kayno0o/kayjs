@@ -67,7 +67,7 @@ describe.each(['posts', 'notes'])('review in %s', (name) => {
     const ref = await draft(name)
     const sent = await submitEntry(ref, writer)
 
-    expect(sent).toMatchObject({ saved: true, review: { status: 'review', by: 'Wanda', events: [{ verb: 'submit', by: 'Wanda' }] } })
+    expect(sent).toMatchObject({ saved: true, review: { status: 'review', by: 'Wanda', events: [{ doneAt: expect.any(Date), verb: 'submit', by: 'Wanda' }] } })
     expect(JSON.stringify(sent)).not.toContain('writer-1')
     expect((await readReview(ref))?.status).toBe('review')
     expect([...(await reviewsOf(name)).keys()]).toEqual(['first'])
