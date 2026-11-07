@@ -225,8 +225,10 @@ async function readEntries(collection: CollectionInfo): Promise<SourceEntry[] | 
 }
 
 export interface HistoryRow {
-  // 0 for the entry as it stood before its first recorded save.
-  at: number
+  // The version's key in ms, which a restore names; 0 for the entry as it stood before its first recorded save.
+  revision: number
+  // When it was saved, absent for that first one.
+  savedAt?: Date | undefined
   author?: string | undefined
   verb: string
   // What this save changed from the one before; empty for the entry's first.
@@ -255,7 +257,8 @@ export async function historyScreen(ref: EntryRef, viewer?: Viewer): Promise<His
   const { collection, entry } = screen
   const revisions = await revisionsOf(ref)
   const rows = revisions.map((revision, index) => ({
-    at: revision.at,
+    revision: revision.at,
+    ...revision.at > 0 && { savedAt: new Date(revision.at) },
     author: revision.author,
     verb: revision.verb,
     changes: index === 0 ? [] : changesBetween(collection.schema, revisions[index - 1]!, revision),
@@ -270,7 +273,7 @@ export async function historyScreen(ref: EntryRef, viewer?: Viewer): Promise<His
 // A trashed entry as the page shows it: the entry itself stays server side.
 export interface TrashRow {
   id: string
-  at: number
+  deletedAt: Date
   author?: string | undefined
   slug: string
   locale?: string | undefined
@@ -291,14 +294,14 @@ export async function trashScreen(name: string): Promise<TrashScreen | undefined
   if (collection?.trash !== true)
     return undefined
 
-  const rows = (await trashOf(name)).map(item => ({ id: item.id, at: item.at, author: item.author, slug: item.slug, locale: item.locale, title: entryTitle(collection, { slug: item.slug, locale: item.locale, data: item.data as SourceEntry['data'], body: item.body, draft: false }) }))
+  const rows = (await trashOf(name)).map(item => ({ id: item.id, deletedAt: new Date(item.at), author: item.author, slug: item.slug, locale: item.locale, title: entryTitle(collection, { slug: item.slug, locale: item.locale, data: item.data as SourceEntry['data'], body: item.body, draft: false }) }))
 
   return { prefix: settings().prefix, collection, rows }
 }
 
 // An editor's action as the page shows it, with the entry's screen when the action left one.
 export interface ActivityRow {
-  at: number
+  doneAt: Date
   verb: Activity['verb']
   collection: string
   title: string
@@ -347,7 +350,7 @@ export async function activityScreen(page: number | undefined): Promise<Activity
   // An entry renamed, deleted or in the trash since holds no such slug: its earlier rows link nowhere.
   const names = [...new Set(shown.rows.map(({ event }) => event.collection))]
   const held = new Map(await Promise.all(names.map(async name => [name, await heldBy(name)] as const)))
-  const rows = shown.rows.map(({ event, title }) => ({ ...event, title, href: held.get(event.collection)?.has(heldKey(event)) === true ? entryPath(prefix, event) : undefined }))
+  const rows = shown.rows.map(({ event, title }) => ({ doneAt: new Date(event.at), verb: event.verb, collection: event.collection, slug: event.slug, locale: event.locale, from: event.from, author: event.author, title, href: held.get(event.collection)?.has(heldKey(event)) === true ? entryPath(prefix, event) : undefined }))
 
   return { prefix, page: shown.page, pages: shown.pages, rows }
 }

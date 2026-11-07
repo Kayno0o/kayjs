@@ -289,7 +289,7 @@ describe('sort', () => {
     expect(await view(shop, 'modified', 'desc')).toEqual(['a', 'c', 'b', 'd'])
     expect(await view(shop, 'modified', 'desc', 2, 2)).toEqual(['b', 'd'])
     expect(await view(shop, 'author', 'asc')).toEqual(['b', 'a', 'c', 'd'])
-    expect((await pageRows(shop, '', 1, async () => files, none, 50, { sort: 'modified', direction: 'asc', edits })).rows[0]).toMatchObject({ modifiedAt: 100, author: 'Ada' })
+    expect((await pageRows(shop, '', 1, async () => files, none, 50, { sort: 'modified', direction: 'asc', edits })).rows[0]).toMatchObject({ modifiedAt: new Date(100), author: 'Ada' })
     expect(await view({ ...shop, kind: 'loaded' }, 'modified', 'asc')).toEqual(['a', 'b', 'c', 'd'])
   })
 
@@ -311,7 +311,7 @@ describe('sort', () => {
     const files = stock.map(entry => ({ ...entry, path: `content/shop/${entry.slug}.md` }))
     const page = await pageRows(shop, '', 1, async () => files, none, 50, { edits: async () => new Map([['content/shop/d.md', { at: 5, author: 'Ada' }]]) })
 
-    expect(page.rows.map(row => row.modifiedAt)).toEqual([undefined, undefined, undefined, 5])
+    expect(page.rows.map(row => row.modifiedAt)).toEqual([undefined, undefined, undefined, new Date(5)])
   })
 
   it('reads nothing more than the page for a key no column has', async () => {

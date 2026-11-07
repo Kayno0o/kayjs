@@ -5,6 +5,7 @@ ai [.] sqliteConversations
 auth [.] DataExport
 auth [.] ManagedUser
 auth [.] lifetime
+cms [.] EntryRow
 cms [.] KeptDraft
 cms [.] Recovery
 kay [./server] AsyncRoomStore

@@ -25,10 +25,10 @@ if rows.length === 0
   EmptyState(title={wording('cms.activity.empty', 'Nothing yet')} description={wording('cms.activity.emptyHint', 'What editors save, publish, delete, restore or rename from now on is listed here.')})
 else
   ol.kcms-history
-    for row of rows key={`${row.at}/${row.collection}/${row.slug}/${row.locale ?? ''}/${row.verb}`}
+    for row of rows key={`${row.doneAt.getTime()}/${row.collection}/${row.slug}/${row.locale ?? ''}/${row.verb}`}
       li.kcms-revision
         .kcms-revision-head
-          EntryEdited(at={row.at} moment author={row.author})
+          EntryEdited(editedAt={row.doneAt} moment author={row.author})
           Badge(label={action(row)})
           if row.href as href
             a(href={href}) {row.title}: {row.locale ? `${row.slug} (${row.locale})` : row.slug}

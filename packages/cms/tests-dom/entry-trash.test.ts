@@ -14,8 +14,8 @@ const NOTES: ScreenCollection = {
   schema: { type: 'object', properties: { title: { type: 'string' } } },
 }
 const rows: TrashScreen['rows'] = [
-  { id: '200', at: 200, author: 'Ada', slug: 'second', title: 'Two' },
-  { id: '100', at: 100, slug: 'first', locale: 'fr', title: 'One' },
+  { id: '200', deletedAt: new Date(200), author: 'Ada', slug: 'second', title: 'Two' },
+  { id: '100', deletedAt: new Date(100), slug: 'first', locale: 'fr', title: 'One' },
 ]
 let mounted: Mounted | undefined
 

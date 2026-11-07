@@ -40,7 +40,7 @@ else
           Badge(label={row.locale ? `${row.slug} (${row.locale})` : row.slug})
           span
             | {wording('cms.trash.deleted', 'Deleted')} 
-            EntryEdited(at={row.at} moment author={row.author})
+            EntryEdited(editedAt={row.deletedAt} moment author={row.author})
           ConfirmDelete(tone="neutral" triggerLook="button" label={wording('cms.history.restoreButton', 'Restore')} message={wording('cms.trash.restoreMessage', 'Restore {title}? It comes back under its slug.', { title: row.title })} failureLabel={wording('cms.history.restoreFailure', 'Could not restore')} onConfirm={async () => { await restore(row.id) }})
           if denied.delete !== undefined
             Refused(tone="danger" label={wording('cms.trash.erase', 'Erase for good')} reason={denied.delete})

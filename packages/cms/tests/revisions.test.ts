@@ -176,6 +176,7 @@ describe('historyScreen', () => {
     const screen = await historyScreen(ref)
 
     expect(screen?.rows.map(row => [row.verb, row.current, row.changes])).toEqual([['update', true, [{ key: 'title', label: 'Title', before: 'One', after: 'Two' }]], ['add', false, []]])
+    expect(screen?.rows.map(row => [row.savedAt instanceof Date, row.revision > 0])).toEqual([[true, true], [true, true]])
   })
 
   test('is none for a missing entry or a collection that keeps no history', async () => {
@@ -266,6 +267,7 @@ describe('the trash', () => {
     await deleteEntry(ref)
     await deleteEntry({ collection: 'notes', slug: 'second' })
     expect((await trashScreen('notes'))?.rows.map(row => [row.slug, row.title])).toEqual([['second', 'Two'], ['first', 'One']])
+    expect((await trashScreen('notes'))?.rows.every(row => row.deletedAt instanceof Date)).toBe(true)
     expect(await trashScreen('plain')).toBeUndefined()
   })
 })

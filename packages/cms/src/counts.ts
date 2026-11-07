@@ -41,5 +41,5 @@ async function counted(collection: CollectionInfo, read: () => Promise<SourceEnt
 
   const rows = rowsOf({ ...collection }, found, now)
 
-  return { drafts: rows.filter(row => statusOf(row) === 'draft').length, goesLive: rows.flatMap(row => row.scheduledAt === undefined ? [] : [row.scheduledAt]) }
+  return { drafts: rows.filter(row => statusOf(row) === 'draft').length, goesLive: rows.flatMap(row => row.scheduledAt === undefined ? [] : [row.scheduledAt.getTime()]) }
 }

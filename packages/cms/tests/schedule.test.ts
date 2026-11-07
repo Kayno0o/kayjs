@@ -63,7 +63,7 @@ describe('rowsOf', () => {
       { slug: 'plain', data: { title: 'Plain' }, draft: false },
     ], NOW)
 
-    expect(rows.map(row => [row.slug, row.scheduledAt])).toEqual([['later', Date.parse('2026-10-20T08:00:00Z')], ['drafted', undefined], ['live', undefined], ['plain', undefined]])
+    expect(rows.map(row => [row.slug, row.scheduledAt])).toEqual([['later', new Date('2026-10-20T08:00:00Z')], ['drafted', undefined], ['live', undefined], ['plain', undefined]])
   })
 })
 
@@ -76,7 +76,7 @@ describe('rowsOf with unpublishAt', () => {
       { slug: 'drafted', data: { title: 'Drafted', ends: '2026-10-20T08:00:00Z', draft: true }, draft: true },
     ], NOW)
 
-    expect(rows.map(row => [row.slug, row.endsAt])).toEqual([['soon', Date.parse('2026-10-20T08:00:00Z')], ['over', Date.parse('2026-10-01')], ['drafted', undefined]])
+    expect(rows.map(row => [row.slug, row.endsAt])).toEqual([['soon', new Date('2026-10-20T08:00:00Z')], ['over', new Date('2026-10-01')], ['drafted', undefined]])
   })
 })
 

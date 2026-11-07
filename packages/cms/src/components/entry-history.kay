@@ -31,7 +31,7 @@ const verbs: Record<string, string> = {
 }
 
 async function restore(row: HistoryRow): Promise<void> {
-  if (await restoreVersion(ref, row.at, entry.version))
+  if (await restoreVersion(ref, row.revision, entry.version))
     await navigate(entryPath(prefix, ref))
 }
 ---
@@ -39,11 +39,11 @@ if rows.length === 0
   EmptyState(title={wording('cms.history.empty', 'No saved version yet')} description={wording('cms.history.emptyHint', 'Each save from now on is kept here, so an older version can be brought back.')})
 else
   ol.kcms-history
-    for row of rows key={row.at}
+    for row of rows key={row.revision}
       li.kcms-revision
         .kcms-revision-head
-          if row.at > 0
-            EntryEdited(at={row.at} moment author={row.author})
+          if row.savedAt as savedAt
+            EntryEdited(editedAt={savedAt} moment author={row.author})
           Badge(label={verbs[row.verb] ?? row.verb})
           if row.current
             Badge(tone="info" label={wording('cms.history.current', 'Current')})

@@ -228,6 +228,7 @@ test('the library lists every upload with the entries using it, its record and w
   expect(fresh.uploads.map(found => found.key).toSorted()).toEqual([shared, legacy].toSorted())
   expect(fresh.uploads.find(found => found.key === shared)).toMatchObject({ name: 'team.png', by: 'Ada', size: PIXEL.length, width: 1, height: 1, usedIn: [{ collection: 'posts', slug: 'a' }, { collection: 'posts', slug: 'b' }], deletable: false })
   expect(fresh.uploads.find(found => found.key === legacy)).toMatchObject({ name: legacy.split('/').at(-1), size: PIXEL.length, usedIn: [], deletable: false })
+  expect(fresh.uploads.find(found => found.key === shared)?.sentAt).toBeInstanceOf(Date)
 
   aged()
 

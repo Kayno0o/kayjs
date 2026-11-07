@@ -35,7 +35,7 @@ const columns: Column<LibraryUpload>[] = [
   { key: 'name', header: wording('cms.media.name', 'Name'), cell: true, sortValue: upload => upload.name },
   { key: 'size', header: wording('cms.media.size', 'Size'), cell: true, sortValue: upload => upload.size ?? 0 },
   { key: 'usedIn', header: wording('cms.media.usedIn', 'Used in'), cell: true, sortValue: upload => upload.usedIn.length },
-  { key: 'at', header: wording('cms.media.sent', 'Sent'), cell: true, sortValue: upload => upload.at ?? 0 },
+  { key: 'at', header: wording('cms.media.sent', 'Sent'), cell: true, sortValue: upload => upload.sentAt?.getTime() ?? 0 },
   { key: 'actions', header: wording('cms.table.actions', 'Actions'), align: 'end', cell: true },
 ]
 
@@ -108,8 +108,8 @@ Table.kcms-media(columns={columns} rows={uploads} rowKey={upload => upload.key})
           if row.usedIn.length > NAMED
             li {wording('cms.media.more', '{count} more', { count: row.usedIn.length - NAMED })}
     else if column.key === 'at'
-      if row.at as at
-        EntryEdited(at={at}) 
+      if row.sentAt as sentAt
+        EntryEdited(editedAt={sentAt})
       if row.by as by
         span.kcms-entry-subtitle  {by}
     else

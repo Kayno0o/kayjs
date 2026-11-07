@@ -326,7 +326,7 @@ test('the badge comes back for a date typed ahead and goes for a date typed in t
   expect(badge()).toBeUndefined()
 })
 
-const rowOf = (slug: string, at: string | undefined) => ({ slug, title: slug, draft: false, ...at !== undefined && Date.parse(at) > Date.now() && { scheduledAt: Date.parse(at) } }) as EntryRow
+const rowOf = (slug: string, at: string | undefined) => ({ slug, title: slug, draft: false, ...at !== undefined && Date.parse(at) > Date.now() && { scheduledAt: new Date(at) } }) as EntryRow
 const statusOf = (slug: string) => mounted!.root.querySelector(`tr:has(a[href$="/${slug}"]) .kui-badge`)?.textContent?.trim()
 
 test('the list names a scheduled time in the editor\'s zone, as the entry screen does, and says Published for an entry with none or one that passed', async () => {
@@ -344,12 +344,12 @@ test('the list names a time in UTC for an editor in UTC and the offset of a half
   const ahead = '2999-10-19T06:00:00Z'
 
   process.env.TZ = 'UTC'
-  mounted = await mountComponent(ScheduledRows, { collection: TALKS, rows: [{ ...rowOf('later', ahead), scheduledAt: Date.parse(ahead) }] })
+  mounted = await mountComponent(ScheduledRows, { collection: TALKS, rows: [{ ...rowOf('later', ahead), scheduledAt: new Date(ahead) }] })
   await settle()
   expect(statusOf('later')).toBe('Scheduled for 2999-10-19 06:00 UTC')
   mounted.unmount()
   process.env.TZ = 'Asia/Kolkata'
-  mounted = await mountComponent(ScheduledRows, { collection: TALKS, rows: [{ ...rowOf('later', ahead), scheduledAt: Date.parse(ahead) }] })
+  mounted = await mountComponent(ScheduledRows, { collection: TALKS, rows: [{ ...rowOf('later', ahead), scheduledAt: new Date(ahead) }] })
   await settle()
   expect(statusOf('later')).toBe('Scheduled for 2999-10-19 11:30 GMT+5:30')
 })
@@ -361,7 +361,7 @@ test('the list\'s badge turns to Published when its date passes, with no reload'
 
   const at = clock.now + 100
 
-  mounted = await mountComponent(ScheduledRows, { collection: TALKS, rows: [{ ...rowOf('later', undefined), scheduledAt: at }] })
+  mounted = await mountComponent(ScheduledRows, { collection: TALKS, rows: [{ ...rowOf('later', undefined), scheduledAt: new Date(at) }] })
   await settle()
   expect(statusOf('later')).toStartWith('Scheduled for ')
 

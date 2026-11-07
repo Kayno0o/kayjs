@@ -23,7 +23,7 @@ if review.events.length > 0
   ol.kcms-review-log(aria-label={wording('cms.review.log', 'Review')})
     for event of events() key={event.at}
       li.kcms-review-event
-        EntryEdited(at={event.at} moment author={event.by})
+        EntryEdited(editedAt={new Date(event.at)} moment author={event.by})
         span {verbs[event.verb] ?? event.verb}
         if event.by
           span {event.by}

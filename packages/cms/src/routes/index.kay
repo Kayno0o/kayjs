@@ -66,6 +66,6 @@ PageSection(title={wording('cms.admin.content', 'Content')} level={1})
           p.kcms-entry-subtitle {row.collection.description}
         if row.edited as edit
           p.kcms-entry-subtitle
-            EntryEdited(at={edit.at} author={edit.author} sentence)
+            EntryEdited(editedAt={new Date(edit.at)} author={edit.author} sentence)
   else
     EmptyState(title={wording('cms.admin.noCollections', 'No collections')} description={wording('cms.admin.noCollectionsHint', 'This site declares no content collection in its content config.')})

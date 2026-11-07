@@ -89,6 +89,7 @@ describe('activity', () => {
     await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
     await deleteEntry(ref)
     expect((await activityScreen(1))?.rows.map(row => [row.verb, row.href])).toEqual([['delete', undefined], ['add', undefined]])
+    expect((await activityScreen(1))?.rows.every(row => row.doneAt instanceof Date && !('at' in row))).toBe(true)
   })
 
   test('links a row only while its entry holds that slug', async () => {

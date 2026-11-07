@@ -17,10 +17,10 @@ export interface EntryRow {
   locale?: string | undefined
   title: string
   draft: boolean
-  // For a published entry whose `publishAt` date is ahead, when it goes live in milliseconds, which the table names in the editor's zone and drops once it passes.
-  scheduledAt?: number | undefined
-  // For a published entry with an `unpublishAt` date, when it comes down in milliseconds, which the table names while ahead and marks Ended once it passes.
-  endsAt?: number | undefined
+  // For a published entry whose `publishAt` date is ahead, when it goes live, which the table names in the editor's zone and drops once it passes.
+  scheduledAt?: Date | undefined
+  // For a published entry with an `unpublishAt` date, when it comes down, which the table names while ahead and marks Ended once it passes.
+  endsAt?: Date | undefined
   url?: string | undefined
   // Why the entry's file does not parse, when it does not.
   problem?: string | undefined
@@ -32,8 +32,8 @@ export interface EntryRow {
   version?: string | undefined
   // In an ordered collection, whether the entry has one before or after it to swap places with, among the entries of its locale; absent while a search is on.
   move?: { up: boolean, down: boolean } | undefined
-  // For a folder entry, when its file was last edited in milliseconds and by whom, from the repository's history, none for a file with no commit.
-  modifiedAt?: number | undefined
+  // For a folder entry, when its file was last edited and by whom, from the repository's history, none for a file with no commit.
+  modifiedAt?: Date | undefined
   author?: string | undefined
   // Whether the signed-in person's role may not change this entry, which is another's.
   locked?: true | undefined
@@ -58,7 +58,7 @@ export function rowsOf(collection: ScreenCollection, entries: SourceEntry[], now
 
     const edit = path === undefined ? undefined : edits?.get(path)
 
-    return { slug, locale, url, draft, problem, cells, ...edit !== undefined && { modifiedAt: edit.at, author: edit.author }, ...goesLiveAt !== undefined && goesLiveAt > now && { scheduledAt: goesLiveAt }, ...comesDownAt !== undefined && { endsAt: comesDownAt }, title: typeof title === 'string' && title.trim() !== '' ? title : slug }
+    return { slug, locale, url, draft, problem, cells, ...edit !== undefined && { modifiedAt: new Date(edit.at), author: edit.author }, ...goesLiveAt !== undefined && goesLiveAt > now && { scheduledAt: new Date(goesLiveAt) }, ...comesDownAt !== undefined && { endsAt: new Date(comesDownAt) }, title: typeof title === 'string' && title.trim() !== '' ? title : slug }
   })
 }
 
@@ -173,7 +173,7 @@ function sortRows(collection: ScreenCollection, rows: EntryRow[], key: string, d
       return STATUS_RANK[statusOf(row)]
 
     if (key === 'modified')
-      return row.modifiedAt
+      return row.modifiedAt?.getTime()
 
     if (key === 'author')
       return row.author === '' ? undefined : row.author
@@ -295,7 +295,7 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
       const path = seen.get(key(row.slug, row.locale))?.path
       const edit = path === undefined ? undefined : last?.get(path)
 
-      return { ...row, ...row.modifiedAt === undefined && edit !== undefined && { modifiedAt: edit.at, author: edit.author }, version: await versionOf({ collection: collection.name, slug: row.slug, locale: row.locale }) }
+      return { ...row, ...row.modifiedAt === undefined && edit !== undefined && { modifiedAt: new Date(edit.at), author: edit.author }, version: await versionOf({ collection: collection.name, slug: row.slug, locale: row.locale }) }
     }))
 
     return { ...listed, rows, total }

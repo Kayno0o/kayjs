@@ -169,8 +169,8 @@ export interface LibraryUpload {
   width: number | undefined
   height: number | undefined
   by: string | undefined
-  // When it was last written, in ms, when the store knows.
-  at: number | undefined
+  // When it was last written, when the store knows.
+  sentAt: Date | undefined
   // The entries mentioning it.
   usedIn: EntryRef[]
   // Whether a kept revision or a trashed entry mentions it, undefined when they could not be read.
@@ -240,7 +240,7 @@ export async function libraryUploads(options: { page?: number | undefined, q?: s
       width: width === undefined ? undefined : Number(width),
       height: height === undefined ? undefined : Number(height),
       by: record?.by,
-      at: record?.at ?? file.modifiedAt?.getTime(),
+      sentAt: record?.at === undefined ? file.modifiedAt : new Date(record.at),
       usedIn,
       held: read.held?.has(idOf(file.key)!),
       deletable: usedIn.length === 0 && read.held !== undefined && !read.held.has(idOf(file.key)!) && file.modifiedAt !== undefined && now - file.modifiedAt.getTime() >= GRACE,

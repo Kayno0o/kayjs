@@ -199,15 +199,15 @@ interface EntryRow
   author?: string | undefined
   cells?: Record<string, string> | undefined
   draft: boolean
-  endsAt?: number | undefined
+  endsAt?: Date | undefined
   locale?: string | undefined
   locked?: true | undefined
   missing?: string[] | undefined
-  modifiedAt?: number | undefined
+  modifiedAt?: Date | undefined
   move?: undefined | { up: boolean; down: boolean; }
   problem?: string | undefined
   review?: "review" | "sent-back" | undefined
-  scheduledAt?: number | undefined
+  scheduledAt?: Date | undefined
   slug: string
   title: string
   url?: string | undefined
