@@ -7,7 +7,7 @@ import { readPersonally } from './scope'
 import { visitAs } from './visit'
 
 // Thrown by a page render that left routes unanswered, for `withResources` to ask them and render again.
-export class ResourcesPending extends Error {
+export class ResourcesPendingError extends Error {
   constructor(readonly wanted: ReadonlyMap<string, string>) {
     super('kay: a resource() asked for a route the render waits for')
   }
@@ -26,7 +26,7 @@ const PERSONAL_ANSWER = /(?:^|[\s,])(?:private|no-store)(?:$|[\s,])/i
 const NOT_FORWARDED = ['content-length', 'content-type', 'transfer-encoding', 'if-none-match', 'if-modified-since', 'if-match', 'if-unmodified-since', 'if-range', 'range', 'upgrade', 'upgrade-insecure-requests', 'connection', 'expect', 'te', 'purpose', 'sec-purpose', 'sec-fetch-user']
 
 // Renders a page and, when its islands read routes with `resource()`, asks those routes in process as the visitor, then renders it again with their answers: a guard refusing or a route failing leaves that island `loading` for the browser.
-// `render` throws `ResourcesPending` as soon as a pass left a route unanswered, before it starts anything a second render would repeat.
+// `render` throws `ResourcesPendingError` as soon as a pass left a route unanswered, before it starts anything a second render would repeat.
 export async function withResources<T>(request: Request, render: () => T): Promise<T> {
   const seeds = new Map<string, Seed | null>()
 
@@ -35,7 +35,7 @@ export async function withResources<T>(request: Request, render: () => T): Promi
       return collectResources(seeds, render, pass === MAX_PASSES)
     }
     catch (thrown) {
-      if (!(thrown instanceof ResourcesPending))
+      if (!(thrown instanceof ResourcesPendingError))
         throw thrown
 
       await Promise.all([...thrown.wanted].map(async ([key, url]) => seeds.set(key, await answer(request, url))))

@@ -78,7 +78,7 @@ import { recordOf, requestRecord } from './request-record'
 import { forgetOnces, guardValues, onceOf } from './request-scope'
 import { againstDeadline, requestSignal, RequestTimeoutError, retime } from './request-timeout'
 import { overHttps } from './request-url'
-import { ResourcesPending, resourcesScript, withResources } from './resources'
+import { ResourcesPendingError, resourcesScript, withResources } from './resources'
 import { askedPath } from './rewrite'
 import { CONTEXT_LAYOUT, guardUrl, routeChain } from './routes'
 import { savesLess } from './save-data'
@@ -1194,7 +1194,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
     for (const block of deferred)
       void held(block.value)
 
-    throw new ResourcesPending(wanted)
+    throw new ResourcesPendingError(wanted)
   }
 
   const seeded = resourcesUsed()
