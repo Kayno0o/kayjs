@@ -148,8 +148,8 @@ const summary = () => selectionSummary(pool(), picked(), placeholder, count => s
 const shown = () => {
   const needle = query().trim().toLowerCase()
 
-  // A function answers for the text itself.
-  return needle && !remote ? listed().filter(option => option.label.toLowerCase().includes(needle)) : listed()
+  // A function answers for the text itself; a list, or a promise once answered, is filtered by it.
+  return needle && typeof options !== 'function' ? listed().filter(option => option.label.toLowerCase().includes(needle)) : listed()
 }
 
 const status = () => {

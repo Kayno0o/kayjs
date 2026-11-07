@@ -136,7 +136,10 @@ const carried = () => {
   return enhanced() && option && option.value !== option.label ? option : undefined
 }
 
-const rows = () => remote ? found() : matchingOptions(known(), text())
+// A function answers for the text itself; a list, or a promise once answered, is filtered by it.
+// kay-allow once-read-prop: a list, a promise or a loader is chosen when the component is created
+const searches = typeof options === 'function'
+const rows = () => searches ? found() : matchingOptions(remote ? found() : known(), text())
 // A remote list is asked for once the text reaches `minLength`, and is waiting until its answer lands.
 const waiting = () => remote && text().trim().length >= minLength && answered() !== text()
 const offered = () => create && !waiting() && offersCreate(remote ? found() : known(), text())

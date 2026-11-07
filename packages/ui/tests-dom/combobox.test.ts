@@ -517,3 +517,13 @@ test('createLabel as a string fills {text}', async () => {
   await settle()
   expect(rows()).toEqual(['Add Pluto'])
 })
+
+test('a promise of options is answered once and filtered by the text typed, as a list is', async () => {
+  const { input, rows } = await combobox(Promise.resolve(PLANETS), undefined, false)
+
+  clock.start()
+  type(input, 'ea')
+  await clock.elapse(260)
+
+  expect(rows()).toEqual(['Earth'])
+})

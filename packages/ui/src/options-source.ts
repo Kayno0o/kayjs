@@ -43,7 +43,7 @@ export interface LoadedOptions<Option> {
   loading: () => boolean
   // Whether the last question was refused, until the next one is asked.
   failed: () => boolean
-  // Asks the same question again.
+  // Asks the same question again; a promise cannot be asked twice, so a rejected one stays failed.
   retry: () => void
 }
 
