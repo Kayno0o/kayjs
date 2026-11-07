@@ -15,6 +15,7 @@ export const ANALYTICS_SCRIPT = `(() => {
   const maxAge = Number(data.maxAge) || 15552000
   const exclude = data.exclude ? JSON.parse(data.exclude).map(pattern => pattern.split('/').filter(Boolean)) : []
   const load = data.load ? JSON.parse(data.load) : undefined
+  const downloads = data.downloads ? new Set(JSON.parse(data.downloads).map(word => word.toLowerCase())) : undefined
   let loaded = false
   let last = document.referrer
   let wanted
@@ -38,13 +39,14 @@ export const ANALYTICS_SCRIPT = `(() => {
     return !!document.querySelector('meta[name=robots][content*=noindex i],meta[name=kay-guarded]') || exclude.some(wanted => wanted.every((word, at) => word === '*' ? parts[at] !== undefined : word === parts[at]))
   }
 
-  async function view(url) {
+  async function view(url, event, props) {
     if (blocked() || skipped(url))
       return
 
-    const body = JSON.stringify({ u: url, s: scope === '/' ? '' : scope, r: last, t: titles ? document.title : '', w: screen.width + 'x' + screen.height, l: navigator.language })
+    const body = JSON.stringify({ u: url, s: scope === '/' ? '' : scope, r: last, t: titles ? document.title : '', w: screen.width + 'x' + screen.height, l: navigator.language, e: event, p: props })
 
-    last = url
+    if (!event)
+      last = url
 
     try {
       await fetch(path, { method: 'POST', keepalive: true, headers: { 'content-type': 'text/plain' }, body })
@@ -122,7 +124,43 @@ export const ANALYTICS_SCRIPT = `(() => {
     }
   }
 
-  const api = window.kayAnalytics = { consent: choice, decide, ask, data, scope, wanted: () => wanted }
+  // A named event with a few short props, counted by the app's server behind the same consent, exclude and rate rules as a visit; a provider that runs its own script counts none.
+  function track(event, props) {
+    if (!load)
+      void view(location.href, String(event), props)
+  }
+
+  const api = window.kayAnalytics = { consent: choice, decide, ask, data, scope, track, wanted: () => wanted }
+
+  // A click on an element marked data-analytics-event, else on a link to another site or a file when the app asked for those.
+  function clicked(element) {
+    const marked = element.closest('[data-analytics-event]')
+
+    if (marked) {
+      const props = {}
+
+      for (const [key, value] of Object.entries(marked.dataset)) {
+        if (key.startsWith('analyticsProp') && key.length > 13)
+          props[key[13].toLowerCase() + key.slice(14)] = value
+      }
+
+      track(marked.dataset.analyticsEvent, props)
+
+      return
+    }
+
+    const link = element.closest('a[href]')
+
+    if (!link || !/^https?:$/.test(link.protocol))
+      return
+
+    const href = link.origin + link.pathname
+
+    if (data.outbound !== undefined && link.origin !== location.origin)
+      track('Outbound Link: Click', { url: href })
+    else if (downloads && (link.hasAttribute('download') || downloads.has(link.pathname.split('.').pop().toLowerCase())))
+      track('File Download', { url: href })
+  }
 
   document.addEventListener('kay:navigate', event => {
     if (!load)
@@ -134,6 +172,9 @@ export const ANALYTICS_SCRIPT = `(() => {
 
     if ((gated || informed) && opening)
       ask(opening)
+
+    if (event.target instanceof Element)
+      clicked(event.target)
   })
 
   if ((gated || informed) && choice() === '')

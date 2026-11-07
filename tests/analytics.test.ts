@@ -3,7 +3,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { analytics } from '../src/server/analytics'
+import { analytics, track } from '../src/server/analytics'
 import { forwardsSettled, warningsReset } from '../src/server/analytics-server'
 import { SHIPPED_WORDS } from '../src/server/analytics-words'
 import { testSite } from '../src/test'
@@ -1208,5 +1208,192 @@ describe('shipped analytics words', () => {
           expect([language, label, label.includes(' ')]).toEqual([language, label, false])
       }
     }
+  })
+})
+
+describe('custom events', () => {
+  const event = (name: unknown, props?: unknown, more: Record<string, unknown> = {}) => ({ ...visit(), e: name, p: props, ...more })
+  const lastBody = () => received.at(-1)!.body as Record<string, unknown>
+
+  it('sends Plausible the name and the props of an event, where a visit sends pageview', async () => {
+    const response = await send(await site(plausible()), event('signup', { plan: 'pro', seats: 3, trial: true }), { 'x-forwarded-for': '198.51.100.9' })
+
+    expect(response.status).toBe(204)
+    expect(received).toHaveLength(1)
+    expect(lastBody()).toEqual({ name: 'signup', url: 'http://localhost/pricing?utm_source=news', domain: 'example.com', referrer: 'https://news.example/story', props: { plan: 'pro', seats: 3, trial: true } })
+    expect(received[0]!.headers.get('x-forwarded-for')).toBe('198.51.100.9')
+  })
+
+  it('leaves props out of an event that has none', async () => {
+    await send(await site(plausible()), event('download'))
+
+    expect(lastBody()).not.toHaveProperty('props')
+  })
+
+  it('sends Umami the event as a named payload with its data', async () => {
+    await send(await site({ provider: 'umami', websiteId: 'site-id', host: `http://localhost:${provider.port}/` }), event('signup', { plan: 'pro' }))
+
+    expect(lastBody()).toMatchObject({ type: 'event', payload: { website: 'site-id', name: 'signup', data: { plan: 'pro' }, url: '/pricing?utm_source=news' } })
+  })
+
+  it('sends Simple Analytics the event with its metadata and no address', async () => {
+    await send(await site({ provider: 'simpleanalytics', host: `http://localhost:${provider.port}` }), event('signup', { plan: 'pro' }), { 'x-forwarded-for': '198.51.100.9' })
+
+    expect(lastBody()).toMatchObject({ type: 'event', event: 'signup', metadata: { plan: 'pro' }, path: '/pricing?utm_source=news' })
+    expect(JSON.stringify(lastBody())).not.toContain('198.51.100.9')
+  })
+
+  it('sends GA4 the event under a name and parameters it accepts, the page ones kept', async () => {
+    await send(await site({ provider: 'ga4', measurementId: 'G-ABC123', apiSecret: 'sec_ret-1', host: `http://localhost:${provider.port}/`, consent: false }), event('File Download: pdf', { 'file-type': 'pdf', 'page_location': 'https://evil.example/' }))
+
+    const [sent] = (lastBody() as { events: { name: string, params: Record<string, unknown> }[] }).events
+
+    expect(sent!.name).toBe('File_Download_pdf')
+    expect(sent!.params).toMatchObject({ file_type: 'pdf', page_location: 'http://localhost/pricing?utm_source=news' })
+  })
+
+  it('sends Matomo the event through its category, action and name', async () => {
+    await send(await site({ provider: 'matomo', siteId: 7, host: `http://localhost:${provider.port}/` }), event('signup', { plan: 'pro' }))
+
+    expect(Object.fromEntries(new URLSearchParams(received[0]!.search))).toMatchObject({ e_c: 'Event', e_a: 'signup', e_n: '{"plan":"pro"}' })
+  })
+
+  it('waits for the yes, honours an opt-out, leaves out excluded pages and production-only like a visit', async () => {
+    const asking = await site(plausible({ consent: true }))
+
+    expect((await send(asking, event('signup'))).status).toBe(204)
+    expect((await send(asking, event('signup'), { cookie: 'kay_analytics=no' })).status).toBe(204)
+    expect((await send(await site(plausible()), event('signup'), { cookie: 'kay_analytics=no' })).status).toBe(204)
+    expect((await send(await site(plausible({ exclude: ['/pricing'] })), event('signup'))).status).toBe(204)
+    expect((await send(await site(plausible()), event('signup'), { 'user-agent': '' })).status).toBe(204)
+    expect(received).toEqual([])
+
+    process.env.NODE_ENV = 'development'
+
+    try {
+      await send(await site(plausible()), event('signup'))
+    }
+    finally {
+      process.env.NODE_ENV = 'production'
+    }
+
+    expect(received).toEqual([])
+    await send(asking, event('signup'), { cookie: 'kay_analytics=yes' })
+    expect(received).toHaveLength(1)
+  })
+
+  it('refuses a hostile name and forwards nothing', async () => {
+    const app = await site(plausible())
+
+    for (const name of ['', '   ', 'a\nb', 'a\u0000b', 'x'.repeat(121), 7, null, ['a'], { toString: 'a' }])
+      expect((await send(app, event(name))).status).toBe(400)
+
+    expect(received).toEqual([])
+  })
+
+  it('keeps only the props that are short words with a string, number or flag value', async () => {
+    const many = Object.fromEntries(Array.from({ length: 30 }, (_, at) => [`k${at}`, at]))
+
+    await send(await site(plausible()), event('x', { 'ok': 'a\u0000b', 'long': 'y'.repeat(500), 'nested': { a: 1 }, 'list': [1], 'nothing': null, 'bad key!': 'v', ['k'.repeat(41)]: 'v', 'dotted.key': 'v' }))
+    const props = (lastBody() as { props: Record<string, unknown> }).props
+
+    expect(props.ok).toBe('a b')
+    expect((props.long as string).length).toBe(300)
+    expect(Object.keys(props).sort()).toEqual(['dotted.key', 'long', 'ok'])
+
+    await send(await site(plausible()), event('x', many))
+    expect(Object.keys((lastBody() as { props: object }).props)).toHaveLength(10)
+  })
+
+  it('treats props that are no object as none, and a prototype key as plain data', async () => {
+    const app = await site(plausible())
+
+    await send(app, event('x', 'text'))
+    expect(lastBody()).not.toHaveProperty('props')
+    await send(app, event('x', [1, 2]))
+    expect(lastBody()).not.toHaveProperty('props')
+    await send(app, '{"u":"http://localhost/","e":"x","p":{"__proto__":{"polluted":1},"a":"b"}}')
+    expect(lastBody()).toMatchObject({ props: { a: 'b' } })
+    expect(({} as { polluted?: number }).polluted).toBeUndefined()
+  })
+
+  it('holds an event to the same body and host checks as a visit', async () => {
+    const app = await site(plausible())
+
+    expect((await send(app, event('x', { big: 'y'.repeat(5000) }))).status).toBe(413)
+    expect((await send(app, event('x', {}, { u: 'http://evil.example/' }))).status).toBe(400)
+    expect(received).toEqual([])
+  })
+
+  it('counts a server-side event from the request behind the same checks, with the request\'s page and no query', async () => {
+    await site(plausible({ hosts: ['track-a.example'] }))
+
+    const request = (headers: Record<string, string> = {}) => new Request('http://localhost/signup?token=secret', { method: 'POST', headers: { 'user-agent': CHROME, 'x-forwarded-for': '198.51.100.9', ...headers } })
+
+    await track({ request: request() }, 'signup', { plan: 'pro' })
+    await forwardsSettled()
+
+    expect(lastBody()).toMatchObject({ name: 'signup', url: 'http://localhost/signup', props: { plan: 'pro' } })
+    expect(received[0]!.headers.get('user-agent')).toBe(CHROME)
+
+    await track({ request: request({ 'user-agent': '' }) }, 'signup')
+    await track({ request: request({ cookie: 'kay_analytics=no' }) }, 'signup')
+    await forwardsSettled()
+    expect(received).toHaveLength(1)
+
+    await expect(track({ request: request() }, 'bad\nname')).rejects.toThrow('event name')
+  })
+
+  it('counts a server-side event only with the yes where consent is asked, and not in development', async () => {
+    await site(plausible({ consent: true, hosts: ['track-b.example'] }))
+
+    const request = (cookie: string) => new Request('http://localhost/signup', { headers: { 'user-agent': CHROME, 'x-forwarded-for': '198.51.100.9', cookie } })
+
+    await track({ request: request('') }, 'signup')
+    await forwardsSettled()
+    expect(received).toEqual([])
+
+    await track({ request: request('kay_analytics=yes') }, 'signup')
+    await forwardsSettled()
+    expect(received).toHaveLength(1)
+
+    process.env.NODE_ENV = 'development'
+
+    try {
+      await track({ request: request('kay_analytics=yes') }, 'signup')
+      await forwardsSettled()
+    }
+    finally {
+      process.env.NODE_ENV = 'production'
+    }
+
+    expect(received).toHaveLength(1)
+  })
+
+  it('leaves a server-side event out of an excluded path', async () => {
+    await site(plausible({ exclude: ['/account'], hosts: ['track-c.example'] }))
+    await track({ request: new Request('http://localhost/account/billing', { headers: { 'user-agent': CHROME } }) }, 'upgrade')
+    await forwardsSettled()
+
+    expect(received).toEqual([])
+  })
+
+  it('does nothing for a provider that counts with its own script', async () => {
+    await site({ provider: 'fathom', siteId: 'ABCDEFGH', consent: false, hosts: ['track-d.example'] })
+    await track({ request: new Request('http://localhost/x', { headers: { 'user-agent': CHROME } }) }, 'signup')
+    await forwardsSettled()
+
+    expect(received).toEqual([])
+  })
+
+  it('writes the outbound and download options on the tracker tag, and refuses a wrong one', async () => {
+    const home = await (await (await site(plausible({ events: { outbound: true, downloads: ['pdf', 'zip'] } }))).handle(new Request('http://localhost/'))).text()
+
+    expect(home).toContain('data-outbound')
+    expect(home).toContain('data-downloads="[&quot;pdf&quot;,&quot;zip&quot;]"')
+    expect(() => analytics(plausible({ events: { downloads: ['.pdf'] } }))).toThrow('events')
+    expect(() => analytics(plausible({ events: { outbound: 'yes' } }))).toThrow('events')
+    expect(() => analytics({ provider: 'fathom', siteId: 'ABCDEFGH', events: { outbound: true } } as never)).toThrow('events')
+    expect(await (await (await site(plausible())).handle(new Request('http://localhost/'))).text()).not.toContain('data-outbound')
   })
 })

@@ -4,6 +4,7 @@ import { createHmac, randomBytes } from 'node:crypto'
 import { isIP } from 'node:net'
 import process from 'node:process'
 import { Elysia } from 'elysia'
+import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
 import { isCrossSite } from './actions'
 import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRIPT_PATH, INTEGRITY, isGated, NOTICE_SCRIPT_PATH } from './analytics'
@@ -12,6 +13,7 @@ import { BASE_PATH, routerPath } from './base'
 import { declined } from './consent-cookie'
 import { readCapped } from './errors'
 import { clientAddress, overLimit } from './protection'
+import { askedPath } from './rewrite'
 
 // A visit is a URL, a title and a few short words: past this it is no visit.
 const MAX_BODY_BYTES = 4096
@@ -38,6 +40,17 @@ const CONTROL_CHARACTERS = /[\p{Cc}\p{Zl}\p{Zp}\p{Bidi_Control}]+/gu
 const SCREEN = /^\d{1,5}x\d{1,5}$/
 const LANGUAGE = /^[a-z]{2,3}(?:-[a-z\d]{2,8}){0,3}$/i
 const TRAILING_SLASH = /\/$/
+// An event is a short name and a few short props: a name with a control character or past 120 characters is no event, and a prop that is not a short word, number or flag is dropped.
+const MAX_EVENT_NAME_LENGTH = 120
+const MAX_PROPS = 10
+const MAX_PROP_KEY_LENGTH = 40
+const MAX_PROP_VALUE_LENGTH = 300
+const PROP_KEY = /^[\w.:-]+$/
+const NON_WORD = /\W+/g
+const LETTER_FIRST = /^[a-z]/i
+// GA4 takes names of letters, digits and underscores that start with a letter, 40 characters at most, and 25 parameters, 3 of which a visit already carries.
+const GA4_NAME_LENGTH = 40
+const GA4_PROPS = 22
 // Logged once a minute at most per kind, so a provider that is down does not fill the log with a line per visit and a burst of one kind does not hide another.
 const lastWarnings = new Map<string, number>()
 
@@ -53,6 +66,24 @@ interface Visit {
   address: string | undefined
   // A provider that wants an id for the visitor gets one made on the server, see `visitorId`.
   visitor?: string | undefined
+  // Set when the visit is a custom event, not a page view.
+  event?: EventData | undefined
+}
+
+export type PropValue = string | number | boolean
+
+export interface EventData {
+  name: string
+  props: Record<string, PropValue>
+}
+
+const hasProps = (event: EventData | undefined) => event !== undefined && Object.keys(event.props).length > 0
+
+// GA4 rejects a name or parameter that is not letters, digits and underscores starting with a letter.
+function ga4Name(name: string): string {
+  const word = name.replace(NON_WORD, '_')
+
+  return (LETTER_FIRST.test(word) ? word : `e_${word}`).slice(0, GA4_NAME_LENGTH)
 }
 
 interface Forward {
@@ -72,7 +103,7 @@ const PROVIDERS = {
     method: 'POST',
     url: `${(options.host ?? 'https://plausible.io').replace(TRAILING_SLASH, '')}/api/event`,
     headers: { 'user-agent': visit.userAgent, 'content-type': 'application/json', ...visit.address !== undefined && { 'x-forwarded-for': visit.address } },
-    body: { name: 'pageview', url: visit.page.href, domain: options.domain ?? visit.page.hostname, referrer: visit.referrer },
+    body: { name: visit.event?.name ?? 'pageview', url: visit.page.href, domain: options.domain ?? visit.page.hostname, referrer: visit.referrer, ...hasProps(visit.event) && { props: visit.event!.props } },
   }),
   umami: (options: Extract<AnalyticsOptions, { provider: 'umami' }>, visit: Visit): Forward => ({
     method: 'POST',
@@ -84,6 +115,7 @@ const PROVIDERS = {
       url: visit.page.pathname + visit.page.search,
       title: visit.title,
       referrer: visit.referrer,
+      ...visit.event !== undefined && { name: visit.event.name, ...hasProps(visit.event) && { data: visit.event.props } },
       ...visit.screen !== undefined && { screen: visit.screen },
       ...visit.language !== undefined && { language: visit.language },
       ...visit.address !== undefined && { ip: visit.address },
@@ -97,9 +129,10 @@ const PROVIDERS = {
       url: `${(options.host ?? 'https://queue.simpleanalyticscdn.com').replace(TRAILING_SLASH, '')}/events`,
       headers: { 'content-type': 'application/json' },
       body: {
-        type: 'pageview',
+        type: visit.event === undefined ? 'pageview' : 'event',
         hostname: options.hostname ?? visit.page.hostname,
-        event: 'pageview',
+        event: visit.event?.name ?? 'pageview',
+        ...hasProps(visit.event) && { metadata: visit.event!.props },
         path: visit.page.pathname + visit.page.search,
         ua: visit.userAgent,
         https: visit.page.protocol === 'https:',
@@ -115,7 +148,8 @@ const PROVIDERS = {
     headers: { 'content-type': 'application/json' },
     body: {
       client_id: visit.visitor,
-      events: [{ name: 'page_view', params: {
+      events: [{ name: visit.event === undefined ? 'page_view' : ga4Name(visit.event.name), params: {
+        ...visit.event !== undefined && Object.fromEntries(Object.entries(visit.event.props).slice(0, GA4_PROPS).map(([key, value]) => [ga4Name(key), value])),
         page_location: visit.page.href,
         page_referrer: visit.referrer,
         page_title: visit.title,
@@ -128,6 +162,15 @@ const PROVIDERS = {
   }),
   matomo: (options: Extract<AnalyticsOptions, { provider: 'matomo' }>, visit: Visit): Forward => {
     const query = new URLSearchParams({ idsite: String(options.siteId), rec: '1', apiv: '1', rand: Math.random().toString(36).slice(2), url: visit.page.href, action_name: visit.title, urlref: visit.referrer, ua: visit.userAgent })
+
+    if (visit.event !== undefined) {
+      query.set('e_c', 'Event')
+      query.set('e_a', visit.event.name)
+
+      // Matomo's event has a name and a value but no props, so they go as the name, in JSON.
+      if (hasProps(visit.event))
+        query.set('e_n', JSON.stringify(visit.event.props))
+    }
 
     if (visit.screen !== undefined)
       query.set('res', visit.screen)
@@ -164,6 +207,9 @@ function visitorId(address: string, userAgent: string): string {
   return `${hash.readUInt32BE(0)}.${hash.readUInt32BE(4)}`
 }
 
+// The options of the analytics the app configured and what it takes, for `track` called from an action or an endpoint, where no tracker posted anything.
+let active: { options: VisitOptions, gated: boolean } | undefined
+
 // Visits being passed on, so a test can wait for them and a flood cannot pile up more than a few at a time.
 const pending = new Set<Promise<void>>()
 
@@ -178,6 +224,8 @@ export function warningsReset(): void {
 
 export function analyticsServer(options: AnalyticsOptions): AnyElysia {
   const gated = isGated(options)
+
+  active = options.provider === 'custom' || options.provider === 'fathom' || options.provider === 'cloudflare' ? undefined : { options, gated }
 
   const tracker = new Elysia({ name: 'kay-analytics' })
     .get(ANALYTICS_SCRIPT_PATH, () => new Response(ANALYTICS_SCRIPT, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=3600' } }))
@@ -224,10 +272,44 @@ export function analyticsServer(options: AnalyticsOptions): AnyElysia {
       const address = options.provider === 'ga4' || needsAddress(options) ? clientAddress(request, server) : ''
 
       // The id is made from the address even when the address is not passed on.
-      send(options, { ...visit, address: needsAddress(options) && isIP(address) !== 0 ? address : undefined, ...options.provider === 'ga4' && { visitor: visitorId(address, visit.userAgent) } })
+      send(options, withIdentity(options, visit, address))
 
       return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
     }, { parse: 'none' })
+}
+
+// The visit as the provider is sent it: the address only when the provider needs it, and GA4's visitor id, made from the address even when that is not passed on.
+function withIdentity(options: VisitOptions, visit: Omit<Visit, 'address'>, address: string): Visit {
+  return { ...visit, address: needsAddress(options) && isIP(address) !== 0 ? address : undefined, ...options.provider === 'ga4' && { visitor: visitorId(address, visit.userAgent) } }
+}
+
+// Counts an event from the server, behind the same checks as one the tracker posts: production only, the visitor's consent, `exclude`, the user agent and the rate limit. The page is the request's own URL without its query.
+export async function trackEvent(request: Request, name: string, props: Record<string, unknown> | undefined): Promise<void> {
+  if (active === undefined)
+    return
+
+  const { options, gated } = active
+  const event = eventOf(name, props)
+
+  if (event === undefined)
+    throw new KayError('config-invalid', `kay: track takes an event name of 1 to ${MAX_EVENT_NAME_LENGTH} characters with no control character; got ${JSON.stringify(name)}`)
+
+  const page = new URL(request.url)
+
+  page.search = ''
+  page.hash = ''
+
+  const userAgent = (request.headers.get('user-agent') ?? '').replace(CONTROL_CHARACTERS, ' ').trim().slice(0, MAX_USER_AGENT_LENGTH)
+
+  if (process.env.NODE_ENV !== 'production' || declined(request, gated) || userAgent === '' || skippedPath(options.exclude, askedPath(request), ''))
+    return
+
+  const address = clientAddress(request, undefined)
+
+  if (await overLimit(RATE_NAME, address, VISITS_PER_MINUTE, MINUTE_MS) !== undefined)
+    return
+
+  send(options, withIdentity(options, { page, referrer: '', title: '', screen: undefined, language: undefined, userAgent, event }, address))
 }
 
 // The mount point the visit's page is under: what the request path has before the tracker's route, else the one the tracker names, a proxy having taken it off the request.
@@ -378,7 +460,7 @@ function readVisit(text: string, request: Request, hosts: ReadonlySet<string>): 
   if (typeof body !== 'object' || body === null || Array.isArray(body))
     return undefined
 
-  const { u, r, t, w, l, s } = body
+  const { u, r, t, w, l, s, e, p } = body
   const page = typeof u === 'string' && u.length <= MAX_URL_LENGTH ? URL.parse(u) : null
 
   if (page === null || (page.protocol !== 'https:' && page.protocol !== 'http:') || page.username !== '' || page.password !== '')
@@ -390,7 +472,12 @@ function readVisit(text: string, request: Request, hosts: ReadonlySet<string>): 
     return undefined
   }
 
-  if ([r, t, w, l, s].some(value => value !== undefined && typeof value !== 'string'))
+  if ([r, t, w, l, s, e].some(value => value !== undefined && typeof value !== 'string'))
+    return undefined
+
+  const event = e === undefined ? undefined : eventOf(e as string, p)
+
+  if (e !== undefined && event === undefined)
     return undefined
 
   const referrer = typeof r === 'string' && r.length <= MAX_URL_LENGTH ? URL.parse(r) : null
@@ -407,7 +494,33 @@ function readVisit(text: string, request: Request, hosts: ReadonlySet<string>): 
     language: typeof l === 'string' && LANGUAGE.test(l) ? l : undefined,
     userAgent: (request.headers.get('user-agent') ?? '').replace(CONTROL_CHARACTERS, ' ').trim().slice(0, MAX_USER_AGENT_LENGTH),
     scope: typeof s === 'string' && BASE_PATH.test(s) ? s : '',
+    ...event !== undefined && { event },
   }
+}
+
+// An event's name and its props, checked: the name is a short line, and only the props with a word for a key and a string, a finite number or a flag for a value are kept, the first few of them. Undefined for a name that is no event.
+function eventOf(name: string, props: unknown): EventData | undefined {
+  if (typeof name !== 'string' || name.trim() === '' || name.length > MAX_EVENT_NAME_LENGTH || name.replace(CONTROL_CHARACTERS, '') !== name)
+    return undefined
+
+  const kept: Record<string, PropValue> = {}
+
+  if (typeof props === 'object' && props !== null && !Array.isArray(props)) {
+    for (const [key, value] of Object.entries(props)) {
+      if (Object.keys(kept).length >= MAX_PROPS)
+        break
+
+      if (key.length > MAX_PROP_KEY_LENGTH || !PROP_KEY.test(key))
+        continue
+
+      if (typeof value === 'string')
+        kept[key] = value.replace(CONTROL_CHARACTERS, ' ').slice(0, MAX_PROP_VALUE_LENGTH)
+      else if ((typeof value === 'number' && Number.isFinite(value)) || typeof value === 'boolean')
+        kept[key] = value
+    }
+  }
+
+  return { name, props: kept }
 }
 
 // Posts the visit to the provider with headers made here: none of the visitor's own, no cookie, no referer, no authorization, goes with it.

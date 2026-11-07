@@ -197,6 +197,30 @@ The list works for the tools kay counts for, so not Fathom, Cloudflare or `custo
 
 The page title is not sent unless you write `titles: true`, since a title can name a person. Like `exclude`, it is a type error for Fathom, Cloudflare and `custom`.
 
+### Counting events
+
+A signup or a download is an event: a name and a few short props. The tool gets it from your server, behind the same consent, `exclude`, opt-out and rate limit as a visit.
+
+In the browser, call `window.kayAnalytics.track('signup', { plan: 'pro' })` from an island or a script, or mark an element and let a click count itself:
+
+```html
+<button data-analytics-event="signup" data-analytics-prop-plan="pro">Start</button>
+```
+
+Each `data-analytics-prop-*` is a prop (`data-analytics-prop-seat-count` is `seatCount`). To count clicks without marking anything, turn on `events: { outbound: true, downloads: true }`: a link to another site sends `Outbound Link: Click` and a link to a file, or one with a `download` attribute, sends `File Download`, each with the target's address without its query as the `url` prop. `downloads` also takes a list of extensions, `['pdf', 'zip']`.
+
+In an action or an endpoint, call `track` with the context:
+
+```ts
+import { track } from 'kay/analytics'
+
+await track(ctx, 'signup', { plan: ctx.body.plan })
+```
+
+It uses the request's own page without its query, its user agent and its consent cookie, so a visitor who has not said yes, or who opted out, is not counted. It does nothing in development or for a site without analytics. A name that is empty, past 120 characters or has a control character throws from `track` and is refused from the browser. Only the first 10 props are kept, each a word for a key and a string, a number or a flag for a value, a string cut at 300 characters.
+
+Events work for the tools kay counts for, so not Fathom, Cloudflare or `custom`, where `events` is a type error and the calls do nothing. GA4 gets the name and the props with anything that is not a letter, digit or underscore turned into an underscore; Matomo gets the name as the event action and the props as JSON in the event name.
+
 ### Counting without asking
 
 Plausible, Simple Analytics, Matomo and Umami on your own `host` count at once, and kay shows a short information line with an `OK` button and an `Opt out` button. Opting out writes `kay_analytics=no`, and your server then passes on nothing for that visitor, on any page. Word it with `info: { text, ok, optOut }`, each a string or one per language. If your site already informs visitors and lets them object, write `info: false`.

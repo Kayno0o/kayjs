@@ -14,6 +14,12 @@ export { vitals, vitalsReport } from './vitals'
 export type { LazyGuard, VitalsOptions } from './vitals'
 export type { RouteVitals, VitalsStore, VitalSummary } from './vitals'
 
+// Counts a named event from an action or an endpoint, with a few short props (strings, numbers, flags), through the provider `analytics()` configured: `await track(ctx, 'signup', { plan: 'pro' })`.
+// It is held to what a visit is: nothing outside production, nothing without the visitor's yes where one is needed or after an opt-out, nothing for an `exclude` path or a request with no user agent, and the same rate limit. It does nothing when the site has no analytics or its provider counts with its own script (`fathom`, `cloudflare`, `custom`). A name that is empty, past 120 characters or has a control character throws.
+export async function track(ctx: { request: Request }, name: string, props?: Record<string, unknown>): Promise<void> {
+  await (await import('./analytics-server')).trackEvent(ctx.request, name, props)
+}
+
 // A text for the consent notice, or one per language: `{ en: 'We count visits', fr: 'Nous comptons les visites' }`, the page's `lang` picking one and the first listed when none fits.
 export type AnalyticsText = string | Record<string, string>
 
@@ -61,6 +67,8 @@ interface Counted extends Common {
   exclude?: string[] | undefined
   // Sends the page title with each visit, which names the page and so may name a person; left out, visits carry the path alone.
   titles?: boolean | undefined
+  // Counts clicks the tracker can tell from a link: `outbound` one to another site (event `Outbound Link: Click`) and `downloads` one to a file (event `File Download`, with `true` for pdf, zip, office, audio, video and image archives, or a list of extensions), each with the address of the target without its query as the `url` prop. Off by default.
+  events?: { outbound?: boolean | undefined, downloads?: boolean | string[] | undefined } | undefined
 }
 
 export interface PlausibleOptions extends Counted {
@@ -115,6 +123,7 @@ export interface Ga4Options extends Counted {
 export interface FathomOptions extends Common {
   exclude?: undefined
   titles?: undefined
+  events?: undefined
   provider: 'fathom'
   // The site's id in Fathom, such as `ABCDEFGH`.
   siteId: string
@@ -126,6 +135,7 @@ export interface FathomOptions extends Common {
 export interface CloudflareOptions extends Common {
   exclude?: undefined
   titles?: undefined
+  events?: undefined
   provider: 'cloudflare'
   // The token of the site in Cloudflare Web Analytics.
   token: string
@@ -135,6 +145,7 @@ export interface CloudflareOptions extends Common {
 export interface CustomOptions extends Common {
   exclude?: undefined
   titles?: undefined
+  events?: undefined
   provider: 'custom'
   // The tracker's script, `https://tracker.example/script.js`.
   script: string
@@ -162,6 +173,8 @@ export const CUSTOM_COLLECT_PATH = `${ANALYTICS_PATH}/collect`
 // The head tags kay put there for a custom tracker, which an app's own tag of the same `src` is not one of.
 export const TRACKER_TAGS = new WeakSet<HeadTag>()
 export const ANALYTICS_PROVIDERS: ReadonlySet<string> = new Set(['plausible', 'umami', 'simpleanalytics', 'matomo', 'ga4', 'fathom', 'cloudflare', 'custom'])
+const DOWNLOAD_EXTENSIONS = ['pdf', 'zip', 'gz', 'tar', '7z', 'rar', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'epub', 'dmg', 'exe', 'apk', 'mp3', 'wav', 'mp4', 'mov', 'webm']
+const EXTENSION = /^[a-z\d]{1,10}$/i
 const SITE_ID = /^[A-Z\d]{1,32}$/i
 const TOKEN = /^[\w-]{1,128}$/
 const MEASUREMENT_ID = /^G-[A-Z\d]{4,20}$/i
@@ -223,6 +236,8 @@ export function analytics(options: AnalyticsOptions): KayExtension {
     : {
       ...(options.exclude?.length ?? 0) > 0 && { 'data-exclude': JSON.stringify(options.exclude) },
       ...options.titles === true && { 'data-titles': '' },
+      ...options.events?.outbound === true && { 'data-outbound': '' },
+      ...options.events?.downloads !== undefined && options.events.downloads !== false && { 'data-downloads': JSON.stringify(options.events.downloads === true ? DOWNLOAD_EXTENSIONS : options.events.downloads) },
     }
 
   if (options.provider !== 'fathom' && options.provider !== 'cloudflare' && options.provider !== 'custom') {
@@ -333,8 +348,17 @@ function checked(options: AnalyticsOptions): void {
   if (options.exclude !== undefined && (!Array.isArray(options.exclude) || options.exclude.some(path => typeof path !== 'string' || !path.startsWith('/') || path === '/')))
     refuse(`exclude is a list of paths starting with /, such as ['/account']; got ${JSON.stringify(options.exclude)}`)
 
-  if (((options.exclude?.length ?? 0) > 0 || options.titles !== undefined) && (options.provider === 'fathom' || options.provider === 'cloudflare' || options.provider === 'custom'))
-    refuse(`takes exclude and titles for the providers kay forwards visits for, not '${options.provider}', whose own script counts the pages`)
+  const events = options.events as Record<string, unknown> | undefined
+
+  if (events !== undefined) {
+    const downloads = events.downloads
+
+    if (typeof events !== 'object' || events === null || (events.outbound !== undefined && typeof events.outbound !== 'boolean') || (downloads !== undefined && typeof downloads !== 'boolean' && !(Array.isArray(downloads) && downloads.every(word => typeof word === 'string' && EXTENSION.test(word)))))
+      refuse(`takes events as { outbound?: boolean, downloads?: boolean | string[] } with extensions such as 'pdf'; got ${JSON.stringify(events)}`)
+  }
+
+  if (((options.exclude?.length ?? 0) > 0 || options.titles !== undefined || options.events !== undefined) && (options.provider === 'fathom' || options.provider === 'cloudflare' || options.provider === 'custom'))
+    refuse(`takes exclude, titles and events for the providers kay forwards visits for, not '${options.provider}', whose own script counts the pages`)
 
   if (typeof options.info === 'object' && isGated(options))
     refuse('takes info for a counter that asks no one; with consent on, the notice is worded by consent, and consent: false shows the line')

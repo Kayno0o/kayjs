@@ -31,6 +31,24 @@ export default defineConfig({
 })
 ```
 
+### Count a signup, a download or any named event
+
+`kayAnalytics.track(name, props)` in the browser, a `data-analytics-event` element, or `track(ctx, name, props)` on the server count a named event through the same provider, consent and `exclude`:
+
+```ts
+import { track } from 'kay/analytics'
+
+export const signup = action(s.Object({ plan: s.String() }), async ({ plan }, ctx) => {
+  await track(ctx, 'signup', { plan })
+})
+```
+
+```kay
+button(data-analytics-event="signup" data-analytics-prop-plan="pro") Start
+```
+
+`events: { outbound: true, downloads: true }` on `analytics()` counts links to other sites and to files with no markup.
+
 ### Ask for analytics consent in your own UI
 
 `consent` from `kay/analytics` is a signal holding the visitor's answer to `analytics({ consent })`: `'yes'`, `'no'` or `''` while they have not chosen. Read it as `consent()`, answer with `consent = 'yes'`, `'no'`, or `''` to ask again. It reads and writes the `kay_analytics` cookie kay's own notice uses, so the two never disagree and the server still forwards nothing without the yes. Pass `consent: { notice: false }` to show no notice of kay's (a `data-analytics-consent` click opens none either) and ask in your own UI:
@@ -79,6 +97,14 @@ else
 - What a provider gets: the page URL without its hash and with only the `utm_*`, `ref` and `source` parameters of its query, the referrer without its query, the title only with `titles: true`, the screen size and language, and the visitor's `User-Agent`, cleaned of control characters. No cookie, `Referer` or `Authorization` of the visitor goes with it.
 - A provider answering 4xx or 5xx to a visit (a wrong site id, domain or secret) logs one warning per provider and status a minute, naming the status and no URL, so lost stats show in the log.
 - The visitor's address is sent only to a provider that needs it to tell visitors apart or place them: Plausible as `X-Forwarded-For`, Umami as `ip` in the payload, Matomo as `cip` with a `tokenAuth`, GA4 as `ip_override` and `custom` as `X-Forwarded-For`, the last two only with `address: true`; Simple Analytics not at all. It is the one `proxy` yields, so set `proxy` behind a CDN: without it every visitor shares the proxy's address, Plausible counts one visitor and the 120 a minute limit is shared by the whole site.
+
+### Rules: Count a signup, a download or any named event
+
+- Three ways in: `window.kayAnalytics.track(name, props)` (an island or a script), a click on an element with `data-analytics-event="name"` whose `data-analytics-prop-*` attributes are the props (`-seat-count` is `seatCount`), and `await track(ctx, name, props)` from `kay/analytics` in an action or an endpoint (anything with a `request`). The browser ones post to the same route as a visit (`e` and `p` beside `u`), so the checks are the visit's: 4 KB body, same host, cross-site 403, 120 a minute from one address, the `kay_analytics` yes where consent is asked, an opt-out, a `noindex` or guarded page, `exclude`, a user agent, production only.
+- `track(ctx, ...)` takes the page from the request's URL without its query, the user agent and the address from the request (set `proxy` behind a CDN), and the consent cookie. It applies `exclude` to the path as the request names it, `base` included. It does nothing in development, with no analytics on the site or with `fathom`, `cloudflare` or `custom` (their own script counts; `kayAnalytics.track` does nothing there either), and returns once the event is queued: the provider is called in the background.
+- A name is 1 to 120 characters with no control character: `track` throws an error for any other, the route answers 400. Props keep the first 10 entries whose key is `[\w.:-]` up to 40 characters and whose value is a string (control characters turned to spaces, cut at 300), a finite number or a boolean; nested values, `null` and the rest are dropped, and props that are no object count as none.
+- Per provider: Plausible `name` and `props`; Umami `name` and `data`; Simple Analytics `type: 'event'`, `event` and `metadata`; GA4 an event named with every non-word character turned into `_` (prefixed `e_` unless it starts with a letter, 40 characters), the first 22 props as parameters under the same rule, the page ones kept; Matomo `e_c=Event`, `e_a` the name and `e_n` the props as JSON. An event carries the visit's page, referrer-less, and no title.
+- `events: { outbound?: boolean, downloads?: boolean | string[] }` on `analytics()` (a type error for `fathom`, `cloudflare` and `custom`) counts clicks with no markup: a link to another site is `Outbound Link: Click` (with `outbound: true`) and a link to a file, or one with a `download` attribute, `File Download` (with `downloads: true` for pdf, zip, office, audio, video and archive extensions, or a list such as `['pdf']`), each with `url` the target's origin and path without query or hash. It adds `data-outbound` and `data-downloads` to the tracker tag, and the tracker grows by about 0.5 KB of gzip for every page.
 
 ### Rules: Measure how fast pages load for real visitors
 
