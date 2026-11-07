@@ -114,14 +114,14 @@ describe('the Jobs tab', () => {
       expect(panel.textContent).toContain('0 steps done')
       expect(panel.querySelectorAll<HTMLButtonElement>('.row')[1]!.querySelector('button')!.disabled).toBe(false)
     })
-    ;[...panel.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Send paid')!.click()
+    // The send reads the queues again, which draws the rows anew: the field held before the click leaves the panel then, whatever the order of the click and the drawing.
+    const drawn = panel.querySelector('input')!
 
-    // The send reads the queues again, which draws the rows anew, and the next field is the one of that drawing.
-    const drawn = panel.querySelector('input')
+    ;[...panel.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Send paid')!.click()
 
     await eventually(() => {
       expect(calls.find(([call]) => call === 'POST /_kay/dev/jobs/send')![1]).toBe(JSON.stringify({ queue: 'workflow:order', id: 'a' }))
-      expect(panel.querySelector('input')).not.toBe(drawn)
+      expect(drawn.isConnected).toBe(false)
       expect(panel.querySelector('input')).not.toBeNull()
     })
 
