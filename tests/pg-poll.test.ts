@@ -153,10 +153,7 @@ describe('the shared event poller', () => {
     let sent = 0
 
     // The server drops a cancel that reaches a backend before it began the statement, as a loaded host makes happen: the first one is lost.
-    slow.cancel = () => {
-      if (++sent > 1)
-        void cancel()
-    }
+    slow.cancel = () => ++sent > 1 ? cancel() : slow
 
     await expect(timeLimited(async () => Promise.all([slow, sql`SELECT 1/0`]), 5000, 'the read')).rejects.toThrow()
     expect(await activeAfterCancel(sql, 'SELECT pg_sleep(15)')).toBe(0)
