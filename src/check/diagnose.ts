@@ -105,7 +105,8 @@ function unsendableFix(lint: NonNullable<ReturnType<typeof typeLint>>, shadow: S
 
   const fix = islandFence(file)
 
-  return fix === undefined ? undefined : { fixes: [{ ...fix, safe: lint.always === true }] }
+  // A `static` pin, written as a fence or a comment, is the author's decision: the fix is offered and never applied by `--fix`.
+  return fix === undefined ? undefined : { fixes: [{ ...fix, safe: lint.always === true && islandPin(file)?.kind !== 'static' }] }
 }
 
 // A block with no parameters is markup, so one a component calls with values is a type error on `Element`: the help names the parameters its prop is typed with.

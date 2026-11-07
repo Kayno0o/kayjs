@@ -1269,7 +1269,7 @@ function unsendable(lint: 'island-prop' | 'promoted-island', message: string, pr
   if (lint === 'promoted-island') {
     return {
       code: lint,
-      message: `This component renders as an island when it is passed what an island is sent: ${holds}, which cannot be sent as data`,
+      message: `This component passes an island a value that cannot be sent as data (${holds}), so the build makes it an island`,
       note: 'a component that is an island or not by what it is given was deprecated in 1.92 and goes in 1.95; the render hydrated it only when it met such a value',
       help: 'write `--- island` in place of `---`, or pass the island data',
       always,

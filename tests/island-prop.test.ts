@@ -131,7 +131,8 @@ describe('island-prop and promoted-island, decided by the types of what is passe
       expect(fix('fields.kay')[0]![0]).toBe(false)
       expect(fix('instance.kay')[0]![0]).toBe(false)
       expect(fix('spread.kay')[0]![0]).toBe(false)
-      expect(fix('pinned.kay')).toEqual([[true, [{ start: 4, end: 10, text: 'island' }]]])
+      // An explicit `--- static` is the author's decision: the fix is offered, `--fix` leaves it.
+      expect(fix('pinned.kay')).toEqual([[false, [{ start: 4, end: 10, text: 'island' }]]])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -148,8 +149,8 @@ describe('island-prop and promoted-island, decided by the types of what is passe
       await applySafeFixes(root, await check(root))
 
       expect(await Bun.file(join(root, 'src/components/callback.kay')).text()).toStartWith('--- island\nimport Island')
-      expect(await Bun.file(join(root, 'src/components/pinned.kay')).text()).toStartWith('--- island\nimport Island')
-      expect(lints(await check(root), root).map(([file]) => file)).toEqual(['components/fields.kay', 'components/instance.kay', 'components/spread.kay', 'components/union.kay', 'routes/_layout.kay', 'routes/index.kay'])
+      expect(await Bun.file(join(root, 'src/components/pinned.kay')).text()).toStartWith('--- static\nimport Island')
+      expect(lints(await check(root), root).map(([file]) => file)).toEqual(['components/fields.kay', 'components/instance.kay', 'components/pinned.kay', 'components/spread.kay', 'components/union.kay', 'routes/_layout.kay', 'routes/index.kay'])
     }
     finally {
       await rm(root, { recursive: true, force: true })

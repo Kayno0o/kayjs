@@ -966,7 +966,7 @@ describe.concurrent('kay check, edge cases', () => {
     try {
       const found = (await check(root)).filter(d => d.code === 'promoted-island')
 
-      expect(found.map(d => [d.file.slice(root.length + 1), d.message.slice(0, 38)])).toEqual([['src/components/parent.kay', 'This component renders as an island wh']])
+      expect(found.map(d => [d.file.slice(root.length + 1), d.message.slice(0, 38)])).toEqual([['src/components/parent.kay', 'This component passes an island a valu']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
